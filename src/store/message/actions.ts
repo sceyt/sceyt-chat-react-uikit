@@ -1,0 +1,315 @@
+import {
+  ADD_ATTACHMENTS,
+  ADD_MESSAGE,
+  DELETE_MESSAGE,
+  ADD_MESSAGES,
+  ADD_REACTION,
+  ADD_REACTION_TO_MESSAGE,
+  CLEAR_MESSAGES,
+  DELETE_REACTION,
+  DELETE_REACTION_FROM_MESSAGE,
+  EDIT_MESSAGE,
+  EMPTY_CHANNEL_ATTACHMENTS,
+  GET_MESSAGES,
+  GET_MESSAGES_ATTACHMENTS,
+  LOAD_MORE_MESSAGES,
+  LOAD_MORE_MESSAGES_ATTACHMENTS,
+  SEND_MESSAGE,
+  SET_ATTACHMENTS,
+  SET_ATTACHMENTS_COMPLETE,
+  SET_MESSAGES,
+  SET_MESSAGES_LOADING_STATE,
+  UPDATE_MESSAGE,
+  UPDATE_MESSAGES_STATUS,
+  UPLOAD_ATTACHMENT_COMPILATION,
+  SET_MESSAGE_TO_EDIT,
+  SET_SCROLL_TO_NEW_MESSAGE,
+  SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON,
+  SET_SEND_MESSAGE_INPUT_HEIGHT,
+  RESEND_MESSAGE,
+  SET_MESSAGE_FOR_REPLY,
+  SEND_TEXT_MESSAGE,
+  SET_MESSAGES_HAS_NEXT,
+  SET_HAS_PREV_MESSAGES,
+  SET_SCROLL_TO_MESSAGE,
+  PAUSE_ATTACHMENT_UPLOADING,
+  RESUME_ATTACHMENT_UPLOADING
+} from './constants'
+import { IChannel, IMessage, IReaction } from '../../types'
+
+export function sendMessageAC(
+  message: any,
+  channelId: string,
+  connectionState: string,
+  sendAttachmentsAsSeparateMessage?: boolean
+) {
+  return {
+    type: SEND_MESSAGE,
+    payload: { message, channelId, connectionState, sendAttachmentsAsSeparateMessage }
+  }
+}
+export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
+  return {
+    type: SEND_TEXT_MESSAGE,
+    payload: { message, channelId, connectionState }
+  }
+}
+
+export function resendMessageAC(channelId: string, message: any) {
+  return {
+    type: RESEND_MESSAGE,
+    payload: { channelId, message }
+  }
+}
+
+export function deleteMessageAC(channelId: string, messageId: string, deleteOption: 'forMe' | 'forEveryone') {
+  return {
+    type: DELETE_MESSAGE,
+    payload: { channelId, messageId, deleteOption }
+  }
+}
+
+export function editMessageAC(channelId: string, message: IMessage) {
+  return {
+    type: EDIT_MESSAGE,
+    payload: { channelId, message }
+  }
+}
+
+export function setMessageToEditAC(message: IMessage | null) {
+  return {
+    type: SET_MESSAGE_TO_EDIT,
+    payload: { message }
+  }
+}
+
+export function getMessagesAC(channel: IChannel, loadWithLastMessage?: boolean, messageId?: string, limit?: number) {
+  return {
+    type: GET_MESSAGES,
+    payload: { channel, loadWithLastMessage, messageId, limit }
+  }
+}
+
+export function setScrollToMessagesAC(messageId: string | null) {
+  return {
+    type: SET_SCROLL_TO_MESSAGE,
+    payload: { messageId }
+  }
+}
+
+export function setMessagesLoadingStateAC(state: number) {
+  return {
+    type: SET_MESSAGES_LOADING_STATE,
+    payload: { state }
+  }
+}
+
+export function addMessagesAC(messages: any, direction: string) {
+  return {
+    type: ADD_MESSAGES,
+    payload: { messages, direction }
+  }
+}
+
+export function setMessagesAC(messages: any) {
+  return {
+    type: SET_MESSAGES,
+    payload: { messages }
+  }
+}
+
+export function addReactionAC(
+  channelId: string,
+  messageId: string,
+  key: string,
+  score: number,
+  reason: string,
+  enforceUnique: boolean
+) {
+  return {
+    type: ADD_REACTION,
+    payload: {
+      channelId,
+      messageId,
+      key,
+      score,
+      reason,
+      enforceUnique
+    }
+  }
+}
+
+export function deleteReactionAC(channelId: string, messageId: string, key: string) {
+  return {
+    type: DELETE_REACTION,
+    payload: {
+      channelId,
+      messageId,
+      key
+    }
+  }
+}
+
+export function addReactionToMessageAC(message: IMessage, reaction: IReaction, isSelf: boolean) {
+  return {
+    type: ADD_REACTION_TO_MESSAGE,
+    payload: { message, reaction, isSelf }
+  }
+}
+
+export function deleteReactionFromMessageAC(message: IMessage, reaction: IReaction, isSelf: boolean) {
+  return {
+    type: DELETE_REACTION_FROM_MESSAGE,
+    payload: { message, reaction, isSelf }
+  }
+}
+
+export function updateAttachmentUploadingStateAC(attachmentUploadingState: string, attachment?: any) {
+  return {
+    type: UPLOAD_ATTACHMENT_COMPILATION,
+    payload: {
+      attachmentUploadingState,
+      attachment
+    }
+  }
+}
+
+export function emptyChannelAttachmentsAC() {
+  return {
+    type: EMPTY_CHANNEL_ATTACHMENTS
+  }
+}
+
+export function addMessageAC(message: IMessage) {
+  return {
+    type: ADD_MESSAGE,
+    payload: { message }
+  }
+}
+
+export function scrollToNewMessageAC(scrollToBottom: boolean, updateMessageList?: boolean) {
+  return {
+    type: SET_SCROLL_TO_NEW_MESSAGE,
+    payload: { scrollToBottom, updateMessageList }
+  }
+}
+
+export function showScrollToNewMessageButtonAC(state: boolean) {
+  return {
+    type: SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON,
+    payload: { state }
+  }
+}
+
+export function loadMoreMessagesAC(
+  channelId: string,
+  limit: number,
+  direction: string,
+  messageId: string,
+  hasNext: boolean
+) {
+  return {
+    type: LOAD_MORE_MESSAGES,
+    payload: { limit, direction, channelId, messageId, hasNext }
+  }
+}
+
+export function setMessagesHasPrevAC(hasPrev: boolean) {
+  return {
+    type: SET_HAS_PREV_MESSAGES,
+    payload: { hasPrev }
+  }
+}
+
+export function setMessagesHasNextAC(hasNext: boolean) {
+  return {
+    type: SET_MESSAGES_HAS_NEXT,
+    payload: { hasNext }
+  }
+}
+
+export function updateMessageAC(messageId: string, params: any) {
+  return {
+    type: UPDATE_MESSAGE,
+    payload: { messageId, params }
+  }
+}
+
+export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: boolean }) {
+  return {
+    type: UPDATE_MESSAGES_STATUS,
+    payload: {
+      name,
+      markersMap
+    }
+  }
+}
+
+export function clearMessagesAC() {
+  return {
+    type: CLEAR_MESSAGES
+  }
+}
+
+export function getAttachmentsAC(channelId: string, messageType: string) {
+  return {
+    type: GET_MESSAGES_ATTACHMENTS,
+    payload: { channelId, messageType }
+  }
+}
+
+export function setAttachmentsAC(messages: IMessage[], messageType: string) {
+  return {
+    type: SET_ATTACHMENTS,
+    payload: { messages, messageType }
+  }
+}
+
+export function loadMoreAttachmentsAC(messageType: string) {
+  return {
+    type: LOAD_MORE_MESSAGES_ATTACHMENTS,
+    payload: { messageType }
+  }
+}
+
+export function addAttachmentsAC(messages: IMessage[], messageType: string) {
+  return {
+    type: ADD_ATTACHMENTS,
+    payload: { messages, messageType }
+  }
+}
+
+export function setAttachmentsCompleteAC(hasPrev: boolean) {
+  return {
+    type: SET_ATTACHMENTS_COMPLETE,
+    payload: { hasPrev }
+  }
+}
+
+export function pauseAttachmentUploadingAC(attachmentId: string) {
+  return {
+    type: PAUSE_ATTACHMENT_UPLOADING,
+    payload: { attachmentId }
+  }
+}
+
+export function resumeAttachmentUploadingAC(attachmentId: string) {
+  return {
+    type: RESUME_ATTACHMENT_UPLOADING,
+    payload: { attachmentId }
+  }
+}
+
+export function setSendMessageInputHeightAC(height: number) {
+  return {
+    type: SET_SEND_MESSAGE_INPUT_HEIGHT,
+    payload: { height }
+  }
+}
+
+export function setMessageForReplyAC(message: IMessage | null) {
+  return {
+    type: SET_MESSAGE_FOR_REPLY,
+    payload: { message }
+  }
+}
