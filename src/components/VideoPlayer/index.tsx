@@ -121,12 +121,14 @@ const VideoPlayer = ({
       {!isPreview && loading && (
         <UploadProgress
           onClick={handlePauseResumeDownload}
-          isRepliedMessage
+          isRepliedMessage={isRepliedMessage}
           backgroundImage={`data:image/jpeg;base64,${file.metadata.thumbnail}`}
-          // borderRadius={borderRadius}
+          borderRadius={borderRadius}
         >
-          <UploadPercent isRepliedMessage>{downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}</UploadPercent>
-          {!downloadIsCancelled && <UploadingIcon isRepliedMessage className='rotate_cont' />}
+          <UploadPercent isRepliedMessage={isRepliedMessage}>
+            {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+          </UploadPercent>
+          {!downloadIsCancelled && <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />}
         </UploadProgress>
       )}
       <video
@@ -217,6 +219,11 @@ const Component = styled.div<{
   display: flex;
   flex-direction: column;
   align-items: center;
+  max-width: ${(props) => props.maxWidth || '100%'};
+  max-height: ${(props) => props.maxHeight || '100%'};
+  width: ${(props) => props.maxWidth};
+  height: ${(props) => props.maxHeight};
+
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
   background-color: transparent;
@@ -235,7 +242,7 @@ const Component = styled.div<{
         : `2px solid ${props.backgroundColor}`};
     object-fit: cover;
     box-sizing: border-box;
-    border-radius: ${(props) => (props.borderRadius || props.isRepliedMessage ? '4px' : '8px')};
+    border-radius: ${(props) => (props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px')};
   }
 
   &:hover {

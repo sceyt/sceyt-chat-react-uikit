@@ -552,7 +552,8 @@ export const UploadProgress = styled.div<{
   //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
   background-image: url(${(props) => props.backgroundImage});
   background-size: cover;
-  border-radius: ${(props) => props.borderRadius};
+  border-radius: ${(props) =>
+    props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
   z-index: 5;
 
   ${(props) => props.isFailedAttachment && 'background-color: rgba(237, 77, 96, 0.1);'}

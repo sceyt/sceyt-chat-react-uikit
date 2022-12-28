@@ -24,10 +24,10 @@ const PendingIconWrapper = styled(PendingIcon)`
   color: ${(props) => props.color || colors.gray4};
 `
 
-export const messageStatusIcon = (messageStatus: string, iconColor?: string) => {
+export const messageStatusIcon = (messageStatus: string, iconColor?: string, readIconColor?: string) => {
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
-      return <ReadIconWrapper />
+      return <ReadIconWrapper color={readIconColor} />
     case MESSAGE_DELIVERY_STATUS.DELIVERED:
       return <DeliveredIconWrapper color={iconColor} />
     case MESSAGE_DELIVERY_STATUS.SENT:

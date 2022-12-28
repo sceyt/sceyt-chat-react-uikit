@@ -337,7 +337,7 @@ const Messages: React.FC<MessagesProps> = ({
         } */
         // dispatch(loadMoreMessagesAC(10, 'next', channel.id))
 
-        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, 10)
+        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
         /* if (cachedMessages.next) {
           loading = true
           handleAddMessages([], 'next', true)
@@ -471,7 +471,7 @@ const Messages: React.FC<MessagesProps> = ({
       // setTimeout(() => {
       if (loadDirection !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
-        lastVisibleMessage && (scrollRef.current.scrollTop = lastVisibleMessage.offsetTop)
+        lastVisibleMessage && (scrollRef.current.scrollTop = lastVisibleMessage.offsetTop + 10)
       } else {
         if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
           scrollRef.current.scrollTop = -400

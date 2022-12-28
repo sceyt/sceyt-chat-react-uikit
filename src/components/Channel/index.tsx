@@ -153,6 +153,7 @@ const Channel: React.FC<IChannelProps> = ({
             channel.lastMessage.type !== 'system' &&
             messageStatusIcon(
               channel.lastMessage.deliveryStatus,
+              undefined,
               customColors && customColors.messageReadStatusTickColor
             )}
         </DeliveryIconCont>
