@@ -47,6 +47,7 @@ export function destroyChannelsMap() {
 
 export const query: any = {
   channelQuery: null,
+  channelQueryForward: null,
   blockedQuery: null,
   current: null,
   membersQuery: null,

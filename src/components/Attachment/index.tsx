@@ -613,7 +613,7 @@ export const AttachmentImg = styled.img<{
       ? '0.5px solid rgba(0, 0, 0, 0.1)'
       : props.withBorder && `2px solid ${props.backgroundColor}`};
   box-sizing: border-box;
-  max-width: 420px;
+  max-width: 100%;
   max-height: 400px;
   width: ${(props) => (props.isRepliedMessage ? '40px' : props.isPrevious ? '48px' : '')};
   height: ${(props) => (props.isRepliedMessage ? '40px' : props.isPrevious ? '48px' : '')};

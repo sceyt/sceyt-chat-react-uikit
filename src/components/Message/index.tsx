@@ -425,6 +425,7 @@ const Message = ({
           {!isThreadMessage && messageActionsShow && <MessageActionsCont />}
           {message.parent && message.parent.id && !isThreadMessage && (
             <ReplyMessageContainer
+              withAttachments={withAttachments}
               leftBorderColor={customColors.messageReadStatusTickColor}
               onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
             >
@@ -739,13 +740,12 @@ const MessageTime = styled.span`
   color: ${colors.gray6};
 `
 
-const ReplyMessageContainer = styled.div<{ leftBorderColor?: string }>`
+const ReplyMessageContainer = styled.div<{ leftBorderColor?: string; withAttachments?: boolean }>`
   display: flex;
   border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
   padding: 0 8px;
   position: relative;
-  margin-top: 6px;
-  margin-bottom: 8px;
+  margin: ${(props) => (props.withAttachments ? '8px 12px' : '8px 0')};
   cursor: pointer;
 `
 const ReplyMessageBody = styled.div`
