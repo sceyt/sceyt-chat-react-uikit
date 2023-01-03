@@ -7,25 +7,32 @@ import {
   GET_CHANNELS,
   REMOVE_CHANNEL,
   SET_ACTIVE_CHANNEL,
-  SET_ADDED_TO_CHANNEL, SET_CHANNEL_LIST_WIDTH,
+  SET_ADDED_TO_CHANNEL,
+  SET_CHANNEL_LIST_WIDTH,
   SET_CHANNEL_TO_ADD,
   SET_CHANNEL_TO_HIDE,
   SET_CHANNEL_TO_REMOVE,
   SET_CHANNEL_TO_UNHIDE,
-  SET_CHANNELS,
-  SET_CHANNELS_LOADING_STATE, SWITCH_TYPING_INDICATOR, TOGGLE_EDIT_CHANNEL,
+  SET_CHANNELS, SET_CHANNELS_FOR_FORWARD,
+  SET_CHANNELS_LOADING_STATE,
+  SWITCH_TYPING_INDICATOR,
+  TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
   UPDATE_CHANNEL_LAST_MESSAGE,
-  UPDATE_CHANNEL_LAST_MESSAGE_STATUS, UPDATE_USER_STATUS_ON_CHANNEL
+  UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
+  UPDATE_USER_STATUS_ON_CHANNEL
 } from "./constants";
 import { IAction, IChannel } from "../../types";
 import { CHANNEL_TYPE } from "../../helpers/constants";
 
 const initialState: {
   channelsLoadingState: string | null,
+  channelsForForwardLoadingState: string | null,
   usersLoadingState: string | null,
   channelsHasNext: boolean,
+  channelsForForwardHasNext: boolean,
   channels: IChannel[],
+  channelsForForward: IChannel[],
   activeChannel: IChannel | {},
   roles: [],
   users: [],
@@ -46,9 +53,12 @@ const initialState: {
   channelListWidth: number,
 } = {
   channelsLoadingState: null,
+  channelsForForwardLoadingState: null,
   usersLoadingState: null,
   channelsHasNext: true,
+  channelsForForwardHasNext: true,
   channels: [],
+  channelsForForward: [],
   activeChannel: {},
   roles: [],
   users: [],
@@ -82,6 +92,12 @@ export default (state = initialState, { type, payload }: IAction = { type: "" })
     }
     case SET_CHANNELS: {
       newState.channels = [...payload.channels];
+      return newState;
+    }
+
+    case SET_CHANNELS_FOR_FORWARD: {
+      console.log('set channels for forward . ... ');
+      newState.channelsForForward = [...payload.channels];
       return newState;
     }
 
@@ -139,12 +155,22 @@ export default (state = initialState, { type, payload }: IAction = { type: "" })
     }
 
     case SET_CHANNELS_LOADING_STATE: {
-      newState.channelsLoadingState = payload.state;
+      const { state, forForward} = payload
+      if (forForward) {
+        newState.channelsForForwardLoadingState = state;
+      } else {
+        newState.channelsLoadingState = state;
+      }
       return newState;
     }
 
     case CHANNELS_HAS_NEXT: {
-      newState.channelsHasNext = payload.bool;
+      const { hasNext, forForward} = payload
+      if (forForward) {
+        newState.channelsForForwardHasNext = hasNext;
+      } else {
+        newState.channelsHasNext = hasNext;
+      }
       return newState;
     }
 

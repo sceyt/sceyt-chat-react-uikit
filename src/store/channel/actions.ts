@@ -9,8 +9,10 @@ import {
   DELETE_CHANNEL,
   DESTROY_SESSION,
   GET_CHANNELS,
+  GET_CHANNELS_FOR_FORWARD,
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
+  LOAD_MORE_CHANNELS_FOR_FORWARD,
   MARK_CHANNEL_AS_READ,
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
@@ -25,6 +27,7 @@ import {
   SET_CHANNEL_TO_REMOVE,
   SET_CHANNEL_TO_UNHIDE,
   SET_CHANNELS,
+  SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
@@ -58,6 +61,20 @@ export function getChannelsAC(params: ChannelQueryParams, isJoinChannel?: boolea
 export function loadMoreChannels(limit?: number) {
   return {
     type: LOAD_MORE_CHANNEL,
+    payload: { limit }
+  }
+}
+
+export function getChannelsForForwardAC(searchValue?: string) {
+  return {
+    type: GET_CHANNELS_FOR_FORWARD,
+    payload: { searchValue }
+  }
+}
+
+export function loadMoreChannelsForForward(limit?: number) {
+  return {
+    type: LOAD_MORE_CHANNELS_FOR_FORWARD,
     payload: { limit }
   }
 }
@@ -141,17 +158,24 @@ export function setChannelsAC(channels: IChannel[]) {
   }
 }
 
-export function setChannelsLoadingStateAC(state: number) {
+export function setChannelsFroForwardAC(channels: IChannel[]) {
   return {
-    type: SET_CHANNELS_LOADING_STATE,
-    payload: { state }
+    type: SET_CHANNELS_FOR_FORWARD,
+    payload: { channels }
   }
 }
 
-export function channelHasNextAC(bool: boolean) {
+export function setChannelsLoadingStateAC(state: number, forForward?: boolean) {
+  return {
+    type: SET_CHANNELS_LOADING_STATE,
+    payload: { state, forForward }
+  }
+}
+
+export function channelHasNextAC(hasNext: boolean, forForward?: boolean) {
   return {
     type: CHANNELS_HAS_NEXT,
-    payload: { bool }
+    payload: { hasNext, forForward }
   }
 }
 

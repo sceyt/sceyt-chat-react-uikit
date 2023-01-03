@@ -6,6 +6,7 @@ import {
   removeChannelAC,
   setActiveChannelAC,
   setChannelsAC,
+  setChannelsFroForwardAC,
   setChannelsLoadingStateAC,
   switchChannelActionAC,
   switchTypingIndicatorAC,
@@ -18,6 +19,7 @@ import {
   CREATE_CHANNEL,
   DELETE_CHANNEL,
   GET_CHANNELS,
+  GET_CHANNELS_FOR_FORWARD,
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
   MARK_CHANNEL_AS_READ,
@@ -164,6 +166,35 @@ function* getChannels(action: IAction): any {
     }
 
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+  } catch (e) {
+    console.log(e, 'Error on get channels')
+    if (e.code !== 10008) {
+      // yield put(setErrorNotification(e.message));
+    }
+  }
+}
+
+function* getChannelsForForward(action: IAction): any {
+  try {
+    const { payload } = action
+    const { searchValue } = payload
+    console.log('searchValue. . ', searchValue)
+    const SceytChatClient = getClient()
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
+
+    const channelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+
+    channelQueryBuilder.sortByLastMessage()
+    channelQueryBuilder.limit(20)
+    const channelQuery = yield call(channelQueryBuilder.build)
+    const channelsData = yield call(channelQuery.loadNextPage)
+    console.log('channels data ... ', channelsData)
+    yield put(channelHasNextAC(channelsData.hasNext, true))
+    const mappedChannels = JSON.parse(JSON.stringify(channelsData.channels))
+    yield put(setChannelsFroForwardAC(mappedChannels))
+    query.channelQueryForward = channelQuery
+
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
   } catch (e) {
     console.log(e, 'Error on get channels')
     if (e.code !== 10008) {
@@ -488,6 +519,7 @@ function* watchForChannelEvents() {
 export default function* ChannelsSaga() {
   yield takeLatest(CREATE_CHANNEL, createChannel)
   yield takeLatest(GET_CHANNELS, getChannels)
+  yield takeLatest(GET_CHANNELS_FOR_FORWARD, getChannelsForForward)
   yield takeLatest(LOAD_MORE_CHANNEL, channelsLoadMore)
   yield takeEvery(SWITCH_CHANNEL, switchChannel)
   yield takeLatest(LEAVE_CHANNEL, leaveChannel)

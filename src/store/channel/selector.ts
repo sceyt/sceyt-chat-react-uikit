@@ -1,4 +1,5 @@
 export const channelsSelector = (store: any) => store.ChannelReducer.channels
+export const channelsForForwardSelector = (store: any) => store.ChannelReducer.channelsForForward
 export const deletedChannelSelector = (store: any) => store.ChannelReducer.deletedChannel
 export const addedChannelSelector = (store: any) => store.ChannelReducer.addedChannel
 export const addedToChannelSelector = (store: any) => store.ChannelReducer.addedToChannel

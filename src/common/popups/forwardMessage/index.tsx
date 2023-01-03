@@ -1,13 +1,12 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { Popup, PopupContainer, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
-import { getChannelsAC } from '../../../store/channel/actions'
+import { getChannelsForForwardAC } from '../../../store/channel/actions'
 import { useDispatch, useSelector } from 'react-redux'
-import { channelsSelector, searchValueSelector } from '../../../store/channel/selector'
+import { channelsForForwardSelector, searchValueSelector } from '../../../store/channel/selector'
 import { IChannel } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
-import { getContactsAC } from '../../../store/user/actions'
 
 interface IProps {
   title: string
@@ -19,7 +18,8 @@ interface IProps {
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
   const dispatch = useDispatch()
-  const channels = useSelector(channelsSelector) || []
+  const channels = useSelector(channelsForForwardSelector) || []
+  console.log('channels on component s... ', channels)
   const searchValue = useSelector(searchValueSelector) || ''
   const [channelIds, setChannelIds] = useState<string[]>([])
 
@@ -36,13 +36,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleSearchValueChange = (e: any) => {
     const { value } = e.target
-    dispatch(getChannelsAC({ search: value }))
+    dispatch(getChannelsForForwardAC(value))
   }
 
   const getMyChannels = () => {
-    dispatch(getContactsAC())
-    dispatch(getChannelsAC({ search: '' }))
+    dispatch(getChannelsForForwardAC())
   }
+
+  useEffect(() => {
+    dispatch(getChannelsForForwardAC())
+  }, [])
   return (
     <PopupContainer>
       <Popup maxWidth='460px' minWidth='460px' isLoading={loading} padding='0'>

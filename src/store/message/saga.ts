@@ -89,7 +89,16 @@ function* sendMessage(action: IAction): any {
         if (fileType === 'video') {
           thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
         }
-        messageAttachment.metadata = { ...messageAttachment.metadata, ...thumbnailMetas }
+        messageAttachment.metadata = {
+          ...messageAttachment.metadata,
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+              thumbnail: thumbnailMetas.thumbnail,
+              width: thumbnailMetas.imageWidth,
+              height: thumbnailMetas.imageHeight,
+              ...(thumbnailMetas.duration && { duration: thumbnailMetas.duration })
+            })
+        }
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder
           .setBody(message.body)
@@ -144,6 +153,7 @@ function* sendMessage(action: IAction): any {
           const uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
           yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment))
           let fileSize = messageAttachment.size
+          let imgAttachmentMeta
           if (fileType === 'image') {
             fileSize = yield call(getImageSize, filePath)
             thumbnailMetas = yield call(
@@ -153,21 +163,22 @@ function* sendMessage(action: IAction): any {
               messageAttachment.type === 'file' ? 50 : undefined,
               messageAttachment.type === 'file' ? 50 : undefined
             )
+            imgAttachmentMeta = JSON.stringify({
+              ...messageAttachment.metadata,
+              ...(thumbnailMetas &&
+                thumbnailMetas.thumbnail && {
+                  thumbnail: thumbnailMetas.thumbnail,
+                  width: thumbnailMetas.imageWidth,
+                  height: thumbnailMetas.imageHeight,
+                  ...(thumbnailMetas.duration && { duration: thumbnailMetas.duration })
+                })
+            })
           }
 
-          const attachmentMeta = JSON.stringify({
-            ...messageAttachment.metadata,
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                thumbnail: thumbnailMetas.thumbnail,
-                width: thumbnailMetas.imageWidth,
-                height: thumbnailMetas.imageHeight
-              })
-          })
           const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
           const attachmentToSend = attachmentBuilder
             .setName(messageAttachment.name)
-            .setMetadata(attachmentMeta)
+            .setMetadata(imgAttachmentMeta || JSON.stringify({ ...messageAttachment.metadata }))
             .setFileSize(fileSize)
             .setUpload(false)
             .create()
