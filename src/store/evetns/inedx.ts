@@ -34,14 +34,19 @@ import {
   // addAllMessages,
   addMessageToMap,
   checkChannelExistsOnMessagesMap,
+  getHasNextCached,
   getMessagesFromMap,
   MESSAGE_LOAD_DIRECTION,
+  removeAllMessages,
+  removeMessagesFromMap,
   updateMarkersOnAllMessages,
+  updateMessageOnAllMessages,
   // MESSAGE_LOAD_DIRECTION,
   updateMessageOnMap,
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { setNotification } from '../../helpers/notifications'
+
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
   const channelListener = new (SceytChatClient.ChannelListener as any)()
@@ -270,6 +275,13 @@ export default function* watchForEvents(): any {
           channel
         }
       })
+    channelListener.onDeletedAllMessages = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.CLEAR_HISTORY,
+        args: {
+          channel
+        }
+      })
     channelListener.onMembersRoleChanged = (channel: IChannel, members: IUser[]) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANGE_ROLE,
@@ -377,7 +389,6 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
         const { channel, removedMembers } = args
         console.log('channel KICK_MEMBERS ... ', removedMembers)
-        console.log('channel  ... ', channel)
         const activeChannelId = yield call(getActiveChannelId)
 
         if (removedMembers[0].id === SceytChatClient.chatClient.user.id) {
@@ -473,7 +484,9 @@ export default function* watchForEvents(): any {
             yield put(updateMessageAC(message.parent.id, { replyCount: parentMessage.replyCount }));
             yield put(updateMessageForThreadReply({ replyCount: parentMessage.replyCount }));
           } else { */
-          yield put(addMessageAC(message))
+          if (!getHasNextCached()) {
+            yield put(addMessageAC(message))
+          }
           addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
           // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
           // }
@@ -487,9 +500,11 @@ export default function* watchForEvents(): any {
 
         yield put(updateChannelDataAC(channel.id, { ...channelForAdd }))
         if (message.user.id !== SceytChatClient.chatClient.user.id) {
-          const notificationStatus = yield call(Notification.requestPermission)
-          if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
-            setNotification(message.body, message.user)
+          if (Notification.permission === 'granted') {
+            const notificationStatus = yield call(Notification.requestPermission)
+            if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
+              setNotification(message.body, message.user)
+            }
           }
           if (message.repliedInThread && message.parent.id) {
             yield put(markMessagesAsDeliveredAC(message.parent.id, [message.id]))
@@ -563,19 +578,19 @@ export default function* watchForEvents(): any {
       } */
       case CHANNEL_EVENT_TYPES.START_TYPING: {
         const { channel, from } = args
-        const activeChannelId = yield call(getActiveChannelId)
-        if (activeChannelId === channel.id) {
-          yield put(switchTypingIndicatorAC(true, from))
-        }
+        // const activeChannelId = yield call(getActiveChannelId)
+        // if (activeChannelId === channel.id) {
+        yield put(switchTypingIndicatorAC(true, channel.id, from))
+        // }
         break
       }
       case CHANNEL_EVENT_TYPES.STOP_TYPING: {
         const { channel, from } = args
-        const activeChannelId = yield call(getActiveChannelId)
+        // const activeChannelId = yield call(getActiveChannelId)
 
-        if (activeChannelId === channel.id) {
-          yield put(switchTypingIndicatorAC(false, from))
-        }
+        // if (activeChannelId === channel.id) {
+        yield put(switchTypingIndicatorAC(false, channel.id, from))
+        // }
         break
       }
       case CHANNEL_EVENT_TYPES.DELETE: {
@@ -601,7 +616,9 @@ export default function* watchForEvents(): any {
         const activeChannelId = getActiveChannelId()
         console.log('channel DELETE_MESSAGE ... ')
         const channelExists = checkChannelExists(channel.id)
+
         if (channel.id === activeChannelId) {
+          updateMessageOnAllMessages(deletedMessage.id, deletedMessage)
           yield put(updateMessageAC(deletedMessage.id, deletedMessage))
         }
         updateMessageOnMap(channel.id, {
@@ -686,12 +703,13 @@ export default function* watchForEvents(): any {
 
       case CHANNEL_EVENT_TYPES.CLEAR_HISTORY: {
         const { channel } = args
-        console.log('channel CLEAR_HISTORY ... ')
         const activeChannelId = yield call(getActiveChannelId)
         const channelExist = yield call(checkChannelExists, channel.id)
         if (channel.id === activeChannelId) {
           yield put(clearMessagesAC())
+          removeAllMessages()
         }
+        removeMessagesFromMap(channel.id)
         if (channelExist) {
           yield put(updateChannelLastMessageAC({}, channel))
         }

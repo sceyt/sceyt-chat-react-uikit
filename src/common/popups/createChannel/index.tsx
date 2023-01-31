@@ -29,9 +29,10 @@ import { AvatarWrapper } from '../../../components/Channel'
 interface ICreateChannelPopup {
   handleClose: () => void
   channelType: string
+  uriPrefixOnCreateChannel?: string
 }
 
-export default function CreateChannel({ handleClose, channelType }: ICreateChannelPopup) {
+export default function CreateChannel({ handleClose, channelType, uriPrefixOnCreateChannel }: ICreateChannelPopup) {
   const dispatch = useDispatch()
   const uriRegexp = new RegExp('^[A-Za-z0-9_]*$')
   const fileUploader = useRef<any>(null)
@@ -90,7 +91,7 @@ export default function CreateChannel({ handleClose, channelType }: ICreateChann
     const createChannelParams = {
       subject: subjectValue,
       metadata: { d: metadataValue },
-      uri: `waafi.com/${URIValue}`,
+      uri: URIValue,
       members: members,
       type: channelType === 'private' ? CHANNEL_TYPE.PRIVATE : CHANNEL_TYPE.PUBLIC,
       avatarFile: newAvatar.src.file
@@ -99,7 +100,8 @@ export default function CreateChannel({ handleClose, channelType }: ICreateChann
       dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()
     } else if (!createPrivateChannel) {
-      dispatch(createChannelAC(createChannelParams))
+      const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
+      dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
       toggleCreateGroupChannelPopup()
     }
   }
@@ -239,7 +241,7 @@ export default function CreateChannel({ handleClose, channelType }: ICreateChann
                 <React.Fragment>
                   <Label>URL</Label>
                   <UriInputWrapper>
-                    <UriPrefix>waafi.com/</UriPrefix>
+                    <UriPrefix>{uriPrefixOnCreateChannel}</UriPrefix>
                     <CustomInput
                       type='text'
                       value={URIValue}
@@ -272,7 +274,7 @@ export default function CreateChannel({ handleClose, channelType }: ICreateChann
               </button> */}
               <Button
                 type='button'
-                backgroundColor={colors.green1}
+                backgroundColor={colors.primary}
                 borderRadius='8px'
                 onClick={() => GoToAddMember()}
                 disabled={!subjectValue || (!createPrivateChannel && (!URIValue || !!wrongUri))}

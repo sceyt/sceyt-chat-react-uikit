@@ -10,9 +10,10 @@ import { IAttachment, IContact, IMessage, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
+import { getCustomDownloader } from './customUploader'
 
 const ReadIconWrapper = styled(ReadIcon)`
-  color: ${(props) => props.color || colors.green1};
+  color: ${(props) => props.color || colors.primary};
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
   color: ${(props) => props.color || colors.gray4};
@@ -24,10 +25,10 @@ const PendingIconWrapper = styled(PendingIcon)`
   color: ${(props) => props.color || colors.gray4};
 `
 
-export const messageStatusIcon = (messageStatus: string, iconColor?: string) => {
+export const messageStatusIcon = (messageStatus: string, iconColor?: string, readIconColor?: string) => {
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
-      return <ReadIconWrapper />
+      return <ReadIconWrapper color={readIconColor} />
     case MESSAGE_DELIVERY_STATUS.DELIVERED:
       return <DeliveredIconWrapper color={iconColor} />
     case MESSAGE_DELIVERY_STATUS.SENT:
@@ -67,7 +68,7 @@ export const MessageTextFormatForEdit = ({ text, message }: { text: string; mess
 }
 
 // eslint-disable-next-line
-const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
+export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
 export const MessageTextFormat = ({ text, message }: { text: string; message: any }) => {
   const messageText = [text]
@@ -162,14 +163,24 @@ export const doesTextHasLink = (text: string) => {
   return links
 }
 
-export const makeUserName = (contact?: IContact, user?: IUser) => {
-  return contact
-    ? contact.firstName
-      ? `${contact.firstName} ${contact.lastName}`
-      : contact.id
+export const makeUserName = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
+  return fromContact
+    ? contact
+      ? contact.firstName
+        ? `${contact.firstName} ${contact.lastName}`
+        : contact.id
+      : user
+      ? user.id || 'Deleted user'
+      : ''
     : user
-    ? user.id
-    : 'Deleted user'
+    ? user.firstName
+      ? `${user.firstName} ${user.lastName}`
+      : user.id || 'Deleted user'
+    : ''
+}
+
+export const systemMessageUserName = (contact: IContact, userId: string) => {
+  return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
 }
 
 export const getLinkTitle = (link: string) => {
@@ -201,9 +212,31 @@ export const getAttachmentsAndLinksFromMessages = (messages: IMessage[], message
 }
 
 export const downloadFile = async (attachment: IAttachment) => {
-  const response = await fetch(attachment.url)
-  const data = await response.blob()
-  FileSaver.saveAs(data, attachment.name)
+  const customDownloader = getCustomDownloader()
+  let response
+  if (customDownloader) {
+    customDownloader(attachment.url).then(async (url) => {
+      response = await fetch(url)
+      const data = await response.blob()
+      FileSaver.saveAs(data, attachment.name)
+    })
+  } else {
+    response = await fetch(attachment.url)
+    const data = await response.blob()
+    FileSaver.saveAs(data, attachment.name)
+  }
+}
+
+export const calculateRenderedImageWidth = (width: number, height: number) => {
+  const maxWidth = 420
+  const maxHeight = 400
+  const minWidth = 130
+  const aspectRatio = width / height
+  if (aspectRatio >= maxWidth / maxHeight) {
+    return [Math.max(minWidth, Math.min(maxWidth, maxWidth)), Math.min(maxHeight, maxWidth / aspectRatio) + 2]
+  } else {
+    return [Math.min(maxWidth, maxHeight * aspectRatio), Math.min(maxHeight, maxHeight)]
+  }
 }
 
 export const lastMessageDateFormat = (date: Date) => {
@@ -277,4 +310,69 @@ export const checkArraysEqual = (arr1: any[], arr2: any[]) => {
     }
   }
   return true
+}
+
+export const getMetadataFromUrl = (url: string): Promise<any> => {
+  return fetch(url)
+    .then((response) => response.text())
+    .then((data) => {
+      // Extract metadata from the HTML
+      const parser = new DOMParser()
+      const doc = parser.parseFromString(data, 'text/html')
+      // @ts-ignore
+      const title = doc.querySelector('title').innerText
+
+      // Extract the description
+      // @ts-ignore
+      const description = (
+        doc.querySelector("meta[name='twitter:description']") ||
+        doc.querySelector("meta[property='og:description']") ||
+        doc.querySelector("meta[name='description']")
+      ).getAttribute('content')
+      let image = ''
+      // Extract the image
+      // @ts-ignore
+      const imageSrc = (
+        doc.querySelector("meta[name='twitter:image']") || doc.querySelector("meta[property='og:image']")
+      ).getAttribute('content')
+      if (!(imageSrc && imageSrc.startsWith('http'))) {
+        image = `${url.slice(0, -1)}${imageSrc}`
+      } else {
+        image = imageSrc
+      }
+      return { title, description, image }
+    })
+    .catch((error) => console.log(error))
+}
+
+export const formatAudioVideoTime = (duration: number, currentTime: number) => {
+  const minutes = Math.floor((duration - currentTime) / 60)
+  const seconds = Math.floor((duration - currentTime) % 60)
+  return `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`
+}
+
+// export const formatLargeText = (text: string, maxWidth: number, container: any) => {
+export const formatLargeText = (text: string, maxLength: number) => {
+  if (text.length > maxLength) {
+    const firstHalf = text.slice(0, maxLength / 2 - 3)
+    const secondHalf = text.slice(-(maxLength / 2 - 3))
+    return firstHalf + '...' + secondHalf
+  } else {
+    return text
+  }
+  /*  const containerWidth = maxWidth
+  const textWidth = container && container.querySelector('span').getBoundingClientRect().width
+  console.log('text width . ', textWidth)
+  console.log('containerWidth . ', containerWidth)
+  if (textWidth > containerWidth) {
+    const diff = containerWidth / textWidth
+    const symbolsRes = text.length * diff
+    console.log('text.length ... ', text.length)
+    console.log('symbolsRes ... ', symbolsRes)
+    const firstHalf = text.slice(0, text.length / 2 - 3)
+    const secondHalf = text.slice(-(symbolsRes / 2))
+    console.log('result .... ', firstHalf + '...' + secondHalf)
+    return firstHalf + '...' + secondHalf
+  }
+  return text */
 }

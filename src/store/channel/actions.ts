@@ -5,11 +5,14 @@ import {
   CHANNEL_INFO_OPEN_CLOSE,
   CHANNELS_HAS_NEXT,
   CHECK_USER_STATUS,
+  CLEAR_HISTORY,
   CREATE_CHANNEL,
+  DELETE_ALL_MESSAGES,
   DELETE_CHANNEL,
   DESTROY_SESSION,
   GET_CHANNELS,
   GET_CHANNELS_FOR_FORWARD,
+  JOIN_TO_CHANNEL,
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
   LOAD_MORE_CHANNELS_FOR_FORWARD,
@@ -18,6 +21,7 @@ import {
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
   REMOVE_CHANNEL,
+  REMOVE_CHANNEL_CACHES,
   SEND_TYPING,
   SET_ACTIVE_CHANNEL,
   SET_ADDED_TO_CHANNEL,
@@ -29,6 +33,8 @@ import {
   SET_CHANNELS,
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
+  SET_DRAGGED_ATTACHMENTS,
+  SET_IS_DRAGGING,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
@@ -112,6 +118,13 @@ export function blockChannelAC(channelId: string) {
 export function removeChannelAC(channelId: string) {
   return {
     type: REMOVE_CHANNEL,
+    payload: { channelId }
+  }
+}
+
+export function removeChannelCachesAC(channelId: string) {
+  return {
+    type: REMOVE_CHANNEL_CACHES,
     payload: { channelId }
   }
 }
@@ -254,10 +267,10 @@ export function sendTypingAC(state: boolean) {
   }
 }
 
-export function switchTypingIndicatorAC(typingState: boolean, from?: IUser) {
+export function switchTypingIndicatorAC(typingState: boolean, channelId: string, from?: IUser) {
   return {
     type: SWITCH_TYPING_INDICATOR,
-    payload: { typingState, from }
+    payload: { typingState, from, channelId }
   }
 }
 
@@ -336,6 +349,52 @@ export function setChannelListWithAC(width: number) {
     type: SET_CHANNEL_LIST_WIDTH,
     payload: {
       width
+    }
+  }
+}
+
+export function clearHistoryAC(channelId: string) {
+  return {
+    type: CLEAR_HISTORY,
+    payload: {
+      channelId
+    }
+  }
+}
+
+export function deleteAllMessagesAC(channelId: string) {
+  return {
+    type: DELETE_ALL_MESSAGES,
+    payload: {
+      channelId
+    }
+  }
+}
+
+export function joinChannelAC(channelId: string) {
+  return {
+    type: JOIN_TO_CHANNEL,
+    payload: {
+      channelId
+    }
+  }
+}
+
+export function setIsDragging(isDragging: boolean) {
+  return {
+    type: SET_IS_DRAGGING,
+    payload: {
+      isDragging
+    }
+  }
+}
+
+export function setDraggedAttachments(attachments: File[], type: string) {
+  return {
+    type: SET_DRAGGED_ATTACHMENTS,
+    payload: {
+      attachments,
+      type
     }
   }
 }

@@ -1,7 +1,6 @@
 export interface ICustomColors {
   selectedChannelBackground?: string,
   selectedChannelLeftBorder?: string,
-  messageReadStatusTickColor?: string,
 }
 
 export type ICustomAvatarColors = [string, string, string, string, string, string]

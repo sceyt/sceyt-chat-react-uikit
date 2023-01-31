@@ -12,6 +12,8 @@ export type IAttachmentMeta = { thumbnail?: string; imageWidth?: number; imageHe
 type messagesMap = {
   [key: string]: IMessage[]
 }
+
+const pendingAttachments: { [key: string]: File } = {}
 let messagesMap: messagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
 let prevCached: boolean = false
@@ -51,6 +53,10 @@ export const updateMarkersOnAllMessages = (markersMap: any, name: string) => {
 
 export const getAllMessages = () => [...activeChannelAllMessages]
 
+export const removeAllMessages = () => {
+  activeChannelAllMessages = []
+}
+
 export const setHasPrevCached = (state: boolean) => (prevCached = state)
 export const getHasPrevCached = () => prevCached
 
@@ -65,20 +71,23 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
   } else {
     const fromMessageIndex = activeChannelAllMessages.findIndex((mes) => mes.id === messageId)
 
-    if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-      messagesForAdd = activeChannelAllMessages.slice(
-        fromMessageIndex <= LOAD_MAX_MESSAGE_COUNT ? 0 : fromMessageIndex - (LOAD_MAX_MESSAGE_COUNT + 1),
-        fromMessageIndex - 1
-      )
-      setHasPrevCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT || fromMessageIndex === 0))
-      setHasNextCached(true)
+    if (fromMessageIndex !== 0) {
+      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+        const sliceFromIndex =
+          fromMessageIndex <= LOAD_MAX_MESSAGE_COUNT ? 0 : fromMessageIndex - (LOAD_MAX_MESSAGE_COUNT + 1)
+        messagesForAdd = activeChannelAllMessages.slice(sliceFromIndex, fromMessageIndex - 1)
+        setHasPrevCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT || sliceFromIndex === 0))
+        setHasNextCached(true)
+      } else {
+        messagesForAdd = activeChannelAllMessages.slice(
+          fromMessageIndex + 1,
+          fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
+        )
+        setHasPrevCached(true)
+        setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))
+      }
     } else {
-      messagesForAdd = activeChannelAllMessages.slice(
-        fromMessageIndex + 1,
-        fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-      )
-      setHasPrevCached(true)
-      setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))
+      setHasPrevCached(false)
     }
   }
 
@@ -93,7 +102,11 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   if (messagesMap[channelId] && messagesMap[channelId].length >= MESSAGES_MAX_LENGTH) {
     messagesMap[channelId].shift()
   }
-  messagesMap[channelId].push(message)
+  if (messagesMap[channelId]) {
+    messagesMap[channelId].push(message)
+  } else {
+    messagesMap[channelId] = [message]
+  }
 }
 
 export function addMessagesToMap(channelId: string, messages: IMessage[], direction: 'next' | 'prev') {
@@ -211,3 +224,11 @@ export const getVideoThumb = (attachmentId: string): IAttachmentMeta => {
 export const deleteVideoThumb = (attachmentId: string) => {
   delete pendingVideoAttachmentsThumbs[attachmentId]
 }
+
+export const setPendingAttachment = (attachmentId: string, file: File) => {
+  pendingAttachments[attachmentId] = file
+}
+
+export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
+
+export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]

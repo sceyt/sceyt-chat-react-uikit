@@ -14,6 +14,7 @@ export function resizeImage(file: any, maxWidth?: number, maxHeight?: number, qu
     // const resizedFiles: any[] = []
     // files.forEach((file: File, index) => {
     const blobURL = URL.createObjectURL(file)
+    console.log('blob url .. ', blobURL)
     const img = new Image()
     img.src = blobURL
     img.onerror = function () {
@@ -52,7 +53,6 @@ export function resizeImage(file: any, maxWidth?: number, maxHeight?: number, qu
 }
 export function getFileSize(url: string) {
   const file = new File([url], '')
-  console.log('file ..... ', file)
   return file.size
 }
 export function createFileImageThumbnail(file: any) {

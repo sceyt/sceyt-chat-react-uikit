@@ -15,6 +15,8 @@ import {
   SET_CHANNEL_TO_UNHIDE,
   SET_CHANNELS, SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
+  SET_DRAGGED_ATTACHMENTS,
+  SET_IS_DRAGGING,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
@@ -23,7 +25,7 @@ import {
   UPDATE_USER_STATUS_ON_CHANNEL
 } from "./constants";
 import { IAction, IChannel } from "../../types";
-import { CHANNEL_TYPE } from "../../helpers/constants";
+import { CHANNEL_TYPE} from "../../helpers/constants";
 
 const initialState: {
   channelsLoadingState: string | null,
@@ -38,10 +40,10 @@ const initialState: {
   users: [],
   errorNotification: string,
   notifications: [],
-  typingIndicator: {
+  typingIndicator: {[key: string]: {
     typingState: boolean,
     from: {},
-  },
+  }},
   searchValue: string,
   addedChannel: IChannel | null,
   addedToChannel: IChannel | null,
@@ -51,6 +53,8 @@ const initialState: {
   channelInfoIsOpen: boolean,
   channelEditMode: boolean,
   channelListWidth: number,
+  isDragging: boolean,
+  draggedAttachments: {attachment: File, type: 'media' | 'file'}[],
 } = {
   channelsLoadingState: null,
   channelsForForwardLoadingState: null,
@@ -64,10 +68,7 @@ const initialState: {
   users: [],
   errorNotification: "",
   notifications: [],
-  typingIndicator: {
-    typingState: false,
-    from: {}
-  },
+  typingIndicator: {},
   searchValue: "",
   addedChannel: null,
   addedToChannel: null,
@@ -77,6 +78,8 @@ const initialState: {
   channelInfoIsOpen: false,
   channelEditMode: false,
   channelListWidth: 0,
+  isDragging: false,
+  draggedAttachments: []
 };
 
 export default (state = initialState, { type, payload }: IAction = { type: "" }) => {
@@ -96,7 +99,6 @@ export default (state = initialState, { type, payload }: IAction = { type: "" })
     }
 
     case SET_CHANNELS_FOR_FORWARD: {
-      console.log('set channels for forward . ... ');
       newState.channelsForForward = [...payload.channels];
       return newState;
     }
@@ -261,8 +263,32 @@ export default (state = initialState, { type, payload }: IAction = { type: "" })
     }
 
     case SWITCH_TYPING_INDICATOR: {
-      const { typingState, from } = payload;
-      newState.typingIndicator = { typingState, from };
+      const { typingState, channelId, from } = payload;
+      if(typingState) {
+        newState.typingIndicator = {...newState.typingIndicator, ...{[channelId]: {from, typingState} }}
+      } else {
+        if(newState.typingIndicator[channelId]) {
+          const copyData = {...newState.typingIndicator}
+          delete copyData[channelId]
+          newState.typingIndicator = copyData
+        }
+      }
+      return newState;
+    }
+
+    case SET_IS_DRAGGING: {
+      const { isDragging } = payload;
+      newState.isDragging = isDragging
+      return newState;
+    }
+
+    case SET_DRAGGED_ATTACHMENTS: {
+      const { attachments, type } = payload;
+      if(attachments.length && attachments.length > 0) {
+        newState.draggedAttachments = attachments.map((attachment: any) => ({data: attachment.data, name: attachment.name, type: attachment.type, attachmentType: type}))
+      } else {
+        newState.draggedAttachments = []
+      }
       return newState;
     }
 

@@ -2,7 +2,7 @@ import {
   ADD_MEMBERS_TO_LIST,
   CLEAR_MEMBERS, GET_ROLES_SUCCESS,
   REMOVE_MEMBER_FROM_LIST,
-  SET_MEMBERS_LOADING_STATE,
+  SET_MEMBERS_LOADING_STATE, SET_MEMBERS_TO_LIST,
   UPDATE_MEMBERS
 } from "./constants";
 import { DESTROY_SESSION } from '../channel/constants'
@@ -26,6 +26,11 @@ export default (state = initialState, { type, payload }: IAction) => {
   let newState = { ...state }
 
   switch (type) {
+    case SET_MEMBERS_TO_LIST: {
+      const { members } = payload
+      newState.activeChannelMembers = [...members]
+      return newState
+    }
     case ADD_MEMBERS_TO_LIST: {
       const { members } = payload
       newState.activeChannelMembers = [

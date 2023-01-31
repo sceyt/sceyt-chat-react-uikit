@@ -1,5 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
+import { colors } from '../../UIHelper/constants'
 
 interface IProps {
   handleSwitch?: () => void
@@ -61,7 +62,7 @@ const Inner = styled.span<any>`
   &::before {
     content: '';
     padding-left: 10px;
-    background-color: ${(props) => props.backgroundColor || '#0dbd8b'};
+    background-color: ${(props) => props.backgroundColor || colors.primary};
     color: #fff;
   }
 

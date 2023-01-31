@@ -3,14 +3,23 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import moment from 'moment'
 // import { ReactComponent as ReactionIcon } from '../../assets/lib/svg/react2.svg'
-import { ReactComponent as DefaultAvatar } from '../../assets/svg/devaultAvatar32.svg'
-import { makeUserName, messageStatusIcon, MessageTextFormat } from '../../helpers'
+import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
+// import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
+// import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
+// import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
+import {
+  calculateRenderedImageWidth,
+  formatAudioVideoTime,
+  makeUserName,
+  messageStatusIcon,
+  MessageTextFormat
+} from '../../helpers'
 import { getClient } from '../../common/client'
 import MessageActions from './MessageActions'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import Avatar from '../Avatar'
 import { MessageOwner, MessageText } from '../../UIHelper'
-import { colors, customColors } from '../../UIHelper/constants'
+import { colors } from '../../UIHelper/constants'
 import Attachment from '../Attachment'
 import { IAttachment, IChannel, IContact, IMessage, IReaction } from '../../types'
 // import EmojisPopup from '../Emojis'
@@ -19,13 +28,18 @@ import {
   addReactionAC,
   deleteMessageAC,
   deleteReactionAC,
+  // resendMessageAC,
   setMessageForReplyAC,
   setMessageToEditAC
 } from '../../store/message/actions'
-import DeletePopup from '../../common/popups/delete'
+import ConfirmPopup from '../../common/popups/delete'
 import { markMessagesAsReadAC } from '../../store/channel/actions'
 import useOnScreen from '../../hooks/useOnScrean'
 import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+// import DropDown from '../../common/dropdown'
+// import { connectionStatusSelector } from '../../store/user/selector'
+// import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
   message: IMessage
@@ -51,9 +65,7 @@ interface IMessageProps {
   incomingMessageBackground?: string
   showOwnAvatar?: boolean
   showMessageStatus?: boolean
-  statusIconColor?: string
   hoverBackground?: boolean
-  senderNameColor?: string
   messageReaction?: boolean
   editMessage?: boolean
   replyMessage?: boolean
@@ -123,9 +135,7 @@ const Message = ({
   incomingMessageBackground = '',
   showOwnAvatar = false,
   showMessageStatus = true,
-  statusIconColor,
   hoverBackground = true,
-  senderNameColor,
   messageReaction = true,
   editMessage = true,
   replyMessage = true,
@@ -173,7 +183,9 @@ const Message = ({
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
+  const getFromContacts = getUserDisplayNameFromContact()
   // const [editMode, setEditMode] = useState(false)
+  // const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
@@ -193,7 +205,7 @@ const Message = ({
 
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    !(channel.type === 'Direct' && !showSenderNameOnDirectChannel) &&
+    !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
   // const selfReactionKeys = message.lastReactions.filter((reaction) => reaction.user.id === user.id);
   const borderRadius = !message.incoming
@@ -207,9 +219,10 @@ const Message = ({
     : nextMessageUserID !== messageUserID || lastMessageInInterval
     ? '4px 16px 16px 16px'
     : '4px 16px 16px 4px'
+
   const showMessageSenderName =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    !(channel.type === 'Direct' && !showSenderNameOnDirectChannel) &&
+    !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     (message.incoming || showSenderNameOnOwnMessages)
   /* const handleClick = (e: any) => {
     if (emojisRef.current && !emojisRef?.current?.contains(e.target)) {
@@ -256,6 +269,11 @@ const Message = ({
     dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
   }
 
+  /*  const handleDeleteFailedMessage = () => {
+    console.log('delete failed message .. ', message)
+    // dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
+  } */
+
   // TODO implement message action
   /* const handleReportMessage = (reportData) => {
     dispatch(reportMessageAC({
@@ -265,11 +283,18 @@ const Message = ({
       reportDescription: reportData.reportDescription,
     }));
   };
+*/
+  /* const handleResendMessage = () => {
+    const messageToResend = { ...message }
+    if (message.attachments && message.attachments.length) {
+      messageToResend.attachments = (message.attachments as IAttachment[]).map((att) => {
+        const pendingAttachment = getPendingAttachment(att.attachmentId!)
+        return { ...att, data: new File([pendingAttachment], att.data.name) }
+      })
+    }
 
-  const handleResendMessage = () => {
-    dispatch(resendMessage(channelId, message));
-  };
- */
+    dispatch(resendMessageAC(messageToResend, channel.id, connectionStatus))
+  } */
 
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     console.log('remove attachment .. ', attachmentId)
@@ -306,6 +331,7 @@ const Message = ({
       () => (
         <MessageActions
           messageFrom={message.user}
+          channelType={channel.type}
           editModeToggle={toggleEditMode}
           messageStatus={message.deliveryStatus || MESSAGE_DELIVERY_STATUS.PENDING}
           handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
@@ -351,7 +377,7 @@ const Message = ({
           reportIconTooltipText={reportIconTooltipText}
           messageActionIconsColor={messageActionIconsColor}
           messageActionIconsHoverColor={messageActionIconsHoverColor}
-          myRole={channel.myRole}
+          myRole={channel.role}
           isIncoming={message.incoming}
         />
       ),
@@ -361,12 +387,14 @@ const Message = ({
     <MessageHeaderCont>
       {showMessageSenderName && (
         <MessageOwner
-          withPadding={withAttachments}
+          withPadding={
+            withAttachments || (message.parent && message.parent.attachments && !!message.parent.attachments.length)
+          }
           messageBody={!!message.body}
-          color={senderNameColor}
+          color={colors.primary}
           rtlDirection={ownMessageOnRightSide && !message.incoming}
         >
-          {makeUserName(senderFromContact, message.user)}
+          {makeUserName(senderFromContact, message.user, getFromContacts)}
         </MessageOwner>
       )}
       {messageTimePosition === 'topOfMessage' && (
@@ -385,10 +413,12 @@ const Message = ({
     <MessageItem
       key={message.id || message.tid}
       rtl={ownMessageOnRightSide && !message.incoming}
+      withAvatar={renderAvatar}
       hoverBackground={hoverBackground ? (message.incoming ? incomingMessageBackground : ownMessageBackground) : ''}
       topMargin={(prevMessageUserID !== messageUserID || firstMessageInInterval) && !isPendingMessage}
       ref={messageItemRef}
       id={message.id}
+      className='MessageItem'
     >
       {renderAvatar && (
         <Avatar
@@ -397,7 +427,6 @@ const Message = ({
           size={32}
           textSize={14}
           setDefaultAvatar
-          defaultAvatarIcon={<DefaultAvatar />}
         />
       )}
       {/* <MessageBoby /> */}
@@ -405,15 +434,64 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={renderAvatar}
+        className='messageContent'
       >
+        {message.state === MESSAGE_STATUS.FAILED && (
+          <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
+            {/* <DropDown
+              // forceClose={showChooseAttachmentType}
+              position={nextMessage ? 'right' : 'topRight'}
+              trigger={<ErrorIconWrapper />}
+            >
+              <DropdownOptionsUl>
+                <DropdownOptionLi
+                  key={1}
+                  textColor={colors.gray6}
+                  hoverBackground={colors.gray5}
+                  onClick={() => handleResendMessage()}
+                  iconWidth='20px'
+                >
+                  <ResendIcon />
+                  Resend
+                </DropdownOptionLi>
+                <DropdownOptionLi
+                  key={2}
+                  textColor={colors.gray6}
+                  hoverBackground={colors.gray5}
+                  onClick={() => handleDeleteFailedMessage()}
+                  iconWidth='20px'
+                >
+                  <DeleteIconWrapper />
+                  Delete
+                </DropdownOptionLi>
+              </DropdownOptionsUl>
+            </DropDown> */}
+          </FailedMessageIcon>
+        )}
         {/* {withAttachments && !message.body && <MessageHeader />} */}
         <MessageBody
+          className='MessageBody'
           isSelfMessage={!message.incoming}
           ownMessageBackground={ownMessageBackground}
           incomingMessageBackground={incomingMessageBackground}
           borderRadius={borderRadius}
-          withAttachments={withAttachments}
-          attachmentWidth={withAttachments && message.attachments[0].metadata && message.attachments[0].metadata.width}
+          withAttachments={withAttachments && message.attachments[0].type !== attachmentTypes.link}
+          attachmentWidth={
+            withAttachments
+              ? message.attachments[0].type === attachmentTypes.image
+                ? message.attachments[0].metadata &&
+                  message.attachments[0].metadata.szw &&
+                  calculateRenderedImageWidth(
+                    message.attachments[0].metadata.szw,
+                    message.attachments[0].metadata.szh
+                  )[0]
+                : /*: message.attachments[0].type === attachmentTypes.link
+                ? 324 */
+                message.attachments[0].type === attachmentTypes.voice
+                ? 254
+                : undefined
+              : undefined
+          }
           noBody={!message.body && !withAttachments}
           onMouseEnter={() => setMessageActionsShow(true)}
           onMouseLeave={() => setMessageActionsShow(false)}
@@ -426,12 +504,14 @@ const Message = ({
           {message.parent && message.parent.id && !isThreadMessage && (
             <ReplyMessageContainer
               withAttachments={withAttachments}
-              leftBorderColor={customColors.messageReadStatusTickColor}
+              leftBorderColor={colors.primary}
               onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
             >
               {
                 message.parent.attachments &&
                   !!message.parent.attachments.length &&
+                  message.parent.attachments[0].type !== attachmentTypes.voice &&
+                  message.parent.attachments[0].type !== attachmentTypes.link &&
                   // <MessageAttachments>
                   (message.parent.attachments as any[]).map((attachment, index) => (
                     <Attachment
@@ -443,7 +523,6 @@ const Message = ({
                       selectedFileAttachmentsIcon={fileAttachmentsIcon}
                       isRepliedMessage
                       borderRadius={index === message.parent!.attachments.length - 1 ? borderRadius : '16px'}
-                      user={message.user}
                       selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                       selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                       selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
@@ -453,27 +532,38 @@ const Message = ({
               }
               <ReplyMessageBody>
                 <MessageOwner
-                  color={senderNameColor}
+                  color={colors.primary}
                   fontSize='12px'
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
                 >
                   {message.parent.user.id === user.id
                     ? 'You'
-                    : makeUserName(parentSenderFromContact, message.parent.user)}
+                    : makeUserName(parentSenderFromContact, message.parent.user, getFromContacts)}
                 </MessageOwner>
 
                 <MessageText fontSize='14px' lineHeight='16px' isRepliedMessage>
+                  {!!message.parent.attachments.length &&
+                    message.parent.attachments[0].type === attachmentTypes.voice && <VoiceIconWrapper />}
                   {message.parent.body
                     ? MessageTextFormat({
                         text: message.parent.body,
                         message: message.parent
                       })
-                    : message.parent.attachments[0].type === 'image'
-                    ? 'Photo'
-                    : message.parent.attachments[0].type === 'video'
-                    ? 'Video'
-                    : 'File'}
-                  {}
+                    : message.parent.attachments.length &&
+                      message.parent.attachments[0].type !== attachmentTypes.link &&
+                      (message.parent.attachments[0].type === attachmentTypes.image
+                        ? 'Photo'
+                        : message.parent.attachments[0].type === attachmentTypes.video
+                        ? 'Video'
+                        : message.parent.attachments[0].type === attachmentTypes.voice
+                        ? ' Voice Message '
+                        : 'File')}
+                  {!!message.parent.attachments.length &&
+                    message.parent.attachments[0].type === attachmentTypes.voice && (
+                      <VoiceDuration>
+                        {formatAudioVideoTime(message.parent.attachments[0].metadata.dur, 0)}
+                      </VoiceDuration>
+                    )}
                 </MessageText>
               </ReplyMessageBody>
             </ReplyMessageContainer>
@@ -506,35 +596,30 @@ const Message = ({
             ) : (
               ''
             )}
-            {!withAttachments && (
-              <MessageStatusAndTime
-                withAttachment={withAttachments}
-                fileAttachment={withAttachments && message.attachments[0].type === 'file'}
-              >
-                {message.state === MESSAGE_STATUS.EDIT ? (
-                  <MessageStatusUpdated color={withAttachments ? colors.white : ''}>edited</MessageStatusUpdated>
-                ) : (
-                  ''
-                )}
+            {!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link) ? (
+              <MessageStatusAndTime>
+                {message.state === MESSAGE_STATUS.EDIT ? <MessageStatusUpdated>edited</MessageStatusUpdated> : ''}
                 {messageTimePosition === 'onMessage' && (
                   <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
                 )}
                 {!message.incoming && showMessageStatus && message.state !== MESSAGE_STATUS.DELETE && (
-                  <MessageStatus iconColor={statusIconColor} lastMessage={!firstMessage}>
-                    {messageStatusIcon(message.deliveryStatus, withAttachments ? colors.white : '')}
+                  <MessageStatus iconColor={colors.primary} lastMessage={!firstMessage}>
+                    {messageStatusIcon(message.deliveryStatus)}
                   </MessageStatus>
                 )}
               </MessageStatusAndTime>
-            )}
+            ) : null}
           </MessageText>
           {/* )} */}
-          {withAttachments && (
+          {withAttachments && message.attachments[0].type !== attachmentTypes.link && (
             <MessageStatusAndTime
-              withAttachment={withAttachments}
-              fileAttachment={withAttachments && message.attachments[0].type === 'file'}
+              withAttachment
+              fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
             >
               {message.state === MESSAGE_STATUS.EDIT ? (
-                <MessageStatusUpdated color={withAttachments ? colors.white : ''}>edited</MessageStatusUpdated>
+                <MessageStatusUpdated color={message.attachments[0].type !== 'voice' ? colors.white : ''}>
+                  edited
+                </MessageStatusUpdated>
               ) : (
                 ''
               )}
@@ -546,7 +631,7 @@ const Message = ({
                 message.state !== MESSAGE_STATUS.DELETE &&
                 messageStatusIcon(
                   message.deliveryStatus,
-                  withAttachments && message.attachments[0].type !== 'file' ? colors.white : ''
+                  message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file' ? colors.white : ''
                 )}
             </MessageStatusAndTime>
           )}
@@ -571,7 +656,6 @@ const Message = ({
                   removeSelected={handleRemoveFailedAttachment}
                   attachments={message.attachments}
                   borderRadius={index === message.attachments.length - 1 ? borderRadius : '16px'}
-                  user={message.user}
                   selectedFileAttachmentsIcon={fileAttachmentsIcon}
                   backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
                   selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
@@ -615,12 +699,15 @@ const Message = ({
         )}
       </MessageContent>
       {deletePopupOpen && (
-        <DeletePopup
-          deleteFunction={handleDeleteMessage}
+        <ConfirmPopup
+          handleFunction={handleDeleteMessage}
           togglePopup={handleToggleDeleteMessagePopup}
           buttonText='Delete'
           description='Who do you want to remove this message for?'
           isDeleteMessage
+          isIncomingMessage={message.incoming}
+          myRole={channel.role}
+          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}
@@ -694,6 +781,18 @@ const ThreadMessageCountContainer = styled.div`
   cursor: pointer;
   position: relative;
 ` */
+const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
+  position: absolute;
+  bottom: 0;
+  left: ${(props) => !props.rtl && '-24px'};
+  right: ${(props) => props.rtl && '-24px'};
+  width: 20px;
+  height: 20px;
+`
+/* const ErrorIconWrapper = styled(ErrorIcon)`
+  width: 20px;
+  height: 20px;
+` */
 const ReactionsContainer = styled.div`
   display: flex;
   margin-top: 4px;
@@ -727,6 +826,12 @@ const EmojiContainer = styled.div<{ rtl: boolean }>`
     color: ${colors.gray7};
   }
  ` */
+
+/* const DeleteIconWrapper = styled(DeleteIcon)`
+  color: ${colors.red3};
+  width: 20px;
+  height: 20px;
+` */
 
 const MessageHeaderCont = styled.div`
   display: flex;
@@ -883,9 +988,10 @@ const MessageBody = styled.div<{
 `
 
 const MessageContent = styled.div<{ messageWidthPercent?: string | number; withAvatar?: boolean; rtl?: boolean }>`
+  position: relative;
   margin-left: 13px;
   margin-right: 13px;
-  transform: ${(props) => !props.withAvatar && (props.rtl ? 'translate(-32px,0)  ' : 'translate(32px,0)')};
+  //transform: ${(props) => !props.withAvatar && (props.rtl ? 'translate(-32px,0)  ' : 'translate(32px,0)')};
   max-width: ${(props) => (props.messageWidthPercent ? `${props.messageWidthPercent}%` : '100%')};
 `
 
@@ -895,16 +1001,27 @@ const MessageContent = styled.div<{ messageWidthPercent?: string | number; withA
   bottom: 8px;
 ` */
 
+const VoiceIconWrapper = styled(VoiceIcon)`
+  transform: translate(0px, 2px);
+  color: ${colors.primary};
+`
+const VoiceDuration = styled.span`
+  color: ${colors.primary};
+`
+
 const MessageItem = styled.div<{
   rtl?: boolean
   hoverBackground?: string
   topMargin?: boolean
   ref?: any
+  withAvatar?: boolean
 }>`
   display: flex;
   position: relative;
   margin-top: ${(props) => props.topMargin && '10px'};
   padding: 3px 40px;
+  padding-left: ${(props) => !props.withAvatar && !props.rtl && '72px'};
+  padding-right: ${(props) => !props.withAvatar && props.rtl && '72px'};
   transition: all 0.2s;
   width: 100%;
   box-sizing: border-box;

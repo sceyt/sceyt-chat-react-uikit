@@ -7,6 +7,7 @@ import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
 import SceytChatHeader from './SceytChatHeader'
 import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
+import Avatar from './Avatar'
 
 export {
   SceytChat,
@@ -17,7 +18,8 @@ export {
   SendMessage,
   ChannelDetails,
   SceytChatHeader,
-  MessagesScrollToBottomButton
+  MessagesScrollToBottomButton,
+  Avatar
 }
 
 declare global {

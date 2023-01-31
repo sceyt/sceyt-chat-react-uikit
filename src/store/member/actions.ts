@@ -12,7 +12,8 @@ import {
   CHANGE_MEMBER_ROLE,
   REPORT_MEMBER,
   GET_ROLES,
-  GET_ROLES_SUCCESS
+  GET_ROLES_SUCCESS,
+  SET_MEMBERS_TO_LIST
 } from './constants'
 import { IAddMember, IMember, IRole } from '../../types'
 
@@ -20,6 +21,13 @@ export function getMembersAC(channelId: string) {
   return {
     type: GET_MEMBERS,
     payload: { channelId }
+  }
+}
+
+export function setMembersToListAC(members: IMember[]) {
+  return {
+    type: SET_MEMBERS_TO_LIST,
+    payload: { members }
   }
 }
 

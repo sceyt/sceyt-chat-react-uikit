@@ -72,7 +72,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.green1} borderRadius='8px' onClick={handleDelete}>
+          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleDelete}>
             {buttonText || 'Delete'}
           </Button>
         </PopupFooter>

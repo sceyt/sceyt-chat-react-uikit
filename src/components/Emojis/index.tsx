@@ -139,7 +139,6 @@ const Container = styled.div<{ rightSide?: boolean }>`
 `
 const EmojiHeader = styled.div`
   height: 32px;
-  font-family: Roboto, sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
@@ -156,7 +155,7 @@ const EmojiSection = styled.div`
 const EmojiCollection = styled.span<EmojiCollectionProps>`
   cursor: pointer;
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.green1 : colors.gray7)};
+    color: ${(props) => (props.activeCollection ? colors.primary : colors.gray7)};
   }
 `
 const CollectionPointer = styled.span``

@@ -65,7 +65,7 @@ const CustomLabel = styled.label<{
   border: ${(props) => (props.isChecked ? 'none' : '1px solid #818C99')};
   border-radius: ${(props) => props.borderRadius || '4px'};
   background-color: ${(props) =>
-    props.isChecked ? props.checkedBackgroundColor || colors.green1 : props.backgroundColor || '#fff'};
+    props.isChecked ? props.checkedBackgroundColor || colors.primary : props.backgroundColor || '#fff'};
 
   & > svg {
     width: calc(100% - 4px);

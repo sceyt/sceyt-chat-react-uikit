@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef } from 'react'
+import React, { FC, useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import {
@@ -29,30 +29,24 @@ import {
 } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { LOADING_STATE } from '../../helpers/constants'
-import {
-  ChannelsList,
-  Container,
-  DirectChannels,
-  GroupChannels,
-  SearchedChannels,
-  SearchedChannelsHeader
-} from './styled'
+
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
-import Avatar from '../Avatar'
-import { getClient } from '../../common/client'
 import { removeChannelFromMap } from '../../helpers/channelHalper'
-import { colors, setCustomColors } from '../../UIHelper/constants'
+import { colors, device, setCustomColors } from '../../UIHelper/constants'
 import { ICustomColors } from '../Channel/types'
 import { IChannel, IContactsMap } from '../../types'
-import { ReactComponent as BottomIcon } from '../../assets/svg/chevronBottom.svg'
+// import { ReactComponent as BottomIcon } from '../../assets/svg/chevronBottom.svg'
 import CreateChannelButton from './CreateChannelButton'
 import { getContactsAC } from '../../store/user/actions'
+import ProfileSettings from './ProfileSettings'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
 
 interface IChannelListProps {
   customColors?: ICustomColors
   List?: FC<{ channels: IChannel[]; loadMoreChannels: (count?: number) => void; children?: React.ReactNode }>
   ListItem?: FC<any>
+  Profile?: JSX.Element
   filter?: { channelType: 'Public' | 'Private' | 'Direct' }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
@@ -60,8 +54,11 @@ interface IChannelListProps {
   showSearch?: boolean
   forceUpdateChannelList?: () => void
   showCreateChannelIcon?: boolean
+  uriPrefixOnCreateChannel?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
+  createChannelIcon?: JSX.Element
+  createChannelIconHoverBackground?: string
   onChannelDeleted?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
   onChannelCreated?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
   onChannelHidden?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
@@ -73,23 +70,28 @@ const ChannelList: React.FC<IChannelListProps> = ({
   customColors,
   List,
   ListItem,
+  Profile,
   filter,
   limit,
   sort,
   avatar,
   showSearch = true,
   showCreateChannelIcon = true,
+  uriPrefixOnCreateChannel,
   onChannelDeleted,
   onChannelCreated,
   onChannelHidden,
   onChannelVisible,
   onAddedToChannel,
   notificationsIsMutedIcon,
-  notificationsIsMutedIconColor
+  notificationsIsMutedIconColor,
   // forceUpdateChannelList
+  createChannelIcon,
+  createChannelIconHoverBackground
 }) => {
   const dispatch = useDispatch()
   // const [searchValue, setSearchValue] = useState('');
+  const getFromContacts = getUserDisplayNameFromContact()
   const channelListRef = useRef<HTMLInputElement>(null)
   const connectionStatus = useSelector(connectionStatusSelector)
   const searchValue = useSelector(searchValueSelector) || ''
@@ -105,8 +107,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const groupChannels = searchValue ? channels.filter((channel: any) => channel.type !== 'Direct') : []
   const channelsLoading = useSelector(channelsLoadingState) || {}
   const activeChannel = useSelector(activeChannelSelector) || {}
-  const SceytChatClient = getClient()
-  const user = SceytChatClient.chatClient.user
+  const [profileIsOpen, setProfileIsOpen] = useState(false)
+
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -127,13 +129,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }
 
   const handleLoadMoreChannels = (count?: number) => {
-    if (channelsLoading === LOADING_STATE.LOADED) {
+    if (channelsLoading === LOADING_STATE.LOADED && !searchValue) {
       dispatch(loadMoreChannels(count))
     }
   }
 
   const handleAllChannelsListScroll = (e: any) => {
-    console.log(' e.target.scrollTop ... . ', e.target.scrollTop)
     if (!searchValue && channelsHasNext && e.target.scrollTop >= e.target.scrollHeight - e.target.offsetHeight - 200) {
       handleLoadMoreChannels()
     }
@@ -147,14 +148,16 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   const handleSearchValueChange = (e: any) => {
     const { value } = e.target
-    console.log('dispatch get channels  4 ')
     dispatch(getChannelsAC({ search: value }))
   }
 
   const getMyChannels = () => {
     dispatch(getContactsAC())
-    console.log('dispatch get channels  2 ')
     dispatch(getChannelsAC({ search: '' }))
+  }
+
+  const handleOpenProfile = () => {
+    setProfileIsOpen(!profileIsOpen)
   }
 
   useEffect(() => {
@@ -172,7 +175,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
-      dispatch(getContactsAC())
+      if (getFromContacts) {
+        dispatch(getContactsAC())
+      }
     }
   }, [connectionStatus])
 
@@ -216,7 +221,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (visibleChannel) {
       if (onChannelVisible) {
-        console.log('call visible channel')
         onChannelVisible((updatedChannels) => handleSetChannelList(updatedChannels, true), visibleChannel)
       } else {
         dispatch(addChannelAC(hiddenChannel))
@@ -231,15 +235,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
-
   return (
     <React.Fragment>
       <Container isCustomContainer={!!List} ref={channelListRef}>
         <ChannelListHeader maxWidth={(channelListRef.current && channelListRef.current.clientWidth) || 0}>
-          <ProfileCont>
+          {Profile || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} />}
+          {/* <ProfileCont onClick={handleOpenProfile}>
             <Avatar image={user.avatarUrl} name={user.firstName || user.id} size={32} textSize={15} setDefaultAvatar />
             <BottomIcon />
-          </ProfileCont>
+          </ProfileCont> */}
           {showSearch && (
             <ChannelSearch
               searchValue={searchValue}
@@ -247,7 +251,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
               getMyChannels={getMyChannels}
             />
           )}
-          {showCreateChannelIcon && <CreateChannelButton showSearch={showSearch} />}
+          {showCreateChannelIcon && (
+            <CreateChannelButton
+              createChannelIcon={createChannelIcon}
+              createChannelIconHoverBackground={createChannelIconHoverBackground}
+              showSearch={showSearch}
+              uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
+            />
+          )}
         </ChannelListHeader>
         {/* <ChannelTabs /> */}
         {List ? (
@@ -403,12 +414,52 @@ const ChannelList: React.FC<IChannelListProps> = ({
             )}
           </React.Fragment>
         )}
+
+        {profileIsOpen && <ProfileSettings handleCloseProfile={handleOpenProfile} />}
       </Container>
     </React.Fragment>
   )
 }
 
 export default ChannelList
+
+const Container = styled.div<{ isCustomContainer?: boolean; ref?: any }>`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: ${(props) => (props.isCustomContainer ? '' : '280px')};
+  min-width: ${(props) => (props.isCustomContainer ? '' : '280px')};
+  //border-right: ${(props) => (props.isCustomContainer ? '' : '1px solid #DFE0EB')};
+
+  ${(props) =>
+    props.isCustomContainer
+      ? ''
+      : `
+    @media  ${device.laptopL} {
+      width: 310px;
+      min-width: auto;
+    }
+ `};
+`
+
+const ChannelsList = styled.div`
+  height: auto;
+  border-right: 1px solid ${colors.gray1};
+  overflow-y: auto;
+`
+const SearchedChannels = styled.div`
+  height: calc(100vh - 123px);
+  overflow-x: hidden;
+`
+const SearchedChannelsHeader = styled.p`
+  padding-left: 16px;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 14px;
+  color: #676a7c;
+`
+const DirectChannels = styled.div``
+const GroupChannels = styled.div``
 
 const ChannelListHeader = styled.div<{ maxWidth?: number }>`
   display: flex;
@@ -418,18 +469,8 @@ const ChannelListHeader = styled.div<{ maxWidth?: number }>`
   //justify-content: flex-end;
   padding: 12px;
   border-right: 1px solid ${colors.gray1};
-  min-height: 68px;
+  border-bottom: 1px solid ${colors.gray1};
+  min-height: 64px;
   box-sizing: border-box;
   max-width: ${(props) => props.maxWidth && `${props.maxWidth}px`};
-`
-
-const ProfileCont = styled.div`
-  display: flex;
-  align-items: center;
-  margin-right: 12px;
-  cursor: pointer;
-
-  & > svg {
-    margin-left: 4px;
-  }
 `

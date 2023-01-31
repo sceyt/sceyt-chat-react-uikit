@@ -1,10 +1,12 @@
 import React from 'react'
 // import useIsMounted from '../../hooks/basic/useIsMounted'
-// import { ReactComponent as DeletedAvatarIcon } from '../../assets/lib/svg/deletedUserAvatar.svg'
+import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
 import { ReactComponent as DefaultAvatar } from '../../assets/svg/devaultAvatar32.svg'
 // import DefaultAvatarSrc from '../../assets/img/defaultAvatar.png'
 // import defaultAvatarSrc from ''
-import { AvatarImage, Container } from './styled'
+import styled from 'styled-components'
+import { generateAvatarColor } from '../../UIHelper'
+import { colors } from '../../UIHelper/constants'
 
 interface IProps {
   image?: string | null
@@ -14,7 +16,6 @@ interface IProps {
   marginAuto?: boolean
   setDefaultAvatar?: boolean
   DeletedIcon?: JSX.Element
-  defaultAvatarIcon?: JSX.Element
 }
 
 const Avatar: React.FC<IProps> = ({
@@ -24,8 +25,7 @@ const Avatar: React.FC<IProps> = ({
   textSize,
   DeletedIcon,
   marginAuto,
-  setDefaultAvatar,
-  defaultAvatarIcon
+  setDefaultAvatar
   // customAvatarColors
 }) => {
   // const isMounted = useIsMounted()
@@ -33,16 +33,26 @@ const Avatar: React.FC<IProps> = ({
   // const [imageLoaded, setImageLoaded] = useState(isMessage);
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
-
   if (!image && name) {
     const splittedName = name.split(' ')
+
     if (splittedName.length > 1 && splittedName[1]) {
-      avatarText = `${splittedName[0][0]}${splittedName[1][0]}`
+      const firstWord = splittedName[0]
+      const secondWord = splittedName[1]
+      const firstCharOfFirstWord = firstWord.codePointAt(0)
+      const firstCharOfSecondWord = secondWord.codePointAt(0)
+
+      // @ts-ignore
+      avatarText = `${String.fromCodePoint(firstCharOfFirstWord)}${String.fromCodePoint(firstCharOfSecondWord)}`
     } else {
-      avatarText = `${splittedName[0][0]}${splittedName[0][1] || ''}`
+      const firstCharOfFirstWord = name.codePointAt(0)
+      const firstCharOfSecondWord = name.codePointAt(1)
+      const str1 = firstCharOfFirstWord ? String.fromCodePoint(firstCharOfFirstWord) : ''
+      const str2 = firstCharOfSecondWord ? String.fromCodePoint(firstCharOfSecondWord) : ''
+
+      avatarText = `${str1}${str2}`
     }
   }
-
   /* useEffect(() => {
     if (!isMessage) {
       const imageSrc = image;
@@ -69,11 +79,11 @@ const Avatar: React.FC<IProps> = ({
     >
       {isDeletedUserAvatar ? (
         // DeletedIcon || <DeletedAvatarIcon />
-        DeletedIcon || <DefaultAvatar />
+        DeletedIcon || <DeletedAvatarWrapper color={colors.deleteUserIconBackground} />
       ) : // : !avatarImage.src && name
       !image ? (
         setDefaultAvatar ? (
-          defaultAvatarIcon || <DefaultAvatar />
+          <DefaultAvatarWrapper color={colors.defaultAvatarBackground} />
         ) : (
           <span>{avatarText}</span>
         )
@@ -97,3 +107,56 @@ const Avatar: React.FC<IProps> = ({
 }
 
 export default Avatar
+
+interface ContainerProps {
+  size?: number
+  avatarName: string
+  textSize?: number
+  isImage?: boolean
+  marginAuto?: boolean
+}
+
+interface AvatarImageProps {
+  showImage: boolean
+  size?: number
+}
+
+export const Container = styled.div<ContainerProps>`
+    display: flex;
+    align-items: center;
+    flex: 0 0 auto;
+    text-transform: uppercase;
+    justify-content: center;
+    width: ${(props) => (props.size ? `${props.size}px` : '38px')};
+    height: ${(props) => (props.size ? `${props.size}px` : '38px')};
+    border-radius: 50%;
+    color: #fff;
+    overflow: hidden;
+    margin: ${(props) => (props.marginAuto ? 'auto' : '')};
+    ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+  span {
+    text-transform: uppercase;
+    font-style: normal;
+    font-weight: 500;
+    font-size: ${(props: ContainerProps) => (props.textSize ? `${props.textSize}px` : '14px')}};
+  }
+  & > svg {
+    height: ${(props) => props.size && `${props.size}px`};
+    width: ${(props) => props.size && `${props.size}px`};
+  }
+
+`
+
+export const AvatarImage = styled.img<AvatarImageProps>`
+  visibility: ${(props: AvatarImageProps) => (props.showImage ? 'visible' : 'hidden')};
+  width: ${(props) => `${props.size}px`};
+  height: ${(props) => `${props.size}px`};
+`
+
+export const DefaultAvatarWrapper = styled(DefaultAvatar)`
+  color: ${(props) => props.color || colors.defaultAvatarBackground};
+`
+
+export const DeletedAvatarWrapper = styled(DeletedAvatarIcon)`
+  color: ${(props) => props.color || colors.deleteUserIconBackground};
+`

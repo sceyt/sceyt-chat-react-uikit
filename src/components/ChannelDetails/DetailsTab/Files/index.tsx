@@ -3,13 +3,13 @@ import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
-import { bytesToSize, downloadFile } from '../../../../helpers'
+import { bytesToSize, downloadFile, formatLargeText } from '../../../../helpers'
 import { colors } from '../../../../UIHelper/constants'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { AttachmentPreviewTitle } from '../index'
+import { AttachmentPreviewTitle } from '../../../../UIHelper'
 
 interface IProps {
   channelId: string
@@ -42,14 +42,22 @@ const Files = ({
         // <FileItemWrapper >
         <FileItem
           key={file.url}
-          onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-          onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
+          // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
+          // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
           hoverBackgroundColor={filePreviewHoverBackgroundColor}
         >
-          <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
-          <FileHoverIconCont>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
+          {file.metadata && file.metadata.tmb ? (
+            <FileThumb src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
+          ) : (
+            <React.Fragment>
+              <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
+              <FileHoverIconCont>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
+            </React.Fragment>
+          )}
           <div>
-            <AttachmentPreviewTitle color={filePreviewTitleColor}>{file.name}</AttachmentPreviewTitle>
+            <AttachmentPreviewTitle color={filePreviewTitleColor}>
+              {formatLargeText(file.name, 28)}
+            </AttachmentPreviewTitle>
             <FileSizeAndDate color={filePreviewSizeColor}>{bytesToSize(file.fileSize)}</FileSizeAndDate>
           </div>
           <DownloadWrapper onClick={() => downloadFile(file)}>
@@ -109,6 +117,13 @@ const FileHoverIconCont = styled.span`
     height: 40px;
   }
 `
+const FileThumb = styled.img`
+  width: 40px;
+  height: 40px;
+  border: 0.5px solid rgba(0, 0, 0, 0.1);
+  border-radius: 8px;
+  object-fit: cover;
+`
 const FileItem = styled.div<any>`
   position: relative;
   padding: 11px 16px;
@@ -125,8 +140,6 @@ const FileItem = styled.div<any>`
     ${DownloadWrapper} {
       visibility: visible;
     }
-  }
-  &.isHover {
     & ${FileIconCont} {
       display: none;
     }
@@ -134,10 +147,12 @@ const FileItem = styled.div<any>`
       display: inline-flex;
     }
   }
+  /*&.isHover {
+
+  }*/
 `
 const FileSizeAndDate = styled.span`
   display: block;
-  font-family: Roboto, sans-serif;
   font-style: normal;
   font-weight: normal;
   font-size: 13px;

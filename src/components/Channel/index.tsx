@@ -1,13 +1,15 @@
-import React, { useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
-import { activeChannelSelector } from '../../store/channel/selector'
+import { activeChannelSelector, typingIndicatorSelector } from '../../store/channel/selector'
 import { switchChannelActionAC } from '../../store/channel/actions'
-import { ReactComponent as TrashIcon } from '../../assets/svg/trash.svg'
-import { ReactComponent as DefaultAvatar } from '../../assets/svg/devaultAvatar50.svg'
+import { ReactComponent as ImageIcon } from '../../assets/svg/picture.svg'
+import { ReactComponent as CameraIcon } from '../../assets/svg/video-call.svg'
+import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import Avatar from '../Avatar'
 import { lastMessageDateFormat, makeUserName, messageStatusIcon } from '../../helpers'
-import { CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { ICustomColors } from './types'
 import { IChannel, IContact } from '../../types'
@@ -16,6 +18,7 @@ import { clearMessagesAC } from '../../store/message/actions'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
 import { colors } from '../../UIHelper/constants'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/notificationsOff3.svg'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
 
 interface IChannelProps {
   channel: IChannel
@@ -36,10 +39,14 @@ const Channel: React.FC<IChannelProps> = ({
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
+  const getFromContacts = getUserDisplayNameFromContact()
   const { user } = ChatClient
   const activeChannel = useSelector(activeChannelSelector) || {}
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const withAvatar = avatar === undefined ? true : avatar
+  const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
+  const lastMessage = channel.lastMessage
+  const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
       dispatch(clearMessagesAC())
@@ -55,6 +62,11 @@ const Channel: React.FC<IChannelProps> = ({
     useUpdatePresence(channel, true)
   }
 
+  useEffect(() => {
+    if (messageTimeAndStatusRef.current) {
+      setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
+    }
+  }, [messageTimeAndStatusRef])
   return (
     <Container
       // ref={channelItemRef}
@@ -72,73 +84,113 @@ const Channel: React.FC<IChannelProps> = ({
             size={50}
             textSize={16}
             setDefaultAvatar={isDirectChannel}
-            defaultAvatarIcon={<DefaultAvatar />}
           />
           {isDirectChannel && channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE && (
-            <UserStatus backgroundColor={customColors && customColors.messageReadStatusTickColor} />
+            <UserStatus backgroundColor={colors.primary} />
           )}
         </AvatarWrapper>
       )}
-      <ChannelInfo
-        avatar={withAvatar}
-        isMuted={channel.muted}
-        statusWidth={(messageTimeAndStatusRef.current && messageTimeAndStatusRef.current.offsetWidth) || 0}
-      >
-        <h3>{channel.subject || (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer) : '')}</h3>
+      <ChannelInfo avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
+        <h3>
+          {channel.subject ||
+            (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
+        </h3>
         {channel.muted && (
           <MutedIcon color={notificationsIsMutedIconColor}>
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-
-        {channel.lastMessage && (
-          <LastMessage>
-            {channel.lastMessage.user &&
-              channel.lastMessage.state !== MESSAGE_STATUS.DELETE &&
-              ((channel.lastMessage.user && channel.lastMessage.user.id === user.id) || !isDirectChannel) &&
-              channel.lastMessage.type !== 'system' && (
-                <LastMessageAuthor minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}>
+        {/* makeUserName(contactsMap[typingIndicator.from.id]) */}
+        {(lastMessage || !!typingIndicator) && (
+          <LastMessage markedAsUnread={channel.markedAsUnread}>
+            {typingIndicator ? (
+              !isDirectChannel ? (
+                <LastMessageAuthor
+                  typing={typingIndicator}
+                  minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}
+                >
                   <span ref={messageAuthorRef}>
-                    {channel.lastMessage.user &&
-                      (channel.lastMessage.user.id === user.id
-                        ? 'You'
-                        : contactsMap[channel.lastMessage.user.id]
-                        ? contactsMap[channel.lastMessage.user.id].firstName
-                        : channel.lastMessage.user.id)}
+                    {typingIndicator
+                      ? contactsMap[typingIndicator.from.id] && contactsMap[typingIndicator.from.id].firstName
+                        ? contactsMap[typingIndicator.from.id]!.firstName!.split(' ')[0]
+                        : typingIndicator.from.id
+                      : ''}
                   </span>
                 </LastMessageAuthor>
-              )}
-            {channel.lastMessage.user &&
-              channel.lastMessage.state !== MESSAGE_STATUS.DELETE &&
-              (channel.lastMessage.user.id === user.id || !isDirectChannel) &&
-              channel.lastMessage.type !== 'system' && <Points>: </Points>}
-            <LastMessageText authorWith={(messageAuthorRef.current && messageAuthorRef.current.offsetWidth) || 0}>
-              {channel.lastMessage.state === MESSAGE_STATUS.DELETE ? (
-                <React.Fragment>
-                  <TrashIcon />
-                  Message was deleted.
-                </React.Fragment>
-              ) : channel.lastMessage.type === 'system' ? (
+              ) : null
+            ) : (
+              lastMessage.user &&
+              lastMessage.state !== MESSAGE_STATUS.DELETE &&
+              ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
+              lastMessage.type !== 'system' && (
+                <LastMessageAuthor minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}>
+                  <span ref={messageAuthorRef}>
+                    {lastMessage.user.id === user.id
+                      ? 'You'
+                      : contactsMap[lastMessage.user.id]
+                      ? contactsMap[lastMessage.user.id].firstName
+                      : lastMessage.user.id || 'Deleted user'}
+                  </span>
+                </LastMessageAuthor>
+              )
+            )}
+            {(typingIndicator
+              ? !isDirectChannel
+              : lastMessage &&
+                lastMessage.user &&
+                lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                (lastMessage.user.id === user.id || !isDirectChannel) &&
+                lastMessage.type !== 'system') && <Points>: </Points>}
+            <LastMessageText
+              withAttachments={!!(lastMessage && lastMessage.attachments && lastMessage.attachments.length)}
+              noBody={lastMessage && !lastMessage.body}
+              deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}
+            >
+              {typingIndicator ? (
+                <TypingIndicator>typing...</TypingIndicator>
+              ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
+                'Message was deleted.'
+              ) : lastMessage.type === 'system' ? (
                 `${
-                  channel.lastMessage.user &&
-                  (channel.lastMessage.user.id === user.id
+                  lastMessage.user &&
+                  (lastMessage.user.id === user.id
                     ? 'You '
-                    : contactsMap[channel.lastMessage.user.id]
-                    ? contactsMap[channel.lastMessage.user.id].firstName
-                    : channel.lastMessage.user.id)
+                    : contactsMap[lastMessage.user.id]
+                    ? contactsMap[lastMessage.user.id].firstName
+                    : lastMessage.user.id)
                 } ${
-                  channel.lastMessage.body === 'CC'
+                  lastMessage.body === 'CC'
                     ? 'Created this channel'
-                    : channel.lastMessage.body === 'CG'
+                    : lastMessage.body === 'CG'
                     ? 'Created this group'
                     : ''
                 }`
-              ) : channel.lastMessage.body ? (
-                channel.lastMessage.body
-              ) : channel.lastMessage.attachments && ` ${channel.lastMessage.attachments.length}` ? (
-                ' Attachment'
               ) : (
-                ''
+                <React.Fragment>
+                  {!!(lastMessage.attachments && lastMessage.attachments.length) &&
+                    (lastMessage.attachments[0].type === attachmentTypes.image ? (
+                      <React.Fragment>
+                        <ImageIcon />
+                        {lastMessage.body ? '' : 'Photo'}
+                      </React.Fragment>
+                    ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
+                      <React.Fragment>
+                        <CameraIcon />
+                        {lastMessage.body ? '' : 'Video'}
+                      </React.Fragment>
+                    ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
+                      <React.Fragment>
+                        <FileIcon />
+                        {lastMessage.body ? '' : 'File'}
+                      </React.Fragment>
+                    ) : (
+                      <React.Fragment>
+                        <VoiceIcon />
+                        {lastMessage.body ? '' : 'Voice'}
+                      </React.Fragment>
+                    ))}
+                  {lastMessage.body}
+                </React.Fragment>
               )}
             </LastMessageText>
           </LastMessage>
@@ -147,24 +199,21 @@ const Channel: React.FC<IChannelProps> = ({
 
       <ChannelStatus ref={messageTimeAndStatusRef}>
         <DeliveryIconCont>
-          {channel.lastMessage &&
-            channel.lastMessage.user &&
-            channel.lastMessage.user.id === user.id &&
-            channel.lastMessage.type !== 'system' &&
-            messageStatusIcon(
-              channel.lastMessage.deliveryStatus,
-              customColors && customColors.messageReadStatusTickColor
-            )}
+          {lastMessage &&
+            lastMessage.user &&
+            lastMessage.user.id === user.id &&
+            lastMessage.type !== 'system' &&
+            messageStatusIcon(lastMessage.deliveryStatus, undefined, colors.primary)}
         </DeliveryIconCont>
         <LastMessageDate>
-          {channel.lastMessage && channel.lastMessage.createdAt && lastMessageDateFormat(channel.lastMessage.createdAt)}
-          {/* {channel.lastMessage &&
-            channel.lastMessage.createdAt &&
-            moment(channel.lastMessage.createdAt).format('HH:mm')} */}
+          {lastMessage && lastMessage.createdAt && lastMessageDateFormat(lastMessage.createdAt)}
+          {/* {lastMessage &&
+            lastMessage.createdAt &&
+            moment(lastMessage.createdAt).format('HH:mm')} */}
         </LastMessageDate>
       </ChannelStatus>
       {(!!channel.unreadMessageCount || channel.markedAsUnread) && (
-        <UnreadCount backgroundColor={customColors && customColors.messageReadStatusTickColor} isMuted={channel.muted}>
+        <UnreadCount backgroundColor={colors.primary} isMuted={channel.muted}>
           {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}
         </UnreadCount>
       )}
@@ -173,10 +222,6 @@ const Channel: React.FC<IChannelProps> = ({
 }
 
 export default Channel
-
-interface LastMessageTextProps {
-  readonly authorWith: number
-}
 
 interface UnreadCountProps {
   readonly isMuted: boolean
@@ -207,7 +252,7 @@ export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; sta
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
-  max-width: ${(props) => `calc(100% - ${props.statusWidth + 62}px)`};
+  max-width: calc(100% - 62px);
 
   h3 {
     display: inline-block;
@@ -216,8 +261,8 @@ export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; sta
     font-weight: 500;
     text-overflow: ellipsis;
     line-height: 18px;
-    letter-spacing: -0.2px;
-    max-width: ${(props) => (props.isMuted ? 'calc(100% - 30px)' : '100%')};
+    letter-spacing: -0.2px;%;
+    max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 20 : 0)}px)`};
     overflow: hidden;
     white-space: nowrap;
     color: ${colors.gray6};
@@ -233,11 +278,12 @@ export const MutedIcon = styled.span`
   }
 `
 
-export const LastMessage = styled.div`
+export const LastMessage = styled.div<{ markedAsUnread?: boolean }>`
   display: flex;
   align-items: center;
   font-size: 14px;
   color: ${colors.gray6};
+  max-width: ${(props) => (props.markedAsUnread ? 'calc(100% - 24px)' : '100%')};
 `
 
 export const AvatarWrapper = styled.div`
@@ -261,6 +307,7 @@ export const UserStatus = styled.span<{ backgroundColor?: string }>`
 export const LastMessageAuthor = styled.div<any>`
   max-width: 120px;
   font-weight: 500;
+  font-style: ${(props) => props.typing && 'italic'};
   color: ${colors.gray8};
 
   & > span {
@@ -276,16 +323,25 @@ export const Points = styled.span`
   margin-right: 2px;
 `
 
-export const LastMessageText = styled.span<LastMessageTextProps>`
+export const LastMessageText = styled.span<{
+  withAttachments?: boolean
+  noBody?: boolean
+  deletedMessage?: boolean
+}>`
   overflow: hidden;
-  max-width: ${(props: any) => `calc(100% - ${props.authorWith}px)`};
   text-overflow: ellipsis;
   white-space: nowrap;
+  height: 19px;
   color: ${colors.gray9};
+  font-style: ${(props) => props.deletedMessage && 'italic'};
+  transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
 
   > svg {
+    width: 16px;
+    height: 16px;
     margin-right: 4px;
-    transform: translate(0px, 2px);
+    color: ${colors.gray4};
+    transform: ${(props) => (props.withAttachments ? 'translate(0px, 4px)' : 'translate(0px, 2px)')};
   }
 `
 
@@ -308,6 +364,9 @@ export const LastMessageDate = styled.span`
 export const DeliveryIconCont = styled.span`
   margin-right: 6px;
   line-height: 13px;
+`
+export const TypingIndicator = styled.span`
+  font-style: italic;
 `
 
 export const UnreadCount = styled.span<UnreadCountProps>`

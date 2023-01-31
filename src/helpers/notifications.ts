@@ -1,5 +1,6 @@
 import { IContactsMap, IUser } from '../types'
 import { makeUserName } from './index'
+import { getUserDisplayNameFromContact } from './contacts'
 let contactsMap = {}
 let logoSrc = ''
 /* let windowObjectReference: any = null // global variable
@@ -30,11 +31,15 @@ function openRequestedSingleTab(url: any) {
      in the event of another call of this function. *!/
 } */
 export const setNotification = (body: string, user: IUser) => {
-  const notification = new Notification(`New Message from ${makeUserName(contactsMap[user.id], user)}`, {
-    body: body,
-    icon: logoSrc,
-    silent: false
-  })
+  const getFromContacts = getUserDisplayNameFromContact()
+  const notification = new Notification(
+    `New Message from ${makeUserName(contactsMap[user.id], user, getFromContacts)}`,
+    {
+      body: body,
+      icon: logoSrc,
+      silent: false
+    }
+  )
   // windowObjectReference = window.sceytTabUrl
   notification.onclick = (event) => {
     event.preventDefault() // prevent the browser from focusing the Notification's tab

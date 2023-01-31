@@ -9,14 +9,14 @@ export const MESSAGE_DELIVERY_STATUS = {
   PENDING: 'pending',
   SENT: 'sent',
   DELIVERED: 'received',
-  READ: 'displayed',
-  FAILED: 'failed'
+  READ: 'displayed'
 }
 
 export const MESSAGE_STATUS = {
   NONE: 'None',
   EDIT: 'Edited',
-  DELETE: 'Deleted'
+  DELETE: 'Deleted',
+  FAILED: 'failed'
 }
 
 export const UPLOAD_STATE = {
@@ -73,11 +73,13 @@ export const attachmentTypes = {
   video: 'video',
   audio: 'audio',
   file: 'file',
-  link: 'link'
+  link: 'link',
+  voice: 'voice'
 }
 export const channelDetailsTabs = {
-  member: 'member',
-  media: 'media',
-  file: 'file',
-  link: 'link'
+  member: 'Members',
+  media: 'Media',
+  file: 'Files',
+  link: 'Links',
+  voice: 'Voice'
 }

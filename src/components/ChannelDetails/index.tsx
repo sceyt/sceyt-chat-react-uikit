@@ -3,7 +3,7 @@ import styled from 'styled-components'
 // import Info from './Info'
 import Actions from './Actions'
 import DetailsTab from './DetailsTab'
-import { CloseIcon, DetailsSectionHeader, SectionHeader, SubTitle } from '../../UIHelper'
+import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
 import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, PRESENCE_STATUS } from '../../helpers/constants'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'
@@ -12,7 +12,6 @@ import { loadMoreMembersAC } from '../../store/member/actions'
 import { membersLoadingStateSelector } from '../../store/member/selector'
 import { ReactComponent as ArrowLeft } from '../../assets/svg/arrowLeft.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/edit.svg'
-import { ReactComponent as DefaultAvatar } from '../../assets/svg/defaultAvatar72.svg'
 // import * as ProfileSrc from '../../assets/img/profile.png'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
@@ -24,6 +23,7 @@ import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import usePermissions from '../../hooks/usePermissions'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
 
 const Details = ({
   channelEditIcon,
@@ -39,6 +39,7 @@ const Details = ({
   unmuteNotificationIconColor,
   muteUnmuteNotificationSwitcherColor,
   muteUnmuteNotificationTextColor,
+  timeOptionsToMuteNotifications,
   showStarredMessages,
   starredMessagesOrder,
   staredMessagesIcon,
@@ -69,30 +70,72 @@ const Details = ({
   deleteChannelIcon,
   deleteChannelIconColor,
   deleteChannelTextColor,
+  deleteChannelOrder,
   showBlockAndLeaveChannel,
+  showBlockUser,
   blockAndLeaveChannelIcon,
   blockAndLeaveChannelIconColor,
   blockAndLeaveChannelTextColor,
+  unblockUserIcon,
   linkPreviewIcon,
   linkPreviewHoverIcon,
   linkPreviewTitleColor,
   linkPreviewColor,
   linkPreviewHoverBackgroundColor,
+  voicePreviewIcon,
+  voicePreviewHoverIcon,
+  voicePreviewTitleColor,
+  voicePreviewDateAndTimeColor,
+  voicePreviewHoverBackgroundColor,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
-  filePreviewDownloadIcon
+  filePreviewDownloadIcon,
+  blockUserWarningText,
+  blockAndLeavePublicChannelWarningText,
+  blockAndLeavePrivateChannelWarningText,
+  leavePublicChannelWarningText,
+  leavePrivateChannelWarningText,
+  deletePublicChannelWarningText,
+  deletePrivateChannelWarningText,
+  deleteDirectChannelWarningText,
+  clearHistoryPublicChannelWarningText,
+  clearHistoryPrivateChannelWarningText,
+  clearHistoryDirectChannelWarningText,
+  showClearHistoryForDirectChannel,
+  showClearHistoryForPrivateChannel,
+  showClearHistoryForPublicChannel,
+  clearHistoryOrder,
+  clearHistoryIcon,
+  clearHistoryTextColor,
+  showDeleteAllMessagesForDirectChannel,
+  showDeleteAllMessagesForPrivateChannel,
+  showDeleteAllMessagesForPublicChannel,
+  deleteAllMessagesOrder,
+  deleteAllMessagesIcon,
+  deleteAllMessagesTextColor,
+  showChangeMemberRole,
+  showKickMember,
+  showKickAndBlockMember,
+  showMakeMemberAdmin,
+  publicChannelDeleteMemberPopupDescription,
+  privateChannelDeleteMemberPopupDescription,
+  publicChannelRevokeAdminPopupDescription,
+  privateChannelRevokeAdminPopupDescription,
+  publicChannelMakeAdminPopupDescription,
+  privateChannelMakeAdminPopupDescription
 }: IDetailsProps) => {
   const dispatch = useDispatch()
+  const getFromContacts = getUserDisplayNameFromContact()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
   // const [tabFixed, setTabFixed] = useState(false)
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
   const channel = useSelector(activeChannelSelector, shallowEqual)
-  const [chekActionPermission] = usePermissions(channel.myRole)
+  const [checkActionPermission] = usePermissions(channel.role)
   const membersLoading = useSelector(membersLoadingStateSelector)
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
@@ -116,7 +159,7 @@ const Details = ({
           dispatch(loadMoreMembersAC(15))
         }
       } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {
-        dispatch(loadMoreAttachmentsAC(activeTab))
+        dispatch(loadMoreAttachmentsAC(10))
       }
     }
   }
@@ -141,11 +184,11 @@ const Details = ({
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <DetailsSectionHeader margin='0 0 0 12px'> Edit details </DetailsSectionHeader>
+            <SectionHeader margin='0 0 0 12px'> Edit details </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <DetailsSectionHeader>Details</DetailsSectionHeader> <CloseIcon onClick={handleDetailsClose} />
+            <SectionHeader>Details</SectionHeader> <CloseIcon onClick={handleDetailsClose} />
           </React.Fragment>
         )}
       </ChannelDetailsHeader>
@@ -173,11 +216,11 @@ const Details = ({
             size={72}
             textSize={32}
             setDefaultAvatar={isDirectChannel}
-            defaultAvatarIcon={<DefaultAvatar />}
           />
           <ChannelInfo>
             <ChannelName isDirect={isDirectChannel}>
-              {channel.subject || (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer) : '')}
+              {channel.subject ||
+                (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
             </ChannelName>
             {isDirectChannel ? (
               <SubTitle>
@@ -188,15 +231,24 @@ const Details = ({
                       userLastActiveDateFormat(channel.peer.presence.lastActiveAt))}
               </SubTitle>
             ) : (
-              <SubTitle>{channel.memberCount} members</SubTitle>
+              <SubTitle>
+                {channel.memberCount}{' '}
+                {channel.type === CHANNEL_TYPE.PUBLIC
+                  ? channel.memberCount > 1
+                    ? 'subscribers'
+                    : 'subscriber'
+                  : channel.memberCount > 1
+                  ? 'members'
+                  : 'member'}
+              </SubTitle>
             )}
           </ChannelInfo>
-          {!isDirectChannel && chekActionPermission('editChannel') && (
+          {!isDirectChannel && checkActionPermission('editChannel') && (
             <EditButton onClick={() => setEditMode(true)}>{channelEditIcon || <EditIcon />}</EditButton>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
-        {channel.myRole && (
+        {channel.role && (
           <Actions
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}
@@ -210,6 +262,18 @@ const Details = ({
             staredMessagesIcon={staredMessagesIcon}
             staredMessagesIconColor={staredMessagesIconColor}
             staredMessagesTextColor={staredMessagesTextColor}
+            showClearHistoryForDirectChannel={showClearHistoryForDirectChannel}
+            showClearHistoryForPrivateChannel={showClearHistoryForPrivateChannel}
+            showClearHistoryForPublicChannel={showClearHistoryForPublicChannel}
+            clearHistoryOrder={clearHistoryOrder}
+            clearHistoryIcon={clearHistoryIcon}
+            clearHistoryTextColor={clearHistoryTextColor}
+            showDeleteAllMessagesForDirectChannel={showDeleteAllMessagesForDirectChannel}
+            showDeleteAllMessagesForPrivateChannel={showDeleteAllMessagesForPrivateChannel}
+            showDeleteAllMessagesForPublicChannel={showDeleteAllMessagesForPublicChannel}
+            deleteAllMessagesOrder={deleteAllMessagesOrder}
+            deleteAllMessagesIcon={deleteAllMessagesIcon}
+            deleteAllMessagesTextColor={deleteAllMessagesTextColor}
             showPinChannel={showPinChannel}
             pinChannelOrder={pinChannelOrder}
             pinChannelIcon={pinChannelIcon}
@@ -232,17 +296,32 @@ const Details = ({
             reportChannelOrder={reportChannelOrder}
             reportChannelIconColor={reportChannelIconColor}
             reportChannelTextColor={reportChannelTextColor}
-            showDeleteChannel={chekActionPermission('deleteChannel')}
+            showDeleteChannel={checkActionPermission('deleteChannel')}
             deleteChannelIcon={deleteChannelIcon}
             deleteChannelIconColor={deleteChannelIconColor}
             deleteChannelTextColor={deleteChannelTextColor}
+            deleteChannelOrder={deleteChannelOrder}
             showBlockAndLeaveChannel={showBlockAndLeaveChannel}
+            showBlockUser={showBlockUser}
             blockAndLeaveChannelIcon={blockAndLeaveChannelIcon}
             blockAndLeaveChannelIconColor={blockAndLeaveChannelIconColor}
             blockAndLeaveChannelTextColor={blockAndLeaveChannelTextColor}
+            unblockUserIcon={unblockUserIcon}
             muteNotificationIcon={muteNotificationIcon}
             channel={channel}
             toggleable={false}
+            blockUserWarningText={blockUserWarningText}
+            blockAndLeavePublicChannelWarningText={blockAndLeavePublicChannelWarningText}
+            blockAndLeavePrivateChannelWarningText={blockAndLeavePrivateChannelWarningText}
+            leavePublicChannelWarningText={leavePublicChannelWarningText}
+            leavePrivateChannelWarningText={leavePrivateChannelWarningText}
+            deletePublicChannelWarningText={deletePublicChannelWarningText}
+            deletePrivateChannelWarningText={deletePrivateChannelWarningText}
+            deleteDirectChannelWarningText={deleteDirectChannelWarningText}
+            clearHistoryPublicChannelWarningText={clearHistoryPublicChannelWarningText}
+            clearHistoryPrivateChannelWarningText={clearHistoryPrivateChannelWarningText}
+            clearHistoryDirectChannelWarningText={clearHistoryDirectChannelWarningText}
+            timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
           />
         )}
         {/* <div ref={tabsRef}> */}
@@ -255,13 +334,28 @@ const Details = ({
           linkPreviewTitleColor={linkPreviewTitleColor}
           linkPreviewColor={linkPreviewColor}
           linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
+          voicePreviewIcon={voicePreviewIcon}
+          voicePreviewHoverIcon={voicePreviewHoverIcon}
+          voicePreviewTitleColor={voicePreviewTitleColor}
+          voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
+          voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
           filePreviewIcon={filePreviewIcon}
           filePreviewHoverIcon={filePreviewHoverIcon}
           filePreviewTitleColor={filePreviewTitleColor}
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
-          chekActionPermission={chekActionPermission}
+          checkActionPermission={checkActionPermission}
+          showChangeMemberRole={showChangeMemberRole}
+          showKickMember={showKickMember}
+          showKickAndBlockMember={showKickAndBlockMember}
+          showMakeMemberAdmin={showMakeMemberAdmin}
+          publicChannelDeleteMemberPopupDescription={publicChannelDeleteMemberPopupDescription}
+          privateChannelDeleteMemberPopupDescription={privateChannelDeleteMemberPopupDescription}
+          publicChannelRevokeAdminPopupDescription={publicChannelRevokeAdminPopupDescription}
+          privateChannelRevokeAdminPopupDescription={privateChannelRevokeAdminPopupDescription}
+          publicChannelMakeAdminPopupDescription={publicChannelMakeAdminPopupDescription}
+          privateChannelMakeAdminPopupDescription={privateChannelMakeAdminPopupDescription}
         />
         {/* </div> */}
       </ChatDetails>
@@ -276,16 +370,17 @@ const Container = styled.div<{ mounted: boolean }>`
   width: 0;
   border-left: 1px solid ${colors.gray1};
   //transition: all 0.1s;
-  ${(props) => props.mounted && ' width: 340px'}
+  ${(props) => props.mounted && ' width: 360px'}
 }
 `
 
 const ChannelDetailsHeader = styled.div`
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  padding: 16px;
   position: relative;
-  height: 68px;
+  height: 64px;
+  box-sizing: border-box;
   border-bottom: 1px solid ${colors.gray1};
 
   & svg {
@@ -295,7 +390,7 @@ const ChannelDetailsHeader = styled.div`
 
 const ChatDetails = styled.div<{ heightOffset: number }>`
   position: relative;
-  width: 340px;
+  width: 360px;
   height: ${(props) => (props.heightOffset ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   overflow-y: auto;
 `

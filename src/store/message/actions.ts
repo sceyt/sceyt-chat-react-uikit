@@ -33,19 +33,23 @@ import {
   SET_HAS_PREV_MESSAGES,
   SET_SCROLL_TO_MESSAGE,
   PAUSE_ATTACHMENT_UPLOADING,
-  RESUME_ATTACHMENT_UPLOADING
+  RESUME_ATTACHMENT_UPLOADING,
+  SET_ATTACHMENTS_FOR_POPUP,
+  SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
+  ADD_ATTACHMENTS_FOR_POPUP
 } from './constants'
-import { IChannel, IMessage, IReaction } from '../../types'
+import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
 export function sendMessageAC(
   message: any,
   channelId: string,
   connectionState: string,
-  sendAttachmentsAsSeparateMessage?: boolean
+  sendAttachmentsAsSeparateMessage?: boolean,
+  isResend?: boolean
 ) {
   return {
     type: SEND_MESSAGE,
-    payload: { message, channelId, connectionState, sendAttachmentsAsSeparateMessage }
+    payload: { message, channelId, connectionState, sendAttachmentsAsSeparateMessage, isResend }
   }
 }
 export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
@@ -55,10 +59,10 @@ export function sendTextMessageAC(message: any, channelId: string, connectionSta
   }
 }
 
-export function resendMessageAC(channelId: string, message: any) {
+export function resendMessageAC(message: any, channelId: string, connectionState: string) {
   return {
     type: RESEND_MESSAGE,
-    payload: { channelId, message }
+    payload: { channelId, message, connectionState }
   }
 }
 
@@ -164,12 +168,12 @@ export function deleteReactionFromMessageAC(message: IMessage, reaction: IReacti
   }
 }
 
-export function updateAttachmentUploadingStateAC(attachmentUploadingState: string, attachment?: any) {
+export function updateAttachmentUploadingStateAC(attachmentUploadingState: string, attachmentId?: any) {
   return {
     type: UPLOAD_ATTACHMENT_COMPILATION,
     payload: {
       attachmentUploadingState,
-      attachment
+      attachmentId
     }
   }
 }
@@ -251,37 +255,65 @@ export function clearMessagesAC() {
   }
 }
 
-export function getAttachmentsAC(channelId: string, messageType: string) {
+export function getAttachmentsAC(
+  channelId: string,
+  attachmentType: string,
+  limit?: number,
+  direction?: string,
+  attachmentId?: string,
+  forPopup?: boolean
+) {
   return {
     type: GET_MESSAGES_ATTACHMENTS,
-    payload: { channelId, messageType }
+    payload: { channelId, attachmentType, limit, direction, forPopup, attachmentId }
   }
 }
 
-export function setAttachmentsAC(messages: IMessage[], messageType: string) {
+export function setAttachmentsAC(attachments: IAttachment[]) {
   return {
     type: SET_ATTACHMENTS,
-    payload: { messages, messageType }
+    payload: { attachments }
   }
 }
 
-export function loadMoreAttachmentsAC(messageType: string) {
+export function setAttachmentsForPopupAC(attachments: IAttachment[]) {
+  return {
+    type: SET_ATTACHMENTS_FOR_POPUP,
+    payload: { attachments }
+  }
+}
+
+export function loadMoreAttachmentsAC(limit: number) {
   return {
     type: LOAD_MORE_MESSAGES_ATTACHMENTS,
-    payload: { messageType }
+    payload: { limit }
   }
 }
 
-export function addAttachmentsAC(messages: IMessage[], messageType: string) {
+export function addAttachmentsAC(attachments: IAttachment[]) {
   return {
     type: ADD_ATTACHMENTS,
-    payload: { messages, messageType }
+    payload: { attachments }
+  }
+}
+
+export function addAttachmentsForPopupAC(attachments: IAttachment[], direction: string) {
+  return {
+    type: ADD_ATTACHMENTS_FOR_POPUP,
+    payload: { attachments, direction }
   }
 }
 
 export function setAttachmentsCompleteAC(hasPrev: boolean) {
   return {
     type: SET_ATTACHMENTS_COMPLETE,
+    payload: { hasPrev }
+  }
+}
+
+export function setAttachmentsCompleteForPopupAC(hasPrev: boolean) {
+  return {
+    type: SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
     payload: { hasPrev }
   }
 }

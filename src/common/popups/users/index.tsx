@@ -31,13 +31,14 @@ import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
 import { colors } from '../../../UIHelper/constants'
-import { IAddMember, IChannel, IContact } from '../../../types'
-import { getContactsAC } from '../../../store/user/actions'
-import { contactListSelector } from '../../../store/user/selector'
+import { IAddMember, IChannel, IContact, IUser } from '../../../types'
+import { getContactsAC, getUsersAC } from '../../../store/user/actions'
+import { contactListSelector, contactsMapSelector, usersListSelector } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
-import { ReactComponent as DefaultAvatar } from '../../../assets/svg/devaultAvatar40.svg'
 import { makeUserName, userLastActiveDateFormat } from '../../../helpers'
+import { getUserDisplayNameFromContact } from '../../../helpers/contacts'
+import { useDidUpdate } from '../../../hooks'
 
 interface ISelectedUserData {
   id: string
@@ -73,6 +74,9 @@ const UsersPopup = ({
   // const showContactInfo = getShowContactInfo()
   // const roles = useSelector(rolesSelector).map((role) => role.name)
   const contactList = useSelector(contactListSelector)
+  const contactsMap = useSelector(contactsMapSelector)
+  const usersList = useSelector(usersListSelector)
+  const getFromContacts = getUserDisplayNameFromContact()
   // const roles: any = []
   // const users = useSelector(usersSelector)
   // const usersLoadingState = useSelector(usersLoadingStateSelector)
@@ -81,7 +85,7 @@ const UsersPopup = ({
   const [userSearchValue, setUserSearchValue] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
-  const [filteredUsers, setFilteredUsers] = useState(contactList)
+  const [filteredUsers, setFilteredUsers] = useState([])
   /* const handleGetUsers = (option) => {
     dispatch(
       getUsers({
@@ -94,35 +98,6 @@ const UsersPopup = ({
   useEffect(() => {
     dispatch(getRoles())
   }, [channel]) */
-
-  useEffect(() => {
-    if (userSearchValue) {
-      const filteredContacts = contactList.filter((contact: IContact) => {
-        return (
-          (contact.firstName && contact.firstName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
-          (contact.lastName && contact.lastName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
-          contact.id.toLowerCase().includes(userSearchValue.toLowerCase())
-          // (contact.keys.length && contact.keys.find((key) =>
-          // key.toLowerCase().includes(userSearchValue.toLowerCase())))
-        )
-      })
-      setFilteredUsers(filteredContacts)
-    } else {
-      setFilteredUsers(contactList)
-    }
-  }, [userSearchValue])
-
-  useEffect(() => {
-    dispatch(getContactsAC())
-  }, [])
-
-  useEffect(() => {
-    if (selectedMembersCont.current) {
-      setUsersContHeight(selectedMembersCont.current.offsetHeight)
-    } else {
-      setUsersContHeight(0)
-    }
-  }, [selectedMembers])
 
   const handleMembersListScroll = (event: any) => {
     if (event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
@@ -150,7 +125,7 @@ const UsersPopup = ({
       newSelectedMembers.push({
         id: contact.id,
         displayName: contact.displayName,
-        role: 'participant'
+        role: channel?.type === CHANNEL_TYPE.PUBLIC ? 'subscriber' : 'participant'
       })
     } else {
       const itemToDeleteIndex = newSelectedMembers.findIndex((member) => member.id === contact.id)
@@ -193,13 +168,14 @@ const UsersPopup = ({
     }
   } */
 
-  const handleCreateChannel = (selectedUser?: IContact) => {
+  const handleCreateChannel = (selectedUser?: IUser) => {
+    console.log('handleCreateChannel .. actionType', actionType)
     if (actionType === 'createChat') {
       const channelData = {
         metadata: '',
         label: '',
         type: CHANNEL_TYPE.DIRECT,
-        userId: selectedUser && selectedUser.user.id
+        userId: selectedUser && selectedUser.id
       }
       dispatch(createChannelAC(channelData))
     } else {
@@ -216,7 +192,7 @@ const UsersPopup = ({
     toggleCreatePopup()
   }
 
-  const handleAddMember = (user: IContact) => {
+  const handleAddMember = (user: IUser) => {
     handleCreateChannel(user)
   }
 
@@ -231,10 +207,51 @@ const UsersPopup = ({
   }
 
   useEffect(() => {
-    if (!userSearchValue) {
-      setFilteredUsers(contactList)
+    if (getFromContacts) {
+      if (!userSearchValue) {
+        setFilteredUsers(contactList.map((cont: IContact) => cont.user))
+      }
+    } else {
+      setFilteredUsers(usersList)
     }
-  }, [contactList])
+  }, [contactList, usersList])
+
+  useDidUpdate(() => {
+    if (getFromContacts) {
+      if (userSearchValue) {
+        const filteredContacts = contactList.filter((contact: IContact) => {
+          return (
+            (contact.firstName && contact.firstName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
+            (contact.lastName && contact.lastName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
+            contact.id.toLowerCase().includes(userSearchValue.toLowerCase())
+            // (contact.keys.length && contact.keys.find((key) =>
+            // key.toLowerCase().includes(userSearchValue.toLowerCase())))
+          )
+        })
+        setFilteredUsers(filteredContacts.map((cont: IContact) => cont.user))
+      } else {
+        setFilteredUsers(contactList.map((cont: IContact) => cont.user))
+      }
+    } else {
+      dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
+    }
+  }, [userSearchValue])
+
+  useEffect(() => {
+    if (selectedMembersCont.current) {
+      setUsersContHeight(selectedMembersCont.current.offsetHeight)
+    } else {
+      setUsersContHeight(0)
+    }
+  }, [selectedMembers])
+
+  useEffect(() => {
+    if (getFromContacts) {
+      dispatch(getContactsAC())
+    } else {
+      dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
+    }
+  }, [])
   return (
     <PopupContainer>
       <Popup
@@ -249,7 +266,13 @@ const UsersPopup = ({
         <PopupBody padding={24} withFooter={actionType !== 'createChat'}>
           <CloseIcon onClick={handleClosePopup} />
 
-          <PopupName>{actionType === 'createChat' ? 'Creat a new chat' : 'Add members'}</PopupName>
+          <PopupName>
+            {actionType === 'createChat'
+              ? 'Creat a new chat'
+              : channel?.type === CHANNEL_TYPE.PUBLIC
+              ? 'Add subscribers'
+              : 'Add members'}
+          </PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg />
             <SearchUsersInput
@@ -280,35 +303,34 @@ const UsersPopup = ({
             selectedMembersHeight={usersContHeight}
             onScroll={handleMembersListScroll}
           >
-            {filteredUsers.map((contact: IContact) => {
-              if (actionType === 'addMembers' && memberIds && memberIds.includes(contact.user.id)) {
+            {filteredUsers.map((user: IUser) => {
+              if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
                 return null
               }
-              const isSelected = selectedMembers.findIndex((member) => member.id === contact.user.id) >= 0
-              const memberDisplayName = makeUserName(contact, contact.user)
+              const isSelected = selectedMembers.findIndex((member) => member.id === user.id) >= 0
+              const memberDisplayName = makeUserName(contactsMap[user.id], user, getFromContacts)
               return (
                 <ListRow
                   isAdd={actionType !== 'createChat'}
-                  key={contact.user.id}
-                  onClick={() => actionType === 'createChat' && handleAddMember(contact)}
+                  key={user.id}
+                  onClick={() => actionType === 'createChat' && handleAddMember(user)}
                 >
                   <Avatar
-                    image={contact.user.avatarUrl}
-                    name={contact.user.firstName || contact.user.id}
+                    image={user.avatarUrl}
+                    name={user.firstName || user.id}
                     size={40}
                     textSize={16}
                     setDefaultAvatar
-                    defaultAvatarIcon={<DefaultAvatar />}
                   />
 
                   <UserNamePresence>
                     <MemberName>{memberDisplayName}</MemberName>
                     <SubTitle>
-                      {contact.user.presence && contact.user.presence.state === PRESENCE_STATUS.ONLINE
+                      {user.presence && user.presence.state === PRESENCE_STATUS.ONLINE
                         ? 'Online'
-                        : contact.user.presence &&
-                          contact.user.presence.lastActiveAt &&
-                          userLastActiveDateFormat(contact.user.presence.lastActiveAt)}
+                        : user.presence &&
+                          user.presence.lastActiveAt &&
+                          userLastActiveDateFormat(user.presence.lastActiveAt)}
                     </SubTitle>
                   </UserNamePresence>
                   {/* {isAdd && isSelected && (
@@ -341,9 +363,9 @@ const UsersPopup = ({
 
                   {actionType !== 'createChat' && (
                     <CustomCheckbox
-                      index={contact.user.id}
+                      index={user.id}
                       state={isSelected}
-                      onChange={(e) => handleUserSelect(e, { id: contact.user.id, displayName: memberDisplayName })}
+                      onChange={(e) => handleUserSelect(e, { id: user.id, displayName: memberDisplayName })}
                       size='18px'
                     />
                     /* <SelectMember
@@ -374,7 +396,7 @@ const UsersPopup = ({
             <Button
               type='button'
               color={colors.white}
-              backgroundColor='#0DBD8B'
+              backgroundColor={colors.primary}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
               onClick={() => handleCreateChannel()}
@@ -485,19 +507,19 @@ const ListRow = styled.div<{ isAdd: boolean }>`
 
 const UserNamePresence = styled.div`
   width: 100%;
+  max-width: calc(100% - 70px);
   margin: 0 auto 0 8px;
   line-height: 10px;
 `
 
 const MemberName = styled.h4`
-  font-family: 'Roboto', sans-serif;
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
   line-height: 16px;
   color: ${colors.blue6};
   margin: 0;
-  max-width: 150px;
+  max-width: calc(100% - 10px);
   text-overflow: ellipsis;
   white-space: nowrap;
   overflow: hidden;

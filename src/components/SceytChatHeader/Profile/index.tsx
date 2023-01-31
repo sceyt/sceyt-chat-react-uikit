@@ -55,7 +55,7 @@ function Profile() {
           >
             <ProfileLogo />
             {' '}
-            View Profile
+            View ProfileSettings
           </DropdownOptionLi>
           <DropdownOptionLi
             key={2}
@@ -95,7 +95,6 @@ const UserInfo = styled.div<any>`
   }
 `
 const UserName = styled.span`
-  font-family: Roboto, sans-serif;
   font-style: normal;
   font-weight: normal;
   font-size: 15px;

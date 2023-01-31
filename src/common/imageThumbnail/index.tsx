@@ -8,9 +8,10 @@ interface IProps {
   borderRadius?: string
   isLoaded: boolean
   isRepliedMessage?: boolean
+  fitTheContainer?: boolean
 }
 
-const ImageThumbnail = ({ src, width, height, borderRadius, isLoaded, isRepliedMessage }: IProps) => {
+const ImageThumbnail = ({ src, width, height, borderRadius, isLoaded, isRepliedMessage, fitTheContainer }: IProps) => {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   // const [loaded, setLoaded] = useState(false)
   useEffect(() => {
@@ -42,6 +43,7 @@ const ImageThumbnail = ({ src, width, height, borderRadius, isLoaded, isRepliedM
         width={width}
         height={height}
         isRepliedMessage={isRepliedMessage}
+        fitTheContainer={fitTheContainer}
       />
     </React.Fragment>
   )
@@ -55,6 +57,7 @@ const Canvas = styled.canvas<{
   width: number
   height: number
   isRepliedMessage?: boolean
+  fitTheContainer?: boolean
 }>`
   //width: ${(props) => `${props.width}px`};
   //height: ${(props) => `${props.height}px`};
@@ -62,7 +65,8 @@ const Canvas = styled.canvas<{
   max-height: 400px;
   width: ${(props) => props.isRepliedMessage && '40px'};
   height: ${(props) => props.isRepliedMessage && '40px'};
-  min-width: ${(props) => !props.isRepliedMessage && '130px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '130px'};
+  height: ${(props) => props.fitTheContainer && '100%'};
   border: 2px solid #dff6eb;
   border-radius: ${(props) => props.borderRadius || '4px'};
   box-sizing: border-box;

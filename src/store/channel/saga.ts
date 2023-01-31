@@ -3,29 +3,35 @@ import {
   addChannelAC,
   addChannelsAC,
   channelHasNextAC,
+  getChannelsAC,
   removeChannelAC,
+  removeChannelCachesAC,
   setActiveChannelAC,
   setChannelsAC,
   setChannelsFroForwardAC,
   setChannelsLoadingStateAC,
   switchChannelActionAC,
-  switchTypingIndicatorAC,
   updateChannelDataAC,
+  updateChannelLastMessageAC,
   updateUserStatusOnChannelAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
   CHECK_USER_STATUS,
+  CLEAR_HISTORY,
   CREATE_CHANNEL,
+  DELETE_ALL_MESSAGES,
   DELETE_CHANNEL,
   GET_CHANNELS,
   GET_CHANNELS_FOR_FORWARD,
+  JOIN_TO_CHANNEL,
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
   MARK_CHANNEL_AS_READ,
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  REMOVE_CHANNEL_CACHES,
   SEND_TYPING,
   SWITCH_CHANNEL,
   TURN_OFF_NOTIFICATION,
@@ -50,12 +56,14 @@ import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../help
 import { IAction, IChannel, IUser } from '../../types'
 import { getClient } from '../../common/client'
 import {
-  sendMessageAC,
+  clearMessagesAC,
+  sendTextMessageAC,
   // clearMessagesAC,
   updateMessageAC
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
 import { CONNECTION_STATUS } from '../user/constants'
+import { removeAllMessages, removeMessagesFromMap } from '../../helpers/messagesHalper'
 
 function* createChannel(action: IAction): any {
   try {
@@ -91,7 +99,7 @@ function* createChannel(action: IAction): any {
           attachments: [],
           type: 'system'
         }
-        yield put(sendMessageAC(messageToSend, createdChannel.id, CONNECTION_STATUS.CONNECTED))
+        yield put(sendTextMessageAC(messageToSend, createdChannel.id, CONNECTION_STATUS.CONNECTED))
       }
       yield put(addChannelAC(JSON.parse(JSON.stringify(createdChannel))))
     }
@@ -196,7 +204,7 @@ function* getChannelsForForward(action: IAction): any {
 
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
   } catch (e) {
-    console.log(e, 'Error on get channels')
+    console.log(e, 'Error on get for forward channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -286,7 +294,7 @@ function* switchChannel(action: IAction) {
     yield call(setUnreadScrollTo, true)
     yield call(setActiveChannelId, channel && channel.id)
     yield put(setActiveChannelAC({ ...channel }))
-    yield put(switchTypingIndicatorAC(false))
+    // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());
     if (channel) {
@@ -332,7 +340,7 @@ function* notificationsTurnOn(): any {
       })
     )
   } catch (e) {
-    console.log('ERROR turn on notifications', e.message)
+    console.log('ERROR turn on notifications: ', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -364,6 +372,20 @@ function* markChannelAsUnRead(action: IAction): any {
   }
 }
 
+function* removeChannelCaches(action: IAction): any {
+  const { payload } = action
+  const { channelId } = payload
+  const activeChannelId = yield call(getActiveChannelId)
+  removeChannelFromMap(channelId)
+  removeMessagesFromMap(channelId)
+  if (activeChannelId === channelId) {
+    const activeChannel = yield call(getLastChannelFromMap)
+    if (activeChannel) {
+      yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
+    }
+  }
+}
+
 function* leaveChannel(action: IAction): any {
   try {
     const { payload } = action
@@ -374,11 +396,16 @@ function* leaveChannel(action: IAction): any {
       yield call(channel.leave)
       yield put(removeChannelAC(channelId))
 
-      yield call(removeChannelFromMap, channelId)
-      const activeChannel = yield call(getLastChannelFromMap)
-      if (activeChannel) {
-        yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
+      if (channel.type === CHANNEL_TYPE.PRIVATE) {
+        const messageToSend: any = {
+          body: 'LG',
+          mentionedMembers: [],
+          attachments: [],
+          type: 'system'
+        }
+        yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
       }
+      yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
     console.log('ERROR in leave channel - ', e.message)
@@ -396,11 +423,8 @@ function* deleteChannel(action: IAction): any {
       yield call(channel.delete)
 
       yield put(removeChannelAC(channelId))
-      yield call(removeChannelFromMap, channelId)
-      const activeChannel = yield call(getLastChannelFromMap)
-      if (activeChannel) {
-        yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
-      }
+
+      yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
     console.log('ERROR in delete channel')
@@ -418,11 +442,7 @@ function* blockChannel(action: IAction): any {
       yield call(channel.block)
       yield put(removeChannelAC(channelId))
 
-      yield call(removeChannelFromMap, channelId)
-      const activeChannel = yield call(getLastChannelFromMap)
-      if (activeChannel) {
-        yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
-      }
+      yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
     console.log('ERROR in block channel - ', e.message)
@@ -512,6 +532,66 @@ function* sendTyping(action: IAction): any {
     }
   }
 }
+
+function* clearHistory(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+
+    const channel = yield call(getChannelFromMap, channelId)
+    const activeChannelId = yield call(getActiveChannelId)
+    if (channel) {
+      yield call(channel.deleteAllMessages, true)
+      yield put(clearMessagesAC())
+      removeMessagesFromMap(channelId)
+      if (channelId === activeChannelId) {
+        removeAllMessages()
+      }
+      yield put(updateChannelLastMessageAC({}, channel))
+    }
+  } catch (e) {
+    console.log('ERROR in clear history')
+    // yield put(setErrorNotification(e.message))
+  }
+}
+
+function* deleteAllMessages(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+
+    const channel = yield call(getChannelFromMap, channelId)
+    const activeChannelId = yield call(getActiveChannelId)
+    if (channel) {
+      yield call(channel.deleteAllMessages)
+      removeMessagesFromMap(channelId)
+      if (channelId === activeChannelId) {
+        yield put(clearMessagesAC())
+        removeAllMessages()
+      }
+      yield put(updateChannelLastMessageAC({}, channel))
+    }
+  } catch (e) {
+    console.log('ERROR in clear history')
+    // yield put(setErrorNotification(e.message))
+  }
+}
+
+function* joinChannel(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+
+    const channel = yield call(getChannelFromMap, channelId)
+    yield call(channel.join)
+    yield put(getChannelsAC({ search: '' }))
+    // yield put(switchChannelAction({ ...JSON.parse(JSON.stringify(channel)), myRole: updatedChannel.myRole }));
+  } catch (error) {
+    console.log(error, 'Error in join to channel')
+    // yield put(setErrorNotification(error.message))
+  }
+}
+
 function* watchForChannelEvents() {
   yield call(watchForEvents)
 }
@@ -535,4 +615,8 @@ export default function* ChannelsSaga() {
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
   yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
   yield takeLatest(SEND_TYPING, sendTyping)
+  yield takeLatest(CLEAR_HISTORY, clearHistory)
+  yield takeLatest(JOIN_TO_CHANNEL, joinChannel)
+  yield takeLatest(DELETE_ALL_MESSAGES, deleteAllMessages)
+  yield takeLatest(REMOVE_CHANNEL_CACHES, removeChannelCaches)
 }
