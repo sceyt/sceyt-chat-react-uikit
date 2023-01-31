@@ -43,14 +43,12 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
         ...member,
         role: selectedRole
       }
-      console.log('chnaged member data .. ', updateMember)
       dispatch(changeMemberRoleAC(channelId, [updateMember]))
     }
     handleClosePopup()
   }
 
   function onChangeFunction(roleName: string) {
-    console.log('selected role ,, ,, ', roleName)
     if (member.role !== roleName) {
       setIsChanged(true)
     }
@@ -93,7 +91,7 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
           <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor='#0DBD8B' borderRadius='8px' onClick={handleSave}>
+          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleSave}>
             Save
           </Button>
         </PopupFooter>
@@ -107,7 +105,6 @@ const RolesSelect = styled.div`
 `
 
 const RoleLabel = styled.div`
-  font-family: Roboto, sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 14px;

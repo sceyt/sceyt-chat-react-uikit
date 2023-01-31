@@ -20,11 +20,14 @@ import {
   UPDATE_MESSAGE,
   UPDATE_MESSAGES_STATUS,
   UPLOAD_ATTACHMENT_COMPILATION,
-  SET_SCROLL_TO_MESSAGE
+  SET_SCROLL_TO_MESSAGE,
+  SET_ATTACHMENTS_FOR_POPUP,
+  ADD_ATTACHMENTS_FOR_POPUP,
+  queryDirection,
+  SET_ATTACHMENTS_COMPLETE_FOR_POPUP
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
-import { getAttachmentsAndLinksFromMessages } from '../../helpers'
 import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_LENGTH,
@@ -43,7 +46,9 @@ export interface IMessageStore {
   pendingMessages: { [key: string]: IMessage[] }
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]
+  attachmentsForPopup: any[]
   attachmentHasNext: boolean
+  attachmentForPopupHasNext: boolean
   messageToEdit: IMessage | null
   messageForReply?: IMessage | null
   activeChannelMessageUpdated: { messageId: string; params: IMessage } | null
@@ -61,8 +66,10 @@ const initialState: IMessageStore = {
   threadMessagesHasNext: false,
   threadMessagesHasPrev: true,
   activeChannelMessages: [],
+  attachmentsForPopup: [],
   activeTabAttachments: [],
   attachmentHasNext: true,
+  attachmentForPopupHasNext: true,
   messageToEdit: null,
   activeChannelNewMessage: null,
   pendingMessages: {},
@@ -132,7 +139,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_MESSAGES: {
       // const { messages, direction, unreadCount } = payload
       const { messages } = payload
-
       newState.activeChannelMessages = messages
       return newState
     }
@@ -285,24 +291,44 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case SET_ATTACHMENTS: {
-      // TODO after getting more reliable attachment query refactor
-      const { messages, messageType } = payload
-      newState.activeTabAttachments = getAttachmentsAndLinksFromMessages(messages, messageType)
+      const { attachments } = payload
+      newState.activeTabAttachments = attachments
+      return newState
+    }
+
+    case SET_ATTACHMENTS_FOR_POPUP: {
+      const { attachments } = payload
+      newState.attachmentsForPopup = attachments
       return newState
     }
 
     case ADD_ATTACHMENTS: {
-      // TODO after getting more reliable attachment query refactor
-      const { messages, messageType } = payload
-      const activeTabAttachments = getAttachmentsAndLinksFromMessages(messages, messageType)
+      const { attachments } = payload
       const attachmentsCopy = [...newState.activeTabAttachments]
-      newState.activeTabAttachments = [...attachmentsCopy, ...activeTabAttachments]
+      newState.activeTabAttachments = [...attachmentsCopy, ...attachments]
+      return newState
+    }
+
+    case ADD_ATTACHMENTS_FOR_POPUP: {
+      const { attachments, direction } = payload
+      const attachmentsCopy = [...newState.attachmentsForPopup]
+      if (direction === queryDirection.PREV) {
+        newState.attachmentsForPopup = [...attachmentsCopy, ...attachments]
+      } else {
+        newState.attachmentsForPopup = [...attachments, ...attachmentsCopy]
+      }
       return newState
     }
 
     case SET_ATTACHMENTS_COMPLETE: {
       const { hasPrev } = payload
       newState.attachmentHasNext = hasPrev
+      return newState
+    }
+
+    case SET_ATTACHMENTS_COMPLETE_FOR_POPUP: {
+      const { hasPrev } = payload
+      newState.attachmentForPopupHasNext = hasPrev
       return newState
     }
 
@@ -328,10 +354,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case UPLOAD_ATTACHMENT_COMPILATION: {
-      const { attachmentUploadingState, attachment } = payload
+      const { attachmentUploadingState, attachmentId } = payload
       newState.attachmentsUploadingState = {
         ...newState.attachmentsUploadingState,
-        [attachment.attachmentId]: attachmentUploadingState
+        [attachmentId]: attachmentUploadingState
       }
       return newState
     }

@@ -1,17 +1,17 @@
-import { useState } from 'react';
+import { useState } from 'react'
 
 const useStateComplex = (initialState: any) => {
-  const [state, setState] = useState(initialState);
+  const [state, setState] = useState(initialState)
 
   return [
     state,
     (value: any) => {
       setState((prevState: any) => ({
         ...prevState,
-        ...value,
-      }));
-    },
-  ];
-};
+        ...value
+      }))
+    }
+  ]
+}
 
-export default useStateComplex;
+export default useStateComplex

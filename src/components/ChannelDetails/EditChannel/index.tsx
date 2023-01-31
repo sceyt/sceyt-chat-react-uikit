@@ -16,20 +16,14 @@ import {
 } from '../../../UIHelper'
 import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
-// import ImageCrop from '../../../../../Common/image-crop'
-import {
-  updateChannelAC
-  // setErrorNotification,
-} from '../../../store/channel/actions'
+import { updateChannelAC } from '../../../store/channel/actions'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
-// import DeletePopup from '../../../../../Common/Popups/delete'
 import { IChannel } from '../../../types'
 import { useDidUpdate, useStateComplex } from '../../../hooks'
-import DeletePopup from '../../../common/popups/delete'
+import ConfirmPopup from '../../../common/popups/delete'
 import ImageCrop from '../../../common/imageCrop'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 import { colors, customColors } from '../../../UIHelper/constants'
-// import { IChannel } from "../../../../types";
 
 const Container = styled.div<{ active: boolean; heightOffset: any }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
@@ -37,7 +31,7 @@ const Container = styled.div<{ active: boolean; heightOffset: any }>`
   position: absolute;
   padding: 24px 16px;
   background-color: #fff;
-  z-index: 10;
+  z-index: 25;
 `
 
 const AvatarCont = styled.div`
@@ -100,7 +94,7 @@ const EditChannel = ({
   const [deleteAvatarPopupOpen, setDeleteAvatarPopupOpen] = useState(false)
   const [selectedImageUrl, setSelectedImageUrl] = useState('')
   const [newSubject, setNewSubject] = useState(channel.subject)
-  const [newDescription, setNewDescription] = useState(channel.metadata.d || channel.metadata)
+  const [newDescription, setNewDescription] = useState(channel.metadata && channel.metadata.d)
   const [offsetTop, setOffsetTop] = useState(null)
   const [newAvatar, setNewAvatar] = useStateComplex({
     src: {},
@@ -194,7 +188,7 @@ const EditChannel = ({
       <Container ref={editContainer} heightOffset={offsetTop} active={isEditMode}>
         <AvatarCont>
           <DropDownWrapper>
-            {!isDirectChannel && channel.myRole && (
+            {!isDirectChannel && channel.role && (
               <DropDown position='center' trigger={<CameraIcon />}>
                 <DropdownOptionsUl>
                   <DropdownOptionLi
@@ -254,7 +248,7 @@ const EditChannel = ({
           <Button
             borderRadius='8px'
             color={editChannelSaveButtonTextColor}
-            backgroundColor={editChannelSaveButtonBackgroundColor || '#0DBD8B'}
+            backgroundColor={editChannelSaveButtonBackgroundColor || colors.primary}
             onClick={handleSave}
           >
             Save
@@ -271,8 +265,8 @@ const EditChannel = ({
       )}
 
       {deleteAvatarPopupOpen && (
-        <DeletePopup
-          deleteFunction={handleRemoveAvatar}
+        <ConfirmPopup
+          handleFunction={handleRemoveAvatar}
           togglePopup={handleToggleDeleteAvatarPopup}
           title='Remove avatar?'
           description='Are you sure you want to remove your avatar?'

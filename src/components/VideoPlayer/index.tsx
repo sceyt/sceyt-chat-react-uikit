@@ -4,13 +4,12 @@ import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { colors } from '../../UIHelper/constants'
-import { AttachmentIconCont } from '../ChannelDetails/DetailsTab'
 import { getFileExtension } from '../../helpers'
 import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
-import { UploadingIcon, UploadPercent, UploadProgress } from '../Attachment'
 import { getFrame3 } from '../../helpers/getVideoFrame'
 import { setVideoThumb } from '../../helpers/messagesHalper'
+import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from '../../UIHelper'
 
 interface IVideoPlayerProps {
   maxWidth?: string
@@ -21,6 +20,9 @@ interface IVideoPlayerProps {
   isRepliedMessage?: boolean
   backgroundColor: string
   src: string
+  uploading?: boolean
+  isDetailsView?: boolean
+  setVideoIsReadyToSend?: (attachmentId: string) => void
 }
 
 const VideoPlayer = ({
@@ -30,8 +32,11 @@ const VideoPlayer = ({
   file,
   borderRadius,
   isPreview,
+  uploading,
   isRepliedMessage,
-  backgroundColor
+  backgroundColor,
+  isDetailsView,
+  setVideoIsReadyToSend
 }: IVideoPlayerProps) => {
   const [videoPlaying, setVideoPlaying] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
@@ -84,7 +89,7 @@ const VideoPlayer = ({
   useEffect(() => {
     let checkVideoInterval: any
 
-    if (file.type === 'video' && videoRef.current) {
+    if (videoRef.current) {
       checkVideoInterval = setInterval(async () => {
         if (videoRef.current && videoRef.current.readyState > 3) {
           // drawCanvas()
@@ -98,6 +103,9 @@ const VideoPlayer = ({
             const thumb = await getFrame3(videoRef.current, 1)
             if (thumb) {
               setVideoThumb(file.attachmentId!, { ...thumb, duration: videoRef.current.duration })
+              if (setVideoIsReadyToSend) {
+                setVideoIsReadyToSend(file.attachmentId!)
+              }
             }
           }
           clearInterval(checkVideoInterval)
@@ -109,6 +117,7 @@ const VideoPlayer = ({
     }
     return () => clearInterval(checkVideoInterval)
   }, [downloadIsCancelled])
+
   return (
     <Component
       maxWidth={maxWidth}
@@ -117,13 +126,14 @@ const VideoPlayer = ({
       isRepliedMessage={isRepliedMessage}
       isPreview={isPreview}
       backgroundColor={backgroundColor}
+      isDetailsView={isDetailsView}
     >
-      {!isPreview && loading && (
+      {!isPreview && loading && !uploading && (
         <UploadProgress
           onClick={handlePauseResumeDownload}
           isRepliedMessage={isRepliedMessage}
-          backgroundImage={`data:image/jpeg;base64,${file.metadata.thumbnail}`}
           borderRadius={borderRadius}
+          backgroundImage={file.metadata && file.metadata.tmb ? file.metadata.tmb : ''}
         >
           <UploadPercent isRepliedMessage={isRepliedMessage}>
             {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
@@ -136,7 +146,7 @@ const VideoPlayer = ({
         preload='auto'
         id='video'
         // crossOrigin='anonymous'
-        src={src || file.url}
+        src={file.attachmentUrl || src || file.url}
         onPause={() => setVideoPlaying(false)}
         onPlay={() => setVideoPlaying(true)}
       >
@@ -156,13 +166,13 @@ const VideoPlayer = ({
       )} */}
       {videoCurrentTime && (
         <VideoControls>
-          {!isPreview && !!videoDuration && !isRepliedMessage && (
+          {!isPreview && !!videoDuration && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
             <VideoPlayButton showOnHover={videoPlaying}>
               <PlayIcon />
             </VideoPlayButton>
           )}
-          <VideoTime isRepliedMessage={isPreview || isRepliedMessage}>
+          <VideoTime isDetailsView={isDetailsView} isRepliedMessage={isPreview || isRepliedMessage}>
             {!isRepliedMessage && !isPreview && <VideoCamIcon />}
             {videoCurrentTime}
           </VideoTime>
@@ -178,12 +188,16 @@ const VideoControls = styled.div`
   position: absolute;
   left: 0;
   width: 100%;
-  height: calc(100% - 64px);
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 `
 
-const VideoTime = styled.div<{ isRepliedMessage?: boolean }>`
+const VideoTime = styled.div<{ isRepliedMessage?: boolean; isDetailsView?: boolean }>`
   position: absolute;
-  top: ${(props) => (props.isRepliedMessage ? '3px' : '8px')};
+  top: ${(props) => (props.isRepliedMessage ? '3px' : props.isDetailsView ? undefined : '8px')};
+  bottom: ${(props) => (props.isDetailsView ? '8px' : undefined)};
   left: ${(props) => (props.isRepliedMessage ? '3px' : '8px')};
   font-size: ${(props) => (props.isRepliedMessage ? '10px' : '12px')};
   display: flex;
@@ -195,14 +209,12 @@ const VideoTime = styled.div<{ isRepliedMessage?: boolean }>`
   color: ${colors.white};
 
   & > svg {
+    color: ${colors.white};
     margin-right: 4px;
   }
 `
 
 const VideoPlayButton = styled.div<{ showOnHover?: boolean }>`
-  position: absolute;
-  top: calc(50% + 4px);
-  left: calc(50% - 28px);
   cursor: pointer;
   visibility: ${(props) => props.showOnHover && 'hidden'};
 `
@@ -210,6 +222,7 @@ const VideoPlayButton = styled.div<{ showOnHover?: boolean }>`
 const Component = styled.div<{
   isPreview?: boolean
   isRepliedMessage?: boolean
+  isDetailsView?: boolean
   maxWidth?: string
   maxHeight?: string
   borderRadius?: string
@@ -239,7 +252,7 @@ const Component = styled.div<{
     border: ${(props) =>
       !props.isPreview && props.isRepliedMessage
         ? '0.5px solid rgba(0, 0, 0, 0.1)'
-        : `2px solid ${props.backgroundColor}`};
+        : !props.isDetailsView && `2px solid ${props.backgroundColor}`};
     object-fit: cover;
     box-sizing: border-box;
     border-radius: ${(props) => (props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px')};

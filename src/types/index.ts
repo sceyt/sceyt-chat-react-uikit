@@ -40,13 +40,11 @@ export interface IChannel {
   subject?: string,
   label?: string,
   metadata: any;
-  myRole: IRole | null;
+  role: string;
   avatarUrl?: string,
   unreadMessageCount?: number,
   delete: () => Promise<void>;
-  clearHistory: () => Promise<{
-    cleared: boolean;
-  }>;
+  deleteAllMessages: (deleteForMe?: boolean) => Promise<void>;
   hide: () => Promise<boolean>;
   unhide: () => Promise<boolean>;
   markAsUnRead: () => Promise<IChannel>;
@@ -106,6 +104,7 @@ export interface IReaction {
 export interface IAttachment {
   id?: string
   attachmentId?: string,
+  createdAt: Date,
   url: any,
   attachmentUrl: string,
   type: string,
@@ -114,6 +113,7 @@ export interface IAttachment {
   fileSize: number
   title?: string
   metadata?: any
+  user: IUser
 }
 
 export interface IMedia extends IAttachment{
@@ -161,3 +161,5 @@ export interface IContact{
 export interface IContactsMap {
   [key: string]: IContact
 }
+
+export type MuteTime = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 24

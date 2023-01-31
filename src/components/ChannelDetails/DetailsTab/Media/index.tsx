@@ -1,12 +1,14 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { getFileExtension } from '../../../../helpers'
+// import { getFileExtension } from '../../../../helpers'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { IAttachment } from '../../../../types'
 import SliderPopup from '../../../../common/popups/sliderPopup'
+import Attachment from '../../../Attachment'
+import { colors } from '../../../../UIHelper/constants'
 // import SliderPopup from '../../../../../common/Popups/SliderPopup'
 
 interface IProps {
@@ -28,19 +30,27 @@ const Media = ({ channelId }: IProps) => {
       {attachments.map((file: IAttachment) => (
         <MediaItem key={file.url} onClick={() => handleMediaItemClick(file)}>
           {file.type === 'image' ? (
-            <img src={file.url} alt='mediaImg' />
+            <Attachment attachment={file} backgroundColor={colors.white} borderRadius='8px' isDetailsView />
           ) : (
-            <video>
+            // <img src={file.url} alt='' />
+
+            <Attachment attachment={file} backgroundColor={colors.white} borderRadius='8px' isDetailsView />
+            /* <video>
               <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
               <source src={file.url} type='video/ogg' />
               <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
               Your browser does not support the video tag.
-            </video>
+            </video> */
           )}
         </MediaItem>
       ))}
       {mediaFile && (
-        <SliderPopup setIsSliderOpen={setMediaFile} mediaFiles={attachments} currentMediaFile={mediaFile} />
+        <SliderPopup
+          channelId={channelId}
+          setIsSliderOpen={setMediaFile}
+          mediaFiles={attachments}
+          currentMediaFile={mediaFile}
+        />
       )}
     </Container>
   )
@@ -49,8 +59,7 @@ const Media = ({ channelId }: IProps) => {
 export default Media
 
 const Container = styled.div<any>`
-  padding: 0 8px;
-  margin: 0 -2px;
+  padding: 6px 4px;
   overflow-x: hidden;
   overflow-y: auto;
   list-style: none;
@@ -60,23 +69,11 @@ const Container = styled.div<any>`
   flex-wrap: wrap;
 `
 const MediaItem = styled.div`
-  width: calc(33.3333% - 6px);
-  height: 90px;
+  width: calc(33.3333% - 5px);
+  height: 110px;
   //border: 1px solid #ccc;
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;
   overflow: hidden;
   margin: 2px;
-  img {
-    max-width: 100%;
-    min-width: 100%;
-    height: 90px;
-    cursor: pointer;
-    object-fit: cover;
-  }
-  video {
-    width: 100%;
-    height: 100%;
-    cursor: pointer;
-  }
 `

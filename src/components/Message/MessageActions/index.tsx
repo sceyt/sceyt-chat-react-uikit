@@ -13,6 +13,7 @@ import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import EmojisPopup from '../../Emojis'
 import usePermissions from '../../../hooks/usePermissions'
+import { CHANNEL_TYPE } from '../../../helpers/constants'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
@@ -21,6 +22,7 @@ interface EditMessageContainerProps {
 
 export default function MessageActions({
   editModeToggle,
+  channelType,
   // handleResendMessage,
   handleOpenDeleteMessage,
   handleOpenForwardMessage,
@@ -69,21 +71,17 @@ export default function MessageActions({
 }: any) {
   const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const emojisRef = useRef<any>(null)
-  const [chekActionPermission] = usePermissions(myRole)
-
+  const [checkActionPermission] = usePermissions(myRole)
+  const isDirectChannel = channelType === CHANNEL_TYPE.DIRECT
   const editMessagePermitted = isIncoming
-    ? chekActionPermission('editAnyMessage')
-    : chekActionPermission('editOwnMessage')
+    ? checkActionPermission('editAnyMessage')
+    : checkActionPermission('editOwnMessage')
 
   const replyMessagePermitted = isIncoming
-    ? chekActionPermission('replyAnyMessage')
-    : chekActionPermission('replyOwnMessage')
+    ? checkActionPermission('replyAnyMessage')
+    : checkActionPermission('replyOwnMessage')
 
-  const deleteMessagePermitted = isIncoming
-    ? chekActionPermission('deleteAnyMessage')
-    : chekActionPermission('deleteOwnMessage')
-
-  const forwardMessagePermitted = chekActionPermission('forwardMessage')
+  const forwardMessagePermitted = checkActionPermission('forwardMessage')
 
   // console.log('reactionPermitted .. . ', reactionPermitted)
   const handleClick = (e: any) => {
@@ -100,7 +98,7 @@ export default function MessageActions({
   return (
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
       <EditMessageContainer className='message_actions_cont '>
-        {showMessageReaction && chekActionPermission('addMessageReaction') && (
+        {showMessageReaction && checkActionPermission('addMessageReaction') && (
           <Action
             order={reactionIconOrder || 0}
             iconColor={messageActionIconsColor}
@@ -111,7 +109,7 @@ export default function MessageActions({
             {reactionIcon || <ReactionIcon />}
           </Action>
         )}
-        {showEditMessage && editMessagePermitted && (
+        {showEditMessage && editMessagePermitted && (isDirectChannel ? !isIncoming : true) && (
           <Action
             order={editIconOrder || 1}
             iconColor={messageActionIconsColor}
@@ -170,7 +168,8 @@ export default function MessageActions({
             {forwardIcon || <ForwardIcon />}
           </Action>
         )}
-        {showDeleteMessage && deleteMessagePermitted && (
+
+        {showDeleteMessage && (channelType === CHANNEL_TYPE.PUBLIC ? myRole === 'owner' || myRole === 'admin' : true) && (
           <Action
             order={deleteIconOrder || 5}
             iconColor={messageActionIconsColor}

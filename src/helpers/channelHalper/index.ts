@@ -1,5 +1,4 @@
 import { IChannel } from '../../types'
-
 let channelsMap: channelMap = {}
 let activeChannelId = ''
 export function setChannelInMap(channel: IChannel) {
@@ -54,7 +53,9 @@ export const query: any = {
   usersQuery: null,
   hiddenQuery: null,
   messageQuery: null,
-  blockedMembersQuery: null
+  blockedMembersQuery: null,
+  AttachmentByTypeQuery: null,
+  AttachmentByTypeQueryForPopup: null
 }
 
 const unreadScrollTo = {

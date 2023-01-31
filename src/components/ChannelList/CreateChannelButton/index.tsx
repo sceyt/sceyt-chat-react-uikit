@@ -12,9 +12,17 @@ import CreateChannel from '../../../common/popups/createChannel'
 
 interface IChannelListProps {
   showSearch?: boolean
+  uriPrefixOnCreateChannel?: string
+  createChannelIcon?: JSX.Element
+  createChannelIconHoverBackground?: string
 }
 
-const CreateChannelButton: React.FC<IChannelListProps> = ({ showSearch }) => {
+const CreateChannelButton: React.FC<IChannelListProps> = ({
+  showSearch,
+  uriPrefixOnCreateChannel,
+  createChannelIcon,
+  createChannelIconHoverBackground
+}) => {
   // const dispatch = useDispatch()
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState('')
@@ -33,8 +41,8 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({ showSearch }) => {
         forceClose={showAddMemberPopup || !!showCreateChannel}
         position='center'
         trigger={
-          <CreateDropdownButton leftAuto={!showSearch}>
-            <AddChannelIcon />
+          <CreateDropdownButton hoverBackground={createChannelIconHoverBackground} leftAuto={!showSearch}>
+            {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
       >
@@ -81,7 +89,11 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({ showSearch }) => {
         />
       )}
       {showCreateChannel && (
-        <CreateChannel handleClose={() => setShowCreateChannel('')} channelType={showCreateChannel} />
+        <CreateChannel
+          handleClose={() => setShowCreateChannel('')}
+          channelType={showCreateChannel}
+          uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
+        />
       )}
     </React.Fragment>
   )
@@ -89,8 +101,11 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({ showSearch }) => {
 
 export default CreateChannelButton
 
-const CreateDropdownButton = styled.div<{ leftAuto: boolean }>`
+const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: string }>`
   //margin-left: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   cursor: pointer;
   line-height: 55px;
   margin-left: ${(props) => (props.leftAuto ? 'auto' : '12px')};
@@ -98,6 +113,6 @@ const CreateDropdownButton = styled.div<{ leftAuto: boolean }>`
   height: 40px;
   border-radius: 50%;
   &:hover {
-    background-color: #ebf7f1;
+    background-color: ${(props) => props.hoverBackground || '#ebf7f1'};
   }
 `

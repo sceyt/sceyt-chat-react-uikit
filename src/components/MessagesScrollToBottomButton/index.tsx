@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
 import React from 'react'
 
-import { colors, customColors } from '../../UIHelper/constants'
+import { colors } from '../../UIHelper/constants'
 import { activeChannelSelector } from '../../store/channel/selector'
 import { scrollToNewMessageAC } from '../../store/message/actions'
 import { IChannel } from '../../types'
@@ -38,8 +38,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountWidth,
   unreadCountHeight,
   unreadCountFontSize,
-  unreadCountTextColor,
-  unreadCountBackgroundColor
+  unreadCountTextColor
 }) => {
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -70,7 +69,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
               height={unreadCountHeight}
               textColor={unreadCountTextColor}
               fontSize={unreadCountFontSize}
-              backgroundColor={unreadCountBackgroundColor || customColors.messageReadStatusTickColor}
+              backgroundColor={colors.primary}
               isMuted={channel.muted}
             >
               {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}

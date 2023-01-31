@@ -13,7 +13,7 @@ import {
 import { colors } from '../../UIHelper/constants'
 import MessageDivider from '../MessageDivider'
 import Message from '../Message'
-import { activeChannelSelector } from '../../store/channel/selector'
+import { activeChannelSelector, isDraggingSelector } from '../../store/channel/selector'
 // import { LOADING_STATE } from '../../helpers/constants'
 import {
   getMessagesAC,
@@ -22,7 +22,7 @@ import {
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC
 } from '../../store/message/actions'
-import { IAttachment, IChannel, IContactsMap } from '../../types'
+import { IChannel, IContactsMap } from '../../types'
 import { getUnreadScrollTo, setUnreadScrollTo } from '../../helpers/channelHalper'
 import { contactsMapSelector } from '../../store/user/selector'
 import {
@@ -34,7 +34,12 @@ import {
   setHasPrevCached
 } from '../../helpers/messagesHalper'
 import SliderPopup from '../../common/popups/sliderPopup'
-import { makeUserName } from '../../helpers'
+import { makeUserName, systemMessageUserName } from '../../helpers'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
+import { setDraggedAttachments, setIsDragging } from '../../store/channel/actions'
+import { useDidUpdate } from '../../hooks'
 
 let loading = false
 // let lastPrevLoadedId: string = ''
@@ -44,6 +49,7 @@ let loading = false
 let loadDirection = ''
 // let nextTargetMessage = ''
 let nextDisable = false
+let prevDisable = false
 const CreateMessageDateDivider = ({
   lastIndex,
   currentMessageDate,
@@ -87,10 +93,8 @@ interface MessagesProps {
   messageTimePosition?: 'topOfMessage' | 'onMessage'
   ownMessageBackground?: string
   incomingMessageBackground?: string
-  statusIconColor?: string
   showMessageStatus?: boolean
   hoverBackground?: boolean
-  senderNameColor?: string
   showSenderNameOnDirectChannel?: boolean
   showSenderNameOnOwnMessages?: boolean
   showOwnAvatar?: boolean
@@ -160,13 +164,11 @@ const Messages: React.FC<MessagesProps> = ({
   messageTimePosition,
   ownMessageBackground,
   incomingMessageBackground,
-  statusIconColor,
   showMessageStatus,
   hoverBackground,
   showSenderNameOnDirectChannel,
   showSenderNameOnOwnMessages,
   showOwnAvatar,
-  senderNameColor,
   messageReaction,
   editMessage,
   replyMessage,
@@ -226,7 +228,9 @@ const Messages: React.FC<MessagesProps> = ({
   fileAttachmentsSizeColor
 }) => {
   const dispatch = useDispatch()
+  const getFromContacts = getUserDisplayNameFromContact()
   const channel: IChannel = useSelector(activeChannelSelector)
+  const isDragging: boolean = useSelector(isDraggingSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
@@ -236,7 +240,6 @@ const Messages: React.FC<MessagesProps> = ({
   // const messages = useSelector(activeChannelMessagesSelector, shallowEqual)
   // const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
   const [unreadMessageId, setUnreadMessageId] = useState('')
-  const [attachments, setAttachments] = useState<any[]>([])
   const [mediaFile, setMediaFile] = useState<any>(null)
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
@@ -294,14 +297,10 @@ const Messages: React.FC<MessagesProps> = ({
         dispatch(showScrollToNewMessageButtonAC(false))
       }
       const scrollHeightQuarter = (target.scrollHeight * 20) / 100
-      // console.log('-target.offsetHeight --- ', target.offsetHeight)
-      // console.log('-target.scrollHeight --- ', target.scrollHeight)
-      // console.log('-target.scrollTop --- ', -target.scrollTop)
-      // console.log('-target.scrollHeight - target.offsetHeight --- ', target.scrollHeight - target.offsetHeight)
-      // console.log('scrollHeightQuarter. . .. .  ', scrollHeightQuarter)
       // -target.scrollTop >= target.scrollHeight - target.offsetHeight - 6
       // if (-target.scrollTop >= scrollHeightQuarter && hasPrev) {
       if (
+        !prevDisable &&
         -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightQuarter &&
         /* hasPrev && */ !loading
       ) {
@@ -316,13 +315,14 @@ const Messages: React.FC<MessagesProps> = ({
        */
         if (hasPrevMessages && lastVisibleMessage) {
           nextDisable = true
-          // console.log('lastVisibleMessageId. .. ', lastVisibleMessageId)
           // target.scrollTop = lastVisibleMessage.offsetTop
         }
         // dispatch(loadMoreMessagesAC(10, 'prev', channel.id))
       }
-      if (lastVisibleMessagePos > target.scrollTop) {
+      if (lastVisibleMessagePos - 420 > target.scrollTop) {
         nextDisable = false
+      } else {
+        prevDisable = false
       }
       if (
         !nextDisable &&
@@ -336,7 +336,9 @@ const Messages: React.FC<MessagesProps> = ({
           target.scrollTop = lastVisibleMessage.offsetTop - 10
         } */
         // dispatch(loadMoreMessagesAC(10, 'next', channel.id))
-
+        if (hasNextMessages && lastVisibleMessage) {
+          prevDisable = true
+        }
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
         /* if (cachedMessages.next) {
           loading = true
@@ -376,7 +378,6 @@ const Messages: React.FC<MessagesProps> = ({
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
         loading = true
         // result = await messageQuery.loadPreviousMessageId(firstMessageId)
-        // console.log('dispatch load prev messages .. ', hasPrevMessages)
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, firstMessageId, hasPrevMessages))
         // lastPrevLoadedId = messageQuery.firstMessageId
         // hasPrevMessages = result.hasNext
@@ -401,14 +402,77 @@ const Messages: React.FC<MessagesProps> = ({
             addMessagesToMap(channel.id, result.messages, 'next')
           }
         }) */
-
-        // console.log('load more next messages ,,, ', lastMessageId)
       }
       // setMessagesLoadingStateAC(LOADING_STATE.LOADED)
     }
-    // console.log('load more messages received .. ', result.messages)
     // addMessagesAC(result.messages, direction)
   }
+
+  const handleDragIn = (e: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    e.target && e.target.classList.add('dragover')
+  }
+  const handleDragOut = (e: any) => {
+    if (e.target.classList.contains('dragover')) {
+      e.target.classList.remove('dragover')
+    }
+    if (!e.relatedTarget || !e.relatedTarget.draggable) {
+      dispatch(setIsDragging(false))
+    }
+  }
+  const handleDropFile = (e: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dispatch(setIsDragging(false))
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const fileList: File[] = Object.values(e.dataTransfer.files)
+      const attachmentsFiles: any = []
+      new Promise<void>((resolve) => {
+        fileList.map((attachment, index) => {
+          const fileReader = new FileReader()
+          fileReader.onload = (event: any) => {
+            const file = event.target.result
+            attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
+            if (fileList.length - 1 === index) {
+              resolve()
+            }
+          }
+          fileReader.readAsDataURL(attachment)
+        })
+      }).then(() => {
+        dispatch(setDraggedAttachments(attachmentsFiles, 'file'))
+      })
+      e.dataTransfer.clearData()
+    }
+  }
+
+  const handleDropMedia = (e: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    dispatch(setIsDragging(false))
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const fileList: File[] = Object.values(e.dataTransfer.files)
+      const attachmentsFiles: any = []
+      new Promise<void>((resolve) => {
+        fileList.map((attachment, index) => {
+          const fileReader = new FileReader()
+          fileReader.onload = (event: any) => {
+            const file = event.target.result
+            attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
+            if (fileList.length - 1 === index) {
+              resolve()
+            }
+          }
+          fileReader.readAsDataURL(attachment)
+        })
+      }).then(() => {
+        dispatch(setDraggedAttachments(attachmentsFiles, 'media'))
+      })
+      e.dataTransfer.clearData()
+    }
+  }
+
   useEffect(() => {
     if (scrollToRepliedMessage) {
       const repliedMessage = document.getElementById(scrollToRepliedMessage)
@@ -453,13 +517,18 @@ const Messages: React.FC<MessagesProps> = ({
     // hasNextMessages = true
     // hasPrevMessages = true
     nextDisable = false
+    prevDisable = false
     // messageTopDateRef.current.innerText = ''
     // setActiveChannel(channel)
   }, [channel.id])
+  useDidUpdate(() => {
+    if (!isDragging) {
+      renderTopDate()
+    }
+  }, [isDragging])
 
   /* useEffect(() => {
     if (channel.id !== activeChannelId) {
-      console.log('set hide messages..... ')
       setHideMessages(true)
       activeChannelId = channel.id
     }
@@ -471,7 +540,9 @@ const Messages: React.FC<MessagesProps> = ({
       // setTimeout(() => {
       if (loadDirection !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
-        lastVisibleMessage && (scrollRef.current.scrollTop = lastVisibleMessage.offsetTop + 10)
+        if (lastVisibleMessage && lastVisibleMessage.offsetTop >= scrollRef.current.scrollTop) {
+          lastVisibleMessage && (scrollRef.current.scrollTop = lastVisibleMessage.offsetTop)
+        }
       } else {
         if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
           scrollRef.current.scrollTop = -400
@@ -484,7 +555,7 @@ const Messages: React.FC<MessagesProps> = ({
       scrollRef.current.scrollTop = 0
       dispatch(scrollToNewMessageAC(false))
     }
-    let updatedAttachments: any = []
+    /* let updatedAttachments: any = []
     if (messages.length) {
       messages.forEach((message) => {
         if (message.attachments.length) {
@@ -496,14 +567,13 @@ const Messages: React.FC<MessagesProps> = ({
         }
       })
     }
-    setAttachments(updatedAttachments)
+    setAttachments(updatedAttachments) */
 
     renderTopDate()
 
     // console.log('messages... ', messages)
   }, [messages])
   /* useEffect(() => {
-    console.log('pendingMessages on messages . 000 .. ... ', pendingMessages)
   }, [pendingMessages]) */
   useEffect(() => {
     if (getUnreadScrollTo()) {
@@ -523,158 +593,204 @@ const Messages: React.FC<MessagesProps> = ({
   })
   return (
     <React.Fragment>
-      {showTopFixedDate && (
-        <MessageTopDate
-          dateDividerFontSize={dateDividerFontSize}
-          dateDividerTextColor={dateDividerTextColor}
-          dateDividerBorder={dateDividerBorder}
-          dateDividerBackgroundColor={dateDividerBackgroundColor}
-          dateDividerBorderRadius={dateDividerBorderRadius}
+      {isDragging && (
+        <DragAndDropContainer
+          id='draggingContainer'
+          draggable
+          onDragLeave={handleDragOut}
           topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
+          height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
         >
-          <span ref={messageTopDateRef} />
-        </MessageTopDate>
+          <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragIn}>
+            <IconWrapper draggable>
+              <ChoseFileIcon />
+            </IconWrapper>
+            Drag & drop to send as file
+          </DropAttachmentArea>
+          <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragIn}>
+            <IconWrapper draggable>
+              <ChoseMediaIcon />
+            </IconWrapper>
+            Drag & drop to add picture or video
+          </DropAttachmentArea>
+        </DragAndDropContainer>
       )}
-      {/* {!hideMessages && ( */}
-      <Container id='scrollableDiv' ref={scrollRef} onScroll={handleMessagesListScroll}>
-        <MessagesBox
-          enableResetScrollToCoords={false}
-          replyMessage={messageForReply && messageForReply.id}
-          attachmentsSelected={attachmentsSelected}
-          ref={messagesBoxRef}
-        >
-          {messages.map((message: any, index: number) => {
-            const prevMessage = messages[index - 1]
-            const nextMessage =
-              messages[index + 1] || (currentChannelPendingMessages.length > 0 && currentChannelPendingMessages[0])
-            const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
-            return (
-              <React.Fragment key={message.id || message.tid}>
-                <CreateMessageDateDivider
-                  // lastIndex={index === 0}
-                  lastIndex={false}
-                  currentMessageDate={message.createdAt}
-                  nextMessageDate={prevMessage && prevMessage.createdAt}
-                  messagesHasNext={hasPrevMessages}
-                  dateDividerFontSize={dateDividerFontSize}
-                  dateDividerTextColor={dateDividerTextColor}
-                  dateDividerBorder={dateDividerBorder}
-                  dateDividerBackgroundColor={dateDividerBackgroundColor}
-                  dateDividerBorderRadius={dateDividerBorderRadius}
-                />
-                {message.type === 'system' ? (
-                  <MessageTopDate
-                    systemMessage
-                    visible={showTopFixedDate}
-                    dividerText={message.body}
+      <React.Fragment>
+        {showTopFixedDate && (
+          <MessageTopDate
+            dateDividerFontSize={dateDividerFontSize}
+            dateDividerTextColor={dateDividerTextColor}
+            dateDividerBorder={dateDividerBorder}
+            dateDividerBackgroundColor={dateDividerBackgroundColor}
+            dateDividerBorderRadius={dateDividerBorderRadius}
+            topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
+          >
+            <span ref={messageTopDateRef} />
+          </MessageTopDate>
+        )}
+        {/* {!hideMessages && ( */}
+        <Container id='scrollableDiv' ref={scrollRef} onScroll={handleMessagesListScroll}>
+          <MessagesBox
+            enableResetScrollToCoords={false}
+            replyMessage={messageForReply && messageForReply.id}
+            attachmentsSelected={attachmentsSelected}
+            ref={messagesBoxRef}
+          >
+            {messages.map((message: any, index: number) => {
+              const prevMessage = messages[index - 1]
+              const nextMessage =
+                messages[index + 1] || (currentChannelPendingMessages.length > 0 && currentChannelPendingMessages[0])
+              const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
+              // @ts-ignore
+              return (
+                <React.Fragment key={message.id || message.tid}>
+                  <CreateMessageDateDivider
+                    // lastIndex={index === 0}
+                    lastIndex={false}
+                    currentMessageDate={message.createdAt}
+                    nextMessageDate={prevMessage && prevMessage.createdAt}
+                    messagesHasNext={hasPrevMessages}
                     dateDividerFontSize={dateDividerFontSize}
                     dateDividerTextColor={dateDividerTextColor}
                     dateDividerBorder={dateDividerBorder}
                     dateDividerBackgroundColor={dateDividerBackgroundColor}
                     dateDividerBorderRadius={dateDividerBorderRadius}
-                  >
-                    <span>
-                      {message.incoming
-                        ? makeUserName(message.user && contactsMap[message.user.id], message.user)
-                        : 'You'}
-                      {message.body === 'CC'
-                        ? ' created this channel '
-                        : message.body === 'CG'
-                        ? ' created this group'
-                        : ''}
-                    </span>
-                  </MessageTopDate>
-                ) : (
-                  <Message
-                    message={message}
-                    channel={channel}
-                    handleMediaItemClick={(attachment) => setMediaFile(attachment)}
-                    senderFromContact={message.user && contactsMap[message.user.id]}
-                    handleScrollToRepliedMessage={handleScrollToRepliedMessage}
-                    parentSenderFromContact={
-                      message.parent && message.parent.user && contactsMap[message.parent.user.id]
-                    }
-                    prevMessage={prevMessage}
-                    nextMessage={nextMessage}
-                    firstMessage={index}
-                    isUnreadMessage={isUnreadMessage}
-                    setLastVisibleMessageId={(msgId) => setLastVisibleMessageId(msgId)}
-                    isThreadMessage={false}
-                    fontFamily={fontFamily}
-                    ownMessageOnRightSide={ownMessageOnRightSide}
-                    messageWidthPercent={messageWidthPercent}
-                    messageTimePosition={messageTimePosition}
-                    ownMessageBackground={ownMessageBackground}
-                    incomingMessageBackground={incomingMessageBackground}
-                    statusIconColor={statusIconColor}
-                    showMessageStatus={showMessageStatus}
-                    hoverBackground={hoverBackground}
-                    showOwnAvatar={showOwnAvatar}
-                    showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
-                    showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
-                    senderNameColor={senderNameColor}
-                    messageReaction={messageReaction}
-                    editMessage={editMessage}
-                    replyMessage={replyMessage}
-                    replyMessageInThread={replyMessageInThread}
-                    deleteMessage={deleteMessage}
-                    reportMessage={reportMessage}
-                    reactionIcon={reactionIcon}
-                    editIcon={editIcon}
-                    replyIcon={replyIcon}
-                    replyInThreadIcon={replyInThreadIcon}
-                    forwardIcon={forwardIcon}
-                    deleteIcon={deleteIcon}
-                    forwardMessage={forwardMessage}
-                    starIcon={starIcon}
-                    staredIcon={staredIcon}
-                    reportIcon={reportIcon}
-                    reactionIconOrder={reactionIconOrder}
-                    editIconOrder={editIconOrder}
-                    replyIconOrder={replyIconOrder}
-                    replyInThreadIconOrder={replyInThreadIconOrder}
-                    forwardIconOrder={forwardIconOrder}
-                    deleteIconOrder={deleteIconOrder}
-                    starIconOrder={starIconOrder}
-                    reportIconOrder={reportIconOrder}
-                    reactionIconTooltipText={reactionIconTooltipText}
-                    editIconTooltipText={editIconTooltipText}
-                    replyIconTooltipText={replyIconTooltipText}
-                    replyInThreadIconTooltipText={replyInThreadIconTooltipText}
-                    forwardIconTooltipText={forwardIconTooltipText}
-                    deleteIconTooltipText={deleteIconTooltipText}
-                    starIconTooltipText={starIconTooltipText}
-                    reportIconTooltipText={reportIconTooltipText}
-                    messageActionIconsHoverColor={messageActionIconsHoverColor}
-                    messageActionIconsColor={messageActionIconsColor}
-                    inlineReactionIcon={inlineReactionIcon}
-                    reactionsBorderColor={reactionsBorderColor}
-                    selfReactionsBorderColor={selfReactionsBorderColor}
-                    fileAttachmentsIcon={fileAttachmentsIcon}
-                    fileAttachmentsBoxWidth={fileAttachmentsBoxWidth}
-                    fileAttachmentsBoxBackground={fileAttachmentsBoxBackground}
-                    fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-                    fileAttachmentsTitleColor={fileAttachmentsTitleColor}
-                    fileAttachmentsSizeColor={fileAttachmentsSizeColor}
                   />
-                )}
-                {isUnreadMessage ? (
-                  <MessageDivider
-                    newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
-                    newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
-                    newMessagesSeparatorWidth={newMessagesSeparatorWidth}
-                    newMessagesSeparatorBorder={newMessagesSeparatorBorder}
-                    newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
-                    newMessagesSeparatorBackground={newMessagesSeparatorBackground}
-                    newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
-                    dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                    unread
-                  />
-                ) : null}
-              </React.Fragment>
-            )
-          })}
-          {/* {currentChannelPendingMessages.map((message: any, index: number) => {
+                  {message.type === 'system' ? (
+                    <MessageTopDate
+                      systemMessage
+                      visible={showTopFixedDate}
+                      dividerText={message.body}
+                      dateDividerFontSize={dateDividerFontSize}
+                      dateDividerTextColor={dateDividerTextColor}
+                      dateDividerBorder={dateDividerBorder}
+                      dateDividerBackgroundColor={dateDividerBackgroundColor}
+                      dateDividerBorderRadius={dateDividerBorderRadius}
+                    >
+                      <span>
+                        {message.incoming
+                          ? makeUserName(message.user && contactsMap[message.user.id], message.user, getFromContacts)
+                          : 'You'}
+                        {message.body === 'CC'
+                          ? ' created this channel '
+                          : message.body === 'CG'
+                          ? ' created this group'
+                          : message.body === 'AM'
+                          ? ` added ${
+                              message.metadata &&
+                              message.metadata.m &&
+                              message.metadata.m
+                                .slice(0, 5)
+                                .map((mem: string) => ` ${systemMessageUserName(contactsMap[mem], mem)}`)
+                            } ${
+                              message.metadata && message.metadata.m && message.metadata.m.length > 5
+                                ? `and ${message.metadata.m.length - 5} more`
+                                : ''
+                            }`
+                          : message.body === 'RM'
+                          ? ` removed ${
+                              message.metadata &&
+                              message.metadata.m &&
+                              message.metadata.m
+                                .slice(0, 5)
+                                .map((mem: string) => ` ${systemMessageUserName(contactsMap[mem], mem)}`)
+                            } ${
+                              message.metadata && message.metadata.m && message.metadata.m.length > 5
+                                ? `and ${message.metadata.m.length - 5} more`
+                                : ''
+                            }`
+                          : ''}
+                      </span>
+                    </MessageTopDate>
+                  ) : (
+                    <Message
+                      message={message}
+                      channel={channel}
+                      handleMediaItemClick={(attachment) => setMediaFile(attachment)}
+                      senderFromContact={message.user && contactsMap[message.user.id]}
+                      handleScrollToRepliedMessage={handleScrollToRepliedMessage}
+                      parentSenderFromContact={
+                        message.parent && message.parent.user && contactsMap[message.parent.user.id]
+                      }
+                      prevMessage={prevMessage}
+                      nextMessage={nextMessage}
+                      firstMessage={index}
+                      isUnreadMessage={isUnreadMessage}
+                      setLastVisibleMessageId={(msgId) => setLastVisibleMessageId(msgId)}
+                      isThreadMessage={false}
+                      fontFamily={fontFamily}
+                      ownMessageOnRightSide={ownMessageOnRightSide}
+                      messageWidthPercent={messageWidthPercent}
+                      messageTimePosition={messageTimePosition}
+                      ownMessageBackground={ownMessageBackground}
+                      incomingMessageBackground={incomingMessageBackground}
+                      showMessageStatus={showMessageStatus}
+                      hoverBackground={hoverBackground}
+                      showOwnAvatar={showOwnAvatar}
+                      showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
+                      showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
+                      messageReaction={messageReaction}
+                      editMessage={editMessage}
+                      replyMessage={replyMessage}
+                      replyMessageInThread={replyMessageInThread}
+                      deleteMessage={deleteMessage}
+                      reportMessage={reportMessage}
+                      reactionIcon={reactionIcon}
+                      editIcon={editIcon}
+                      replyIcon={replyIcon}
+                      replyInThreadIcon={replyInThreadIcon}
+                      forwardIcon={forwardIcon}
+                      deleteIcon={deleteIcon}
+                      forwardMessage={forwardMessage}
+                      starIcon={starIcon}
+                      staredIcon={staredIcon}
+                      reportIcon={reportIcon}
+                      reactionIconOrder={reactionIconOrder}
+                      editIconOrder={editIconOrder}
+                      replyIconOrder={replyIconOrder}
+                      replyInThreadIconOrder={replyInThreadIconOrder}
+                      forwardIconOrder={forwardIconOrder}
+                      deleteIconOrder={deleteIconOrder}
+                      starIconOrder={starIconOrder}
+                      reportIconOrder={reportIconOrder}
+                      reactionIconTooltipText={reactionIconTooltipText}
+                      editIconTooltipText={editIconTooltipText}
+                      replyIconTooltipText={replyIconTooltipText}
+                      replyInThreadIconTooltipText={replyInThreadIconTooltipText}
+                      forwardIconTooltipText={forwardIconTooltipText}
+                      deleteIconTooltipText={deleteIconTooltipText}
+                      starIconTooltipText={starIconTooltipText}
+                      reportIconTooltipText={reportIconTooltipText}
+                      messageActionIconsHoverColor={messageActionIconsHoverColor}
+                      messageActionIconsColor={messageActionIconsColor}
+                      inlineReactionIcon={inlineReactionIcon}
+                      reactionsBorderColor={reactionsBorderColor}
+                      selfReactionsBorderColor={selfReactionsBorderColor}
+                      fileAttachmentsIcon={fileAttachmentsIcon}
+                      fileAttachmentsBoxWidth={fileAttachmentsBoxWidth}
+                      fileAttachmentsBoxBackground={fileAttachmentsBoxBackground}
+                      fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+                      fileAttachmentsTitleColor={fileAttachmentsTitleColor}
+                      fileAttachmentsSizeColor={fileAttachmentsSizeColor}
+                    />
+                  )}
+                  {isUnreadMessage ? (
+                    <MessageDivider
+                      newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
+                      newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
+                      newMessagesSeparatorWidth={newMessagesSeparatorWidth}
+                      newMessagesSeparatorBorder={newMessagesSeparatorBorder}
+                      newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
+                      newMessagesSeparatorBackground={newMessagesSeparatorBackground}
+                      newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
+                      dividerText={newMessagesSeparatorText || 'Unread Messages'}
+                      unread
+                    />
+                  ) : null}
+                </React.Fragment>
+              )
+            })}
+            {/* {currentChannelPendingMessages.map((message: any, index: number) => {
             const prevMessage = index === 0 ? messages[messages.length - 1] : currentChannelPendingMessages[index - 1]
             const nextMessage = currentChannelPendingMessages[index + 1]
             return (
@@ -750,11 +866,13 @@ const Messages: React.FC<MessagesProps> = ({
               </React.Fragment>
             )
           })} */}
-        </MessagesBox>
-        {mediaFile && (
-          <SliderPopup setIsSliderOpen={setMediaFile} mediaFiles={attachments} currentMediaFile={mediaFile} />
-        )}
-      </Container>
+          </MessagesBox>
+          {mediaFile && (
+            <SliderPopup channelId={channel.id} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />
+          )}
+        </Container>
+      </React.Fragment>
+
       {/* // )} */}
     </React.Fragment>
   )
@@ -801,7 +919,6 @@ const SystemMessage = styled.div<any>`
   background: transparent;
   span {
     display: ${(props) => (props.visible ? 'inline-block' : 'none')};
-    font-family: Roboto, sans-serif;
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
@@ -828,7 +945,8 @@ export const MessageTopDate = styled.div<any>`
   background: transparent;
   span {
     //display: ${(props) => !props.systemMessage && 'none'};
-    font-family: Roboto, sans-serif;
+    display: inline-block;
+    max-width: 300px;
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
@@ -839,5 +957,60 @@ export const MessageTopDate = styled.div<any>`
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+  }
+`
+
+export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: number }>`
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  margin-bottom: -31px;
+  margin-top: -2px;
+
+  position: absolute;
+  left: 0;
+  top: ${(props) => (props.topOffset ? `${props.topOffset + 2}px` : 0)};
+  width: 100%;
+  height: ${(props) => (props.height ? `${props.height + 30}px` : '100%')};
+  background-color: ${colors.white};
+  z-index: 999;
+`
+
+export const IconWrapper = styled.span`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 64px;
+  width: 64px;
+  background-color: ${colors.gray5};
+  border-radius: 50%;
+  text-align: center;
+  margin-bottom: 16px;
+  transition: all 0.3s;
+  & > svg {
+    color: ${colors.primary};
+    width: 32px;
+    height: 32px;
+  }
+`
+
+export const DropAttachmentArea = styled.div<{ margin?: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  height: 100%;
+  border: 1px dashed ${colors.gray3};
+  border-radius: 16px;
+  margin: ${(props) => props.margin || '12px 32px 32px'};
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
+  color: ${colors.gray6};
+  transition: all 0.1s;
+
+  &.dragover {
+    border: 1px dashed ${colors.primary};
   }
 `

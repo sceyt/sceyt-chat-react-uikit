@@ -1,7 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import { ReactComponent as ChatLogoSVG } from '../../assets/svg/chatLogo.svg'
-// import Profile from './Profile';
+// import ProfileSettings from './ProfileSettings';
 // import ConnectionStatus from './ConnectionStatus';
 import { colors } from '../../UIHelper/constants'
 
@@ -29,7 +29,7 @@ function SceytChatHeader() {
         <ChatLogoSVG />
       </Logo>
       {/* <ConnectionStatus /> */}
-      {/* <Profile /> */}
+      {/* <ProfileSettings /> */}
     </Container>
   )
 }

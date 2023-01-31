@@ -1,10 +1,9 @@
 import styled from 'styled-components'
 import React, { useEffect, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
-import { ReactComponent as DefaultAvatar } from '../../assets/svg/devaultAvatar36.svg'
 import { CHANNEL_TYPE, PRESENCE_STATUS } from '../../helpers/constants'
-import { activeChannelSelector } from '../../store/channel/selector'
+import { activeChannelSelector, channelInfoIsOpenSelector } from '../../store/channel/selector'
 import Avatar from '../Avatar'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { switchChannelInfoAC } from '../../store/channel/actions'
@@ -13,13 +12,14 @@ import { makeUserName, userLastActiveDateFormat } from '../../helpers'
 import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
+import { getUserDisplayNameFromContact } from '../../helpers/contacts'
 
 const Container = styled.div`
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
-  height: 69px;
+  height: 64px;
   box-sizing: border-box;
   border-bottom: 1px solid ${colors.gray1};
 `
@@ -38,8 +38,12 @@ const ChannelName = styled.div`
   margin-left: 7px;
 `
 
-const ChanelInfo = styled.span`
+const ChanelInfo = styled.span<{ infoIconColor?: string }>`
   cursor: pointer;
+
+  > svg {
+    color: ${(props) => props.infoIconColor};
+  }
 `
 
 interface IProps {
@@ -48,13 +52,15 @@ interface IProps {
 
 export default function ChatHeader({ infoIcon }: IProps) {
   const dispatch = useDispatch()
+  const getFromContacts = getUserDisplayNameFromContact()
   const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
+  const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
 
   const channelDetailsOnOpen = () => {
-    dispatch(switchChannelInfoAC(true))
+    dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
   }
 
   const channelDetailsOpen = false
@@ -81,14 +87,15 @@ export default function ChatHeader({ infoIcon }: IProps) {
             size={36}
             textSize={13}
             setDefaultAvatar={isDirectChannel}
-            defaultAvatarIcon={<DefaultAvatar />}
           />
           {/* {isDirectChannel && activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
         </AvatarWrapper>
         <ChannelName>
           <SectionHeader>
             {activeChannel.subject ||
-              (isDirectChannel ? makeUserName(contactsMap[activeChannel.peer.id], activeChannel.peer) : '')}
+              (isDirectChannel
+                ? makeUserName(contactsMap[activeChannel.peer.id], activeChannel.peer, getFromContacts)
+                : '')}
           </SectionHeader>
           {isDirectChannel ? (
             <SubTitle>
@@ -100,12 +107,27 @@ export default function ChatHeader({ infoIcon }: IProps) {
             </SubTitle>
           ) : (
             <SubTitle>
-              {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} Members `}
+              {!activeChannel.subject && !isDirectChannel
+                ? ''
+                : `${activeChannel.memberCount} ${
+                    activeChannel.type === CHANNEL_TYPE.PUBLIC
+                      ? activeChannel.memberCount > 1
+                        ? 'subscribers'
+                        : 'subscriber'
+                      : activeChannel.memberCount > 1
+                      ? 'members'
+                      : 'member'
+                  } `}
             </SubTitle>
           )}
         </ChannelName>
       </ChannelInfo>
-      <ChanelInfo onClick={() => channelDetailsOnOpen()}>{infoButtonVisible && (infoIcon || <InfoIcon />)}</ChanelInfo>
+      <ChanelInfo
+        onClick={() => channelDetailsOnOpen()}
+        infoIconColor={channelDetailsIsOpen ? colors.primary : colors.gray4}
+      >
+        {infoButtonVisible && (infoIcon || <InfoIcon />)}
+      </ChanelInfo>
     </Container>
   )
 }

@@ -1,4 +1,3 @@
-import { IAttachment } from '../types'
 import { ICustomUploader, IProgress, IUploadTask } from '../components/ChatContainer'
 
 let CustomUploader: ICustomUploader
@@ -21,9 +20,10 @@ export const getCustomUploader = () => CustomUploader
 export const getCustomDownloader = () => CustomUploader && CustomUploader.download
 
 export const customUpload = (
-  attachment: IAttachment,
+  file: File,
+  uploadId: any,
   progress: ({ loaded, total }: IProgress) => void,
-  getUpdatedFilePath: (newPath: String) => void
+  getUpdatedFilePath?: (newPath: String) => void
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (CustomUploader) {
@@ -50,8 +50,8 @@ export const customUpload = (
         } else if (error) {
         }
       } */
-      pendingUploaders[attachment.attachmentId!] = uploadTask
-      CustomUploader.upload(attachment, uploadTask)
+      pendingUploaders[uploadId] = uploadTask
+      CustomUploader.upload(file, uploadTask)
     } else {
       reject(new Error('No Custom uploader'))
     }

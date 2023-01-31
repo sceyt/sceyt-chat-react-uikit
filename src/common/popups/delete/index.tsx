@@ -12,31 +12,46 @@ import {
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
+import usePermissions from '../../../hooks/usePermissions'
 
 interface IProps {
   title: string
   description: string
   buttonText: string
+  buttonTextColor?: string
+  buttonBackground?: string
   togglePopup: () => void
-  deleteFunction: (option?: any) => void
+  handleFunction: (option?: any) => void
   loading?: boolean
   isDeleteMessage?: boolean
+  isIncomingMessage?: boolean
+  isDirectChannel?: boolean
+  myRole?: string
 }
 
-function DeletePopup({
+function ConfirmPopup({
   title,
   description,
   buttonText,
+  buttonTextColor,
+  buttonBackground,
   togglePopup,
-  deleteFunction,
+  handleFunction,
   isDeleteMessage,
+  isIncomingMessage,
+  isDirectChannel,
+  myRole = '',
   loading
 }: IProps) {
+  const [checkActionPermission] = usePermissions(myRole)
   const [initialRender, setInitialRender] = useState(true)
-  const [deleteMessageOption, setDeleteMessageOption] = useState('forEveryone')
+  const deleteForEveryoneIsPermitted = isIncomingMessage
+    ? !isDirectChannel && checkActionPermission('deleteAnyMessage')
+    : checkActionPermission('deleteOwnMessage')
+  const [deleteMessageOption, setDeleteMessageOption] = useState(deleteForEveryoneIsPermitted ? 'forEveryone' : 'forMe')
 
   const handleDelete = () => {
-    deleteFunction(isDeleteMessage && deleteMessageOption)
+    handleFunction(isDeleteMessage && deleteMessageOption)
     togglePopup()
   }
 
@@ -52,7 +67,7 @@ function DeletePopup({
   // @ts-ignore
   return (
     <PopupContainer>
-      <Popup maxWidth='460px' minWidth='460px' isLoading={loading} padding='0'>
+      <Popup maxWidth='520px' minWidth='520px' isLoading={loading} padding='0'>
         <PopupBody padding={24}>
           <CloseIcon onClick={() => togglePopup()} />
           <PopupName isDelete marginBottom='20px'>
@@ -61,15 +76,17 @@ function DeletePopup({
           <PopupDescription>{description}</PopupDescription>
           {isDeleteMessage && (
             <DeleteMessageOptions>
-              <DeleteOptionItem onClick={() => setDeleteMessageOption('forEveryone')}>
-                <CustomRadio
-                  index='1'
-                  size='18px'
-                  state={deleteMessageOption === 'forEveryone'}
-                  onChange={(e) => handleChoseDeleteOption(e, 'forEveryone')}
-                />
-                Delete for everyone
-              </DeleteOptionItem>
+              {deleteForEveryoneIsPermitted && (
+                <DeleteOptionItem onClick={() => setDeleteMessageOption('forEveryone')}>
+                  <CustomRadio
+                    index='1'
+                    size='18px'
+                    state={deleteMessageOption === 'forEveryone'}
+                    onChange={(e) => handleChoseDeleteOption(e, 'forEveryone')}
+                  />
+                  Delete for everyone
+                </DeleteOptionItem>
+              )}
               <DeleteOptionItem onClick={() => setDeleteMessageOption('forMe')}>
                 <CustomRadio
                   index='2'
@@ -88,7 +105,8 @@ function DeletePopup({
           </Button>
           <Button
             type='button'
-            backgroundColor='#FA4C56'
+            backgroundColor={buttonBackground || colors.red1}
+            color={buttonTextColor}
             borderRadius='8px'
             onClick={handleDelete}
             disabled={initialRender}
@@ -101,7 +119,7 @@ function DeletePopup({
   )
 }
 
-export default DeletePopup
+export default ConfirmPopup
 
 const DeleteMessageOptions = styled.div`
   margin-top: 14px;

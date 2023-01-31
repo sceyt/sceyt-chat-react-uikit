@@ -7,7 +7,7 @@ export const colors = {
 
   blue1: '#172268',
   // blue2: '#4f6aff',
-  blue2: '#2F81FF',
+  blue2: '#438CED',
   blue3: '#63afff',
   // blue4: '#283379',
   blue4: '#1F223C',
@@ -22,9 +22,9 @@ export const colors = {
   gray0: '#F3F5F8',
   gray1: '#EDEDED',
   gray2: '#ecedf0',
-  gray3: '#DBDBDB',
+  gray3: '#B2B6BE',
   gray4: '#818C99',
-  gray5: '#F3F5F7',
+  gray5: '#F0F2F5',
   gray6: '#17191C',
   gray7: '#898B99',
   gray8: '#3A3C3E',
@@ -36,14 +36,18 @@ export const colors = {
   // cobalt1: '#4f6aff',
   cobalt1: '#2F81FF',
 
-  green1: '#0DBD8B',
-  green2: '#2ba57a',
+  primary: '#0DBD8B',
 
   red1: '#FA4C56',
   red2: '#d7596c',
-  red3: '#F0506D',
+  red3: '#F94C56',
 
-  yellow1: '#FCD36E'
+  yellow1: '#FCD36E',
+
+  purple: '#7A6EF6',
+
+  defaultAvatarBackground: '#D0D8E3',
+  deleteUserIconBackground: '#D0D8E3'
 }
 
 export const size = {

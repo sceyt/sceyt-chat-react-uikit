@@ -9,54 +9,85 @@ import Files from './Files'
 import Links from './Links'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 import { IChannel } from '../../../types'
+import Voices from './Voices'
 
 interface IProps {
   channel: IChannel
   activeTab: string
   setActiveTab: (activeTab: string) => void
-  chekActionPermission: (permission: string) => boolean
+  checkActionPermission: (permission: string) => boolean
   linkPreviewIcon?: JSX.Element
   linkPreviewHoverIcon?: JSX.Element
   linkPreviewTitleColor?: string
   linkPreviewColor?: string
   linkPreviewHoverBackgroundColor?: string
+  voicePreviewIcon?: JSX.Element
+  voicePreviewHoverIcon?: JSX.Element
+  voicePreviewTitleColor?: string
+  voicePreviewDateAndTimeColor?: string
+  voicePreviewHoverBackgroundColor?: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
   filePreviewTitleColor?: string
   filePreviewSizeColor?: string
   filePreviewHoverBackgroundColor?: string
   filePreviewDownloadIcon?: JSX.Element
+  showChangeMemberRole?: boolean
+  showKickMember?: boolean
+  showKickAndBlockMember?: boolean
+  showMakeMemberAdmin?: boolean
+  publicChannelDeleteMemberPopupDescription?: string
+  privateChannelDeleteMemberPopupDescription?: string
+  publicChannelRevokeAdminPopupTitle?: string
+  publicChannelRevokeAdminPopupDescription?: string
+  privateChannelRevokeAdminPopupTitle?: string
+  privateChannelRevokeAdminPopupDescription?: string
+  publicChannelMakeAdminPopupTitle?: string
+  publicChannelMakeAdminPopupDescription?: string
+  privateChannelMakeAdminPopupTitle?: string
+  privateChannelMakeAdminPopupDescription?: string
 }
 
 const DetailsTab = ({
   channel,
   activeTab,
-  chekActionPermission,
+  checkActionPermission,
   setActiveTab,
   linkPreviewIcon,
   linkPreviewHoverIcon,
   linkPreviewTitleColor,
   linkPreviewColor,
   linkPreviewHoverBackgroundColor,
+  voicePreviewIcon,
+  voicePreviewHoverIcon,
+  voicePreviewTitleColor,
+  voicePreviewDateAndTimeColor,
+  voicePreviewHoverBackgroundColor,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
-  filePreviewDownloadIcon
+  filePreviewDownloadIcon,
+  showChangeMemberRole,
+  showKickMember,
+  showKickAndBlockMember,
+  showMakeMemberAdmin,
+  publicChannelDeleteMemberPopupDescription,
+  privateChannelDeleteMemberPopupDescription,
+  publicChannelRevokeAdminPopupDescription,
+  privateChannelRevokeAdminPopupDescription,
+  publicChannelMakeAdminPopupDescription,
+  privateChannelMakeAdminPopupDescription
 }: IProps) => {
   const dispatch = useDispatch()
-  /* const [activeTab, setActiveTab] = useState(
-    channel.type !== CHANNEL_TYPE.DIRECT ? channelDetailsTabs.member : channelDetailsTabs.media
-  ) */
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-  const showMembers = !isDirectChannel && chekActionPermission('getMembers')
+  const showMembers = !isDirectChannel && checkActionPermission('getMembers')
 
   const handleTabClick = (tabIndex: string) => {
     dispatch(emptyChannelAttachmentsAC())
     setActiveTab(tabIndex)
   }
-
   useEffect(() => {
     if (!showMembers) {
       setActiveTab(channelDetailsTabs.media)
@@ -67,40 +98,55 @@ const DetailsTab = ({
 
   return (
     <Container>
-      <DetailsTabHeader activeTabColor='#0DBD8B'>
-        {showMembers && (
-          <button
-            className={activeTab === channelDetailsTabs.member ? 'active' : ''}
-            type='button'
-            onClick={() => handleTabClick(channelDetailsTabs.member)}
-          >
-            Members
-          </button>
-        )}
-        <button
-          className={activeTab === channelDetailsTabs.media ? 'active' : ''}
-          type='button'
-          onClick={() => handleTabClick(channelDetailsTabs.media)}
-        >
-          Media
-        </button>
-        <button
-          className={activeTab === channelDetailsTabs.file ? 'active' : ''}
-          type='button'
-          onClick={() => handleTabClick(channelDetailsTabs.file)}
-        >
-          Files
-        </button>
-        <button
-          className={activeTab === channelDetailsTabs.link ? 'active' : ''}
-          type='button'
-          onClick={() => handleTabClick(channelDetailsTabs.link)}
-        >
-          Links
-        </button>
+      <DetailsTabHeader activeTabColor={colors.primary}>
+        {Object.keys(channelDetailsTabs).map((key) => {
+          if (key === 'member') {
+            if (showMembers) {
+              return (
+                <button
+                  className={activeTab === channelDetailsTabs[key] ? 'active' : ''}
+                  type='button'
+                  onClick={() => handleTabClick(channelDetailsTabs[key])}
+                  key={key}
+                >
+                  {channelDetailsTabs[key] === channelDetailsTabs.member
+                    ? channel.type === CHANNEL_TYPE.PUBLIC
+                      ? 'Subscribers'
+                      : channelDetailsTabs[key]
+                    : channelDetailsTabs[key]}
+                </button>
+              )
+            } else {
+              return null
+            }
+          }
+          return (
+            <button
+              className={activeTab === channelDetailsTabs[key] ? 'active' : ''}
+              type='button'
+              onClick={() => handleTabClick(channelDetailsTabs[key])}
+              key={key}
+            >
+              {channelDetailsTabs[key]}
+            </button>
+          )
+        })}
       </DetailsTabHeader>
       {showMembers && activeTab === channelDetailsTabs.member && (
-        <Members channel={channel} chekActionPermission={chekActionPermission} />
+        <Members
+          publicChannelDeleteMemberPopupDescription={publicChannelDeleteMemberPopupDescription}
+          privateChannelDeleteMemberPopupDescription={privateChannelDeleteMemberPopupDescription}
+          publicChannelRevokeAdminPopupDescription={publicChannelRevokeAdminPopupDescription}
+          privateChannelRevokeAdminPopupDescription={privateChannelRevokeAdminPopupDescription}
+          publicChannelMakeAdminPopupDescription={publicChannelMakeAdminPopupDescription}
+          privateChannelMakeAdminPopupDescription={privateChannelMakeAdminPopupDescription}
+          channel={channel}
+          chekActionPermission={checkActionPermission}
+          showChangeMemberRole={showChangeMemberRole}
+          showKickMember={showKickMember}
+          showKickAndBlockMember={showKickAndBlockMember}
+          showMakeMemberAdmin={showMakeMemberAdmin}
+        />
       )}
       {activeTab === channelDetailsTabs.media && <Media channelId={channel.id} />}
       {activeTab === channelDetailsTabs.file && (
@@ -124,6 +170,16 @@ const DetailsTab = ({
           linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
         />
       )}
+      {activeTab === channelDetailsTabs.voice && (
+        <Voices
+          channelId={channel.id}
+          voicePreviewIcon={voicePreviewIcon}
+          voicePreviewHoverIcon={voicePreviewHoverIcon}
+          voicePreviewTitleColor={voicePreviewTitleColor}
+          voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
+          voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
+        />
+      )}
     </Container>
   )
 }
@@ -135,59 +191,39 @@ const Container = styled.div`
 `
 
 const DetailsTabHeader = styled.div<{ activeTabColor?: string }>`
-  padding: 0 11px;
-  margin: 8px 0;
+  padding: 0 20px;
   border-bottom: 1px solid ${colors.gray1};
   display: flex;
   justify-content: space-between;
   position: sticky;
   top: 0;
-  z-index: 2;
+  z-index: 12;
   background: #fff;
   button {
     position: relative;
     border: none;
-    margin: 0 5px;
     background: transparent;
     outline: none;
-    padding: 6px 0;
-    font-family: Roboto, sans-serif;
+    padding: 13px 0 11px;
     font-style: normal;
-    font-weight: normal;
+    font-weight: 500;
     font-size: 15px;
     line-height: 20px;
-    color: ${colors.gray6};
+    color: ${colors.gray9};
     cursor: pointer;
   }
-  & .active:after {
-    content: '';
-    width: 100%;
-    border-radius: 2px;
-    height: 2px;
-    background-color: #0dbd8b;
-    position: absolute;
-    top: calc(100% - 1px);
-    left: 0;
+  & .active {
+    color: ${colors.gray6};
+
+    &:after {
+      content: '';
+      width: 100%;
+      border-radius: 2px;
+      height: 2px;
+      background-color: ${(props) => props.activeTabColor || colors.primary};
+      position: absolute;
+      top: calc(100% - 1px);
+      left: 0;
+    }
   }
-`
-
-export const AttachmentIconCont = styled.span`
-  display: inline-flex;
-`
-export const AttachmentHoverIconCont = styled.span`
-  display: none;
-`
-
-export const AttachmentPreviewTitle = styled.span<{ color?: string }>`
-  display: block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  max-width: calc(100% - 20px);
-  font-family: Roboto, sans-serif;
-  font-style: normal;
-  font-weight: normal;
-  font-size: 15px;
-  line-height: 20px;
-  color: ${(props) => props.color || colors.blue10};
 `

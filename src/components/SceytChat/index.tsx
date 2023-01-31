@@ -7,22 +7,24 @@ import { destroyChannelsMap } from '../../helpers/channelHalper'
 import { destroySession, watchForEventsAC } from '../../store/channel/actions'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { ChatContainer } from './styled'
-import { getContactsAC, setConnectionStatusAC } from '../../store/user/actions'
-import { setShowContactInfo } from '../../helpers/contacts'
+import { setConnectionStatusAC, setUserAC } from '../../store/user/actions'
+import { setUserDisplayNameFromContact } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
+import { colors } from '../../UIHelper/constants'
 
 const SceytChat = ({
   client,
   avatarColors,
   children,
-  showContactInfoOnUserList,
+  userDisplayNameFromContacts,
   logoSrc,
   CustomUploader,
-  sendAttachmentsAsSeparateMessages
+  sendAttachmentsAsSeparateMessages,
+  customColors
 }: IChatClientProps) => {
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -55,7 +57,10 @@ const SceytChat = ({
     if (client) {
       setClient(client)
       setSceytChatClient(client)
-      dispatch(getContactsAC())
+      dispatch(setUserAC(client.chatClient.user))
+      /* if (userDisplayNameFromContacts) {
+        dispatch(getContactsAC())
+      } */
       dispatch(watchForEventsAC())
       dispatch(setConnectionStatusAC(client.chatClient.connectStatus))
     } else {
@@ -73,7 +78,27 @@ const SceytChat = ({
         setVideoBlob(file)
       }) */
     }
-
+    if (customColors) {
+      if (customColors.primaryColor) {
+        colors.primary = customColors.primaryColor
+        console.log('set primary color. .. ', customColors.primaryColor)
+      }
+      if (customColors.textColor1) {
+        colors.gray6 = customColors.textColor1
+      }
+      if (customColors.textColor2) {
+        colors.gray8 = customColors.textColor2
+      }
+      if (customColors.textColor3) {
+        colors.gray9 = customColors.textColor3
+      }
+      if (customColors.defaultAvatarBackground) {
+        colors.defaultAvatarBackground = customColors.defaultAvatarBackground
+      }
+      if (customColors.deletedUserAvatarBackground) {
+        colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
+      }
+    }
     if (sendAttachmentsAsSeparateMessages) {
       setSendAttachmentsAsSeparateMessages(sendAttachmentsAsSeparateMessages)
     }
@@ -84,8 +109,8 @@ const SceytChat = ({
     if (avatarColors) {
       setAvatarColor(avatarColors)
     }
-    if (showContactInfoOnUserList) {
-      setShowContactInfo(showContactInfoOnUserList)
+    if (userDisplayNameFromContacts) {
+      setUserDisplayNameFromContact(userDisplayNameFromContacts)
     }
     try {
       if (window.Notification && Notification.permission === 'default') {
@@ -101,7 +126,7 @@ const SceytChat = ({
     return () => {
       document.removeEventListener(visibilityChange, handleVisibilityChange)
     }
-  }, [])
+  }, [customColors])
 
   useEffect(() => {
     if (tabIsActive) {

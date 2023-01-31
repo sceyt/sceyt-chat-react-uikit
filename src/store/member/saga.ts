@@ -1,14 +1,14 @@
 import { put, call, takeLatest } from 'redux-saga/effects'
 import {
-  clearMembersAC,
   setMembersLoadingStateAC,
   removeMemberFromListAC,
   updateMembersAC,
   addMembersToListAC,
-  getRolesSuccess
+  getRolesSuccess,
+  setMembersToListAC
 } from './actions'
 import { getChannelFromMap, query } from '../../helpers/channelHalper'
-import { LOADING_STATE } from '../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 
 import {
   GET_MEMBERS,
@@ -23,6 +23,8 @@ import {
 import { updateChannelDataAC } from '../channel/actions'
 import { IAction, IMember } from '../../types'
 import { getClient } from '../../common/client'
+import { sendTextMessageAC } from '../message/actions'
+import { CONNECTION_STATUS } from '../user/constants'
 
 function* getMembers(action: IAction): any {
   try {
@@ -37,8 +39,7 @@ function* getMembers(action: IAction): any {
     query.membersQuery = membersQuery
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
     const { members } = yield call(membersQuery.loadNextPage)
-    yield put(clearMembersAC())
-    yield put(addMembersToListAC(members))
+    yield put(setMembersToListAC(members))
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
     console.log('ERROR in get member - ', e.message)
@@ -83,11 +84,27 @@ function* addMembers(action: IAction): any {
         const memberBuilder = channel.createMemberBuilder(mem.id)
         return memberBuilder.setRole(mem.role).create()
       })
+
       const addedMembers = yield call(channel.addMembers, membersToAdd)
+      if (channel.type === CHANNEL_TYPE.PRIVATE) {
+        const membersIds: string[] = []
+        addedMembers.forEach((mem: IMember) => {
+          membersIds.push(mem.id)
+        })
+        const messageToSend: any = {
+          metadata: { m: membersIds },
+          body: 'AM',
+          mentionedMembers: [],
+          attachments: [],
+          type: 'system'
+        }
+        yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
+      }
       yield put(addMembersToListAC(addedMembers))
       yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount }))
     }
   } catch (e) {
+    console.log('error on add members... ', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -100,7 +117,20 @@ function* kickMemberFromChannel(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
 
     const removedMembers = yield call(channel.kickMembers, [memberId])
-
+    if (channel.type === CHANNEL_TYPE.PRIVATE) {
+      const membersIds: string[] = []
+      removedMembers.forEach((mem: IMember) => {
+        membersIds.push(mem.id)
+      })
+      const messageToSend: any = {
+        metadata: { m: membersIds },
+        body: 'RM',
+        mentionedMembers: [],
+        attachments: [],
+        type: 'system'
+      }
+      yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
+    }
     yield put(removeMemberFromListAC(removedMembers))
     yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount }))
   } catch (e) {

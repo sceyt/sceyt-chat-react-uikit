@@ -22,7 +22,6 @@ export const Container = styled.div<any>`
     span {
       position: absolute;
       top: -13px;
-      font-family: Roboto, sans-serif;
       font-style: normal;
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};

@@ -8,11 +8,10 @@ export default function usePermissions(myRole: string) {
   const rolesMap = useSelector(rolesMapSelector, shallowEqual)
   const myPermissions = myRole && rolesMap[myRole] ? rolesMap[myRole].permissions : []
   // const myPermissions: any = []
-
-  const chekActionPermission = (actionName: string) => myPermissions.includes(actionName)
-
+  const checkActionPermission = (actionName: string) => myPermissions.includes(actionName)
+  // console.log('roleMap .. .', rolesMap)
   useEffect(() => {
     dispatch(getRolesAC())
   }, [])
-  return [chekActionPermission, myPermissions] as const
+  return [checkActionPermission, myPermissions] as const
 }

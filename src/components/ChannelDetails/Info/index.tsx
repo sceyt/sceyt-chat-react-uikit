@@ -228,7 +228,7 @@ const Info = ({ channel, handleToggleEditMode }: IProps) => {
               </SectionHeader>
               <ChannelMembers>{channel.memberCount} members</ChannelMembers>
             </ChannelSubject>
-            {!isDirectChannel && channel.myRole && (
+            {!isDirectChannel && channel.role && (
               <EditSubject onClick={() => handleToggleEditMode()}>
                 <EditIcon />
               </EditSubject>

@@ -13,6 +13,8 @@ export const attachmentCompilationStateSelector = (store: any) => store.MessageR
 export const attachmentUploadProgressSelector = (store: any) => store.MessageReducer.uploadAttachmentProgress
 export const activeTabAttachmentsSelector = (store: any) => store.MessageReducer.activeTabAttachments
 export const activeTabAttachmentsHasNextSelector = (store: any) => store.MessageReducer.attachmentHasNext
+export const attachmentsForPopupSelector = (store: any) => store.MessageReducer.attachmentsForPopup
+export const attachmentsForPopupHasNextSelector = (store: any) => store.MessageReducer.attachmentForPopupHasNext
 export const messageForReplySelector = (store: any) => store.MessageReducer.messageForReply
 export const messageForThreadReplySelector = (store: any) => store.MessageReducer.messageForThreadReply
 export const messageToEditSelector = (store: any) => store.MessageReducer.messageToEdit

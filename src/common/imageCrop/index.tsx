@@ -11,7 +11,6 @@ interface IProps {
   onAccept: (file: File) => void
   handleClosePopup: (cropped?: boolean) => void
 }
-
 const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
   const [state, setState] = useStateComplex({
@@ -85,7 +84,7 @@ const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
           <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor='#0DBD8B' borderRadius='8px' onClick={returnCroppedImage}>
+          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={returnCroppedImage}>
             Save
           </Button>
         </PopupFooter>
@@ -112,7 +111,7 @@ const Controls = styled.div`
     &::-webkit-slider-runnable-track {
       height: 6px;
       -webkit-appearance: none;
-      color: ${colors.green1};
+      color: ${colors.primary};
       margin-top: -1px;
       border-radius: 3px;
     }
@@ -121,7 +120,7 @@ const Controls = styled.div`
       -webkit-appearance: none;
       height: 16px;
       cursor: ew-resize;
-      background: ${colors.green1};
+      background: ${colors.primary};
       border-radius: 50%;
       transform: translate(0, -5px);
     }

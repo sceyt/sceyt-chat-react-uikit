@@ -22,10 +22,6 @@ const hashCode = (string: string) => {
 
 export const GlobalStyles = createGlobalStyle`
 
-  html, body {
-    font-family: 'Roboto', sans-serif;
-  }
-
   .rc-mentions {
     position: relative;
 
@@ -164,7 +160,6 @@ export const GlobalStyles = createGlobalStyle`
     outline: none;
     cursor: pointer;
     text-align: center;
-    font-family: 'Roboto', sans-serif;
     font-style: normal;
     border-radius: 4px;
     font-weight: 500;
@@ -223,17 +218,17 @@ export const GlobalStyles = createGlobalStyle`
     }
 
     &.green {
-      color: ${colors.green1};
-      border: 1px solid ${colors.green1};
+      color: ${colors.primary};
+      border: 1px solid ${colors.primary};
 
       &.filled {
         color: white;
-        background-color: ${colors.green1};
+        background-color: ${colors.primary};
       }
 
       &:hover, &:focus {
         &:not(.loading).filled {
-          background-color: ${colors.green2};
+          background-color: ${colors.primary};
         }
       }
     }
@@ -309,13 +304,20 @@ export const DropdownOptionsUl = styled.ul`
   padding: 0;
 `
 
-export const DropdownOptionLi = styled.li<{ textColor?: string; hoverBackground?: string; iconWidth?: string }>`
+export const DropdownOptionLi = styled.li<{
+  textColor?: string
+  hoverBackground?: string
+  iconWidth?: string
+  iconColor?: string
+  margin?: string
+}>`
   cursor: pointer;
   display: flex;
   align-items: center;
   font-size: 14px;
   line-height: 20px;
   color: ${(props: any) => props.textColor || colors.blue6};
+  margin: ${(props: any) => props.margin};
   padding: 6px 6px 6px 16px;
 
   &:hover {
@@ -323,7 +325,10 @@ export const DropdownOptionLi = styled.li<{ textColor?: string; hoverBackground?
   }
 
   & > svg {
+    width: ${(props) => props.iconWidth};
     min-width: ${(props) => props.iconWidth};
+    height: ${(props) => props.iconWidth};
+    color: ${(props) => props.iconColor};
     margin-right: 10px;
   }
 `
@@ -339,7 +344,6 @@ export const CustomSelect = styled.div`
   border: ${(props: any) => (props.isError ? `1px solid ${colors.red1}` : `1px solid ${colors.gray2}`)};
   box-sizing: border-box;
   border-radius: 4px;
-  font-family: 'Roboto', sans-serif;
   font-style: normal;
   font-weight: normal;
   font-size: 14px;
@@ -400,14 +404,6 @@ export const Label = styled.label`
   color: ${colors.gray6};
 `
 
-export const SectionHeader = styled.h3`
-  font-weight: 500;
-  font-size: 15px;
-  line-height: 18px;
-  margin: 0;
-  color: ${colors.gray6};
-`
-
 export const UploadFile = styled.input`
   display: none;
 `
@@ -441,7 +437,7 @@ export const CustomInput = styled.input<{ error?: boolean }>`
   outline: none;
 
   &:focus {
-    border: 1px solid ${(props) => (props.error ? `1px solid ${colors.red1}` : colors.green1)};
+    border: 1px solid ${(props) => (props.error ? `1px solid ${colors.red1}` : colors.primary)};
     outline: 2px solid ${(props) => (props.error ? `1px solid ${colors.red2}` : '#ebf7f1')};
   }
   &:disabled {
@@ -517,6 +513,7 @@ export const Button = styled.button<{
   backgroundColor?: string
   borderRadius?: string
   disabled?: boolean
+  margin?: string
 }>`
   display: inline-block;
   box-sizing: border-box;
@@ -524,7 +521,6 @@ export const Button = styled.button<{
   outline: none;
   cursor: ${(props) => !props.disabled && 'pointer'};
   text-align: center;
-  font-family: 'Roboto', sans-serif;
   font-style: normal;
   border-radius: ${(props) => props.borderRadius || '4px'};
   font-weight: 500;
@@ -534,7 +530,7 @@ export const Button = styled.button<{
   background-color: ${(props) => props.backgroundColor || colors.white};
   color: ${(props) => props.color || (props.backgroundColor ? colors.white : colors.gray6)};
   border: 1px solid ${(props) => props.backgroundColor || colors.gray2};
-  margin: 0;
+  margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
   opacity: ${(props) => (props.disabled ? 0.5 : 1)};
@@ -549,12 +545,11 @@ export const PopupName = styled.h3<{
   marginBottom?: string
   isDelete?: boolean
 }>`
-  font-family: 'Roboto', sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 23px;
-  color: ${colors.blue6};
+  color: ${colors.gray6};
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
   margin-bottom: ${(props: any) => props.marginBottom};
@@ -585,7 +580,7 @@ export const PopupContainer = styled.div`
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(23, 34, 104, 0.16);
+  background: rgba(0, 0, 0, 0.4);
 `
 
 export const ButtonBlock = styled.div<any>`
@@ -645,17 +640,17 @@ export const Popup = styled.div<any>`
 
 export const PopupBody = styled.div<{ padding: number; withFooter?: boolean }>`
   padding: ${(props) => `${props.padding}px`};
+  margin-bottom: 8px;
 
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.padding}px))` : 'calc(100% - 54px)')};
 `
 
 export const PopupDescription = styled.span`
-  font-family: 'Roboto', sans-serif;
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
   line-height: 22px;
-  color: ${colors.blue7};
+  color: ${colors.gray8};
   cursor: default;
   white-space: pre-line;
   margin-top: ${(props: any) => props.marginTop || '10px'};
@@ -675,9 +670,10 @@ export const PopupFooter = styled(ButtonBlock)`
   border-radius: 0 0 8px 8px;
 `
 
-export const DetailsSectionHeader = styled.h4<{ margin?: string }>`
+export const SectionHeader = styled.h4<{ margin?: string }>`
   font-weight: 500;
   font-size: 15px;
+  line-height: 20px;
   color: ${colors.gray6};
   margin: ${(props) => props.margin || 0};
 `
@@ -832,14 +828,15 @@ export const MessageText = styled.pre<{
   font-family: ${(props) => props.fontFamily || 'Inter, sans-serif'};
   margin: 0;
   padding: ${(props) =>
-    props.withAttachment && props.showMessageSenderName ? '0 10px 10px' : props.withAttachment ? '8px 10px 10px' : ''};
+    props.withAttachment && props.showMessageSenderName ? '0 12px 10px' : props.withAttachment ? '8px 12px 10px' : ''};
   font-size: ${(props) => props.fontSize || '15px'};
   font-weight: 400;
   word-wrap: break-word;
   white-space: pre-wrap;
+  //white-space: normal;
   line-height: ${(props) => props.lineHeight || '20px'};
   letter-spacing: -0.2px;
-  color: #17191c;
+  color: ${colors.gray6};
   user-select: text;
 
   ${(props) =>
@@ -858,6 +855,10 @@ export const MessageText = styled.pre<{
     left: 0;
     bottom: 0;
     height: 1px;
+  }
+
+  & > a {
+    color: ${colors.blue2};
   }
 `
 
@@ -888,4 +889,111 @@ export const SubTitle = styled.span`
   line-height: 16px;
   letter-spacing: -0.078px;
   color: ${colors.gray9};
+`
+
+export const AttachmentIconCont = styled.span`
+  display: inline-flex;
+`
+
+export const UploadingIcon = styled.span<{ fileAttachment?: boolean; isRepliedMessage?: boolean }>`
+  display: inline-block;
+  border: ${(props) => (props.fileAttachment ? '2px' : '3px')} solid rgba(255, 255, 255, 0.8);
+  border-top: ${(props) => (props.fileAttachment ? '2px' : '3px')} solid rgba(0, 0, 0, 0);
+  border-radius: 50%;
+  width: ${(props) => (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
+  height: ${(props) => (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
+
+  animation: preloader 1.5s linear infinite;
+
+  @keyframes preloader {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`
+
+export const UploadPercent = styled.span<{ fileAttachment?: boolean; isRepliedMessage?: boolean }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  color: #fff;
+  width: ${(props) => (props.fileAttachment ? '36px' : props.isRepliedMessage ? '40px' : '56px')};
+  height: ${(props) => (props.fileAttachment ? '36px' : props.isRepliedMessage ? '40px' : '56px')};
+  background-color: rgba(0,0,0,0.4);
+  border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
+}
+  ${(props) =>
+    (props.fileAttachment || props.isRepliedMessage) &&
+    `& > svg {
+    width: 15px;
+    height: 15px;
+  }`}
+`
+
+export const UploadProgress = styled.div<{
+  positionStatic?: boolean
+  isFailedAttachment?: boolean
+  whiteBackground?: boolean
+  fileAttachment?: boolean
+  isRepliedMessage?: boolean
+  onClick?: any
+  backgroundImage?: string
+  borderRadius?: string
+  width?: number
+  height?: number
+  withBorder?: boolean
+  backgroundColor?: string
+}>`
+  position: ${(props) => !props.positionStatic && 'absolute'};
+  top: ${(props) => (props.fileAttachment ? '9px' : '0')};
+  left: ${(props) => (props.fileAttachment ? '12px' : '0')};
+  width: ${(props) =>
+    props.fileAttachment ? '36px' : props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
+  height: ${(props) =>
+    props.fileAttachment ? '36px' : props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
+  background-image: url(${(props) => 'data:image/jpeg;base64,' + props.backgroundImage});
+  background-size: cover;
+  border-radius: ${(props) =>
+    props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
+  z-index: 5;
+
+  border: ${(props) =>
+    props.isRepliedMessage
+      ? '0.5px solid rgba(0, 0, 0, 0.1)'
+      : props.withBorder && `2px solid ${props.backgroundColor}`};
+  box-sizing: border-box;
+  ${(props) => props.isFailedAttachment && 'background-color: rgba(237, 77, 96, 0.1);'}
+  ${(props) =>
+    props.whiteBackground &&
+    `
+    background-color: rgba(255,255,255,0.3);
+    border: 1px solid  ${colors.gray1};
+
+    ${UploadingIcon} {
+        border: 4px solid rgba(238,238,238,0.8);
+        border-top: 4px solid ${colors.cobalt1};
+    }
+  `}
+`
+
+export const AttachmentPreviewTitle = styled.span<{ color?: string }>`
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  max-width: calc(100% - 20px);
+  font-style: normal;
+  font-weight: normal;
+  font-size: 15px;
+  line-height: 20px;
+  height: 20px;
+  color: ${(props) => props.color || colors.blue10};
 `

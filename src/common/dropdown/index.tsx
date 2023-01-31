@@ -14,7 +14,7 @@ const DropDownContainer = styled.div<{ height?: string; center: boolean; order?:
     `};
 `
 
-const DropDownTriggerContainer = styled.button<{
+const DropDownTriggerContainer = styled.div<{
   withIcon?: boolean
   iconColor?: string
   isOpen?: boolean
@@ -66,6 +66,7 @@ const DropDownBody = styled.div<any>`
   right: 0;
   top: 100%;
   display: flex;
+  direction: initial;
   flex-direction: column;
   background: #ffffff;
   border-radius: 8px;
@@ -85,15 +86,17 @@ const DropDownBody = styled.div<any>`
 
   ${(props) =>
     props.position === 'top'
-      ? `
-    top: inherit;
-    bottom: 100%;
-        `
+      ? `top: inherit;
+         bottom: 100%;`
       : props.position === 'topRight'
-      ? `
-    top: inherit;
-    right: inherit;
-    bottom: 100%`
+      ? `top: inherit;
+         right: inherit;
+         bottom: 100%`
+      : props.position === 'right' || props.position === 'center'
+      ? `right: inherit;`
+      : props.position === 'left'
+      ? `right: inherit;
+          left: 0;`
       : ''}
 `
 
