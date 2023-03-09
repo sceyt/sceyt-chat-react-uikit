@@ -1,0 +1,16 @@
+export declare const GET_MEMBERS = "GET_MEMBERS";
+export declare const ADD_MEMBERS = "ADD_MEMBERS";
+export declare const SET_MEMBERS_TO_LIST = "SET_MEMBERS_TO_LIST";
+export declare const ADD_MEMBERS_TO_LIST = "ADD_MEMBERS_TO_LIST";
+export declare const UPDATE_MEMBERS = "UPDATE_MEMBERS";
+export declare const UPDATE_MEMBERS_PRESENCE = "UPDATE_MEMBERS_PRESENCE";
+export declare const LOAD_MORE_MEMBERS = "LOAD_MORE_MEMBERS";
+export declare const SET_MEMBERS_LOADING_STATE = "SET_MEMBERS_LOADING_STATE";
+export declare const CLEAR_MEMBERS = "CLEAR_MEMBERS";
+export declare const KICK_MEMBER = "KICK_MEMBER";
+export declare const BLOCK_MEMBER = "BLOCK_MEMBER";
+export declare const REPORT_MEMBER = "REPORT_MEMBER";
+export declare const REMOVE_MEMBER_FROM_LIST = "REMOVE_MEMBER_FROM_LIST";
+export declare const GET_ROLES = "GET_ROLES";
+export declare const GET_ROLES_SUCCESS = "GET_ROLES_SUCCESS";
+export declare const CHANGE_MEMBER_ROLE = "CHANGE_MEMBER_ROLE";
