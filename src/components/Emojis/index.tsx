@@ -35,7 +35,18 @@ const EmojiIcon = ({ collectionName }: any) => {
   }
 }
 
-function EmojisPopup({ setMessageText, messageText, handleEmojiPopupToggle, handleAddReaction, rightSide }: any) {
+// function EmojisPopup({ setMessageText, messageText, handleEmojiPopupToggle, handleAddReaction, rightSide }: any) {
+function EmojisPopup({
+  handleAddEmoji,
+  handleEmojiPopupToggle,
+  rtlDirection,
+  rightSide
+}: {
+  handleAddEmoji: (selectedEmoji: string) => void
+  handleEmojiPopupToggle?: (state: boolean) => void
+  rtlDirection?: boolean
+  rightSide?: boolean
+}) {
   const [activeCollection, setActiveCollection] = useState('People')
   const [collectionHeights, setCollectionHeights] = useState<number[]>([])
   const emojiContainerRef = useRef<any>(null)
@@ -59,13 +70,16 @@ function EmojisPopup({ setMessageText, messageText, handleEmojiPopupToggle, hand
     }
   }
   const chooseEmoji = (selectedEmoji: any) => {
-    if (setMessageText) {
-      console.log('select emoji ... ')
+    handleAddEmoji(selectedEmoji)
+    if (handleEmojiPopupToggle) {
+      handleEmojiPopupToggle(false)
+    }
+    /* if (setMessageText) {
       setMessageText(messageText + selectedEmoji)
       handleEmojiPopupToggle(false)
     } else {
       handleAddReaction(selectedEmoji)
-    }
+    } */
   }
   const handleEmojiCollectionClick = (mainCollection: any) => {
     const collection: any = collectionsRef.current.find((el: any) => el.collectionName === mainCollection)
@@ -82,7 +96,7 @@ function EmojisPopup({ setMessageText, messageText, handleEmojiPopupToggle, hand
   }, [])
 
   return (
-    <Container rightSide={rightSide} id='emojisContainer'>
+    <Container rightSide={rightSide} id='emojisContainer' rtlDirection={rtlDirection}>
       <EmojiHeader>{activeCollection}</EmojiHeader>
       <EmojiSection ref={emojiContainerRef} onScroll={handleEmojiListScroll}>
         <AllEmojis>
@@ -125,9 +139,10 @@ function EmojisPopup({ setMessageText, messageText, handleEmojiPopupToggle, hand
 
 export default EmojisPopup
 
-const Container = styled.div<{ rightSide?: boolean }>`
+const Container = styled.div<{ rightSide?: boolean; rtlDirection?: boolean }>`
   position: absolute;
-  left: ${(props) => (props.rightSide ? '-276px' : '-8px')};
+  left: ${(props) => (props.rtlDirection ? '' : props.rightSide ? '-276px' : '0')};
+  right: ${(props) => props.rtlDirection && '0'};
   bottom: 46px;
   width: 306px;
   border: 1px solid ${colors.gray1};

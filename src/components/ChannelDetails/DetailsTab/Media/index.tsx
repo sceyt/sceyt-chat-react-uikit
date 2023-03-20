@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // import { getFileExtension } from '../../../../helpers'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { getAttachmentsAC } from '../../../../store/message/actions'
+import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { IAttachment } from '../../../../types'
 import SliderPopup from '../../../../common/popups/sliderPopup'
@@ -23,12 +23,13 @@ const Media = ({ channelId }: IProps) => {
     setMediaFile(file)
   }
   useEffect(() => {
+    dispatch(setAttachmentsAC([]))
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.media))
   }, [channelId])
   return (
     <Container>
       {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.url} onClick={() => handleMediaItemClick(file)}>
+        <MediaItem key={file.id} onClick={() => handleMediaItemClick(file)}>
           {file.type === 'image' ? (
             <Attachment attachment={file} backgroundColor={colors.white} borderRadius='8px' isDetailsView />
           ) : (
@@ -69,8 +70,9 @@ const Container = styled.div<any>`
   flex-wrap: wrap;
 `
 const MediaItem = styled.div`
-  width: calc(33.3333% - 5px);
+  width: calc(33.3333% - 4px);
   height: 110px;
+  box-sizing: border-box;
   //border: 1px solid #ccc;
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 8px;

@@ -2,7 +2,7 @@ import SceytChat from './ChatContainer'
 import ChannelList from './ChannelList'
 import Chat from './Chat'
 import ChatHeader from './ChatHeader'
-import Messages from './Messages'
+import MessageList from './Messages'
 import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
 import SceytChatHeader from './SceytChatHeader'
@@ -14,7 +14,7 @@ export {
   ChannelList,
   Chat,
   ChatHeader,
-  Messages,
+  MessageList,
   SendMessage,
   ChannelDetails,
   SceytChatHeader,

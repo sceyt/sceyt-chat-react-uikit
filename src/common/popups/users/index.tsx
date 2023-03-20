@@ -20,7 +20,7 @@ import {
 } from '../../../../../../store/channel/selector' */
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 // import { ReactComponent as CreateChannelIcon } from '../../../../../assets/svg/add.svg'
-import { CHANNEL_TYPE, PRESENCE_STATUS } from '../../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
 /* import {
   createChannel,
@@ -32,12 +32,17 @@ import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
 import { colors } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
-import { getContactsAC, getUsersAC } from '../../../store/user/actions'
-import { contactListSelector, contactsMapSelector, usersListSelector } from '../../../store/user/selector'
+import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
+import {
+  contactListSelector,
+  contactsMapSelector,
+  usersListSelector,
+  usersLoadingStateSelector
+} from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
 import { makeUserName, userLastActiveDateFormat } from '../../../helpers'
-import { getUserDisplayNameFromContact } from '../../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate } from '../../../hooks'
 
 interface ISelectedUserData {
@@ -76,10 +81,10 @@ const UsersPopup = ({
   const contactList = useSelector(contactListSelector)
   const contactsMap = useSelector(contactsMapSelector)
   const usersList = useSelector(usersListSelector)
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   // const roles: any = []
   // const users = useSelector(usersSelector)
-  // const usersLoadingState = useSelector(usersLoadingStateSelector)
+  const usersLoadingState = useSelector(usersLoadingStateSelector)
   const selectedMembersCont = useRef<any>('')
 
   const [userSearchValue, setUserSearchValue] = useState('')
@@ -101,9 +106,9 @@ const UsersPopup = ({
 
   const handleMembersListScroll = (event: any) => {
     if (event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
-      /* if (usersLoadingState === LOADING_STATE.LOADED) {
-        dispatch(loadMoreUsers(20))
-      } */
+      if (!getFromContacts && usersLoadingState === LOADING_STATE.LOADED) {
+        dispatch(loadMoreUsersAC(20))
+      }
     }
   }
 
@@ -169,7 +174,6 @@ const UsersPopup = ({
   } */
 
   const handleCreateChannel = (selectedUser?: IUser) => {
-    console.log('handleCreateChannel .. actionType', actionType)
     if (actionType === 'createChat') {
       const channelData = {
         metadata: '',

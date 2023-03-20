@@ -14,51 +14,66 @@ import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/attachment.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
+import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
+import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import { colors } from '../../UIHelper/constants'
 import EmojisPopup from '../Emojis'
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
 // import { useDidUpdate } from '../../hooks'
 import {
   editMessageAC,
+  resendMessageAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessageForReplyAC,
   setMessageToEditAC,
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
-import { makeUserName, MessageTextFormat, urlRegex } from '../../helpers'
-import { DropdownOptionLi, DropdownOptionsUl, UploadFile } from '../../UIHelper'
+import {
+  detectBrowser,
+  detectOS,
+  getCaretPosition,
+  getCaretPosition1,
+  makeUserName,
+  MessageTextFormat,
+  placeCaretAtEnd,
+  setCursorPosition
+} from '../../helpers'
+import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
 import {
   activeChannelSelector,
+  channelInfoIsOpenSelector,
   draggedAttachmentsSelector,
   typingIndicatorSelector
 } from '../../store/channel/selector'
-import { IUser } from '../../types'
+import { IMember, IMessage, IUser } from '../../types'
 import { joinChannelAC, sendTypingAC, setDraggedAttachments } from '../../store/channel/actions'
 import { createFileImageThumbnail, createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
-import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
-import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import DropDown from '../../common/dropdown'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { getFrame } from '../../helpers/getVideoFrame'
-import { deleteVideoThumb } from '../../helpers/messagesHalper'
-import { attachmentTypes } from '../../helpers/constants'
+import { deleteVideoThumb, getPendingMessagesMap } from '../../helpers/messagesHalper'
+import { attachmentTypes, CHANNEL_TYPE } from '../../helpers/constants'
 import usePermissions from '../../hooks/usePermissions'
-import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
+import { getClient } from '../../common/client'
+import { CONNECTION_STATUS } from '../../store/user/constants'
+import MentionMembersPopup from '../../common/popups/mentions'
+import LinkifyIt from 'linkify-it'
 // import got from 'got'
-
+let prevActiveChannelId: any
 interface SendMessageProps {
   draggedAttachments?: boolean
   handleAttachmentSelected?: (state: boolean) => void
+  disabled?: boolean
   hideEmojis?: boolean
   emojiIcoOrder?: number
   attachmentIcoOrder?: number
   sendIconOrder?: number
-  iconsHoverColor?: string
   inputOrder?: number
   CustomTypingIndicator?: FC<{ from: IUser; typingState: boolean }>
   margin?: string
@@ -76,12 +91,12 @@ interface SendMessageProps {
 const SendMessageInput: React.FC<SendMessageProps> = ({
   handleAttachmentSelected,
   // draggedAttachments,
+  disabled = false,
   emojiIcoOrder,
   attachmentIcoOrder,
   sendIconOrder,
   inputOrder,
   hideEmojis,
-  iconsHoverColor,
   CustomTypingIndicator,
   margin,
   border,
@@ -96,12 +111,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   replyMessageIcon
 }) => {
   const dispatch = useDispatch()
-  const getFromContacts = getUserDisplayNameFromContact()
+
+  const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const isBlockedUserChat = activeChannel.peer && activeChannel.peer.blocked
+  const isDeletedUserChat = activeChannel.peer && activeChannel.peer.activityState === 'Deleted'
   const messageToEdit = useSelector(messageToEditSelector)
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
+  const ChatClient = getClient()
+  const { user } = ChatClient
   // const { handleSendMessage } = useMessages(activeChannel)
   /* const recordingInitialState = {
     recordingSeconds: 0,
@@ -127,80 +147,144 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   // const [recording, setRecording] = useState<Recording>(recordingInitialState)
   // const [recordedFile, setRecordedFile] = useState<any>(null)
 
-  // const [mentionedMembers, setMentionedMembers] = useState([])
+  const [mentionedMembers, setMentionedMembers] = useState<any>([])
 
-  // const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState([])
+  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>([])
 
-  // const [currentMentions, setCurrentMentions] = useState(undefined)
+  const [currentMentions, setCurrentMentions] = useState<any>(undefined)
 
-  // const [mentionTyping, setMentionTyping] = useState(false)
+  const [mentionTyping, setMentionTyping] = useState(false)
 
-  // const [mentionEdit, setMentionEdit] = useState(undefined)
+  const [mentionEdit, setMentionEdit] = useState<any>(undefined)
 
-  // const [selectionPos, setSelectionPos] = useState()
+  const [selectionPos, setSelectionPos] = useState<any>()
 
   const [typingTimout, setTypingTimout] = useState<any>()
+  const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
   const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
-  // const [openMention, setOpenMention] = useState(false)
+  const [openMention, setOpenMention] = useState(false)
   const [attachments, setAttachments]: any = useState([])
   const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   // const typingIndicator = { from: { firstName: 'Armen2', lastName: 'Mkrtchyan2', id: 'armen2' }, typingState: true }
   const fileUploader = useRef<any>(null)
-  const messageInput = useRef<any>(null)
+  const messageInputRef = useRef<any>(null)
   // const emojisRef = useRef<any>(null)
   const emojiBtnRef = useRef<any>(null)
-  // const mentionsRef = useRef<any>(null)
+  const mentionsRef = useRef<any>(null)
   // const mentionsBtnRef = useRef<any>(null)
   // const playerRef = useRef<any>(null)
 
-  const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm'
+  const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
   const handleSendTypingState = (typingState: boolean) => {
+    if (typingState) {
+      setInTypingStateTimout(
+        setTimeout(() => {
+          setInTypingStateTimout(0)
+        }, 3000)
+      )
+    } else {
+      clearTimeout(inTypingStateTimout)
+    }
     setInTypingState(typingState)
     dispatch(sendTypingAC(typingState))
   }
 
-  /* const handleSetMention = (member) => {
-    const mentionDisplayName = `${member.firstName}${member.lastName !== '' ? ` ${member.lastName}` : ''}`;
-    const mentionToChange = mentionedMembers.find((men) => men.start === currentMentions.start);
+  const handleAddEmoji = (emoji: string) => {
+    const selPos = getCaretPosition(messageInputRef.current)
+    const newText = messageText.slice(0, selPos) + emoji + messageText.slice(selPos)
+    setMessageText(newText)
+    messageInputRef.current.innerText = newText
+    setCursorPosition(messageInputRef.current, selPos + emoji.length)
+  }
+
+  const handleSetMention = (member: IMember) => {
+    const mentionDisplayName = makeUserName(
+      user.id === member.id ? member : contactsMap[member.id],
+      member,
+      getFromContacts
+    )
+    const mentionToChange = mentionedMembers.find((men: any) => men.start === currentMentions.start)
+    // console.log('handle set mention .......................')
+    // console.log('mentionToChange:', mentionToChange)
     if (mentionToChange) {
-      setMentionedMembers(mentionedMembers.filter((menMem) => menMem.start !== currentMentions.start));
-      setMentionedMembersDisplayName(mentionedMembersDisplayName.filter((menMem) => menMem.id !== mentionToChange.id));
-    }
-    setMentionedMembers((members) =>
-    [...members,
-    { ...member, start: currentMentions.start, end: currentMentions.start + mentionDisplayName.length + 1 }]);
-    if (!mentionedMembersDisplayName.find((menMem) => menMem.id === member.id)) {
+      setMentionedMembers(
+        mentionedMembers.map((menMem: any) => {
+          if (menMem.start === currentMentions.start) {
+            return {
+              ...member,
+              start: currentMentions.start,
+              end: currentMentions.start + 1 + mentionDisplayName.trim().length
+            }
+          } else {
+            return menMem
+          }
+        })
+      )
       setMentionedMembersDisplayName(
-        (prevState) => ([...prevState, { id: member.id, displayName: `@${mentionDisplayName}` }]),
-      );
+        mentionedMembersDisplayName.filter((menMem: any) => menMem.id !== mentionToChange.id)
+      )
+    } else {
+      /* console.log('set mention ....................... ', {
+        ...member,
+        start: currentMentions.start,
+        end: currentMentions.start + 1 + mentionDisplayName.trim().length
+      }) */
+      setMentionedMembers((members: any) => [
+        ...members,
+        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.trim().length }
+      ])
     }
-    setMentionTyping(false);
-    setMessageText([messageText.slice(0, currentMentions.start + 1),
-      mentionDisplayName, messageText.slice(currentMentions.start + 1 + currentMentions.typed.length)].join(''));
-    const updateCurrentMentions = { ...currentMentions };
-    updateCurrentMentions.typed = mentionDisplayName;
-    updateCurrentMentions.id = member.id;
-    updateCurrentMentions.end = updateCurrentMentions.start + mentionDisplayName.length;
-    setCurrentMentions(updateCurrentMentions);
-    setMentionEdit(undefined);
-    messageInput.current.focus();
-  }; */
-  /* const handleCloseMentionsPopup = () => {
+
+    if (!mentionedMembersDisplayName.find((menMem: any) => menMem.id === member.id)) {
+      setMentionedMembersDisplayName((prevState: any) => [
+        ...prevState,
+        { id: member.id, displayName: `@${mentionDisplayName}` }
+      ])
+    }
+    setMentionTyping(false)
+    /* const currentText = [
+      messageText.slice(0, mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1),
+      `${mentionDisplayName} `,
+      messageText.slice(
+        mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
+      )
+    ].join('')
+    */
+    const currentText = `${messageText.slice(
+      0,
+      mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1
+    )}${mentionDisplayName} ${messageText.slice(
+      mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
+    )}`
+    setMessageText(currentText)
+    messageInputRef.current.innerText = currentText
+
+    setCursorPosition(messageInputRef.current, currentMentions.start + 1 + mentionDisplayName.length)
+    const updateCurrentMentions = { ...currentMentions }
+    updateCurrentMentions.typed = mentionDisplayName
+    updateCurrentMentions.id = member.id
+    updateCurrentMentions.end = updateCurrentMentions.start + mentionDisplayName.length
+
+    setCurrentMentions(updateCurrentMentions)
+    setMentionEdit(undefined)
+    messageInputRef.current.focus()
+  }
+  const handleCloseMentionsPopup = () => {
     setOpenMention(false)
     setMentionTyping(false)
     setMentionEdit(undefined)
-  } */
+  }
   /* const handleMentionButtonClick = () => {
     if (!openMention) {
-      const selPos = messageInput.current.selectionStart;
+      const selPos = messageInputRef.current.selectionStart;
       const updateMessageText = [messageText.slice(0, selPos), '@', messageText.slice(selPos)].join('');
 
       setMessageText(updateMessageText);
       setCurrentMentions({
-        start: messageInput.current.selectionStart,
+        start: messageInputRef.current.selectionStart,
         typed: '',
       });
     } else if (messageText.slice(-1) === '@') {
@@ -209,110 +293,147 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setOpenMention(!openMention);
   }; */
   const handleTyping = (e: any) => {
-    if (messageToEdit) {
-      setEditMessageText(e.currentTarget.value)
-    } else {
-      setMessageText(e.currentTarget.value)
-    }
-    /* if (mentionTyping) {
-      if (e.currentTarget.value.slice(-1) === ' ') {
-        setMentionTyping(false);
-        handleCloseMentionsPopup();
-        if (!currentMentions.end) {
-          setCurrentMentions(undefined);
-        }
-      } else if (!currentMentions.end) {
-        const typedMessage = e.currentTarget.value;
-        const updateCurrentMentions = { ...currentMentions };
-        // eslint-disable-next-line prefer-destructuring
-        updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1).split(' ')[0];
-        setCurrentMentions(updateCurrentMentions);
+    if (!(openMention && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) {
+      if (messageToEdit) {
+        setEditMessageText(e.currentTarget.innerText)
+      } else {
+        setMessageText(e.currentTarget.innerText)
       }
-    } */
-    /* if (mentionEdit && !(e.key === 'Delete' || e.key === 'Backspace')) {
-      const selPos = e.currentTarget.selectionStart;
-      setMentionedMembers(((prevState) => prevState.filter((mem) => mem.id !== mentionEdit.id)));
-      setCurrentMentions({
-        start: mentionEdit.start,
-        typed: messageText.slice(mentionEdit.start + 1, selPos),
-      });
-    } */
+      // e.currentTarget.html = e.currentTarget.innerText
+      handleMentionDetect(e)
 
-    if (typingTimout) {
-      clearTimeout(typingTimout)
-    } else {
-      handleSendTypingState(true)
+      if (typingTimout) {
+        if (!inTypingStateTimout) {
+          handleSendTypingState(true)
+        }
+        clearTimeout(typingTimout)
+      } else {
+        handleSendTypingState(true)
+      }
+      setTypingTimout(
+        setTimeout(() => {
+          setTypingTimout(0)
+        }, 2000)
+      )
     }
-    setTypingTimout(
-      setTimeout(() => {
-        setTypingTimout(0)
-      }, 2000)
-    )
   }
-
-  /* const handleKeyDown = (e) => {
-    const selPos = e.currentTarget.selectionStart;
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-      setSelectionPos(selPos);
-    }
-    if (e.key === '@' && !mentionTyping) {
-      setCurrentMentions({
-        start: messageInput.current.selectionStart,
-        typed: '',
-      });
-
-      if (!mentionTyping) {
-        setMentionTyping(true);
-        setOpenMention(true);
-      }
-    }
-    if (mentionedMembers.length) {
-      let edited = false;
-      const editMentions = mentionedMembers.map((men) => {
-        if (men.start > selPos - 1) {
-          if (!edited) {
-            edited = true;
+  const handleMentionDetect = (e: any) => {
+    // const selPos = getCaretPosition(e.currentTarget)
+    const selPos = getCaretPosition1(e.currentTarget)
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
+      setSelectionPos(selPos)
+    } else {
+      if (mentionedMembers.length) {
+        let edited = false
+        const editMentions = mentionedMembers.map((men: any) => {
+          if (men.start > selPos) {
+            if (!edited) {
+              edited = true
+            }
+            const newMen = { ...men }
+            if (e.key === 'Delete' || e.key === 'Backspace') {
+              newMen.start -= 1
+              newMen.end -= 1
+            } else {
+              newMen.start += 1
+              newMen.end += 1
+            }
+            return newMen
           }
-          const newMen = { ...men };
-          if (e.key === 'Delete' || e.key === 'Backspace') {
-            newMen.start -= 1;
-            newMen.end -= 1;
-          } else {
-            newMen.start += 1;
-            newMen.end += 1;
-          }
-          return newMen;
+          return men
+        })
+        if (edited) {
+          setMentionedMembers(editMentions)
         }
-        return men;
-      });
-      if (edited) {
-        setMentionedMembers(editMentions);
       }
     }
-    if (e.keyCode === 8) {
-      const mentionToEdit = mentionedMembers.find((menMem) => menMem.start < selPos && menMem.end >= selPos);
+    if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
+      setMentionTyping(true)
+      setOpenMention(true)
+    }
+    const lastChar = messageInputRef.current.innerText.slice(0, selPos).slice(-1)
+    if (lastChar === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
+      setCurrentMentions({
+        start: selPos - 1,
+        typed: ''
+      })
+
+      // if (!mentionTyping) {
+      setMentionTyping(true)
+      setOpenMention(true)
+      // }
+    }
+    let shouldClose = false
+    if (e.key === 'Backspace') {
+      const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       if (mentionToEdit) {
-        setOpenMention(true);
-        setMentionTyping(true);
-        setMentionedMembers(((prevState) => prevState.filter((mem) => mem.id !== mentionToEdit.id)));
+        const currentText = [messageText.slice(0, mentionToEdit.start + 1), messageText.slice(mentionToEdit.end)].join(
+          ''
+        )
+        setMessageText(currentText)
+        messageInputRef.current.innerText = currentText
+        setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.start !== mentionToEdit.start))
+        setMentionEdit(undefined)
+        setCursorPosition(messageInputRef.current, mentionToEdit.start + 1)
+        setOpenMention(true)
+        setMentionTyping(true)
         setCurrentMentions({
           start: mentionToEdit.start,
-          typed: messageText.slice(mentionToEdit.start, selPos - 1),
-        });
+          typed: ''
+        })
+        /* setOpenMention(true)
+        console.log('set mention typing 2 ', true)
+        setMentionTyping(true)
+        setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.id !== mentionToEdit.id))
+
+        setCurrentMentions({
+          start: mentionToEdit.start,
+          typed: messageText.slice(mentionToEdit.start, selPos - 1)
+        }) */
       } else if (currentMentions) {
-        if (currentMentions.start + 1 >= selPos) {
-          setCurrentMentions(undefined);
-          setOpenMention(false);
-          setMentionTyping(false);
+        if (currentMentions.start >= selPos) {
+          shouldClose = true
+          setCurrentMentions(undefined)
+          setOpenMention(false)
+          setMentionTyping(false)
         } else {
           setCurrentMentions({
             start: currentMentions.start,
-            typed: messageText.slice(currentMentions.start, selPos - 1),
-          });
+            typed: messageText.slice(currentMentions.start + 1, selPos)
+          })
         }
       }
     }
-  }; */
+    if (mentionTyping) {
+      if (e.key === ' ') {
+        // setMentionTyping(false)
+        handleCloseMentionsPopup()
+        // if (!currentMentions.end) {
+        //   setCurrentMentions(undefined)
+        // }
+      } else if (!currentMentions.end && !shouldClose) {
+        const typedMessage = e.currentTarget.innerText
+        const updateCurrentMentions = { ...currentMentions }
+        // eslint-disable-next-line prefer-destructuring
+        // updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1).split(' ')[0]
+        updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1, selPos)
+        setCurrentMentions(updateCurrentMentions)
+      }
+    }
+    if (mentionEdit && (e.key === 'Delete' || e.key === 'Backspace')) {
+      // if(mentionTyping && currentMentions.start === selectionPos)
+      const currentText = [messageText.slice(0, mentionEdit.start + 1), messageText.slice(mentionEdit.end)].join('')
+      setMessageText(currentText)
+      messageInputRef.current.innerText = currentText
+      setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.start !== mentionEdit.start))
+      setMentionEdit(undefined)
+      setCursorPosition(messageInputRef.current, mentionEdit.start + 1)
+      setCurrentMentions({
+        start: mentionEdit.start,
+        typed: ''
+      })
+    }
+  }
 
   const handleCloseReply = () => {
     dispatch(setMessageForReplyAC(null))
@@ -320,55 +441,58 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleSendEditMessage = (event?: any) => {
     const { shiftKey, charCode, type } = event
-    const shouldSend = (charCode === 13 && shiftKey === false) || type === 'click'
+    const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
     if (shouldSend) {
       event.preventDefault()
       if (messageToEdit) {
         handleEditMessage()
-      } else {
+      } else if (messageText || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
         // if (messageTexToSend) {
-        // eslint-disable-next-line max-len
-        /* let mentionedMembersPositions = {}
-         const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a, b) =>
-           a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
-         )
-         const findIndexes = []
-         sortedMentionedMembersDspNames.forEach((menMem) => {
-           let menIndex = messageTexToSend.indexOf(menMem.displayName)
-           let existingIndex = findIndexes.includes(menIndex)
-           let i = 0
-           while (existingIndex) {
-             menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-             existingIndex = findIndexes.includes(menIndex)
-             // eslint-disable-next-line no-plusplus
-             i++
-             if (i > sortedMentionedMembersDspNames.length) {
-               break
-             }
-           }
+        const mentionedMembersPositions = {}
+        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+          a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+        ) */
+        // const findIndexes: any = []
+        mentionedMembers.forEach((menMem: any) => {
+          if (!mentionedMembersPositions[menMem.id]) {
+            mentionedMembersPositions[menMem.id] = { loc: menMem.start, len: menMem.end - menMem.start }
+          }
+        })
+        /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
+          let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
+          let existingIndex = findIndexes.includes(menIndex)
+          let i = 0
+          while (existingIndex) {
+            menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
+            existingIndex = findIndexes.includes(menIndex)
+            // eslint-disable-next-line no-plusplus
+            i++
+            if (i > sortedMentionedMembersDspNames.length) {
+              break
+            }
+          }
 
-           const mentionDisplayLength = menMem.displayName.length
-           if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-             findIndexes.push(menIndex)
-             mentionedMembersPositions = {
-               ...mentionedMembersPositions,
-               [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
-             }
-           }
-         }) */
-
+          const mentionDisplayLength = menMem.displayName.length
+          if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
+            findIndexes.push(menIndex)
+            mentionedMembersPositions = {
+              ...mentionedMembersPositions,
+              [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+            }
+          }
+        }) */
         const messageToSend: any = {
-          // metadata: mentionedMembersPositions,
+          metadata: mentionedMembersPositions,
           body: messageTexToSend,
           mentionedMembers: [],
           attachments: [],
           type: 'text'
         }
 
-        /* messageToSend.mentionedMembers = mentionedMembers.filter(
-           (v: any, i, a) => a.findIndex((t: any) => t.id === v.id) === i
-         ) */
+        messageToSend.mentionedMembers = mentionedMembers.filter(
+          (v: any, i: any, a: any) => a.findIndex((t: any) => t.id === v.id) === i
+        )
         // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
 
         if (messageForReply) {
@@ -376,24 +500,25 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         if (messageTexToSend && !attachments.length) {
-          const messageTextArr = [messageTexToSend]
+          const linkify = new LinkifyIt()
+          const match = linkify.match(messageTexToSend)
+          // const messageTextArr = [messageTexToSend]
           let firstUrl: any
-          messageTextArr.forEach((textPart) => {
+          if (match) {
+            firstUrl = match[0].url
+          }
+          /* messageTextArr.forEach((textPart) => {
             if (urlRegex.test(textPart)) {
               const textArray = textPart.split(urlRegex)
               textArray.forEach(async (part) => {
                 if (urlRegex.test(part)) {
                   if (!firstUrl) {
                     firstUrl = part
-                    try {
-                    } catch (error) {
-                      console.error(error)
-                    }
                   }
                 }
               })
             }
-          })
+          }) */
           if (firstUrl) {
             messageToSend.attachments = [
               {
@@ -413,7 +538,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               name: attachment.data.name,
               data: attachment.data,
               attachmentId: attachment.attachmentId,
-              upload: attachment.upload,
+              upload: true,
               attachmentUrl: attachment.attachmentUrl,
               metadata: attachment.metadata,
               type: attachment.type,
@@ -451,14 +576,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, false))
           }
         }
-
         setMessageText('')
+        messageInputRef.current.innerText = ''
         setAttachments([])
         handleCloseReply()
-        // setMentionedMembers([])
-        // setMentionedMembersDisplayName([])
-        // setOpenMention(false)
-        // setMentionTyping(false)
+        setMentionedMembers([])
+        setMentionedMembersDisplayName([])
+        setOpenMention(false)
+        setMentionTyping(false)
+        setCurrentMentions(undefined)
+
         fileUploader.current.value = ''
         if (inTypingState) {
           handleSendTypingState(false)
@@ -545,6 +672,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   const handleCloseEditMode = () => {
     setEditMessageText('')
+    if (messageInputRef.current) {
+      messageInputRef.current.innerText = ''
+    }
     dispatch(setMessageToEditAC(null))
   }
   const removeUpload = (attachmentId: string) => {
@@ -563,118 +693,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     // if (fileList.length > 10) {
     //   alert('You are chosen more than 10 attachment')
     // } else {
-    const customUploader = getCustomUploader()
     fileList.forEach(async (file: any) => {
-      const fileType = file.type.split('/')[0]
-      if (customUploader) {
-        if (fileType === 'image') {
-          resizeImage(file, 700, 500).then(async (resizedFile: any) => {
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                upload: false,
-                type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-                attachmentId: uuidv4(),
-                size: file.size
-              }
-            ])
-          })
-        } else if (fileType === 'video') {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: false,
-              type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(file),
-              attachmentId: uuidv4(),
-              size: file.size
-            }
-          ])
-        } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: false,
-              type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(file),
-              attachmentId: uuidv4(),
-              size: file.size
-            }
-          ])
-        }
-      } else {
-        if (fileType === 'image') {
-          if (isMediaAttachment) {
-            resizeImage(file).then(async (resizedFile: any) => {
-              const { thumbnail } = await createImageThumbnail(file)
-              // resizedFiles.forEach((file: any, index: number) => {
-              setAttachments((prevState: any[]) => [
-                ...prevState,
-                {
-                  data: new File([resizedFile.blob], resizedFile.file.name),
-                  attachmentUrl: URL.createObjectURL(file),
-                  attachmentId: uuidv4(),
-                  type: fileType,
-                  metadata: JSON.stringify({
-                    tmb: thumbnail,
-                    szw: resizedFile.newWidth,
-                    szh: resizedFile.newHeight
-                  })
-                }
-              ])
-              // })
-            })
-          } else {
-            createFileImageThumbnail(file).then((thumbnail) => {
-              setAttachments((prevState: any[]) => [
-                ...prevState,
-                {
-                  data: file,
-                  // type: file.type.split('/')[0],
-                  type: 'file',
-                  attachmentUrl: URL.createObjectURL(file as any),
-                  attachmentId: uuidv4(),
-                  metadata: JSON.stringify({
-                    tmb: thumbnail
-                  })
-                }
-              ])
-            })
-          }
-        } else if (fileType === 'video') {
-          const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              // type: file.type.split('/')[0],
-              type: 'video',
-              attachmentUrl: URL.createObjectURL(file as any),
-              attachmentId: uuidv4(),
-              metadata: JSON.stringify({
-                tmb: thumb,
-                szw: width,
-                szh: height
-              })
-            }
-          ])
-        } else {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              // type: file.type.split('/')[0],
-              type: 'file',
-              attachmentUrl: URL.createObjectURL(file as any),
-              attachmentId: uuidv4()
-            }
-          ])
-        }
-      }
+      handleAddAttachment(file, isMediaAttachment)
     })
     // }
     /* const { files } = fileUploader.current
@@ -698,9 +718,31 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     fileUploader.current.click()
   }
 
+  const handlePastAttachments = (e: any) => {
+    const os = detectOS()
+    const browser = detectBrowser()
+    if (os === 'Windows' && browser === 'Firefox') {
+      e.preventDefault()
+    } else {
+      if (e.clipboardData.files && e.clipboardData.files.length > 0) {
+        e.preventDefault()
+        const fileList: File[] = Object.values(e.clipboardData.files)
+        fileList.forEach(async (file: any) => {
+          handleAddAttachment(file, true)
+        })
+      } else {
+        e.preventDefault()
+        document.execCommand('inserttext', false, e.clipboardData.getData('text/plain'))
+
+        // e.currentTarget.innerText = e.clipboardData.getData('Text')
+        // placeCaretAtEnd(messageInputRef.current)
+      }
+    }
+  }
+
   const handleEmojiPopupToggle = (bool: boolean) => {
     setIsEmojisOpened(bool)
-    messageInput.current.focus()
+    messageInputRef.current.focus()
   }
 
   const setVideoIsReadyToSend = (attachmentId: string) => {
@@ -722,29 +764,146 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setIsEmojisOpened(false)
     }
     /* if (!mentionsRef.current.contains(e.target) && !mentionsBtnRef.current.contains(e.target)) {
-      handleCloseMentionsPopup();
+      handleCloseMentionsPopup()
     } */
   }
-  /* useEffect(() => {
+  useEffect(() => {
     if (mentionedMembers.length) {
-      const currentPos = messageInput.current.selectionStart;
-      const mentionToEdit = mentionedMembers.find((menMem) => menMem.start <= currentPos && menMem.end >= currentPos);
+      const currentPos = getCaretPosition(messageInputRef.current)
+      const mentionToEdit = mentionedMembers.find(
+        (menMem: any) => menMem.start < currentPos && menMem.end >= currentPos
+      )
       if (mentionToEdit) {
-        setMentionEdit(mentionToEdit);
-        if (!currentMentions) {
-          setCurrentMentions({
-            start: mentionToEdit.start,
-            typed: messageText.slice(mentionToEdit.start + 1, mentionToEdit.end),
-          });
-        }
-        setOpenMention(true);
-        setMentionTyping(true);
+        setMentionEdit(mentionToEdit)
+        // if (!currentMentions) {
+        setCurrentMentions({
+          start: mentionToEdit.start,
+          typed: ''
+        })
+        // }
+        setOpenMention(true)
+        setMentionTyping(true)
       } else if (openMention || mentionTyping) {
-        handleCloseMentionsPopup();
-        setMentionTyping(false);
+        handleCloseMentionsPopup()
+        setMentionTyping(false)
+        setOpenMention(false)
       }
     }
-  }, [selectionPos]); */
+  }, [selectionPos])
+
+  const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
+    const customUploader = getCustomUploader()
+    const fileType = file.type.split('/')[0]
+    if (customUploader) {
+      if (fileType === 'image') {
+        resizeImage(file).then(async (resizedFile: any) => {
+          setAttachments((prevState: any[]) => [
+            ...prevState,
+            {
+              data: file,
+              upload: false,
+              type: isMediaAttachment ? fileType : 'file',
+              attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
+              attachmentId: uuidv4(),
+              size: file.size
+            }
+          ])
+        })
+      } else if (fileType === 'video') {
+        setAttachments((prevState: any[]) => [
+          ...prevState,
+          {
+            data: file,
+            upload: false,
+            type: isMediaAttachment ? fileType : 'file',
+            attachmentUrl: URL.createObjectURL(file),
+            attachmentId: uuidv4(),
+            size: file.size
+          }
+        ])
+      } else {
+        setAttachments((prevState: any[]) => [
+          ...prevState,
+          {
+            data: file,
+            upload: false,
+            type: 'file',
+            attachmentUrl: URL.createObjectURL(file),
+            attachmentId: uuidv4(),
+            size: file.size
+          }
+        ])
+      }
+    } else {
+      if (fileType === 'image') {
+        if (isMediaAttachment) {
+          resizeImage(file).then(async (resizedFile: any) => {
+            const { thumbnail } = await createImageThumbnail(file)
+            // resizedFiles.forEach((file: any, index: number) => {
+            setAttachments((prevState: any[]) => [
+              ...prevState,
+              {
+                data: new File([resizedFile.blob], resizedFile.file.name),
+                attachmentUrl: URL.createObjectURL(file),
+                attachmentId: uuidv4(),
+                type: fileType,
+                metadata: JSON.stringify({
+                  tmb: thumbnail,
+                  szw: resizedFile.newWidth,
+                  szh: resizedFile.newHeight
+                })
+              }
+            ])
+            // })
+          })
+        } else {
+          createFileImageThumbnail(file).then((thumbnail) => {
+            setAttachments((prevState: any[]) => [
+              ...prevState,
+              {
+                data: file,
+                // type: file.type.split('/')[0],
+                type: 'file',
+                attachmentUrl: URL.createObjectURL(file as any),
+                attachmentId: uuidv4(),
+                metadata: JSON.stringify({
+                  tmb: thumbnail
+                })
+              }
+            ])
+          })
+        }
+      } else if (fileType === 'video') {
+        const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
+        setAttachments((prevState: any[]) => [
+          ...prevState,
+          {
+            data: file,
+            // type: file.type.split('/')[0],
+            type: 'video',
+            attachmentUrl: URL.createObjectURL(file as any),
+            attachmentId: uuidv4(),
+            metadata: JSON.stringify({
+              tmb: thumb,
+              szw: width,
+              szh: height
+            })
+          }
+        ])
+      } else {
+        setAttachments((prevState: any[]) => [
+          ...prevState,
+          {
+            data: file,
+            // type: file.type.split('/')[0],
+            type: 'file',
+            attachmentUrl: URL.createObjectURL(file as any),
+            attachmentId: uuidv4()
+          }
+        ])
+      }
+    }
+  }
 
   useEffect(() => {
     if (typingTimout === 0) {
@@ -769,119 +928,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             type: draggedData.type
           }) */
       )
-      const customUploader = getCustomUploader()
       attachmentsFiles.forEach(async (file: any) => {
-        const fileType = file.type.split('/')[0]
-        const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
-        if (customUploader) {
-          if (fileType === 'image') {
-            resizeImage(file, 700, 500).then(async (resizedFile: any) => {
-              setAttachments((prevState: any[]) => [
-                ...prevState,
-                {
-                  data: file,
-                  upload: false,
-                  type: isMediaAttachment ? fileType : 'file',
-                  attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-                  attachmentId: uuidv4(),
-                  size: file.size
-                }
-              ])
-            })
-          } else if (fileType === 'video') {
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                upload: false,
-                type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(file),
-                attachmentId: uuidv4(),
-                size: file.size
-              }
-            ])
-          } else {
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                upload: false,
-                type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(file),
-                attachmentId: uuidv4(),
-                size: file.size
-              }
-            ])
-          }
-        } else {
-          if (fileType === 'image') {
-            if (isMediaAttachment) {
-              resizeImage(file).then(async (resizedFile: any) => {
-                const { thumbnail } = await createImageThumbnail(file)
-                // resizedFiles.forEach((file: any, index: number) => {
-                setAttachments((prevState: any[]) => [
-                  ...prevState,
-                  {
-                    data: new File([resizedFile.blob], resizedFile.file.name),
-                    attachmentUrl: URL.createObjectURL(file),
-                    attachmentId: uuidv4(),
-                    type: fileType,
-                    metadata: JSON.stringify({
-                      tmb: thumbnail,
-                      szw: resizedFile.newWidth,
-                      szh: resizedFile.newHeight
-                    })
-                  }
-                ])
-                // })
-              })
-            } else {
-              createFileImageThumbnail(file).then((thumbnail) => {
-                setAttachments((prevState: any[]) => [
-                  ...prevState,
-                  {
-                    data: file,
-                    // type: file.type.split('/')[0],
-                    type: 'file',
-                    attachmentUrl: URL.createObjectURL(file as any),
-                    attachmentId: uuidv4(),
-                    metadata: JSON.stringify({
-                      tmb: thumbnail
-                    })
-                  }
-                ])
-              })
-            }
-          } else if (fileType === 'video') {
-            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                // type: file.type.split('/')[0],
-                type: 'video',
-                attachmentUrl: URL.createObjectURL(file as any),
-                attachmentId: uuidv4(),
-                metadata: JSON.stringify({
-                  tmb: thumb,
-                  szw: width,
-                  szh: height
-                })
-              }
-            ])
-          } else {
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                // type: file.type.split('/')[0],
-                type: 'file',
-                attachmentUrl: URL.createObjectURL(file as any),
-                attachmentId: uuidv4()
-              }
-            ])
-          }
-        }
+        handleAddAttachment(file, draggedAttachments[0].attachmentType === 'media')
       })
       dispatch(setDraggedAttachments([], ''))
     }
@@ -1006,17 +1054,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [recordedFile])
 */
+
   useEffect(() => {
-    setMessageText('')
-    // setMentionedMembers([])
-    // setMentionedMembersDisplayName([])
-    setAttachments([])
-    if (messageInput.current) {
-      messageInput.current.focus()
+    if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
+      setMessageText('')
+      // messageInputRef.current.innerText = ''
+      handleCloseReply()
+      setMentionedMembersDisplayName([])
+      setAttachments([])
+      handleCloseEditMode()
+      clearTimeout(typingTimout)
+    } else if (activeChannel.id) {
+      prevActiveChannelId = activeChannel.id
     }
-    // setOpenMention(false)
-    handleCloseEditMode()
-    clearTimeout(typingTimout)
+    if (messageInputRef.current) {
+      messageInputRef.current.focus()
+    }
+    setMentionedMembers([])
+    setOpenMention(false)
+    setCurrentMentions(undefined)
+    setMentionTyping(false)
   }, [activeChannel.id])
 
   useEffect(() => {
@@ -1024,7 +1081,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (attachments.length) {
         let videoAttachment = false
         attachments.forEach((att: any) => {
-          if (att.data.type.split('/')[0] === 'video') {
+          if (att.type === 'video') {
             videoAttachment = true
             if (!readyVideoAttachments[att.attachmentId]) {
               setSendMessageIsActive(false)
@@ -1045,6 +1102,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [messageText, attachments, editMessageText, readyVideoAttachments])
 
   useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      setTimeout(() => {
+        const pendingMessagesMap = getPendingMessagesMap()
+        Object.keys(pendingMessagesMap).forEach((key: any) => {
+          pendingMessagesMap[key].forEach((msg: IMessage) => {
+            dispatch(resendMessageAC(msg, key, connectionStatus))
+          })
+        })
+      }, 1000)
+    }
+  }, [connectionStatus])
+
+  useEffect(() => {
     if (handleAttachmentSelected) {
       handleAttachmentSelected(!!attachments.length)
     }
@@ -1061,14 +1131,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
-    if (messageInput.current) {
-      messageInput.current.focus()
+    if (messageInputRef.current) {
+      messageInputRef.current.focus()
     }
   }, [messageForReply])
 
   useEffect(() => {
-    if (messageToEdit) {
+    if (messageToEdit && messageInputRef.current) {
       setEditMessageText(messageToEdit.body || '')
+      messageInputRef.current.innerText = messageToEdit.body
+      // Creates range object
+      placeCaretAtEnd(messageInputRef.current)
+
+      // Set cursor on focus
+      messageInputRef.current.focus()
       if (messageForReply) {
         handleCloseReply()
       }
@@ -1077,8 +1153,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
 
-    if (messageInput.current) {
-      messageInput.current.focus()
+    if (messageInputRef.current) {
+      messageInputRef.current.focus()
     }
   }, [messageToEdit])
 
@@ -1100,7 +1176,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       wavesurfer.current.play();
     }); */
 
-    if (emojiBtnRef.current && emojiBtnRef.current.offsetLeft > messageInput.current.offsetWidth) {
+    if (emojiBtnRef.current && emojiBtnRef.current.offsetLeft > messageInputRef.current.offsetWidth) {
       setEmojisInRightSide(true)
     }
     document.addEventListener('mousedown', handleClick)
@@ -1108,18 +1184,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       document.removeEventListener('mousedown', handleClick)
     }
   }, [])
+
   return (
     <Container margin={margin} border={border} borderRadius={borderRadius} ref={messageContRef}>
       {!activeChannel.id ? (
         <Loading />
-      ) : isBlockedUserChat ? (
+      ) : isBlockedUserChat || isDeletedUserChat || disabled ? (
         <BlockedUserInfo>
-          <BlockInfoIcon /> You blocked this user.
+          <BlockInfoIcon />{' '}
+          {isDeletedUserChat
+            ? 'This user has been deleted.'
+            : disabled
+            ? "Sender doesn't support replies"
+            : 'You blocked this user.'}
         </BlockedUserInfo>
       ) : !activeChannel.role ? (
-        <JoinChannelCont onClick={handleJoinToChannel}>Join</JoinChannelCont>
-      ) : !checkActionPermission('sendMessage') ? (
-        <ReadOnlyCont>
+        <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+          Join
+        </JoinChannelCont>
+      ) : (
+          activeChannel.type === CHANNEL_TYPE.PUBLIC
+            ? !(activeChannel.role === 'admin' || activeChannel.role === 'owner')
+            : !checkActionPermission('sendMessage')
+        ) ? (
+        <ReadOnlyCont iconColor={colors.primary}>
           <EyeIcon /> Read only
         </ReadOnlyCont>
       ) : (
@@ -1148,8 +1236,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           {/* <EmojiContainer rigthSide={emojisInRightSide} ref={emojisRef} isEmojisOpened={isEmojisOpened}> */}
           {isEmojisOpened && (
             <EmojisPopup
-              setMessageText={setMessageText}
-              messageText={messageText}
+              handleAddEmoji={handleAddEmoji}
+              // messageText={messageText}
               // ccc={handleTyping}
               handleEmojiPopupToggle={handleEmojiPopupToggle}
               rightSide={emojisInRightSide}
@@ -1161,11 +1249,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <CloseEditMode onClick={handleCloseEditMode}>
                 <CloseIcon />
               </CloseEditMode>
-              <EditReplyMessageHeader>
+              <EditReplyMessageHeader color={colors.primary}>
                 <EditIcon />
                 Edit Message
               </EditReplyMessageHeader>
-              {messageToEdit.body}
+              <EditMessageText>{messageToEdit.body}</EditMessageText>
             </EditReplyMessageCont>
           )}
           {messageForReply && (
@@ -1173,11 +1261,53 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <CloseEditMode onClick={handleCloseReply}>
                 <CloseIcon />
               </CloseEditMode>
-              <EditReplyMessageHeader>
-                {replyMessageIcon || <ReplyIcon />} Reply{' '}
-                {makeUserName(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
-              </EditReplyMessageHeader>
-              {MessageTextFormat({ text: messageForReply.body, message: messageForReply })}
+              <ReplyMessageCont>
+                {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                  (messageForReply.attachments[0].type === attachmentTypes.image ||
+                  messageForReply.attachments[0].type === attachmentTypes.video ? (
+                    <Attachment
+                      attachment={messageForReply.attachments[0]}
+                      backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                      isRepliedMessage
+                    />
+                  ) : (
+                    messageForReply.attachments[0].type === attachmentTypes.file && (
+                      <ReplyIconWrapper backgroundColor={colors.primary}>
+                        <ChoseFileIcon />
+                      </ReplyIconWrapper>
+                    )
+                  ))}
+                <div>
+                  <EditReplyMessageHeader color={colors.primary}>
+                    {replyMessageIcon || <ReplyIcon />} Reply to
+                    <UserName>
+                      {user.id === messageForReply.user.id
+                        ? user.firstName
+                          ? `${user.firstName} ${user.lastName}`
+                          : user.id
+                        : makeUserName(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
+                    </UserName>
+                  </EditReplyMessageHeader>
+                  {messageForReply.attachments && messageForReply.attachments.length ? (
+                    messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                      'Voice'
+                    ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                      <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                    ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                      <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                    ) : (
+                      <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                    )
+                  ) : (
+                    MessageTextFormat({
+                      text: messageForReply.body,
+                      message: messageForReply,
+                      contactsMap,
+                      getFromContacts
+                    })
+                  )}
+                </div>
+              </ReplyMessageCont>
             </EditReplyMessageCont>
           )}
           {/* {messageForReply && (
@@ -1219,16 +1349,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
           {/* <div id="waveform" /> */}
           {/* <SendMessageInput messageForReply={messageForReply}> */}
-          <SendMessageInputContainer border={border} borderRadius={borderRadius}>
+          <SendMessageInputContainer border={border} borderRadius={borderRadius} iconColor={colors.primary}>
             {/* <AddAttachmentIcon onClick={() => onOpenFileUploader()} isActive={!!attachments.length}> */}
 
             {/* {!recording.initRecording && ( */}
             <DropDown
               forceClose={showChooseAttachmentType}
               position='top'
-              order={attachmentIcoOrder}
+              order={attachmentIcoOrder === 0 || attachmentIcoOrder ? attachmentIcoOrder : 4}
               trigger={
-                <AddAttachmentIcon isActive={!!attachments.length} iconHoverColor={iconsHoverColor}>
+                <AddAttachmentIcon color={colors.primary}>
                   <AttachmentIcon />
                 </AddAttachmentIcon>
               }
@@ -1272,7 +1402,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 order={emojiIcoOrder}
                 isEmojisOpened={isEmojisOpened}
                 ref={emojiBtnRef}
-                iconHoverColor={iconsHoverColor}
+                hoverColor={colors.primary}
                 onClick={() => {
                   setIsEmojisOpened(!isEmojisOpened)
                 }}
@@ -1281,26 +1411,32 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               </EmojiButton>
             )}
 
-            {/* <MentionsContainer ref={mentionsRef} mentionsIsOpen={openMention}>
-          {openMention && (
-          <MentionMembersPopup
-            channelId={activeChannel.id}
-            addMentionMember={handleSetMention}
-            searchMention={currentMentions.typed}
-            handleMentionsPopupClose={handleCloseMentionsPopup}
-          />
-          )}
-        </MentionsContainer> */}
+            <MentionsContainer ref={mentionsRef} mentionsIsOpen={openMention}>
+              {openMention && (
+                <MentionMembersPopup
+                  channelId={activeChannel.id}
+                  addMentionMember={handleSetMention}
+                  searchMention={currentMentions.typed}
+                  handleMentionsPopupClose={handleCloseMentionsPopup}
+                />
+              )}
+            </MentionsContainer>
             <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-            <MessageInput
-              order={inputOrder}
-              onChange={handleTyping}
-              onKeyPress={handleSendEditMessage}
-              // onKeyDown={handleKeyDown}
-              value={editMessageText || messageText}
-              ref={messageInput}
-              placeholder='Type message here...'
-            />
+            <MessageInputWrapper order={inputOrder} channelDetailsIsOpen={channelDetailsIsOpen}>
+              <MessageInput
+                contentEditable
+                suppressContentEditableWarning
+                onKeyUp={handleTyping}
+                // onChange={handleTyping}
+                onPaste={handlePastAttachments}
+                onKeyPress={handleSendEditMessage}
+                data-placeholder='Type message here ...'
+                // onKeyDown={handleKeyDown}
+                // value={editMessageText || messageText}
+                ref={messageInputRef}
+                // placeholder='Type message here...'
+              />
+            </MessageInputWrapper>
             <SendMessageIcon
               isActive={sendMessageIsActive}
               order={sendIconOrder}
@@ -1317,7 +1453,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               onKeyPress={handleSendEditMessage}
               // onKeyDown={handleKeyDown}
               value={messageText}
-              ref={messageInput}
+              ref={messageInputRef}
               placeholder='Type message here...'
             />
           )}
@@ -1350,7 +1486,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 }
 
-const Container = styled.div<{ margin?: string; border?: string; borderRadius?: string; ref?: any }>`
+const Container = styled.div<{ margin?: string; border?: string; borderRadius?: string; ref?: any; height?: number }>`
   margin: ${(props) => props.margin || '30px 16px 16px'};
   border-top: 1px solid ${colors.gray1};
   border: ${(props) => props.border || ''};
@@ -1374,6 +1510,15 @@ const EditReplyMessageCont = styled.div<any>`
   border-bottom: 1px solid ${colors.gray1};
 `
 
+const EditMessageText = styled.p<any>`
+  margin: 0;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+`
+
 const CloseEditMode = styled.span`
   position: absolute;
   top: 8px;
@@ -1383,14 +1528,24 @@ const CloseEditMode = styled.span`
   text-align: center;
   line-height: 22px;
   cursor: pointer;
+
+  & > svg {
+    color: ${colors.gray4};
+  }
 `
+
+const UserName = styled.span<any>`
+  font-weight: 500;
+  margin-left: 4px;
+`
+
 const EditReplyMessageHeader = styled.h4<any>`
   display: flex;
   margin: 0 0 2px;
-  font-weight: 500;
+  font-weight: 400;
   font-size: 13px;
   line-height: 16px;
-  color: ${colors.primary};
+  color: ${(props) => props.color || colors.primary};
 
   > svg {
     margin-right: 4px;
@@ -1398,13 +1553,43 @@ const EditReplyMessageHeader = styled.h4<any>`
     height: 16px;
   }
 `
+
+const AddAttachmentIcon = styled.span<any>`
+  display: flex;
+  height: 48px;
+  align-items: center;
+  margin: 0 5px;
+  cursor: pointer;
+  line-height: 13px;
+  z-index: 2;
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+
+  > svg {
+    ${(props) => (props.isActive ? `color: ${props.color || colors.primary};` : 'color: #898B99;')}
+  }
+
+  &:hover > svg {
+    color: ${(props) => props.color || colors.primary};
+  }
+`
+
 const SendMessageInputContainer = styled.div<any>`
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   position: relative;
   min-height: 48px;
   box-sizing: border-box;
   border-radius: ${(props) => (props.messageForReply ? '0 0 4px 4px' : '4px')};
+
+  & .dropdown-trigger.open {
+    color: #ccc;
+    & ${AddAttachmentIcon} {
+      & > svg {
+        color: ${(props) => props.iconColor || colors.primary};
+        };
+      }
+    }
+  }
 `
 
 /*
@@ -1416,21 +1601,44 @@ const CloseReply = styled.span`
 `
 */
 
-const MessageInput = styled.textarea<any>`
-  resize: none;
-  padding: 14px 12px 0 12px;
-  //padding: 16px 45px 0 80px;
+const MessageInputWrapper = styled.div<any>`
   width: 100%;
+  //max-width: ${(props) =>
+    props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
+  max-width: calc(100% - 110px);
+  position: relative;
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 3)};
+`
+const MessageInput = styled.div<any>`
+  margin: 14px 12px 14px 12px;
+  //width: 100%;
+  max-height: 80px;
+  min-height: 20px;
   display: block;
   border: none;
   font: inherit;
   box-sizing: border-box;
-  border-radius: 6px;
   outline: none !important;
   font-size: 15px;
-  line-height: 17px;
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 3)};
+  line-height: 20px;
+  overflow: auto;
 
+  &:empty:before {
+    content: attr(data-placeholder);
+  }
+  &:before {
+    position: absolute;
+    top: 15px;
+    left: 12px;
+    font-size: 15px;
+    color: ${colors.gray7};
+    pointer-events: none;
+    unicode-bidi: plaintext;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
   &::placeholder {
     font-size: 15px;
     color: ${colors.gray7};
@@ -1439,22 +1647,10 @@ const MessageInput = styled.textarea<any>`
   //caret-color: #000;
 `
 
-const AddAttachmentIcon = styled.span<any>`
-  margin: 0 5px;
-  cursor: pointer;
-  line-height: 13px;
-  z-index: 2;
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
-
-  > svg {
-    ${(props) => (props.isActive ? `color: ${props.iconHoverColor || colors.cobalt1};` : 'color: #898B99;')}
-  }
-
-  &:hover > svg {
-    color: ${(props) => props.iconHoverColor || colors.cobalt1};
-  }
-`
 const EmojiButton = styled.span<any>`
+  display: flex;
+  height: 48px;
+  align-items: center;
   position: relative;
   margin: 0 5px;
   cursor: pointer;
@@ -1462,11 +1658,11 @@ const EmojiButton = styled.span<any>`
   z-index: 2;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.iconHoverColor || colors.cobalt1};` : 'color: #898B99;')}
+    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')}
   }
 
   &:hover > svg {
-    color: ${(props) => props.iconHoverColor || colors.cobalt1};
+    color: ${(props) => props.hoverColor || colors.primary};
   }
 `
 
@@ -1493,7 +1689,7 @@ const EmojiButton = styled.span<any>`
   z-index: 9998;
 ` */
 
-export const MentionsContainer = styled.span`
+export const MentionsContainer = styled.div<{ mentionsIsOpen?: boolean }>`
   position: absolute;
   left: 0;
   bottom: 100%;
@@ -1509,6 +1705,9 @@ export const MentionsContainer = styled.span`
 ` */
 
 const SendMessageIcon = styled.span<any>`
+  display: flex;
+  height: 48px;
+  align-items: center;
   margin: 0 5px;
   cursor: pointer;
   line-height: 13px;
@@ -1644,7 +1843,7 @@ const BlockedUserInfo = styled.div`
     margin-right: 12px;
   }
 `
-const JoinChannelCont = styled.div`
+const JoinChannelCont = styled.div<{ color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1654,11 +1853,11 @@ const JoinChannelCont = styled.div`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.primary};
+  color: ${(props) => props.color || colors.primary};
   background-color: ${colors.gray5};
   cursor: pointer;
 `
-const ReadOnlyCont = styled.div`
+const ReadOnlyCont = styled.div<{ iconColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1671,7 +1870,25 @@ const ReadOnlyCont = styled.div`
 
   & > svg {
     margin-right: 12px;
-    color: ${colors.primary};
+    color: ${(props) => props.iconColor || colors.primary};
+  }
+`
+const ReplyMessageCont = styled.div`
+  display: flex;
+`
+const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 12px;
+  width: 40px;
+  height: 40px;
+  background-color: ${(props) => props.backgroundColor || colors.primary};
+  border-radius: 50%;
+  & > svg {
+    width: 20px;
+    height: 20px;
+    color: ${colors.white};
   }
 `
 /* interface Recording {

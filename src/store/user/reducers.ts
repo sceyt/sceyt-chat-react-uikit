@@ -1,6 +1,7 @@
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   ADD_USERS,
+  BROWSER_TAB_IS_ACTIVE,
   SET_CONNECTION_STATUS,
   SET_CONTACTS,
   SET_ROLES,
@@ -19,6 +20,7 @@ export interface IUserStore {
   rolesMap: { [key: string]: IRole }
   contactsMap: { [key: string]: IContact }
   user: IUser
+  browserTabIsActive: boolean
 }
 
 const initialState: IUserStore = {
@@ -28,7 +30,8 @@ const initialState: IUserStore = {
   usersLoadingState: null,
   rolesMap: {},
   contactsMap: {},
-  user: { id: '', firstName: '', lastName: '' }
+  user: { id: '', firstName: '', lastName: '' },
+  browserTabIsActive: true
 }
 
 export default (state = initialState, { type, payload }: IAction) => {
@@ -64,7 +67,7 @@ export default (state = initialState, { type, payload }: IAction) => {
       const { contacts } = payload
       newState.contactList = [...contacts]
       const contactsMap = {}
-      contacts.map((contact: IContact) => {
+      contacts.forEach((contact: IContact) => {
         contactsMap[contact.id] = contact
       })
       newState.contactsMap = contactsMap
@@ -74,7 +77,7 @@ export default (state = initialState, { type, payload }: IAction) => {
     case SET_ROLES: {
       const { roles } = payload
       const rolesMap = {}
-      roles.map((role: IRole) => {
+      roles.forEach((role: IRole) => {
         rolesMap[role.name] = role
       })
       newState.rolesMap = rolesMap
@@ -87,6 +90,10 @@ export default (state = initialState, { type, payload }: IAction) => {
       return newState
     }
 
+    case BROWSER_TAB_IS_ACTIVE: {
+      newState.browserTabIsActive = payload.state
+      return newState
+    }
     case DESTROY_SESSION: {
       newState = initialState
       return newState

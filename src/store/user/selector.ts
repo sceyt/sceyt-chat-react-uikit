@@ -5,3 +5,4 @@ export const rolesMapSelector = (store: any) => store.UserReducer.rolesMap
 export const userSelector = (store: any) => store.UserReducer.user
 export const usersListSelector = (store: any) => store.UserReducer.usersList
 export const usersLoadingStateSelector = (store: any) => store.UserReducer.usersLoadingState
+export const browserTabIsActiveSelector = (store: any) => store.UserReducer.browserTabIsActive

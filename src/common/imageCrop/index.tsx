@@ -13,6 +13,7 @@ interface IProps {
 }
 const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
+
   const [state, setState] = useStateComplex({
     image: image.url,
     crop: { x: 0, y: 0 },

@@ -1,12 +1,15 @@
 import {
   ADD_MEMBERS_TO_LIST,
-  CLEAR_MEMBERS, GET_ROLES_SUCCESS,
+  CLEAR_MEMBERS,
+  GET_ROLES_SUCCESS,
   REMOVE_MEMBER_FROM_LIST,
-  SET_MEMBERS_LOADING_STATE, SET_MEMBERS_TO_LIST,
-  UPDATE_MEMBERS
-} from "./constants";
+  SET_MEMBERS_LOADING_STATE,
+  SET_MEMBERS_TO_LIST,
+  UPDATE_MEMBERS,
+  UPDATE_MEMBERS_PRESENCE
+} from './constants'
 import { DESTROY_SESSION } from '../channel/constants'
-import { IAction, IMember, IRole } from "../../types";
+import { IAction, IMember, IRole } from '../../types'
 
 export interface IMembersStore {
   membersLoadingState: boolean
@@ -33,10 +36,7 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
     case ADD_MEMBERS_TO_LIST: {
       const { members } = payload
-      newState.activeChannelMembers = [
-        ...newState.activeChannelMembers,
-        ...members
-      ]
+      newState.activeChannelMembers = [...newState.activeChannelMembers, ...members]
       return newState
     }
     case UPDATE_MEMBERS: {
@@ -45,12 +45,31 @@ export default (state = initialState, { type, payload }: IAction) => {
       const membersCopy = [...newState.activeChannelMembers]
       if (members.length) {
         const updatedMembersMap: any = {}
-        for(let i = 0; i < members.length; i++) {
-          updatedMembersMap[members[i].id] = members[i];
+        for (let i = 0; i < members.length; i++) {
+          updatedMembersMap[members[i].id] = members[i]
         }
         updateMembers = membersCopy.map((member) => {
           if (updatedMembersMap[member.id]) {
             return updatedMembersMap[member.id]
+          }
+          return member
+        })
+        newState.activeChannelMembers = updateMembers
+      }
+      return newState
+    }
+    case UPDATE_MEMBERS_PRESENCE: {
+      const { members } = payload
+      let updateMembers: any = []
+      if (members.length && newState.activeChannelMembers.length) {
+        const membersCopy = [...newState.activeChannelMembers]
+        const updatedMembersMap: any = {}
+        for (let i = 0; i < members.length; i++) {
+          updatedMembersMap[members[i].id] = members[i]
+        }
+        updateMembers = membersCopy.map((member: IMember) => {
+          if (updatedMembersMap[member.id]) {
+            return { ...member, presence: updatedMembersMap[member.id].presence }
           }
           return member
         })
@@ -67,15 +86,13 @@ export default (state = initialState, { type, payload }: IAction) => {
     case REMOVE_MEMBER_FROM_LIST: {
       const { members } = payload
       if (members.length) {
-        let updateMembers: any = [];
-        const membersCopy = [...newState.activeChannelMembers];
-        const removedMembersMap: any = {};
+        let updateMembers: any = []
+        const membersCopy = [...newState.activeChannelMembers]
+        const removedMembersMap: any = {}
         for (let i = 0; i < members.length; i++) {
-          removedMembersMap[members[i].id] = members[i];
+          removedMembersMap[members[i].id] = members[i]
         }
-        updateMembers = membersCopy.filter(
-          (member) => !removedMembersMap[member.id]
-        )
+        updateMembers = membersCopy.filter((member) => !removedMembersMap[member.id])
         newState.activeChannelMembers = updateMembers
       }
       return newState

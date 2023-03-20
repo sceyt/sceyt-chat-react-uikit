@@ -12,7 +12,8 @@ import { makeUserName, userLastActiveDateFormat } from '../../helpers'
 import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
-import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { hideUserPresence } from '../../helpers/userHelper'
 
 const Container = styled.div`
   display: flex;
@@ -52,7 +53,7 @@ interface IProps {
 
 export default function ChatHeader({ infoIcon }: IProps) {
   const dispatch = useDispatch()
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -79,15 +80,17 @@ export default function ChatHeader({ infoIcon }: IProps) {
     <Container>
       <ChannelInfo>
         <AvatarWrapper>
-          <Avatar
-            name={
-              activeChannel.subject || (isDirectChannel ? activeChannel.peer.firstName || activeChannel.peer.id : '')
-            }
-            image={activeChannel.avatarUrl || (isDirectChannel ? activeChannel.peer.avatarUrl : '')}
-            size={36}
-            textSize={13}
-            setDefaultAvatar={isDirectChannel}
-          />
+          {(activeChannel.subject || (isDirectChannel && activeChannel.peer)) && (
+            <Avatar
+              name={
+                activeChannel.subject || (isDirectChannel ? activeChannel.peer.firstName || activeChannel.peer.id : '')
+              }
+              image={activeChannel.avatarUrl || (isDirectChannel ? activeChannel.peer.avatarUrl : '')}
+              size={36}
+              textSize={13}
+              setDefaultAvatar={isDirectChannel}
+            />
+          )}
           {/* {isDirectChannel && activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
         </AvatarWrapper>
         <ChannelName>
@@ -99,11 +102,13 @@ export default function ChatHeader({ infoIcon }: IProps) {
           </SectionHeader>
           {isDirectChannel ? (
             <SubTitle>
-              {activeChannel.peer.presence &&
-                (activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE
-                  ? 'Online'
-                  : activeChannel.peer.presence.lastActiveAt &&
-                    userLastActiveDateFormat(activeChannel.peer.presence.lastActiveAt))}
+              {hideUserPresence(activeChannel.peer)
+                ? ''
+                : activeChannel.peer.presence &&
+                  (activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE
+                    ? 'Online'
+                    : activeChannel.peer.presence.lastActiveAt &&
+                      userLastActiveDateFormat(activeChannel.peer.presence.lastActiveAt))}
             </SubTitle>
           ) : (
             <SubTitle>

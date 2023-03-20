@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../../assets/svg/linkIcon.svg'
 import { colors } from '../../../../UIHelper/constants'
@@ -25,22 +25,22 @@ const LinkItem = ({
   // const [imageSrc, setImageSrc] = useState('')
   // const [loading, setLoading] = useState(true)
 
-  /* useEffect(() => {
-    getMetadataFromUrl(link).then((res) => {
-      if (res) {
-        if (res.title) {
-          setTitle(res.title)
-        }
-        if (res.image) {
-          setImageSrc(res.image)
-        }
+  useEffect(() => {
+    // .then(process.exit)
+    /*    urlMetadata(link).then(
+      function (metadata) {
+        // success handler
+        console.log('metadata for url ... ', link, 'metadata ---- ', metadata)
+      },
+      function (error) {
+        // failure handler
+        console.log('error on get metadata ... ', error)
       }
-      setLoading(false)
-    })
-  }, []) */
+    ) */
+  }, [])
   return (
-    <FileItem hoverBackgroundColor={linkPreviewHoverBackgroundColor}>
-      <a href={link} target='_blank' rel='noreferrer'>
+    <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor}>
+      <a draggable={false} href={link} target='_blank' rel='noreferrer'>
         {/* {loading ? (
           <Loading />
         ) : imageSrc ? (

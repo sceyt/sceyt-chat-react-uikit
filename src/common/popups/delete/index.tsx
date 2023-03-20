@@ -16,7 +16,7 @@ import usePermissions from '../../../hooks/usePermissions'
 
 interface IProps {
   title: string
-  description: string
+  description: string | JSX.Element
   buttonText: string
   buttonTextColor?: string
   buttonBackground?: string
@@ -26,6 +26,7 @@ interface IProps {
   isDeleteMessage?: boolean
   isIncomingMessage?: boolean
   isDirectChannel?: boolean
+  allowDeleteIncoming?: boolean
   myRole?: string
 }
 
@@ -39,6 +40,7 @@ function ConfirmPopup({
   handleFunction,
   isDeleteMessage,
   isIncomingMessage,
+  allowDeleteIncoming,
   isDirectChannel,
   myRole = '',
   loading
@@ -46,7 +48,7 @@ function ConfirmPopup({
   const [checkActionPermission] = usePermissions(myRole)
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
-    ? !isDirectChannel && checkActionPermission('deleteAnyMessage')
+    ? allowDeleteIncoming && !isDirectChannel && checkActionPermission('deleteAnyMessage')
     : checkActionPermission('deleteOwnMessage')
   const [deleteMessageOption, setDeleteMessageOption] = useState(deleteForEveryoneIsPermitted ? 'forEveryone' : 'forMe')
 

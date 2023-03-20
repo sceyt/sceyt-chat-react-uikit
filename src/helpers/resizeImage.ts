@@ -1,20 +1,25 @@
 import { IAttachmentMeta } from './messagesHalper'
 
-const MAX_WIDTH = 1920
+const MAX_WIDTH = 1280
 const MAX_HEIGHT = 1080
 const MIME_TYPE = 'image/jpeg'
-const QUALITY = 0.7
+const QUALITY = 0.9
 const THUMBNAIL_MAX_WIDTH = 6
 const THUMBNAIL_MAX_HEIGHT = 6
 const THUMBNAIL_MIME_TYPE = 'image/jpeg'
 const THUMBNAIL_QUALITY = 0.7
 
-export function resizeImage(file: any, maxWidth?: number, maxHeight?: number, quality?: number) {
+export function resizeImage(
+  file: any,
+  maxWidth?: number,
+  maxHeight?: number,
+  quality?: number
+): Promise<{ file: File; blob: Blob | null; newWidth: number; newHeight: number }> {
+  console.log('resize image. .. ', quality)
   return new Promise((resolve) => {
     // const resizedFiles: any[] = []
     // files.forEach((file: File, index) => {
     const blobURL = URL.createObjectURL(file)
-    console.log('blob url .. ', blobURL)
     const img = new Image()
     img.src = blobURL
     img.onerror = function () {
@@ -125,7 +130,6 @@ export function createImageThumbnail(
       ctx.drawImage(img, 0, 0, newWidth, newHeight)
 
       const base64String = canvas.toDataURL(THUMBNAIL_MIME_TYPE, THUMBNAIL_QUALITY)
-
       resolve({
         thumbnail: base64String.replace('data:image/jpeg;base64,', ''),
         imageWidth: img.width,
@@ -159,6 +163,9 @@ export function calculateSize(width: number, height: number, maxWidth: number, m
       width = Math.round((width * maxHeight) / height)
       height = maxHeight
     }
+  }
+  if (height < 1) {
+    height = 1
   }
   return [width, height]
 }

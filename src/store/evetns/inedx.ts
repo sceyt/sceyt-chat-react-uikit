@@ -26,9 +26,16 @@ import {
   updateChannelLastMessageAC,
   updateChannelLastMessageStatusAC
 } from '../channel/actions'
-import { addMessageAC, clearMessagesAC, updateMessageAC, updateMessagesStatusAC } from '../message/actions'
+import {
+  addMessageAC,
+  addReactionToMessageAC,
+  clearMessagesAC,
+  deleteReactionFromMessageAC,
+  updateMessageAC,
+  updateMessagesStatusAC
+} from '../message/actions'
 import { CONNECTION_EVENT_TYPES } from '../user/constants'
-import { setConnectionStatusAC } from '../user/actions'
+import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
   addAllMessages,
   // addAllMessages,
@@ -46,11 +53,13 @@ import {
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { setNotification } from '../../helpers/notifications'
+import { addMembersToListAC, removeMemberFromListAC } from '../member/actions'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
   const channelListener = new (SceytChatClient.ChannelListener as any)()
   const connectionListener = new (SceytChatClient.ConnectionListener as any)()
+  const typingUsersTimeout: { [key: string]: any } = {}
   const chan = eventChannel((emitter) => {
     channelListener.onCreated = (createdChannel: IChannel) => {
       emitter({
@@ -332,6 +341,7 @@ export default function* watchForEvents(): any {
         console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
         const channelExists = checkChannelExists(createdChannel.id)
         if (!channelExists) {
+          yield put(getContactsAC())
           yield call(setChannelInMap, createdChannel)
           yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
         }
@@ -358,11 +368,19 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.LEAVE: {
         // const { channel, member } = args
         console.log('channel LEAVE ... ')
-        const { channel } = args
+        const { channel, member } = args
 
+        const channelExists = checkChannelExists(channel.id)
         const activeChannelId = yield call(getActiveChannelId)
         if (activeChannelId === channel.id) {
-          // yield put(removeMemberFromListAC([member]));
+          yield put(removeMemberFromListAC([member]))
+        }
+        if (channelExists) {
+          yield put(
+            updateChannelDataAC(channel.id, {
+              memberCount: channel.memberCount
+            })
+          )
         }
         // TODO notification
         /* const not = {
@@ -391,62 +409,53 @@ export default function* watchForEvents(): any {
         console.log('channel KICK_MEMBERS ... ', removedMembers)
         const activeChannelId = yield call(getActiveChannelId)
 
-        if (removedMembers[0].id === SceytChatClient.chatClient.user.id) {
-          const channelExists = checkChannelExists(channel.id)
-          console.log('channelExists ... ', channelExists)
-          if (channelExists) {
+        const channelExists = checkChannelExists(channel.id)
+
+        if (channelExists) {
+          if (removedMembers[0].id === SceytChatClient.chatClient.user.id) {
             yield call(removeChannelFromMap, channel.id)
             yield put(removeChannelAC(channel.id))
             const activeChannel = yield call(getLastChannelFromMap)
             if (activeChannel) {
               yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
             }
+          } else {
+            if (activeChannelId === channel.id) {
+              yield put(removeMemberFromListAC(removedMembers))
+            }
+            yield put(
+              updateChannelDataAC(channel.id, {
+                memberCount: channel.memberCount
+              })
+            )
           }
-        } else if (activeChannelId === channel.id) {
-          // TODO remove member
-          // yield put(removeMemberFromListAC(removedMembers));
-          yield put(
-            updateChannelDataAC(channel.id, {
-              memberCount: channel.memberCount
-            })
-          )
         }
 
         break
       }
       case CHANNEL_EVENT_TYPES.ADD_MEMBERS: {
         // const { channel, addedMembers } = args
-        const { channel } = args
+        const { channel, addedMembers } = args
         console.log('channel ADD_MEMBERS ... ')
         const activeChannelId = yield call(getActiveChannelId)
         const channelExists = checkChannelExists(channel.id)
-        if (!channelExists) {
-          console.log('event call set addedTp')
-          yield call(setChannelInMap, channel)
-          yield put(setAddedToChannelAC(JSON.parse(JSON.stringify(channel))))
-
-          // TODO notification
-          /* const not = {
-           id: createId(),
-           title: 'Join to channel',
-           message: `${channel.subject || channel.label}`,
-         };
-         yield put(setNotification(not)); */
-        }
-        if (activeChannelId === channel.id) {
-          // TODO add member
-          // yield put(addMembersToListAC(addedMembers));
+        if (channelExists) {
+          if (activeChannelId === channel.id) {
+            yield put(addMembersToListAC(addedMembers))
+          }
           yield put(
             updateChannelDataAC(channel.id, {
               memberCount: channel.memberCount
             })
           )
+        } else {
+          yield call(setChannelInMap, channel)
+          yield put(setAddedToChannelAC(JSON.parse(JSON.stringify(channel))))
         }
         break
       }
       case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
         const { updatedChannel } = args
-        console.log('channel UPDATE_CHANNEL ... ')
         const channelExists = checkChannelExists(updatedChannel.id)
         if (channelExists) {
           const { subject, avatarUrl } = updatedChannel
@@ -456,14 +465,16 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
+        console.log('channel MESSAGE ... ', message, channel)
         const activeChannelId = yield call(getActiveChannelId)
         const channelExists = checkChannelExists(channel.id)
         const channelForAdd = JSON.parse(JSON.stringify(channel))
+        yield put(addChannelAC(channelForAdd))
         if (!channelExists) {
           yield call(setChannelInMap, channel)
-          yield put(addChannelAC(channelForAdd))
         } else if (!message.repliedInThread) {
           yield put(updateChannelLastMessageAC(message, channelForAdd))
+          yield put(updateChannelDataAC(message, channelForAdd))
         }
         if (channel.id === activeChannelId) {
           // TODO message for thread reply
@@ -499,11 +510,10 @@ export default function* watchForEvents(): any {
         }
 
         yield put(updateChannelDataAC(channel.id, { ...channelForAdd }))
-        if (message.user.id !== SceytChatClient.chatClient.user.id) {
+        if (message.user.id !== SceytChatClient.chatClient.user.id && !channel.muted) {
           if (Notification.permission === 'granted') {
-            const notificationStatus = yield call(Notification.requestPermission)
-            if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
-              setNotification(message.body, message.user)
+            if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
+              setNotification(message.body, message.user, channel)
             }
           }
           if (message.repliedInThread && message.parent.id) {
@@ -531,31 +541,33 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
         const { channelId, markerList } = args
+        console.log('channel MESSAGE_MARKERS_RECEIVED ...', channelId, markerList)
         const channel = yield call(getChannelFromMap, channelId)
-        const activeChannelId = yield call(getActiveChannelId)
         if (channel) {
+          const activeChannelId = yield call(getActiveChannelId)
           const lastMessage = {
             ...channel.lastMessage,
             deliveryStatus: markerList.name
           }
           let updateLastMessage = false
           markerList.messageIds.forEach((messageId: string) => {
-            if (messageId === channel.lastMessage.id) {
+            if (channel.lastMessage && messageId === channel.lastMessage.id) {
               updateLastMessage = true
             }
           })
           if (updateLastMessage) {
             yield put(updateChannelLastMessageStatusAC(lastMessage, JSON.parse(JSON.stringify(channel))))
           }
-        }
-        const markersMap: any = {}
-        markerList.messageIds.forEach((messageId: string) => (markersMap[messageId] = true))
-        if (activeChannelId === channelId) {
-          yield put(updateMessagesStatusAC(markerList.name, markersMap))
-          updateMarkersOnAllMessages(markersMap, markerList.name)
-        }
 
-        updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
+          const markersMap: any = {}
+          markerList.messageIds.forEach((messageId: string) => (markersMap[messageId] = true))
+          if (activeChannelId === channelId) {
+            yield put(updateMessagesStatusAC(markerList.name, markersMap))
+            updateMarkersOnAllMessages(markersMap, markerList.name)
+          }
+
+          updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
+        }
         break
       }
       /* case CHANNEL_EVENT_TYPES.MESSAGE_AS_READ: {
@@ -578,19 +590,22 @@ export default function* watchForEvents(): any {
       } */
       case CHANNEL_EVENT_TYPES.START_TYPING: {
         const { channel, from } = args
-        // const activeChannelId = yield call(getActiveChannelId)
-        // if (activeChannelId === channel.id) {
+        if (typingUsersTimeout[from.id]) {
+          clearTimeout(typingUsersTimeout[from.id])
+        }
+        typingUsersTimeout[from.id] = setTimeout(() => {
+          channelListener.onMemberStoppedTyping(channel, from)
+        }, 4000)
         yield put(switchTypingIndicatorAC(true, channel.id, from))
         // }
         break
       }
       case CHANNEL_EVENT_TYPES.STOP_TYPING: {
         const { channel, from } = args
-        // const activeChannelId = yield call(getActiveChannelId)
-
-        // if (activeChannelId === channel.id) {
+        if (typingUsersTimeout[from.id]) {
+          clearTimeout(typingUsersTimeout[from.id])
+        }
         yield put(switchTypingIndicatorAC(false, channel.id, from))
-        // }
         break
       }
       case CHANNEL_EVENT_TYPES.DELETE: {
@@ -666,26 +681,23 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
         console.log('channel REACTION_ADDED ... ')
-        // const { channel, user, message, reaction } = args
-        // const isSelf = user.id === SceytChatClient.chatClient.user.id
-        // const activeChannelId = getActiveChannelId()
+        const { channel, user, message, reaction } = args
+        const isSelf = user.id === SceytChatClient.chatClient.user.id
+        const activeChannelId = getActiveChannelId()
 
-        // TODO add reaction to message
-        /* if (channel.id === activeChannelId) {
-          yield put(addReactionToMessage(message, reaction, isSelf));
-        } */
+        if (channel.id === activeChannelId) {
+          yield put(addReactionToMessageAC(message, reaction, isSelf))
+        }
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
-        // const { channel, user, message, reaction } = args
-        const { channel } = args
+        const { channel, user, message, reaction } = args
         console.log('channel REACTION_DELETED ... ')
-        // const isSelf = user.id === SceytChatClient.chatClient.user.id
+        const isSelf = user.id === SceytChatClient.chatClient.user.id
         const activeChannelId = getActiveChannelId()
 
-        // TODO remove reaction from message
         if (channel.id === activeChannelId) {
-          // yield put(deleteReactionFromMessage(message, reaction, isSelf));
+          yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
         }
         break
       }
@@ -703,6 +715,7 @@ export default function* watchForEvents(): any {
 
       case CHANNEL_EVENT_TYPES.CLEAR_HISTORY: {
         const { channel } = args
+        console.log('CLEAR_HISTORY: ', channel)
         const activeChannelId = yield call(getActiveChannelId)
         const channelExist = yield call(checkChannelExists, channel.id)
         if (channel.id === activeChannelId) {
@@ -711,7 +724,7 @@ export default function* watchForEvents(): any {
         }
         removeMessagesFromMap(channel.id)
         if (channelExist) {
-          yield put(updateChannelLastMessageAC({}, channel))
+          yield put(updateChannelDataAC(channel.id, { lastMessage: {}, unreadMessageCount: 0 }))
         }
 
         break
@@ -756,13 +769,13 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
-        console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
+        // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
         yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.markedAsUnread }))
         break
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
-        console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
+        // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
         yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.markedAsUnread }))
         break
       }

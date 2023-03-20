@@ -8,6 +8,7 @@ export const visibleChannelSelector = (store: any) => store.ChannelReducer.visib
 export const activeChannelSelector = (store: any) => store.ChannelReducer.activeChannel
 export const channelsLoadingState = (store: any) => store.ChannelReducer.channelsLoadingState
 export const channelsHasNextSelector = (store: any) => store.ChannelReducer.channelsHasNext
+export const channelsForForwardHasNextSelector = (store: any) => store.ChannelReducer.channelsForForwardHasNext
 export const searchValueSelector = (store: any) => store.ChannelReducer.searchValue
 export const channelInfoIsOpenSelector = (store: any) => store.ChannelReducer.channelInfoIsOpen
 export const channelEditModeSelector = (store: any) => store.ChannelReducer.channelEditMode

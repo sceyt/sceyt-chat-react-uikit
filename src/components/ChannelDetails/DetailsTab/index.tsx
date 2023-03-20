@@ -21,8 +21,10 @@ interface IProps {
   linkPreviewTitleColor?: string
   linkPreviewColor?: string
   linkPreviewHoverBackgroundColor?: string
-  voicePreviewIcon?: JSX.Element
-  voicePreviewHoverIcon?: JSX.Element
+  voicePreviewPlayIcon?: JSX.Element
+  voicePreviewPlayHoverIcon?: JSX.Element
+  voicePreviewPauseIcon?: JSX.Element
+  voicePreviewPauseHoverIcon?: JSX.Element
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
@@ -58,8 +60,10 @@ const DetailsTab = ({
   linkPreviewTitleColor,
   linkPreviewColor,
   linkPreviewHoverBackgroundColor,
-  voicePreviewIcon,
-  voicePreviewHoverIcon,
+  voicePreviewPlayIcon,
+  voicePreviewPlayHoverIcon,
+  voicePreviewPauseIcon,
+  voicePreviewPauseHoverIcon,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor,
@@ -173,8 +177,10 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.voice && (
         <Voices
           channelId={channel.id}
-          voicePreviewIcon={voicePreviewIcon}
-          voicePreviewHoverIcon={voicePreviewHoverIcon}
+          voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+          voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+          voicePreviewPauseIcon={voicePreviewPauseIcon}
+          voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
           voicePreviewTitleColor={voicePreviewTitleColor}
           voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
           voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}

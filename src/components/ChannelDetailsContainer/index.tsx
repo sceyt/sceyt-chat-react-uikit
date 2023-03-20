@@ -2,7 +2,7 @@ import React from 'react'
 import { shallowEqual, useSelector } from 'react-redux'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
-import {MuteTime} from "../../types";
+import { MuteTime } from '../../types'
 export interface IDetailsProps {
   channelEditIcon?: JSX.Element
   editChannelSaveButtonBackgroundColor?: string
@@ -87,8 +87,10 @@ export interface IDetailsProps {
   linkPreviewColor?: string
   linkPreviewHoverBackgroundColor?: string
 
-  voicePreviewIcon?: JSX.Element
-  voicePreviewHoverIcon?: JSX.Element
+  voicePreviewPlayIcon?: JSX.Element
+  voicePreviewPlayHoverIcon?: JSX.Element
+  voicePreviewPauseIcon?: JSX.Element
+  voicePreviewPauseHoverIcon?: JSX.Element
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
@@ -138,7 +140,7 @@ const ChannelDetailsContainer = ({
   unmuteNotificationIconColor,
   muteUnmuteNotificationSwitcherColor,
   muteUnmuteNotificationTextColor,
- timeOptionsToMuteNotifications,
+  timeOptionsToMuteNotifications,
   showStarredMessages,
   starredMessagesOrder,
   staredMessagesIcon,
@@ -166,6 +168,7 @@ const ChannelDetailsContainer = ({
   reportChannelOrder,
   reportChannelIconColor,
   reportChannelTextColor,
+  showDeleteChannel,
   deleteChannelIcon,
   deleteChannelIconColor,
   deleteChannelTextColor,
@@ -267,6 +270,7 @@ const ChannelDetailsContainer = ({
           reportChannelOrder={reportChannelOrder}
           reportChannelIconColor={reportChannelIconColor}
           reportChannelTextColor={reportChannelTextColor}
+          showDeleteChannel={showDeleteChannel}
           deleteChannelIcon={deleteChannelIcon}
           deleteChannelIconColor={deleteChannelIconColor}
           deleteChannelTextColor={deleteChannelTextColor}

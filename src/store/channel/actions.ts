@@ -1,6 +1,7 @@
 import {
   ADD_CHANNEL,
   ADD_CHANNELS,
+  ADD_CHANNELS_FOR_FORWARD,
   BLOCK_CHANNEL,
   CHANNEL_INFO_OPEN_CLOSE,
   CHANNELS_HAS_NEXT,
@@ -95,6 +96,13 @@ export function addChannelAC(channel: IChannel) {
 export function addChannelsAC(channels: IChannel[]) {
   return {
     type: ADD_CHANNELS,
+    payload: { channels }
+  }
+}
+
+export function addChannelsForForwardAC(channels: IChannel[]) {
+  return {
+    type: ADD_CHANNELS_FOR_FORWARD,
     payload: { channels }
   }
 }
@@ -380,7 +388,7 @@ export function joinChannelAC(channelId: string) {
   }
 }
 
-export function setIsDragging(isDragging: boolean) {
+export function setIsDraggingAC(isDragging: boolean) {
   return {
     type: SET_IS_DRAGGING,
     payload: {

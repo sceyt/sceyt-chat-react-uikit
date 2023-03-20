@@ -1,4 +1,9 @@
 import { IChannel } from '../../types'
+
+type channelMap = {
+  [key: string]: IChannel
+}
+
 let channelsMap: channelMap = {}
 let activeChannelId = ''
 export function setChannelInMap(channel: IChannel) {
@@ -21,7 +26,7 @@ export function setChannelsInMap(channels: IChannel[]) {
     }
     channelsMap[channel.id] = channel
   })
-  return JSON.parse(JSON.stringify(channelsArr))
+  return JSON.parse(JSON.stringify(channels))
 }
 
 export function getChannelFromMap(channelId: string) {
@@ -68,8 +73,4 @@ export function getUnreadScrollTo() {
 
 export function setUnreadScrollTo(state: boolean) {
   unreadScrollTo.isScrolled = state
-}
-
-type channelMap = {
-  [key: string]: IChannel
 }

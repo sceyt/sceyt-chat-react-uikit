@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import { colors } from '../../UIHelper/constants'
-import { useEventListener } from '../../hooks'
+import { useDidUpdate, useEventListener } from '../../hooks'
 
 const DropDownContainer = styled.div<{ height?: string; center: boolean; order?: number }>`
   position: relative;
@@ -178,7 +178,7 @@ const DropDown = ({
 
   useEventListener('click', handleDropdownClicks)
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (forceClose) {
       setIsOpen(false)
     }
