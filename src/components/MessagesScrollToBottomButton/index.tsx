@@ -7,7 +7,7 @@ import { activeChannelSelector } from '../../store/channel/selector'
 import { scrollToNewMessageAC } from '../../store/message/actions'
 import { IChannel } from '../../types'
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
-import { UnreadCount } from '../Channel'
+import { UnreadCountProps } from '../Channel'
 import { sendMessageInputHeightSelector, showScrollToNewMessageButtonSelector } from '../../store/message/selector'
 
 interface MessagesScrollToBottomButtonProps {
@@ -117,4 +117,25 @@ const BottomButton = styled.div<{
     bottom: 32px;
     right: 0;
   }
+`
+
+const UnreadCount = styled.span<UnreadCountProps>`
+  position: absolute;
+  bottom: 11px;
+  right: 16px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  background-color: ${(props) => props.backgroundColor || colors.cobalt1};
+  padding: 0 4px;
+  font-size: ${(props) => props.fontSize || '13px'};
+  line-height: 20px;
+  min-width: ${(props) => props.width || '20px'};
+  height: ${(props) => props.height || '20px'};
+  text-align: center;
+  font-weight: 500;
+  color: ${(props) => props.textColor || '#fff'};
+  border-radius: 10px;
+  box-sizing: border-box;
+
+  /*${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}*/
 `

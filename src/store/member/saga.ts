@@ -32,7 +32,7 @@ function* getMembers(action: IAction): any {
     const { channelId } = payload
     const SceytChatClient = getClient()
     const membersQueryBuilder = new (SceytChatClient.chatClient.MemberListQueryBuilder as any)(channelId)
-    membersQueryBuilder.all().byAffiliationOrder().orderKeyByUsername().limit(15)
+    membersQueryBuilder.all().byAffiliationOrder().orderKeyByUsername().limit(50)
 
     const membersQuery = yield call(membersQueryBuilder.build)
 

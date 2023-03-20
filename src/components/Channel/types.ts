@@ -1,15 +1,15 @@
-export interface ICustomColors {
-  selectedChannelBackground?: string,
-  selectedChannelLeftBorder?: string,
+export interface IChannelsCustomColors {
+  selectedChannelBackground?: string
+  selectedChannelLeftBorder?: string
 }
 
 export type ICustomAvatarColors = [string, string, string, string, string, string]
 
 export interface ChannelQueryParams {
-  filter?: { channelType: 'Public' | 'Private' | 'Direct' },
-  limit?: number,
-  sort?: 'byLastMessage' | 'byCreationDate',
-  search: string,
+  filter?: { channelType: 'Public' | 'Private' | 'Direct' }
+  limit?: number
+  sort?: 'byLastMessage' | 'byCreationDate'
+  search: string
   /* search?: {
     /!*directChannel?: {
       user: 'beginsWith' | 'equals' | 'contains',

@@ -1,4 +1,5 @@
 import { ICustomUploader, IProgress, IUploadTask } from '../components/ChatContainer'
+import { IAttachment } from '../types'
 
 let CustomUploader: ICustomUploader
 let sendAttachmentsAsSeparateMessages: boolean = false
@@ -20,8 +21,7 @@ export const getCustomUploader = () => CustomUploader
 export const getCustomDownloader = () => CustomUploader && CustomUploader.download
 
 export const customUpload = (
-  file: File,
-  uploadId: any,
+  attachment: IAttachment,
   progress: ({ loaded, total }: IProgress) => void,
   getUpdatedFilePath?: (newPath: String) => void
 ): Promise<string> => {
@@ -29,7 +29,7 @@ export const customUpload = (
     if (CustomUploader) {
       const uploadTask: IUploadTask = {
         updateLocalFileLocation: getUpdatedFilePath,
-        progress: progress,
+        progress,
         failure: (e: Error) => reject(e),
         success: (uri: string) => resolve(uri),
         cancel: () => {},
@@ -50,8 +50,8 @@ export const customUpload = (
         } else if (error) {
         }
       } */
-      pendingUploaders[uploadId] = uploadTask
-      CustomUploader.upload(file, uploadTask)
+      pendingUploaders[attachment.attachmentId!] = uploadTask
+      CustomUploader.upload(attachment, uploadTask)
     } else {
       reject(new Error('No Custom uploader'))
     }

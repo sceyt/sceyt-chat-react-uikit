@@ -1,13 +1,17 @@
 import { IMessage, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
-import { MESSAGE_DELIVERY_STATUS } from '../constants'
-export const MESSAGES_MAX_LENGTH = 50
-export const LOAD_MAX_MESSAGE_COUNT = 10
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
+export const MESSAGES_MAX_LENGTH = 60
+export const LOAD_MAX_MESSAGE_COUNT = 20
 export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
 }
 export type IAttachmentMeta = { thumbnail?: string; imageWidth?: number; imageHeight?: number; duration?: number }
+
+type pendingMessagesMap = {
+  [key: string]: IMessage[]
+}
 
 type messagesMap = {
   [key: string]: IMessage[]
@@ -15,6 +19,7 @@ type messagesMap = {
 
 const pendingAttachments: { [key: string]: File } = {}
 let messagesMap: messagesMap = {}
+const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
 let prevCached: boolean = false
 let nextCached = false
@@ -39,6 +44,12 @@ export const updateMessageOnAllMessages = (messageId: string, updatedParams: any
   })
 }
 
+export const removeMessageFromAllMessages = (messageId: string) => {
+  activeChannelAllMessages = [...activeChannelAllMessages].filter(
+    (msg) => !(msg.id === messageId || msg.tid === messageId)
+  )
+}
+
 export const updateMarkersOnAllMessages = (markersMap: any, name: string) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (
@@ -57,7 +68,9 @@ export const removeAllMessages = () => {
   activeChannelAllMessages = []
 }
 
-export const setHasPrevCached = (state: boolean) => (prevCached = state)
+export const setHasPrevCached = (state: boolean) => {
+  prevCached = state
+}
 export const getHasPrevCached = () => prevCached
 
 export const setHasNextCached = (state: boolean) => (nextCached = state)
@@ -65,26 +78,29 @@ export const getHasNextCached = () => nextCached
 
 export const getFromAllMessagesByMessageId = (messageId: string, direction: string, getWithLastMessage?: boolean) => {
   let messagesForAdd: IMessage[] = []
-
   if (getWithLastMessage) {
-    messagesForAdd = activeChannelAllMessages.slice(-MESSAGES_MAX_LENGTH)
+    messagesForAdd = [...activeChannelAllMessages].slice(-MESSAGES_MAX_LENGTH)
+    setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_LENGTH)
+    setHasNextCached(false)
   } else {
     const fromMessageIndex = activeChannelAllMessages.findIndex((mes) => mes.id === messageId)
-
     if (fromMessageIndex !== 0) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
         const sliceFromIndex =
           fromMessageIndex <= LOAD_MAX_MESSAGE_COUNT ? 0 : fromMessageIndex - (LOAD_MAX_MESSAGE_COUNT + 1)
-        messagesForAdd = activeChannelAllMessages.slice(sliceFromIndex, fromMessageIndex - 1)
+        messagesForAdd = activeChannelAllMessages.slice(sliceFromIndex, fromMessageIndex)
         setHasPrevCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT || sliceFromIndex === 0))
         setHasNextCached(true)
       } else {
-        messagesForAdd = activeChannelAllMessages.slice(
-          fromMessageIndex + 1,
-          fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-        )
+        const toMessage = fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
+
+        messagesForAdd = activeChannelAllMessages.slice(fromMessageIndex + 1, toMessage)
+        if (toMessage > activeChannelAllMessages.length - 1) {
+          setHasNextCached(false)
+        } else {
+          setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))
+        }
         setHasPrevCached(true)
-        setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))
       }
     } else {
       setHasPrevCached(false)
@@ -106,6 +122,14 @@ export function addMessageToMap(channelId: string, message: IMessage) {
     messagesMap[channelId].push(message)
   } else {
     messagesMap[channelId] = [message]
+  }
+
+  if (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+    if (pendingMessagesMap[channelId]) {
+      pendingMessagesMap[channelId].push(message)
+    } else {
+      pendingMessagesMap[channelId] = [message]
+    }
   }
 }
 
@@ -136,6 +160,18 @@ export function addMessagesToMap(channelId: string, messages: IMessage[], direct
 }
 
 export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
+  if (
+    updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
+    updatedMessage.params.state !== MESSAGE_STATUS.FAILED &&
+    pendingMessagesMap[channelId]
+  ) {
+    const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
+    if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
+      pendingMessagesMap[channelId] = filteredMessages
+    } else {
+      delete pendingMessagesMap[channelId]
+    }
+  }
   if (messagesMap[channelId]) {
     messagesMap[channelId] = messagesMap[channelId].map((mes) => {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
@@ -194,6 +230,18 @@ export function removeMessagesFromMap(channelId: string) {
   delete messagesMap[channelId]
 }
 
+export function removeMessageFromMap(channelId: string, messageId: string) {
+  messagesMap[channelId] = [...messagesMap[channelId]].filter((msg) => !(msg.id === messageId || msg.tid === messageId))
+
+  pendingMessagesMap[channelId] = [...pendingMessagesMap[channelId]].filter(
+    (msg) => !(msg.id === messageId || msg.tid === messageId)
+  )
+}
+
+export function clearMessagesMap() {
+  messagesMap = {}
+}
+
 export function checkChannelExistsOnMessagesMap(channelId: string) {
   return !!messagesMap[channelId]
 }
@@ -232,3 +280,6 @@ export const setPendingAttachment = (attachmentId: string, file: File) => {
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
 
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
+
+export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
+export const getPendingMessagesMap = () => pendingMessagesMap

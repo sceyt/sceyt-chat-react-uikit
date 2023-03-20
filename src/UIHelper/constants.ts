@@ -1,4 +1,4 @@
-import { ICustomColors } from '../components/Channel/types'
+import { IChannelsCustomColors } from '../components/Channel/types'
 
 export const colors = {
   white: '#ffffff',
@@ -36,7 +36,7 @@ export const colors = {
   // cobalt1: '#4f6aff',
   cobalt1: '#2F81FF',
 
-  primary: '#0DBD8B',
+  primary: '#2F81FF',
 
   red1: '#FA4C56',
   red2: '#d7596c',
@@ -70,11 +70,11 @@ export const device = {
   max: `screen and (max-width: ${size.max})`
 }
 
-export const customColors: ICustomColors = {}
+export const customColors: IChannelsCustomColors = {}
 
-export const setCustomColors = (colorsKeyValues: ICustomColors) => {
+export const setCustomColors = (colorsKeyValues: IChannelsCustomColors) => {
   const colorsKeys = Object.keys(colorsKeyValues)
-  colorsKeys.map((key) => {
+  colorsKeys.forEach((key) => {
     customColors[key] = colorsKeyValues[key]
   })
 }

@@ -34,8 +34,8 @@ const Avatar: React.FC<IProps> = ({
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
   if (!image && name) {
-    const splittedName = name.split(' ')
-
+    const trimedName = name.trim()
+    const splittedName = trimedName.split(' ')
     if (splittedName.length > 1 && splittedName[1]) {
       const firstWord = splittedName[0]
       const secondWord = splittedName[1]
@@ -43,14 +43,13 @@ const Avatar: React.FC<IProps> = ({
       const firstCharOfSecondWord = secondWord.codePointAt(0)
 
       // @ts-ignore
-      avatarText = `${String.fromCodePoint(firstCharOfFirstWord)}${String.fromCodePoint(firstCharOfSecondWord)}`
+      avatarText = `${firstCharOfFirstWord ? String.fromCodePoint(firstCharOfFirstWord) : ''}${
+        firstCharOfSecondWord ? String.fromCodePoint(firstCharOfSecondWord) : ''
+      }`
     } else {
-      const firstCharOfFirstWord = name.codePointAt(0)
-      const firstCharOfSecondWord = name.codePointAt(1)
-      const str1 = firstCharOfFirstWord ? String.fromCodePoint(firstCharOfFirstWord) : ''
-      const str2 = firstCharOfSecondWord ? String.fromCodePoint(firstCharOfSecondWord) : ''
+      const firstCharOfFirstWord = trimedName.codePointAt(0)
 
-      avatarText = `${str1}${str2}`
+      avatarText = firstCharOfFirstWord ? String.fromCodePoint(firstCharOfFirstWord) : ''
     }
   }
   /* useEffect(() => {
@@ -89,6 +88,7 @@ const Avatar: React.FC<IProps> = ({
         )
       ) : (
         <AvatarImage
+          draggable={false}
           showImage
           // showImage={imageLoaded}
           // src={avatarImage.src!}
@@ -137,6 +137,7 @@ export const Container = styled.div<ContainerProps>`
   span {
     text-transform: uppercase;
     font-style: normal;
+    white-space: nowrap;
     font-weight: 500;
     font-size: ${(props: ContainerProps) => (props.textSize ? `${props.textSize}px` : '14px')}};
   }

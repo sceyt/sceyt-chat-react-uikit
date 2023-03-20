@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as AddMemberIcon } from '../../../../assets/svg/addMember.svg'
 import { ReactComponent as MoreIcon } from '../../../../assets/svg/more_vert.svg'
-import { DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
+import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
 import {
   blockMemberAC,
   changeMemberRoleAC,
@@ -25,7 +25,7 @@ import { makeUserName, userLastActiveDateFormat } from '../../../../helpers'
 import UsersPopup from '../../../../common/popups/users'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
-import { getUserDisplayNameFromContact } from '../../../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 
 interface IProps {
   channel: IChannel
@@ -56,7 +56,7 @@ const Members = ({
   showKickMember = true,
   showKickAndBlockMember = true
 }: IProps) => {
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
   const [kickMemberPopupOpen, setKickMemberPopupOpen] = useState(false)
   const [blockMemberPopupOpen, setBlockMemberPopupOpen] = useState(false)
@@ -64,7 +64,7 @@ const Members = ({
   const [makeAdminPopup, setMakeAdminPopup] = useState(false)
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
-  const [closeMenu, setCloseMenu] = useState(false)
+  const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const membersLoading = useSelector(membersLoadingStateSelector) || {}
@@ -84,9 +84,9 @@ const Members = ({
     }
   }
 
-  const watchDropdownState = (state: boolean) => {
+  const watchDropdownState = (state: boolean, memberId: string) => {
     if (state) {
-      setCloseMenu(!state)
+      setCloseMenu(memberId)
     }
   }
 
@@ -124,7 +124,7 @@ const Members = ({
       setMakeAdminPopup(!makeAdminPopup)
     }
   }
-
+  console.log('render members ********************************* ')
   const handleKickMember = () => {
     selectedMember && dispatch(kickMemberAC(channel.id, selectedMember.id))
   }
@@ -168,7 +168,7 @@ const Members = ({
       <ActionsMenu>
         <MembersList onScroll={handleMembersListScroll}>
           {chekActionPermission('addMember') && (
-            <MemberItem key={1} onClick={handleAddMemberPopup}>
+            <MemberItem key={1} onClick={handleAddMemberPopup} addMemberIconColor={colors.primary}>
               <AddMemberIcon />
               {channel?.type === CHANNEL_TYPE.PUBLIC ? 'Add subscribers' : 'Add members'}
             </MemberItem>
@@ -194,13 +194,9 @@ const Members = ({
                           getFromContacts
                         )}
                     {member.role === 'owner' ? (
-                      <RoleBadge color={colors.primary} backgroundColor='rgba(13, 189, 139, 0.1)'>
-                        Owner
-                      </RoleBadge>
+                      <RoleBadge color={colors.primary}>Owner</RoleBadge>
                     ) : member.role === 'admin' ? (
-                      <RoleBadge color={colors.purple} backgroundColor='rgba(122, 110, 246, 0.1)'>
-                        Admin
-                      </RoleBadge>
+                      <RoleBadge color={colors.purple}>Admin</RoleBadge>
                     ) : (
                       ''
                     )}
@@ -213,11 +209,11 @@ const Members = ({
                         userLastActiveDateFormat(member.presence.lastActiveAt)}
                   </SubTitle>
                 </MemberNamePresence>
-                {!noMemberEditPermissions && (
+                {!noMemberEditPermissions && member.role !== 'owner' && (
                   <DropDown
                     isSelect
-                    forceClose={closeMenu}
-                    watchToggleState={watchDropdownState}
+                    forceClose={!!(closeMenu && closeMenu !== member.id)}
+                    watchToggleState={(state) => watchDropdownState(state, member.id)}
                     trigger={
                       <EditMemberIcon>
                         <MoreIcon />
@@ -237,7 +233,7 @@ const Members = ({
                           Change role
                         </DropdownOptionLi>
                       )}
-                      {showMakeMemberAdmin && chekActionPermission('changeMemberRole') && (
+                      {showMakeMemberAdmin && chekActionPermission('changeMemberRole') && member.role !== 'owner' && (
                         <DropdownOptionLi
                           onClick={() => {
                             setSelectedMember(member)
@@ -250,7 +246,7 @@ const Members = ({
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
                       )}
-                      {showKickMember && chekActionPermission('kickMember') && (
+                      {showKickMember && chekActionPermission('kickMember') && member.role !== 'owner' && (
                         <DropdownOptionLi
                           onClick={() => {
                             setSelectedMember(member)
@@ -260,7 +256,7 @@ const Members = ({
                           key={3}
                           hoverBackground={customColors.selectedChannelBackground}
                         >
-                          Remove member
+                          Remove
                         </DropdownOptionLi>
                       )}
                       {showKickAndBlockMember && chekActionPermission('kickAndBlockMember') && (
@@ -291,13 +287,19 @@ const Members = ({
           buttonText='Remove'
           title={channel.type === CHANNEL_TYPE.PRIVATE ? 'Remove member' : 'Remove subscriber'}
           description={
-            privateChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE
-              ? privateChannelDeleteMemberPopupDescription
-              : publicChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC
-              ? publicChannelDeleteMemberPopupDescription
-              : `Are you sure to remove  ${
-                  selectedMember ? makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts) : ''
-                } from this ${channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?`
+            privateChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
+              privateChannelDeleteMemberPopupDescription
+            ) : publicChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
+              publicChannelDeleteMemberPopupDescription
+            ) : (
+              <span>
+                Are you sure to remove
+                {!!selectedMember && (
+                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                )}
+                from this {channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
+              </span>
+            )
           }
         />
       )}
@@ -320,13 +322,19 @@ const Members = ({
           buttonBackground={colors.primary}
           title='Promote admin'
           description={
-            privateChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE
-              ? privateChannelMakeAdminPopupDescription
-              : publicChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC
-              ? publicChannelMakeAdminPopupDescription
-              : `Are you sure you want to promote ${
-                  selectedMember && makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)
-                } to Admin?`
+            privateChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
+              privateChannelMakeAdminPopupDescription
+            ) : publicChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
+              publicChannelMakeAdminPopupDescription
+            ) : (
+              <span>
+                Are you sure you want to promote
+                {selectedMember && (
+                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                )}
+                to <BoltText>Admin?</BoltText>
+              </span>
+            )
           }
         />
       )}
@@ -337,13 +345,21 @@ const Members = ({
           buttonText='Revoke'
           title='Revoke admin'
           description={
-            privateChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE
-              ? privateChannelRevokeAdminPopupDescription
-              : publicChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC
-              ? publicChannelRevokeAdminPopupDescription
-              : `Are you sure you want to revoke “Admin” rights from user: ${
-                  selectedMember && makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)
-                } ?`
+            privateChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
+              privateChannelRevokeAdminPopupDescription
+            ) : publicChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
+              publicChannelRevokeAdminPopupDescription
+            ) : (
+              <span>
+                Are you sure you want to revoke
+                <BoltText> “Admin” </BoltText>
+                rights from user:
+                {selectedMember && (
+                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                )}
+                ?
+              </span>
+            )
           }
         />
       )}
@@ -404,7 +420,7 @@ const MembersList = styled.ul`
   list-style: none;
   transition: all 0.2s;
 `
-const MemberItem = styled.li<{ hoverBackground?: string }>`
+const MemberItem = styled.li<{ hoverBackground?: string; addMemberIconColor?: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
@@ -417,6 +433,7 @@ const MemberItem = styled.li<{ hoverBackground?: string }>`
     background-color: #fff;
 
     > svg {
+      color: ${(props) => props.addMemberIconColor || colors.primary};
       margin-right: 12px;
     }
   }
@@ -442,7 +459,8 @@ const MemberItem = styled.li<{ hoverBackground?: string }>`
   }
 `
 
-const RoleBadge = styled.span<{ color?: string; backgroundColor?: string }>`
+const RoleBadge = styled.span<{ color?: string }>`
+  position: relative;
   padding: 2px 8px;
   border-radius: 12px;
   margin-left: 4px;
@@ -450,5 +468,16 @@ const RoleBadge = styled.span<{ color?: string; backgroundColor?: string }>`
   font-size: 12px;
   line-height: 16px;
   color: ${(props) => props.color};
-  background-color: ${(props) => props.backgroundColor};
+
+  &::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    border-radius: 12px;
+    width: 100%;
+    height: 100%;
+    background-color: ${(props) => props.color || colors.primary};
+    opacity: 0.1;
+  }
 `

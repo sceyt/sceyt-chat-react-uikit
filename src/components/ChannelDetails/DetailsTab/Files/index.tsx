@@ -47,7 +47,7 @@ const Files = ({
           hoverBackgroundColor={filePreviewHoverBackgroundColor}
         >
           {file.metadata && file.metadata.tmb ? (
-            <FileThumb src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
+            <FileThumb draggable={false} src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
           ) : (
             <React.Fragment>
               <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
@@ -56,9 +56,11 @@ const Files = ({
           )}
           <div>
             <AttachmentPreviewTitle color={filePreviewTitleColor}>
-              {formatLargeText(file.name, 28)}
+              {formatLargeText(file.name, 32)}
             </AttachmentPreviewTitle>
-            <FileSizeAndDate color={filePreviewSizeColor}>{bytesToSize(file.fileSize)}</FileSizeAndDate>
+            <FileSizeAndDate color={filePreviewSizeColor}>
+              {file.fileSize ? bytesToSize(file.fileSize) : ''}
+            </FileSizeAndDate>
           </div>
           <DownloadWrapper onClick={() => downloadFile(file)}>
             {filePreviewDownloadIcon || <Download />}

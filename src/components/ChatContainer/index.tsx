@@ -5,6 +5,7 @@ import { Provider } from 'react-redux'
 import store from '../../store'
 import { ICustomAvatarColors } from '../Channel/types'
 import SceytChat from '../SceytChat'
+import { IAttachment, IUser } from '../../types'
 export interface IProgress {
   loaded: number
   total: number
@@ -21,14 +22,15 @@ export interface IUploadTask {
 }
 
 export interface ICustomUploader {
-  upload: (file: File, uploadTask: IUploadTask) => void
+  upload: (attachment: IAttachment, uploadTask: IUploadTask) => void
   download: (uri: string, progressCallback?: (progress: any) => void) => Promise<string>
 }
 
 export interface IChatClientProps {
   client: SceytChatClient
   avatarColors?: ICustomAvatarColors
-  userDisplayNameFromContacts?: boolean
+  hideUserPresence?: (user: IUser) => boolean
+  showOnlyContactUsers?: boolean
   sendAttachmentsAsSeparateMessages?: boolean
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
@@ -47,11 +49,12 @@ const SceytChatContainer = ({
   client,
   avatarColors,
   children,
-  userDisplayNameFromContacts,
+  showOnlyContactUsers,
   sendAttachmentsAsSeparateMessages,
   logoSrc,
   CustomUploader,
-  customColors
+  customColors,
+  hideUserPresence
 }: IChatClientProps) => {
   return (
     <Provider store={store}>
@@ -59,11 +62,12 @@ const SceytChatContainer = ({
         client={client}
         avatarColors={avatarColors}
         children={children}
-        userDisplayNameFromContacts={userDisplayNameFromContacts}
+        showOnlyContactUsers={showOnlyContactUsers}
         logoSrc={logoSrc}
         CustomUploader={CustomUploader}
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
         customColors={customColors}
+        hideUserPresence={hideUserPresence}
       />
     </Provider>
   )

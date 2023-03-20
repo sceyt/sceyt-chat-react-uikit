@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // import { getAttachments, loadMoreAttachments } from '../../../../../store/message/actions';
@@ -10,8 +10,10 @@ import VoiceItem from './voiceItem'
 
 interface IProps {
   channelId: string
-  voicePreviewIcon?: JSX.Element
-  voicePreviewHoverIcon?: JSX.Element
+  voicePreviewPlayIcon?: JSX.Element
+  voicePreviewPlayHoverIcon?: JSX.Element
+  voicePreviewPauseIcon?: JSX.Element
+  voicePreviewPauseHoverIcon?: JSX.Element
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
@@ -19,13 +21,16 @@ interface IProps {
 
 const Voices = ({
   channelId,
-  voicePreviewIcon,
-  voicePreviewHoverIcon,
+  voicePreviewPlayIcon,
+  voicePreviewPlayHoverIcon,
+  voicePreviewPauseIcon,
+  voicePreviewPauseHoverIcon,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor
 }: IProps) => {
   const dispatch = useDispatch()
+  const [payingVoiceId, setPlayingVoiceId] = useState('')
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
@@ -40,9 +45,13 @@ const Voices = ({
           file={file}
           voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
           voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
-          voicePreviewHoverIcon={voicePreviewHoverIcon}
+          voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+          voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+          voicePreviewPauseIcon={voicePreviewPauseIcon}
+          voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
           voicePreviewTitleColor={voicePreviewTitleColor}
-          voicePreviewIcon={voicePreviewIcon}
+          setVoiceIsPlaying={(voiceId) => setPlayingVoiceId(voiceId)}
+          playingVoiceId={payingVoiceId}
         />
       ))}
     </Container>

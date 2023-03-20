@@ -42,6 +42,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         position='center'
         trigger={
           <CreateDropdownButton hoverBackground={createChannelIconHoverBackground} leftAuto={!showSearch}>
+            <IconWrapper />
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -101,18 +102,31 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
 
 export default CreateChannelButton
 
-const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: string }>`
+const IconWrapper = styled.span`
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  opacity: 0.2;
+`
+const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: string; iconColor?: string }>`
   //margin-left: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  overflow: hidden;
   line-height: 55px;
   margin-left: ${(props) => (props.leftAuto ? 'auto' : '12px')};
   width: 40px;
   height: 40px;
   border-radius: 50%;
   &:hover {
-    background-color: ${(props) => props.hoverBackground || '#ebf7f1'};
+    & ${IconWrapper} {
+      background-color: ${(props) => props.iconColor || colors.primary};
+    }
+  }
+  & > svg {
+    color: ${(props) => props.iconColor || colors.primary};
   }
 `

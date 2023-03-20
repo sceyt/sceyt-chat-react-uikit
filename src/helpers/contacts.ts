@@ -1,7 +1,7 @@
 let userDisplayNameFromContact = false
 
-export const setUserDisplayNameFromContact = (value: boolean) => {
+export const setShowOnlyContactUsers = (value: boolean) => {
   userDisplayNameFromContact = value
 }
 
-export const getUserDisplayNameFromContact = () => userDisplayNameFromContact
+export const getShowOnlyContactUsers = () => userDisplayNameFromContact

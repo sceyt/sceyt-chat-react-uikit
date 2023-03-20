@@ -2,27 +2,27 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { activeChannelSelector, typingIndicatorSelector } from '../../store/channel/selector'
-import { switchChannelActionAC } from '../../store/channel/actions'
+import { sendTypingAC, switchChannelActionAC } from '../../store/channel/actions'
 import { ReactComponent as ImageIcon } from '../../assets/svg/picture.svg'
 import { ReactComponent as CameraIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
+import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
-import { lastMessageDateFormat, makeUserName, messageStatusIcon } from '../../helpers'
+import { lastMessageDateFormat, makeUserName, messageStatusIcon, systemMessageUserName } from '../../helpers'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
-import { ICustomColors } from './types'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
 // import useOnScreen from '../../hooks/useOnScrean'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
-import { colors } from '../../UIHelper/constants'
+import { colors, customColors } from '../../UIHelper/constants'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/notificationsOff3.svg'
-import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { hideUserPresence } from '../../helpers/userHelper'
 
 interface IChannelProps {
   channel: IChannel
-  customColors?: ICustomColors
   avatar?: boolean
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
@@ -31,7 +31,6 @@ interface IChannelProps {
 
 const Channel: React.FC<IChannelProps> = ({
   channel,
-  customColors,
   avatar,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
@@ -39,7 +38,7 @@ const Channel: React.FC<IChannelProps> = ({
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const { user } = ChatClient
   const activeChannel = useSelector(activeChannelSelector) || {}
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
@@ -49,6 +48,7 @@ const Channel: React.FC<IChannelProps> = ({
   const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
+      dispatch(sendTypingAC(false))
       dispatch(clearMessagesAC())
       dispatch(switchChannelActionAC(chan))
     }
@@ -58,9 +58,9 @@ const Channel: React.FC<IChannelProps> = ({
 
   // const channelItemRef = useRef()
   // const isVisible = useOnScreen(channelItemRef)
-  if (isDirectChannel) {
-    useUpdatePresence(channel, true)
-  }
+  // if (isDirectChannel) {
+  useUpdatePresence(channel, true)
+  // }
 
   useEffect(() => {
     if (messageTimeAndStatusRef.current) {
@@ -85,9 +85,12 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={16}
             setDefaultAvatar={isDirectChannel}
           />
-          {isDirectChannel && channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE && (
-            <UserStatus backgroundColor={colors.primary} />
-          )}
+          {isDirectChannel &&
+            (hideUserPresence(channel.peer)
+              ? ''
+              : channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE) && (
+              <UserStatus backgroundColor={colors.primary} />
+            )}
         </AvatarWrapper>
       )}
       <ChannelInfo avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
@@ -102,7 +105,12 @@ const Channel: React.FC<IChannelProps> = ({
         )}
         {/* makeUserName(contactsMap[typingIndicator.from.id]) */}
         {(lastMessage || !!typingIndicator) && (
-          <LastMessage markedAsUnread={channel.markedAsUnread}>
+          <LastMessage
+            markedAsUnread={
+              !!(channel.markedAsUnread || (channel.unreadMessageCount && channel.unreadMessageCount > 0))
+            }
+            unreadMentions={!!(channel.unreadMentionsCount && channel.unreadMentionsCount > 0)}
+          >
             {typingIndicator ? (
               !isDirectChannel ? (
                 <LastMessageAuthor
@@ -129,7 +137,7 @@ const Channel: React.FC<IChannelProps> = ({
                       ? 'You'
                       : contactsMap[lastMessage.user.id]
                       ? contactsMap[lastMessage.user.id].firstName
-                      : lastMessage.user.id || 'Deleted user'}
+                      : lastMessage.user.id || 'Deleted'}
                   </span>
                 </LastMessageAuthor>
               )
@@ -142,7 +150,14 @@ const Channel: React.FC<IChannelProps> = ({
                 (lastMessage.user.id === user.id || !isDirectChannel) &&
                 lastMessage.type !== 'system') && <Points>: </Points>}
             <LastMessageText
-              withAttachments={!!(lastMessage && lastMessage.attachments && lastMessage.attachments.length)}
+              withAttachments={
+                !!(
+                  lastMessage &&
+                  lastMessage.attachments &&
+                  lastMessage.attachments.length &&
+                  lastMessage.attachments[0].type !== attachmentTypes.link
+                ) && !typingIndicator
+              }
               noBody={lastMessage && !lastMessage.body}
               deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}
             >
@@ -163,6 +178,36 @@ const Channel: React.FC<IChannelProps> = ({
                     ? 'Created this channel'
                     : lastMessage.body === 'CG'
                     ? 'Created this group'
+                    : lastMessage.body === 'AM'
+                    ? ` added ${
+                        lastMessage.metadata &&
+                        lastMessage.metadata.m &&
+                        lastMessage.metadata.m
+                          .slice(0, 5)
+                          .map((mem: string) =>
+                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
+                          )
+                      } ${
+                        lastMessage.metadata && lastMessage.metadata.m && lastMessage.metadata.m.length > 5
+                          ? `and ${lastMessage.metadata.m.length - 5} more`
+                          : ''
+                      }`
+                    : lastMessage.body === 'RM'
+                    ? ` removed ${
+                        lastMessage.metadata &&
+                        lastMessage.metadata.m &&
+                        lastMessage.metadata.m
+                          .slice(0, 5)
+                          .map((mem: string) =>
+                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
+                          )
+                      } ${
+                        lastMessage.metadata && lastMessage.metadata.m && lastMessage.metadata.m.length > 5
+                          ? `and ${lastMessage.metadata.m.length - 5} more`
+                          : ''
+                      }`
+                    : lastMessage.body === 'LG'
+                    ? 'Left this group'
                     : ''
                 }`
               ) : (
@@ -183,12 +228,12 @@ const Channel: React.FC<IChannelProps> = ({
                         <FileIcon />
                         {lastMessage.body ? '' : 'File'}
                       </React.Fragment>
-                    ) : (
+                    ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
                       <React.Fragment>
                         <VoiceIcon />
                         {lastMessage.body ? '' : 'Voice'}
                       </React.Fragment>
-                    ))}
+                    ) : null)}
                   {lastMessage.body}
                 </React.Fragment>
               )}
@@ -198,13 +243,15 @@ const Channel: React.FC<IChannelProps> = ({
       </ChannelInfo>
 
       <ChannelStatus ref={messageTimeAndStatusRef}>
-        <DeliveryIconCont>
-          {lastMessage &&
-            lastMessage.user &&
-            lastMessage.user.id === user.id &&
-            lastMessage.type !== 'system' &&
-            messageStatusIcon(lastMessage.deliveryStatus, undefined, colors.primary)}
-        </DeliveryIconCont>
+        {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && (
+          <DeliveryIconCont>
+            {lastMessage &&
+              lastMessage.user &&
+              lastMessage.user.id === user.id &&
+              lastMessage.type !== 'system' &&
+              messageStatusIcon(lastMessage.deliveryStatus, undefined, colors.primary)}
+          </DeliveryIconCont>
+        )}
         <LastMessageDate>
           {lastMessage && lastMessage.createdAt && lastMessageDateFormat(lastMessage.createdAt)}
           {/* {lastMessage &&
@@ -212,18 +259,28 @@ const Channel: React.FC<IChannelProps> = ({
             moment(lastMessage.createdAt).format('HH:mm')} */}
         </LastMessageDate>
       </ChannelStatus>
-      {(!!channel.unreadMessageCount || channel.markedAsUnread) && (
-        <UnreadCount backgroundColor={colors.primary} isMuted={channel.muted}>
-          {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}
-        </UnreadCount>
-      )}
+      <UnreadInfo>
+        {!!(channel.unreadMentionsCount && channel.unreadMentionsCount > 0) && (
+          <UnreadMentionIconWrapper
+            iconColor={colors.primary}
+            rightMargin={!!(channel.unreadMessageCount || channel.markedAsUnread)}
+          >
+            <MentionIcon />
+          </UnreadMentionIconWrapper>
+        )}
+        {!!(channel.unreadMessageCount || channel.markedAsUnread) && (
+          <UnreadCount backgroundColor={colors.primary} isMuted={channel.muted}>
+            {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}
+          </UnreadCount>
+        )}
+      </UnreadInfo>
     </Container>
   )
 }
 
 export default Channel
 
-interface UnreadCountProps {
+export interface UnreadCountProps {
   readonly isMuted: boolean
   readonly backgroundColor?: string
   width?: string
@@ -278,12 +335,16 @@ export const MutedIcon = styled.span`
   }
 `
 
-export const LastMessage = styled.div<{ markedAsUnread?: boolean }>`
+export const LastMessage = styled.div<{ markedAsUnread?: boolean; unreadMentions?: boolean }>`
   display: flex;
   align-items: center;
   font-size: 14px;
   color: ${colors.gray6};
-  max-width: ${(props) => (props.markedAsUnread ? 'calc(100% - 24px)' : '100%')};
+  max-width: ${(props) =>
+    props.markedAsUnread || props.unreadMentions
+      ? // @ts-ignore
+        `calc(100% - ${props.markedAsUnread && props.unreadMentions ? 48 : 24}px)`
+      : '100%'};
 `
 
 export const AvatarWrapper = styled.div`
@@ -331,7 +392,6 @@ export const LastMessageText = styled.span<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  height: 19px;
   color: ${colors.gray9};
   font-style: ${(props) => props.deletedMessage && 'italic'};
   transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
@@ -341,7 +401,7 @@ export const LastMessageText = styled.span<{
     height: 16px;
     margin-right: 4px;
     color: ${colors.gray4};
-    transform: ${(props) => (props.withAttachments ? 'translate(0px, 4px)' : 'translate(0px, 2px)')};
+    transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
   }
 `
 
@@ -365,16 +425,32 @@ export const DeliveryIconCont = styled.span`
   margin-right: 6px;
   line-height: 13px;
 `
+
+export const UnreadMentionIconWrapper = styled.span<{ iconColor?: string; rightMargin?: boolean }>`
+  margin-right: ${(props) => props.rightMargin && '8px'};
+  line-height: 13px;
+
+  & > svg {
+    color: ${(props) => props.iconColor || colors.primary};
+  }
+`
+
 export const TypingIndicator = styled.span`
   font-style: italic;
 `
 
-export const UnreadCount = styled.span<UnreadCountProps>`
+export const UnreadInfo = styled.span`
   position: absolute;
   bottom: 11px;
   right: 16px;
+  display: flex;
+  margin-top: 7px;
+  align-items: center;
   flex: 0 0 auto;
   margin-left: auto;
+`
+const UnreadCount = styled.span<UnreadCountProps>`
+  display: inline-block;
   background-color: ${(props) => props.backgroundColor || colors.cobalt1};
   padding: 0 4px;
   font-size: ${(props) => props.fontSize || '13px'};
@@ -385,8 +461,7 @@ export const UnreadCount = styled.span<UnreadCountProps>`
   font-weight: 500;
   color: ${(props) => props.textColor || '#fff'};
   border-radius: 10px;
-  margin-top: 7px;
   box-sizing: border-box;
 
-  ${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}
+  /*${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}*/
 `

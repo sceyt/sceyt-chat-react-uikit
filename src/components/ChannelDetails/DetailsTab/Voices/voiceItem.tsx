@@ -1,7 +1,9 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePreview.svg'
+import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 import { ReactComponent as VoicePlayHoverIcon } from '../../../../assets/svg/voicePreviewHoverIcon.svg'
+import { ReactComponent as VoicePauseHoverIcon } from '../../../../assets/svg/voicePreviewPauseHover.svg'
 import { colors } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
 import { getCustomDownloader } from '../../../../helpers/customUploader'
@@ -9,53 +11,95 @@ import { useSelector } from 'react-redux'
 import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
 import { formatAudioVideoTime, makeUserName } from '../../../../helpers'
 import moment from 'moment/moment'
-import { getUserDisplayNameFromContact } from '../../../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
+import { useDidUpdate } from '../../../../hooks'
 
 interface IProps {
   file: IAttachment
-  voicePreviewIcon?: JSX.Element
-  voicePreviewHoverIcon?: JSX.Element
+  voicePreviewPlayIcon?: JSX.Element
+  voicePreviewPlayHoverIcon?: JSX.Element
+  voicePreviewPauseIcon?: JSX.Element
+  voicePreviewPauseHoverIcon?: JSX.Element
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
+  playingVoiceId?: string
+  setVoiceIsPlaying?: (attachmentId: string) => void
 }
 
 const VoiceItem = ({
   file,
-  voicePreviewIcon,
-  voicePreviewHoverIcon,
+  voicePreviewPlayIcon,
+  voicePreviewPlayHoverIcon,
+  voicePreviewPauseIcon,
+  voicePreviewPauseHoverIcon,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
-  voicePreviewHoverBackgroundColor
+  voicePreviewHoverBackgroundColor,
+  setVoiceIsPlaying,
+  playingVoiceId
 }: IProps) => {
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const [fileUrl, setFileUrl] = useState('')
   const [audioIsPlaying, setAudioIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState('')
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
-  const audioRef = useRef<HTMLAudioElement>()
   const user = useSelector(userSelector)
+  const audioRef = useRef<HTMLAudioElement>()
+  const intervalRef = useRef<any>(null)
 
   const handlePlayPause = () => {
     if (audioRef && audioRef.current) {
       if (audioRef.current.paused) {
+        let audioDuration: number | undefined = audioRef.current?.duration
+        intervalRef.current = setInterval(() => {
+          const audioCurrentTime = audioRef.current?.currentTime
+          if (audioDuration) {
+            if ((audioCurrentTime || audioCurrentTime === 0) && audioDuration - audioCurrentTime > 0) {
+              setCurrentTime(formatAudioVideoTime(audioDuration, audioCurrentTime))
+            } else {
+              setCurrentTime(formatAudioVideoTime(audioDuration, 0))
+              setAudioIsPlaying(false)
+              audioRef.current?.pause()
+              audioRef.current && (audioRef.current.currentTime = 0)
+              clearInterval(intervalRef.current)
+            }
+          } else {
+            audioDuration = audioRef.current?.duration
+          }
+        }, 10)
         setAudioIsPlaying(true)
+        if (setVoiceIsPlaying) {
+          setVoiceIsPlaying(file.id!)
+        }
         audioRef.current?.play()
       } else {
+        clearInterval(intervalRef.current)
         setAudioIsPlaying(false)
         audioRef.current?.pause()
       }
     }
   }
 
+  useDidUpdate(() => {
+    if (playingVoiceId && playingVoiceId !== file.id) {
+      clearInterval(intervalRef.current)
+      setAudioIsPlaying(false)
+      audioRef.current?.pause()
+    }
+  }, [playingVoiceId])
   useEffect(() => {
     if (customDownloader) {
       customDownloader(file.url).then((url) => {
-        console.log('set url ,,, ', url)
         setFileUrl(url)
       })
     } else {
       setFileUrl(file.url)
+    }
+
+    return () => {
+      clearInterval(intervalRef.current)
     }
   }, [])
   return (
@@ -66,16 +110,16 @@ const VoiceItem = ({
     >
       {audioIsPlaying ? (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause}>{voicePreviewIcon || <VoicePlayIcon />}</FileIconCont>
+          <FileIconCont onClick={handlePlayPause}>{voicePreviewPauseIcon || <VoicePauseIcon />}</FileIconCont>
           <FileHoverIconCont onClick={handlePlayPause}>
-            {voicePreviewHoverIcon || <VoicePlayHoverIcon />}
+            {voicePreviewPauseHoverIcon || <VoicePauseHoverIcon />}
           </FileHoverIconCont>
         </React.Fragment>
       ) : (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause}>{voicePreviewIcon || <VoicePlayIcon />}</FileIconCont>
+          <FileIconCont onClick={handlePlayPause}>{voicePreviewPlayIcon || <VoicePlayIcon />}</FileIconCont>
           <FileHoverIconCont onClick={handlePlayPause}>
-            {voicePreviewHoverIcon || <VoicePlayHoverIcon />}
+            {voicePreviewPlayHoverIcon || <VoicePlayHoverIcon />}
           </FileHoverIconCont>
         </React.Fragment>
       )}
@@ -84,7 +128,9 @@ const VoiceItem = ({
           {file.user.id === user.id ? 'You' : makeUserName(contactsMap[file.user.id], file.user, getFromContacts)}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
-        <AudioSendTime>{formatAudioVideoTime(file.metadata.dur, 0)}</AudioSendTime>
+        <AudioSendTime>
+          {currentTime || file.metadata.dur ? formatAudioVideoTime(file.metadata.dur, 0) : ''}
+        </AudioSendTime>
       </AudioInfo>
 
       <Audio controls ref={audioRef} src={fileUrl}>

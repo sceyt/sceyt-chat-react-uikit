@@ -24,6 +24,7 @@ import ConfirmPopup from '../../../common/popups/delete'
 import ImageCrop from '../../../common/imageCrop'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 import { colors, customColors } from '../../../UIHelper/constants'
+import { resizeImage } from '../../../helpers/resizeImage'
 
 const Container = styled.div<{ active: boolean; heightOffset: any }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
@@ -120,27 +121,29 @@ const EditChannel = ({
     dispatch(updateChannelAC(channel.id, data))
   }
 
-  const handleImageCrop = (image: File) => {
+  const handleImageCrop = async (image: File) => {
+    const { blob } = await resizeImage(image, undefined, undefined, 0.9)
+    const file = new File([blob!], image.name)
     setNewAvatar({
       src: {
-        file: image
+        file
       },
-      url: URL.createObjectURL(image)
+      url: URL.createObjectURL(file)
     })
     // handleUpdateChannel({ avatar: image })
   }
 
   const handleFileUpload = () => {
     const file = fileUploader.current.files[0]
-    if (file.size < 1000000) {
-      handleSelectImage(file)
-    } else {
-      /* dispatch(
+    // if (file.size < 1000000) {
+    handleSelectImage(file)
+    // } else {
+    /* dispatch(
         setErrorNotification(
           'The file is too large. Allowed Maximum size is 1m'
         )
       ) */
-    }
+    // }
   }
 
   const handleRemoveAvatar = () => {

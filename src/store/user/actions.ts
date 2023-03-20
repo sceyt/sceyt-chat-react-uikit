@@ -1,6 +1,7 @@
 import {
   ADD_USERS,
   BLOCK_USERS,
+  BROWSER_TAB_IS_ACTIVE,
   GET_CONTACTS,
   GET_ROLES,
   GET_USERS,
@@ -119,6 +120,13 @@ export function updateUserProfileAC(profile: any) {
   return {
     type: UPDATE_USER_PROFILE,
     payload: { profile }
+  }
+}
+
+export function browserTabIsActiveAC(state: boolean) {
+  return {
+    type: BROWSER_TAB_IS_ACTIVE,
+    payload: { state }
   }
 }
 

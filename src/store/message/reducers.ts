@@ -24,7 +24,8 @@ import {
   SET_ATTACHMENTS_FOR_POPUP,
   ADD_ATTACHMENTS_FOR_POPUP,
   queryDirection,
-  SET_ATTACHMENTS_COMPLETE_FOR_POPUP
+  SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
+  DELETE_MESSAGE_FROM_LIST
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -98,7 +99,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           updateMessageList: false
         }
       } else { */
-
       const messagesCopy = [...newState.activeChannelMessages]
       if (newState.activeChannelMessages.length >= MESSAGES_MAX_LENGTH) {
         messagesCopy.shift()
@@ -119,6 +119,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       return newState
     }
 
+    case DELETE_MESSAGE_FROM_LIST: {
+      newState.activeChannelMessages = [...newState.activeChannelMessages].filter(
+        (msg) => !(msg.id === payload.messageId || msg.tid === payload.messageId)
+      )
+      return newState
+    }
     case SET_SCROLL_TO_MESSAGE: {
       newState.scrollToMessage = payload.messageId
       return newState
@@ -225,8 +231,8 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case ADD_REACTION_TO_MESSAGE: {
       const { message, reaction, isSelf } = payload
-      const messagesCopy = [...newState.activeChannelMessages]
-      newState.activeChannelMessages = messagesCopy.map((msg) => {
+      // const messagesCopy = [...newState.activeChannelMessages]
+      newState.activeChannelMessages = newState.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
           let slfReactions = [...msg.selfReactions]
           if (isSelf) {

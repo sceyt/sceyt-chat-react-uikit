@@ -36,7 +36,9 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SET_ATTACHMENTS_FOR_POPUP,
   SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
-  ADD_ATTACHMENTS_FOR_POPUP
+  ADD_ATTACHMENTS_FOR_POPUP,
+  DELETE_MESSAGE_FROM_LIST,
+  FORWARD_MESSAGE
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -52,6 +54,7 @@ export function sendMessageAC(
     payload: { message, channelId, connectionState, sendAttachmentsAsSeparateMessage, isResend }
   }
 }
+
 export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
   return {
     type: SEND_TEXT_MESSAGE,
@@ -66,10 +69,24 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
+export function forwardMessageAC(message: any, channelId: string, connectionState: string) {
+  return {
+    type: FORWARD_MESSAGE,
+    payload: { message, channelId, connectionState }
+  }
+}
+
 export function deleteMessageAC(channelId: string, messageId: string, deleteOption: 'forMe' | 'forEveryone') {
   return {
     type: DELETE_MESSAGE,
     payload: { channelId, messageId, deleteOption }
+  }
+}
+
+export function deleteMessageFromListAC(messageId: string) {
+  return {
+    type: DELETE_MESSAGE_FROM_LIST,
+    payload: { messageId }
   }
 }
 

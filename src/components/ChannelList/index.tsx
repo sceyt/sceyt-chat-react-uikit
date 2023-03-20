@@ -10,7 +10,6 @@ import {
   channelsSelector,
   deletedChannelSelector,
   hiddenChannelSelector,
-  searchValueSelector,
   visibleChannelSelector
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
@@ -34,24 +33,38 @@ import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
 import { removeChannelFromMap } from '../../helpers/channelHalper'
 import { colors, device, setCustomColors } from '../../UIHelper/constants'
-import { ICustomColors } from '../Channel/types'
 import { IChannel, IContactsMap } from '../../types'
 // import { ReactComponent as BottomIcon } from '../../assets/svg/chevronBottom.svg'
 import CreateChannelButton from './CreateChannelButton'
 import { getContactsAC } from '../../store/user/actions'
 import ProfileSettings from './ProfileSettings'
-import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
+import { useDidUpdate } from '../../hooks'
+import { getMessagesAC } from '../../store/message/actions'
+
+interface IChannelGroup {
+  groupName: string
+  channelList: IChannel[]
+}
 
 interface IChannelListProps {
-  customColors?: ICustomColors
-  List?: FC<{ channels: IChannel[]; loadMoreChannels: (count?: number) => void; children?: React.ReactNode }>
+  List?: FC<{
+    channels: IChannel[]
+    loadMoreChannels: (count?: number) => void
+    searchValue?: string
+    handleSetChannelListWithGroups?: (channelListGroups: IChannelGroup[]) => void
+    children?: React.ReactNode
+  }>
   ListItem?: FC<any>
+  getActiveChannel?: (channel: IChannel) => void
   Profile?: JSX.Element
   filter?: { channelType: 'Public' | 'Private' | 'Direct' }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   avatar?: boolean
   showSearch?: boolean
+  searchOption?: 'custom' | 'default'
   forceUpdateChannelList?: () => void
   showCreateChannelIcon?: boolean
   uriPrefixOnCreateChannel?: string
@@ -59,6 +72,8 @@ interface IChannelListProps {
   notificationsIsMutedIconColor?: string
   createChannelIcon?: JSX.Element
   createChannelIconHoverBackground?: string
+  selectedChannelBackground?: string
+  selectedChannelLeftBorder?: string
   onChannelDeleted?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
   onChannelCreated?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
   onChannelHidden?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
@@ -67,15 +82,19 @@ interface IChannelListProps {
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
-  customColors,
+  selectedChannelBackground,
+  selectedChannelLeftBorder,
+
   List,
   ListItem,
+  getActiveChannel,
   Profile,
   filter,
   limit,
   sort,
   avatar,
   showSearch = true,
+  searchOption = 'default',
   showCreateChannelIcon = true,
   uriPrefixOnCreateChannel,
   onChannelDeleted,
@@ -91,10 +110,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
 }) => {
   const dispatch = useDispatch()
   // const [searchValue, setSearchValue] = useState('');
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const channelListRef = useRef<HTMLInputElement>(null)
+  const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
-  const searchValue = useSelector(searchValueSelector) || ''
+  // const searchValue = useSelector(searchValueSelector) || ''
   const channels = useSelector(channelsSelector, shallowEqual) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const addedChannel = useSelector(addedChannelSelector)
@@ -108,6 +128,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const channelsLoading = useSelector(channelsLoadingState) || {}
   const activeChannel = useSelector(activeChannelSelector) || {}
   const [profileIsOpen, setProfileIsOpen] = useState(false)
+  const [channelGroupsList, setChannelGroupsList] = useState<IChannelGroup[] | undefined>()
 
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
@@ -126,6 +147,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
       channelsForAction.forEach((channelToDelete: any) => removeChannelFromMap(channelToDelete.id))
     }
     dispatch(setChannelsAC(updatedChannels))
+  }
+
+  const handleSetChannelListWithGroups = (channelGroupsList: IChannelGroup[]) => {
+    setChannelGroupsList(channelGroupsList)
   }
 
   const handleLoadMoreChannels = (count?: number) => {
@@ -147,13 +172,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }
 
   const handleSearchValueChange = (e: any) => {
-    const { value } = e.target
-    dispatch(getChannelsAC({ search: value }))
+    setSearchValue(e.target.value)
   }
 
   const getMyChannels = () => {
-    dispatch(getContactsAC())
-    dispatch(getChannelsAC({ search: '' }))
+    setSearchValue('')
   }
 
   const handleOpenProfile = () => {
@@ -172,12 +195,16 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [deletedChannel])
 
-  useEffect(() => {
+  useDidUpdate(() => {
+    console.log('connectionStatus.. .. ', connectionStatus)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
-      if (getFromContacts) {
-        dispatch(getContactsAC())
+      if (activeChannel.id) {
+        dispatch(getMessagesAC(activeChannel))
       }
+      clearMessagesMap()
+      removeAllMessages()
+      // dispatch(switchChannelActionAC(activeChannel.id))
     }
   }, [connectionStatus])
 
@@ -196,10 +223,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (addedToChannel) {
       if (onAddedToChannel) {
-        console.log('call added to channel on use effect')
         onAddedToChannel((updatedChannels) => handleSetChannelList(updatedChannels, false), addedToChannel)
       } else {
-        console.log('addedToChannel add channel from comp ... ', addedToChannel)
         dispatch(addChannelAC(addedToChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -209,7 +234,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (hiddenChannel) {
       if (onChannelHidden) {
-        console.log('call hidden channel')
         onChannelHidden((updatedChannels) => handleSetChannelList(updatedChannels, true), hiddenChannel)
       } else {
         dispatch(removeChannelAC(hiddenChannel.id))
@@ -229,17 +253,36 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [visibleChannel])
 
+  useDidUpdate(() => {
+    if (searchOption === 'default') {
+      dispatch(getChannelsAC({ filter, limit, sort, search: searchValue }))
+    }
+  }, [searchValue])
+  useDidUpdate(() => {
+    if (getActiveChannel) {
+      getActiveChannel(activeChannel)
+    }
+  }, [activeChannel.id])
   useEffect(() => {
-    if (customColors) {
-      setCustomColors(customColors)
+    dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
+    if (getFromContacts) {
+      dispatch(getContactsAC())
+    }
+    if (selectedChannelBackground || selectedChannelLeftBorder) {
+      setCustomColors({
+        ...(selectedChannelBackground && { selectedChannelBackground }),
+        ...(selectedChannelLeftBorder && { selectedChannelLeftBorder })
+      })
     }
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
+
+  // console.log('channels ... ', channels)
   return (
     <React.Fragment>
       <Container isCustomContainer={!!List} ref={channelListRef}>
         <ChannelListHeader maxWidth={(channelListRef.current && channelListRef.current.clientWidth) || 0}>
-          {Profile || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} />}
+          {Profile /* || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} /> */}
           {/* <ProfileCont onClick={handleOpenProfile}>
             <Avatar image={user.avatarUrl} name={user.firstName || user.id} size={32} textSize={15} setDefaultAvatar />
             <BottomIcon />
@@ -262,8 +305,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
         </ChannelListHeader>
         {/* <ChannelTabs /> */}
         {List ? (
-          <List channels={channels} loadMoreChannels={handleLoadMoreChannels}>
-            {!directChannels.length && !searchValue && (
+          <List
+            channels={channels}
+            loadMoreChannels={handleLoadMoreChannels}
+            searchValue={searchValue}
+            handleSetChannelListWithGroups={handleSetChannelListWithGroups}
+          >
+            {!directChannels.length && !searchValue ? (
               <React.Fragment>
                 {channels.map((channel: IChannel) =>
                   ListItem ? (
@@ -273,7 +321,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       notificationsIsMutedIcon={notificationsIsMutedIcon}
                       notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                       avatar={avatar}
-                      customColors={customColors}
                       channel={channel}
                       key={channel.id}
                       contactsMap={contactsMap}
@@ -281,51 +328,71 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )
                 )}
               </React.Fragment>
-            )}
-            {channelsLoading === LOADING_STATE.LOADED && searchValue && (
-              <React.Fragment>
-                {!!directChannels.length && (
-                  <DirectChannels>
-                    <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
-                    {directChannels.map((channel: IChannel) =>
-                      ListItem ? (
-                        <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
-                      ) : (
-                        <Channel
-                          notificationsIsMutedIcon={notificationsIsMutedIcon}
-                          notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                          avatar={avatar}
-                          customColors={customColors}
-                          channel={channel}
-                          key={channel.id}
-                          contactsMap={contactsMap}
-                        />
-                      )
-                    )}
-                  </DirectChannels>
-                )}
-                {!!groupChannels.length && (
-                  <GroupChannels>
-                    <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
-                    {groupChannels.map((channel: IChannel) =>
-                      ListItem ? (
-                        <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
-                      ) : (
-                        <Channel
-                          notificationsIsMutedIcon={notificationsIsMutedIcon}
-                          notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                          avatar={avatar}
-                          customColors={customColors}
-                          channel={channel}
-                          key={channel.id}
-                          contactsMap={contactsMap}
-                        />
-                      )
-                    )}
-                  </GroupChannels>
-                )}
+            ) : (
+              channelsLoading === LOADING_STATE.LOADED &&
+              searchValue &&
+              (searchOption === 'custom' ? (
+                <div>
+                  {channelGroupsList
+                    ? channelGroupsList.map((channelGroup) => (
+                        <React.Fragment>
+                          <SearchedChannelsHeader>{channelGroup.groupName}</SearchedChannelsHeader>
+                          {channelGroup.channelList.map((channel) => (
+                            <Channel
+                              notificationsIsMutedIcon={notificationsIsMutedIcon}
+                              notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                              avatar={avatar}
+                              channel={channel}
+                              key={channel.id}
+                              contactsMap={contactsMap}
+                            />
+                          ))}
+                        </React.Fragment>
+                      ))
+                    : ''}
+                </div>
+              ) : (
+                <React.Fragment>
+                  {!!directChannels.length && (
+                    <DirectChannels>
+                      <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
+                      {directChannels.map((channel: IChannel) =>
+                        ListItem ? (
+                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                        ) : (
+                          <Channel
+                            notificationsIsMutedIcon={notificationsIsMutedIcon}
+                            notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            avatar={avatar}
+                            channel={channel}
+                            key={channel.id}
+                            contactsMap={contactsMap}
+                          />
+                        )
+                      )}
+                    </DirectChannels>
+                  )}
+                  {!!groupChannels.length && (
+                    <GroupChannels>
+                      <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
+                      {groupChannels.map((channel: IChannel) =>
+                        ListItem ? (
+                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                        ) : (
+                          <Channel
+                            notificationsIsMutedIcon={notificationsIsMutedIcon}
+                            notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            avatar={avatar}
+                            channel={channel}
+                            key={channel.id}
+                            contactsMap={contactsMap}
+                          />
+                        )
+                      )}
+                    </GroupChannels>
+                  )}
 
-                {/* {!channels.length && (
+                  {/* {!channels.length && (
             <NoDataPage
               title="Nothing found"
               text="Sorry, there is nothing that matches your search."
@@ -334,7 +401,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
               styledTextWidth="190px"
             />
           )} */}
-              </React.Fragment>
+                </React.Fragment>
+              ))
             )}
           </List>
         ) : (
@@ -349,7 +417,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       notificationsIsMutedIcon={notificationsIsMutedIcon}
                       notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                       avatar={avatar}
-                      customColors={customColors}
                       channel={channel}
                       key={channel.id}
                       contactsMap={contactsMap}
@@ -371,7 +438,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           notificationsIsMutedIcon={notificationsIsMutedIcon}
                           notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                           avatar={avatar}
-                          customColors={customColors}
                           channel={channel}
                           contactsMap={contactsMap}
                           key={channel.id}
@@ -391,7 +457,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           notificationsIsMutedIcon={notificationsIsMutedIcon}
                           notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                           avatar={avatar}
-                          customColors={customColors}
                           channel={channel}
                           key={channel.id}
                           contactsMap={contactsMap}
@@ -427,8 +492,8 @@ const Container = styled.div<{ isCustomContainer?: boolean; ref?: any }>`
   position: relative;
   display: flex;
   flex-direction: column;
-  width: ${(props) => (props.isCustomContainer ? '' : '280px')};
-  min-width: ${(props) => (props.isCustomContainer ? '' : '280px')};
+  width: ${(props) => (props.isCustomContainer ? '' : '360px')};
+  min-width: ${(props) => (props.isCustomContainer ? '' : '360px')};
   //border-right: ${(props) => (props.isCustomContainer ? '' : '1px solid #DFE0EB')};
 
   ${(props) =>
@@ -443,9 +508,10 @@ const Container = styled.div<{ isCustomContainer?: boolean; ref?: any }>`
 `
 
 const ChannelsList = styled.div`
-  height: auto;
   border-right: 1px solid ${colors.gray1};
   overflow-y: auto;
+  width: 360px;
+  height: 100%;
 `
 const SearchedChannels = styled.div`
   height: calc(100vh - 123px);

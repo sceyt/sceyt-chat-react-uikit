@@ -13,7 +13,8 @@ import {
   REPORT_MEMBER,
   GET_ROLES,
   GET_ROLES_SUCCESS,
-  SET_MEMBERS_TO_LIST
+  SET_MEMBERS_TO_LIST,
+  UPDATE_MEMBERS_PRESENCE
 } from './constants'
 import { IAddMember, IMember, IRole } from '../../types'
 
@@ -41,6 +42,13 @@ export function addMembersToListAC(members: IMember[]) {
 export function updateMembersAC(members: IMember[]) {
   return {
     type: UPDATE_MEMBERS,
+    payload: { members }
+  }
+}
+
+export function updateMembersPresenceAC(members: IMember[]) {
+  return {
+    type: UPDATE_MEMBERS_PRESENCE,
     payload: { members }
   }
 }

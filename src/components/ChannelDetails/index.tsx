@@ -23,7 +23,8 @@ import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import usePermissions from '../../hooks/usePermissions'
-import { getUserDisplayNameFromContact } from '../../helpers/contacts'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { hideUserPresence } from '../../helpers/userHelper'
 
 const Details = ({
   channelEditIcon,
@@ -68,6 +69,7 @@ const Details = ({
   reportChannelIconColor,
   reportChannelTextColor,
   deleteChannelIcon,
+  showDeleteChannel,
   deleteChannelIconColor,
   deleteChannelTextColor,
   deleteChannelOrder,
@@ -82,8 +84,10 @@ const Details = ({
   linkPreviewTitleColor,
   linkPreviewColor,
   linkPreviewHoverBackgroundColor,
-  voicePreviewIcon,
-  voicePreviewHoverIcon,
+  voicePreviewPlayIcon,
+  voicePreviewPlayHoverIcon,
+  voicePreviewPauseIcon,
+  voicePreviewPauseHoverIcon,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor,
@@ -128,7 +132,7 @@ const Details = ({
   privateChannelMakeAdminPopupDescription
 }: IDetailsProps) => {
   const dispatch = useDispatch()
-  const getFromContacts = getUserDisplayNameFromContact()
+  const getFromContacts = getShowOnlyContactUsers()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
   // const [tabFixed, setTabFixed] = useState(false)
@@ -214,7 +218,7 @@ const Details = ({
             image={channel.avatarUrl || (channel.peer && channel.peer.avatarUrl)}
             name={channel.subject || (channel.peer && (channel.peer.firstName || channel.peer.id))}
             size={72}
-            textSize={32}
+            textSize={26}
             setDefaultAvatar={isDirectChannel}
           />
           <ChannelInfo>
@@ -224,11 +228,13 @@ const Details = ({
             </ChannelName>
             {isDirectChannel ? (
               <SubTitle>
-                {channel.peer.presence &&
-                  (channel.peer.presence.state === PRESENCE_STATUS.ONLINE
-                    ? 'Online'
-                    : channel.peer.presence.lastActiveAt &&
-                      userLastActiveDateFormat(channel.peer.presence.lastActiveAt))}
+                {hideUserPresence(channel.peer)
+                  ? ''
+                  : channel.peer.presence &&
+                    (channel.peer.presence.state === PRESENCE_STATUS.ONLINE
+                      ? 'Online'
+                      : channel.peer.presence.lastActiveAt &&
+                        userLastActiveDateFormat(channel.peer.presence.lastActiveAt))}
               </SubTitle>
             ) : (
               <SubTitle>
@@ -296,7 +302,7 @@ const Details = ({
             reportChannelOrder={reportChannelOrder}
             reportChannelIconColor={reportChannelIconColor}
             reportChannelTextColor={reportChannelTextColor}
-            showDeleteChannel={checkActionPermission('deleteChannel')}
+            showDeleteChannel={showDeleteChannel && checkActionPermission('deleteChannel')}
             deleteChannelIcon={deleteChannelIcon}
             deleteChannelIconColor={deleteChannelIconColor}
             deleteChannelTextColor={deleteChannelTextColor}
@@ -334,8 +340,10 @@ const Details = ({
           linkPreviewTitleColor={linkPreviewTitleColor}
           linkPreviewColor={linkPreviewColor}
           linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
-          voicePreviewIcon={voicePreviewIcon}
-          voicePreviewHoverIcon={voicePreviewHoverIcon}
+          voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+          voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+          voicePreviewPauseIcon={voicePreviewPauseIcon}
+          voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
           voicePreviewTitleColor={voicePreviewTitleColor}
           voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
           voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
