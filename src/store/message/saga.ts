@@ -113,6 +113,10 @@ function* sendMessage(action: IAction): any {
             messageAttachment.type === 'file' ? 50 : undefined,
             messageAttachment.type === 'file' ? 50 : undefined
           )
+        } else if (fileType === attachmentTypes.voice) {
+          thumbnailMetas = {
+            duration: 3
+          }
         }
         messageAttachment.metadata = {
           ...messageAttachment.metadata,

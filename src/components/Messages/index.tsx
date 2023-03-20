@@ -740,7 +740,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages... ', messages)
+    console.log('messages... ', messages)
   }, [messages])
   /* useEffect(() => {
   }, [pendingMessages]) */
