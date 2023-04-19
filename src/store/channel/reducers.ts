@@ -19,6 +19,7 @@ import {
   SET_CHANNELS_LOADING_STATE,
   SET_DRAGGED_ATTACHMENTS,
   SET_IS_DRAGGING,
+  SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
@@ -59,6 +60,7 @@ const initialState: {
   channelListWidth: number
   isDragging: boolean
   draggedAttachments: { attachment: File; type: 'media' | 'file' }[]
+  tabIsActive: boolean
 } = {
   channelsLoadingState: null,
   channelsForForwardLoadingState: null,
@@ -83,6 +85,7 @@ const initialState: {
   channelEditMode: false,
   channelListWidth: 0,
   isDragging: false,
+  tabIsActive: true,
   draggedAttachments: []
 }
 
@@ -215,6 +218,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_USER_STATUS_ON_CHANNEL: {
       const usersMap = payload.usersMap
+      // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
       const updatedChannels = newState.channels.map((channel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT && usersMap[channel.peer.id]) {
           return { ...channel, peer: usersMap[channel.peer.id] }
@@ -325,6 +329,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_CHANNEL_LIST_WIDTH: {
       const { width } = payload
       newState.channelListWidth = width
+      return newState
+    }
+
+    case SET_TAB_IS_ACTIVE: {
+      const { isActive } = payload
+      newState.tabIsActive = isActive
       return newState
     }
 

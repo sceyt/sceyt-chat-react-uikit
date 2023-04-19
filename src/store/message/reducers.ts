@@ -25,7 +25,13 @@ import {
   ADD_ATTACHMENTS_FOR_POPUP,
   queryDirection,
   SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
-  DELETE_MESSAGE_FROM_LIST
+  DELETE_MESSAGE_FROM_LIST,
+  SET_REACTIONS_LIST,
+  ADD_REACTIONS_TO_LIST,
+  SET_REACTIONS_LOADING_STATE,
+  DELETE_REACTION_FROM_LIST,
+  ADD_REACTION_TO_LIST,
+  SET_MESSAGE_MENU_OPENED
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -35,7 +41,7 @@ import {
   setHasNextCached,
   setHasPrevCached
 } from '../../helpers/messagesHalper'
-import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 
 export interface IMessageStore {
   messagesLoadingState: number | null
@@ -59,6 +65,10 @@ export interface IMessageStore {
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
   scrollToMessage: string | null
+  reactionsList: IReaction[]
+  reactionsHasNext: boolean
+  reactionsLoadingState: number | null
+  openedMessageMenu: string
 }
 const initialState: IMessageStore = {
   messagesLoadingState: null,
@@ -84,7 +94,11 @@ const initialState: IMessageStore = {
   sendMessageInputHeight: 0,
   messageForReply: null,
   attachmentsUploadingState: {},
-  scrollToMessage: null
+  scrollToMessage: null,
+  reactionsList: [],
+  reactionsHasNext: true,
+  reactionsLoadingState: null,
+  openedMessageMenu: ''
 }
 
 export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
@@ -222,7 +236,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       const messagesCopy = [...newState.activeChannelMessages]
       newState.activeChannelMessages = messagesCopy.map((message) => {
         if (message.tid === messageId || message.id === messageId) {
-          return { ...message, ...params }
+          if (params.state === MESSAGE_STATUS.DELETE) {
+            return { ...params }
+          } else {
+            return { ...message, ...params }
+          }
         }
         return message
       })
@@ -365,6 +383,41 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         ...newState.attachmentsUploadingState,
         [attachmentId]: attachmentUploadingState
       }
+      return newState
+    }
+
+    case SET_REACTIONS_LIST: {
+      const { reactions, hasNext } = payload
+      newState.reactionsHasNext = hasNext
+      newState.reactionsList = [...reactions]
+      return newState
+    }
+
+    case ADD_REACTIONS_TO_LIST: {
+      const { reactions, hasNext } = payload
+      newState.reactionsHasNext = hasNext
+      newState.reactionsList = [...newState.reactionsList, ...reactions]
+      return newState
+    }
+
+    case ADD_REACTION_TO_LIST: {
+      newState.reactionsList = [...newState.reactionsList, payload.reaction]
+      return newState
+    }
+
+    case DELETE_REACTION_FROM_LIST: {
+      const { reaction } = payload
+      newState.reactionsList = [...newState.reactionsList].filter((item) => item.id !== reaction.id)
+      return newState
+    }
+
+    case SET_REACTIONS_LOADING_STATE: {
+      newState.reactionsLoadingState = payload.state
+      return newState
+    }
+
+    case SET_MESSAGE_MENU_OPENED: {
+      newState.openedMessageMenu = payload.messageId
       return newState
     }
 

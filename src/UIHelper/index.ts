@@ -936,8 +936,9 @@ export const UploadAvatarHandler = styled.div`
   color: ${colors.blue7};
 `
 
-export const MentionedUser = styled.span`
-  color: #2f81ff;
+export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boolean }>`
+  color: ${(props) => (props.isLastMessage ? colors.gray9 : props.color || colors.primary)};
+  font-weight: ${(props) => props.isLastMessage && '500'};
 `
 
 export const MessageOwner = styled.h3<any>`
@@ -1133,7 +1134,7 @@ export const UploadProgress = styled.div<{
   height: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
   min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '130px' : null)};
-  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && '90px'};
+  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isFailedAttachment && '90px'};
   display: flex;
   //display: none;
   align-items: center;
@@ -1150,7 +1151,7 @@ export const UploadProgress = styled.div<{
       ? '0.5px solid rgba(0, 0, 0, 0.1)'
       : props.withBorder && `2px solid ${props.backgroundColor}`};
   box-sizing: border-box;
-  ${(props) => props.isFailedAttachment && 'background-color: rgba(237, 77, 96, 0.1);'}
+  /* ${(props) => props.isFailedAttachment && 'background-color: rgba(237, 77, 96, 0.1);'}*/
   ${(props) =>
     props.whiteBackground &&
     `

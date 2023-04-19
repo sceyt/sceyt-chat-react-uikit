@@ -152,6 +152,7 @@ export const AvatarImage = styled.img<AvatarImageProps>`
   visibility: ${(props: AvatarImageProps) => (props.showImage ? 'visible' : 'hidden')};
   width: ${(props) => `${props.size}px`};
   height: ${(props) => `${props.size}px`};
+  object-fit: cover;
 `
 
 export const DefaultAvatarWrapper = styled(DefaultAvatar)`

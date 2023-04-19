@@ -78,20 +78,55 @@ export const MessageTextFormat = ({
   text,
   message,
   contactsMap,
-  getFromContacts
+  getFromContacts,
+  isLastMessage,
+  isNotification
 }: {
   text: string
   message: any
   contactsMap: IContactsMap
   getFromContacts: boolean
+  isLastMessage?: boolean
+  isNotification?: boolean
 }) => {
   let messageText: any = [text]
   if (message.mentionedUsers && message.mentionedUsers.length > 0) {
-    const mentionsPositions: any = Object.entries(message.metadata)
+    const mentionsPositions: any = Array.isArray(message.metadata)
+      ? [...message.metadata].sort((a: any, b: any) => b.loc - a.loc)
+      : []
+    /* const mentionsPositions: any = Object.entries(message.metadata)
       .sort(([, a]: any, [, b]: any) => b.loc - a.loc)
-      .reduce((r, [k, v]) => ({ ...r, [k]: v }), {})
+      .reduce((r, [k, v]) => ({ ...r, [k]: v }), {}) */
     // eslint-disable-next-line guard-for-in,no-restricted-syntax
-    for (const mentionMemberId in mentionsPositions) {
+
+    mentionsPositions.forEach((mention: any) => {
+      const textPart = messageText.shift()
+      const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mention.id)
+      if (mentionDisplay) {
+        const user = getClient().user
+        messageText.unshift(
+          `${textPart?.substring(0, mention.loc)}`,
+          // @ts-ignore
+          isNotification ? (
+            `@${makeUserName(
+              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
+              mentionDisplay,
+              getFromContacts
+            ).trim()}`
+          ) : (
+            <MentionedUser isLastMessage={isLastMessage} color={colors.primary} key={`${mention.loc}`}>
+              {`@${makeUserName(
+                user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
+                mentionDisplay,
+                getFromContacts
+              ).trim()}`}
+            </MentionedUser>
+          ),
+          `${textPart?.substring(mention.loc + mention.len)}`
+        )
+      }
+    })
+    /*  for (const mentionMemberId in mentionsPositions) {
       const textPart = messageText.shift()
       const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mentionMemberId)
       if (mentionDisplay) {
@@ -99,7 +134,7 @@ export const MessageTextFormat = ({
         messageText.unshift(
           `${textPart?.substring(0, mentionsPositions[mentionMemberId].loc)}`,
           // @ts-ignore
-          <MentionedUser key={`${mentionMemberId}`}>
+          <MentionedUser color={colors.primary} key={`${mentionMemberId}`}>
             {`@${makeUserName(
               user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
               mentionDisplay,
@@ -109,11 +144,11 @@ export const MessageTextFormat = ({
           `${textPart?.substring(mentionsPositions[mentionMemberId].loc + mentionsPositions[mentionMemberId].len)}`
         )
       }
-    }
+    } */
   }
   const linkify = new LinkifyIt()
   const match = linkify.match(text)
-  if (match) {
+  if (!isLastMessage && !isNotification && match) {
     let newMessageText: any
     match.forEach((matchItem, index) => {
       if (index === 0) {
@@ -161,12 +196,12 @@ export const MessageTextFormat = ({
       messageText.splice(index, 1, ...urlArray)
     }
   }) */
-  return messageText.length > 1 ? messageText : text
+  return messageText.length > 1 ? (isNotification ? messageText.join('') : messageText) : text
 }
 
 export const bytesToSize = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes'
-  const k = 1024
+  const k = 1000
   const dm = decimals < 0 ? 0 : decimals
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
   const i = Math.floor(Math.log(bytes) / Math.log(k))
@@ -446,17 +481,53 @@ export const formatLargeText = (text: string, maxLength: number): any => {
 
 export const getCaretPosition1 = (element: any) => {
   let caretOffset = 0
+  let textNodes = 0
   const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  const focusOffset = win.getSelection().focusOffset
+  const focusNode = win.getSelection().focusNode
+  let textNodesAdded = false
+  element.childNodes.forEach((node: any, index: number) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node === focusNode) {
+        textNodesAdded = true
+        caretOffset += focusOffset + textNodes
+        return
+      } else {
+        caretOffset += node.nodeValue.length
+      }
+      textNodes += 1
+    }
+    if (element.childNodes.length === index + 1 && !textNodesAdded) {
+      caretOffset += textNodes
+    }
+  })
+  /* const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
   let sel
   if (typeof win.getSelection !== 'undefined') {
     sel = win.getSelection()
     if (sel.rangeCount > 0) {
       const range = win.getSelection().getRangeAt(0)
+      const rangeCount = win.getSelection().rangeCount
+      const anchorOffset = win.getSelection().anchorOffset
+      const anchorNode = win.getSelection().anchorNode
+      const focusOffset = win.getSelection().focusOffset
+      const focusNode = win.getSelection().focusNode
+      console.log('ranges. . . . . .', rangeCount)
+      console.log('anchorOffset. . . . . .', anchorOffset)
+      console.log('anchorNode. . . . . .', anchorNode)
+      console.log('focusOffset. . . . . .', focusOffset)
+      console.log('focusNode. . . . . .', focusNode)
+      console.log('range. . . . . .', range)
       const preCaretRange = range.cloneRange()
       preCaretRange.selectNodeContents(element)
       preCaretRange.setEnd(range.endContainer, range.endOffset)
+      console.log('preCaretRange. . . . . .', preCaretRange)
+      console.log('preCaretRange.toString(). . . . . .', preCaretRange.toString())
       caretOffset = preCaretRange.toString().length
+
+      console.log(' 1 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
     }
   } else if ((sel = doc.selection) && sel.type !== 'Control') {
     const textRange = sel.createRange()
@@ -464,7 +535,71 @@ export const getCaretPosition1 = (element: any) => {
     preCaretTextRange.moveToElementText(element)
     preCaretTextRange.setEndPoint('EndToEnd', textRange)
     caretOffset = preCaretTextRange.text.length
-  }
+    console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
+  } */
+  return caretOffset
+}
+
+export const getCaretPositionAsText = (element: any) => {
+  let caretOffset = 0
+  let textNodes = 0
+  const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  const focusOffset = win.getSelection().focusOffset
+  const focusNode = win.getSelection().focusNode
+  let textNodesAdded = false
+  element.childNodes.forEach((node: any, index: number) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node === focusNode) {
+        textNodesAdded = true
+        caretOffset += focusOffset + textNodes
+        return
+      } else {
+        caretOffset += node.nodeValue.length
+      }
+      textNodes += 1
+    } else if (node.nodeType === Node.ELEMENT_NODE) {
+      caretOffset += node.innerText.length
+    }
+    if (element.childNodes.length === index + 1 && !textNodesAdded) {
+      caretOffset += textNodes
+    }
+  })
+  /* const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  let sel
+  if (typeof win.getSelection !== 'undefined') {
+    sel = win.getSelection()
+    if (sel.rangeCount > 0) {
+      const range = win.getSelection().getRangeAt(0)
+      const rangeCount = win.getSelection().rangeCount
+      const anchorOffset = win.getSelection().anchorOffset
+      const anchorNode = win.getSelection().anchorNode
+      const focusOffset = win.getSelection().focusOffset
+      const focusNode = win.getSelection().focusNode
+      console.log('ranges. . . . . .', rangeCount)
+      console.log('anchorOffset. . . . . .', anchorOffset)
+      console.log('anchorNode. . . . . .', anchorNode)
+      console.log('focusOffset. . . . . .', focusOffset)
+      console.log('focusNode. . . . . .', focusNode)
+      console.log('range. . . . . .', range)
+      const preCaretRange = range.cloneRange()
+      preCaretRange.selectNodeContents(element)
+      preCaretRange.setEnd(range.endContainer, range.endOffset)
+      console.log('preCaretRange. . . . . .', preCaretRange)
+      console.log('preCaretRange.toString(). . . . . .', preCaretRange.toString())
+      caretOffset = preCaretRange.toString().length
+
+      console.log(' 1 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
+    }
+  } else if ((sel = doc.selection) && sel.type !== 'Control') {
+    const textRange = sel.createRange()
+    const preCaretTextRange = doc.body.createTextRange()
+    preCaretTextRange.moveToElementText(element)
+    preCaretTextRange.setEndPoint('EndToEnd', textRange)
+    caretOffset = preCaretTextRange.text.length
+    console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
+  } */
   return caretOffset
 }
 export const getCaretPosition = (editableDiv: any) => {
@@ -552,10 +687,11 @@ export const getCaretPosition = (editableDiv: any) => {
 export const setCursorPosition = (element: any, position: number) => {
   const range = document.createRange()
   const sel = window.getSelection()
-  let node = element.childNodes[0]
-  let offset = 0
+  console.log('element.childNodes. . . .', element.childNodes)
+  let currentNode = element.childNodes[0]
+  // let offset = 0
 
-  for (let i = 0; i < element.childNodes.length; i++) {
+  /* for (let i = 0; i < element.childNodes.length; i++) {
     if (offset + element.childNodes[i].textContent.length >= position) {
       node = element.childNodes[i]
       offset = position - offset
@@ -563,8 +699,41 @@ export const setCursorPosition = (element: any, position: number) => {
     }
     offset += element.childNodes[i].textContent.length
   }
+*/
+  let caretOffset = 0
+  let textNodes = 0
+  let textNodesAdded = false
+  let currentNodeIsFind = false
+  element.childNodes.forEach((node: any, index: number) => {
+    if (node.nodeType === Node.TEXT_NODE) {
+      currentNode = node
+      const textLength = node.nodeValue.length
+      caretOffset = caretOffset + textLength
+      if (element.childNodes.length === index + 1) {
+        textNodesAdded = true
+        caretOffset += textNodes
+      }
+      if (caretOffset >= position) {
+        currentNodeIsFind = true
+        currentNode = node
+        caretOffset = position - (caretOffset - textLength)
+        return
+      }
 
-  range.setStart(node, offset)
+      textNodes += 1
+    } else if (node.nodeName === 'SPAN') {
+      caretOffset += 1
+      currentNode = node
+    }
+    if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
+      if (!textNodesAdded) {
+        caretOffset += textNodes
+      }
+      currentNodeIsFind = true
+      caretOffset = caretOffset - position
+    }
+  })
+  range.setStart(currentNode, caretOffset)
   range.collapse(true)
   if (sel) {
     sel.removeAllRanges()
@@ -632,4 +801,44 @@ export const detectBrowser = () => {
     browser = 'Internet Explorer'
   }
   return browser
+}
+
+export const getEmojisCategoryTitle = (categoryKey: string) => {
+  let category = ''
+
+  switch (categoryKey) {
+    case 'People':
+      category = 'Smileys & People'
+      break
+    case 'Animals':
+      category = 'Animals & Nature'
+      break
+    case 'Food':
+      category = 'Food & Drink'
+      break
+    case 'Travel':
+      category = 'Travel & Places'
+      break
+    case 'Objects':
+      category = 'Objects'
+      break
+    case 'Symbols':
+      category = 'Symbols'
+      break
+    case 'Flags':
+      category = 'Flags'
+      break
+    default:
+      category = ''
+      break
+  }
+  return category
+}
+
+export const isJSON = (str: any) => {
+  try {
+    return JSON.parse(str) && !!str
+  } catch (e) {
+    return false
+  }
 }

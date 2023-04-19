@@ -80,6 +80,11 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
     }
   }
 
+  const handleClicks = (e: any) => {
+    if (!e.target.closest('.custom_carousel_item') && !e.target.closest('.custom_carousel_arrow')) {
+      handleClosePopup()
+    }
+  }
   useDidUpdate(() => {
     if (customUploader && currentFile) {
       if (playedVideo) {
@@ -240,7 +245,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           </ActionItem>
         </Actions>
       </SliderHeader>
-      <SliderBody>
+      <SliderBody onClick={handleClicks}>
         {!!(attachmentsList && attachmentsList.length) && (
           // @ts-ignore
           <Carousel
@@ -267,6 +272,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
               const disabled = type === 'PREV' ? prevButtonDisabled : nextButtonDisabled
               return (
                 <ArrowButton
+                  className='custom_carousel_arrow'
                   leftButton={type === 'PREV'}
                   type='button'
                   onClick={(e) => {
@@ -283,7 +289,12 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
             isRTL={false}
           >
             {attachmentsList.map((file) => (
-              <CarouselItem key={file.id} draggable={false} visibleSlide={visibleSlide}>
+              <CarouselItem
+                className='custom_carousel_item'
+                key={file.id}
+                draggable={false}
+                visibleSlide={visibleSlide}
+              >
                 {downloadedFiles[file.id!] ? (
                   <React.Fragment>
                     {file.type === 'image' ? (
@@ -451,6 +462,9 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
     @media (max-width: 480px) {
       min-width: inherit;
     }
+  }
+  img {
+    min-width: inherit;
   }
 `
 const UploadCont = styled.div`

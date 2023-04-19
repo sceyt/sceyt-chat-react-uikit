@@ -97,6 +97,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
       videoRef.current.currentTime -= 5
     }
   } */
+
   useEffect(() => {
     if (progressRef.current) {
       progressRef.current.style.backgroundSize = `${progress}%`
@@ -157,7 +158,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
     }
   }, [])
   return (
-    <Component ref={containerRef} fullScreen={isFullScreen}>
+    <Component ref={containerRef} fullScreen={isFullScreen} className='custom_video_player'>
       <video
         onClick={() => videoHandler(playing ? 'pause' : 'play')}
         id='video1'
@@ -238,6 +239,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
 export default VideoPlayer
 
 const Component = styled.div<any>`
+  position: relative;
   display: inline-flex;
   & > video {
     ${(props) =>
@@ -249,6 +251,15 @@ const Component = styled.div<any>`
         height: 100%;
         object-fit: contain;
     `}
+  }
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    height: 70px;
+    width: 100%;
+    background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0) 100%);
   }
 `
 

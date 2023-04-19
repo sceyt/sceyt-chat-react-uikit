@@ -8,7 +8,7 @@ import styled, { keyframes } from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
-import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
+// import { ReactComponent as RecordIcon } from '../../assets/lib/svg/recordButton.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/edit.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/attachment.svg'
@@ -123,14 +123,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   // const { handleSendMessage } = useMessages(activeChannel)
-  const recordingInitialState = {
+  /* const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
     initRecording: false,
     mediaStream: null,
     mediaRecorder: null,
     audio: undefined
-  }
+  } */
   const messageContRef = useRef<any>(null)
   const [checkActionPermission] = usePermissions(activeChannel.role)
   const [messageText, setMessageText] = useState('')
@@ -144,8 +144,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
   const [emojisInRightSide, setEmojisInRightSide] = useState(false)
 
-  const [recording, setRecording] = useState<any>(recordingInitialState)
-  const [recordedFile, setRecordedFile] = useState<any>(null)
+  // const [recording, setRecording] = useState<Recording>(recordingInitialState)
+  // const [recordedFile, setRecordedFile] = useState<any>(null)
 
   const [mentionedMembers, setMentionedMembers] = useState<any>([])
 
@@ -440,209 +440,181 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleSendEditMessage = (event?: any) => {
-    if (recordedFile) {
-      const file = new File([recordedFile.data], recordedFile.data.name, {
-        type: 'audio/mp3'
-      })
-      console.log('file . . . . ', file)
-      console.log('recordedFile . . . . ', recordedFile)
-      console.log('recordedFile duration . . . . ', recordedFile.data.duration)
-      const messageToSend = {
-        metadata: '',
-        body: '',
-        mentionedMembers: [],
-        attachments: [
-          {
-            name: recordedFile.data.name,
-            data: file,
-            attachmentId: uuidv4(),
-            upload: true,
-            size: recordedFile.data.size,
-            attachmentUrl: recordedFile.attachmentURL,
-            metadata: {},
-            type: attachmentTypes.voice
+    const { shiftKey, charCode, type } = event
+    const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
+    if (shouldSend) {
+      event.preventDefault()
+      if (messageToEdit) {
+        handleEditMessage()
+      } else if (messageText || (attachments.length && attachments.length > 0)) {
+        const messageTexToSend = messageText.trim()
+        // if (messageTexToSend) {
+        const mentionedMembersPositions = {}
+        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+          a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+        ) */
+        // const findIndexes: any = []
+        mentionedMembers.forEach((menMem: any) => {
+          if (!mentionedMembersPositions[menMem.id]) {
+            mentionedMembersPositions[menMem.id] = { loc: menMem.start, len: menMem.end - menMem.start }
           }
-        ],
-        type: 'text'
-      }
-      dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
-    } else {
-      const { shiftKey, charCode, type } = event
-      const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
-      if (shouldSend) {
-        event.preventDefault()
-        if (messageToEdit) {
-          handleEditMessage()
-        } else if (messageText || (attachments.length && attachments.length > 0)) {
-          const messageTexToSend = messageText.trim()
-          // if (messageTexToSend) {
-          const mentionedMembersPositions = {}
-          /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
-            a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
-          ) */
-          // const findIndexes: any = []
-          mentionedMembers.forEach((menMem: any) => {
-            if (!mentionedMembersPositions[menMem.id]) {
-              mentionedMembersPositions[menMem.id] = { loc: menMem.start, len: menMem.end - menMem.start }
+        })
+        /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
+          let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
+          let existingIndex = findIndexes.includes(menIndex)
+          let i = 0
+          while (existingIndex) {
+            menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
+            existingIndex = findIndexes.includes(menIndex)
+            // eslint-disable-next-line no-plusplus
+            i++
+            if (i > sortedMentionedMembersDspNames.length) {
+              break
             }
-          })
-          /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
-            let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
-            let existingIndex = findIndexes.includes(menIndex)
-            let i = 0
-            while (existingIndex) {
-              menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-              existingIndex = findIndexes.includes(menIndex)
-              // eslint-disable-next-line no-plusplus
-              i++
-              if (i > sortedMentionedMembersDspNames.length) {
-                break
-              }
-            }
+          }
 
-            const mentionDisplayLength = menMem.displayName.length
-            if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-              findIndexes.push(menIndex)
-              mentionedMembersPositions = {
-                ...mentionedMembersPositions,
-                [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
-              }
+          const mentionDisplayLength = menMem.displayName.length
+          if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
+            findIndexes.push(menIndex)
+            mentionedMembersPositions = {
+              ...mentionedMembersPositions,
+              [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+            }
+          }
+        }) */
+        const messageToSend: any = {
+          metadata: mentionedMembersPositions,
+          body: messageTexToSend,
+          mentionedMembers: [],
+          attachments: [],
+          type: 'text'
+        }
+
+        messageToSend.mentionedMembers = mentionedMembers.filter(
+          (v: any, i: any, a: any) => a.findIndex((t: any) => t.id === v.id) === i
+        )
+        // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
+
+        if (messageForReply) {
+          messageToSend.parent = messageForReply
+        }
+
+        if (messageTexToSend && !attachments.length) {
+          const linkify = new LinkifyIt()
+          const match = linkify.match(messageTexToSend)
+          // const messageTextArr = [messageTexToSend]
+          let firstUrl: any
+          if (match) {
+            firstUrl = match[0].url
+          }
+          /* messageTextArr.forEach((textPart) => {
+            if (urlRegex.test(textPart)) {
+              const textArray = textPart.split(urlRegex)
+              textArray.forEach(async (part) => {
+                if (urlRegex.test(part)) {
+                  if (!firstUrl) {
+                    firstUrl = part
+                  }
+                }
+              })
             }
           }) */
-          const messageToSend: any = {
-            metadata: mentionedMembersPositions,
-            body: messageTexToSend,
-            mentionedMembers: [],
-            attachments: [],
-            type: 'text'
-          }
-
-          messageToSend.mentionedMembers = mentionedMembers.filter(
-            (v: any, i: any, a: any) => a.findIndex((t: any) => t.id === v.id) === i
-          )
-          // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
-
-          if (messageForReply) {
-            messageToSend.parent = messageForReply
-          }
-
-          if (messageTexToSend && !attachments.length) {
-            const linkify = new LinkifyIt()
-            const match = linkify.match(messageTexToSend)
-            // const messageTextArr = [messageTexToSend]
-            let firstUrl: any
-            if (match) {
-              firstUrl = match[0].url
-            }
-            /* messageTextArr.forEach((textPart) => {
-              if (urlRegex.test(textPart)) {
-                const textArray = textPart.split(urlRegex)
-                textArray.forEach(async (part) => {
-                  if (urlRegex.test(part)) {
-                    if (!firstUrl) {
-                      firstUrl = part
-                    }
-                  }
-                })
+          if (firstUrl) {
+            messageToSend.attachments = [
+              {
+                type: attachmentTypes.link,
+                data: firstUrl,
+                upload: false
               }
-            }) */
-            if (firstUrl) {
-              messageToSend.attachments = [
+            ]
+          }
+          dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
+        }
+        if (attachments.length) {
+          const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
+
+          messageToSend.attachments = attachments.map((attachment: any, index: any) => {
+            const attachmentToSend = {
+              name: attachment.data.name,
+              data: attachment.data,
+              attachmentId: attachment.attachmentId,
+              upload: true,
+              attachmentUrl: attachment.attachmentUrl,
+              metadata: attachment.metadata,
+              type: attachment.type,
+              size: attachment.size
+            }
+            if (sendAsSeparateMessage) {
+              if (index !== 0) {
+                messageToSend.body = ''
+              }
+              /* handleSendMessage(
                 {
-                  type: attachmentTypes.link,
-                  data: firstUrl,
-                  upload: false
-                }
-              ]
-            }
-            dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
-          }
-          if (attachments.length) {
-            const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-
-            messageToSend.attachments = attachments.map((attachment: any, index: any) => {
-              const attachmentToSend = {
-                name: attachment.data.name,
-                data: attachment.data,
-                attachmentId: attachment.attachmentId,
-                upload: true,
-                attachmentUrl: attachment.attachmentUrl,
-                metadata: attachment.metadata,
-                type: attachment.type,
-                size: attachment.size
-              }
-              if (sendAsSeparateMessage) {
-                if (index !== 0) {
-                  messageToSend.body = ''
-                }
-                /* handleSendMessage(
+                  ...messageToSend,
+                  attachments: [attachmentToSend],
+                  metadata: { ...messageToSend.metadata, groupId }
+                },
+                connectionStatus,
+                activeChannel.id,
+                true
+              ) */
+              dispatch(
+                sendMessageAC(
                   {
                     ...messageToSend,
-                    attachments: [attachmentToSend],
-                    metadata: { ...messageToSend.metadata, groupId }
+                    attachments: [attachmentToSend]
                   },
-                  connectionStatus,
                   activeChannel.id,
+                  connectionStatus,
                   true
-                ) */
-                dispatch(
-                  sendMessageAC(
-                    {
-                      ...messageToSend,
-                      attachments: [attachmentToSend]
-                    },
-                    activeChannel.id,
-                    connectionStatus,
-                    true
-                  )
                 )
-              }
-              return attachmentToSend
-            })
-            if (!sendAsSeparateMessage) {
-              dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, false))
+              )
             }
+            return attachmentToSend
+          })
+          if (!sendAsSeparateMessage) {
+            dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, false))
           }
-          setMessageText('')
-          messageInputRef.current.innerText = ''
-          setAttachments([])
-          handleCloseReply()
-          setMentionedMembers([])
-          setMentionedMembersDisplayName([])
-          setOpenMention(false)
-          setMentionTyping(false)
-          setCurrentMentions(undefined)
-
-          fileUploader.current.value = ''
-          if (inTypingState) {
-            handleSendTypingState(false)
-          }
-          clearTimeout(typingTimout)
-          setTypingTimout(undefined)
-          /* else if (recordedFile) {
-           /!* const file = new File([recordedFile.data], 'voice_message.webm', {
-             type: 'audio/ogg',
-           });
-           const messageToSend = {
-             metadata: '',
-             body: '',
-             mentionedMembers: [],
-             attachments: [
-               {
-                 name: recordedFile.data.name,
-                 data: recordedFile.data,
-                 attachmentId: Date.now(),
-                 upload: true,
-                 attachmentUrl: recordedFile.attachmentURL,
-                 metadata: 'metadata for voice message',
-                 type: recordedFile.data.type.split('/')[1]
-               }
-             ],
-             type: 'voice'
-           }
-           dispatch(sendMessageAC(messageToSend))
-         } */
         }
+        setMessageText('')
+        messageInputRef.current.innerText = ''
+        setAttachments([])
+        handleCloseReply()
+        setMentionedMembers([])
+        setMentionedMembersDisplayName([])
+        setOpenMention(false)
+        setMentionTyping(false)
+        setCurrentMentions(undefined)
+
+        fileUploader.current.value = ''
+        if (inTypingState) {
+          handleSendTypingState(false)
+        }
+        clearTimeout(typingTimout)
+        setTypingTimout(undefined)
+        /* else if (recordedFile) {
+         /!* const file = new File([recordedFile.data], 'voice_message.webm', {
+           type: 'audio/ogg',
+         });
+         const messageToSend = {
+           metadata: '',
+           body: '',
+           mentionedMembers: [],
+           attachments: [
+             {
+               name: recordedFile.data.name,
+               data: recordedFile.data,
+               attachmentId: Date.now(),
+               upload: true,
+               attachmentUrl: recordedFile.attachmentURL,
+               metadata: 'metadata for voice message',
+               type: recordedFile.data.type.split('/')[1]
+             }
+           ],
+           type: 'voice'
+         }
+         dispatch(sendMessageAC(messageToSend))
+       } */
       }
     }
   }
@@ -963,7 +935,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [draggedAttachments])
 
-  const startRecording = async () => {
+  /* const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
       setRecording((prevState: any) => ({
@@ -971,7 +943,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         initRecording: true,
         mediaStream: stream
       }))
-    } catch (e) {}
+    } catch (e) {
+    }
   }
 
   const saveRecord = () => {
@@ -983,7 +956,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const deleteRecord = () => {
     const recorder = recording.mediaRecorder
-    if (recorder) recorder.stream.getAudioTracks().forEach((track: any) => track.stop())
+    if (recorder)
+      recorder.stream.getAudioTracks().forEach((track: any) => track.stop())
     setRecording(recordingInitialState)
   }
 
@@ -992,7 +966,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setRecording({
         ...recording,
         mediaRecorder: new MediaRecorder(recording.mediaStream, {
-          mimeType: 'audio/webm; codecs=opus'
+          mimeType: 'audio/webm'
         })
       })
     }
@@ -1004,13 +978,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
     if (recording.initRecording) {
       recordingInterval = setInterval(() => {
-        setRecording((prevState: any) => {
-          if (prevState.recordingSeconds === MAX_RECORDER_TIME && prevState.recordingMilliseconds === 0) {
+        setRecording((prevState) => {
+          if (
+            prevState.recordingSeconds === MAX_RECORDER_TIME &&
+            prevState.recordingMilliseconds === 0
+          ) {
             clearInterval(recordingInterval)
             return prevState
           }
 
-          if (prevState.recordingMilliseconds >= 0 && prevState.recordingMilliseconds < 99) {
+          if (
+            prevState.recordingMilliseconds >= 0 &&
+            prevState.recordingMilliseconds < 99
+          ) {
             return {
               ...prevState,
               recordingMilliseconds: prevState.recordingMilliseconds + 1
@@ -1038,14 +1018,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     let chunks: Blob[] = []
     if (recorder && recorder.state === 'inactive') {
       recorder.start()
-      recorder.ondataavailable = (e: any) => {
+      recorder.ondataavailable = (e) => {
         chunks.push(e.data)
       }
 
       recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/mpeg-3' })
+        const blob = new Blob(chunks, { type: 'audio/webm' })
         chunks = []
-        setRecording((prevState: any) => {
+        setRecording((prevState) => {
           if (prevState.mediaRecorder) {
             setRecordedFile({
               data: blob,
@@ -1063,7 +1043,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     return () => {
-      if (recorder) recorder.stream.getAudioTracks().forEach((track: any) => track.stop())
+      if (recorder)
+        recorder.stream.getAudioTracks().forEach((track) => track.stop())
     }
   }, [recording.mediaRecorder])
 
@@ -1072,6 +1053,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       handleSendEditMessage()
     }
   }, [recordedFile])
+*/
 
   useEffect(() => {
     if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
@@ -1455,31 +1437,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 // placeholder='Type message here...'
               />
             </MessageInputWrapper>
-            {sendMessageIsActive ? (
-              <SendMessageIcon
-                isActive={sendMessageIsActive}
-                order={sendIconOrder}
-                onClick={sendMessageIsActive ? handleSendEditMessage : null}
-              >
-                <SendIcon />
-              </SendMessageIcon>
-            ) : recording.initRecording ? (
-              <React.Fragment>
-                <RecordingTimer>
-                  {recording.recordingSeconds}:{recording.recordingMilliseconds}
-                </RecordingTimer>
-                <SendMessageIcon order={sendIconOrder} onClick={deleteRecord}>
-                  <CloseIcon />
-                </SendMessageIcon>
-                <SendMessageIcon order={sendIconOrder} onClick={saveRecord}>
-                  <SendIcon />
-                </SendMessageIcon>
-              </React.Fragment>
-            ) : (
-              <SendMessageIcon order={sendIconOrder} onClick={startRecording} iconColor={colors.primary}>
-                <RecordIcon />
-              </SendMessageIcon>
-            )}
+            <SendMessageIcon
+              isActive={sendMessageIsActive}
+              order={sendIconOrder}
+              onClick={sendMessageIsActive ? handleSendEditMessage : null}
+            >
+              <SendIcon />
+            </SendMessageIcon>
             {/*  {recording.initRecording ? (
             <AudioCont />
           ) : (
@@ -1750,24 +1714,20 @@ const SendMessageIcon = styled.span<any>`
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
 
   color: ${(props) => (props.isActive ? colors.primary : '#ccc')};
-
-  & > svg {
-    color: ${(props) => props.iconColor || colors.primary};
-  }
 `
-/*
-const AudioCont = styled.div<any>`
+
+/* const AudioCont = styled.div<any>`
   display: flex;
   width: 100%;
   justify-content: flex-end;
-` */
+`
 
 const RecordingTimer = styled.span<any>`
   display: inline-block;
   width: 50px;
   font-size: 16px;
   color: ${colors.gray6};
-`
+` */
 
 const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
   display: flex;

@@ -1,4 +1,5 @@
 import { IChannel } from '../../types'
+import { isJSON } from '../index'
 
 type channelMap = {
   [key: string]: IChannel
@@ -19,14 +20,27 @@ export function getActiveChannelId() {
 }
 
 export function setChannelsInMap(channels: IChannel[]) {
-  const channelsArr: IChannel[] = []
-  channels.forEach((channel) => {
-    if (!channelsMap[channel.id]) {
+  // const channelsArr: IChannel[] = []
+  const channelsForUpdateLastReactionMessage: IChannel[] = []
+  const formattedChannel = channels.map((channel) => {
+    /* if (!channelsMap[channel.id]) {
       channelsArr.push(channel)
+    } */
+    if (
+      channel.userMessageReactions &&
+      channel.userMessageReactions.length &&
+      channel.lastMessage &&
+      channel.lastMessage.id < channel.userMessageReactions[0].id &&
+      channel.lastMessage.id !== channel.userMessageReactions[0].messageId
+    ) {
+      channelsForUpdateLastReactionMessage.push(channel)
     }
+    channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
     channelsMap[channel.id] = channel
+
+    return channel
   })
-  return JSON.parse(JSON.stringify(channels))
+  return { channels: JSON.parse(JSON.stringify(formattedChannel)), channelsForUpdateLastReactionMessage }
 }
 
 export function getChannelFromMap(channelId: string) {
@@ -60,7 +74,8 @@ export const query: any = {
   messageQuery: null,
   blockedMembersQuery: null,
   AttachmentByTypeQuery: null,
-  AttachmentByTypeQueryForPopup: null
+  AttachmentByTypeQueryForPopup: null,
+  ReactionsQuery: null
 }
 
 const unreadScrollTo = {

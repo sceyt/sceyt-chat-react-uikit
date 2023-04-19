@@ -28,6 +28,8 @@ const Container = styled.div`
 const ChannelInfo = styled.div`
   display: flex;
   align-items: center;
+  width: 650px;
+  max-width: calc(100% - 70px);
 
   & ${UserStatus} {
     width: 10px;
@@ -37,6 +39,14 @@ const ChannelInfo = styled.div`
 
 const ChannelName = styled.div`
   margin-left: 7px;
+  width: 100%;
+
+  & > ${SectionHeader} {
+    max-width: calc(100% - 8px);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
 `
 
 const ChanelInfo = styled.span<{ infoIconColor?: string }>`

@@ -20,4 +20,3 @@ declare module '*.png' {
 // const svgComponent: SvgrComponent
 // export default svgUrl
 // export { svgComponent as ReactComponent }
-// }

@@ -4,7 +4,7 @@ import SceytChatClient from 'sceyt-chat'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { setClient } from '../../common/client'
 import { destroyChannelsMap, setActiveChannelId } from '../../helpers/channelHalper'
-import { destroySession, setIsDraggingAC, watchForEventsAC } from '../../store/channel/actions'
+import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { ChatContainer } from './styled'
 import { browserTabIsActiveAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
@@ -62,6 +62,7 @@ const SceytChat = ({
       dispatch(setIsDraggingAC(true))
     }
   }
+
   const handleVisibilityChange = () => {
     if (document[hidden]) {
       setTabIsActive(false)
@@ -75,21 +76,26 @@ const SceytChat = ({
     if (client) {
       setClient(client)
       setSceytChatClient(client)
-      dispatch(setUserAC(client.chatClient.user))
+      dispatch(setUserAC(client.user))
       /* if (userDisplayNameFromContacts) {
         dispatch(getContactsAC())
       } */
 
       dispatch(watchForEventsAC())
-      console.log('client.chatClient.connectStatus.. ... ', client.chatClient.connectStatus)
-      dispatch(setConnectionStatusAC(client.chatClient.connectStatus))
+      dispatch(setConnectionStatusAC(client.connectionState))
     } else {
-      console.log('destroy session... ')
       clearMessagesMap()
       removeAllMessages()
       setActiveChannelId('')
       destroyChannelsMap()
       dispatch(destroySession())
+    }
+
+    window.onblur = () => {
+      setTabIsActive(false)
+    }
+    window.onfocus = () => {
+      setTabIsActive(true)
     }
   }, [client])
   useEffect(() => {
@@ -155,8 +161,8 @@ const SceytChat = ({
   }, [customColors])
 
   useEffect(() => {
+    dispatch(setTabIsActiveAC(tabIsActive))
     if (tabIsActive) {
-      console.log('tab is active')
       if (window.sceytTabNotifications) {
         window.sceytTabNotifications.close()
       }

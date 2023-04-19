@@ -5,7 +5,7 @@ import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 // import { ReactComponent as DownloadFileIcon } from '../../assets/svg/download.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/fileIcon.svg'
 import { ReactComponent as RemoveAttachment } from '../../assets/svg/deleteUpload.svg'
-import { ReactComponent as RemoveFaledAttachment } from '../../assets/svg/deleteFailed.svg'
+// import { ReactComponent as RemoveFaledAttachment } from '../../assets/svg/deleteFailed.svg'
 // import { ReactComponent as PlayIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as UploadIcon } from '../../assets/svg/upload.svg'
 import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
@@ -29,7 +29,6 @@ interface AttachmentPops {
   removeSelected?: (attachmentUrl: string) => void
   setVideoIsReadyToSend?: (attachmentId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
-  attachments?: IAttachment[]
   borderRadius?: string
   backgroundColor: string
   selectedFileAttachmentsBoxBorder?: string
@@ -181,17 +180,17 @@ const Attachment = ({
             }
           }
         } else {
-          if (attachment.type === attachmentTypes.video && cachedUrl) {
+          if (cachedUrl) {
             // @ts-ignore
             setAttachmentUrl(cachedUrl)
             setIsCached(true)
           } else {
             if (customDownloader) {
               customDownloader(attachment.url).then(async (url) => {
-                if (attachment.type === attachmentTypes.video) {
-                  const response = await fetch(url)
-                  setAttachmentToCache(attachment.id!, response)
-                }
+                // if (attachment.type === attachmentTypes.video) {
+                const response = await fetch(url)
+                setAttachmentToCache(attachment.id!, response)
+                // }
                 setAttachmentUrl(url)
               })
             } else {
@@ -223,8 +222,8 @@ const Attachment = ({
           backgroundImage={attachment.metadata && attachment.metadata.tmb}
           isRepliedMessage={isRepliedMessage}
           fitTheContainer={isDetailsView}
-          width={renderWidth}
-          height={renderHeight}
+          width={!isPrevious && !isRepliedMessage ? renderWidth : undefined}
+          height={!isPrevious && !isRepliedMessage ? renderHeight : undefined}
         >
           {(attachment.attachmentUrl || attachmentUrl) && (
             <AttachmentImg
@@ -446,14 +445,13 @@ const Attachment = ({
                 )}
               </UploadPercent>
               <UploadingIcon fileAttachment className='rotate_cont' />
-            </UploadProgress>
-          ) : attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
+            </UploadProgress> /*: attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
             <React.Fragment>
               <UploadProgress isFailedAttachment>
-                <RemoveFailed onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
-                {/* <ErrorIcon /> */}
+                <FailedFileIcon onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
               </UploadProgress>
             </React.Fragment>
+          ) */
           ) : null}
           {!isRepliedMessage && (
             <AttachmentFileInfo isPrevious={isPrevious}>
@@ -467,9 +465,9 @@ const Attachment = ({
               <AttachmentSize color={selectedFileAttachmentsSizeColor}>
                 {((attachment.data && attachment.data.size) || attachment.fileSize) &&
                   bytesToSize(isPrevious ? attachment.data.size : +attachment.fileSize)}
-                <span>
+                {/* <span>
                   {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL && 'Upload error'}
-                </span>
+                </span> */}
               </AttachmentSize>
             </AttachmentFileInfo>
           )}
@@ -539,8 +537,9 @@ const AttachmentImgCont = styled.div<{
   height: ${(props) => props.fitTheContainer && '100%'};
 
   width: ${(props) => (props.fitTheContainer ? '100%' : props.width && `${props.width}px`)};
-  height: ${(props) => (props.fitTheContainer ? '100%' : props.height ? `${props.height}px` : '100%')};
-
+  height: ${(props) => (props.fitTheContainer ? '100%' : props.height && `${props.height}px`)};
+  max-height: 396px;
+  min-height: ${(props) => props.height && '90px'};
   cursor: pointer;
 
   ${(props) =>
@@ -653,14 +652,16 @@ const RemoveChosenFile = styled(RemoveAttachment)`
   cursor: pointer;
   z-index: 4;
 `
-
-const RemoveFailed = styled(RemoveFaledAttachment)`
+/*
+const FailedFileIcon = styled(ErrorIcon)`
   position: absolute;
-  top: calc(50% - 11px);
-  right: 18px;
+  top: -6px;
+  right: -24px;
+  width: 20px;
+  height: 20px;
   padding: 2px;
   cursor: pointer;
-`
+` */
 
 const AttachmentName = styled.h3<{ color?: string }>`
   font-size: 15px;

@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React from 'react'
 import styled from 'styled-components'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/trash.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report_icon.svg'
@@ -12,7 +12,6 @@ import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/thread_re
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import EmojisPopup from '../../Emojis'
 import usePermissions from '../../../hooks/usePermissions'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 
@@ -31,7 +30,6 @@ export default function MessageActions({
   handleCopyMessage,
   handleReportMessage,
   messageStatus,
-  handleAddEmoji,
   handleReplyMessage,
   isThreadMessage,
   rtlDirection,
@@ -74,10 +72,10 @@ export default function MessageActions({
   reportIconTooltipText,
   myRole,
   isIncoming,
-  messageActionIconsColor
+  messageActionIconsColor,
+  handleOpenEmojis
 }: any) {
-  const [reactionIsOpen, setReactionIsOpen] = useState(false)
-  const emojisRef = useRef<any>(null)
+  // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const [checkActionPermission] = usePermissions(myRole)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const editMessagePermitted = isIncoming
@@ -94,7 +92,7 @@ export default function MessageActions({
   const handleOpenReaction = (e: any) => {
     e.stopPropagation()
     e.preventDefault()
-    setReactionIsOpen(true)
+    handleOpenEmojis()
   }
   // console.log('reactionPermitted .. . ', reactionPermitted)
   /* const handleClick = (e: any) => {
@@ -233,16 +231,6 @@ export default function MessageActions({
             {reportIcon || <ReportIcon />}
           </Action>
         )}
-
-        <EmojiContainer ref={emojisRef} rtlDirection={rtlDirection}>
-          {reactionIsOpen && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
-            <EmojisPopup
-              rtlDirection={rtlDirection}
-              handleEmojiPopupToggle={setReactionIsOpen}
-              handleAddEmoji={handleAddEmoji}
-            />
-          )}
-        </EmojiContainer>
       </EditMessageContainer>
     </MessageActionsWrapper>
   )
@@ -313,11 +301,3 @@ const DeleteMessage = styled(Action)<any>`
 const ReportMessage = styled(Action)<any>`
   order: ${(props) => props.order || 6};
 ` */
-
-const EmojiContainer = styled.div<any>`
-  position: absolute;
-  left: ${(props) => (props.rtlDirection ? '' : '0')};
-  right: ${(props) => props.rtlDirection && '0'};
-  bottom: -10px;
-  z-index: 99;
-`

@@ -18,7 +18,6 @@ import {
 } from './actions'
 import {
   BLOCK_CHANNEL,
-  CHECK_USER_STATUS,
   CLEAR_HISTORY,
   CREATE_CHANNEL,
   DELETE_ALL_MESSAGES,
@@ -55,7 +54,7 @@ import {
   setChannelInMap
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
-import { IAction, IChannel, IMember } from '../../types'
+import { IAction, IChannel, IMember, IMessage } from '../../types'
 import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
@@ -64,9 +63,10 @@ import {
   updateMessageAC
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
-import { CONNECTION_STATUS } from '../user/constants'
+import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
 import { removeAllMessages, removeMessagesFromMap } from '../../helpers/messagesHalper'
 import { updateMembersPresenceAC } from '../member/actions'
+import { updateUserStatusOnMapAC } from '../user/actions'
 
 function* createChannel(action: IAction): any {
   try {
@@ -81,13 +81,11 @@ function* createChannel(action: IAction): any {
           console.log('upload percent - ', progressPercent)
         }
       }
-      createChannelData.avatarUrl = yield call(SceytChatClient.chatClient.uploadFile, fileToUpload)
+      createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
       delete createChannelData.avatarFile
     }
-    const createdChannel = yield call(
-      SceytChatClient.chatClient[`${channelData.type}Channel`].create,
-      createChannelData
-    )
+    console.log('createChannelData. . . . .', createChannelData)
+    const createdChannel = yield call(SceytChatClient[`${channelData.type}Channel`].create, createChannelData)
     let checkChannelExist = false
     if (createdChannel.type === CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
@@ -123,7 +121,7 @@ function* getChannels(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const { search: searchBy } = params
     if (searchBy) {
-      const directChannelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const directChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       directChannelQueryBuilder.direct()
       directChannelQueryBuilder.userContains(searchBy)
       directChannelQueryBuilder.sortByLastMessage()
@@ -131,7 +129,7 @@ function* getChannels(action: IAction): any {
       const directChannelQuery = yield call(directChannelQueryBuilder.build)
       const directChannelsData = yield call(directChannelQuery.loadNextPage)
       // getting other channels
-      const groupChannelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const groupChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       groupChannelQueryBuilder.subjectContains(searchBy)
       groupChannelQueryBuilder.sortByLastMessage()
       groupChannelQueryBuilder.limit(20)
@@ -139,11 +137,33 @@ function* getChannels(action: IAction): any {
       const groupChannelsData = yield call(groupChannelQuery.loadNextPage)
       // set all channels
       const allChannels: IChannel[] = directChannelsData.channels.concat(groupChannelsData.channels)
+      console.log('all channels. . .. ', allChannels)
       yield call(destroyChannelsMap)
-      const mappedChannels = yield call(setChannelsInMap, allChannels)
+      const { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
+        setChannelsInMap,
+        allChannels
+      )
+      console.log('channelsForUpdateLastReactionMessage saga. . . . ..', channelsForUpdateLastReactionMessage)
+      if (channelsForUpdateLastReactionMessage.length) {
+        const channelMessageMap: { [key: string]: IMessage } = {}
+        yield call(async () => {
+          console.log('call promise all. . . . ..')
+          return await Promise.all(
+            channelsForUpdateLastReactionMessage.map(async (channel: IChannel) => {
+              return new Promise((resolve) => {
+                // yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, att.attachment))
+                channel.getMessagesById([channel.userMessageReactions![0].messageId]).then((messages) => {
+                  channelMessageMap[channel.id] = messages[0]
+                  resolve(true)
+                })
+              })
+            })
+          )
+        })
+      }
       yield put(setChannelsAC(mappedChannels))
     } else {
-      const channelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       if (params.filter && params.filter.channelType) {
         console.log('params.filter.channelType ... ', params.filter.channelType)
         if (params.filter.channelType.toLowerCase() === 'direct') {
@@ -164,7 +184,39 @@ function* getChannels(action: IAction): any {
       const channelId = yield call(getActiveChannelId)
       let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
       yield call(destroyChannelsMap)
-      const mappedChannels = yield call(setChannelsInMap, channelsData.channels)
+      let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
+        setChannelsInMap,
+        channelsData.channels
+      )
+
+      if (channelsForUpdateLastReactionMessage.length) {
+        const channelMessageMap: { [key: string]: IMessage } = {}
+        yield call(async () => {
+          return await Promise.all(
+            channelsForUpdateLastReactionMessage.map(async (channel: IChannel) => {
+              return new Promise((resolve) => {
+                // yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, att.attachment))
+                channel
+                  .getMessagesById([channel.userMessageReactions![0].messageId])
+                  .then((messages) => {
+                    channelMessageMap[channel.id] = messages[0]
+                    resolve(true)
+                  })
+                  .catch((e) => {
+                    console.log(e, 'Error on getMessagesById')
+                    resolve(true)
+                  })
+              })
+            })
+          )
+        })
+        mappedChannels = mappedChannels.map((channel: IChannel) => {
+          if (channelMessageMap[channel.id]) {
+            channel.lastReactedMessage = channelMessageMap[channel.id]
+          }
+          return channel
+        })
+      }
       yield put(setChannelsAC(mappedChannels))
       if (!channelId) {
         ;[activeChannel] = channelsData.channels
@@ -192,7 +244,7 @@ function* getChannelsForForward(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
 
     if (searchValue) {
-      const directChannelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const directChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       directChannelQueryBuilder.direct()
       directChannelQueryBuilder.userContains(searchValue)
       directChannelQueryBuilder.sortByLastMessage()
@@ -203,7 +255,7 @@ function* getChannelsForForward(action: IAction): any {
         (channel: IChannel) => !!(channel.peer && channel.peer.id)
       )
       // getting other channels
-      const groupChannelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const groupChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       groupChannelQueryBuilder.subjectContains(searchValue)
       groupChannelQueryBuilder.sortByLastMessage()
       groupChannelQueryBuilder.limit(20)
@@ -214,11 +266,11 @@ function* getChannelsForForward(action: IAction): any {
       )
       // set all channels
       const allChannels: IChannel[] = directChannelsToAdd.concat(groupChannelsToAdd)
-      const mappedChannels = yield call(setChannelsInMap, allChannels)
+      const { channels: mappedChannels } = yield call(setChannelsInMap, allChannels)
       yield put(setChannelsFroForwardAC(mappedChannels))
       yield put(channelHasNextAC(false, true))
     } else {
-      const channelQueryBuilder = new (SceytChatClient.chatClient.ChannelListQueryBuilder as any)()
+      const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       channelQueryBuilder.sortByLastMessage()
       channelQueryBuilder.limit(20)
       const channelQuery = yield call(channelQueryBuilder.build)
@@ -231,7 +283,7 @@ function* getChannelsForForward(action: IAction): any {
           ? channel.peer.id
           : true
       )
-      const mappedChannels = yield call(setChannelsInMap, channelsToAdd)
+      const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
       yield put(setChannelsFroForwardAC(mappedChannels))
       query.channelQueryForward = channelQuery
     }
@@ -255,7 +307,39 @@ function* channelsLoadMore(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelsData = yield call(channelQuery.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext))
-    const mappedChannels = yield call(setChannelsInMap, channelsData.channels)
+    let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
+      setChannelsInMap,
+      channelsData.channels
+    )
+
+    if (channelsForUpdateLastReactionMessage.length) {
+      const channelMessageMap: { [key: string]: IMessage } = {}
+      yield call(async () => {
+        return await Promise.all(
+          channelsForUpdateLastReactionMessage.map(async (channel: IChannel) => {
+            return new Promise((resolve) => {
+              // yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, att.attachment))
+              channel
+                .getMessagesById([channel.userMessageReactions![0].messageId])
+                .then((messages) => {
+                  channelMessageMap[channel.id] = messages[0]
+                  resolve(true)
+                })
+                .catch((e) => {
+                  console.log(e, 'Error on getMessagesById')
+                  resolve(true)
+                })
+            })
+          })
+        )
+      })
+      mappedChannels = mappedChannels.map((channel: IChannel) => {
+        if (channelMessageMap[channel.id]) {
+          channel.lastReactedMessage = channelMessageMap[channel.id]
+        }
+        return channel
+      })
+    }
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (error) {
@@ -284,7 +368,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
         ? channel.peer.id
         : true
     )
-    const mappedChannels = yield call(setChannelsInMap, channelsToAdd)
+    const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(addChannelsForForwardAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (error) {
@@ -535,7 +619,7 @@ function* updateChannel(action: IAction): any {
           console.log('upload percent - ', progressPercent)
         }
       }
-      paramsToUpdate.avatarUrl = yield call(SceytChatClient.chatClient.uploadFile as any, fileToUpload)
+      paramsToUpdate.avatarUrl = yield call(SceytChatClient.uploadFile as any, fileToUpload)
     }
     if (config.subject) {
       paramsToUpdate.subject = config.subject
@@ -560,7 +644,7 @@ function* checkUsersStatus(action: IAction): any {
     const { usersMap } = payload
     const SceytChatClient = getClient()
     const usersForUpdate = Object.keys(usersMap)
-    const updatedUsers = yield call(SceytChatClient.chatClient.getUsers as any, usersForUpdate)
+    const updatedUsers = yield call(SceytChatClient.getUsers as any, usersForUpdate)
     const usersToUpdateMap: { [key: string]: IMember } = {}
     let update: boolean = false
     updatedUsers.forEach((updatedUser: IMember) => {
@@ -577,6 +661,7 @@ function* checkUsersStatus(action: IAction): any {
     })
     if (update) {
       yield put(updateMembersPresenceAC(Object.values(usersToUpdateMap)))
+      yield put(updateUserStatusOnMapAC(usersToUpdateMap))
       yield put(updateUserStatusOnChannelAC(usersToUpdateMap))
     }
   } catch (e) {

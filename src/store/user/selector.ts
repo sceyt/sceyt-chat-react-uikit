@@ -6,3 +6,4 @@ export const userSelector = (store: any) => store.UserReducer.user
 export const usersListSelector = (store: any) => store.UserReducer.usersList
 export const usersLoadingStateSelector = (store: any) => store.UserReducer.usersLoadingState
 export const browserTabIsActiveSelector = (store: any) => store.UserReducer.browserTabIsActive
+export const usersMapSelector = (store: any) => store.UserReducer.updatedUserMap

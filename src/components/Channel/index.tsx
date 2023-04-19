@@ -9,7 +9,13 @@ import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
-import { lastMessageDateFormat, makeUserName, messageStatusIcon, systemMessageUserName } from '../../helpers'
+import {
+  lastMessageDateFormat,
+  makeUserName,
+  messageStatusIcon,
+  MessageTextFormat,
+  systemMessageUserName
+} from '../../helpers'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
@@ -44,7 +50,7 @@ const Channel: React.FC<IChannelProps> = ({
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const withAvatar = avatar === undefined ? true : avatar
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
-  const lastMessage = channel.lastMessage
+  const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
@@ -66,7 +72,8 @@ const Channel: React.FC<IChannelProps> = ({
     if (messageTimeAndStatusRef.current) {
       setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
     }
-  }, [messageTimeAndStatusRef])
+  }, [messageTimeAndStatusRef, lastMessage])
+
   return (
     <Container
       // ref={channelItemRef}
@@ -126,6 +133,21 @@ const Channel: React.FC<IChannelProps> = ({
                   </span>
                 </LastMessageAuthor>
               ) : null
+            ) : channel.lastReactedMessage && channel.userMessageReactions && channel.userMessageReactions[0] ? (
+              lastMessage.state !== MESSAGE_STATUS.DELETE &&
+              ((channel.userMessageReactions[0].user && channel.userMessageReactions[0].user.id === user.id) ||
+                !isDirectChannel) &&
+              lastMessage.type !== 'system' && (
+                <LastMessageAuthor minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}>
+                  <span ref={messageAuthorRef}>
+                    {channel.userMessageReactions[0].user.id === user.id
+                      ? 'You'
+                      : contactsMap[channel.userMessageReactions[0].user.id]
+                      ? contactsMap[channel.userMessageReactions[0].user.id].firstName
+                      : channel.userMessageReactions[0].user.id || 'Deleted'}
+                  </span>
+                </LastMessageAuthor>
+              )
             ) : (
               lastMessage.user &&
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
@@ -142,13 +164,13 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               )
             )}
-            {(typingIndicator
-              ? !isDirectChannel
-              : lastMessage &&
-                lastMessage.user &&
-                lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                (lastMessage.user.id === user.id || !isDirectChannel) &&
-                lastMessage.type !== 'system') && <Points>: </Points>}
+            {!isDirectChannel &&
+              (typingIndicator ||
+                (lastMessage &&
+                  lastMessage.user &&
+                  lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                  (lastMessage.user.id === user.id || !isDirectChannel) &&
+                  lastMessage.type !== 'system')) && <Points>: </Points>}
             <LastMessageText
               withAttachments={
                 !!(
@@ -212,6 +234,13 @@ const Channel: React.FC<IChannelProps> = ({
                 }`
               ) : (
                 <React.Fragment>
+                  {channel.lastReactedMessage && (
+                    <React.Fragment>
+                      Reacted
+                      <ReactionItem>{channel.userMessageReactions && channel.userMessageReactions[0].key}</ReactionItem>
+                      to{' "'}
+                    </React.Fragment>
+                  )}
                   {!!(lastMessage.attachments && lastMessage.attachments.length) &&
                     (lastMessage.attachments[0].type === attachmentTypes.image ? (
                       <React.Fragment>
@@ -234,7 +263,15 @@ const Channel: React.FC<IChannelProps> = ({
                         {lastMessage.body ? '' : 'Voice'}
                       </React.Fragment>
                     ) : null)}
-                  {lastMessage.body}
+                  {!!(lastMessage && lastMessage.id) &&
+                    MessageTextFormat({
+                      text: lastMessage.body,
+                      message: lastMessage,
+                      contactsMap,
+                      getFromContacts,
+                      isLastMessage: true
+                    })}
+                  {channel.lastReactedMessage && '"'}
                 </React.Fragment>
               )}
             </LastMessageText>
@@ -319,7 +356,7 @@ export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; sta
     text-overflow: ellipsis;
     line-height: 18px;
     letter-spacing: -0.2px;%;
-    max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 20 : 0)}px)`};
+    max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 20 : 0) + 2}px)`};
     overflow: hidden;
     white-space: nowrap;
     color: ${colors.gray6};
@@ -381,7 +418,7 @@ export const LastMessageAuthor = styled.div<any>`
 `
 
 export const Points = styled.span`
-  margin-right: 2px;
+  margin-right: 4px;
 `
 
 export const LastMessageText = styled.span<{
@@ -437,6 +474,12 @@ export const UnreadMentionIconWrapper = styled.span<{ iconColor?: string; rightM
 
 export const TypingIndicator = styled.span`
   font-style: italic;
+`
+
+export const ReactionItem = styled.span`
+  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
+    twemoji mozilla, segoe ui symbol;
+  padding: 0 3px;
 `
 
 export const UnreadInfo = styled.span`

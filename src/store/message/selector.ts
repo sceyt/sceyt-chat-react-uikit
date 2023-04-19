@@ -26,3 +26,7 @@ export const scrollToNewMessageSelector = (store: any) => store.MessageReducer.s
 export const showScrollToNewMessageButtonSelector = (store: any) => store.MessageReducer.showScrollToNewMessageButton
 export const sendMessageInputHeightSelector = (store: any) => store.MessageReducer.sendMessageInputHeight
 export const scrollToMessageSelector = (store: any) => store.MessageReducer.scrollToMessage
+export const reactionsListSelector = (store: any) => store.MessageReducer.reactionsList
+export const reactionsHasNextSelector = (store: any) => store.MessageReducer.reactionsHasNext
+export const reactionsLoadingStateSelector = (store: any) => store.MessageReducer.reactionsLoadingState
+export const openedMessageMenuSelector = (store: any) => store.MessageReducer.openedMessageMenu

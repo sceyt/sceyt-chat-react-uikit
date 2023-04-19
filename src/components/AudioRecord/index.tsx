@@ -1,16 +1,17 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
+
 // @ts-ignore
 import WaveSurfer from 'wavesurfer.js'
+// @ts-ignore
+import MicrophonePlugin from 'wavesurfer.js/dist/plugin/wavesurfer.microphone.js'
 
 import { useDidUpdate } from '../../hooks'
 
-import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
-import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
+import { ReactComponent as PlayIcon } from '../../assets/svg/playRecord.svg'
+import { ReactComponent as PauseIcon } from '../../assets/svg/stopRecord.svg'
 import { colors } from '../../UIHelper/constants'
-import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
-import { getPlayingAudioId, setPlayingAudioId } from '../../helpers/playingAudio'
 
 interface Recording {
   recordingSeconds: number
@@ -22,11 +23,11 @@ interface Recording {
 }
 
 interface AudioPlayerProps {
-  url: string
-  file: IAttachment
+  recordTime: string
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
+// @ts-ignore
+const AudioRecord: React.FC<AudioPlayerProps> = () => {
   const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -35,42 +36,26 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
+
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
   const [isRendered, setIsRendered] = useState<any>(false)
   const [playAudio, setPlayAudio] = useState<any>(false)
-  const [payingAudioId, setPayingAudioId] = useState<any>(false)
 
   const [currentTime, setCurrentTime] = useState<any>('')
-  const [audioRate, setAudioRate] = useState<any>(1)
   // const [voiceUrl, setVoiceUrl] = useState<any>('')
 
   const wavesurfer = useRef<any>(null)
   const wavesurferContainer = useRef<any>(null)
-  const intervalRef = useRef<any>(null)
 
-  const handleSetAudioRate = () => {
-    if (audioRate === 1) {
-      setAudioRate(1.5)
-      wavesurfer.current.setPlaybackRate(1.5)
-    } else if (audioRate === 1.5) {
-      setAudioRate(2)
-      wavesurfer.current.audioRate = 2
-      wavesurfer.current.setPlaybackRate(2)
-    } else {
-      setAudioRate(1)
-      wavesurfer.current.audioRate = 1
-      wavesurfer.current.setPlaybackRate(1)
-    }
-  }
+  let context: AudioContext, processor: any
+  const intervalRef = useRef<any>(null)
 
   const handlePlayPause = () => {
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
-        setPlayingAudioId(file.id!)
         const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
-          setPayingAudioId(getPlayingAudioId())
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
@@ -85,14 +70,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             return `${wavesurfer.current.getCurrentTime().toFixed(0)}`
           }) */
         }, 10)
-      } else {
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
-        }
       }
       wavesurfer.current.playPause()
     }
   }
+
   useDidUpdate(() => {
     if (recording.mediaStream) {
       setRecording({
@@ -140,17 +122,22 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
   }, [recording.initRecording])
 
   useEffect(() => {
-    if (url && !isRendered) {
-      wavesurfer.current = WaveSurfer.create({
+    if (!isRendered) {
+      const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent)
+      // const microphone = MicrophonePlugin.create({ bufferSize: 1024 })
+      /*    wavesurfer.current = WaveSurfer.create({
         container: wavesurferContainer.current,
-        waveColor: colors.gray9,
+        waveColor: 'black',
+        interact: false,
+        cursorWidth: 0,
+        /!*   waveColor: colors.gray9,
         skipLength: 0,
         progressColor: colors.primary,
         // audioContext,
         // cursorColor: 'transparent',
         // splitChannels: true,
         // barWidth: 1.5,
-        audioRate,
+        audioRate: 1,
         // barHeight: 3,
 
         barWidth: 1,
@@ -161,8 +148,66 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         cursorWidth: 0,
         barGap: 2,
         barMinHeight: 1,
-        height: 20
+        height: 20, *!/
+        plugins: [microphone]
       })
+      wavesurfer.current.microphone.on('deviceReady', function (stream: any) {
+        console.log('Device ready!', stream)
+        wavesurfer.current.microphone.play()
+      })
+      wavesurfer.current.microphone.on('deviceError', function (code: any) {
+        console.warn('Device error: ' + code)
+      })
+      wavesurfer.current.microphone.start()
+ */
+      if (isSafari) {
+        // Safari 11 or newer automatically suspends new AudioContext's that aren't
+        // created in response to a user-gesture, like a click or tap, so create one
+        // here (inc. the script processor)
+        // @ts-ignore
+        const AudioContext = window.AudioContext || window.webkitAudioContext
+        context = new AudioContext()
+        processor = context.createScriptProcessor(1024, 1, 1)
+      }
+      if (!wavesurfer.current) {
+        wavesurfer.current = WaveSurfer.create({
+          container: wavesurferContainer.current,
+          waveColor: 'black',
+          interact: false,
+          cursorWidth: 0,
+          audioContext: context || null,
+          audioScriptProcessor: processor || null,
+          plugins: [
+            MicrophonePlugin.create({
+              bufferSize: 4096,
+              numberOfInputChannels: 1,
+              numberOfOutputChannels: 1,
+              constraints: {
+                video: false,
+                audio: true
+              }
+            })
+          ]
+        })
+
+        wavesurfer.current.microphone.on('deviceReady', function () {
+          console.info('Device ready!')
+        })
+        wavesurfer.current.microphone.on('deviceError', function (code: any) {
+          console.warn('Device error: ' + code)
+        })
+        wavesurfer.current.on('error', function (e: any) {
+          console.warn(e)
+        })
+        wavesurfer.current.microphone.start()
+      } else {
+        console.log('stop recording -----------------------------')
+        if (wavesurfer.current.microphone.active) {
+          wavesurfer.current.microphone.stop()
+        } else {
+          wavesurfer.current.microphone.start()
+        }
+      }
       /* .then((blob) => {
         // Here's where you get access to the blob
         // And you can use it for whatever you want
@@ -176,9 +221,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         console.log('object url ........ ', objectURL);
       }); */
       // wavesurfer.current.load(url);
-      wavesurfer.current.load(url)
+      // wavesurfer.current.load(url)
 
-      wavesurfer.current.on('ready', () => {
+      /* wavesurfer.current.on('ready', () => {
         // wavesurfer.current.play();
         const audioDuration = wavesurfer.current.getDuration()
         const currentTime = wavesurfer.current.getCurrentTime()
@@ -188,64 +233,52 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         wavesurfer.current.drawBuffer = (d: any) => {
           console.log('filters --- ', d)
         }
-      })
+      }) */
       /* wavesurfer.current.drawBuffer = () => {
         return file.metadata.tmb
       } */
-      wavesurfer.current.on('finish', () => {
+      /*   wavesurfer.current.on('finish', () => {
         setPlayAudio(false)
         wavesurfer.current.seekTo(0)
         const audioDuration = wavesurfer.current.getDuration()
         const currentTime = wavesurfer.current.getCurrentTime()
         setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
-        }
         clearInterval(intervalRef.current)
       })
-
+*/
+      /*
       wavesurfer.current.on('pause', () => {
         setPlayAudio(false)
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
-        }
         clearInterval(intervalRef.current)
       })
+*/
 
-      wavesurfer.current.on('interaction', () => {
+      /*   wavesurfer.current.on('interaction', () => {
         const audioDuration = wavesurfer.current.getDuration()
         const currentTime = wavesurfer.current.getCurrentTime()
         setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
-      })
+      }) */
       setIsRendered(true)
     }
+
     return () => {
       clearInterval(intervalRef.current)
     }
-  }, [url])
-  useEffect(() => {
-    if (payingAudioId && wavesurfer.current && payingAudioId !== file.id) {
-      setPlayAudio(false)
-      wavesurfer.current.pause()
-    }
-  }, [payingAudioId])
+  }, [])
+
   // console.log('currentTime . .. . ', currentTime)
   return (
     <Container>
       <PlayPause onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
       <WaveContainer>
-        <AudioVisualization ref={wavesurferContainer} />
-        <AudioRate onClick={handleSetAudioRate}>
-          {audioRate}
-          <span>X</span>
-        </AudioRate>
+        <AudioVisualization className='visuaisation' ref={wavesurferContainer} />
       </WaveContainer>
       <Timer>{currentTime}</Timer>
     </Container>
   )
 }
 
-export default AudioPlayer
+export default AudioRecord
 
 const Container = styled.div`
   position: relative;
@@ -257,39 +290,10 @@ const Container = styled.div`
 
 const PlayPause = styled.div`
   cursor: pointer;
-
-  & > svg {
-    display: flex;
-    width: 40px;
-    height: 40px;
-  }
 `
 
 const AudioVisualization = styled.div`
   width: 100%;
-`
-const AudioRate = styled.div`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background-color: ${colors.white};
-  width: 30px;
-  min-width: 30px;
-  border-radius: 12px;
-  font-weight: 600;
-  font-size: 12px;
-  line-height: 14px;
-  color: ${colors.gray9};
-  height: 18px;
-  box-sizing: border-box;
-  margin-left: 14px;
-  cursor: pointer;
-
-  & > span {
-    margin-top: auto;
-    line-height: 16px;
-    font-size: 9px;
-  }
 `
 
 const WaveContainer = styled.div`

@@ -41,6 +41,7 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
     case UPDATE_MEMBERS: {
       const { members } = payload
+      console.log('UPDATE_MEMBERS . ... .. ', members)
       let updateMembers: any = []
       const membersCopy = [...newState.activeChannelMembers]
       if (members.length) {

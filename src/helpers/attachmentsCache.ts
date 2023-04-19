@@ -16,6 +16,7 @@ export const setAttachmentToCache = (attachmentId: string, attachmentResponse: a
         })
         .catch((e) => {
           console.log('Error on cache attachment ... ', e)
+          caches.delete(attachmentId)
         })
     })
   }
@@ -30,7 +31,7 @@ export const getAttachmentUrlFromCache = (attachmentId: string) => {
         return URL.createObjectURL(await response.blob())
       } else {
         // The image or video is not cached
-        console.log('The image or video is not cached', response)
+        console.log('The image or video is not cached', attachmentId)
         return false
       }
     })

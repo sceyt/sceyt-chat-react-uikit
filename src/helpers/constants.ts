@@ -16,7 +16,7 @@ export const MESSAGE_STATUS = {
   NONE: 'None',
   EDIT: 'Edited',
   DELETE: 'Deleted',
-  FAILED: 'failed'
+  FAILED: 'Failed'
 }
 
 export const UPLOAD_STATE = {

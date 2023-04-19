@@ -5,7 +5,6 @@ import {
   BLOCK_CHANNEL,
   CHANNEL_INFO_OPEN_CLOSE,
   CHANNELS_HAS_NEXT,
-  CHECK_USER_STATUS,
   CLEAR_HISTORY,
   CREATE_CHANNEL,
   DELETE_ALL_MESSAGES,
@@ -36,6 +35,7 @@ import {
   SET_CHANNELS_LOADING_STATE,
   SET_DRAGGED_ATTACHMENTS,
   SET_IS_DRAGGING,
+  SET_TAB_IS_ACTIVE,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
@@ -334,15 +334,6 @@ export function toggleEditChannelAC(state: boolean) {
   }
 }
 
-export function checkUserStatusAC(usersMap: { [key: string]: string }) {
-  return {
-    type: CHECK_USER_STATUS,
-    payload: {
-      usersMap
-    }
-  }
-}
-
 export function updateUserStatusOnChannelAC(usersMap: { [key: string]: IUser }) {
   return {
     type: UPDATE_USER_STATUS_ON_CHANNEL,
@@ -403,6 +394,14 @@ export function setDraggedAttachments(attachments: File[], type: string) {
     payload: {
       attachments,
       type
+    }
+  }
+}
+export function setTabIsActiveAC(isActive: boolean) {
+  return {
+    type: SET_TAB_IS_ACTIVE,
+    payload: {
+      isActive
     }
   }
 }

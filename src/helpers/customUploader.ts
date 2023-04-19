@@ -77,5 +77,7 @@ export const resumeUpload = (attachmentId: string) => {
 }
 
 export const cancelUpload = (attachmentId: string) => {
-  return pendingUploaders[attachmentId].cancel()
+  if (pendingUploaders[attachmentId]) {
+    return pendingUploaders[attachmentId].cancel()
+  }
 }

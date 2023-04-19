@@ -31,7 +31,7 @@ function* getMembers(action: IAction): any {
     const { payload } = action
     const { channelId } = payload
     const SceytChatClient = getClient()
-    const membersQueryBuilder = new (SceytChatClient.chatClient.MemberListQueryBuilder as any)(channelId)
+    const membersQueryBuilder = new (SceytChatClient.MemberListQueryBuilder as any)(channelId)
     membersQueryBuilder.all().byAffiliationOrder().orderKeyByUsername().limit(50)
 
     const membersQuery = yield call(membersQueryBuilder.build)
@@ -173,7 +173,7 @@ function* reportMember(action: IAction): any {
   const SceytChatClient = getClient()
   try {
     yield call(
-      SceytChatClient.chatClient.userReport,
+      SceytChatClient.userReport,
       reportData.reportReason,
       reportData.userId,
       reportData.messageIds,
@@ -188,7 +188,7 @@ function* reportMember(action: IAction): any {
 function* getRoles(): any {
   try {
     const SceytChatClient = getClient()
-    const roles = yield call(SceytChatClient.chatClient.getRoles)
+    const roles = yield call(SceytChatClient.getRoles)
     yield put(getRolesSuccess(roles))
   } catch (e) {
     console.log('error in get roles')
