@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import styled from 'styled-components'
-import PropTypes from 'prop-types'
 import {
   ButtonBlock,
   Popup,
@@ -147,20 +146,6 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
       )}
     </PopupContainer>
   )
-}
-
-EditProfile.propTypes = {
-  channel: PropTypes.shape({
-    name: PropTypes.string,
-    subject: PropTypes.string
-  }),
-  toggleEditPopup: PropTypes.func,
-  user: PropTypes.objectOf(PropTypes.any).isRequired
-}
-
-EditProfile.defaultProps = {
-  channel: null,
-  toggleEditPopup: null
 }
 
 const AvatarBadge = styled.div`

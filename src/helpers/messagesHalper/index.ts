@@ -206,6 +206,71 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
   }
 }
 
+export const addReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
+  activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
+    if (msg.id === message.id) {
+      let slfReactions = [...msg.selfReactions]
+      if (isSelf) {
+        if (slfReactions) {
+          slfReactions.push(reaction)
+        } else {
+          slfReactions = [reaction]
+        }
+      }
+      return {
+        ...msg,
+        selfReactions: slfReactions,
+        lastReactions: message.lastReactions,
+        reactionScores: message.reactionScores
+      }
+    }
+    return msg
+  })
+}
+
+export function removeReactionToMessageOnMap(
+  channelId: string,
+  message: IMessage,
+  reaction: IReaction,
+  isSelf: boolean
+) {
+  if (messagesMap[channelId]) {
+    messagesMap[channelId] = messagesMap[channelId].map((msg) => {
+      if (msg.id === message.id) {
+        let { selfReactions } = msg
+        if (isSelf) {
+          selfReactions = msg.selfReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+        }
+        return {
+          ...msg,
+          lastReactions: message.lastReactions,
+          reactionScores: message.reactionScores,
+          selfReactions
+        }
+      }
+      return msg
+    })
+  }
+}
+
+export const removeReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
+  activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
+    if (msg.id === message.id) {
+      let { selfReactions } = msg
+      if (isSelf) {
+        selfReactions = msg.selfReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+      }
+      return {
+        ...msg,
+        lastReactions: message.lastReactions,
+        reactionScores: message.reactionScores,
+        selfReactions
+      }
+    }
+    return msg
+  })
+}
+
 export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
   if (messagesMap[channelId] && newMarkers && newMarkers.markersMap) {
     messagesMap[channelId] = messagesMap[channelId].map((mes) => {

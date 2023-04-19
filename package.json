@@ -36,6 +36,7 @@
     "@testing-library/jest-dom": "^4.2.4",
     "@testing-library/react": "^9.5.0",
     "@testing-library/user-event": "^7.2.1",
+    "@types/dom-mediacapture-record": "^1.0.11",
     "@types/file-saver": "^2.0.5",
     "@types/jest": "^25.1.4",
     "@types/linkify-it": "^3.0.2",
@@ -77,11 +78,12 @@
     "assets"
   ],
   "dependencies": {
-    "uuid": "^9.0.0",
-    "wavesurfer.js": "6.4.0",
-    "react-easy-crop": "^4.6.2",
     "file-saver": "^2.0.5",
+    "linkify-it": "^4.0.1",
+    "mic-recorder-to-mp3": "^2.2.2",
+    "react-easy-crop": "^4.6.2",
     "react-elastic-carousel": "^0.11.5",
-    "linkify-it": "^4.0.1"
+    "uuid": "^9.0.0",
+    "wavesurfer.js": "6.4.0"
   }
 }

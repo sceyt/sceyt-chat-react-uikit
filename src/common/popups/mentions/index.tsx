@@ -8,11 +8,12 @@ import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
-import { makeUserName } from '../../../helpers'
+import { makeUserName, userLastActiveDateFormat } from '../../../helpers'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
 import { useDidUpdate, useEventListener } from '../../../hooks'
+import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
   channelId: string
@@ -33,7 +34,7 @@ export default function MentionMembersPopup({
   const [filteredMembers, setFilteredMembers] = useState<IMember[]>([])
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
-  const user = getClient().chatClient.user
+  const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
   const dispatch = useDispatch()
   const handleMembersListScroll = (event: any) => {
@@ -142,21 +143,24 @@ export default function MentionMembersPopup({
                 textSize={14}
                 setDefaultAvatar
               />
-              {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />}
             </AvatarWrapper>
-            <MemberName>
-              {makeUserName(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
-            </MemberName>
+            <UserNamePresence>
+              <MemberName>
+                {makeUserName(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
+              </MemberName>
+              <SubTitle>
+                {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE
+                  ? 'Online'
+                  : member.presence &&
+                    member.presence.lastActiveAt &&
+                    userLastActiveDateFormat(member.presence.lastActiveAt)}
+              </SubTitle>
+            </UserNamePresence>
           </MemberItem>
         ))}
       </MembersList>
     </Container>
   )
-}
-
-MentionMembersPopup.defaultProps = {
-  activeItemIndex: null,
-  searchMention: ''
 }
 
 const Container = styled.div<{ height?: number }>`
@@ -170,10 +174,18 @@ const Container = styled.div<{ height?: number }>`
   border-radius: 6px;
 `
 
-const MemberName = styled.span`
-  margin: 0 0 0 12px;
-  max-width: calc(100% - 30px);
-  font-weight: 400;
+const UserNamePresence = styled.div`
+  width: 100%;
+  margin-left: 12px;
+`
+
+const MemberName = styled.h3`
+  margin: 0;
+  max-width: calc(100% - 1px);
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;

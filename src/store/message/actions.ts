@@ -38,7 +38,15 @@ import {
   SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
   ADD_ATTACHMENTS_FOR_POPUP,
   DELETE_MESSAGE_FROM_LIST,
-  FORWARD_MESSAGE
+  FORWARD_MESSAGE,
+  GET_REACTIONS,
+  LOAD_MORE_REACTIONS,
+  SET_REACTIONS_LIST,
+  ADD_REACTIONS_TO_LIST,
+  SET_REACTIONS_LOADING_STATE,
+  DELETE_REACTION_FROM_LIST,
+  ADD_REACTION_TO_LIST,
+  SET_MESSAGE_MENU_OPENED
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -160,13 +168,14 @@ export function addReactionAC(
   }
 }
 
-export function deleteReactionAC(channelId: string, messageId: string, key: string) {
+export function deleteReactionAC(channelId: string, messageId: string, key: string, isLastReaction?: boolean) {
   return {
     type: DELETE_REACTION,
     payload: {
       channelId,
       messageId,
-      key
+      key,
+      isLastReaction
     }
   }
 }
@@ -182,6 +191,54 @@ export function deleteReactionFromMessageAC(message: IMessage, reaction: IReacti
   return {
     type: DELETE_REACTION_FROM_MESSAGE,
     payload: { message, reaction, isSelf }
+  }
+}
+
+export function getReactionsAC(messageId: string, key?: string, limit?: number) {
+  return {
+    type: GET_REACTIONS,
+    payload: { messageId, key, limit }
+  }
+}
+
+export function loadMoreReactionsAC(limit: number) {
+  return {
+    type: LOAD_MORE_REACTIONS,
+    payload: { limit }
+  }
+}
+
+export function setReactionsListAC(reactions: IReaction[], hasNext: boolean) {
+  return {
+    type: SET_REACTIONS_LIST,
+    payload: { reactions, hasNext }
+  }
+}
+
+export function addReactionsToListAC(reactions: IReaction[], hasNext: boolean) {
+  return {
+    type: ADD_REACTIONS_TO_LIST,
+    payload: { reactions, hasNext }
+  }
+}
+
+export function addReactionToListAC(reaction: IReaction) {
+  return {
+    type: ADD_REACTION_TO_LIST,
+    payload: { reaction }
+  }
+}
+export function deleteReactionFromListAC(reaction: IReaction) {
+  return {
+    type: DELETE_REACTION_FROM_LIST,
+    payload: { reaction }
+  }
+}
+
+export function setReactionsLoadingStateAC(state: number) {
+  return {
+    type: SET_REACTIONS_LOADING_STATE,
+    payload: { state }
   }
 }
 
@@ -353,6 +410,13 @@ export function setSendMessageInputHeightAC(height: number) {
   return {
     type: SET_SEND_MESSAGE_INPUT_HEIGHT,
     payload: { height }
+  }
+}
+
+export function setMessageMenuOpenedAC(messageId: string) {
+  return {
+    type: SET_MESSAGE_MENU_OPENED,
+    payload: { messageId }
   }
 }
 

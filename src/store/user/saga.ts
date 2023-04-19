@@ -26,7 +26,7 @@ import { updateChannelDataAC } from '../channel/actions'
 function* getContacts(): any {
   try {
     const SceytChatClient = getClient()
-    const contactsData = yield call(SceytChatClient.chatClient.getAllContacts)
+    const contactsData = yield call(SceytChatClient.getAllContacts)
     yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
     yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
@@ -39,7 +39,7 @@ function* getContacts(): any {
 function* getRoles(): any {
   try {
     const SceytChatClient = getClient()
-    const roles = yield call(SceytChatClient.chatClient.getRoles)
+    const roles = yield call(SceytChatClient.getRoles)
     yield put(setRolesAC(roles))
   } catch (e) {
     console.log('ERROR in get roles - ', e.message)
@@ -54,7 +54,7 @@ function* blockUser(action: IAction): any {
     const SceytChatClient = getClient()
     const { payload } = action
     const { userIds } = payload
-    const blockedUsers = yield call(SceytChatClient.chatClient.blockUsers, userIds)
+    const blockedUsers = yield call(SceytChatClient.blockUsers, userIds)
 
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
@@ -72,7 +72,7 @@ function* unblockUser(action: IAction): any {
     const SceytChatClient = getClient()
     const { payload } = action
     const { userIds } = payload
-    const unblockedUsers = yield call(SceytChatClient.chatClient.unblockUsers, userIds)
+    const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
     if (activeChannel.peer && activeChannel.peer.id === unblockedUsers[0].id) {
@@ -98,7 +98,7 @@ function* updateProfile(action: IAction): any {
           console.log('upload percent - ', progressPercent)
         }
       }
-      updateUserProfileData.avatarUrl = yield call(SceytChatClient.chatClient.uploadFile, fileToUpload)
+      updateUserProfileData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
     } else if (avatarUrl && user.avatarUrl !== avatarUrl) {
       updateUserProfileData.avatarUrl = avatarUrl
     }
@@ -118,7 +118,7 @@ function* updateProfile(action: IAction): any {
       updateUserProfileData.metadata = metadata
     }
 
-    const updatedUser = yield call(SceytChatClient.chatClient.setProfile, updateUserProfileData)
+    const updatedUser = yield call(SceytChatClient.setProfile, updateUserProfileData)
     yield put(updateUserProfileAC({ ...updatedUser }))
   } catch (error) {
     console.log(error, 'Error on update user')
@@ -131,7 +131,7 @@ function* getUsers(action: IAction): any {
     const { payload } = action
     const { params } = payload
     const SceytChatClient = getClient()
-    const usersQueryBuilder = new SceytChatClient.chatClient.UserListQueryBuilder()
+    const usersQueryBuilder = new SceytChatClient.UserListQueryBuilder()
 
     if (params.query) {
       usersQueryBuilder.query(params.query)

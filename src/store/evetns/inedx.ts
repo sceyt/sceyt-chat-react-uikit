@@ -1,4 +1,4 @@
-import { call, put, take } from 'redux-saga/effects'
+import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
 import { IChannel, IMarker, IMessage, IReaction, IUser } from '../../types'
@@ -40,12 +40,16 @@ import {
   addAllMessages,
   // addAllMessages,
   addMessageToMap,
+  addReactionOnAllMessages,
+  addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
   getHasNextCached,
   getMessagesFromMap,
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
+  removeReactionOnAllMessages,
+  removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
   updateMessageOnAllMessages,
   // MESSAGE_LOAD_DIRECTION,
@@ -53,7 +57,10 @@ import {
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { setNotification } from '../../helpers/notifications'
-import { addMembersToListAC, removeMemberFromListAC } from '../member/actions'
+import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
+import { MessageTextFormat } from '../../helpers'
+import { contactsMapSelector } from '../user/selector'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -256,7 +263,7 @@ export default function* watchForEvents(): any {
           message
         }
       }) */
-    connectionListener.onConnectionStatusChanged = (status: string) =>
+    connectionListener.onConnectionStateChanged = (status: string) =>
       emitter({
         type: CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED,
         args: {
@@ -412,7 +419,7 @@ export default function* watchForEvents(): any {
         const channelExists = checkChannelExists(channel.id)
 
         if (channelExists) {
-          if (removedMembers[0].id === SceytChatClient.chatClient.user.id) {
+          if (removedMembers[0].id === SceytChatClient.user.id) {
             yield call(removeChannelFromMap, channel.id)
             yield put(removeChannelAC(channel.id))
             const activeChannel = yield call(getLastChannelFromMap)
@@ -482,7 +489,7 @@ export default function* watchForEvents(): any {
             // const messageForThreadReply = yield select(messageForThreadReplySelector);
             let parentMessage;
             if (!messageForThreadReply) {
-              const messageQueryBuilder = new sceytClient.chatClient.MessageListQueryBuilder(channel.id);
+              const messageQueryBuilder = new sceytClient.MessageListQueryBuilder(channel.id);
               messageQueryBuilder.limit(1);
               const messageQuery = yield call(messageQueryBuilder.build);
               const { messages } = yield call(messageQuery.loadNearMessageId, message.parent.id);
@@ -501,19 +508,34 @@ export default function* watchForEvents(): any {
           addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
           // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
           // }
-          if (message.user.id !== SceytChatClient.chatClient.user.id) {
+          if (message.user.id !== SceytChatClient.user.id) {
             // yield put(markMessagesAsReadAC(channel.id, [message.id]))
           }
         }
+
         if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
           addMessageToMap(channel.id, message)
         }
 
-        yield put(updateChannelDataAC(channel.id, { ...channelForAdd }))
-        if (message.user.id !== SceytChatClient.chatClient.user.id && !channel.muted) {
+        yield put(
+          updateChannelDataAC(channel.id, { ...channelForAdd, userMessageReactions: [], lastReactedMessage: null })
+        )
+        console.log('channel MESSAGE ... ', message)
+        if (!message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
           if (Notification.permission === 'granted') {
             if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
-              setNotification(message.body, message.user, channel)
+              const contactsMap = yield select(contactsMapSelector)
+              const getFromContacts = getShowOnlyContactUsers()
+              const messageBody = MessageTextFormat({
+                text: message.body,
+                message,
+                contactsMap,
+                getFromContacts,
+                isLastMessage: false,
+                isNotification: true
+              })
+              console.log('messageBody. . . . ', messageBody)
+              setNotification(messageBody, message.user, channel)
             }
           }
           if (message.repliedInThread && message.parent.id) {
@@ -682,22 +704,53 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
         console.log('channel REACTION_ADDED ... ')
         const { channel, user, message, reaction } = args
-        const isSelf = user.id === SceytChatClient.chatClient.user.id
+        const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
         if (channel.id === activeChannelId) {
           yield put(addReactionToMessageAC(message, reaction, isSelf))
+          addReactionOnAllMessages(message, reaction, true)
+        }
+        if (message.user.id === SceytChatClient.user.id) {
+          if (!isSelf && Notification.permission === 'granted') {
+            if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
+              setNotification(message.body, reaction.user, channel, reaction.key)
+            }
+          }
+
+          if (channel.userMessageReactions && channel.userMessageReactions.length) {
+            const channelUpdateParams = {
+              userMessageReactions: channel.userMessageReactions,
+              lastReactedMessage: message
+            }
+            yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+          }
+        }
+
+        if (checkChannelExistsOnMessagesMap(channel.id)) {
+          addReactionToMessageOnMap(channel.id, message, reaction, true)
         }
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
         const { channel, user, message, reaction } = args
         console.log('channel REACTION_DELETED ... ')
-        const isSelf = user.id === SceytChatClient.chatClient.user.id
+        const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
         if (channel.id === activeChannelId) {
           yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
+          removeReactionOnAllMessages(message, reaction, true)
+        }
+        if (!(channel.userMessageReactions && channel.userMessageReactions.length)) {
+          const channelUpdateParams = {
+            userMessageReactions: [],
+            lastReactedMessage: null
+          }
+          yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+        }
+        if (checkChannelExistsOnMessagesMap(channel.id)) {
+          removeReactionToMessageOnMap(channel.id, message, reaction, true)
         }
         break
       }
@@ -797,13 +850,17 @@ export default function* watchForEvents(): any {
           break;
       } */
       case CHANNEL_EVENT_TYPES.CHANGE_ROLE: {
-        // const { channel, members } = args
-        console.log('channel CHANGE_ROLE ... ')
-        const { channel } = args
+        const { channel, members } = args
+        console.log('channel CHANGE_ROLE  channel ... ', channel)
+        console.log('channel CHANGE_ROLE  member ... ', members)
         const activeChannelId = yield call(getActiveChannelId)
         if (channel.id === activeChannelId) {
-          // TODO update member
-          // yield put(updateMembersAC(members));
+          yield put(updateMembersAC(members))
+        }
+        for (let i = 0; i < members.length; i++) {
+          if (members[i].id === SceytChatClient.user.id) {
+            yield put(updateChannelDataAC(channel.id, { role: members[i].role }))
+          }
         }
         break
       }
@@ -844,6 +901,7 @@ export default function* watchForEvents(): any {
       } */
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
+        console.log('setConnectionStatusAC -  -- -___---***********************... ', status)
         yield put(setConnectionStatusAC(status))
         break
       }

@@ -35,7 +35,7 @@ import {
   setHasPrevCached
 } from '../../helpers/messagesHalper'
 import SliderPopup from '../../common/popups/sliderPopup'
-import { makeUserName, systemMessageUserName } from '../../helpers'
+import { isJSON, makeUserName, systemMessageUserName } from '../../helpers'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
@@ -66,7 +66,8 @@ const CreateMessageDateDivider = ({
   dateDividerBorder,
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
-  noMargin
+  noMargin,
+  marginBottom
 }: any) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
@@ -89,6 +90,7 @@ const CreateMessageDateDivider = ({
       dateDividerBackgroundColor={dateDividerBackgroundColor}
       dateDividerBorderRadius={dateDividerBorderRadius}
       noMargin={noMargin}
+      marginBottom={marginBottom}
     />
   )
 }
@@ -123,6 +125,10 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  openFrequentlyUsedReactions?: boolean
+  separateEmojiCategoriesWithTitle?: boolean
+  emojisCategoryIconsPosition?: 'top' | 'bottom'
+  emojisContainerBorderRadius?: string
   reactionIconOrder?: number
   editIconOrder?: number
   copyIconOrder?: number
@@ -212,6 +218,10 @@ const MessageList: React.FC<MessagesProps> = ({
   staredIcon,
   reportIcon,
   reactionIconOrder,
+  openFrequentlyUsedReactions,
+  separateEmojiCategoriesWithTitle,
+  emojisCategoryIconsPosition,
+  emojisContainerBorderRadius,
   reactionsDisplayCount,
   showEachReactionCount,
   reactionItemBorder,
@@ -422,9 +432,7 @@ const MessageList: React.FC<MessagesProps> = ({
     prevDisable = true
     nextDisable = true
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
-      console.log('handle scroll to reply message .... ')
       const repliedMessage = document.getElementById(messageId)
-      console.log(' scroll to message .... ', repliedMessage)
       if (repliedMessage) {
         scrollRef.current.scrollTop = repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
         repliedMessage.classList.add('highlight')
@@ -656,13 +664,15 @@ const MessageList: React.FC<MessagesProps> = ({
           let i: any = 0
           let messagesHeight = 0
           while (i !== prevMessageId) {
-            if (messages[i].id === prevMessageId) {
-              i = prevMessageId
-            } else {
-              const currentMessage = document.getElementById(messages[i].id)
-              // eslint-disable-next-line no-unused-expressions
-              currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
-              i++
+            if (messages[i]) {
+              if (messages[i].id === prevMessageId) {
+                i = prevMessageId
+              } else {
+                const currentMessage = document.getElementById(messages[i].id)
+                // eslint-disable-next-line no-unused-expressions
+                currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
+                i++
+              }
             }
           }
 
@@ -740,7 +750,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages... ', messages)
+    console.log('messages... ', messages)
   }, [messages])
   /* useEffect(() => {
   }, [pendingMessages]) */
@@ -838,7 +848,7 @@ const MessageList: React.FC<MessagesProps> = ({
                   <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
-                      noMargin={prevMessage && prevMessage.type === 'system'}
+                      noMargin={!isUnreadMessage && prevMessage && prevMessage.type === 'system'}
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}
@@ -848,6 +858,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
+                      marginBottom={prevMessage && prevMessage.type === 'system' && message.type !== 'system'}
                     />
                     {message.type === 'system' ? (
                       <MessageTopDate
@@ -872,8 +883,7 @@ const MessageList: React.FC<MessagesProps> = ({
                             ? ' created this group'
                             : message.body === 'AM'
                             ? ` added ${
-                                message.metadata &&
-                                message.metadata.m &&
+                                !!(message.metadata && message.metadata.m) &&
                                 message.metadata.m
                                   .slice(0, 5)
                                   .map((mem: string) =>
@@ -906,7 +916,10 @@ const MessageList: React.FC<MessagesProps> = ({
                     ) : (
                       <MessageWrapper id={message.id}>
                         <Message
-                          message={message}
+                          message={{
+                            ...message,
+                            metadata: isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+                          }}
                           channel={channel}
                           stopScrolling={setStopScrolling}
                           handleMediaItemClick={(attachment) => setMediaFile(attachment)}
@@ -948,6 +961,10 @@ const MessageList: React.FC<MessagesProps> = ({
                           staredIcon={staredIcon}
                           reportIcon={reportIcon}
                           reactionIconOrder={reactionIconOrder}
+                          openFrequentlyUsedReactions={openFrequentlyUsedReactions}
+                          emojisCategoryIconsPosition={emojisCategoryIconsPosition}
+                          emojisContainerBorderRadius={emojisContainerBorderRadius}
+                          separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
                           editIconOrder={editIconOrder}
                           copyIconOrder={copyIconOrder}
                           replyIconOrder={replyIconOrder}

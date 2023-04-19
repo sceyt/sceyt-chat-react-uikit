@@ -58,64 +58,15 @@ declare class AttachmentBuilder {
   create: () => IAttachment
 }
 
-export interface IChannel {
-  id: string
-  createdAt: Date | number
-  updatedAt: Date | number
-  lastReadMessageId: string
-  lastDeliveredMessageId: string
-  lastMessage: any | null
-  memberCount: number
-  markedAsUnread: boolean
-  muted: boolean
-  muteExpireTime: Date | number
-  type: 'Public' | 'Private' | 'Direct'
-  peer?: any
-  subject?: string
-  label?: string
-  metadata: any
-  role: string
-  avatarUrl?: string
-  unreadMessageCount?: number
-  unreadMentionsCount?: number
-  unreadReactionsCount?: number
-  delete: () => Promise<void>
-  deleteAllMessages: (deleteForMe?: boolean) => Promise<void>
-  hide: () => Promise<boolean>
-  unhide: () => Promise<boolean>
-  markAsUnRead: () => Promise<IChannel>
-  mute: (_muteExpireTime: number) => Promise<IChannel>
-  unmute: () => Promise<IChannel>
-  markMessagesAsDelivered: (_messageIds: string[]) => Promise<void>
-  markMessagesAsRead: (_messageIds: string[]) => Promise<void>
-  startTyping: () => void
-  stopTyping: () => void
-  sendMessage: (message: any) => Promise<any>
-  editMessage: (message: any) => Promise<any>
-  reSendMessage: (failedMessage: any) => Promise<any>
-  deleteMessageById: (messageId: string) => Promise<any>
-  deleteMessage: (message: any) => Promise<any>
-  addReaction: (
-    messageId: string,
-    key: string,
-    score: number,
-    reason: string,
-    enforceUnique: boolean
-  ) => Promise<{ message: any; reaction: any }>
-  deleteReaction: (messageId: string, key: string) => Promise<{ message: any; reaction: any }>
-  createMessageBuilder: () => any
-  createAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
-}
-
 export interface IReaction {
+  id: string
   key: string
   score: number
   reason: string
-  updatedAt: Date
-  messageId: number
+  createdAt: Date
+  messageId: string
   user: IUser
 }
-
 export interface IMessage {
   id: string
   tid?: string
@@ -147,6 +98,59 @@ export interface IMessage {
     messageId: string
     user: IUser
   }
+}
+
+export interface IChannel {
+  id: string
+  createdAt: Date | number
+  updatedAt: Date | number
+  lastReadMessageId: string
+  lastDeliveredMessageId: string
+  lastMessage: any | null
+  lastReactedMessage?: IMessage
+  memberCount: number
+  markedAsUnread: boolean
+  muted: boolean
+  muteExpireTime: Date | number
+  type: 'Public' | 'Private' | 'Direct'
+  peer?: any
+  subject?: string
+  label?: string
+  metadata: any
+  role: string
+  avatarUrl?: string
+  unreadMessageCount?: number
+  unreadMentionsCount?: number
+  unreadReactionsCount?: number
+  userMessageReactions?: IReaction[]
+  delete: () => Promise<void>
+  deleteAllMessages: (deleteForMe?: boolean) => Promise<void>
+  hide: () => Promise<boolean>
+  unhide: () => Promise<boolean>
+  markAsUnRead: () => Promise<IChannel>
+  mute: (_muteExpireTime: number) => Promise<IChannel>
+  unmute: () => Promise<IChannel>
+  markMessagesAsDelivered: (_messageIds: string[]) => Promise<void>
+  markMessagesAsRead: (_messageIds: string[]) => Promise<void>
+  startTyping: () => void
+  stopTyping: () => void
+  sendMessage: (message: any) => Promise<any>
+  editMessage: (message: any) => Promise<any>
+  reSendMessage: (failedMessage: any) => Promise<any>
+  deleteMessageById: (messageId: string) => Promise<any>
+  deleteMessage: (message: any) => Promise<any>
+  addReaction: (
+    messageId: string,
+    key: string,
+    score: number,
+    reason: string,
+    enforceUnique: boolean
+  ) => Promise<{ message: any; reaction: any }>
+  deleteReaction: (messageId: string, key: string) => Promise<{ message: any; reaction: any }>
+  createMessageBuilder: () => any
+  createAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
+  createThread: (messageId: string) => IChannel
+  getMessagesById: (messageIds: string[]) => Promise<IMessage[]>
 }
 
 export interface IMedia extends IAttachment {

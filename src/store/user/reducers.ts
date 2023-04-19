@@ -8,6 +8,7 @@ import {
   SET_USER,
   SET_USERS,
   SET_USERS_LOADING_STATE,
+  UPDATE_USER_MAP,
   UPDATE_USER_PROFILE
 } from './constants'
 import { IAction, IContact, IRole, IUser } from '../../types'
@@ -19,6 +20,7 @@ export interface IUserStore {
   usersLoadingState: number | null
   rolesMap: { [key: string]: IRole }
   contactsMap: { [key: string]: IContact }
+  updatedUserMap: { [key: string]: IUser }
   user: IUser
   browserTabIsActive: boolean
 }
@@ -30,6 +32,7 @@ const initialState: IUserStore = {
   usersLoadingState: null,
   rolesMap: {},
   contactsMap: {},
+  updatedUserMap: {},
   user: { id: '', firstName: '', lastName: '' },
   browserTabIsActive: true
 }
@@ -60,6 +63,11 @@ export default (state = initialState, { type, payload }: IAction) => {
 
     case SET_USERS_LOADING_STATE: {
       newState.usersLoadingState = payload.state
+      return newState
+    }
+
+    case UPDATE_USER_MAP: {
+      newState.updatedUserMap = payload.usersMap
       return newState
     }
 

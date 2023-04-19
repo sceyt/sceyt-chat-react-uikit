@@ -2,14 +2,17 @@ import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 // import { CHANNEL_TYPE } from '../../helpers/constants'
 import { IChannel } from '../../types'
-import { checkUserStatusAC, updateUserStatusOnChannelAC } from '../../store/channel/actions'
+import { updateUserStatusOnChannelAC } from '../../store/channel/actions'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { checkUserStatusAC } from '../../store/user/actions'
+// import { checkUserStatusAC } from '../../store/user/actions'
 const usersMap = {}
 let updateInterval: any
 export default function useUpdatePresence(channel: IChannel, isVisible: boolean) {
   const dispatch = useDispatch()
   const connectionStatus = useSelector(connectionStatusSelector)
+  // const updatedUsersMap = useSelector(usersMapSelector)
   // const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   // if (isDirectChannel) {
   const userId = channel.peer && channel.peer.id
@@ -39,6 +42,15 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
     }
   }, [connectionStatus])
 
+  /* useEffect(() => {
+    console.log('updatedUsersMap', updatedUsersMap)
+    if (updatedUsersMap) {
+      Object.keys(updatedUsersMap).forEach((key) => {
+        usersMap[key] = updatedUsersMap[key]
+      })
+    }
+  }, [updatedUsersMap]) */
+
   useEffect(() => {
     /* if (channel.peer) {
       console.log('channel.peer.presence', channel.peer.presence)
@@ -56,6 +68,6 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
       dispatch(updateUserStatusOnChannelAC({ [channel.peer.id]: channel.peer }))
       usersMap[channel.peer.id] = channel.peer.presence
     }
-  }, [channel])
+  }, [])
   // }
 }

@@ -17,3 +17,4 @@ export const typingIndicatorSelector = (channelId: string) => (store: any) =>
 export const channelListWidthSelector = (store: any) => store.ChannelReducer.channelListWidth
 export const isDraggingSelector = (store: any) => store.ChannelReducer.isDragging
 export const draggedAttachmentsSelector = (store: any) => store.ChannelReducer.draggedAttachments
+export const tabIsActiveSelector = (store: any) => store.ChannelReducer.tabIsActive

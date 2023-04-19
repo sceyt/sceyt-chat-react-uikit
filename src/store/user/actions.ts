@@ -2,6 +2,7 @@ import {
   ADD_USERS,
   BLOCK_USERS,
   BROWSER_TAB_IS_ACTIVE,
+  CHECK_USER_STATUS,
   GET_CONTACTS,
   GET_ROLES,
   GET_USERS,
@@ -15,6 +16,7 @@ import {
   SET_USERS_LOADING_STATE,
   UNBLOCK_USERS,
   UPDATE_PROFILE,
+  UPDATE_USER_MAP,
   UPDATE_USER_PROFILE
 } from './constants'
 import { IContact, IRole, IUser } from '../../types'
@@ -127,6 +129,23 @@ export function browserTabIsActiveAC(state: boolean) {
   return {
     type: BROWSER_TAB_IS_ACTIVE,
     payload: { state }
+  }
+}
+
+export function checkUserStatusAC(usersMap: { [key: string]: string }) {
+  return {
+    type: CHECK_USER_STATUS,
+    payload: {
+      usersMap
+    }
+  }
+}
+export function updateUserStatusOnMapAC(usersMap: { [key: string]: IUser }) {
+  return {
+    type: UPDATE_USER_MAP,
+    payload: {
+      usersMap
+    }
   }
 }
 

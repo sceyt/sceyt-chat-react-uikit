@@ -1,6 +1,5 @@
 import React, { useRef, useState } from 'react'
 import styled from 'styled-components'
-import PropTypes from 'prop-types'
 import { useDispatch } from 'react-redux'
 import {
   Popup,
@@ -34,7 +33,7 @@ interface ICreateChannelPopup {
 
 export default function CreateChannel({ handleClose, channelType, uriPrefixOnCreateChannel }: ICreateChannelPopup) {
   const dispatch = useDispatch()
-  const uriRegexp = new RegExp('^[A-Za-z0-9_]*$')
+  const uriRegexp = new RegExp('^[A-Za-z0-9]*$')
   const fileUploader = useRef<any>(null)
   const [usersPopupVisible, setUsersPopupVisible] = useState(false)
   const [createGroupChannelPopupVisible, setCreateGroupChannelPopupVisible] = useState(true)
@@ -92,7 +91,7 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
       subject: subjectValue,
       metadata: { d: metadataValue },
       uri: URIValue,
-      members: members,
+      members,
       type: channelType === 'private' ? CHANNEL_TYPE.PRIVATE : CHANNEL_TYPE.PUBLIC,
       avatarFile: newAvatar.src.file
     }
@@ -303,14 +302,6 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
       )}
     </Container>
   )
-}
-
-CreateChannel.propTypes = {
-  isButton: PropTypes.bool
-}
-
-CreateChannel.defaultProps = {
-  isButton: false
 }
 
 const Container = styled.div``

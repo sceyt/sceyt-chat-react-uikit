@@ -9,6 +9,7 @@ import { IAttachment } from '../../../../types'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import Attachment from '../../../Attachment'
 import { colors } from '../../../../UIHelper/constants'
+import { isJSON } from '../../../../helpers'
 // import SliderPopup from '../../../../../common/Popups/SliderPopup'
 
 interface IProps {
@@ -31,11 +32,21 @@ const Media = ({ channelId }: IProps) => {
       {attachments.map((file: IAttachment) => (
         <MediaItem key={file.id} onClick={() => handleMediaItemClick(file)}>
           {file.type === 'image' ? (
-            <Attachment attachment={file} backgroundColor={colors.white} borderRadius='8px' isDetailsView />
+            <Attachment
+              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+              backgroundColor={colors.white}
+              borderRadius='8px'
+              isDetailsView
+            />
           ) : (
             // <img src={file.url} alt='' />
 
-            <Attachment attachment={file} backgroundColor={colors.white} borderRadius='8px' isDetailsView />
+            <Attachment
+              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+              backgroundColor={colors.white}
+              borderRadius='8px'
+              isDetailsView
+            />
             /* <video>
               <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
               <source src={file.url} type='video/ogg' />

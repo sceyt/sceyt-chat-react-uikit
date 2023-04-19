@@ -3,6 +3,7 @@ import { makeUserName } from './index'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
+import { CHANNEL_TYPE } from './constants'
 let contactsMap = {}
 let logoSrc = ''
 /* let windowObjectReference: any = null // global variable
@@ -32,7 +33,7 @@ function openRequestedSingleTab(url: any) {
   /!* explanation: we store the current url in order to compare url
      in the event of another call of this function. *!/
 } */
-export const setNotification = (body: string, user: IUser, channel: IChannel) => {
+export const setNotification = (body: string, user: IUser, channel: IChannel, reaction?: string) => {
   const getFromContacts = getShowOnlyContactUsers()
 
   /* chrome.runtime.onMessage.addListener(function (msg, sender) {
@@ -48,17 +49,31 @@ export const setNotification = (body: string, user: IUser, channel: IChannel) =>
     })
   }) */
 
-  const notification = new Notification(
-    `New Message from ${makeUserName(contactsMap[user.id], user, getFromContacts)}`,
-    {
+  let notification: any
+  if (reaction) {
+    notification = new Notification(
+      `${
+        channel.type === CHANNEL_TYPE.DIRECT
+          ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+          : channel.subject
+      }`,
+      {
+        body: `${
+          channel.type !== CHANNEL_TYPE.DIRECT ? makeUserName(contactsMap[user.id], user, getFromContacts) + ': ' : ''
+        } reacted ${reaction} to "${body}"`,
+        icon: logoSrc
+        // silent: false
+      }
+    )
+  } else {
+    notification = new Notification(`New Message from ${makeUserName(contactsMap[user.id], user, getFromContacts)}`, {
       body,
       icon: logoSrc
       // silent: false
-    }
-  )
-
+    })
+  }
   // windowObjectReference = window.sceytTabUrl
-  notification.onclick = (event) => {
+  notification.onclick = (event: any) => {
     event.preventDefault() // prevent the browser from focusing the Notification's tab
     window.focus()
     store.dispatch({

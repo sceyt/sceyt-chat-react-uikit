@@ -9,8 +9,10 @@ import {
   FORWARD_MESSAGE,
   GET_MESSAGES,
   GET_MESSAGES_ATTACHMENTS,
+  GET_REACTIONS,
   LOAD_MORE_MESSAGES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
+  LOAD_MORE_REACTIONS,
   PAUSE_ATTACHMENT_UPLOADING,
   queryDirection,
   RESEND_MESSAGE,
@@ -29,7 +31,10 @@ import {
   addAttachmentsForPopupAC,
   addMessageAC,
   addMessagesAC,
+  addReactionsToListAC,
+  addReactionToListAC,
   addReactionToMessageAC,
+  deleteReactionFromListAC,
   deleteReactionFromMessageAC,
   getMessagesAC,
   scrollToNewMessageAC,
@@ -42,6 +47,8 @@ import {
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
   setMessagesLoadingStateAC,
+  setReactionsListAC,
+  setReactionsLoadingStateAC,
   setScrollToMessagesAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -54,7 +61,7 @@ import {
   MESSAGE_STATUS,
   UPLOAD_STATE
 } from '../../helpers/constants'
-import { addChannelAC, updateChannelLastMessageAC } from '../channel/actions'
+import { addChannelAC, updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import {
   addReactionToMessageOnMap,
   getAllMessages,
@@ -79,7 +86,10 @@ import {
   checkChannelExistsOnMessagesMap,
   getPendingMessages,
   setPendingAttachment,
-  getPendingAttachment
+  getPendingAttachment,
+  removeReactionToMessageOnMap,
+  addReactionOnAllMessages,
+  removeReactionOnAllMessages
 } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../user/constants'
 import { customUpload, getCustomUploader, pauseUpload, resumeUpload } from '../../helpers/customUploader'
@@ -113,6 +123,11 @@ function* sendMessage(action: IAction): any {
             messageAttachment.type === 'file' ? 50 : undefined,
             messageAttachment.type === 'file' ? 50 : undefined
           )
+        } else if (fileType === attachmentTypes.voice) {
+          thumbnailMetas = {
+            duration: 3,
+            thumbnail: messageAttachment.metadata.tmb
+          }
         }
         messageAttachment.metadata = {
           ...messageAttachment.metadata,
@@ -123,6 +138,7 @@ function* sendMessage(action: IAction): any {
             dur: thumbnailMetas.duration && Math.floor(thumbnailMetas.duration)
           }
         }
+        messageAttachment.fileSize = message.attachments[0].data.size
         setPendingAttachment(messageAttachment.attachmentId, messageAttachment.data)
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder
@@ -282,6 +298,7 @@ function* sendMessage(action: IAction): any {
               throw Error('Network error')
             }
           } catch (e) {
+            console.log('Error on uploading attachment', messageAttachment.attachmentId)
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageAttachment.attachmentId))
 
             updateMessageOnMap(channel.id, {
@@ -625,10 +642,11 @@ function* sendMessage(action: IAction): any {
 // let msgCount = 1
 function* sendTextMessage(action: IAction): any {
   // let messageForCatch = {}
+  const { payload } = action
+  const { message, connectionState, channelId } = payload
+  const channel = yield call(getChannelFromMap, channelId)
+  let sendMessageTid
   try {
-    const { payload } = action
-    const { message, connectionState, channelId } = payload
-    const channel = yield call(getChannelFromMap, channelId)
     const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
@@ -659,6 +677,10 @@ function* sendTextMessage(action: IAction): any {
         parent: message.parent
       })
     )
+    sendMessageTid = messageToSend.tid
+    if (pendingMessage.metadata) {
+      pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
+    }
     // console.log('getHasNextCached .. . .', getHasNextCached())
     const hasNextMessages = yield select(messagesHasNextSelector)
     if (!getHasNextCached()) {
@@ -701,10 +723,18 @@ function* sendTextMessage(action: IAction): any {
       })
       updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
       yield put(updateChannelLastMessageAC(JSON.parse(JSON.stringify(messageResponse)), { id: channel.id } as IChannel))
+    } else {
+      throw new Error('Connection required to send message')
     }
     // messageForCatch = messageToSend
   } catch (e) {
-    console.log('error on send message ... ', e)
+    console.log('error on send text message ... ', e)
+    updateMessageOnMap(channel.id, {
+      messageId: sendMessageTid,
+      params: { state: MESSAGE_STATUS.FAILED }
+    })
+    updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
+    yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
 }
@@ -826,11 +856,11 @@ function* resendMessage(action: IAction): any {
       }
       console.log('attachmentCompilation. .. . .', attachmentCompilation)
       if (
+        connectionState === CONNECTION_STATUS.CONNECTED &&
         attachmentCompilation[messageAttachment.attachmentId] &&
         attachmentCompilation[messageAttachment.attachmentId] === UPLOAD_STATE.FAIL
       ) {
         const pendingAttachment = getPendingAttachment(message.attachments[0].attachmentId)
-        console.log('pending attachment for resend ... ', pendingAttachment)
         messageAttachment.data = pendingAttachment
         messageAttachment.url = pendingAttachment
         const fileType = messageAttachment.data.type.split('/')[0]
@@ -842,19 +872,70 @@ function* resendMessage(action: IAction): any {
 
           let uri
           try {
-            console.log('going to upload attachments ..... ', messageAttachment)
-            uri = yield call(customUpload, messageAttachment, handleUploadProgress)
+            let filePath
+            const handleUpdateLocalPath = (updatedLink: string) => {
+              filePath = updatedLink
+              thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
+              messageCopy.attachments[0] = { ...messageCopy.attachments[0], attachmentUrl: updatedLink }
+              const updateAttachmentPath = {
+                attachments: [{ ...messageCopy.attachments[0], attachmentUrl: updatedLink }]
+              }
+              store.dispatch({
+                type: UPDATE_MESSAGE,
+                payload: {
+                  message: JSON.parse(
+                    JSON.stringify({
+                      ...updateAttachmentPath
+                    })
+                  )
+                }
+              })
+            }
+            uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
 
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment.attachmentId))
 
-            const attachmentToSend = { ...messageAttachment, url: uri, upload: false }
+            delete messageCopy.createdAt
+            let thumbnailMetas: IAttachmentMeta = {}
+            let fileSize = pendingAttachment.size
+            if (messageAttachment.url.type.split('/')[0] === 'image') {
+              fileSize = yield call(getImageSize, filePath)
+              thumbnailMetas = yield call(
+                createImageThumbnail,
+                null,
+                filePath,
+                messageAttachment.type === 'file' ? 50 : undefined,
+                messageAttachment.type === 'file' ? 50 : undefined
+              )
+            }
+
+            const attachmentMeta = JSON.stringify({
+              ...messageAttachment.metadata,
+              ...(thumbnailMetas &&
+                thumbnailMetas.thumbnail && {
+                  tmb: thumbnailMetas.thumbnail,
+                  szw: thumbnailMetas.imageWidth,
+                  szh: thumbnailMetas.imageHeight
+                })
+            })
+            const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
+
+            /* const attachmentToSend = { ...messageAttachment, url: uri, upload: false } */
+            const attachmentToSend = attachmentBuilder
+              .setName(messageAttachment.name)
+              .setMetadata(attachmentMeta)
+              .setFileSize(fileSize)
+              .setUpload(false)
+              .create()
+            // not for SDK, for displaying attachments and their progress
+            attachmentToSend.attachmentId = messageAttachment.attachmentId
+            attachmentToSend.attachmentUrl = messageAttachment.attachmentUrl
             yield put(
               updateMessageAC(
                 messageCopy.tid,
                 JSON.parse(JSON.stringify({ ...messageCopy, attachments: [attachmentToSend] }))
               )
             )
-            delete messageCopy.createdAt
             messageCopy.attachments = [attachmentToSend]
 
             if (connectionState === CONNECTION_STATUS.CONNECTED) {
@@ -949,7 +1030,7 @@ function* deleteMessage(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
 
     const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-
+    console.log('deleted message ... ', deletedMessage)
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
     updateMessageOnMap(channel.id, {
       messageId: deletedMessage.id,
@@ -999,14 +1080,14 @@ function* getMessagesQuery(action: IAction): any {
     const { channel, loadWithLastMessage, messageId, limit } = action.payload
     if (channel.id) {
       const SceytChatClient = getClient()
-      /* const attachmentQueryBuilder = new (SceytChatClient.chatClient.AttachmentListQueryBuilder as any)(channel.id)
+      /* const attachmentQueryBuilder = new (SceytChatClient.AttachmentListQueryBuilder as any)(channel.id)
       attachmentQueryBuilder.types(['image', 'video'])
       attachmentQueryBuilder.limit(10)
       const attachmentQuery = yield call(attachmentQueryBuilder.build)
 
       const attachmentResult = yield call(attachmentQuery.loadPrevious)
       console.log('attachmentResult ... ', attachmentResult) */
-      const messageQueryBuilder = new (SceytChatClient.chatClient.MessageListQueryBuilder as any)(channel.id)
+      const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(limit || MESSAGES_MAX_LENGTH)
       messageQueryBuilder.reverse(true)
       const messageQuery = yield call(messageQueryBuilder.build)
@@ -1152,7 +1233,7 @@ function* loadMoreMessages(action: IAction): any {
     const { payload } = action
     const { limit, direction, channelId, messageId, hasNext } = payload
     const SceytChatClient = getClient()
-    const messageQueryBuilder = new (SceytChatClient.chatClient.MessageListQueryBuilder as any)(channelId)
+    const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
     messageQueryBuilder.reverse(true)
     const messageQuery = yield call(messageQueryBuilder.build)
     messageQuery.limit = limit || 5
@@ -1207,10 +1288,20 @@ function* addReaction(action: IAction): any {
   try {
     const { payload } = action
     const { channelId, messageId, key, score, reason, enforceUnique } = payload
+    const user = getClient().user
     const channel = yield call(getChannelFromMap, channelId)
     const { message, reaction } = yield call(channel.addReaction, messageId, key, score, reason, enforceUnique)
+    if (user.id === message.user.id) {
+      const channelUpdateParam = {
+        userMessageReactions: [reaction],
+        lastReactedMessage: message
+      }
+      yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+    }
+    yield put(addReactionToListAC(reaction))
     yield put(addReactionToMessageAC(message, reaction, true))
     addReactionToMessageOnMap(channelId, message, reaction, true)
+    addReactionOnAllMessages(message, reaction, true)
   } catch (e) {
     console.log('ERROR in add reaction', e.message)
     // yield put(setErrorNotification(e.message))
@@ -1220,12 +1311,62 @@ function* addReaction(action: IAction): any {
 function* deleteReaction(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, messageId, key } = payload
+    const { channelId, messageId, key, isLastReaction } = payload
     const channel = yield call(getChannelFromMap, channelId)
     const { message, reaction } = yield call(channel.deleteReaction, messageId, key)
+    if (isLastReaction) {
+      const channelUpdateParam = {
+        userMessageReactions: [],
+        lastReactedMessage: null
+      }
+      yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+    }
+    yield put(deleteReactionFromListAC(reaction))
     yield put(deleteReactionFromMessageAC(message, reaction, true))
+    removeReactionToMessageOnMap(channelId, message, reaction, true)
+    removeReactionOnAllMessages(message, reaction, true)
   } catch (e) {
     console.log('ERROR in delete reaction', e.message)
+    // yield put(setErrorNotification(e.message))
+  }
+}
+
+function* getReactions(action: IAction): any {
+  try {
+    const { payload } = action
+    const { messageId, key, limit } = payload
+    const SceytChatClient = getClient()
+    yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADING))
+    const reactionQueryBuilder = new (SceytChatClient.ReactionListQueryBuilder as any)(messageId)
+    reactionQueryBuilder.limit(limit || 10)
+    if (key) {
+      reactionQueryBuilder.setKey(key)
+    }
+    const reactionQuery = yield call(reactionQueryBuilder.build)
+
+    const result = yield call(reactionQuery.loadNext)
+    query.ReactionsQuery = reactionQuery
+    yield put(setReactionsListAC(result.reactions, result.hasNext))
+    yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
+  } catch (e) {
+    console.log('ERROR in get reactions', e.message)
+    // yield put(setErrorNotification(e.message))
+  }
+}
+function* loadMoreReactions(action: IAction): any {
+  try {
+    const { payload } = action
+    const { limit } = payload
+    yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADING))
+    const ReactionQuery = query.ReactionsQuery
+    if (limit) {
+      ReactionQuery.limit = limit
+    }
+    const result = yield call(ReactionQuery.loadNext)
+    yield put(addReactionsToListAC(result.reactions, result.hasNext))
+    yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
+  } catch (e) {
+    console.log('ERROR in load more reactions', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1250,10 +1391,7 @@ function* getMessageAttachments(action: IAction): any {
     } else if (attachmentType === channelDetailsTabs.voice) {
       typeList = [attachmentTypes.voice]
     }
-    const AttachmentByTypeQueryBuilder = new (SceytChatClient.chatClient.AttachmentListQueryBuilder as any)(
-      channelId,
-      typeList
-    )
+    const AttachmentByTypeQueryBuilder = new (SceytChatClient.AttachmentListQueryBuilder as any)(channelId, typeList)
     AttachmentByTypeQueryBuilder.limit(limit || 34)
     const AttachmentByTypeQuery = yield call(AttachmentByTypeQueryBuilder.build)
     if (forPopup) {
@@ -1358,6 +1496,8 @@ export default function* MessageSaga() {
   yield takeLatest(ADD_REACTION, addReaction)
   yield takeLatest(DELETE_REACTION, deleteReaction)
   yield takeEvery(LOAD_MORE_MESSAGES, loadMoreMessages)
+  yield takeEvery(GET_REACTIONS, getReactions)
+  yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
   yield takeEvery(RESUME_ATTACHMENT_UPLOADING, resumeAttachmentUploading)
 }

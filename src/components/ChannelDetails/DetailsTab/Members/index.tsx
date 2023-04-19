@@ -66,9 +66,10 @@ const Members = ({
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
+  console.log('members', members)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const membersLoading = useSelector(membersLoadingStateSelector) || {}
-  const user = getClient().chatClient.user
+  const user = getClient().user
   const dispatch = useDispatch()
   const noMemberEditPermissions =
     !chekActionPermission('changeMemberRole') &&
@@ -124,7 +125,7 @@ const Members = ({
       setMakeAdminPopup(!makeAdminPopup)
     }
   }
-  console.log('render members ********************************* ')
+
   const handleKickMember = () => {
     selectedMember && dispatch(kickMemberAC(channel.id, selectedMember.id))
   }
@@ -148,7 +149,7 @@ const Members = ({
     if (selectedMember) {
       const updateMember: IMember = {
         ...selectedMember,
-        role: 'subscriber'
+        role: channel.type === CHANNEL_TYPE.PUBLIC ? 'subscriber' : 'participant'
       }
 
       dispatch(changeMemberRoleAC(channel.id, [updateMember]))
@@ -209,7 +210,7 @@ const Members = ({
                         userLastActiveDateFormat(member.presence.lastActiveAt)}
                   </SubTitle>
                 </MemberNamePresence>
-                {!noMemberEditPermissions && member.role !== 'owner' && (
+                {!noMemberEditPermissions && member.role !== 'owner' && member.id !== user.id && (
                   <DropDown
                     isSelect
                     forceClose={!!(closeMenu && closeMenu !== member.id)}

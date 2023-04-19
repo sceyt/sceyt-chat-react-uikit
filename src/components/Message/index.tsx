@@ -6,9 +6,10 @@ import moment from 'moment'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 // import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
+import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
 // import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
-import { calculateRenderedImageWidth, makeUserName, messageStatusIcon, MessageTextFormat } from '../../helpers'
+import { calculateRenderedImageWidth, isJSON, makeUserName, messageStatusIcon, MessageTextFormat } from '../../helpers'
 import { getClient } from '../../common/client'
 import MessageActions from './MessageActions'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
@@ -28,6 +29,7 @@ import {
   resendMessageAC,
   // resendMessageAC,
   setMessageForReplyAC,
+  setMessageMenuOpenedAC,
   setMessageToEditAC
 } from '../../store/message/actions'
 import ConfirmPopup from '../../common/popups/delete'
@@ -44,6 +46,11 @@ import {
 } from '../../helpers/messagesHalper'
 // import DropDown from '../../common/dropdown'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
+import { tabIsActiveSelector } from '../../store/channel/selector'
+import ReactionsPopup from '../../common/popups/reactions'
+import EmojisPopup from '../Emojis'
+import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
+import { openedMessageMenuSelector } from '../../store/message/selector'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
@@ -89,6 +96,10 @@ interface IMessageProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  openFrequentlyUsedReactions?: boolean
+  separateEmojiCategoriesWithTitle?: boolean
+  emojisCategoryIconsPosition?: 'top' | 'bottom'
+  emojisContainerBorderRadius?: string
   reactionIconOrder?: number
   editIconOrder?: number
   copyIconOrder?: number
@@ -176,6 +187,7 @@ const Message = ({
   staredIcon,
   reportIcon,
   reactionIconOrder,
+  openFrequentlyUsedReactions,
   editIconOrder,
   copyIconOrder,
   replyIconOrder,
@@ -214,7 +226,10 @@ const Message = ({
   // fileAttachmentsBoxBackground,
   fileAttachmentsBoxBorder,
   fileAttachmentsTitleColor,
-  fileAttachmentsSizeColor
+  fileAttachmentsSizeColor,
+  emojisCategoryIconsPosition,
+  emojisContainerBorderRadius,
+  separateEmojiCategoriesWithTitle
 }: IMessageProps) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -222,11 +237,22 @@ const Message = ({
   const getFromContacts = getShowOnlyContactUsers()
   // const [editMode, setEditMode] = useState(false)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+  const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
+  const tabIsActive = useSelector(tabIsActiveSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector, shallowEqual)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
+  const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
+  const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
+  const [reactionsPopupOpen, setReactionsPopupOpen] = useState(false)
+  const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
+  const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
+  const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const messageItemRef = useRef<any>()
+  const isVisible = useOnScreen(messageItemRef)
+
   const reactionsList = message.reactionScores && Object.keys(message.reactionScores)
   const reactionsCount =
     message.reactionScores &&
@@ -254,9 +280,20 @@ const Message = ({
     ? (nextMessage.createdAt as number) - (message.createdAt as number) > 300000
     : false */
   const withAttachments = message.attachments && message.attachments.length > 0
-  const withMediaAttachment =
+  const notLinkAttachment =
+    withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
+  const parentNotLinkAttachment =
+    message.parent &&
+    message.parent.attachments &&
+    message.parent.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
+  const mediaAttachment =
     withAttachments &&
-    (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
+    message.attachments.find(
+      (attachment: IAttachment) =>
+        attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image
+    )
+  const withMediaAttachment = !!mediaAttachment
+  // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
 
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
@@ -371,6 +408,19 @@ const Message = ({
     setMessageActionsShow(false)
   }
 
+  const handleToggleReactionsPopup = () => {
+    const reactionsContainer = document.getElementById(`${message.id}_reactions_container}`)
+    const reactionsContPos = reactionsContainer && reactionsContainer.getBoundingClientRect()
+    const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
+    const offsetBottom = window.innerHeight - bottomPos
+    setReactionsPopupPosition(offsetBottom)
+    setReactionsPopupHorizontalPosition({
+      left: reactionsContainer ? reactionsContainer.getBoundingClientRect().left : 0,
+      right: reactionsContPos ? window.innerWidth - reactionsContPos.left - reactionsContPos.width : 0
+    })
+    setReactionsPopupOpen(!reactionsPopupOpen)
+  }
+
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     console.log('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
@@ -378,8 +428,12 @@ const Message = ({
   }
 
   const handleMouseEnter = () => {
-    messageActionsTimeout.current = setTimeout(() => setMessageActionsShow(true), 450)
+    messageActionsTimeout.current = setTimeout(() => {
+      setMessageActionsShow(true)
+      dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
+    }, 450)
   }
+
   const handleMouseLeave = () => {
     clearTimeout(messageActionsTimeout.current)
     setMessageActionsShow(false)
@@ -402,7 +456,17 @@ const Message = ({
 
   const handleReactionAddDelete = (selectedEmoji: any) => {
     if (message.selfReactions && message.selfReactions.some((item: IReaction) => item.key === selectedEmoji)) {
-      dispatch(deleteReactionAC(channel.id, message.id, selectedEmoji))
+      dispatch(
+        deleteReactionAC(
+          channel.id,
+          message.id,
+          selectedEmoji,
+          channel.userMessageReactions &&
+            channel.userMessageReactions[0] &&
+            channel.userMessageReactions[0].messageId === message.id &&
+            channel.userMessageReactions[0].key === selectedEmoji
+        )
+      )
     } else {
       const score = 1
       const reason = 'mmm'
@@ -411,11 +475,13 @@ const Message = ({
     }
 
     setMessageActionsShow(false)
+    setFrequentlyEmojisOpen(false)
     // setReactionIsOpen(false)
   }
 
   const handleSendReadMarker = () => {
     if (
+      isVisible &&
       message.incoming &&
       !(message.selfMarkers.length && message.selfMarkers.includes(MESSAGE_DELIVERY_STATUS.READ))
     ) {
@@ -430,9 +496,6 @@ const Message = ({
       })
     }
   }
-
-  const messageItemRef = useRef()
-  const isVisible = useOnScreen(messageItemRef)
 
   /*  const MessageActionsCont =
     // () =>
@@ -530,12 +593,62 @@ const Message = ({
     </MessageHeaderCont>
   )
 
+  const handleClick = (e: any) => {
+    const emojisContainer = document.getElementById('emojisContainer')
+    const frequentlyEmojisContainer = document.getElementById('frequently_emojis_container')
+    if (emojisContainer && !emojisContainer.contains(e.target)) {
+      setEmojisPopupOpen(false)
+    }
+    if (frequentlyEmojisContainer && !frequentlyEmojisContainer.contains(e.target)) {
+      setFrequentlyEmojisOpen(false)
+    }
+  }
+
+  const handleOpenEmojis = () => {
+    if (openFrequentlyUsedReactions) {
+      setFrequentlyEmojisOpen(true)
+    } else {
+      setEmojisPopupOpen(true)
+    }
+  }
+
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && tabIsActive) {
       setLastVisibleMessageId(message.id)
       handleSendReadMarker()
     }
   }, [isVisible])
+
+  useEffect(() => {
+    if (tabIsActive) {
+      handleSendReadMarker()
+    }
+  }, [tabIsActive])
+
+  useEffect(() => {
+    if (emojisPopupOpen) {
+      // const emojisContainer = document.getElementById(`${message.id}_emoji_popup_container`)
+      const bottomPos = messageItemRef.current ? messageItemRef.current.getBoundingClientRect().bottom : 0
+      const offsetBottom = window.innerHeight - bottomPos
+      setEmojisPopupPosition(offsetBottom < 300 ? 'top' : 'bottom')
+      setFrequentlyEmojisOpen(false)
+    } else {
+      setEmojisPopupPosition('')
+    }
+  }, [emojisPopupOpen])
+
+  useEffect(() => {
+    if (openedMessageMenuId !== message.id) {
+      setMessageActionsShow(false)
+    }
+  }, [openedMessageMenuId])
+
+  useEffect(() => {
+    document.addEventListener('mousedown', handleClick)
+    return () => {
+      document.removeEventListener('mousedown', handleClick)
+    }
+  }, [])
 
   return (
     <MessageItem
@@ -579,6 +692,7 @@ const Message = ({
       >
         {message.state === MESSAGE_STATUS.FAILED && (
           <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
+            <ErrorIconWrapper />
             {/* <DropDown
               // forceClose={showChooseAttachmentType}
               position={nextMessage ? 'right' : 'topRight'}
@@ -610,35 +724,35 @@ const Message = ({
           </FailedMessageIcon>
         )}
         {/* {withAttachments && !message.body && <MessageHeader />} */}
+
         <MessageBody
           className='messageBody'
           isSelfMessage={!message.incoming}
           isReplyMessage={!!(message.parent && message.parent.id && !isThreadMessage)}
-          parentMessageAttachmentType={
+          parentMessageIsVoice={
             message.parent &&
             message.parent.attachments &&
             message.parent.attachments[0] &&
-            message.parent.attachments[0].type
+            message.parent.attachments[0].type === attachmentTypes.voice
           }
           ownMessageBackground={ownMessageBackground}
           incomingMessageBackground={incomingMessageBackground}
           borderRadius={borderRadius}
-          withAttachments={withAttachments && message.attachments[0].type !== attachmentTypes.link}
+          withAttachments={notLinkAttachment}
           attachmentWidth={
             withAttachments
-              ? message.attachments[0].type === attachmentTypes.image
-                ? message.attachments[0].metadata &&
-                  message.attachments[0].metadata.szw &&
-                  calculateRenderedImageWidth(
-                    message.attachments[0].metadata.szw,
-                    message.attachments[0].metadata.szh
-                  )[0]
+              ? mediaAttachment
+                ? mediaAttachment.type === attachmentTypes.image
+                  ? mediaAttachment.metadata &&
+                    mediaAttachment.metadata.szw &&
+                    calculateRenderedImageWidth(mediaAttachment.metadata.szw, mediaAttachment.metadata.szh)[0]
+                  : mediaAttachment.type === attachmentTypes.video
+                  ? 320
+                  : undefined
                 : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
                 message.attachments[0].type === attachmentTypes.voice
                 ? 254
-                : message.attachments[0].type === attachmentTypes.video
-                ? 320
                 : undefined
               : undefined
           }
@@ -648,7 +762,7 @@ const Message = ({
         >
           {/* {withAttachments && !!message.body && <MessageHeader />} */}
           {(showMessageSenderName || messageTimePosition === 'topOfMessage') && <MessageHeader />}
-          {!isThreadMessage && messageActionsShow && (
+          {!isThreadMessage && messageActionsShow && !emojisPopupOpen && !frequentlyEmojisOpen && (
             <MessageActions
               messageFrom={message.user}
               channel={channel}
@@ -714,6 +828,7 @@ const Message = ({
               messageActionIconsColor={messageActionIconsColor}
               myRole={channel.role}
               isIncoming={message.incoming}
+              handleOpenEmojis={handleOpenEmojis}
             />
           )}
           {message.parent && message.parent.id && !isThreadMessage && (
@@ -726,15 +841,17 @@ const Message = ({
                 message.parent.attachments &&
                   !!message.parent.attachments.length &&
                   message.parent.attachments[0].type !== attachmentTypes.voice &&
-                  message.parent.attachments[0].type !== attachmentTypes.link &&
+                  parentNotLinkAttachment &&
                   // <MessageAttachments>
                   (message.parent.attachments as any[]).map((attachment, index) => (
                     <Attachment
                       key={attachment.attachmentId || attachment.url}
                       backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
-                      attachment={attachment}
+                      attachment={{
+                        ...attachment,
+                        metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+                      }}
                       removeSelected={handleRemoveFailedAttachment}
-                      attachments={message.parent!.attachments}
                       selectedFileAttachmentsIcon={fileAttachmentsIcon}
                       isRepliedMessage
                       borderRadius={index === message.parent!.attachments.length - 1 ? borderRadius : '16px'}
@@ -768,8 +885,7 @@ const Message = ({
                         contactsMap,
                         getFromContacts
                       })
-                    : message.parent.attachments.length &&
-                      message.parent.attachments[0].type !== attachmentTypes.link &&
+                    : parentNotLinkAttachment &&
                       (message.parent.attachments[0].type === attachmentTypes.image
                         ? 'Photo'
                         : message.parent.attachments[0].type === attachmentTypes.video
@@ -812,7 +928,7 @@ const Message = ({
           <MessageText
             draggable={false}
             showMessageSenderName={showMessageSenderName}
-            withAttachment={withAttachments && message.attachments[0].type !== attachmentTypes.link && !!message.body}
+            withAttachment={notLinkAttachment && !!message.body}
             withMediaAttachment={withMediaAttachment}
             fontFamily={fontFamily}
             isForwarded={!!message.forwardingDetails}
@@ -846,7 +962,7 @@ const Message = ({
             ) : null}
           </MessageText>
           {/* )} */}
-          {withAttachments && message.attachments[0].type !== attachmentTypes.link && (
+          {notLinkAttachment && (
             <MessageStatusAndTime
               withAttachment
               fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
@@ -893,9 +1009,11 @@ const Message = ({
                 <Attachment
                   key={attachment.attachmentId || attachment.url}
                   handleMediaItemClick={handleMediaItemClick}
-                  attachment={attachment}
+                  attachment={{
+                    ...attachment,
+                    metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+                  }}
                   removeSelected={handleRemoveFailedAttachment}
-                  attachments={message.attachments}
                   imageMinWidth={
                     message.parent &&
                     message.parent.attachments &&
@@ -915,6 +1033,39 @@ const Message = ({
               ))
             // </MessageAttachments>
           }
+          {emojisPopupOpen && emojisPopupPosition && (
+            <EmojiContainer
+              id={`${message.id}_emoji_popup_container`}
+              position={emojisPopupPosition}
+              rtlDirection={ownMessageOnRightSide && !message.incoming}
+            >
+              {message.deliveryStatus && message.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
+                <EmojisPopup
+                  relativePosition
+                  emojisPopupPosition={emojisPopupPosition}
+                  emojisCategoryIconsPosition={emojisCategoryIconsPosition}
+                  emojisContainerBorderRadius={emojisContainerBorderRadius}
+                  separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
+                  rtlDirection={ownMessageOnRightSide && !message.incoming}
+                  handleEmojiPopupToggle={setEmojisPopupOpen}
+                  handleAddEmoji={handleReactionAddDelete}
+                />
+              )}
+            </EmojiContainer>
+          )}
+          {frequentlyEmojisOpen && !emojisPopupOpen && (
+            <FrequentlyEmojisContainer
+              id='frequently_emojis_container'
+              rtlDirection={ownMessageOnRightSide && !message.incoming}
+            >
+              <FrequentlyEmojis
+                rtlDirection={ownMessageOnRightSide && !message.incoming}
+                handleAddEmoji={handleReactionAddDelete}
+                handleEmojiPopupToggle={setEmojisPopupOpen}
+                frequentlyEmojis={message.selfReactions}
+              />
+            </FrequentlyEmojisContainer>
+          )}
         </MessageBody>
 
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
@@ -922,8 +1073,20 @@ const Message = ({
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
+        {reactionsPopupOpen && (
+          <ReactionsPopup
+            bottomPosition={reactionsPopupPosition}
+            horizontalPositions={reactionsPopupHorizontalPosition}
+            reactionScores={message.reactionScores || {}}
+            messageId={message.id}
+            handleReactionsPopupClose={handleToggleReactionsPopup}
+            rtlDirection={ownMessageOnRightSide && !message.incoming}
+            handleAddDeleteEmoji={handleReactionAddDelete}
+          />
+        )}
         {reactionsList && reactionsList.length && (
           <ReactionsContainer
+            id={`${message.id}_reactions_container`}
             border={reactionsContainerBorder}
             boxShadow={reactionsContainerBoxShadow}
             borderRadius={reactionsContainerBorderRadius}
@@ -940,11 +1103,14 @@ const Message = ({
                 )}
               </EmojiContainer>
             </ReactionEmojis> */}
-            <MessageReactionsCont rtlDirection={ownMessageOnRightSide && !message.incoming}>
+            <MessageReactionsCont
+              rtlDirection={ownMessageOnRightSide && !message.incoming}
+              onClick={handleToggleReactionsPopup}
+            >
               {reactionsList.slice(0, reactionsDisplayCount || 5).map((key) => (
                 <MessageReaction
                   key={key}
-                  onClick={() => handleReactionAddDelete(key)}
+                  // onClick={() => handleReactionAddDelete(key)}
                   self={!!message.selfReactions.find((selfReaction: IReaction) => selfReaction.key === key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
@@ -954,7 +1120,9 @@ const Message = ({
                   isLastReaction={reactionsCount === 1}
                   fontSize={reactionsFontSize}
                 >
-                  {`${key} ${showEachReactionCount ? message.reactionScores![key] : ''}`}
+                  <MessageReactionKey>{`${key} ${
+                    showEachReactionCount ? message.reactionScores![key] : ''
+                  }`}</MessageReactionKey>
                 </MessageReaction>
               ))}
               {reactionsCount && reactionsCount > 1 && (
@@ -1010,6 +1178,11 @@ const Message = ({
 }
 
 export default Message
+
+const MessageReactionKey = styled.span`
+  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
+    twemoji mozilla, segoe ui symbol;
+`
 
 const MessageReaction = styled.span<{
   self?: boolean
@@ -1072,16 +1245,16 @@ const ThreadMessageCountContainer = styled.div`
 ` */
 const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   position: absolute;
-  bottom: 0;
+  top: -6px;
   left: ${(props) => !props.rtl && '-24px'};
   right: ${(props) => props.rtl && '-24px'};
   width: 20px;
   height: 20px;
 `
-/* const ErrorIconWrapper = styled(ErrorIcon)`
+const ErrorIconWrapper = styled(ErrorIcon)`
   width: 20px;
   height: 20px;
-` */
+`
 const ReactionsContainer = styled.div<{
   border?: string
   boxShadow?: string
@@ -1092,8 +1265,8 @@ const ReactionsContainer = styled.div<{
   rtlDirection?: boolean
 }>`
   display: inline-flex;
-  margin-left: ${(props) => !props.rtlDirection && 'auto'};
-  margin-right: ${(props) => props.rtlDirection && 'auto'};
+  margin-left: ${(props) => props.rtlDirection && 'auto'};
+  margin-right: ${(props) => !props.rtlDirection && 'auto'};
 
   margin-top: 4px;
   justify-content: flex-end;
@@ -1111,10 +1284,12 @@ const ReactionsContainer = styled.div<{
   `};
 `
 const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`
+  position: relative;
   display: inline-flex;
   max-width: 300px;
   //overflow-x: auto;
   direction: ${(props) => props.rtlDirection && 'ltr'};
+  cursor: pointer;
 `
 /*
 const EmojiContainer = styled.div<{ rtl: boolean }>`
@@ -1311,7 +1486,7 @@ const MessageBody = styled.div<{
   withAttachments?: boolean
   noBody?: boolean
   isReplyMessage?: boolean
-  parentMessageAttachmentType?: any
+  parentMessageIsVoice?: any
   attachmentWidth?: number
 }>`
   position: relative;
@@ -1322,7 +1497,7 @@ const MessageBody = styled.div<{
     props.withAttachments
       ? props.attachmentWidth && props.attachmentWidth < 420
         ? props.attachmentWidth < 130
-          ? props.parentMessageAttachmentType && props.parentMessageAttachmentType === attachmentTypes.voice
+          ? props.isReplyMessage
             ? '210px'
             : '130px'
           : `${props.attachmentWidth}px`
@@ -1407,4 +1582,19 @@ const MessageItem = styled.div<{
   &:hover ${MessageStatus} {
     visibility: visible;
   }
+`
+
+const EmojiContainer = styled.div<any>`
+  position: absolute;
+  left: ${(props) => (props.rtlDirection ? '' : '0')};
+  right: ${(props) => props.rtlDirection && '0'};
+  top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
+  z-index: 99;
+`
+const FrequentlyEmojisContainer = styled.div<any>`
+  position: absolute;
+  left: ${(props) => (props.rtlDirection ? '' : '0')};
+  right: ${(props) => props.rtlDirection && '0'};
+  top: -50px;
+  z-index: 99;
 `
