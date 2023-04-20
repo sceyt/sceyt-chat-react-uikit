@@ -103,7 +103,7 @@ function* sendMessage(action: IAction): any {
     const { payload } = action
     const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
     const channel = yield call(getChannelFromMap, channelId)
-    const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
+    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
 
@@ -647,7 +647,7 @@ function* sendTextMessage(action: IAction): any {
   const channel = yield call(getChannelFromMap, channelId)
   let sendMessageTid
   try {
-    const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
+    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
       const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
@@ -752,7 +752,7 @@ function* forwardMessage(action: IAction): any {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
-          .setMetadata(JSON.stringify(attachments[0].metadata))
+          .setMetadata(attachments[0].metadata)
           .setFileSize(attachments[0].fileSize)
           .setUpload(false)
           .create()

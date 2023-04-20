@@ -19,7 +19,6 @@ import {
   reactionsLoadingStateSelector,
   sendMessageInputHeightSelector
 } from '../../../store/message/selector'
-import { channelInfoIsOpenSelector, channelListWidthSelector } from '../../../store/channel/selector'
 
 interface IReactionsPopupProps {
   messageId: string
@@ -36,22 +35,22 @@ export default function ReactionsPopup({
   handleReactionsPopupClose,
   handleAddDeleteEmoji,
   bottomPosition,
-  horizontalPositions,
+  // horizontalPositions,
   reactionScores,
   rtlDirection
 }: IReactionsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
   const messageInputHeight = useSelector(sendMessageInputHeightSelector, shallowEqual)
-  const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
-  const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  // const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
+  // const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const reactionsHasNext = useSelector(reactionsHasNextSelector, shallowEqual)
   const reactionsLoadingState = useSelector(reactionsLoadingStateSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [activeTabKey, setActiveTabKey] = useState('all')
   const [popupVerticalPosition, setPopupVerticalPosition] = useState('')
-  const [popupHorizontalPosition, setPopupHorizontalPosition] = useState('')
+  // const [popupHorizontalPosition, setPopupHorizontalPosition] = useState('')
   const [popupHeight, setPopupHeight] = useState(0)
   const [calculateSizes, setCalculateSizes] = useState(false)
   const [closeIsApproved, setCloseIsApproved] = useState(false)
@@ -111,14 +110,14 @@ export default function ReactionsPopup({
   useEffect(() => {
     if (reactions && reactions.length) {
       if (calculateSizes) {
-        const popupPos = popupRef.current?.getBoundingClientRect()
-        if (rtlDirection) {
+        // const popupPos = popupRef.current?.getBoundingClientRect()
+        /*  if (rtlDirection) {
           setPopupHorizontalPosition(
             horizontalPositions.right - (channelDetailsIsOpen ? 362 : 0) > popupPos?.width! ? 'right' : 'left'
           )
         } else {
           setPopupHorizontalPosition(horizontalPositions.left - channelListWidth > popupPos?.width! ? 'left' : 'right')
-        }
+        } */
         const botPost = bottomPosition - messageInputHeight - 40
         const reactionsHeight = reactions.length * 44 + 45
         setPopupHeight(reactionsHeight)
@@ -131,7 +130,7 @@ export default function ReactionsPopup({
     <Container
       ref={popupRef}
       popupVerticalPosition={popupVerticalPosition}
-      popupHorizontalPosition={popupHorizontalPosition}
+      // popupHorizontalPosition={popupHorizontalPosition}
       className='reactions_popup'
       height={popupHeight}
       visible={!!(reactions && reactions.length && reactionsLoadingState === LOADING_STATE.LOADED)}
@@ -195,14 +194,16 @@ export default function ReactionsPopup({
 
 const Container = styled.div<{
   popupVerticalPosition: string
-  popupHorizontalPosition: string
+  popupHorizontalPosition?: string
   height: number
   visible?: any
   rtlDirection?: boolean
 }>`
   position: absolute;
-  right: ${(props) => props.popupHorizontalPosition === 'left' && (props.rtlDirection ? 'calc(100% - 80px)' : 0)};
-  left: ${(props) => props.popupHorizontalPosition === 'right' && (!props.rtlDirection ? 'calc(100% - 80px)' : 0)};
+  /*right: ${(props) => props.popupHorizontalPosition === 'left' && (props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
+  right: ${(props) => props.rtlDirection && 0};
+  /*left: ${(props) => props.popupHorizontalPosition === 'right' && (!props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
+  left: ${(props) => !props.rtlDirection && 0};
   top: ${(props) => props.popupVerticalPosition === 'bottom' && '100%'};
   bottom: ${(props) => props.popupVerticalPosition === 'top' && '42px'};
   width: 340px;

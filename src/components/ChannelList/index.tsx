@@ -116,7 +116,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const connectionStatus = useSelector(connectionStatusSelector)
   // const searchValue = useSelector(searchValueSelector) || ''
   const channels = useSelector(channelsSelector, shallowEqual) || []
-  console.log('channels', channels)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const addedChannel = useSelector(addedChannelSelector)
   const addedToChannel = useSelector(addedToChannelSelector)

@@ -293,8 +293,10 @@ const Message = ({
         attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image
     )
   const withMediaAttachment = !!mediaAttachment
+  const attachmentMetas =
+    mediaAttachment &&
+    (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata)
   // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
-
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
@@ -496,7 +498,6 @@ const Message = ({
       })
     }
   }
-
   /*  const MessageActionsCont =
     // () =>
     // useMemo(
@@ -575,7 +576,11 @@ const Message = ({
       {showMessageSenderName && (
         <MessageOwner
           withPadding={
-            withAttachments || (message.parent && message.parent.attachments && !!message.parent.attachments.length)
+            (withAttachments && notLinkAttachment) ||
+            (message.parent &&
+              message.parent.attachments &&
+              !!message.parent.attachments.length &&
+              parentNotLinkAttachment)
           }
           isForwarded={message.forwardingDetails}
           messageBody={!!message.body}
@@ -743,9 +748,9 @@ const Message = ({
             withAttachments
               ? mediaAttachment
                 ? mediaAttachment.type === attachmentTypes.image
-                  ? mediaAttachment.metadata &&
-                    mediaAttachment.metadata.szw &&
-                    calculateRenderedImageWidth(mediaAttachment.metadata.szw, mediaAttachment.metadata.szh)[0]
+                  ? attachmentMetas &&
+                    attachmentMetas.szw &&
+                    calculateRenderedImageWidth(attachmentMetas.szw, attachmentMetas.szh)[0]
                   : mediaAttachment.type === attachmentTypes.video
                   ? 320
                   : undefined

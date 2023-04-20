@@ -149,7 +149,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const [mentionedMembers, setMentionedMembers] = useState<any>([])
 
-  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>([])
+  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>({})
 
   const [currentMentions, setCurrentMentions] = useState<any>(undefined)
 
@@ -223,9 +223,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
         })
       )
-      setMentionedMembersDisplayName(
-        mentionedMembersDisplayName.filter((menMem: any) => menMem.id !== mentionToChange.id)
-      )
+      const mentionDisplayNameToChange = { ...mentionedMembersDisplayName }
+      delete mentionDisplayNameToChange[mentionToChange.id]
+      setMentionedMembersDisplayName(mentionDisplayNameToChange)
     } else {
       /* console.log('set mention ....................... ', {
         ...member,
@@ -238,11 +238,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       ])
     }
 
-    if (!mentionedMembersDisplayName.find((menMem: any) => menMem.id === member.id)) {
-      setMentionedMembersDisplayName((prevState: any) => [
+    if (!mentionedMembersDisplayName[member.id]) {
+      setMentionedMembersDisplayName((prevState: any) => ({
         ...prevState,
-        { id: member.id, displayName: `@${mentionDisplayName}` }
-      ])
+        [member.id]: { id: member.id, displayName: `@${mentionDisplayName}` }
+      }))
     }
     setMentionTyping(false)
     /* const currentText = [
@@ -440,6 +440,33 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleSendEditMessage = (event?: any) => {
+    /* if (recordedFile) {
+      /!* const file = new File([recordedFile.data], recordedFile.data.name, {
+        type: 'audio/mp3'
+      }) *!/
+      // console.log('file . . . . ', file)
+      console.log('recordedFile . . . . ', recordedFile)
+      console.log('recordedFile duration . . . . ', recordedFile.data.duration)
+      const messageToSend = {
+        metadata: '',
+        body: '',
+        mentionedMembers: [],
+        attachments: [
+          {
+            name: `${uuidv4()}.mp3`,
+            data: recordedFile.data,
+            attachmentId: uuidv4(),
+            upload: true,
+            size: recordedFile.data.size,
+            attachmentUrl: recordedFile.attachmentURL,
+            metadata: { tmb: recordedFile.thumbs },
+            type: attachmentTypes.voice
+          }
+        ],
+        type: 'text'
+      }
+      dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
+    } else { */
     const { shiftKey, charCode, type } = event
     const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
     if (shouldSend) {
@@ -448,40 +475,62 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         handleEditMessage()
       } else if (messageText || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-        // if (messageTexToSend) {
-        const mentionedMembersPositions = {}
-        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
-          a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
-        ) */
-        // const findIndexes: any = []
-        mentionedMembers.forEach((menMem: any) => {
-          if (!mentionedMembersPositions[menMem.id]) {
-            mentionedMembersPositions[menMem.id] = { loc: menMem.start, len: menMem.end - menMem.start }
-          }
-        })
-        /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
-          let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
-          let existingIndex = findIndexes.includes(menIndex)
-          let i = 0
-          while (existingIndex) {
-            menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-            existingIndex = findIndexes.includes(menIndex)
-            // eslint-disable-next-line no-plusplus
-            i++
-            if (i > sortedMentionedMembersDspNames.length) {
-              break
-            }
-          }
+        const trimLength = messageText.length - messageText.trimStart().length
 
-          const mentionDisplayLength = menMem.displayName.length
-          if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-            findIndexes.push(menIndex)
-            mentionedMembersPositions = {
-              ...mentionedMembersPositions,
-              [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+        // if (messageTexToSend) {
+        const mentionedMembersPositions: any = []
+        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+            a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+          ) */
+        // const findIndexes: any = []
+        console.log('mentionedMembers . . . . .', mentionedMembers)
+        console.log('mentionedMembers display name . . . . .', mentionedMembersDisplayName)
+        if (mentionedMembers && mentionedMembers.length > 0) {
+          let lastFoundIndex = 0
+          mentionedMembers.forEach((menMem: any) => {
+            const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
+            console.log('menMem. . . . . ', menMem)
+            console.log('mentionDisplayName. . . . . ', mentionDisplayName)
+            console.log('find from index. . . . . ', lastFoundIndex)
+            const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
+            lastFoundIndex = menIndex + mentionDisplayName.length
+            console.log('mentionDisplayName.length... . . ', mentionDisplayName.length)
+            console.log('menIndex . . . ..  . . .', menIndex)
+            console.log('lastFoundIndex... . . ', lastFoundIndex)
+            // if (!mentionedMembersPositions[menMem.id]) {
+            mentionedMembersPositions.push({
+              id: menMem.id,
+              // loc: menIndex,
+              loc: menMem.start - trimLength,
+              // len: mentionDisplayName.length
+              len: menMem.end - menMem.start
+            })
+            // }
+          })
+        }
+        /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
+            let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
+            let existingIndex = findIndexes.includes(menIndex)
+            let i = 0
+            while (existingIndex) {
+              menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
+              existingIndex = findIndexes.includes(menIndex)
+              // eslint-disable-next-line no-plusplus
+              i++
+              if (i > sortedMentionedMembersDspNames.length) {
+                break
+              }
             }
-          }
-        }) */
+
+            const mentionDisplayLength = menMem.displayName.length
+            if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
+              findIndexes.push(menIndex)
+              mentionedMembersPositions = {
+                ...mentionedMembersPositions,
+                [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+              }
+            }
+          }) */
         const messageToSend: any = {
           metadata: mentionedMembersPositions,
           body: messageTexToSend,
@@ -508,17 +557,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             firstUrl = match[0].url
           }
           /* messageTextArr.forEach((textPart) => {
-            if (urlRegex.test(textPart)) {
-              const textArray = textPart.split(urlRegex)
-              textArray.forEach(async (part) => {
-                if (urlRegex.test(part)) {
-                  if (!firstUrl) {
-                    firstUrl = part
+              if (urlRegex.test(textPart)) {
+                const textArray = textPart.split(urlRegex)
+                textArray.forEach(async (part) => {
+                  if (urlRegex.test(part)) {
+                    if (!firstUrl) {
+                      firstUrl = part
+                    }
                   }
-                }
-              })
-            }
-          }) */
+                })
+              }
+            }) */
           if (firstUrl) {
             messageToSend.attachments = [
               {
@@ -547,17 +596,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             if (sendAsSeparateMessage) {
               if (index !== 0) {
                 messageToSend.body = ''
+                messageToSend.metadata = ''
+                delete messageToSend.mentionedMembers
               }
               /* handleSendMessage(
-                {
-                  ...messageToSend,
-                  attachments: [attachmentToSend],
-                  metadata: { ...messageToSend.metadata, groupId }
-                },
-                connectionStatus,
-                activeChannel.id,
-                true
-              ) */
+                  {
+                    ...messageToSend,
+                    attachments: [attachmentToSend],
+                    metadata: { ...messageToSend.metadata, groupId }
+                  },
+                  connectionStatus,
+                  activeChannel.id,
+                  true
+                ) */
+              console.log('messageToSend. . . . .  .', messageToSend)
               dispatch(
                 sendMessageAC(
                   {
@@ -577,6 +629,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
         }
         setMessageText('')
+
         messageInputRef.current.innerText = ''
         setAttachments([])
         handleCloseReply()
@@ -593,29 +646,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         clearTimeout(typingTimout)
         setTypingTimout(undefined)
         /* else if (recordedFile) {
-         /!* const file = new File([recordedFile.data], 'voice_message.webm', {
-           type: 'audio/ogg',
-         });
-         const messageToSend = {
-           metadata: '',
-           body: '',
-           mentionedMembers: [],
-           attachments: [
-             {
-               name: recordedFile.data.name,
-               data: recordedFile.data,
-               attachmentId: Date.now(),
-               upload: true,
-               attachmentUrl: recordedFile.attachmentURL,
-               metadata: 'metadata for voice message',
-               type: recordedFile.data.type.split('/')[1]
-             }
-           ],
-           type: 'voice'
-         }
-         dispatch(sendMessageAC(messageToSend))
-       } */
+           /!* const file = new File([recordedFile.data], 'voice_message.webm', {
+             type: 'audio/ogg',
+           });
+           const messageToSend = {
+             metadata: '',
+             body: '',
+             mentionedMembers: [],
+             attachments: [
+               {
+                 name: recordedFile.data.name,
+                 data: recordedFile.data,
+                 attachmentId: Date.now(),
+                 upload: true,
+                 attachmentUrl: recordedFile.attachmentURL,
+                 metadata: 'metadata for voice message',
+                 type: recordedFile.data.type.split('/')[1]
+               }
+             ],
+             type: 'voice'
+           }
+           dispatch(sendMessageAC(messageToSend))
+         } */
       }
+      // }
     }
   }
   const handleEditMessage = () => {
@@ -1198,14 +1252,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ? "Sender doesn't support replies"
             : 'You blocked this user.'}
         </BlockedUserInfo>
-      ) : !activeChannel.role ? (
+      ) : !activeChannel.role && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
         <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
           Join
         </JoinChannelCont>
       ) : (
           activeChannel.type === CHANNEL_TYPE.PUBLIC
             ? !(activeChannel.role === 'admin' || activeChannel.role === 'owner')
-            : !checkActionPermission('sendMessage')
+            : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
         ) ? (
         <ReadOnlyCont iconColor={colors.primary}>
           <EyeIcon /> Read only

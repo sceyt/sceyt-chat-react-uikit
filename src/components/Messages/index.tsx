@@ -370,7 +370,8 @@ const MessageList: React.FC<MessagesProps> = ({
         !scrollToRepliedMessage &&
         -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightQuarter &&
         /* hasPrev && */ !loading &&
-        !scrollToNewMessage.scrollToBottom
+        !scrollToNewMessage.scrollToBottom &&
+        messages.length
       ) {
         loadDirection = 'prev'
         // console.log('load prev messages........ ')
@@ -750,7 +751,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    console.log('messages... ', messages)
+    // console.log('messages... ', messages)
   }, [messages])
   /* useEffect(() => {
   }, [pendingMessages]) */
