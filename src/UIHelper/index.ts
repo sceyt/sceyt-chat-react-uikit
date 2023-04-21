@@ -946,7 +946,7 @@ export const MessageOwner = styled.h3<any>`
   white-space: nowrap;
   padding: ${(props) =>
     props.withPadding &&
-    (props.messageBody ? '8px 0 0 12px' : props.isForwarded ? '8px 0 2px 12px' : '8px 0 4px 12px')};
+    (props.isForwarded ? '8px 0 2px 12px' : !props.isReply && !props.messageBody ? '8px 0 8px 12px' : '8px 0 0 12px')};
   color: ${(props) => props.color || colors.primary};
   margin-left: ${(props) => props.rtlDirection && 'auto'};
   font-weight: 500;

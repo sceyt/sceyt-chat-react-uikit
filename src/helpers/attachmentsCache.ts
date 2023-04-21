@@ -22,6 +22,12 @@ export const setAttachmentToCache = (attachmentId: string, attachmentResponse: a
   }
   // downloadedAttachments[attachmentId] = attachmentUrl
 }
+export const removeAttachmentFromCache = (attachmentId: string) => {
+  if (cacheAvailable) {
+    caches.delete(attachmentId)
+  }
+  // downloadedAttachments[attachmentId] = attachmentUrl
+}
 
 export const getAttachmentUrlFromCache = (attachmentId: string) => {
   if (cacheAvailable) {

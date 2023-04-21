@@ -768,7 +768,7 @@ function* forwardMessage(action: IAction): any {
         .setForwardingMessageId(message.id)
 
       const messageToSend = messageBuilder.create()
-
+      console.log('forward message ... create messageToSend ... ', messageToSend)
       const pendingMessage = JSON.parse(
         JSON.stringify({
           ...messageToSend,
@@ -796,7 +796,9 @@ function* forwardMessage(action: IAction): any {
         addMessageToMap(channelId, pendingMessage)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
+        console.log('forward message ... send message ... ', messageToSend)
         const messageResponse = yield call(channel.sendMessage, messageToSend)
+        console.log('forward message ... message  response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           deliveryStatus: messageResponse.deliveryStatus,

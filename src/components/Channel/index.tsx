@@ -164,13 +164,12 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               )
             )}
-            {!isDirectChannel &&
-              (typingIndicator ||
-                (lastMessage &&
-                  lastMessage.user &&
-                  lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                  (lastMessage.user.id === user.id || !isDirectChannel) &&
-                  lastMessage.type !== 'system')) && <Points>: </Points>}
+            {(typingIndicator ||
+              (lastMessage &&
+                lastMessage.user &&
+                lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                (lastMessage.user.id === user.id || !isDirectChannel) &&
+                lastMessage.type !== 'system')) && <Points>: </Points>}
             <LastMessageText
               withAttachments={
                 !!(

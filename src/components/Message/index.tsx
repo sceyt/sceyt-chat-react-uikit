@@ -570,18 +570,18 @@ const Message = ({
       // ),
       // [message.id]
     ) */
-
   const MessageHeader = () => (
     <MessageHeaderCont>
       {showMessageSenderName && (
         <MessageOwner
           withPadding={
-            (withAttachments && notLinkAttachment) ||
+            withAttachments && notLinkAttachment /* ||
             (message.parent &&
               message.parent.attachments &&
               !!message.parent.attachments.length &&
-              parentNotLinkAttachment)
+              parentNotLinkAttachment) */
           }
+          isReply={!!message.parent}
           isForwarded={message.forwardingDetails}
           messageBody={!!message.body}
           color={colors.primary}
@@ -831,13 +831,15 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.role}
+              myRole={channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.role : channel.role}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />
           )}
           {message.parent && message.parent.id && !isThreadMessage && (
             <ReplyMessageContainer
+              withSenderName={showMessageSenderName}
+              withBody={!!message.body}
               withAttachments={withAttachments}
               leftBorderColor={colors.primary}
               onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
@@ -1338,12 +1340,26 @@ const MessageTime = styled.span`
   color: ${colors.gray6};
 `
 
-const ReplyMessageContainer = styled.div<{ leftBorderColor?: string; withAttachments?: boolean }>`
+const ReplyMessageContainer = styled.div<{
+  leftBorderColor?: string
+  withAttachments?: boolean
+  withSenderName?: boolean
+  withBody?: boolean
+}>`
   display: flex;
   border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
   padding: 0 6px;
   position: relative;
-  margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
+  //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
+  margin: ${(props) =>
+    props.withAttachments
+      ? props.withBody
+        ? '6px 12px 0'
+        : '6px 12px 8px'
+      : props.withSenderName
+      ? '6px 0 8px'
+      : '0 0 8px'};
+  margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;
 `
 const ReplyMessageBody = styled.div`

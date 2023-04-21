@@ -205,7 +205,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       user.id === member.id ? member : contactsMap[member.id],
       member,
       getFromContacts
-    )
+    ).trim()
     const mentionToChange = mentionedMembers.find((men: any) => men.start === currentMentions.start)
     // console.log('handle set mention .......................')
     // console.log('mentionToChange:', mentionToChange)
@@ -216,7 +216,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             return {
               ...member,
               start: currentMentions.start,
-              end: currentMentions.start + 1 + mentionDisplayName.trim().length
+              end: currentMentions.start + 1 + mentionDisplayName.length
             }
           } else {
             return menMem
@@ -234,10 +234,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }) */
       setMentionedMembers((members: any) => [
         ...members,
-        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.trim().length }
+        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.length }
       ])
     }
-
     if (!mentionedMembersDisplayName[member.id]) {
       setMentionedMembersDisplayName((prevState: any) => ({
         ...prevState,
@@ -256,12 +255,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const currentText = `${messageText.slice(
       0,
       mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1
-    )}${mentionDisplayName} ${messageText.slice(
+    )}${mentionDisplayName}${messageText.slice(
       mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
     )}`
     setMessageText(currentText)
     messageInputRef.current.innerText = currentText
-
     setCursorPosition(messageInputRef.current, currentMentions.start + 1 + mentionDisplayName.length)
     const updateCurrentMentions = { ...currentMentions }
     updateCurrentMentions.typed = mentionDisplayName
@@ -483,20 +481,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
           ) */
         // const findIndexes: any = []
-        console.log('mentionedMembers . . . . .', mentionedMembers)
-        console.log('mentionedMembers display name . . . . .', mentionedMembersDisplayName)
         if (mentionedMembers && mentionedMembers.length > 0) {
           let lastFoundIndex = 0
           mentionedMembers.forEach((menMem: any) => {
             const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
-            console.log('menMem. . . . . ', menMem)
-            console.log('mentionDisplayName. . . . . ', mentionDisplayName)
-            console.log('find from index. . . . . ', lastFoundIndex)
+            // console.log('menMem. . . . . ', menMem)
+            // console.log('mentionDisplayName. . . . . ', mentionDisplayName)
+            // console.log('find from index. . . . . ', lastFoundIndex)
             const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
             lastFoundIndex = menIndex + mentionDisplayName.length
-            console.log('mentionDisplayName.length... . . ', mentionDisplayName.length)
-            console.log('menIndex . . . ..  . . .', menIndex)
-            console.log('lastFoundIndex... . . ', lastFoundIndex)
+            // console.log('mentionDisplayName.length... . . ', mentionDisplayName.length)
+            // console.log('menIndex . . . ..  . . .', menIndex)
+            // console.log('lastFoundIndex... . . ', lastFoundIndex)
             // if (!mentionedMembersPositions[menMem.id]) {
             mentionedMembersPositions.push({
               id: menMem.id,
@@ -609,7 +605,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   activeChannel.id,
                   true
                 ) */
-              console.log('messageToSend. . . . .  .', messageToSend)
               dispatch(
                 sendMessageAC(
                   {

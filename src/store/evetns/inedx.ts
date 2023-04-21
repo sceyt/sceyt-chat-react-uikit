@@ -702,8 +702,8 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
-        console.log('channel REACTION_ADDED ... ')
         const { channel, user, message, reaction } = args
+        console.log('channel REACTION_ADDED ... ', args)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 

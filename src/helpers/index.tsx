@@ -261,7 +261,7 @@ export const makeUserName = (contact?: IContact, user?: IUser, fromContact?: boo
   return fromContact
     ? contact
       ? contact.firstName
-        ? `${contact.firstName} ${contact.lastName}`
+        ? `${contact.firstName.trim()} ${contact.lastName?.trim()}`
         : contact.id
       : user
       ? user.id || 'Deleted user'
@@ -496,6 +496,7 @@ export const getCaretPosition1 = (element: any) => {
       } else {
         caretOffset += node.nodeValue.length
       }
+    } else {
       textNodes += 1
     }
     if (element.childNodes.length === index + 1 && !textNodesAdded) {
@@ -687,7 +688,6 @@ export const getCaretPosition = (editableDiv: any) => {
 export const setCursorPosition = (element: any, position: number) => {
   const range = document.createRange()
   const sel = window.getSelection()
-  console.log('element.childNodes. . . .', element.childNodes)
   let currentNode = element.childNodes[0]
   // let offset = 0
 
@@ -719,12 +719,13 @@ export const setCursorPosition = (element: any, position: number) => {
         caretOffset = position - (caretOffset - textLength)
         return
       }
-
+    } else {
       textNodes += 1
-    } else if (node.nodeName === 'SPAN') {
+    }
+    /* else if (node.nodeName === 'SPAN') {
       caretOffset += 1
       currentNode = node
-    }
+    } */
     if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
       if (!textNodesAdded) {
         caretOffset += textNodes
