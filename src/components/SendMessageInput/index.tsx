@@ -258,9 +258,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     )}${mentionDisplayName}${messageText.slice(
       mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
     )}`
+    /* const currentTextCont = `${messageInputRef.current.innerHTML.slice(
+      0,
+      mentionToChange ? mentionToChange.start : currentMentions.start
+    )}<span class='mention_user'>@${mentionDisplayName}</span>&nbsp;${messageInputRef.current.innerHTML.slice(
+      mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
+    )}` */
     setMessageText(currentText)
+    // console.log('currentTextCont. . . ', currentTextCont)
+    // console.log('messageInputRef.current innerHtml. . . ', messageInputRef.current.innerHTML)
     messageInputRef.current.innerText = currentText
+    // messageInputRef.current.innerHTML = currentTextCont
     setCursorPosition(messageInputRef.current, currentMentions.start + 1 + mentionDisplayName.length)
+    // setCursorPosition(messageInputRef.current, currentMentions.start + 2)
     const updateCurrentMentions = { ...currentMentions }
     updateCurrentMentions.typed = mentionDisplayName
     updateCurrentMentions.id = member.id
@@ -1483,6 +1493,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 // onKeyDown={handleKeyDown}
                 // value={editMessageText || messageText}
                 ref={messageInputRef}
+                mentionColor={colors.primary}
                 // placeholder='Type message here...'
               />
             </MessageInputWrapper>
@@ -1692,6 +1703,10 @@ const MessageInput = styled.div<any>`
     font-size: 15px;
     color: ${colors.gray7};
     opacity: 1;
+  }
+
+  & span.mention_user {
+    color: ${(props) => props.mentionColor || colors.primary};
   }
   //caret-color: #000;
 `

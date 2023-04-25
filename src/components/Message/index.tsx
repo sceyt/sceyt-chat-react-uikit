@@ -51,6 +51,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { openedMessageMenuSelector } from '../../store/message/selector'
+import { useDidUpdate } from '../../hooks'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
@@ -353,7 +354,6 @@ const Message = ({
     stopScrolling(!forwardPopupOpen)
   }
 
-  // TODO implement reply message
   const handleReplyMessage = (threadReply: boolean) => {
     if (threadReply) {
       // dispatch(setMessageForThreadReply(message));
@@ -371,7 +371,6 @@ const Message = ({
   }
 
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
-    console.log('delete message .. ', message)
     dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
 
     setMessageActionsShow(false)
@@ -434,6 +433,13 @@ const Message = ({
       setMessageActionsShow(true)
       dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
     }, 450)
+  }
+
+  const closeMessageActions = (close: boolean) => {
+    setMessageActionsShow(!close)
+    if (close && !messageActionsShow && messageActionsTimeout.current) {
+      clearTimeout(messageActionsTimeout.current)
+    }
   }
 
   const handleMouseLeave = () => {
@@ -642,8 +648,8 @@ const Message = ({
     }
   }, [emojisPopupOpen])
 
-  useEffect(() => {
-    if (openedMessageMenuId !== message.id) {
+  useDidUpdate(() => {
+    if (openedMessageMenuId && openedMessageMenuId !== message.id) {
       setMessageActionsShow(false)
     }
   }, [openedMessageMenuId])
@@ -831,7 +837,7 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.role : channel.role}
+              myRole={channel.role || (channel.peer && channel.peer.role)}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />
@@ -1035,7 +1041,7 @@ const Message = ({
                   selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                   selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                   selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                  closeMessageActions={(state) => setMessageActionsShow(state)}
+                  closeMessageActions={closeMessageActions}
                 />
               ))
             // </MessageAttachments>
@@ -1536,11 +1542,6 @@ const MessageBody = styled.div<{
   overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
   transform-origin: right;
-  &:hover .message_actions_cont {
-      visibility: visible;
-      opacity: 1;
-    }
-  }
 `
 
 const MessageContent = styled.div<{ messageWidthPercent?: string | number; withAvatar?: boolean; rtl?: boolean }>`

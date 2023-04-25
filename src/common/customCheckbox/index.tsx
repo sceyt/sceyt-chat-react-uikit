@@ -12,6 +12,7 @@ interface IProps {
   tickColor?: string
   borderRadius?: string
   size?: string
+  disabled?: boolean
 }
 
 const CustomCheckbox = ({
@@ -22,6 +23,7 @@ const CustomCheckbox = ({
   backgroundColor,
   tickColor,
   borderRadius,
+  disabled,
   size
 }: IProps) => {
   return (
@@ -34,11 +36,18 @@ const CustomCheckbox = ({
         tickColor={tickColor}
         borderRadius={borderRadius}
         htmlFor={`checkbox-${index}`}
+        disabled={disabled}
       >
         {state && <TickIcon />}
       </CustomLabel>
 
-      <Checkbox type='checkbox' id={`checkbox-${index}`} checked={state} onChange={(e) => onChange(e)} />
+      <Checkbox
+        type='checkbox'
+        disabled={disabled}
+        id={`checkbox-${index}`}
+        checked={state}
+        onChange={(e) => onChange(e)}
+      />
     </React.Fragment>
   )
 }
@@ -52,6 +61,7 @@ const CustomLabel = styled.label<{
   tickColor?: string
   borderRadius?: string
   isChecked: boolean
+  disabled?: boolean
 }>`
   position: relative;
   display: flex;
@@ -61,11 +71,12 @@ const CustomLabel = styled.label<{
   width: ${(props) => props.size || '12px'};
   min-width: ${(props) => props.size || '12px'};
   height: ${(props) => props.size || '12px'};
-  cursor: pointer;
+  cursor: ${(props) => !props.disabled && 'pointer'};
   border: ${(props) => (props.isChecked ? 'none' : '1px solid #818C99')};
   border-radius: ${(props) => props.borderRadius || '4px'};
   background-color: ${(props) =>
     props.isChecked ? props.checkedBackgroundColor || colors.primary : props.backgroundColor || '#fff'};
+  opacity: ${(props) => props.disabled && 0.4};
 
   & > svg {
     width: calc(100% - 4px);

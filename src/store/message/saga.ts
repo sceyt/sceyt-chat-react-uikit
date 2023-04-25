@@ -654,6 +654,7 @@ function* sendTextMessage(action: IAction): any {
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
+    console.log('send measage ... ', message)
     const messageBuilder = channel.createMessageBuilder()
     messageBuilder
       .setBody(message.body)
@@ -693,6 +694,7 @@ function* sendTextMessage(action: IAction): any {
     addMessageToMap(channelId, pendingMessage)
     addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
     yield put(scrollToNewMessageAC(true, true))
+    console.log('messageToSend. . .', messageToSend)
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       const messageResponse = yield call(channel.sendMessage, messageToSend)
       /* if (msgCount <= 200) {

@@ -135,6 +135,13 @@ const Attachment = ({
       }
     }
   }
+
+  const handleMouseEvent = (enter: boolean) => {
+    if (closeMessageActions) {
+      closeMessageActions(enter)
+    }
+  }
+
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
 
   useEffect(() => {
@@ -422,8 +429,8 @@ const Attachment = ({
             <DownloadFile
               backgroundColor={colors.primary}
               onClick={() => downloadFile(attachment)}
-              onMouseEnter={() => closeMessageActions && closeMessageActions(false)}
-              onMouseLeave={() => closeMessageActions && closeMessageActions(true)}
+              onMouseEnter={() => handleMouseEvent(true)}
+              onMouseLeave={() => handleMouseEvent(false)}
             >
               <DownloadIcon />
             </DownloadFile>

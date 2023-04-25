@@ -901,7 +901,6 @@ export default function* watchForEvents(): any {
       } */
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
-        console.log('setConnectionStatusAC -  -- -___---***********************... ', status)
         yield put(setConnectionStatusAC(status))
         break
       }

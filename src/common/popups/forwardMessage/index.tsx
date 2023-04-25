@@ -77,7 +77,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
-    if (event.target.checked) {
+    if (event.target.checked && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
@@ -187,6 +187,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   </ChannelInfo>
                   <CustomCheckbox
                     index={channel.id}
+                    disabled={selectedChannels.length >= 5 && !isSelected}
                     state={isSelected}
                     onChange={(e) => handleChannelSelect(e, channel)}
                     size='18px'

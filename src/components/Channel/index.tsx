@@ -51,6 +51,8 @@ const Channel: React.FC<IChannelProps> = ({
   const withAvatar = avatar === undefined ? true : avatar
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
+  const lastMessageMetas =
+    lastMessage && lastMessage.type === 'system' && lastMessage.metadata && JSON.parse(lastMessage.metadata)
   const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
@@ -164,12 +166,12 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               )
             )}
-            {(typingIndicator ||
-              (lastMessage &&
-                lastMessage.user &&
-                lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                (lastMessage.user.id === user.id || !isDirectChannel) &&
-                lastMessage.type !== 'system')) && <Points>: </Points>}
+            {(isDirectChannel
+              ? !typingIndicator && lastMessage.user && lastMessage.user.id === user.id && !channel.lastReactedMessage
+              : typingIndicator ||
+                (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
+              <Points>: </Points>
+            )}
             <LastMessageText
               withAttachments={
                 !!(
@@ -201,30 +203,30 @@ const Channel: React.FC<IChannelProps> = ({
                     ? 'Created this group'
                     : lastMessage.body === 'AM'
                     ? ` added ${
-                        lastMessage.metadata &&
-                        lastMessage.metadata.m &&
-                        lastMessage.metadata.m
+                        lastMessageMetas &&
+                        lastMessageMetas.m &&
+                        lastMessageMetas.m
                           .slice(0, 5)
                           .map((mem: string) =>
                             mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
                           )
                       } ${
-                        lastMessage.metadata && lastMessage.metadata.m && lastMessage.metadata.m.length > 5
-                          ? `and ${lastMessage.metadata.m.length - 5} more`
+                        lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                          ? `and ${lastMessageMetas.m.length - 5} more`
                           : ''
                       }`
                     : lastMessage.body === 'RM'
                     ? ` removed ${
-                        lastMessage.metadata &&
-                        lastMessage.metadata.m &&
-                        lastMessage.metadata.m
+                        lastMessageMetas &&
+                        lastMessageMetas.m &&
+                        lastMessageMetas.m
                           .slice(0, 5)
                           .map((mem: string) =>
                             mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
                           )
                       } ${
-                        lastMessage.metadata && lastMessage.metadata.m && lastMessage.metadata.m.length > 5
-                          ? `and ${lastMessage.metadata.m.length - 5} more`
+                        lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                          ? `and ${lastMessageMetas.m.length - 5} more`
                           : ''
                       }`
                     : lastMessage.body === 'LG'

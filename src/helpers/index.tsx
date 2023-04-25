@@ -704,6 +704,8 @@ export const setCursorPosition = (element: any, position: number) => {
   let textNodes = 0
   let textNodesAdded = false
   let currentNodeIsFind = false
+  console.log('element.childNodes. . . . .', element.childNodes)
+  console.log('position. . . . .', position)
   element.childNodes.forEach((node: any, index: number) => {
     if (node.nodeType === Node.TEXT_NODE) {
       currentNode = node
