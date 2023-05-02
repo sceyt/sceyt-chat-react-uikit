@@ -33,12 +33,14 @@ import {
 import {
   detectBrowser,
   detectOS,
+  // getCaretPosition,
+  // getCaretPosition1,
   getCaretPosition,
-  getCaretPosition1,
   makeUserName,
   MessageTextFormat,
   placeCaretAtEnd,
-  setCursorPosition
+  setCursorPosition,
+  typingTextFormat
 } from '../../helpers'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
@@ -196,7 +198,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const selPos = getCaretPosition(messageInputRef.current)
     const newText = messageText.slice(0, selPos) + emoji + messageText.slice(selPos)
     setMessageText(newText)
-    messageInputRef.current.innerText = newText
+    if (mentionedMembers.length && mentionedMembers.length > 0) {
+      const currentTextCont = typingTextFormat({
+        text: newText,
+        mentionedMembers: [
+          ...mentionedMembers.map((menMem: any) => ({
+            ...menMem,
+            displayName: mentionedMembersDisplayName[menMem.id].displayName
+          }))
+        ]
+      })
+      messageInputRef.current.innerHTML = currentTextCont
+    } else {
+      messageInputRef.current.innerText = newText
+    }
     setCursorPosition(messageInputRef.current, selPos + emoji.length)
   }
 
@@ -258,6 +273,45 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     )}${mentionDisplayName}${messageText.slice(
       mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
     )}`
+    const mentionedMembersPositions: any = []
+    /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+        a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+      ) */
+    // const findIndexes: any = []
+    if (mentionedMembers && mentionedMembers.length > 0) {
+      let lastFoundIndex = 0
+      const starts: any = {}
+      mentionedMembers.forEach((menMem: any) => {
+        const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
+
+        const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
+        lastFoundIndex = menIndex + mentionDisplayName.length
+
+        if (!starts[menMem.start]) {
+          mentionedMembersPositions.push({
+            displayName: mentionedMembersDisplayName[menMem.id].displayName,
+            start: menIndex,
+            // loc: menMem.start - trimLength,
+            end: menIndex + mentionDisplayName.length
+            // len: menMem.end - menMem.start
+          })
+        }
+        starts[menMem.start] = true
+        // }
+      })
+    }
+    const currentTextCont = typingTextFormat({
+      text: currentText,
+      mentionedMembers: [
+        ...mentionedMembersPositions,
+        {
+          displayName: `@${mentionDisplayName}`,
+          start: mentionToChange ? mentionToChange.start : currentMentions.start,
+          end: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
+        }
+      ],
+      currentMentionEnd: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
+    })
     /* const currentTextCont = `${messageInputRef.current.innerHTML.slice(
       0,
       mentionToChange ? mentionToChange.start : currentMentions.start
@@ -267,9 +321,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setMessageText(currentText)
     // console.log('currentTextCont. . . ', currentTextCont)
     // console.log('messageInputRef.current innerHtml. . . ', messageInputRef.current.innerHTML)
-    messageInputRef.current.innerText = currentText
-    // messageInputRef.current.innerHTML = currentTextCont
-    setCursorPosition(messageInputRef.current, currentMentions.start + 1 + mentionDisplayName.length)
+    // messageInputRef.current.innerText = currentText
+    messageInputRef.current.innerHTML = currentTextCont
+    setCursorPosition(messageInputRef.current, currentMentions.start + 2 + mentionDisplayName.length)
     // setCursorPosition(messageInputRef.current, currentMentions.start + 2)
     const updateCurrentMentions = { ...currentMentions }
     updateCurrentMentions.typed = mentionDisplayName
@@ -327,12 +381,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   const handleMentionDetect = (e: any) => {
     // const selPos = getCaretPosition(e.currentTarget)
-    const selPos = getCaretPosition1(e.currentTarget)
+    // const selPos = getCaretPosition1(e.currentTarget)
+    const selPos = getCaretPosition(e.currentTarget)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
       setSelectionPos(selPos)
     } else {
       if (mentionedMembers.length) {
-        let edited = false
+        /*  const edited = false
         const editMentions = mentionedMembers.map((men: any) => {
           if (men.start > selPos) {
             if (!edited) {
@@ -352,13 +407,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
         if (edited) {
           setMentionedMembers(editMentions)
-        }
+        } */
       }
     }
     if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
       setMentionTyping(true)
       setOpenMention(true)
     }
+    // const selPos1 = getCaretPositionAsText(e.currentTarget)
     const lastChar = messageInputRef.current.innerText.slice(0, selPos).slice(-1)
     if (lastChar === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
       setCurrentMentions({
@@ -375,18 +431,56 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (e.key === 'Backspace') {
       const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       if (mentionToEdit) {
-        const currentText = [messageText.slice(0, mentionToEdit.start + 1), messageText.slice(mentionToEdit.end)].join(
-          ''
-        )
+        let editingMentionPosition = 0
+        const mentionedMembersPositions: any = []
+        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+            a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+          ) */
+        // const findIndexes: any = []
+        if (mentionedMembers && mentionedMembers.length > 0) {
+          let lastFoundIndex = 0
+          const starts: any = {}
+          mentionedMembers.forEach((menMem: any) => {
+            const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
+
+            const menIndex = messageText.indexOf(mentionDisplayName, lastFoundIndex)
+            lastFoundIndex = menIndex + mentionDisplayName.length
+            if (menMem.start === mentionToEdit.start) {
+              editingMentionPosition = menIndex
+            }
+            if (!starts[menMem.start] && menMem.start !== mentionToEdit.start) {
+              mentionedMembersPositions.push({
+                displayName: mentionedMembersDisplayName[menMem.id].displayName,
+                start: menIndex,
+                // loc: menMem.start - trimLength,
+                end: menIndex + mentionDisplayName.length
+                // len: menMem.end - menMem.start
+              })
+            }
+            starts[menMem.start] = true
+            // }
+          })
+        }
+        const currentText = [
+          messageText.slice(0, editingMentionPosition + 1),
+          messageText.slice(editingMentionPosition + mentionedMembersDisplayName[mentionToEdit.id].displayName.length)
+        ].join('')
+        const currentTextCont = typingTextFormat({
+          text: currentText,
+          mentionedMembers: [...mentionedMembersPositions]
+        })
         setMessageText(currentText)
-        messageInputRef.current.innerText = currentText
+        messageInputRef.current.innerHTML = currentTextCont
         setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.start !== mentionToEdit.start))
         setMentionEdit(undefined)
-        setCursorPosition(messageInputRef.current, mentionToEdit.start + 1)
+        setCursorPosition(
+          messageInputRef.current,
+          selPos - (mentionedMembersDisplayName[mentionToEdit.id].displayName.length - 2)
+        )
         setOpenMention(true)
         setMentionTyping(true)
         setCurrentMentions({
-          start: mentionToEdit.start,
+          start: editingMentionPosition,
           typed: ''
         })
         /* setOpenMention(true)
@@ -493,6 +587,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         // const findIndexes: any = []
         if (mentionedMembers && mentionedMembers.length > 0) {
           let lastFoundIndex = 0
+          const starts: any = {}
           mentionedMembers.forEach((menMem: any) => {
             const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
             // console.log('menMem. . . . . ', menMem)
@@ -504,13 +599,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             // console.log('menIndex . . . ..  . . .', menIndex)
             // console.log('lastFoundIndex... . . ', lastFoundIndex)
             // if (!mentionedMembersPositions[menMem.id]) {
-            mentionedMembersPositions.push({
-              id: menMem.id,
-              // loc: menIndex,
-              loc: menMem.start - trimLength,
-              // len: mentionDisplayName.length
-              len: menMem.end - menMem.start
-            })
+            if (!starts[menMem.start - trimLength]) {
+              mentionedMembersPositions.push({
+                id: menMem.id,
+                loc: menIndex,
+                // loc: menMem.start - trimLength,
+                len: mentionDisplayName.length
+                // len: menMem.end - menMem.start
+              })
+            }
+            starts[menMem.start - trimLength] = true
             // }
           })
         }
@@ -828,11 +926,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   useEffect(() => {
     if (mentionedMembers.length) {
-      const currentPos = getCaretPosition(messageInputRef.current)
-      const mentionToEdit = mentionedMembers.find(
+      // const currentPos = getCaretPosition(messageInputRef.current)
+      /* const mentionToEdit = mentionedMembers.find(
         (menMem: any) => menMem.start < currentPos && menMem.end >= currentPos
-      )
-      if (mentionToEdit) {
+      ) */
+      /* if (mentionToEdit) {
         setMentionEdit(mentionToEdit)
         // if (!currentMentions) {
         setCurrentMentions({
@@ -842,7 +940,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         // }
         setOpenMention(true)
         setMentionTyping(true)
-      } else if (openMention || mentionTyping) {
+      } else */ if (openMention || mentionTyping) {
         handleCloseMentionsPopup()
         setMentionTyping(false)
         setOpenMention(false)
@@ -1300,6 +1398,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               // ccc={handleTyping}
               handleEmojiPopupToggle={handleEmojiPopupToggle}
               rightSide={emojisInRightSide}
+              bottomPosition={'100%'}
             />
           )}
           {/* </EmojiContainer> */}

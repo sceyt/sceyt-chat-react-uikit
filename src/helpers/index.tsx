@@ -74,6 +74,93 @@ export const MessageTextFormatForEdit = ({ text, message }: { text: string; mess
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
+export const typingTextFormat = ({
+  text,
+  mentionedMembers,
+  currentMentionEnd
+}: {
+  text: string
+  mentionedMembers: any
+  currentMentionEnd?: number
+  setEmoji?: any
+}) => {
+  // const messageText: any = [text]
+  let messageText: any = ''
+  if (mentionedMembers.length > 0) {
+    const mentionsPositions: any = Array.isArray(mentionedMembers)
+      ? [...mentionedMembers].sort((a: any, b: any) => a.start - b.start)
+      : []
+
+    let prevEnd = 0
+    // const currentLine = 0
+    const separateLines = text.split(/\r?\n|\r|\n/g)
+    // let textLine = separateLines[currentLine]
+    let addedMembers = 0
+    let textLengthInCurrentIteration = 0
+    for (let i = 0; i < separateLines.length; i++) {
+      let nextTextPart = ''
+      const currentLine = separateLines[i]
+      let lastFoundIndexOnTheLine = 0
+      textLengthInCurrentIteration += currentLine.length + 1
+      if (mentionsPositions.length > addedMembers) {
+        for (let j = addedMembers; j < mentionsPositions.length; j++) {
+          const mention = mentionsPositions[j]
+
+          if (mention.start >= textLengthInCurrentIteration) {
+            const addPart = (nextTextPart || currentLine.substring(prevEnd)).trimStart()
+            messageText = `${messageText} ${addPart}`
+            prevEnd = 0
+            break
+          }
+          if (!nextTextPart || nextTextPart === '') {
+            const mentionStartInCurrentLine = currentLine.indexOf(mention.displayName, lastFoundIndexOnTheLine)
+            lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
+
+            nextTextPart = currentLine.substring(mentionStartInCurrentLine + mention.displayName.length)
+            const setSpaceToEnd =
+              (currentMentionEnd && currentMentionEnd === mention.end) ||
+              (!nextTextPart.trim() && !separateLines[i + 1])
+
+            messageText += `${currentLine.substring(
+              0,
+              mentionStartInCurrentLine
+              // mention.start - (textLengthInCurrentIteration - 1 - currentLine.length) - prevEnd
+            )}<span class='mention_user'>${mention.displayName}</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+
+            prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+          } else {
+            const mentionStartInCurrentLine = nextTextPart.indexOf(mention.displayName)
+
+            lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
+            // prevEnd = mentionStartInCurrentLine + mention.displayName.length
+
+            const nextPart = nextTextPart.substring(mentionStartInCurrentLine + mention.displayName.length)
+            const setSpaceToEnd =
+              (currentMentionEnd && currentMentionEnd === mention.end) || (!nextPart.trim() && !separateLines[i + 1])
+
+            messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class="mention_user">${
+              mention.displayName
+            }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+
+            nextTextPart = nextPart
+            prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+          }
+          addedMembers++
+          if (addedMembers === mentionsPositions.length && nextTextPart.trim()) {
+            messageText += nextTextPart
+          }
+        }
+      } else {
+        messageText += `${currentLine}`
+      }
+      if (separateLines.length > i + 1) {
+        messageText += '<br/>'
+      }
+    }
+  }
+  return messageText.length > 1 ? messageText : text
+}
+
 export const MessageTextFormat = ({
   text,
   message,
@@ -91,8 +178,9 @@ export const MessageTextFormat = ({
 }) => {
   let messageText: any = [text]
   if (message.mentionedUsers && message.mentionedUsers.length > 0) {
-    const mentionsPositions: any = Array.isArray(message.metadata)
-      ? [...message.metadata].sort((a: any, b: any) => b.loc - a.loc)
+    const messageMetadata = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+    const mentionsPositions: any = Array.isArray(messageMetadata)
+      ? [...messageMetadata].sort((a: any, b: any) => b.loc - a.loc)
       : []
     /* const mentionsPositions: any = Object.entries(message.metadata)
       .sort(([, a]: any, [, b]: any) => b.loc - a.loc)
@@ -479,7 +567,7 @@ export const formatLargeText = (text: string, maxLength: number): any => {
   return text */
 }
 
-export const getCaretPosition1 = (element: any) => {
+/* export const getCaretPosition1 = (element: any) => {
   let caretOffset = 0
   let textNodes = 0
   const doc = element.ownerDocument || element.document
@@ -503,7 +591,7 @@ export const getCaretPosition1 = (element: any) => {
       caretOffset += textNodes
     }
   })
-  /* const doc = element.ownerDocument || element.document
+  /!* const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
   let sel
   if (typeof win.getSelection !== 'undefined') {
@@ -537,11 +625,11 @@ export const getCaretPosition1 = (element: any) => {
     preCaretTextRange.setEndPoint('EndToEnd', textRange)
     caretOffset = preCaretTextRange.text.length
     console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-  } */
+  } *!/
   return caretOffset
-}
+} */
 
-export const getCaretPositionAsText = (element: any) => {
+export const getCaretPosition = (element: any) => {
   let caretOffset = 0
   let textNodes = 0
   const doc = element.ownerDocument || element.document
@@ -549,67 +637,75 @@ export const getCaretPositionAsText = (element: any) => {
   const focusOffset = win.getSelection().focusOffset
   const focusNode = win.getSelection().focusNode
   let textNodesAdded = false
-  element.childNodes.forEach((node: any, index: number) => {
+  for (let i = 0; i < element.childNodes.length; i++) {
+    const node = element.childNodes[i]
     if (node.nodeType === Node.TEXT_NODE) {
       if (node === focusNode) {
         textNodesAdded = true
         caretOffset += focusOffset + textNodes
-        return
+        break
       } else {
         caretOffset += node.nodeValue.length
       }
+    } else if (node.nodeName === 'SPAN') {
+      if (node.contains(focusNode)) {
+        textNodesAdded = true
+        caretOffset += focusOffset + textNodes
+        break
+      } else {
+        caretOffset += node.innerText.length
+      }
+    } else {
       textNodes += 1
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      caretOffset += node.innerText.length
     }
-    if (element.childNodes.length === index + 1 && !textNodesAdded) {
+    if (element.childNodes.length === i + 1 && !textNodesAdded) {
       caretOffset += textNodes
     }
-  })
+  }
   /* const doc = element.ownerDocument || element.document
-  const win = doc.defaultView || doc.parentWindow
-  let sel
-  if (typeof win.getSelection !== 'undefined') {
-    sel = win.getSelection()
-    if (sel.rangeCount > 0) {
-      const range = win.getSelection().getRangeAt(0)
-      const rangeCount = win.getSelection().rangeCount
-      const anchorOffset = win.getSelection().anchorOffset
-      const anchorNode = win.getSelection().anchorNode
-      const focusOffset = win.getSelection().focusOffset
-      const focusNode = win.getSelection().focusNode
-      console.log('ranges. . . . . .', rangeCount)
-      console.log('anchorOffset. . . . . .', anchorOffset)
-      console.log('anchorNode. . . . . .', anchorNode)
-      console.log('focusOffset. . . . . .', focusOffset)
-      console.log('focusNode. . . . . .', focusNode)
-      console.log('range. . . . . .', range)
-      const preCaretRange = range.cloneRange()
-      preCaretRange.selectNodeContents(element)
-      preCaretRange.setEnd(range.endContainer, range.endOffset)
-      console.log('preCaretRange. . . . . .', preCaretRange)
-      console.log('preCaretRange.toString(). . . . . .', preCaretRange.toString())
-      caretOffset = preCaretRange.toString().length
+const win = doc.defaultView || doc.parentWindow
+let sel
+if (typeof win.getSelection !== 'undefined') {
+  sel = win.getSelection()
+  if (sel.rangeCount > 0) {
+    const range = win.getSelection().getRangeAt(0)
+    const rangeCount = win.getSelection().rangeCount
+    const anchorOffset = win.getSelection().anchorOffset
+    const anchorNode = win.getSelection().anchorNode
+    const focusOffset = win.getSelection().focusOffset
+    const focusNode = win.getSelection().focusNode
+    console.log('ranges. . . . . .', rangeCount)
+    console.log('anchorOffset. . . . . .', anchorOffset)
+    console.log('anchorNode. . . . . .', anchorNode)
+    console.log('focusOffset. . . . . .', focusOffset)
+    console.log('focusNode. . . . . .', focusNode)
+    console.log('range. . . . . .', range)
+    const preCaretRange = range.cloneRange()
+    preCaretRange.selectNodeContents(element)
+    preCaretRange.setEnd(range.endContainer, range.endOffset)
+    console.log('preCaretRange. . . . . .', preCaretRange)
+    console.log('preCaretRange.toString(). . . . . .', preCaretRange.toString())
+    caretOffset = preCaretRange.toString().length
 
-      console.log(' 1 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-    }
-  } else if ((sel = doc.selection) && sel.type !== 'Control') {
-    const textRange = sel.createRange()
-    const preCaretTextRange = doc.body.createTextRange()
-    preCaretTextRange.moveToElementText(element)
-    preCaretTextRange.setEndPoint('EndToEnd', textRange)
-    caretOffset = preCaretTextRange.text.length
-    console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-  } */
+    console.log(' 1 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
+  }
+} else if ((sel = doc.selection) && sel.type !== 'Control') {
+  const textRange = sel.createRange()
+  const preCaretTextRange = doc.body.createTextRange()
+  preCaretTextRange.moveToElementText(element)
+  preCaretTextRange.setEndPoint('EndToEnd', textRange)
+  caretOffset = preCaretTextRange.text.length
+  console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
+} */
   return caretOffset
 }
-export const getCaretPosition = (editableDiv: any) => {
+/* export const getCaretPosition = (editableDiv: any) => {
   // return caretOffset
 
   // console.log('cursorPosition -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
 
   // @ts-ignore
-  /* if (window.getSelection && window.getSelection().getRangeAt) {
+  /!* if (window.getSelection && window.getSelection().getRangeAt) {
     const range = window.getSelection().getRangeAt(0)
     const selectedObj = window.getSelection()
     let rangeCount = 0
@@ -625,7 +721,7 @@ export const getCaretPosition = (editableDiv: any) => {
     }
     return range.startOffset + rangeCount
   }
-  return -1 */
+  return -1 *!/
   // @ts-ignore
   let caretPos = 0
   let sel
@@ -636,7 +732,7 @@ export const getCaretPosition = (editableDiv: any) => {
       range = sel!.getRangeAt(0)
       if (range.commonAncestorContainer.parentNode === editableDiv) {
         // console.log('range.endOffset. ..  ', range.endOffset)
-        /* let lines = 0
+        /!* let lines = 0
         editableDiv.childNodes.forEach((node: any) => {
           // editableDiv.insertBefore(tempEl, node)
           // console.log('node.textContent.length .. . .', node.textContent.length)
@@ -647,7 +743,7 @@ export const getCaretPosition = (editableDiv: any) => {
           // console.log('lines  . . ..  .. . . . ', lines)
           // console.log('node.textContent.length  . . ..  .. . . . ', node.textContent.length)
           caretPos += node.textContent.length + lines
-        }) */
+        }) *!/
         caretPos = range.endOffset
       }
     }
@@ -672,7 +768,7 @@ export const getCaretPosition = (editableDiv: any) => {
     }
   }
   return caretPos
-}
+} */
 
 /* export const setCursorPosition = (element: any, position: number) => {
   const range = document.createRange()
@@ -689,25 +785,12 @@ export const setCursorPosition = (element: any, position: number) => {
   const range = document.createRange()
   const sel = window.getSelection()
   let currentNode = element.childNodes[0]
-  // let offset = 0
-
-  /* for (let i = 0; i < element.childNodes.length; i++) {
-    if (offset + element.childNodes[i].textContent.length >= position) {
-      node = element.childNodes[i]
-      offset = position - offset
-      break
-    }
-    offset += element.childNodes[i].textContent.length
-  }
-*/
   let caretOffset = 0
   let textNodes = 0
   let textNodesAdded = false
   let currentNodeIsFind = false
-  console.log('element.childNodes. . . . .', element.childNodes)
-  console.log('position. . . . .', position)
   element.childNodes.forEach((node: any, index: number) => {
-    if (node.nodeType === Node.TEXT_NODE) {
+    if (!currentNodeIsFind && node.nodeType === Node.TEXT_NODE) {
       currentNode = node
       const textLength = node.nodeValue.length
       caretOffset = caretOffset + textLength
@@ -721,18 +804,30 @@ export const setCursorPosition = (element: any, position: number) => {
         caretOffset = position - (caretOffset - textLength)
         return
       }
-    } else {
-      textNodes += 1
+    } else if (!currentNodeIsFind) {
+      if (node.nodeName === 'SPAN') {
+        caretOffset += node.innerText.length
+        if (caretOffset >= position) {
+          currentNodeIsFind = true
+          currentNode = node
+          caretOffset = position - (caretOffset - node.innerText.length)
+          return
+        }
+        if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
+          caretOffset += 1
+        }
+      } else {
+        textNodes += 1
+      }
     }
-    /* else if (node.nodeName === 'SPAN') {
-      caretOffset += 1
-      currentNode = node
-    } */
     if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
       if (!textNodesAdded) {
         caretOffset += textNodes
       }
       currentNodeIsFind = true
+      if (position > caretOffset) {
+        caretOffset++
+      }
       caretOffset = caretOffset - position
     }
   })
