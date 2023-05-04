@@ -9,13 +9,8 @@ import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
-import {
-  lastMessageDateFormat,
-  makeUserName,
-  messageStatusIcon,
-  MessageTextFormat,
-  systemMessageUserName
-} from '../../helpers'
+import { messageStatusIcon, systemMessageUserName } from '../../helpers'
+import { lastMessageDateFormat, makeUserName, MessageTextFormat } from '../../helpers/message'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'

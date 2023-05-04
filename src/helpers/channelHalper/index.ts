@@ -1,5 +1,5 @@
 import { IChannel } from '../../types'
-import { isJSON } from '../index'
+import { isJSON } from '../message'
 
 type channelMap = {
   [key: string]: IChannel

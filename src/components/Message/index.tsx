@@ -9,7 +9,8 @@ import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
 // import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
-import { calculateRenderedImageWidth, isJSON, makeUserName, messageStatusIcon, MessageTextFormat } from '../../helpers'
+import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
+import { isJSON, makeUserName, MessageTextFormat } from '../../helpers/message'
 import { getClient } from '../../common/client'
 import MessageActions from './MessageActions'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
@@ -580,6 +581,7 @@ const Message = ({
     <MessageHeaderCont>
       {showMessageSenderName && (
         <MessageOwner
+          className='message-owner 000'
           withPadding={
             withAttachments && notLinkAttachment /* ||
             (message.parent &&
@@ -846,7 +848,7 @@ const Message = ({
             <ReplyMessageContainer
               withSenderName={showMessageSenderName}
               withBody={!!message.body}
-              withAttachments={withAttachments}
+              withAttachments={withAttachments && notLinkAttachment}
               leftBorderColor={colors.primary}
               onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
             >
@@ -877,6 +879,7 @@ const Message = ({
               }
               <ReplyMessageBody>
                 <MessageOwner
+                  className='reply-message-owner'
                   color={colors.primary}
                   fontSize='12px'
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
@@ -912,6 +915,7 @@ const Message = ({
           )}
           {message.forwardingDetails && (
             <ForwardedTitle
+              withPadding={withAttachments && notLinkAttachment}
               withAttachments={withAttachments}
               withMediaAttachment={withMediaAttachment}
               withBody={!!message.body}
@@ -1377,6 +1381,7 @@ const ForwardedTitle = styled.h3<{
   withAttachments?: boolean
   withBody?: boolean
   showSenderName?: boolean
+  withPadding?: boolean
   withMediaAttachment?: boolean
   color?: string
 }>`
@@ -1388,11 +1393,15 @@ const ForwardedTitle = styled.h3<{
   color: ${(props) => props.color || colors.primary};
   //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
-  padding: ${(props) => props.withAttachments && '8px 0 0 12px'};
-  padding-top: ${(props) => props.showSenderName && (props.withBody ? '2px' : '0')};
+  padding: ${(props) => props.withPadding && '8px 0 0 12px'};
+  padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};
   padding-bottom: ${(props) =>
     props.withBody
-      ? (!props.withAttachments || props.showSenderName) && '4px'
+      ? !props.withAttachments || props.showSenderName
+        ? '4px'
+        : props.withAttachments && !props.withPadding
+        ? '4px'
+        : '0'
       : props.withAttachments
       ? props.withMediaAttachment
         ? '8px'

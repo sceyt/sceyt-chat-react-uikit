@@ -1,5 +1,5 @@
 import { IChannel, IContactsMap, IUser } from '../types'
-import { makeUserName } from './index'
+import { makeUserName } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'

@@ -58,7 +58,7 @@ import {
 } from '../../helpers/messagesHalper'
 import { setNotification } from '../../helpers/notifications'
 import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
-import { MessageTextFormat } from '../../helpers'
+import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 
@@ -532,7 +532,7 @@ export default function* watchForEvents(): any {
                 contactsMap,
                 getFromContacts,
                 isLastMessage: false,
-                isNotification: true
+                asSampleText: true
               })
               console.log('messageBody. . . . ', messageBody)
               setNotification(messageBody, message.user, channel)

@@ -35,7 +35,8 @@ import {
   setHasPrevCached
 } from '../../helpers/messagesHalper'
 import SliderPopup from '../../common/popups/sliderPopup'
-import { isJSON, makeUserName, systemMessageUserName } from '../../helpers'
+import { systemMessageUserName } from '../../helpers'
+import { isJSON, makeUserName } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'

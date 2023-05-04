@@ -9,7 +9,7 @@ import { IAttachment } from '../../../../types'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import Attachment from '../../../Attachment'
 import { colors } from '../../../../UIHelper/constants'
-import { isJSON } from '../../../../helpers'
+import { isJSON } from '../../../../helpers/message'
 // import SliderPopup from '../../../../../common/Popups/SliderPopup'
 
 interface IProps {

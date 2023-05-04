@@ -41,7 +41,8 @@ import {
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
-import { makeUserName, userLastActiveDateFormat } from '../../../helpers'
+import { userLastActiveDateFormat } from '../../../helpers'
+import { makeUserName } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate } from '../../../hooks'
 
