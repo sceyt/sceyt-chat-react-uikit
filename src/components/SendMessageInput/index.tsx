@@ -939,6 +939,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } */
   }
   useEffect(() => {
+    if (mentionTyping) {
+      if (selectionPos <= currentMentions.start) {
+        handleCloseMentionsPopup()
+        setMentionTyping(false)
+        setCurrentMentions(undefined)
+      }
+    }
     /* if (mentionedMembers.length) {
       // const currentPos = getCaretPosition(messageInputRef.current)
       const mentionToEdit = mentionedMembers.find(

@@ -35,6 +35,7 @@ export default function MentionMembersPopup({
   const [filteredMembers, setFilteredMembers] = useState<IMember[]>([])
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
+  const [hideMenu, setHideMenu] = useState(false)
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
   const dispatch = useDispatch()
@@ -82,9 +83,8 @@ export default function MentionMembersPopup({
   }
   const handleClicks = (e: any) => {
     if (e.target.closest('.mention_member_popup')) {
-      return
     }
-    handleMentionsPopupClose()
+    // handleMentionsPopupClose()
   }
 
   useEventListener('click', handleClicks)
@@ -124,8 +124,21 @@ export default function MentionMembersPopup({
     }
   }, [searchMention])
 
+  useDidUpdate(() => {
+    if (filteredMembersLength.current === 0) {
+      // handleMentionsPopupClose()
+      setHideMenu(true)
+    } else {
+      setHideMenu(false)
+    }
+  }, [filteredMembersLength.current])
+
   return (
-    <Container className='mention_member_popup' height={filteredMembers && filteredMembers.length * 44}>
+    <Container
+      className='mention_member_popup'
+      hidden={hideMenu}
+      height={filteredMembers && filteredMembers.length * 44}
+    >
       <MembersList onScroll={handleMembersListScroll}>
         {filteredMembers.map((member: IMember, index: number) => (
           <MemberItem
@@ -164,7 +177,7 @@ export default function MentionMembersPopup({
   )
 }
 
-const Container = styled.div<{ height?: number }>`
+const Container = styled.div<{ height?: number; hidden?: boolean }>`
   width: 300px;
   height: ${(props) => props.height && props.height + 22}px;
   max-height: 240px;
@@ -173,6 +186,7 @@ const Container = styled.div<{ height?: number }>`
   box-sizing: border-box;
   box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;
+  visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
 `
 
 const UserNamePresence = styled.div`
