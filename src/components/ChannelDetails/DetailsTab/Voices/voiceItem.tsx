@@ -10,7 +10,7 @@ import { getCustomDownloader } from '../../../../helpers/customUploader'
 import { useSelector } from 'react-redux'
 import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
 import { formatAudioVideoTime } from '../../../../helpers'
-import { makeUserName } from '../../../../helpers/message'
+import { makeUsername } from '../../../../helpers/message'
 import moment from 'moment/moment'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { useDidUpdate } from '../../../../hooks'
@@ -126,7 +126,7 @@ const VoiceItem = ({
       )}
       <AudioInfo>
         <AudioTitle color={voicePreviewTitleColor}>
-          {file.user.id === user.id ? 'You' : makeUserName(contactsMap[file.user.id], file.user, getFromContacts)}
+          {file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts)}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
         <AudioSendTime>

@@ -654,7 +654,6 @@ function* sendTextMessage(action: IAction): any {
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
-    console.log('send measage ... ', message)
     const messageBuilder = channel.createMessageBuilder()
     messageBuilder
       .setBody(message.body)
@@ -694,7 +693,6 @@ function* sendTextMessage(action: IAction): any {
     addMessageToMap(channelId, pendingMessage)
     addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
     yield put(scrollToNewMessageAC(true, true))
-    console.log('messageToSend. . .', messageToSend)
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       const messageResponse = yield call(channel.sendMessage, messageToSend)
       /* if (msgCount <= 200) {
@@ -770,7 +768,6 @@ function* forwardMessage(action: IAction): any {
         .setForwardingMessageId(message.id)
 
       const messageToSend = messageBuilder.create()
-      console.log('forward message ... create messageToSend ... ', messageToSend)
       const pendingMessage = JSON.parse(
         JSON.stringify({
           ...messageToSend,
@@ -798,9 +795,7 @@ function* forwardMessage(action: IAction): any {
         addMessageToMap(channelId, pendingMessage)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
-        console.log('forward message ... send message ... ', messageToSend)
         const messageResponse = yield call(channel.sendMessage, messageToSend)
-        console.log('forward message ... message  response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           deliveryStatus: messageResponse.deliveryStatus,
@@ -1278,6 +1273,8 @@ function* loadMoreMessages(action: IAction): any {
     } */
     if (result.messages && result.messages.length && result.messages.length > 0) {
       yield put(addMessagesAC(result.messages, direction))
+    } else {
+      yield put(addMessagesAC([], direction))
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {

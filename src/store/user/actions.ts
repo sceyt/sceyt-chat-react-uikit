@@ -4,13 +4,11 @@ import {
   BROWSER_TAB_IS_ACTIVE,
   CHECK_USER_STATUS,
   GET_CONTACTS,
-  GET_ROLES,
   GET_USERS,
   LOAD_MORE_USERS,
   SET_CONNECTION_STATUS,
   SET_CONTACT_LOADING_STATE,
   SET_CONTACTS,
-  SET_ROLES,
   SET_USER,
   SET_USERS,
   SET_USERS_LOADING_STATE,
@@ -19,7 +17,7 @@ import {
   UPDATE_USER_MAP,
   UPDATE_USER_PROFILE
 } from './constants'
-import { IContact, IRole, IUser } from '../../types'
+import { IContact, IUser } from '../../types'
 
 export function setConnectionStatusAC(status: string) {
   return {
@@ -73,20 +71,6 @@ export function setContactsAC(contacts: IContact[]) {
   return {
     type: SET_CONTACTS,
     payload: { contacts }
-  }
-}
-
-export function getRolesAC() {
-  return {
-    type: GET_ROLES,
-    payload: {}
-  }
-}
-
-export function setRolesAC(roles: IRole[]) {
-  return {
-    type: SET_ROLES,
-    payload: { roles }
   }
 }
 

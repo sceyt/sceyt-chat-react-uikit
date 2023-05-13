@@ -66,6 +66,8 @@ export const getAllMessages = () => [...activeChannelAllMessages]
 
 export const removeAllMessages = () => {
   activeChannelAllMessages = []
+  setHasPrevCached(false)
+  setHasNextCached(false)
 }
 
 export const setHasPrevCached = (state: boolean) => {

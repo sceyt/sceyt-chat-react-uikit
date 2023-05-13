@@ -4,21 +4,19 @@ import {
   BROWSER_TAB_IS_ACTIVE,
   SET_CONNECTION_STATUS,
   SET_CONTACTS,
-  SET_ROLES,
   SET_USER,
   SET_USERS,
   SET_USERS_LOADING_STATE,
   UPDATE_USER_MAP,
   UPDATE_USER_PROFILE
 } from './constants'
-import { IAction, IContact, IRole, IUser } from '../../types'
+import { IAction, IContact, IUser } from '../../types'
 
 export interface IUserStore {
   connectionStatus: string
   contactList: IContact[]
   usersList: IUser[]
   usersLoadingState: number | null
-  rolesMap: { [key: string]: IRole }
   contactsMap: { [key: string]: IContact }
   updatedUserMap: { [key: string]: IUser }
   user: IUser
@@ -30,7 +28,6 @@ const initialState: IUserStore = {
   contactList: [],
   usersList: [],
   usersLoadingState: null,
-  rolesMap: {},
   contactsMap: {},
   updatedUserMap: {},
   user: { id: '', firstName: '', lastName: '' },
@@ -79,16 +76,6 @@ export default (state = initialState, { type, payload }: IAction) => {
         contactsMap[contact.id] = contact
       })
       newState.contactsMap = contactsMap
-      return newState
-    }
-
-    case SET_ROLES: {
-      const { roles } = payload
-      const rolesMap = {}
-      roles.forEach((role: IRole) => {
-        rolesMap[role.name] = role
-      })
-      newState.rolesMap = rolesMap
       return newState
     }
 

@@ -19,7 +19,7 @@ import { IDetailsProps } from '../ChannelDetailsContainer'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
 import { userLastActiveDateFormat } from '../../helpers'
-import { makeUserName } from '../../helpers/message'
+import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
@@ -225,7 +225,7 @@ const Details = ({
           <ChannelInfo>
             <ChannelName isDirect={isDirectChannel}>
               {channel.subject ||
-                (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
+                (isDirectChannel ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
             </ChannelName>
             {isDirectChannel ? (
               <SubTitle>

@@ -9,7 +9,7 @@ import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
 import { userLastActiveDateFormat } from '../../../helpers'
-import { makeUserName } from '../../../helpers/message'
+import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
@@ -54,8 +54,8 @@ export default function MentionMembersPopup({
 
   const sortMembers = (membersList: IMember[]) => {
     return [...membersList].sort((a: IMember, b: IMember) => {
-      const aDisplayName = makeUserName(a.id === user.id ? a : contactsMap[a.id], a, getFromContacts)
-      const bDisplayName = makeUserName(b.id === user.id ? b : contactsMap[b.id], b, getFromContacts)
+      const aDisplayName = makeUsername(a.id === user.id ? a : contactsMap[a.id], a, getFromContacts)
+      const bDisplayName = makeUsername(b.id === user.id ? b : contactsMap[b.id], b, getFromContacts)
       if (aDisplayName < bDisplayName) {
         return -1
       }
@@ -112,7 +112,7 @@ export default function MentionMembersPopup({
   useDidUpdate(() => {
     if (searchMention) {
       const searchedMembers = [...members].filter((member: IMember) => {
-        const displayName = makeUserName(contactsMap[member.id], member, getFromContacts)
+        const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
         return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
       })
       filteredMembersLength.current = searchedMembers.length
@@ -160,7 +160,7 @@ export default function MentionMembersPopup({
             </AvatarWrapper>
             <UserNamePresence>
               <MemberName>
-                {makeUserName(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
+                {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
               <SubTitle>
                 {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE

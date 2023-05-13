@@ -14,7 +14,7 @@ import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
 import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
-import { makeUserName } from '../../../helpers/message'
+import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import CustomCheckbox from '../../customCheckbox'
@@ -84,7 +84,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
         displayName:
           channel.subject ||
           (channel.type === CHANNEL_TYPE.DIRECT
-            ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+            ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
             : '')
       })
     } else {
@@ -162,7 +162,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     <ChannelTitle>
                       {channel.subject ||
                         (isDirectChannel
-                          ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+                          ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
                           : '')}
                     </ChannelTitle>
                     <ChannelMembers>

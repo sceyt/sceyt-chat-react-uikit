@@ -15,6 +15,7 @@ export interface IMembersStore {
   membersLoadingState: boolean
   membersHasNext: boolean
   roles: IRole[] | []
+  rolesMap: { [key: string]: IRole }
   activeChannelMembers: IMember[] | []
 }
 
@@ -22,7 +23,8 @@ const initialState: IMembersStore = {
   membersLoadingState: false,
   membersHasNext: true,
   activeChannelMembers: [],
-  roles: []
+  roles: [],
+  rolesMap: {}
 }
 
 export default (state = initialState, { type, payload }: IAction) => {
@@ -105,7 +107,13 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
 
     case GET_ROLES_SUCCESS: {
-      newState.roles = payload.roles
+      const { roles } = payload
+      const rolesMap = {}
+      roles.forEach((role: IRole) => {
+        rolesMap[role.name] = role
+      })
+      newState.rolesMap = rolesMap
+      newState.roles = roles
       return newState
     }
 

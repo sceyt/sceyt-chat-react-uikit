@@ -9,7 +9,7 @@ import { SectionHeader, SubTitle } from '../../UIHelper'
 import { switchChannelInfoAC } from '../../store/channel/actions'
 import { AvatarWrapper, UserStatus } from '../Channel'
 import { userLastActiveDateFormat } from '../../helpers'
-import { makeUserName } from '../../helpers/message'
+import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
@@ -108,7 +108,7 @@ export default function ChatHeader({ infoIcon }: IProps) {
           <SectionHeader>
             {activeChannel.subject ||
               (isDirectChannel
-                ? makeUserName(contactsMap[activeChannel.peer.id], activeChannel.peer, getFromContacts)
+                ? makeUsername(contactsMap[activeChannel.peer.id], activeChannel.peer, getFromContacts)
                 : '')}
           </SectionHeader>
           {isDirectChannel ? (
