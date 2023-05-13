@@ -107,7 +107,6 @@ const Channel: React.FC<IChannelProps> = ({
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {/* makeUsername(contactsMap[typingIndicator.from.id]) */}
         {(lastMessage || !!typingIndicator) && (
           <LastMessage
             markedAsUnread={
