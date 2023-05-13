@@ -103,7 +103,7 @@ function* sendMessage(action: IAction): any {
     const { payload } = action
     const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
     const channel = yield call(getChannelFromMap, channelId)
-    const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
+    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
 
@@ -647,13 +647,14 @@ function* sendTextMessage(action: IAction): any {
   const channel = yield call(getChannelFromMap, channelId)
   let sendMessageTid
   try {
-    const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
+    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
       const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
+    console.log('send measage ... ', message)
     const messageBuilder = channel.createMessageBuilder()
     messageBuilder
       .setBody(message.body)
@@ -693,6 +694,7 @@ function* sendTextMessage(action: IAction): any {
     addMessageToMap(channelId, pendingMessage)
     addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
     yield put(scrollToNewMessageAC(true, true))
+    console.log('messageToSend. . .', messageToSend)
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       const messageResponse = yield call(channel.sendMessage, messageToSend)
       /* if (msgCount <= 200) {
@@ -752,7 +754,7 @@ function* forwardMessage(action: IAction): any {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
-          .setMetadata(JSON.stringify(attachments[0].metadata))
+          .setMetadata(attachments[0].metadata)
           .setFileSize(attachments[0].fileSize)
           .setUpload(false)
           .create()
@@ -768,7 +770,7 @@ function* forwardMessage(action: IAction): any {
         .setForwardingMessageId(message.id)
 
       const messageToSend = messageBuilder.create()
-
+      console.log('forward message ... create messageToSend ... ', messageToSend)
       const pendingMessage = JSON.parse(
         JSON.stringify({
           ...messageToSend,
@@ -796,7 +798,9 @@ function* forwardMessage(action: IAction): any {
         addMessageToMap(channelId, pendingMessage)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
+        console.log('forward message ... send message ... ', messageToSend)
         const messageResponse = yield call(channel.sendMessage, messageToSend)
+        console.log('forward message ... message  response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           deliveryStatus: messageResponse.deliveryStatus,

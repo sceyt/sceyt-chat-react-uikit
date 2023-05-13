@@ -4,15 +4,12 @@ import { ReactComponent as ReadIcon } from '../assets/svg/ticks_read.svg'
 import { ReactComponent as DeliveredIcon } from '../assets/svg/ticks_delivered.svg'
 import { ReactComponent as SentIcon } from '../assets/svg/ticks_sent.svg'
 import { ReactComponent as PendingIcon } from '../assets/svg/pending_icon.svg'
-import { channelDetailsTabs, attachmentTypes, MESSAGE_DELIVERY_STATUS } from './constants'
-import { MentionedUser } from '../UIHelper'
-import { IAttachment, IContact, IContactsMap, IMessage, IUser } from '../types'
+import { MESSAGE_DELIVERY_STATUS } from './constants'
+import { IAttachment, IContact } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
 import { getCustomDownloader } from './customUploader'
-import { getClient } from '../common/client'
-import LinkifyIt from 'linkify-it'
 
 const ReadIconWrapper = styled(ReadIcon)`
   color: ${(props) => props.color || colors.primary};
@@ -42,162 +39,8 @@ export const messageStatusIcon = (messageStatus: string, iconColor?: string, rea
 
 export const isAlphanumeric = (str: string) => /[a-z]/i.test(str)
 
-export const getFileExtension = (filename: string) => {
-  const ext = filename.split('.').pop()
-  if (ext === filename) return ''
-  return ext
-}
-
-export const MessageTextFormatForEdit = ({ text, message }: { text: string; message: any }) => {
-  const messageText = [text]
-  if (message.mentionedUsers && message.mentionedUsers.length > 0) {
-    const mentionsPositions: any = Object.entries(message.metadata)
-      .sort(([, a]: any, [, b]: any) => b - a)
-      .reduce((r, [k, v]) => ({ ...r, [k]: v }), {})
-
-    // eslint-disable-next-line guard-for-in,no-restricted-syntax
-    for (const mentionMemberId in mentionsPositions) {
-      const textPart = messageText.shift()
-      const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mentionMemberId)
-      if (mentionDisplay) {
-        messageText.unshift(
-          `${textPart?.substring(0, mentionsPositions[mentionMemberId].loc)}`,
-          `@${mentionDisplay.firstName} ${mentionDisplay.lastName}`,
-          `${textPart?.substring(mentionsPositions[mentionMemberId].loc + mentionsPositions[mentionMemberId].len)}`
-        )
-      }
-    }
-  }
-  return messageText.length > 1 ? messageText.join('') : text
-}
-
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
-
-export const MessageTextFormat = ({
-  text,
-  message,
-  contactsMap,
-  getFromContacts,
-  isLastMessage,
-  isNotification
-}: {
-  text: string
-  message: any
-  contactsMap: IContactsMap
-  getFromContacts: boolean
-  isLastMessage?: boolean
-  isNotification?: boolean
-}) => {
-  let messageText: any = [text]
-  if (message.mentionedUsers && message.mentionedUsers.length > 0) {
-    const mentionsPositions: any = Array.isArray(message.metadata)
-      ? [...message.metadata].sort((a: any, b: any) => b.loc - a.loc)
-      : []
-    /* const mentionsPositions: any = Object.entries(message.metadata)
-      .sort(([, a]: any, [, b]: any) => b.loc - a.loc)
-      .reduce((r, [k, v]) => ({ ...r, [k]: v }), {}) */
-    // eslint-disable-next-line guard-for-in,no-restricted-syntax
-
-    mentionsPositions.forEach((mention: any) => {
-      const textPart = messageText.shift()
-      const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mention.id)
-      if (mentionDisplay) {
-        const user = getClient().user
-        messageText.unshift(
-          `${textPart?.substring(0, mention.loc)}`,
-          // @ts-ignore
-          isNotification ? (
-            `@${makeUserName(
-              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-              mentionDisplay,
-              getFromContacts
-            ).trim()}`
-          ) : (
-            <MentionedUser isLastMessage={isLastMessage} color={colors.primary} key={`${mention.loc}`}>
-              {`@${makeUserName(
-                user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-                mentionDisplay,
-                getFromContacts
-              ).trim()}`}
-            </MentionedUser>
-          ),
-          `${textPart?.substring(mention.loc + mention.len)}`
-        )
-      }
-    })
-    /*  for (const mentionMemberId in mentionsPositions) {
-      const textPart = messageText.shift()
-      const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mentionMemberId)
-      if (mentionDisplay) {
-        const user = getClient().chatClient.user
-        messageText.unshift(
-          `${textPart?.substring(0, mentionsPositions[mentionMemberId].loc)}`,
-          // @ts-ignore
-          <MentionedUser color={colors.primary} key={`${mentionMemberId}`}>
-            {`@${makeUserName(
-              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-              mentionDisplay,
-              getFromContacts
-            ).trim()}`}
-          </MentionedUser>,
-          `${textPart?.substring(mentionsPositions[mentionMemberId].loc + mentionsPositions[mentionMemberId].len)}`
-        )
-      }
-    } */
-  }
-  const linkify = new LinkifyIt()
-  const match = linkify.match(text)
-  if (!isLastMessage && !isNotification && match) {
-    let newMessageText: any
-    match.forEach((matchItem, index) => {
-      if (index === 0) {
-        newMessageText = [
-          text.split(matchItem.text)[0],
-          <a
-            draggable={false}
-            key={index}
-            href={matchItem.url}
-            target='_blank'
-            rel='noreferrer'
-          >{`${matchItem.text} `}</a>,
-          text.split(matchItem.text)[1]
-        ]
-      } else {
-        const msgArr = [
-          newMessageText[index * 2].split(matchItem.text)[0],
-          <a
-            draggable={false}
-            key={index}
-            href={matchItem.url}
-            target='_blank'
-            rel='noreferrer'
-          >{`${matchItem.text} `}</a>,
-          newMessageText[index * 2].split(matchItem.text)[1]
-        ]
-        newMessageText.splice(index * 2, 1, ...msgArr)
-      }
-    })
-    messageText = newMessageText
-    // console.log('newMessageText ... . ', newMessageText)
-  }
-  /* messageText.forEach((textPart, index) => {
-    // if (urlRegex.test(textPart)) {
-     messageText.forEach((textPart, index) => {
-    if (urlRegex.test(textPart)) {
-      const textArray = textPart.split(urlRegex)
-      const urlArray = textArray.map((part) => {
-        if (urlRegex.test(part)) {
-          return <a key={part} href={part} target='_blank' rel='noreferrer'>{`${part} `}</a>
-        }
-        return `${part} `
-      }) *!/
-      // @ts-ignore
-      messageText.splice(index, 1, ...urlArray)
-    }
-  }) */
-  return messageText.length > 1 ? (isNotification ? messageText.join('') : messageText) : text
-}
 
 export const bytesToSize = (bytes: number, decimals = 2) => {
   if (bytes === 0) return '0 Bytes'
@@ -208,101 +51,8 @@ export const bytesToSize = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
-export const setMessageTypeByAttachment = (attachmentType: string) => {
-  switch (attachmentType) {
-    case attachmentTypes.image:
-    case attachmentTypes.video:
-      return 'media'
-    default:
-      return 'file'
-  }
-}
-
-export const getAttachmentType = (dataName: string) => {
-  const ext = getFileExtension(dataName)
-  switch (ext) {
-    case 'jpg':
-    case 'jpeg':
-    case 'png':
-    case 'gif':
-    case 'tiff':
-      return attachmentTypes.image
-    case 'avi':
-    case 'mp4':
-    case 'wmv':
-    case 'mov':
-    case 'flv':
-      return attachmentTypes.video
-    case 'mp3':
-    case 'wav':
-    case 'flac':
-    case 'wma':
-      return attachmentTypes.audio
-    default:
-      return attachmentTypes.file
-  }
-}
-
-export const doesTextHasLink = (text: string) => {
-  const links: any[] = []
-  const strArray = text.split(' ')
-  strArray.forEach((item) => {
-    if (/(https?:\/\/[^\s]+)/.test(item)) {
-      links.push(item)
-    }
-  })
-  return links
-}
-
-export const makeUserName = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
-  if (user && isAlphanumeric(user.id)) {
-    return user.id.charAt(0).toUpperCase() + user.id.slice(1)
-  }
-  return fromContact
-    ? contact
-      ? contact.firstName
-        ? `${contact.firstName} ${contact.lastName}`
-        : contact.id
-      : user
-      ? user.id || 'Deleted user'
-      : ''
-    : user
-    ? user.firstName
-      ? `${user.firstName} ${user.lastName}`
-      : user.id || 'Deleted user'
-    : ''
-}
-
 export const systemMessageUserName = (contact: IContact, userId: string) => {
   return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
-}
-
-export const getLinkTitle = (link: string) => {
-  const string = link.replace(/^(?:https?:\/\/)?(?:www\.)?/i, '').split('.')[0]
-  return string.charAt(0).toUpperCase() + string.slice(1)
-}
-
-// TODO delete after attachments query is created
-export const getAttachmentsAndLinksFromMessages = (messages: IMessage[], messageType: string) => {
-  let activeTabAttachments: any[] = []
-  if (messageType === channelDetailsTabs.link) {
-    messages.forEach((mes, i) => {
-      const { id } = mes
-      const links = doesTextHasLink(mes.body)
-      links.forEach((link: string, linkIndex: number) => {
-        // fetch(link).then((res) => console.log('res -- ', res))
-        activeTabAttachments.push({ id: `${linkIndex + 1}${i + 1}${id}`, url: link, title: getLinkTitle(link) })
-      })
-    })
-  } else {
-    messages.forEach((mes) => {
-      const { updatedAt } = mes
-      const { user } = mes
-      const attachments = (mes.attachments as any[]).map((att) => ({ ...att, updatedAt, user }))
-      activeTabAttachments = [...activeTabAttachments, ...attachments]
-    })
-  }
-  return activeTabAttachments
 }
 
 export const downloadFile = async (attachment: IAttachment) => {
@@ -335,25 +85,6 @@ export const calculateRenderedImageWidth = (width: number, height: number) => {
       return [Math.min(maxWidth, height * aspectRatio), Math.min(maxHeight, height)]
     }
   }
-}
-
-export const lastMessageDateFormat = (date: Date) => {
-  // check for current day
-  const currentTime = moment()
-  const startOfDay = currentTime.startOf('day')
-  const isToday = moment(date).diff(startOfDay) >= 0
-  if (isToday) {
-    return moment(date).format('HH:mm')
-  }
-
-  // check for last week
-  const isInLastWeek = moment().diff(moment(date), 'weeks') < 1
-  if (isInLastWeek) {
-    return moment(date).format('dddd')
-  }
-
-  // return formatted date
-  return moment(date).format('DD.MM.YY')
 }
 
 export const userLastActiveDateFormat = (date: Date) => {
@@ -479,7 +210,7 @@ export const formatLargeText = (text: string, maxLength: number): any => {
   return text */
 }
 
-export const getCaretPosition1 = (element: any) => {
+/* export const getCaretPosition1 = (element: any) => {
   let caretOffset = 0
   let textNodes = 0
   const doc = element.ownerDocument || element.document
@@ -496,13 +227,14 @@ export const getCaretPosition1 = (element: any) => {
       } else {
         caretOffset += node.nodeValue.length
       }
+    } else {
       textNodes += 1
     }
     if (element.childNodes.length === index + 1 && !textNodesAdded) {
       caretOffset += textNodes
     }
   })
-  /* const doc = element.ownerDocument || element.document
+  /!* const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
   let sel
   if (typeof win.getSelection !== 'undefined') {
@@ -536,176 +268,56 @@ export const getCaretPosition1 = (element: any) => {
     preCaretTextRange.setEndPoint('EndToEnd', textRange)
     caretOffset = preCaretTextRange.text.length
     console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-  } */
+  } *!/
   return caretOffset
-}
-
-export const getCaretPositionAsText = (element: any) => {
-  let caretOffset = 0
-  let textNodes = 0
-  const doc = element.ownerDocument || element.document
-  const win = doc.defaultView || doc.parentWindow
-  const focusOffset = win.getSelection().focusOffset
-  const focusNode = win.getSelection().focusNode
-  let textNodesAdded = false
-  element.childNodes.forEach((node: any, index: number) => {
-    if (node.nodeType === Node.TEXT_NODE) {
-      if (node === focusNode) {
-        textNodesAdded = true
-        caretOffset += focusOffset + textNodes
-        return
-      } else {
-        caretOffset += node.nodeValue.length
-      }
-      textNodes += 1
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      caretOffset += node.innerText.length
-    }
-    if (element.childNodes.length === index + 1 && !textNodesAdded) {
-      caretOffset += textNodes
-    }
-  })
-  /* const doc = element.ownerDocument || element.document
-  const win = doc.defaultView || doc.parentWindow
-  let sel
-  if (typeof win.getSelection !== 'undefined') {
-    sel = win.getSelection()
-    if (sel.rangeCount > 0) {
-      const range = win.getSelection().getRangeAt(0)
-      const rangeCount = win.getSelection().rangeCount
-      const anchorOffset = win.getSelection().anchorOffset
-      const anchorNode = win.getSelection().anchorNode
-      const focusOffset = win.getSelection().focusOffset
-      const focusNode = win.getSelection().focusNode
-      console.log('ranges. . . . . .', rangeCount)
-      console.log('anchorOffset. . . . . .', anchorOffset)
-      console.log('anchorNode. . . . . .', anchorNode)
-      console.log('focusOffset. . . . . .', focusOffset)
-      console.log('focusNode. . . . . .', focusNode)
-      console.log('range. . . . . .', range)
-      const preCaretRange = range.cloneRange()
-      preCaretRange.selectNodeContents(element)
-      preCaretRange.setEnd(range.endContainer, range.endOffset)
-      console.log('preCaretRange. . . . . .', preCaretRange)
-      console.log('preCaretRange.toString(). . . . . .', preCaretRange.toString())
-      caretOffset = preCaretRange.toString().length
-
-      console.log(' 1 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-    }
-  } else if ((sel = doc.selection) && sel.type !== 'Control') {
-    const textRange = sel.createRange()
-    const preCaretTextRange = doc.body.createTextRange()
-    preCaretTextRange.moveToElementText(element)
-    preCaretTextRange.setEndPoint('EndToEnd', textRange)
-    caretOffset = preCaretTextRange.text.length
-    console.log(' 2 caretOffset -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-  } */
-  return caretOffset
-}
-export const getCaretPosition = (editableDiv: any) => {
-  // return caretOffset
-
-  // console.log('cursorPosition -=-=-= -- -= -=-=-= - - * * * ** ', caretOffset)
-
-  // @ts-ignore
-  /* if (window.getSelection && window.getSelection().getRangeAt) {
-    const range = window.getSelection().getRangeAt(0)
-    const selectedObj = window.getSelection()
-    let rangeCount = 0
-    const childNodes = selectedObj.anchorNode.parentNode.childNodes
-    for (let i = 0; i < childNodes.length; i++) {
-      if (childNodes[i] == selectedObj.anchorNode) {
-        break
-      }
-      if (childNodes[i].outerHTML) rangeCount += childNodes[i].outerHTML.length
-      else if (childNodes[i].nodeType == 3) {
-        rangeCount += childNodes[i].textContent.length
-      }
-    }
-    return range.startOffset + rangeCount
-  }
-  return -1 */
-  // @ts-ignore
-  let caretPos = 0
-  let sel
-  let range: any
-  if (window.getSelection) {
-    sel = window.getSelection()
-    if (sel!.rangeCount) {
-      range = sel!.getRangeAt(0)
-      if (range.commonAncestorContainer.parentNode === editableDiv) {
-        // console.log('range.endOffset. ..  ', range.endOffset)
-        /* let lines = 0
-        editableDiv.childNodes.forEach((node: any) => {
-          // editableDiv.insertBefore(tempEl, node)
-          // console.log('node.textContent.length .. . .', node.textContent.length)
-          // const tempRange = range.duplicate()
-          // tempRange.moveToElementText(tempEl)
-          // tempRange.setEndPoint('EndToEnd', range)
-          lines++
-          // console.log('lines  . . ..  .. . . . ', lines)
-          // console.log('node.textContent.length  . . ..  .. . . . ', node.textContent.length)
-          caretPos += node.textContent.length + lines
-        }) */
-        caretPos = range.endOffset
-      }
-    }
-  } else {
-    // @ts-ignore
-    if (document.selection && document.selection.createRange) {
-      // @ts-ignore
-      range = document.selection.createRange()
-      // @ts-ignore
-      if (range.parentElement() === editableDiv) {
-        // console.log('editableDiv.childNodes ... . .', editableDiv.childNodes)
-        const tempEl = document.createElement('span')
-        editableDiv.childNodes.forEach((node: any) => {
-          editableDiv.insertBefore(tempEl, node)
-          // console.log('node.textContent.length .. . .', node.textContent.length)
-          // const tempRange = range.duplicate()
-          // tempRange.moveToElementText(tempEl)
-          // tempRange.setEndPoint('EndToEnd', range)
-          caretPos += node.textContent.length
-        })
-      }
-    }
-  }
-  return caretPos
-}
-
-/* export const setCursorPosition = (element: any, position: number) => {
-  const range = document.createRange()
-  const sel = window.getSelection()
-  range.setStart(element.childNodes[0], position)
-  range.collapse(true)
-  if (sel) {
-    sel.removeAllRanges()
-    sel.addRange(range)
-  }
-  element.focus()
 } */
+
+export const getCaretPosition = (element: any) => {
+  let caretOffset = 0
+  let textNodes = 0
+  const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  const focusOffset = win.getSelection().focusOffset
+  const focusNode = win.getSelection().focusNode
+  let textNodesAdded = false
+  for (let i = 0; i < element.childNodes.length; i++) {
+    const node = element.childNodes[i]
+    if (node.nodeType === Node.TEXT_NODE) {
+      if (node === focusNode) {
+        textNodesAdded = true
+        caretOffset += focusOffset + textNodes
+        break
+      } else {
+        caretOffset += node.nodeValue.length
+      }
+    } else if (node.nodeName === 'SPAN') {
+      if (node.contains(focusNode)) {
+        textNodesAdded = true
+        caretOffset += focusOffset + textNodes
+        break
+      } else {
+        caretOffset += node.innerText.length
+      }
+    } else {
+      textNodes += 1
+    }
+    if (element.childNodes.length === i + 1 && !textNodesAdded) {
+      caretOffset += textNodes
+    }
+  }
+  return caretOffset
+}
+
 export const setCursorPosition = (element: any, position: number) => {
   const range = document.createRange()
   const sel = window.getSelection()
-  console.log('element.childNodes. . . .', element.childNodes)
   let currentNode = element.childNodes[0]
-  // let offset = 0
-
-  /* for (let i = 0; i < element.childNodes.length; i++) {
-    if (offset + element.childNodes[i].textContent.length >= position) {
-      node = element.childNodes[i]
-      offset = position - offset
-      break
-    }
-    offset += element.childNodes[i].textContent.length
-  }
-*/
   let caretOffset = 0
   let textNodes = 0
   let textNodesAdded = false
   let currentNodeIsFind = false
   element.childNodes.forEach((node: any, index: number) => {
-    if (node.nodeType === Node.TEXT_NODE) {
+    if (!currentNodeIsFind && node.nodeType === Node.TEXT_NODE) {
       currentNode = node
       const textLength = node.nodeValue.length
       caretOffset = caretOffset + textLength
@@ -719,17 +331,30 @@ export const setCursorPosition = (element: any, position: number) => {
         caretOffset = position - (caretOffset - textLength)
         return
       }
-
-      textNodes += 1
-    } else if (node.nodeName === 'SPAN') {
-      caretOffset += 1
-      currentNode = node
+    } else if (!currentNodeIsFind) {
+      if (node.nodeName === 'SPAN') {
+        caretOffset += node.innerText.length
+        if (caretOffset >= position) {
+          currentNodeIsFind = true
+          currentNode = node
+          caretOffset = position - (caretOffset - node.innerText.length)
+          return
+        }
+        if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
+          caretOffset += 1
+        }
+      } else {
+        textNodes += 1
+      }
     }
     if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
       if (!textNodesAdded) {
         caretOffset += textNodes
       }
       currentNodeIsFind = true
+      if (position > caretOffset) {
+        caretOffset++
+      }
       caretOffset = caretOffset - position
     }
   })
@@ -833,12 +458,4 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
       break
   }
   return category
-}
-
-export const isJSON = (str: any) => {
-  try {
-    return JSON.parse(str) && !!str
-  } catch (e) {
-    return false
-  }
 }

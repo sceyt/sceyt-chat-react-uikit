@@ -9,7 +9,8 @@ import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
 // import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
-import { calculateRenderedImageWidth, isJSON, makeUserName, messageStatusIcon, MessageTextFormat } from '../../helpers'
+import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
+import { isJSON, makeUserName, MessageTextFormat } from '../../helpers/message'
 import { getClient } from '../../common/client'
 import MessageActions from './MessageActions'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
@@ -51,6 +52,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { openedMessageMenuSelector } from '../../store/message/selector'
+import { useDidUpdate } from '../../hooks'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
@@ -293,8 +295,10 @@ const Message = ({
         attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image
     )
   const withMediaAttachment = !!mediaAttachment
+  const attachmentMetas =
+    mediaAttachment &&
+    (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata)
   // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
-
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
@@ -351,7 +355,6 @@ const Message = ({
     stopScrolling(!forwardPopupOpen)
   }
 
-  // TODO implement reply message
   const handleReplyMessage = (threadReply: boolean) => {
     if (threadReply) {
       // dispatch(setMessageForThreadReply(message));
@@ -369,7 +372,6 @@ const Message = ({
   }
 
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
-    console.log('delete message .. ', message)
     dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
 
     setMessageActionsShow(false)
@@ -434,6 +436,13 @@ const Message = ({
     }, 450)
   }
 
+  const closeMessageActions = (close: boolean) => {
+    setMessageActionsShow(!close)
+    if (close && !messageActionsShow && messageActionsTimeout.current) {
+      clearTimeout(messageActionsTimeout.current)
+    }
+  }
+
   const handleMouseLeave = () => {
     clearTimeout(messageActionsTimeout.current)
     setMessageActionsShow(false)
@@ -496,7 +505,6 @@ const Message = ({
       })
     }
   }
-
   /*  const MessageActionsCont =
     // () =>
     // useMemo(
@@ -569,14 +577,19 @@ const Message = ({
       // ),
       // [message.id]
     ) */
-
   const MessageHeader = () => (
     <MessageHeaderCont>
       {showMessageSenderName && (
         <MessageOwner
+          className='message-owner 000'
           withPadding={
-            withAttachments || (message.parent && message.parent.attachments && !!message.parent.attachments.length)
+            withAttachments && notLinkAttachment /* ||
+            (message.parent &&
+              message.parent.attachments &&
+              !!message.parent.attachments.length &&
+              parentNotLinkAttachment) */
           }
+          isReply={!!message.parent}
           isForwarded={message.forwardingDetails}
           messageBody={!!message.body}
           color={colors.primary}
@@ -637,8 +650,8 @@ const Message = ({
     }
   }, [emojisPopupOpen])
 
-  useEffect(() => {
-    if (openedMessageMenuId !== message.id) {
+  useDidUpdate(() => {
+    if (openedMessageMenuId && openedMessageMenuId !== message.id) {
       setMessageActionsShow(false)
     }
   }, [openedMessageMenuId])
@@ -743,9 +756,9 @@ const Message = ({
             withAttachments
               ? mediaAttachment
                 ? mediaAttachment.type === attachmentTypes.image
-                  ? mediaAttachment.metadata &&
-                    mediaAttachment.metadata.szw &&
-                    calculateRenderedImageWidth(mediaAttachment.metadata.szw, mediaAttachment.metadata.szh)[0]
+                  ? attachmentMetas &&
+                    attachmentMetas.szw &&
+                    calculateRenderedImageWidth(attachmentMetas.szw, attachmentMetas.szh)[0]
                   : mediaAttachment.type === attachmentTypes.video
                   ? 320
                   : undefined
@@ -826,14 +839,16 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.role}
+              myRole={channel.role || (channel.peer && channel.peer.role)}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />
           )}
           {message.parent && message.parent.id && !isThreadMessage && (
             <ReplyMessageContainer
-              withAttachments={withAttachments}
+              withSenderName={showMessageSenderName}
+              withBody={!!message.body}
+              withAttachments={withAttachments && notLinkAttachment}
               leftBorderColor={colors.primary}
               onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
             >
@@ -864,6 +879,7 @@ const Message = ({
               }
               <ReplyMessageBody>
                 <MessageOwner
+                  className='reply-message-owner'
                   color={colors.primary}
                   fontSize='12px'
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
@@ -899,6 +915,7 @@ const Message = ({
           )}
           {message.forwardingDetails && (
             <ForwardedTitle
+              withPadding={withAttachments && notLinkAttachment}
               withAttachments={withAttachments}
               withMediaAttachment={withMediaAttachment}
               withBody={!!message.body}
@@ -1028,7 +1045,7 @@ const Message = ({
                   selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                   selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                   selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                  closeMessageActions={(state) => setMessageActionsShow(state)}
+                  closeMessageActions={closeMessageActions}
                 />
               ))
             // </MessageAttachments>
@@ -1333,12 +1350,26 @@ const MessageTime = styled.span`
   color: ${colors.gray6};
 `
 
-const ReplyMessageContainer = styled.div<{ leftBorderColor?: string; withAttachments?: boolean }>`
+const ReplyMessageContainer = styled.div<{
+  leftBorderColor?: string
+  withAttachments?: boolean
+  withSenderName?: boolean
+  withBody?: boolean
+}>`
   display: flex;
   border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
   padding: 0 6px;
   position: relative;
-  margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
+  //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
+  margin: ${(props) =>
+    props.withAttachments
+      ? props.withBody
+        ? '6px 12px 0'
+        : '6px 12px 8px'
+      : props.withSenderName
+      ? '6px 0 8px'
+      : '0 0 8px'};
+  margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;
 `
 const ReplyMessageBody = styled.div`
@@ -1350,6 +1381,7 @@ const ForwardedTitle = styled.h3<{
   withAttachments?: boolean
   withBody?: boolean
   showSenderName?: boolean
+  withPadding?: boolean
   withMediaAttachment?: boolean
   color?: string
 }>`
@@ -1361,11 +1393,15 @@ const ForwardedTitle = styled.h3<{
   color: ${(props) => props.color || colors.primary};
   //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
-  padding: ${(props) => props.withAttachments && '8px 0 0 12px'};
-  padding-top: ${(props) => props.showSenderName && (props.withBody ? '2px' : '0')};
+  padding: ${(props) => props.withPadding && '8px 0 0 12px'};
+  padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};
   padding-bottom: ${(props) =>
     props.withBody
-      ? (!props.withAttachments || props.showSenderName) && '4px'
+      ? !props.withAttachments || props.showSenderName
+        ? '4px'
+        : props.withAttachments && !props.withPadding
+        ? '4px'
+        : '0'
       : props.withAttachments
       ? props.withMediaAttachment
         ? '8px'
@@ -1515,11 +1551,6 @@ const MessageBody = styled.div<{
   overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
   transform-origin: right;
-  &:hover .message_actions_cont {
-      visibility: visible;
-      opacity: 1;
-    }
-  }
 `
 
 const MessageContent = styled.div<{ messageWidthPercent?: string | number; withAvatar?: boolean; rtl?: boolean }>`

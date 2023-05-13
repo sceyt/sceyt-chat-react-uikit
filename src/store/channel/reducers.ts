@@ -221,7 +221,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
       const updatedChannels = newState.channels.map((channel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT && usersMap[channel.peer.id]) {
-          return { ...channel, peer: usersMap[channel.peer.id] }
+          return { ...channel, peer: { ...channel.peer, presence: usersMap[channel.peer.id].presence } }
         }
         return channel
       })
@@ -229,9 +229,14 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         (newState.activeChannel as IChannel).type === CHANNEL_TYPE.DIRECT &&
         usersMap[(newState.activeChannel as IChannel).peer.id]
       ) {
-        newState.activeChannel = {
-          ...newState.activeChannel,
-          peer: usersMap[(newState.activeChannel as IChannel).peer.id]
+        if ('peer' in newState.activeChannel) {
+          newState.activeChannel = {
+            ...newState.activeChannel,
+            peer: {
+              ...(newState.activeChannel.peer && newState.activeChannel.peer),
+              presence: usersMap[(newState.activeChannel as IChannel).peer.id].presence
+            }
+          }
         }
       }
       newState.channels = [...updatedChannels]

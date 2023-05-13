@@ -35,7 +35,8 @@ import {
   setHasPrevCached
 } from '../../helpers/messagesHalper'
 import SliderPopup from '../../common/popups/sliderPopup'
-import { isJSON, makeUserName, systemMessageUserName } from '../../helpers'
+import { systemMessageUserName } from '../../helpers'
+import { isJSON, makeUserName } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
@@ -359,18 +360,14 @@ const MessageList: React.FC<MessagesProps> = ({
         dispatch(showScrollToNewMessageButtonAC(false))
       }
       const scrollHeightQuarter = (target.scrollHeight * 20) / 100
-      // -target.scrollTop >= target.scrollHeight - target.offsetHeight - 6
-      // if (-target.scrollTop >= scrollHeightQuarter && hasPrev) {
-      // console.log('-target.scrollTop ... ', -target.scrollTop)
-      // console.log('messagesLoading !== LOADING_STATE.LOADING ... ', messagesLoading !== LOADING_STATE.LOADING)
-      // console.log('!loading ... ', !loading)
       if (
         !prevDisable &&
         messagesLoading !== LOADING_STATE.LOADING &&
         !scrollToRepliedMessage &&
         -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightQuarter &&
         /* hasPrev && */ !loading &&
-        !scrollToNewMessage.scrollToBottom
+        !scrollToNewMessage.scrollToBottom &&
+        messages.length
       ) {
         loadDirection = 'prev'
         // console.log('load prev messages........ ')
@@ -750,7 +747,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    console.log('messages... ', messages)
+    // console.log('messages... ', messages)
   }, [messages])
   /* useEffect(() => {
   }, [pendingMessages]) */
@@ -843,6 +840,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 const nextMessage =
                   messages[index + 1] || (currentChannelPendingMessages.length > 0 && currentChannelPendingMessages[0])
                 const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
+                const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
                 // @ts-ignore
                 return (
                   <React.Fragment key={message.id || message.tid}>
@@ -883,29 +881,29 @@ const MessageList: React.FC<MessagesProps> = ({
                             ? ' created this group'
                             : message.body === 'AM'
                             ? ` added ${
-                                !!(message.metadata && message.metadata.m) &&
-                                message.metadata.m
+                                !!(messageMetas && messageMetas.m) &&
+                                messageMetas.m
                                   .slice(0, 5)
                                   .map((mem: string) =>
                                     mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
                                   )
                               } ${
-                                message.metadata && message.metadata.m && message.metadata.m.length > 5
-                                  ? `and ${message.metadata.m.length - 5} more`
+                                messageMetas && messageMetas.m && messageMetas.m.length > 5
+                                  ? `and ${messageMetas.m.length - 5} more`
                                   : ''
                               }`
                             : message.body === 'RM'
                             ? ` removed ${
-                                message.metadata &&
-                                message.metadata.m &&
-                                message.metadata.m
+                                messageMetas &&
+                                messageMetas.m &&
+                                messageMetas.m
                                   .slice(0, 5)
                                   .map((mem: string) =>
                                     mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
                                   )
                               } ${
-                                message.metadata && message.metadata.m && message.metadata.m.length > 5
-                                  ? `and ${message.metadata.m.length - 5} more`
+                                messageMetas && messageMetas.m && messageMetas.m.length > 5
+                                  ? `and ${messageMetas.m.length - 5} more`
                                   : ''
                               }`
                             : message.body === 'LG'
@@ -918,7 +916,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         <Message
                           message={{
                             ...message,
-                            metadata: isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+                            metadata: messageMetas
                           }}
                           channel={channel}
                           stopScrolling={setStopScrolling}

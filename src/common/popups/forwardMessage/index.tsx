@@ -13,7 +13,8 @@ import { IChannel } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
 import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
-import { makeUserName, userLastActiveDateFormat } from '../../../helpers'
+import { userLastActiveDateFormat } from '../../../helpers'
+import { makeUserName } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import CustomCheckbox from '../../customCheckbox'
@@ -77,7 +78,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
-    if (event.target.checked) {
+    if (event.target.checked && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
@@ -187,6 +188,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   </ChannelInfo>
                   <CustomCheckbox
                     index={channel.id}
+                    disabled={selectedChannels.length >= 5 && !isSelected}
                     state={isSelected}
                     onChange={(e) => handleChannelSelect(e, channel)}
                     size='18px'

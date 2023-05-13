@@ -33,13 +33,13 @@ import {
 import {
   detectBrowser,
   detectOS,
+  // getCaretPosition,
+  // getCaretPosition1,
   getCaretPosition,
-  getCaretPosition1,
-  makeUserName,
-  MessageTextFormat,
   placeCaretAtEnd,
   setCursorPosition
 } from '../../helpers'
+import { getDuplicateMentionsFromMeta, makeUserName, MessageTextFormat, typingTextFormat } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
 import {
@@ -149,7 +149,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const [mentionedMembers, setMentionedMembers] = useState<any>([])
 
-  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>([])
+  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>({})
 
   const [currentMentions, setCurrentMentions] = useState<any>(undefined)
 
@@ -194,9 +194,34 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleAddEmoji = (emoji: string) => {
     const selPos = getCaretPosition(messageInputRef.current)
-    const newText = messageText.slice(0, selPos) + emoji + messageText.slice(selPos)
-    setMessageText(newText)
-    messageInputRef.current.innerText = newText
+    const messageTextToFormat = editMessageText || messageText
+    const newText = messageTextToFormat.slice(0, selPos) + emoji + messageTextToFormat.slice(selPos)
+    if (editMessageText) {
+      setEditMessageText(newText)
+    } else {
+      setMessageText(newText)
+    }
+    let editingMentions: any = []
+    if (messageToEdit && messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length > 0) {
+      // Get duplicate mentions from metadata
+      editingMentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
+    }
+    const mentions =
+      editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
+    if (mentions.length && mentions.length > 0) {
+      const currentTextCont = typingTextFormat({
+        text: newText,
+        mentionedMembers: [
+          ...mentions.map((menMem: any) => ({
+            ...menMem,
+            displayName: `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+          }))
+        ]
+      })
+      messageInputRef.current.innerHTML = currentTextCont
+    } else {
+      messageInputRef.current.innerText = newText
+    }
     setCursorPosition(messageInputRef.current, selPos + emoji.length)
   }
 
@@ -205,10 +230,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       user.id === member.id ? member : contactsMap[member.id],
       member,
       getFromContacts
-    )
+    ).trim()
     const mentionToChange = mentionedMembers.find((men: any) => men.start === currentMentions.start)
-    // console.log('handle set mention .......................')
-    // console.log('mentionToChange:', mentionToChange)
     if (mentionToChange) {
       setMentionedMembers(
         mentionedMembers.map((menMem: any) => {
@@ -216,53 +239,94 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             return {
               ...member,
               start: currentMentions.start,
-              end: currentMentions.start + 1 + mentionDisplayName.trim().length
+              end: currentMentions.start + 1 + mentionDisplayName.length
             }
           } else {
             return menMem
           }
         })
       )
-      setMentionedMembersDisplayName(
-        mentionedMembersDisplayName.filter((menMem: any) => menMem.id !== mentionToChange.id)
-      )
+      const mentionDisplayNameToChange = { ...mentionedMembersDisplayName }
+      delete mentionDisplayNameToChange[mentionToChange.id]
+      setMentionedMembersDisplayName(mentionDisplayNameToChange)
     } else {
-      /* console.log('set mention ....................... ', {
-        ...member,
-        start: currentMentions.start,
-        end: currentMentions.start + 1 + mentionDisplayName.trim().length
-      }) */
       setMentionedMembers((members: any) => [
         ...members,
-        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.trim().length }
+        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.length }
       ])
     }
-
-    if (!mentionedMembersDisplayName.find((menMem: any) => menMem.id === member.id)) {
-      setMentionedMembersDisplayName((prevState: any) => [
+    if (!mentionedMembersDisplayName[member.id]) {
+      setMentionedMembersDisplayName((prevState: any) => ({
         ...prevState,
-        { id: member.id, displayName: `@${mentionDisplayName}` }
-      ])
+        [member.id]: { id: member.id, displayName: `@${mentionDisplayName}` }
+      }))
     }
     setMentionTyping(false)
-    /* const currentText = [
-      messageText.slice(0, mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1),
-      `${mentionDisplayName} `,
-      messageText.slice(
-        mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
-      )
-    ].join('')
-    */
-    const currentText = `${messageText.slice(
+    const messageTextToFormat = editMessageText || messageText
+    const currentText = `${messageTextToFormat.slice(
       0,
       mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1
-    )}${mentionDisplayName} ${messageText.slice(
+    )}${mentionDisplayName}${messageTextToFormat.slice(
       mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
     )}`
-    setMessageText(currentText)
-    messageInputRef.current.innerText = currentText
+    const mentionedMembersPositions: any = []
+    /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+        a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+      ) */
+    // const findIndexes: any = []
+    let editingMentions: any = []
+    if (messageToEdit && messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length > 0) {
+      // Get duplicate mentions from metadata
+      editingMentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
+    }
+    const mentions =
+      editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
+    if (mentions && mentions.length > 0) {
+      let lastFoundIndex = 0
+      const starts: any = {}
+      mentions.forEach((menMem: any) => {
+        const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
+        const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
+        lastFoundIndex = menIndex + mentionDisplayName.length
 
-    setCursorPosition(messageInputRef.current, currentMentions.start + 1 + mentionDisplayName.length)
+        if (!starts[menIndex]) {
+          mentionedMembersPositions.push({
+            displayName: mentionDisplayName,
+            start: menIndex,
+            end: menIndex + mentionDisplayName.length
+          })
+        }
+        starts[menIndex] = true
+        // }
+      })
+    }
+    const currentTextCont = typingTextFormat({
+      text: currentText,
+      mentionedMembers: [
+        ...mentionedMembersPositions,
+        {
+          displayName: `@${mentionDisplayName}`,
+          start: mentionToChange ? mentionToChange.start : currentMentions.start,
+          end: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
+        }
+      ],
+      currentMentionEnd: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
+    })
+    /* const currentTextCont = `${messageInputRef.current.innerHTML.slice(
+      0,
+      mentionToChange ? mentionToChange.start : currentMentions.start
+    )}<span class='mention_user'>@${mentionDisplayName}</span>&nbsp;${messageInputRef.current.innerHTML.slice(
+      mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
+    )}` */
+    if (editMessageText) {
+      setEditMessageText(currentText)
+    } else {
+      setMessageText(currentText)
+    }
+    // messageInputRef.current.innerText = currentText
+    messageInputRef.current.innerHTML = currentTextCont
+    setCursorPosition(messageInputRef.current, currentMentions.start + 2 + mentionDisplayName.length)
+    // setCursorPosition(messageInputRef.current, currentMentions.start + 2)
     const updateCurrentMentions = { ...currentMentions }
     updateCurrentMentions.typed = mentionDisplayName
     updateCurrentMentions.id = member.id
@@ -319,12 +383,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   const handleMentionDetect = (e: any) => {
     // const selPos = getCaretPosition(e.currentTarget)
-    const selPos = getCaretPosition1(e.currentTarget)
+    // const selPos = getCaretPosition1(e.currentTarget)
+    const selPos = getCaretPosition(e.currentTarget)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
       setSelectionPos(selPos)
     } else {
       if (mentionedMembers.length) {
-        let edited = false
+        /*  const edited = false
         const editMentions = mentionedMembers.map((men: any) => {
           if (men.start > selPos) {
             if (!edited) {
@@ -344,15 +409,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
         if (edited) {
           setMentionedMembers(editMentions)
-        }
+        } */
       }
     }
     if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
       setMentionTyping(true)
       setOpenMention(true)
     }
-    const lastChar = messageInputRef.current.innerText.slice(0, selPos).slice(-1)
-    if (lastChar === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
+    // const selPos1 = getCaretPositionAsText(e.currentTarget)
+    // const lastChar = messageInputRef.current.innerText.slice(0, selPos).slice(-1)
+    const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
+    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
       setCurrentMentions({
         start: selPos - 1,
         typed: ''
@@ -365,24 +432,66 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     let shouldClose = false
     if (e.key === 'Backspace') {
+      if (!messageInputRef.current.innerText.trim()) {
+        setMessageText('')
+        setMentionedMembers([])
+      }
       const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       if (mentionToEdit) {
-        const currentText = [messageText.slice(0, mentionToEdit.start + 1), messageText.slice(mentionToEdit.end)].join(
-          ''
-        )
+        let editingMentionPosition = 0
+        const mentionedMembersPositions: any = []
+        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
+            a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
+          ) */
+        // const findIndexes: any = []
+        if (mentionedMembers && mentionedMembers.length > 0) {
+          let lastFoundIndex = 0
+          const starts: any = {}
+          const updatedMentionedMembers: any = []
+          mentionedMembers.forEach((menMem: any) => {
+            const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
+
+            const menIndex = messageText.indexOf(mentionDisplayName, lastFoundIndex)
+            lastFoundIndex = menIndex + mentionDisplayName.length
+            if (menMem.start === mentionToEdit.start) {
+              editingMentionPosition = menIndex
+            }
+            if (!starts[menMem.start] && menMem.start !== mentionToEdit.start) {
+              updatedMentionedMembers.push({ ...menMem, start: menIndex, end: menIndex + mentionDisplayName.length })
+              mentionedMembersPositions.push({
+                displayName: mentionedMembersDisplayName[menMem.id].displayName,
+                start: menIndex,
+                // loc: menMem.start - trimLength,
+                end: menIndex + mentionDisplayName.length
+                // len: menMem.end - menMem.start
+              })
+            }
+            starts[menMem.start] = true
+            // }
+          })
+          setMentionedMembers(updatedMentionedMembers)
+        }
+        const currentText = [
+          messageText.slice(0, editingMentionPosition),
+          messageText.slice(editingMentionPosition + mentionedMembersDisplayName[mentionToEdit.id].displayName.length)
+        ].join('')
+        const currentTextCont = typingTextFormat({
+          text: currentText,
+          mentionedMembers: [...mentionedMembersPositions]
+        })
         setMessageText(currentText)
-        messageInputRef.current.innerText = currentText
+        messageInputRef.current.innerHTML = currentTextCont
         setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.start !== mentionToEdit.start))
         setMentionEdit(undefined)
-        setCursorPosition(messageInputRef.current, mentionToEdit.start + 1)
-        setOpenMention(true)
-        setMentionTyping(true)
+
+        setCursorPosition(messageInputRef.current, selPos)
+        /*  setOpenMention(true)
+         setMentionTyping(true)
         setCurrentMentions({
-          start: mentionToEdit.start,
+          start: editingMentionPosition,
           typed: ''
-        })
+        }) */
         /* setOpenMention(true)
-        console.log('set mention typing 2 ', true)
         setMentionTyping(true)
         setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.id !== mentionToEdit.id))
 
@@ -422,7 +531,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     if (mentionEdit && (e.key === 'Delete' || e.key === 'Backspace')) {
       // if(mentionTyping && currentMentions.start === selectionPos)
-      const currentText = [messageText.slice(0, mentionEdit.start + 1), messageText.slice(mentionEdit.end)].join('')
+      /* const currentText = [messageText.slice(0, mentionEdit.start + 1), messageText.slice(mentionEdit.end)].join('')
       setMessageText(currentText)
       messageInputRef.current.innerText = currentText
       setMentionedMembers((prevState: any) => prevState.filter((mem: any) => mem.start !== mentionEdit.start))
@@ -431,7 +540,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setCurrentMentions({
         start: mentionEdit.start,
         typed: ''
-      })
+      }) */
     }
   }
 
@@ -440,6 +549,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleSendEditMessage = (event?: any) => {
+    /* if (recordedFile) {
+      /!* const file = new File([recordedFile.data], recordedFile.data.name, {
+        type: 'audio/mp3'
+      }) *!/
+      const messageToSend = {
+        metadata: '',
+        body: '',
+        mentionedMembers: [],
+        attachments: [
+          {
+            name: `${uuidv4()}.mp3`,
+            data: recordedFile.data,
+            attachmentId: uuidv4(),
+            upload: true,
+            size: recordedFile.data.size,
+            attachmentUrl: recordedFile.attachmentURL,
+            metadata: { tmb: recordedFile.thumbs },
+            type: attachmentTypes.voice
+          }
+        ],
+        type: 'text'
+      }
+      dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
+    } else { */
     const { shiftKey, charCode, type } = event
     const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
     if (shouldSend) {
@@ -448,40 +581,48 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         handleEditMessage()
       } else if (messageText || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-        // if (messageTexToSend) {
-        const mentionedMembersPositions = {}
-        /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
-          a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
-        ) */
-        // const findIndexes: any = []
-        mentionedMembers.forEach((menMem: any) => {
-          if (!mentionedMembersPositions[menMem.id]) {
-            mentionedMembersPositions[menMem.id] = { loc: menMem.start, len: menMem.end - menMem.start }
-          }
-        })
+        const mentionedMembersPositions: any = []
+        if (mentionedMembers && mentionedMembers.length > 0) {
+          let lastFoundIndex = 0
+          const starts: any = {}
+          mentionedMembers.forEach((menMem: any) => {
+            const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
+            const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
+            lastFoundIndex = menIndex + mentionDisplayName.length
+            if (!starts[menIndex]) {
+              mentionedMembersPositions.push({
+                id: menMem.id,
+                loc: menIndex,
+                len: mentionDisplayName.length
+              })
+            }
+            starts[menIndex] = true
+            // }
+          })
+        }
         /* sortedMentionedMembersDspNames.forEach((menMem: any) => {
-          let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
-          let existingIndex = findIndexes.includes(menIndex)
-          let i = 0
-          while (existingIndex) {
-            menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-            existingIndex = findIndexes.includes(menIndex)
-            // eslint-disable-next-line no-plusplus
-            i++
-            if (i > sortedMentionedMembersDspNames.length) {
-              break
+            let menIndex = messageTexToSend.indexOf(menMem.displayName.trim())
+            let existingIndex = findIndexes.includes(menIndex)
+            let i = 0
+            while (existingIndex) {
+              menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
+              existingIndex = findIndexes.includes(menIndex)
+              // eslint-disable-next-line no-plusplus
+              i++
+              if (i > sortedMentionedMembersDspNames.length) {
+                break
+              }
             }
-          }
 
-          const mentionDisplayLength = menMem.displayName.length
-          if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-            findIndexes.push(menIndex)
-            mentionedMembersPositions = {
-              ...mentionedMembersPositions,
-              [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+            const mentionDisplayLength = menMem.displayName.length
+            if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
+              findIndexes.push(menIndex)
+              mentionedMembersPositions = {
+                ...mentionedMembersPositions,
+                [menMem.id]: { loc: menIndex, len: mentionDisplayLength }
+              }
             }
-          }
-        }) */
+          }) */
         const messageToSend: any = {
           metadata: mentionedMembersPositions,
           body: messageTexToSend,
@@ -508,17 +649,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             firstUrl = match[0].url
           }
           /* messageTextArr.forEach((textPart) => {
-            if (urlRegex.test(textPart)) {
-              const textArray = textPart.split(urlRegex)
-              textArray.forEach(async (part) => {
-                if (urlRegex.test(part)) {
-                  if (!firstUrl) {
-                    firstUrl = part
+              if (urlRegex.test(textPart)) {
+                const textArray = textPart.split(urlRegex)
+                textArray.forEach(async (part) => {
+                  if (urlRegex.test(part)) {
+                    if (!firstUrl) {
+                      firstUrl = part
+                    }
                   }
-                }
-              })
-            }
-          }) */
+                })
+              }
+            }) */
           if (firstUrl) {
             messageToSend.attachments = [
               {
@@ -547,17 +688,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             if (sendAsSeparateMessage) {
               if (index !== 0) {
                 messageToSend.body = ''
+                messageToSend.metadata = ''
+                delete messageToSend.mentionedMembers
               }
               /* handleSendMessage(
-                {
-                  ...messageToSend,
-                  attachments: [attachmentToSend],
-                  metadata: { ...messageToSend.metadata, groupId }
-                },
-                connectionStatus,
-                activeChannel.id,
-                true
-              ) */
+                  {
+                    ...messageToSend,
+                    attachments: [attachmentToSend],
+                    metadata: { ...messageToSend.metadata, groupId }
+                  },
+                  connectionStatus,
+                  activeChannel.id,
+                  true
+                ) */
               dispatch(
                 sendMessageAC(
                   {
@@ -577,15 +720,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }
         }
         setMessageText('')
-        messageInputRef.current.innerText = ''
-        setAttachments([])
-        handleCloseReply()
-        setMentionedMembers([])
-        setMentionedMembersDisplayName([])
-        setOpenMention(false)
-        setMentionTyping(false)
-        setCurrentMentions(undefined)
 
+        messageInputRef.current.innerText = ''
         fileUploader.current.value = ''
         if (inTypingState) {
           handleSendTypingState(false)
@@ -593,38 +729,68 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         clearTimeout(typingTimout)
         setTypingTimout(undefined)
         /* else if (recordedFile) {
-         /!* const file = new File([recordedFile.data], 'voice_message.webm', {
-           type: 'audio/ogg',
-         });
-         const messageToSend = {
-           metadata: '',
-           body: '',
-           mentionedMembers: [],
-           attachments: [
-             {
-               name: recordedFile.data.name,
-               data: recordedFile.data,
-               attachmentId: Date.now(),
-               upload: true,
-               attachmentUrl: recordedFile.attachmentURL,
-               metadata: 'metadata for voice message',
-               type: recordedFile.data.type.split('/')[1]
-             }
-           ],
-           type: 'voice'
-         }
-         dispatch(sendMessageAC(messageToSend))
-       } */
+           /!* const file = new File([recordedFile.data], 'voice_message.webm', {
+             type: 'audio/ogg',
+           });
+           const messageToSend = {
+             metadata: '',
+             body: '',
+             mentionedMembers: [],
+             attachments: [
+               {
+                 name: recordedFile.data.name,
+                 data: recordedFile.data,
+                 attachmentId: Date.now(),
+                 upload: true,
+                 attachmentUrl: recordedFile.attachmentURL,
+                 metadata: 'metadata for voice message',
+                 type: recordedFile.data.type.split('/')[1]
+               }
+             ],
+             type: 'voice'
+           }
+           dispatch(sendMessageAC(messageToSend))
+         } */
       }
+
+      setAttachments([])
+      handleCloseReply()
+      setMentionedMembers([])
+      setMentionedMembersDisplayName([])
+      setOpenMention(false)
+      setMentionTyping(false)
+      setCurrentMentions(undefined)
     }
   }
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
-    let mentionedMembersPositions = messageToEdit.metadata
-    let mentionedUserForSend = messageToEdit.mentionedUsers
+    const mentionedMembersPositions: any = []
+    const mentionedUserForSend: any = []
     if (messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length) {
-      mentionedMembersPositions = {}
-      const findIndexes: any[] = []
+      const mentions = [...messageToEdit.mentionedUsers, ...mentionedMembers]
+      let lastFoundIndex = 0
+      const starts: any = {}
+      mentions.forEach((menMem: any) => {
+        const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+        const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
+        if (menIndex >= 0) {
+          lastFoundIndex = menIndex + mentionDisplayName.length
+          if (!starts[menIndex]) {
+            mentionedMembersPositions.push({
+              id: menMem.id,
+              loc: menIndex,
+              len: mentionDisplayName.length
+            })
+          }
+          starts[menIndex] = true
+
+          mentionedUserForSend.push(menMem)
+        }
+
+        // }
+      })
+
+      /* const findIndexes: any[] = []
       mentionedUserForSend.forEach((menMem: any) => {
         // eslint-disable-next-line max-len
         const mentionedMembersDisplayName = `@${menMem.firstName}${menMem.lastName !== '' ? ` ${menMem.lastName}` : ''}`
@@ -656,9 +822,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-      })
+      }) */
     }
-
     const messageToSend = {
       ...messageToEdit,
       metadata: mentionedMembersPositions,
@@ -675,6 +840,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageInputRef.current) {
       messageInputRef.current.innerText = ''
     }
+
+    setMentionedMembers([])
+    setMentionedMembersDisplayName([])
+    setOpenMention(false)
+    setMentionTyping(false)
+    setCurrentMentions(undefined)
     dispatch(setMessageToEditAC(null))
   }
   const removeUpload = (attachmentId: string) => {
@@ -768,10 +939,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } */
   }
   useEffect(() => {
-    if (mentionedMembers.length) {
-      const currentPos = getCaretPosition(messageInputRef.current)
+    if (mentionTyping) {
+      if (selectionPos <= currentMentions.start) {
+        handleCloseMentionsPopup()
+        setMentionTyping(false)
+        setCurrentMentions(undefined)
+      }
+    }
+    /* if (mentionedMembers.length) {
+      // const currentPos = getCaretPosition(messageInputRef.current)
       const mentionToEdit = mentionedMembers.find(
-        (menMem: any) => menMem.start < currentPos && menMem.end >= currentPos
+        (menMem: any) => menMem.start < selectionPos && menMem.end >= selectionPos
       )
       if (mentionToEdit) {
         setMentionEdit(mentionToEdit)
@@ -788,7 +966,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setMentionTyping(false)
         setOpenMention(false)
       }
-    }
+    } */
   }, [selectionPos])
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
@@ -1138,8 +1316,43 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useEffect(() => {
     if (messageToEdit && messageInputRef.current) {
-      setEditMessageText(messageToEdit.body || '')
-      messageInputRef.current.innerText = messageToEdit.body
+      if (messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length) {
+        const formattedText = MessageTextFormat({
+          text: messageToEdit.body,
+          message: messageToEdit,
+          contactsMap,
+          getFromContacts,
+          asSampleText: true
+        })
+        setEditMessageText(formattedText)
+        // Get duplicate mentions from metadata
+        const mentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
+        const mentionedMembersPositions: any = []
+        let lastFoundIndex = 0
+        const starts: any = {}
+        mentions.forEach((menMem: any) => {
+          const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+          const menIndex = formattedText.indexOf(mentionDisplayName, lastFoundIndex)
+          lastFoundIndex = menIndex + mentionDisplayName.length
+          if (!starts[menIndex]) {
+            mentionedMembersPositions.push({
+              displayName: mentionDisplayName,
+              start: menIndex,
+              end: menIndex + mentionDisplayName.length
+            })
+          }
+          starts[menIndex] = true
+          // }
+        })
+        const currentTextCont = typingTextFormat({
+          text: messageToEdit.body,
+          mentionedMembers: [...mentionedMembersPositions]
+        })
+        messageInputRef.current.innerHTML = currentTextCont
+      } else {
+        setEditMessageText(messageToEdit.body || '')
+        messageInputRef.current.innerText = messageToEdit.body
+      }
       // Creates range object
       placeCaretAtEnd(messageInputRef.current)
 
@@ -1198,14 +1411,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ? "Sender doesn't support replies"
             : 'You blocked this user.'}
         </BlockedUserInfo>
-      ) : !activeChannel.role ? (
+      ) : !activeChannel.role && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
         <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
           Join
         </JoinChannelCont>
       ) : (
           activeChannel.type === CHANNEL_TYPE.PUBLIC
             ? !(activeChannel.role === 'admin' || activeChannel.role === 'owner')
-            : !checkActionPermission('sendMessage')
+            : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
         ) ? (
         <ReadOnlyCont iconColor={colors.primary}>
           <EyeIcon /> Read only
@@ -1241,6 +1454,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               // ccc={handleTyping}
               handleEmojiPopupToggle={handleEmojiPopupToggle}
               rightSide={emojisInRightSide}
+              bottomPosition={'100%'}
             />
           )}
           {/* </EmojiContainer> */}
@@ -1434,6 +1648,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 // onKeyDown={handleKeyDown}
                 // value={editMessageText || messageText}
                 ref={messageInputRef}
+                mentionColor={colors.primary}
                 // placeholder='Type message here...'
               />
             </MessageInputWrapper>
@@ -1643,6 +1858,11 @@ const MessageInput = styled.div<any>`
     font-size: 15px;
     color: ${colors.gray7};
     opacity: 1;
+  }
+
+  & span.mention_user {
+    color: ${(props) => props.mentionColor || colors.primary};
+    user-modify: read-only;
   }
   //caret-color: #000;
 `

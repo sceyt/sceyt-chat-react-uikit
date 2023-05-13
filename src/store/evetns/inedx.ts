@@ -58,7 +58,7 @@ import {
 } from '../../helpers/messagesHalper'
 import { setNotification } from '../../helpers/notifications'
 import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
-import { MessageTextFormat } from '../../helpers'
+import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 
@@ -532,7 +532,7 @@ export default function* watchForEvents(): any {
                 contactsMap,
                 getFromContacts,
                 isLastMessage: false,
-                isNotification: true
+                asSampleText: true
               })
               console.log('messageBody. . . . ', messageBody)
               setNotification(messageBody, message.user, channel)
@@ -702,8 +702,8 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
-        console.log('channel REACTION_ADDED ... ')
         const { channel, user, message, reaction } = args
+        console.log('channel REACTION_ADDED ... ', args)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
@@ -901,7 +901,6 @@ export default function* watchForEvents(): any {
       } */
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
-        console.log('setConnectionStatusAC -  -- -___---***********************... ', status)
         yield put(setConnectionStatusAC(status))
         break
       }
