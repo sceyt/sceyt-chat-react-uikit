@@ -22,7 +22,7 @@ import ConfirmPopup from '../../../../common/popups/delete'
 import ChangeMemberRole from './change-member-role'
 import { getClient } from '../../../../common/client'
 import { userLastActiveDateFormat } from '../../../../helpers'
-import { makeUserName } from '../../../../helpers/message'
+import { makeUsername } from '../../../../helpers/message'
 import UsersPopup from '../../../../common/popups/users'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
@@ -190,7 +190,7 @@ const Members = ({
                   <MemberName>
                     {member.id === user.id
                       ? 'You'
-                      : makeUserName(
+                      : makeUsername(
                           member.id === user.id ? (member as unknown as IContact) : contactsMap[member.id],
                           member,
                           getFromContacts
@@ -297,7 +297,7 @@ const Members = ({
               <span>
                 Are you sure to remove
                 {!!selectedMember && (
-                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
                 )}
                 from this {channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
               </span>
@@ -332,7 +332,7 @@ const Members = ({
               <span>
                 Are you sure you want to promote
                 {selectedMember && (
-                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
                 )}
                 to <BoltText>Admin?</BoltText>
               </span>
@@ -357,7 +357,7 @@ const Members = ({
                 <BoltText> “Admin” </BoltText>
                 rights from user:
                 {selectedMember && (
-                  <BoltText> {makeUserName(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
                 )}
                 ?
               </span>

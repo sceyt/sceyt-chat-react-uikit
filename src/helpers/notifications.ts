@@ -1,5 +1,5 @@
 import { IChannel, IContactsMap, IUser } from '../types'
-import { makeUserName } from './message'
+import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
@@ -54,19 +54,19 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
     notification = new Notification(
       `${
         channel.type === CHANNEL_TYPE.DIRECT
-          ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+          ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
           : channel.subject
       }`,
       {
         body: `${
-          channel.type !== CHANNEL_TYPE.DIRECT ? makeUserName(contactsMap[user.id], user, getFromContacts) + ': ' : ''
+          channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
         } reacted ${reaction} to "${body}"`,
         icon: logoSrc
         // silent: false
       }
     )
   } else {
-    notification = new Notification(`New Message from ${makeUserName(contactsMap[user.id], user, getFromContacts)}`, {
+    notification = new Notification(`New Message from ${makeUsername(contactsMap[user.id], user, getFromContacts)}`, {
       body,
       icon: logoSrc
       // silent: false

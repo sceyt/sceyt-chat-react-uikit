@@ -7,7 +7,7 @@ import { IReaction } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
 import { userLastActiveDateFormat } from '../../../helpers'
-import { makeUserName } from '../../../helpers/message'
+import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
@@ -171,7 +171,7 @@ export default function ReactionsPopup({
             </AvatarWrapper>
             <UserNamePresence>
               <MemberName>
-                {makeUserName(
+                {makeUsername(
                   reaction.user.id === user.id ? reaction.user : contactsMap[reaction.user.id],
                   reaction.user,
                   getFromContacts

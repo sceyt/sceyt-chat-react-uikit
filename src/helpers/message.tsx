@@ -95,7 +95,7 @@ export const typingTextFormat = ({
   return messageText.length > 1 ? messageText : text
 }
 
-export const makeUserName = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
+export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
   if (user && isAlphanumeric(user.id)) {
     return user.id.charAt(0).toUpperCase() + user.id.slice(1)
   }
@@ -208,14 +208,14 @@ export const MessageTextFormat = ({
             firstPart,
             // @ts-ignore
             asSampleText ? (
-              `@${makeUserName(
+              `@${makeUsername(
                 user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
                 mentionDisplay,
                 getFromContacts
               ).trim()}`
             ) : (
               <MentionedUser isLastMessage={isLastMessage} color={colors.primary} key={`${mention.loc}`}>
-                {`@${makeUserName(
+                {`@${makeUsername(
                   user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
                   mentionDisplay,
                   getFromContacts

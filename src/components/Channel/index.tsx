@@ -10,7 +10,7 @@ import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
-import { lastMessageDateFormat, makeUserName, MessageTextFormat } from '../../helpers/message'
+import { lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
@@ -100,14 +100,14 @@ const Channel: React.FC<IChannelProps> = ({
       <ChannelInfo avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
         <h3>
           {channel.subject ||
-            (isDirectChannel ? makeUserName(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
+            (isDirectChannel ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
         </h3>
         {channel.muted && (
           <MutedIcon color={notificationsIsMutedIconColor}>
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {/* makeUserName(contactsMap[typingIndicator.from.id]) */}
+        {/* makeUsername(contactsMap[typingIndicator.from.id]) */}
         {(lastMessage || !!typingIndicator) && (
           <LastMessage
             markedAsUnread={

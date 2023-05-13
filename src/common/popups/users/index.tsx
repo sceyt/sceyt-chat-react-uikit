@@ -42,7 +42,7 @@ import {
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
-import { makeUserName } from '../../../helpers/message'
+import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate } from '../../../hooks'
 
@@ -313,7 +313,7 @@ const UsersPopup = ({
                 return null
               }
               const isSelected = selectedMembers.findIndex((member) => member.id === user.id) >= 0
-              const memberDisplayName = makeUserName(contactsMap[user.id], user, getFromContacts)
+              const memberDisplayName = makeUsername(contactsMap[user.id], user, getFromContacts)
               return (
                 <ListRow
                   isAdd={actionType !== 'createChat'}

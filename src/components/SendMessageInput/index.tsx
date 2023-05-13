@@ -28,7 +28,7 @@ import {
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
 import { detectBrowser, detectOS, getCaretPosition, placeCaretAtEnd, setCursorPosition } from '../../helpers'
-import { getDuplicateMentionsFromMeta, makeUserName, MessageTextFormat, typingTextFormat } from '../../helpers/message'
+import { getDuplicateMentionsFromMeta, makeUsername, MessageTextFormat, typingTextFormat } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
 import {
@@ -191,7 +191,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         mentionedMembers: [
           ...mentions.map((menMem: any) => ({
             ...menMem,
-            displayName: `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+            displayName: `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
           }))
         ]
       })
@@ -203,7 +203,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   const handleSetMention = (member: IMember) => {
-    const mentionDisplayName = makeUserName(
+    const mentionDisplayName = makeUsername(
       user.id === member.id ? member : contactsMap[member.id],
       member,
       getFromContacts
@@ -258,7 +258,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       let lastFoundIndex = 0
       const starts: any = {}
       mentions.forEach((menMem: any) => {
-        const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
+        const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
         const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
         lastFoundIndex = menIndex + mentionDisplayName.length
 
@@ -618,7 +618,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       let lastFoundIndex = 0
       const starts: any = {}
       mentions.forEach((menMem: any) => {
-        const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+        const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
         const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
         if (menIndex >= 0) {
           lastFoundIndex = menIndex + mentionDisplayName.length
@@ -1184,7 +1184,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         let lastFoundIndex = 0
         const starts: any = {}
         mentions.forEach((menMem: any) => {
-          const mentionDisplayName = `@${makeUserName(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
           const menIndex = formattedText.indexOf(mentionDisplayName, lastFoundIndex)
           lastFoundIndex = menIndex + mentionDisplayName.length
           if (!starts[menIndex]) {
@@ -1352,7 +1352,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         ? user.firstName
                           ? `${user.firstName} ${user.lastName}`
                           : user.id
-                        : makeUserName(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
+                        : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
                     </UserName>
                   </EditReplyMessageHeader>
                   {messageForReply.attachments && messageForReply.attachments.length ? (

@@ -9,7 +9,7 @@ import { ReactComponent as CloseIcon } from '../../../assets/svg/close.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
 import { ReactComponent as LeftArrow } from '../../../assets/svg/sliderButtonLeft.svg'
 import { bytesToSize, downloadFile } from '../../../helpers'
-import { makeUserName } from '../../../helpers/message'
+import { makeUsername } from '../../../helpers/message'
 import { IMedia } from '../../../types'
 import { getCustomDownloader, getCustomUploader } from '../../../helpers/customUploader'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
@@ -54,7 +54,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   // const attachmentsHasNext = useSelector(attachmentsForPopupHasNextSelector, shallowEqual) || []
   const attachmentUserName = currentFile
     ? currentFile.user &&
-      makeUserName(
+      makeUsername(
         contactsMap[currentFile.user.id],
         currentFile.user,
         getFromContacts && user.id !== currentFile.user.id

@@ -36,7 +36,7 @@ import {
 } from '../../helpers/messagesHalper'
 import SliderPopup from '../../common/popups/sliderPopup'
 import { systemMessageUserName } from '../../helpers'
-import { isJSON, makeUserName } from '../../helpers/message'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
@@ -884,7 +884,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       >
                         <span>
                           {message.incoming
-                            ? makeUserName(message.user && contactsMap[message.user.id], message.user, getFromContacts)
+                            ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
                             : 'You'}
                           {message.body === 'CC'
                             ? ' created this channel '

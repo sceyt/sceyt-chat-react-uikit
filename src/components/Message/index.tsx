@@ -10,7 +10,7 @@ import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
 // import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
 import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
-import { isJSON, makeUserName, MessageTextFormat } from '../../helpers/message'
+import { isJSON, makeUsername, MessageTextFormat } from '../../helpers/message'
 import { getClient } from '../../common/client'
 import MessageActions from './MessageActions'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
@@ -588,7 +588,7 @@ const Message = ({
               !!message.parent.attachments.length &&
               parentNotLinkAttachment) */
           }
-          isReply={!!message.parent}
+          isReplied={!!message.parent}
           isForwarded={message.forwardingDetails}
           messageBody={!!message.body}
           color={colors.primary}
@@ -596,7 +596,7 @@ const Message = ({
         >
           {message.user.id === user.id && message.user.firstName
             ? `${message.user.firstName} ${message.user.lastName}`
-            : makeUserName(contactsMap[message.user.id], message.user, getFromContacts)}
+            : makeUsername(contactsMap[message.user.id], message.user, getFromContacts)}
         </MessageOwner>
       )}
       {messageTimePosition === 'topOfMessage' && (
@@ -885,7 +885,7 @@ const Message = ({
                 >
                   {message.parent.user.id === user.id
                     ? 'You'
-                    : makeUserName(contactsMap[message.parent.user.id], message.parent.user, getFromContacts)}
+                    : makeUsername(contactsMap[message.parent.user.id], message.parent.user, getFromContacts)}
                 </MessageOwner>
 
                 <ReplyMessageText fontSize='14px' lineHeight='16px'>
@@ -925,7 +925,7 @@ const Message = ({
               Forwarded message
               {/* {message.forwardingDetails.user.id === user.id
                 ? ' You'
-                : ` ${makeUserName(forwardSenderFromContact, message.forwardingDetails.user, getFromContacts)}`} */}
+                : ` ${makeUsername(forwardSenderFromContact, message.forwardingDetails.user, getFromContacts)}`} */}
             </ForwardedTitle>
           )}
           {/* {message.type === 'voice' && message.attachments[0] ? (
