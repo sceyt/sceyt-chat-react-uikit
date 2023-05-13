@@ -25,7 +25,7 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
     clearInterval(updateInterval)
     updateInterval = setInterval(() => {
-      /*  const date = new Date()
+      /* const date = new Date()
       console.info(
         `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : get users `
       ) */

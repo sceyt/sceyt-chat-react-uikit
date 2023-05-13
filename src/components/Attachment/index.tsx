@@ -20,6 +20,8 @@ import { pauseAttachmentUploadingAC, resumeAttachmentUploadingAC } from '../../s
 import AudioPlayer from '../AudioPlayer'
 import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
+import { connectionStatusSelector } from '../../store/user/selector'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -60,6 +62,7 @@ const Attachment = ({
 }: AttachmentPops) => {
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
+  const connectionStatus = useSelector(connectionStatusSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
   // const [imageLoading, setImageLoading] = useState(true)
@@ -167,7 +170,10 @@ const Attachment = ({
       })
     } */
     // setAttachmentUrl('')
-    if (!(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)) {
+    if (
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
+    ) {
       getAttachmentUrlFromCache(attachment.id!).then((cachedUrl) => {
         if (attachment.type === 'image' && !isPrevious) {
           if (cachedUrl) {
@@ -207,12 +213,7 @@ const Attachment = ({
         }
       })
     }
-    // console.log('imageLoading.. ', imageLoading)
-    /* setInterval(() => {
-      console.log('set progress... ', progress)
-      setProgress((prevState) => prevState + 0.01)
-    }, 100) */
-  }, [attachment])
+  }, [attachment.id])
 
   // console.log('attachment ... ', attachment)
   // @ts-ignore

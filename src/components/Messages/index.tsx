@@ -25,7 +25,7 @@ import {
 } from '../../store/message/actions'
 import { IChannel, IContactsMap } from '../../types'
 import { getUnreadScrollTo, setUnreadScrollTo } from '../../helpers/channelHalper'
-import { browserTabIsActiveSelector, contactsMapSelector } from '../../store/user/selector'
+import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import {
   getHasNextCached,
   getHasPrevCached,
@@ -44,6 +44,7 @@ import { setDraggedAttachments } from '../../store/channel/actions'
 import { useDidUpdate } from '../../hooks'
 import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 
 let loading = false
 let loadFromServer = false
@@ -283,6 +284,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
+  const connectionStatus = useSelector(connectionStatusSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
@@ -361,6 +363,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       const scrollHeightQuarter = (target.scrollHeight * 20) / 100
       if (
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !prevDisable &&
         messagesLoading !== LOADING_STATE.LOADING &&
         !scrollToRepliedMessage &&
@@ -397,6 +400,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       if (
         !nextDisable &&
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
         messagesLoading !== LOADING_STATE.LOADING &&
         (hasNextMessages || getHasNextCached()) &&
         -target.scrollTop <= 400 &&
@@ -453,7 +457,7 @@ const MessageList: React.FC<MessagesProps> = ({
     // let result: any = {}
     const hasPrevCached = getHasPrevCached()
     const hasNextCached = getHasNextCached()
-    if (!loading) {
+    if (!loading && connectionStatus === CONNECTION_STATUS.CONNECTED) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
         loading = true
         // result = await messageQuery.loadPreviousMessageId(firstMessageId)
@@ -614,6 +618,13 @@ const MessageList: React.FC<MessagesProps> = ({
       setIsDragging(false)
     }
   }, [draggingSelector])
+  useDidUpdate(() => {
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      loading = false
+      prevDisable = false
+      nextDisable = false
+    }
+  }, [connectionStatus])
 
   useEffect(() => {
     setHasNextCached(false)

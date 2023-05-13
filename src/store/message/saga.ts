@@ -1278,6 +1278,8 @@ function* loadMoreMessages(action: IAction): any {
     } */
     if (result.messages && result.messages.length && result.messages.length > 0) {
       yield put(addMessagesAC(result.messages, direction))
+    } else {
+      yield put(addMessagesAC([], direction))
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {

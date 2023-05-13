@@ -254,7 +254,6 @@ const Message = ({
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
-
   const reactionsList = message.reactionScores && Object.keys(message.reactionScores)
   const reactionsCount =
     message.reactionScores &&

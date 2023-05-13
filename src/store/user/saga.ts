@@ -1,20 +1,11 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
-import {
-  BLOCK_USERS,
-  GET_CONTACTS,
-  GET_ROLES,
-  GET_USERS,
-  LOAD_MORE_USERS,
-  UNBLOCK_USERS,
-  UPDATE_PROFILE
-} from './constants'
+import { BLOCK_USERS, GET_CONTACTS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
 import { LOADING_STATE } from '../../helpers/constants'
 import {
   addUsersAC,
   setContactsAC,
   setContactsLoadingStateAC,
-  setRolesAC,
   setUsersAC,
   setUsersLoadingStateAC,
   updateUserProfileAC
@@ -31,18 +22,6 @@ function* getContacts(): any {
     yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
     console.log('ERROR in get contacts - :', e.message)
-    if (e.code !== 10008) {
-      // yield put(setErrorNotification(e.message))
-    }
-  }
-}
-function* getRoles(): any {
-  try {
-    const SceytChatClient = getClient()
-    const roles = yield call(SceytChatClient.getRoles)
-    yield put(setRolesAC(roles))
-  } catch (e) {
-    console.log('ERROR in get roles - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -87,7 +66,7 @@ function* unblockUser(action: IAction): any {
 function* updateProfile(action: IAction): any {
   try {
     const { payload } = action
-    const { user, firstName, lastName, avatarUrl, metadata, avatarFile, presence } = payload
+    const { user, firstName, lastName, avatarUrl, metadata, avatarFile } = payload
     const updateUserProfileData: any = {}
 
     const SceytChatClient = getClient()
@@ -105,9 +84,6 @@ function* updateProfile(action: IAction): any {
 
     if (firstName && user.firstName !== firstName) {
       updateUserProfileData.firstName = firstName
-    }
-
-    if (user.presence.status !== presence) {
     }
 
     if (lastName && user.lastName !== lastName) {
@@ -214,7 +190,6 @@ export default function* MembersSaga() {
   yield takeLatest(GET_CONTACTS, getContacts)
   yield takeLatest(GET_USERS, getUsers)
   yield takeLatest(LOAD_MORE_USERS, loadMoreUsers)
-  yield takeLatest(GET_ROLES, getRoles)
   yield takeLatest(BLOCK_USERS, blockUser)
   yield takeLatest(UNBLOCK_USERS, unblockUser)
   yield takeLatest(UPDATE_PROFILE, updateProfile)
