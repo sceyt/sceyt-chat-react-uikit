@@ -600,7 +600,7 @@ const MessageList: React.FC<MessagesProps> = ({
   useEffect(() => {
     if (scrollToNewMessage.scrollToBottom) {
       dispatch(showScrollToNewMessageButtonAC(false))
-      loading = false
+      loading = true
       if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
         dispatch(getMessagesAC(channel, !hasNextMessages))
       }
@@ -681,6 +681,8 @@ const MessageList: React.FC<MessagesProps> = ({
                 currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
                 i++
               }
+            } else {
+              break
             }
           }
 
@@ -852,12 +854,13 @@ const MessageList: React.FC<MessagesProps> = ({
                   messages[index + 1] || (currentChannelPendingMessages.length > 0 && currentChannelPendingMessages[0])
                 const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
-                // @ts-ignore
                 return (
                   <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
-                      noMargin={!isUnreadMessage && prevMessage && prevMessage.type === 'system'}
+                      noMargin={
+                        !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
+                      }
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}

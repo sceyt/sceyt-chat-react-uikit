@@ -61,6 +61,7 @@ import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../
 import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -563,8 +564,8 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
         const { channelId, markerList } = args
-        console.log('channel MESSAGE_MARKERS_RECEIVED ...', channelId, markerList)
         const channel = yield call(getChannelFromMap, channelId)
+        console.log('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
         if (channel) {
           const activeChannelId = yield call(getActiveChannelId)
           const lastMessage = {
@@ -572,8 +573,14 @@ export default function* watchForEvents(): any {
             deliveryStatus: markerList.name
           }
           let updateLastMessage = false
+          const markersMap: any = {}
           markerList.messageIds.forEach((messageId: string) => {
-            if (channel.lastMessage && messageId === channel.lastMessage.id) {
+            markersMap[messageId] = true
+            if (
+              channel.lastMessage &&
+              messageId === channel.lastMessage.id &&
+              channel.lastMessage.deliveryStatus !== MESSAGE_DELIVERY_STATUS.READ
+            ) {
               updateLastMessage = true
             }
           })
@@ -581,8 +588,6 @@ export default function* watchForEvents(): any {
             yield put(updateChannelLastMessageStatusAC(lastMessage, JSON.parse(JSON.stringify(channel))))
           }
 
-          const markersMap: any = {}
-          markerList.messageIds.forEach((messageId: string) => (markersMap[messageId] = true))
           if (activeChannelId === channelId) {
             yield put(updateMessagesStatusAC(markerList.name, markersMap))
             updateMarkersOnAllMessages(markersMap, markerList.name)

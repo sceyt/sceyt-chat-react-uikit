@@ -102,12 +102,14 @@ function EmojisPopup({
   }
 
   useEffect(() => {
-    const containerTop = emojiContainerRef.current.getBoundingClientRect().top + 10
-    const heights = collectionsRef.current.map(
-      (col: any) => col.elem.current.getBoundingClientRect().top - 80 - containerTop
-    )
-    setCollectionHeights(heights)
     setRendered(true)
+    setTimeout(() => {
+      const containerTop = emojiContainerRef.current.getBoundingClientRect().top + 10
+      const heights = collectionsRef.current.map((col: any) => {
+        return col.elem.current.getBoundingClientRect().top - 80 - containerTop
+      })
+      setCollectionHeights(heights)
+    }, 300)
   }, [])
 
   return (

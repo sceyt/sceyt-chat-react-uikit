@@ -46,7 +46,6 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
 
   const handleScrollToBottom = () => {
-    console.log('scroll buttun cliced ... ')
     dispatch(scrollToNewMessageAC(true, true))
   }
   return (

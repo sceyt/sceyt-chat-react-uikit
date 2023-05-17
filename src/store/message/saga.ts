@@ -1025,11 +1025,9 @@ function* deleteMessage(action: IAction): any {
   try {
     const { payload } = action
     const { messageId, channelId, deleteOption } = payload
-    console.log('saga delete message ... ', messageId)
     const channel = yield call(getChannelFromMap, channelId)
 
     const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-    console.log('deleted message ... ', deletedMessage)
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
     updateMessageOnMap(channel.id, {
       messageId: deletedMessage.id,

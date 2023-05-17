@@ -10,7 +10,7 @@ import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
-import { lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
+import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
@@ -47,7 +47,10 @@ const Channel: React.FC<IChannelProps> = ({
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
-    lastMessage && lastMessage.type === 'system' && lastMessage.metadata && JSON.parse(lastMessage.metadata)
+    lastMessage &&
+    lastMessage.type === 'system' &&
+    lastMessage.metadata &&
+    (isJSON(lastMessage.metadata) ? JSON.parse(lastMessage.metadata) : lastMessage.metadata)
   const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
@@ -161,7 +164,11 @@ const Channel: React.FC<IChannelProps> = ({
               )
             )}
             {(isDirectChannel
-              ? !typingIndicator && lastMessage.user && lastMessage.user.id === user.id && !channel.lastReactedMessage
+              ? !typingIndicator &&
+                lastMessage.user &&
+                lastMessage.user.id === user.id &&
+                !channel.lastReactedMessage &&
+                lastMessage.state !== MESSAGE_STATUS.DELETE
               : typingIndicator ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
               <Points>: </Points>
