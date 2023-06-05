@@ -21,7 +21,7 @@ import { CHANNEL_TYPE } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 // import ReportPopup from '../../../../common/Popups/report';
 // import { reportUserAC } from '../../../../store/member/actions'
-import { IChannel, IMember, MuteTime } from '../../../types'
+import { IChannel, MuteTime } from '../../../types'
 import DropDown from '../../../common/dropdown'
 import {
   blockChannelAC,
@@ -176,6 +176,11 @@ const Actions = ({
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor
 }: IProps) => {
+  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isPublicChannel = channel.type === CHANNEL_TYPE.PUBLIC
+  const isPrivateChannel = channel.type === CHANNEL_TYPE.PRIVATE
+  const channelType = channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : isDirectChannel ? 'chat' : 'group'
+
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
   const [deleteAllMessagesPopupOpen, setDeleteAllMessagesPopupOpenPopupOpen] = useState(false)
   const [leaveChannelPopupOpen, setLeaveChannelPopupOpen] = useState(false)
@@ -184,7 +189,7 @@ const Actions = ({
   const [blockUserPopupOpen, setBlockUserPopupOpen] = useState(false)
   const [unblockUserPopupOpen, setUnblockUserPopupOpen] = useState(false)
   const [reportUserPopupOpen, setReportUserPopupOpen] = useState(false)
-  const [checkActionPermission] = usePermissions(channel.role)
+  const [checkActionPermission] = usePermissions(isDirectChannel ? 'owner' : channel.role)
   // const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [popupButtonText, setPopupButtonText] = useState('')
   const [popupTitle, setPopupTitle] = useState('')
@@ -195,11 +200,6 @@ const Actions = ({
   const oneHour = 60 * 60 * 1000
   const twoHours = oneHour * 2
   const oneDay = oneHour * 24
-
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-  const isPublicChannel = channel.type === CHANNEL_TYPE.PUBLIC
-  const isPrivateChannel = channel.type === CHANNEL_TYPE.PRIVATE
-  const channelType = channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : isDirectChannel ? 'chat' : 'group'
 
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
@@ -293,7 +293,6 @@ const Actions = ({
       // setShowMuteDropdown(true)
     }
   } */
-
   const handleNotificationOnOff = (expTime?: number) => {
     console.log('exp time ... ', expTime)
     if (channel.muted) {
@@ -623,10 +622,10 @@ const Actions = ({
           togglePopup={handleToggleLeaveChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.PRIVATE && leavePrivateChannelWarningText
-              ? leavePrivateChannelWarningText
-              : channel.type === CHANNEL_TYPE.PUBLIC && leavePublicChannelWarningText
-              ? leavePublicChannelWarningText
+            channel.type === CHANNEL_TYPE.PRIVATE
+              ? 'Once you leave this channel it will be removed for you along with its entire history.'
+              : channel.type === CHANNEL_TYPE.PUBLIC
+              ? 'Once you leave this group it will be removed for you along with its entire history.'
               : `Are you sure you want to leave the "${
                   channel.subject || (channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.firstName : '')
                 }"  channel?`
@@ -640,12 +639,12 @@ const Actions = ({
           togglePopup={handleToggleDeleteChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT && deleteDirectChannelWarningText
-              ? deleteDirectChannelWarningText
-              : channel.type === CHANNEL_TYPE.PRIVATE && deletePrivateChannelWarningText
-              ? deletePrivateChannelWarningText
-              : channel.type === CHANNEL_TYPE.PUBLIC && deletePublicChannelWarningText
-              ? deletePublicChannelWarningText
+            channel.type === CHANNEL_TYPE.DIRECT
+              ? 'Once you delete this chat it will be removed from the chat list with its message history.'
+              : channel.type === CHANNEL_TYPE.PRIVATE
+              ? 'Once you delete this group it will be permanently removed along with its entire history for all the group members.'
+              : channel.type === CHANNEL_TYPE.PUBLIC
+              ? 'Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.'
               : `Are you sure you want to delete the ${
                   channel.type === CHANNEL_TYPE.DIRECT
                     ? `channel with ${channel.peer.firstName}`
@@ -660,15 +659,9 @@ const Actions = ({
           handleFunction={handleBlockChannel}
           togglePopup={handleToggleBlockChannelPopupOpen}
           buttonText={popupButtonText}
-          description={
-            channel.type === CHANNEL_TYPE.PRIVATE && blockAndLeavePrivateChannelWarningText
-              ? blockAndLeavePrivateChannelWarningText
-              : channel.type === CHANNEL_TYPE.PUBLIC && blockAndLeavePublicChannelWarningText
-              ? blockAndLeavePublicChannelWarningText
-              : `Are you sure you want to block the "${
-                  channel.subject || (channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.firstName : '')
-                }"  channel?`
-          }
+          description={`Are you sure you want to block the "${
+            channel.subject || (channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.firstName : '')
+          }"  channel?`}
           title={popupTitle}
         />
       )}
@@ -678,8 +671,7 @@ const Actions = ({
           togglePopup={handleToggleBlockUserPopupOpen}
           buttonText={popupButtonText}
           description={
-            blockUserWarningText ||
-            `Are you sure you want to block ${channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.firstName : ''} ?`
+            'Blocking a user will prevent them from sending you messages, calls, adding you to groups and channels.'
           }
           title={popupTitle}
         />
@@ -699,12 +691,12 @@ const Actions = ({
           togglePopup={handleToggleClearHistoryPopup}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT && clearHistoryDirectChannelWarningText
-              ? clearHistoryDirectChannelWarningText
-              : channel.type === CHANNEL_TYPE.PRIVATE && clearHistoryPrivateChannelWarningText
-              ? clearHistoryPrivateChannelWarningText
-              : channel.type === CHANNEL_TYPE.PUBLIC && clearHistoryPublicChannelWarningText
-              ? clearHistoryPublicChannelWarningText
+            channel.type === CHANNEL_TYPE.DIRECT
+              ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
+              : channel.type === CHANNEL_TYPE.PRIVATE
+              ? 'Once you clear the history it will be permanently removed for you.'
+              : channel.type === CHANNEL_TYPE.PUBLIC
+              ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
               : 'Are you sure you want to clear history? This action cannot be undone.'
           }
           title={popupTitle}
@@ -716,13 +708,13 @@ const Actions = ({
           togglePopup={handleToggleDeleteAllMessagesPopup}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT && clearHistoryDirectChannelWarningText
-              ? clearHistoryDirectChannelWarningText
-              : channel.type === CHANNEL_TYPE.PRIVATE && clearHistoryPrivateChannelWarningText
-              ? clearHistoryPrivateChannelWarningText
-              : channel.type === CHANNEL_TYPE.PUBLIC && clearHistoryPublicChannelWarningText
-              ? clearHistoryPublicChannelWarningText
-              : 'Are you sure you want to delete all messages? This action cannot be undone.'
+            channel.type === CHANNEL_TYPE.DIRECT
+              ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
+              : channel.type === CHANNEL_TYPE.PRIVATE
+              ? 'Once you clear the history it will be permanently removed for you.'
+              : channel.type === CHANNEL_TYPE.PUBLIC
+              ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
+              : 'Are you sure you want to clear history? This action cannot be undone.'
           }
           title={popupTitle}
         />

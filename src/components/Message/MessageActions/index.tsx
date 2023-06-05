@@ -14,8 +14,6 @@ import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import usePermissions from '../../../hooks/usePermissions'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import { IMember } from '../../../types'
-import { getClient } from '../../../common/client'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean

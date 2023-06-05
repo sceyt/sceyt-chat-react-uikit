@@ -21,7 +21,7 @@ import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../..
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
-import { IContactsMap, IMember } from '../../types'
+import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -238,7 +238,7 @@ const Details = ({
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
-        {channel.role && (
+        {(channel.role || channel.type === CHANNEL_TYPE.DIRECT) && (
           <Actions
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}

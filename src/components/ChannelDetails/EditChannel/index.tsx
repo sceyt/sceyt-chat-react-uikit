@@ -18,7 +18,7 @@ import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
 import { updateChannelAC } from '../../../store/channel/actions'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
-import { IChannel, IMember } from '../../../types'
+import { IChannel } from '../../../types'
 import { useDidUpdate, useStateComplex } from '../../../hooks'
 import ConfirmPopup from '../../../common/popups/delete'
 import ImageCrop from '../../../common/imageCrop'
@@ -26,7 +26,6 @@ import { channelEditModeSelector } from '../../../store/channel/selector'
 import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { getUploadImageIcon } from '../../../helpers/channelHalper'
-import { getClient } from '../../../common/client'
 
 const Container = styled.div<{ active: boolean; heightOffset: any }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};

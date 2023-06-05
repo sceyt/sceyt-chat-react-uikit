@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
 import {
@@ -56,7 +56,7 @@ export default function CreateChannel({
     url: '' // channelDetails.avatar
   })
   // const [pagination, setPagination] = useState(false)
-  const createGroupChannel = channelType === CHANNEL_TYPE.GROUP
+  const createPrivateChannel = channelType === CHANNEL_TYPE.PRIVATE
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
   }

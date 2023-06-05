@@ -28,7 +28,7 @@ import {
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel, IMember } from '../../types'
+import { IAction, IChannel } from '../../types'
 import { CHANNEL_TYPE } from '../../helpers/constants'
 
 const initialState: {

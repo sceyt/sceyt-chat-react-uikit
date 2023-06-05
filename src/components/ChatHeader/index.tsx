@@ -15,53 +15,10 @@ import { AvatarWrapper, UserStatus } from '../Channel'
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
-import { IContactsMap, IMember } from '../../types'
+import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
-
-const Container = styled.div<{ background?: string }>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  height: 64px;
-  box-sizing: border-box;
-  border-bottom: 1px solid ${colors.gray1};
-  background-color: ${(props) => props.background};
-`
-
-const ChannelInfo = styled.div`
-  display: flex;
-  align-items: center;
-  width: 650px;
-  max-width: calc(100% - 70px);
-
-  & ${UserStatus} {
-    width: 10px;
-    height: 10px;
-  }
-`
-
-const ChannelName = styled.div`
-  margin-left: 7px;
-  width: 100%;
-
-  & > ${SectionHeader} {
-    max-width: calc(100% - 8px);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-`
-
-const ChanelInfo = styled.span<{ infoIconColor?: string }>`
-  cursor: pointer;
-
-  > svg {
-    color: ${(props) => props.infoIconColor};
-  }
-`
 
 interface IProps {
   backgroundColor?: string
@@ -128,22 +85,22 @@ export default function ChatHeader({
                 : '')}
           </SectionHeader>
           {showMemberInfo &&
-            (isDirectChannel && directChannelUser ? (
+            (isDirectChannel ? (
               <SubTitle color={memberInfoTextColor}>
-                {hideUserPresence(directChannelUser)
+                {hideUserPresence(activeChannel.peer)
                   ? ''
-                  : directChannelUser.presence &&
-                    (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                  : activeChannel.peer.presence &&
+                    (activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE
                       ? 'Online'
-                      : directChannelUser.presence.lastActiveAt &&
-                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                      : activeChannel.peer.presence.lastActiveAt &&
+                        userLastActiveDateFormat(activeChannel.peer.presence.lastActiveAt))}
               </SubTitle>
             ) : (
               <SubTitle color={memberInfoTextColor}>
                 {!activeChannel.subject && !isDirectChannel
                   ? ''
                   : `${activeChannel.memberCount} ${
-                      activeChannel.type === CHANNEL_TYPE.BROADCAST
+                      activeChannel.type === CHANNEL_TYPE.PUBLIC
                         ? activeChannel.memberCount > 1
                           ? 'subscribers'
                           : 'subscriber'
@@ -166,3 +123,46 @@ export default function ChatHeader({
     </Container>
   )
 }
+
+const Container = styled.div<{ background?: string }>`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  height: 64px;
+  box-sizing: border-box;
+  border-bottom: 1px solid ${colors.gray1};
+  background-color: ${(props) => props.background};
+`
+
+const ChannelInfo = styled.div`
+  display: flex;
+  align-items: center;
+  width: 650px;
+  max-width: calc(100% - 70px);
+
+  & ${UserStatus} {
+    width: 10px;
+    height: 10px;
+  }
+`
+
+const ChannelName = styled.div`
+  margin-left: 7px;
+  width: 100%;
+
+  & > ${SectionHeader} {
+    max-width: calc(100% - 8px);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+`
+
+const ChanelInfo = styled.span<{ infoIconColor?: string }>`
+  cursor: pointer;
+
+  > svg {
+    color: ${(props) => props.infoIconColor};
+  }
+`

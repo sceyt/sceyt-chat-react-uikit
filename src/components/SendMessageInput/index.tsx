@@ -376,7 +376,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
-    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.GROUP) {
+    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
       setCurrentMentions({
         start: selPos - 1,
         typed: ''
