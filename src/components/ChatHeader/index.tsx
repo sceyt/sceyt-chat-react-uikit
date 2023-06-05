@@ -19,6 +19,7 @@ import { IContactsMap, IMember } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
+import { getClient } from '../../common/client'
 
 const Container = styled.div<{ background?: string }>`
   display: flex;
@@ -79,12 +80,15 @@ export default function ChatHeader({
   showMemberInfo = true
 }: IProps) {
   const dispatch = useDispatch()
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
 
   const channelDetailsOnOpen = () => {
@@ -107,12 +111,15 @@ export default function ChatHeader({
     <Container background={backgroundColor}>
       <ChannelInfo>
         <AvatarWrapper>
-          {(activeChannel.subject || (isDirectChannel && activeChannel.peer)) && (
+          {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
             <Avatar
               name={
-                activeChannel.subject || (isDirectChannel ? activeChannel.peer.firstName || activeChannel.peer.id : '')
+                activeChannel.subject ||
+                (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
               }
-              image={activeChannel.avatarUrl || (isDirectChannel ? activeChannel.peer.avatarUrl : '')}
+              image={
+                activeChannel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+              }
               size={36}
               textSize={13}
               setDefaultAvatar={isDirectChannel}
@@ -123,8 +130,8 @@ export default function ChatHeader({
         <ChannelName>
           <SectionHeader color={titleColor}>
             {activeChannel.subject ||
-              (isDirectChannel
-                ? makeUsername(contactsMap[activeChannel.peer.id], activeChannel.peer, getFromContacts)
+              (isDirectChannel && directChannelUser
+                ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                 : '')}
           </SectionHeader>
           {showMemberInfo &&

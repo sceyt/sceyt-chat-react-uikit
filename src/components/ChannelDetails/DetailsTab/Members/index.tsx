@@ -137,7 +137,7 @@ const Members = ({
     if (selectedMember) {
       const updateMember: IMember = {
         ...selectedMember,
-        role: channel.type === CHANNEL_TYPE.PUBLIC ? 'subscriber' : 'participant'
+        role: channel.type === CHANNEL_TYPE.BROADCAST ? 'subscriber' : 'participant'
       }
 
       dispatch(changeMemberRoleAC(channel.id, [updateMember]))
@@ -166,7 +166,7 @@ const Members = ({
               addMemberIconColor={colors.primary}
             >
               <AddMemberIcon />
-              {channel?.type === CHANNEL_TYPE.PUBLIC ? 'Add subscribers' : 'Add members'}
+              {channel?.type === CHANNEL_TYPE.BROADCAST ? 'Add subscribers' : 'Add members'}
             </MemberItem>
           )}
 
@@ -283,19 +283,13 @@ const Members = ({
           buttonText='Remove'
           title={channel.type === CHANNEL_TYPE.GROUP ? 'Remove member' : 'Remove subscriber'}
           description={
-            privateChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
-              privateChannelDeleteMemberPopupDescription
-            ) : publicChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
-              publicChannelDeleteMemberPopupDescription
-            ) : (
-              <span>
-                Are you sure to remove
-                {!!selectedMember && (
-                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
-                )}
-                from this {channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
-              </span>
-            )
+            <span>
+              Are you sure to remove
+              {!!selectedMember && (
+                <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+              )}
+              from this {channel.type === CHANNEL_TYPE.BROADCAST ? 'channel' : 'group'}?
+            </span>
           }
         />
       )}
@@ -318,19 +312,13 @@ const Members = ({
           buttonBackground={colors.primary}
           title='Promote admin'
           description={
-            privateChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
-              privateChannelMakeAdminPopupDescription
-            ) : publicChannelMakeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
-              publicChannelMakeAdminPopupDescription
-            ) : (
-              <span>
-                Are you sure you want to promote
-                {selectedMember && (
-                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
-                )}
-                to <BoltText>Admin?</BoltText>
-              </span>
-            )
+            <span>
+              Are you sure you want to promote
+              {selectedMember && (
+                <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+              )}
+              to <BoltText>Admin?</BoltText>
+            </span>
           }
         />
       )}
@@ -341,21 +329,15 @@ const Members = ({
           buttonText='Revoke'
           title='Revoke admin'
           description={
-            privateChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
-              privateChannelRevokeAdminPopupDescription
-            ) : publicChannelRevokeAdminPopupDescription && channel.type === CHANNEL_TYPE.PUBLIC ? (
-              publicChannelRevokeAdminPopupDescription
-            ) : (
-              <span>
-                Are you sure you want to revoke
-                <BoltText> “Admin” </BoltText>
-                rights from user:
-                {selectedMember && (
-                  <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
-                )}
-                ?
-              </span>
-            )
+            <span>
+              Are you sure you want to revoke
+              <BoltText> “Admin” </BoltText>
+              rights from user:
+              {selectedMember && (
+                <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
+              )}
+              ?
+            </span>
           }
         />
       )}

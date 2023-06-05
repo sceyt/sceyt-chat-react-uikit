@@ -30,6 +30,7 @@ import {
 } from './constants'
 import { IAction, IChannel, IMember } from '../../types'
 import { CHANNEL_TYPE } from '../../helpers/constants'
+import { getClient } from '../../common/client'
 
 const initialState: {
   channelsLoadingState: string | null
@@ -222,24 +223,29 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case UPDATE_USER_STATUS_ON_CHANNEL: {
       const usersMap = payload.usersMap
       // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
+      const ChatClient = getClient()
+      const { user } = ChatClient
       const updatedChannels = newState.channels.map((channel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT && usersMap[channel.peer.id]) {
-          return { ...channel, peer: { ...channel.peer, presence: usersMap[channel.peer.id].presence } }
+        const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+        const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+        if (channel.type === CHANNEL_TYPE.DIRECT && directChannelUser && usersMap[directChannelUser.id]) {
+          return { ...channel, peer: { ...directChannelUser, presence: usersMap[directChannelUser.id].presence } }
         }
         return channel
       })
-      if (
+      const activeChannelUser =
         (newState.activeChannel as IChannel).type === CHANNEL_TYPE.DIRECT &&
-        usersMap[(newState.activeChannel as IChannel).peer.id]
-      ) {
-        if ('peer' in newState.activeChannel) {
-          newState.activeChannel = {
-            ...newState.activeChannel,
-            peer: {
-              ...(newState.activeChannel.peer && newState.activeChannel.peer),
-              presence: usersMap[(newState.activeChannel as IChannel).peer.id].presence
+        (newState.activeChannel as IChannel).members.find((member: IMember) => member.id !== user.id)
+      if (activeChannelUser && usersMap[activeChannelUser.id]) {
+        newState.activeChannel = {
+          ...newState.activeChannel,
+          members: (newState.activeChannel as IChannel).members.map((member) => {
+            if (member.id !== user.id) {
+              return { ...member, presence: usersMap[activeChannelUser.id].presence }
+            } else {
+              return member
             }
-          }
+          })
         }
       }
       newState.channels = [...updatedChannels]

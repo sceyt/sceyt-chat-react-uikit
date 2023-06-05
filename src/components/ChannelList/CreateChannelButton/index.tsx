@@ -31,16 +31,19 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
 }) => {
   // const dispatch = useDispatch()
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
-  const [showCreateChannel, setShowCreateChannel] = useState('')
+  const [showCreateChannel, setShowCreateChannel] = useState(false)
+  const [creatingChannelType, setCreatingChannelType] = useState<'group' | 'broadcast' | 'direct'>('group')
 
-  const handleOpenCreateChannel = (channelType: string) => {
+  const handleOpenCreateChannel = (channelType: 'group' | 'broadcast' | 'direct') => {
+    setCreatingChannelType(channelType)
     if (channelType === 'direct') {
       // dispatch(setChannelEditModeAC(true))
       setShowAddMemberPopup(true)
     } else {
-      setShowCreateChannel(channelType)
+      setShowCreateChannel(true)
     }
   }
+
   return (
     <React.Fragment>
       <DropDown
@@ -57,7 +60,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
             key={1}
             textColor={colors.gray6}
             hoverBackground={colors.gray5}
-            onClick={() => handleOpenCreateChannel('public')}
+            onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
           >
             {newChannelIcon || <CreateChannelIcon />}
@@ -67,7 +70,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
             key={2}
             textColor={colors.gray6}
             hoverBackground={colors.gray5}
-            onClick={() => handleOpenCreateChannel('private')}
+            onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
           >
             {newGroupIcon || <CreateGrouplIcon />}
@@ -96,8 +99,8 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
       )}
       {showCreateChannel && (
         <CreateChannel
-          handleClose={() => setShowCreateChannel('')}
-          channelType={showCreateChannel}
+          handleClose={() => setShowCreateChannel(false)}
+          channelType={creatingChannelType}
           uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
           uploadPhotoIcon={uploadPhotoIcon}
         />

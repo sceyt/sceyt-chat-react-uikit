@@ -1097,7 +1097,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 No messages in this
                 {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
-                  : channel.type === CHANNEL_TYPE.PRIVATE
+                  : channel.type === CHANNEL_TYPE.GROUP
                   ? ' group chat'
                   : ' channel'}
               </NoMessagesContainer>

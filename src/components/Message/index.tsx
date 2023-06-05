@@ -876,7 +876,7 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.role || (channel.peer && channel.peer.role)}
+              myRole={channel.role}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />

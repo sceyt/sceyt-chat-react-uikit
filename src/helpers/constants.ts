@@ -32,9 +32,9 @@ export const LOADING_STATE = {
 }
 
 export const CHANNEL_TYPE = {
-  PRIVATE: 'Private',
-  PUBLIC: 'Public',
-  DIRECT: 'Direct'
+  GROUP: 'group',
+  BROADCAST: 'broadcast',
+  DIRECT: 'direct'
 }
 
 export const PRESENCE_STATUS = {

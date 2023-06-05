@@ -82,10 +82,9 @@ function* createChannel(action: IAction): any {
         }
       }
       createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
-      delete createChannelData.avatarFile
     }
-    console.log('createChannelData. . . . .', createChannelData)
-    const createdChannel = yield call(SceytChatClient[`${channelData.type}Channel`].create, createChannelData)
+    delete createChannelData.avatarFile
+    const createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
     let checkChannelExist = false
     if (createdChannel.type === CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
@@ -95,7 +94,7 @@ function* createChannel(action: IAction): any {
       if (createdChannel.type !== CHANNEL_TYPE.DIRECT) {
         const messageToSend: any = {
           // metadata: mentionedMembersPositions,
-          body: createdChannel.type === CHANNEL_TYPE.PUBLIC ? 'CC' : 'CG',
+          body: createdChannel.type === CHANNEL_TYPE.BROADCAST ? 'CC' : 'CG',
           mentionedMembers: [],
           attachments: [],
           type: 'system'
@@ -122,7 +121,7 @@ function* getChannels(action: IAction): any {
     const { search: searchBy } = params
     if (searchBy) {
       const directChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      directChannelQueryBuilder.direct()
+      directChannelQueryBuilder.type(CHANNEL_TYPE.DIRECT)
       directChannelQueryBuilder.userContains(searchBy)
       directChannelQueryBuilder.sortByLastMessage()
       directChannelQueryBuilder.limit(10)
@@ -165,15 +164,7 @@ function* getChannels(action: IAction): any {
       const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       if (params.filter && params.filter.channelType) {
         console.log('params.filter.channelType ... ', params.filter.channelType)
-        if (params.filter.channelType.toLowerCase() === 'direct') {
-          channelQueryBuilder.direct()
-        } else if (params.filter.channelType.toLowerCase() === 'public') {
-          channelQueryBuilder.public()
-        } else if (params.filter.channelType.toLowerCase() === 'private') {
-          channelQueryBuilder.private()
-        } else {
-          throw new Error('Bad filter type')
-        }
+        channelQueryBuilder.type(params.filter.channelType)
       }
       channelQueryBuilder.sortByLastMessage()
       channelQueryBuilder.limit(params.limit || 20)
@@ -245,14 +236,14 @@ function* getChannelsForForward(action: IAction): any {
 
     if (searchValue) {
       const directChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      directChannelQueryBuilder.direct()
+      directChannelQueryBuilder.type(CHANNEL_TYPE.DIRECT)
       directChannelQueryBuilder.userContains(searchValue)
       directChannelQueryBuilder.sortByLastMessage()
       directChannelQueryBuilder.limit(10)
       const directChannelQuery = yield call(directChannelQueryBuilder.build)
       const directChannelsData = yield call(directChannelQuery.loadNextPage)
-      const directChannelsToAdd = directChannelsData.channels.filter(
-        (channel: IChannel) => !!(channel.peer && channel.peer.id)
+      const directChannelsToAdd = directChannelsData.channels.filter((channel: IChannel) =>
+        channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
       )
       // getting other channels
       const groupChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
@@ -262,7 +253,7 @@ function* getChannelsForForward(action: IAction): any {
       const groupChannelQuery = yield call(groupChannelQueryBuilder.build)
       const groupChannelsData = yield call(groupChannelQuery.loadNextPage)
       const groupChannelsToAdd = groupChannelsData.channels.filter((channel: IChannel) =>
-        channel.type === CHANNEL_TYPE.PUBLIC ? channel.role === 'admin' || channel.role === 'owner' : true
+        channel.type === CHANNEL_TYPE.BROADCAST ? channel.role === 'admin' || channel.role === 'owner' : true
       )
       // set all channels
       const allChannels: IChannel[] = directChannelsToAdd.concat(groupChannelsToAdd)
@@ -277,10 +268,10 @@ function* getChannelsForForward(action: IAction): any {
       const channelsData = yield call(channelQuery.loadNextPage)
       yield put(channelHasNextAC(channelsData.hasNext, true))
       const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-        channel.type === CHANNEL_TYPE.PUBLIC
+        channel.type === CHANNEL_TYPE.BROADCAST
           ? channel.role === 'admin' || channel.role === 'owner'
           : channel.type === CHANNEL_TYPE.DIRECT
-          ? channel.peer.id
+          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
           : true
       )
       const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
@@ -363,10 +354,10 @@ function* channelsForForwardLoadMore(action: IAction): any {
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
     const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === CHANNEL_TYPE.PUBLIC
+      channel.type === CHANNEL_TYPE.BROADCAST
         ? channel.role === 'admin' || channel.role === 'owner'
         : channel.type === CHANNEL_TYPE.DIRECT
-        ? channel.peer.id
+        ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
         : true
     )
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
@@ -540,7 +531,7 @@ function* leaveChannel(action: IAction): any {
 
     const channel = yield call(getChannelFromMap, channelId)
     if (channel) {
-      if (channel.type === CHANNEL_TYPE.PRIVATE) {
+      if (channel.type === CHANNEL_TYPE.GROUP) {
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder.setBody('LG').setType('system').setDisplayCount(0).setSilent(true)
         const messageToSend = messageBuilder.create()

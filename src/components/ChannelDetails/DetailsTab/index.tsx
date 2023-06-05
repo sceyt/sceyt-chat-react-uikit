@@ -98,7 +98,7 @@ const DetailsTab = ({
                   key={key}
                 >
                   {channelDetailsTabs[key] === channelDetailsTabs.member
-                    ? channel.type === CHANNEL_TYPE.PUBLIC
+                    ? channel.type === CHANNEL_TYPE.BROADCAST
                       ? 'Subscribers'
                       : channelDetailsTabs[key]
                     : channelDetailsTabs[key]}

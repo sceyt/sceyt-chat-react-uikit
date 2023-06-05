@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
 import {
@@ -27,7 +27,7 @@ import { AvatarWrapper } from '../../../components/Channel'
 
 interface ICreateChannelPopup {
   handleClose: () => void
-  channelType: string
+  channelType: 'group' | 'broadcast' | 'direct'
   uriPrefixOnCreateChannel?: string
   uploadPhotoIcon?: JSX.Element
 }
@@ -87,7 +87,7 @@ export default function CreateChannel({
   }
 
   const GoToAddMember = () => {
-    if (subjectValue && (createPrivateChannel || (URIValue && uriRegexp.test(URIValue)))) {
+    if (subjectValue && (createGroupChannel || (URIValue && uriRegexp.test(URIValue)))) {
       setUsersPopupVisible(true)
       // setPagination(true)
       setCreateGroupChannelPopupVisible(false)
@@ -100,13 +100,13 @@ export default function CreateChannel({
       metadata: { d: metadataValue },
       uri: URIValue,
       members,
-      type: channelType === 'private' ? CHANNEL_TYPE.PRIVATE : CHANNEL_TYPE.PUBLIC,
+      type: channelType,
       avatarFile: newAvatar.src.file
     }
-    if (createPrivateChannel && members.length > 0) {
+    if (createGroupChannel && members.length > 0) {
       dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()
-    } else if (!createPrivateChannel) {
+    } else if (!createGroupChannel) {
       const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
       dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
       toggleCreateGroupChannelPopup()
@@ -194,7 +194,7 @@ export default function CreateChannel({
           getSelectedUsers={handleAddMembersForCreateChannel}
           creatChannelSelectedMembers={selectedMembers}
           actionType='selectUsers'
-          selectIsRequired={createPrivateChannel}
+          selectIsRequired={createGroupChannel}
           popupHeight='540px'
           popupWidth='520px'
         />
@@ -206,8 +206,8 @@ export default function CreateChannel({
             <PopupBody padding={24}>
               <CloseIcon onClick={toggleCreateGroupChannelPopup} />
 
-              <PopupName marginBottom='20px'>Create {createPrivateChannel ? 'Group' : 'Channel'}</PopupName>
-              {!createPrivateChannel && (
+              <PopupName marginBottom='20px'>Create {createGroupChannel ? 'Group' : 'Channel'}</PopupName>
+              {!createGroupChannel && (
                 <CrateChannelTitle>Create a Channel to post your content to a large audience.</CrateChannelTitle>
               )}
 
@@ -236,12 +236,12 @@ export default function CreateChannel({
                   onChange={handleSelectImage}
                 />
               </UploadChannelAvatar>
-              <Label> {createPrivateChannel ? 'Group' : 'Channel'} name</Label>
+              <Label> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
               <CustomInput
                 type='text'
                 value={subjectValue}
                 onChange={handleTypeSubject}
-                placeholder={`Enter ${createPrivateChannel ? 'group' : 'channel'} name`}
+                placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
               />
 
               <Label>Description</Label>
@@ -249,9 +249,9 @@ export default function CreateChannel({
                 type='text'
                 value={metadataValue}
                 onChange={handleTypeMetadata}
-                placeholder={`Enter ${createPrivateChannel ? 'group' : 'channel'} description`}
+                placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
               />
-              {!createPrivateChannel && (
+              {!createGroupChannel && (
                 <React.Fragment>
                   <Label>URL</Label>
                   <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
@@ -291,14 +291,14 @@ export default function CreateChannel({
                 backgroundColor={colors.primary}
                 borderRadius='8px'
                 onClick={() => GoToAddMember()}
-                disabled={!subjectValue || (!createPrivateChannel && (!URIValue || !!wrongUri))}
+                disabled={!subjectValue || (!createGroupChannel && (!URIValue || !!wrongUri))}
               >
                 Next
               </Button>
               {/* <button
                 type='button'
                 className='button blue filled'
-                disabled={!subjectValue ? !subjectValue : !createPrivateChannel && !URIValue}
+                disabled={!subjectValue ? !subjectValue : !createGroupChannel && !URIValue}
                 onClick={GoToAddMember}
               >
                 Next

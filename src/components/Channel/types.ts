@@ -5,7 +5,7 @@ export interface IChannelsCustomColors {
 export type ICustomAvatarColors = [string, string, string, string, string, string]
 
 export interface ChannelQueryParams {
-  filter?: { channelType: 'Public' | 'Private' | 'Direct' }
+  filter?: { channelType?: 'Public' | 'Private' | 'Direct' }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   search: string

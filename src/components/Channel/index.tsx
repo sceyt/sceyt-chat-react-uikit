@@ -55,6 +55,7 @@ const Channel: React.FC<IChannelProps> = ({
   const { user } = ChatClient
   const activeChannel = useSelector(activeChannelSelector) || {}
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const withAvatar = avatar === undefined ? true : avatar
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
@@ -101,16 +102,21 @@ const Channel: React.FC<IChannelProps> = ({
         <AvatarWrapper>
           <Avatar
             // customAvatarColors={userAvatarColors}
-            name={channel.subject || (isDirectChannel ? channel.peer.firstName || channel.peer.id : '')}
-            image={channel.avatarUrl || (isDirectChannel ? channel.peer.avatarUrl : '')}
+            name={
+              channel.subject ||
+              (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
+            }
+            image={channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
             size={50}
             textSize={16}
             setDefaultAvatar={isDirectChannel}
           />
           {isDirectChannel &&
-            (hideUserPresence(channel.peer)
+            directChannelUser &&
+            hideUserPresence &&
+            (hideUserPresence(directChannelUser)
               ? ''
-              : channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE) && (
+              : directChannelUser.presence && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE) && (
               <UserStatus backgroundColor={colors.primary} />
             )}
         </AvatarWrapper>
@@ -118,7 +124,9 @@ const Channel: React.FC<IChannelProps> = ({
       <ChannelInfo avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
         <h3>
           {channel.subject ||
-            (isDirectChannel ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
+            (isDirectChannel && directChannelUser
+              ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+              : '')}
         </h3>
         {channel.muted && (
           <MutedIcon color={notificationsIsMutedIconColor}>

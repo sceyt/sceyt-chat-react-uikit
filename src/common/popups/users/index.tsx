@@ -132,7 +132,8 @@ const UsersPopup = ({
       newSelectedMembers.push({
         id: contact.id,
         displayName: contact.displayName,
-        role: channel?.type === CHANNEL_TYPE.PUBLIC ? 'subscriber' : 'participant'
+        avatarUrl: contact.avatarUrl,
+        role: channel?.type === CHANNEL_TYPE.BROADCAST ? 'subscriber' : 'participant'
       })
     } else {
       const itemToDeleteIndex = newSelectedMembers.findIndex((member) => member.id === contact.id)
@@ -176,12 +177,17 @@ const UsersPopup = ({
   } */
 
   const handleCreateChannel = (selectedUser?: IUser) => {
-    if (actionType === 'createChat') {
+    if (actionType === 'createChat' && selectedUser) {
       const channelData = {
         metadata: '',
         label: '',
         type: CHANNEL_TYPE.DIRECT,
-        userId: selectedUser && selectedUser.id
+        members: [
+          {
+            ...selectedUser,
+            role: 'owner'
+          }
+        ]
       }
       dispatch(createChannelAC(channelData))
     } else {
@@ -275,7 +281,7 @@ const UsersPopup = ({
           <PopupName>
             {actionType === 'createChat'
               ? 'Creat a new chat'
-              : channel?.type === CHANNEL_TYPE.PUBLIC
+              : channel?.type === CHANNEL_TYPE.BROADCAST
               ? 'Add subscribers'
               : 'Add members'}
           </PopupName>
@@ -491,11 +497,13 @@ const SearchUsersInput = styled.input`
   box-sizing: border-box;
   border-radius: 8px;
   padding-left: 36px;
+
   &::placeholder {
     color: ${colors.gray4};
     font-size: 14px;
     opacity: 1;
   }
+
   &:focus {
     outline: none;
   }

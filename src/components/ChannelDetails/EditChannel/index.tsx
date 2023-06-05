@@ -91,6 +91,8 @@ const EditChannel = ({
   editChannelCancelButtonBackgroundColor,
   editChannelCancelButtonTextColor
 }: IProps) => {
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const dispatch = useDispatch()
   const isEditMode = useSelector(channelEditModeSelector)
   const [cropPopup, setCropPopup] = useState(false)
@@ -107,6 +109,7 @@ const EditChannel = ({
   const editContainer = useRef<any>(null)
   const fileUploader = useRef<any>(null)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
 
   const onOpenFileUploader = () => {
     fileUploader.current.click()
@@ -224,8 +227,8 @@ const EditChannel = ({
           </DropDownWrapper>
           <Avatar
             size={120}
-            image={newAvatar.url || (isDirectChannel ? channel.peer.avatarUrl : '')}
-            name={isDirectChannel ? channel.peer.id : channel.subject || channel.id}
+            image={newAvatar.url || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
+            name={isDirectChannel && directChannelUser ? directChannelUser.id : channel.subject || channel.id}
             textSize={70}
           />
         </AvatarCont>

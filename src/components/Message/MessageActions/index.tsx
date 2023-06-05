@@ -78,8 +78,11 @@ export default function MessageActions({
   handleOpenEmojis
 }: any) {
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const [checkActionPermission] = usePermissions(myRole)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const editMessagePermitted = isIncoming
     ? checkActionPermission('editAnyMessage')
     : checkActionPermission('editOwnMessage')
@@ -133,7 +136,9 @@ export default function MessageActions({
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
-          (isDirectChannel ? !isIncoming && channel.peer.activityState !== 'Deleted' : true) && (
+          (isDirectChannel && directChannelUser
+            ? !isIncoming && directChannelUser.activityState !== 'Deleted'
+            : true) && (
             <Action
               order={editIconOrder || 1}
               iconColor={messageActionIconsColor}
@@ -158,7 +163,7 @@ export default function MessageActions({
           <React.Fragment>
             {showReplyMessage &&
               replyMessagePermitted &&
-              (isDirectChannel ? channel.peer.activityState !== 'Deleted' : true) && (
+              (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) && (
                 <Action
                   order={replyIconOrder || 2}
                   iconColor={messageActionIconsColor}
@@ -207,21 +212,22 @@ export default function MessageActions({
           </Action>
         )}
 
-        {showDeleteMessage && (channel.type === CHANNEL_TYPE.PUBLIC ? myRole === 'owner' || myRole === 'admin' : true) && (
-          <Action
-            order={deleteIconOrder || 6}
-            iconColor={messageActionIconsColor}
-            hoverIconColor={colors.primary}
-            onClick={() =>
-              messageStatus === MESSAGE_DELIVERY_STATUS.PENDING
-                ? handleDeletePendingMessage()
-                : handleOpenDeleteMessage()
-            }
-          >
-            <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
-            {deleteIcon || <DeleteIcon />}
-          </Action>
-        )}
+        {showDeleteMessage &&
+          (channel.type === CHANNEL_TYPE.BROADCAST ? myRole === 'owner' || myRole === 'admin' : true) && (
+            <Action
+              order={deleteIconOrder || 6}
+              iconColor={messageActionIconsColor}
+              hoverIconColor={colors.primary}
+              onClick={() =>
+                messageStatus === MESSAGE_DELIVERY_STATUS.PENDING
+                  ? handleDeletePendingMessage()
+                  : handleOpenDeleteMessage()
+              }
+            >
+              <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
+              {deleteIcon || <DeleteIcon />}
+            </Action>
+          )}
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={reportIconOrder || 7}

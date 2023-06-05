@@ -757,7 +757,7 @@ function* forwardMessage(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
     const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     let attachments = message.attachments
-    if (!(channel.type === CHANNEL_TYPE.PUBLIC && !(channel.role === 'admin' || channel.role === 'owner'))) {
+    if (!(channel.type === CHANNEL_TYPE.BROADCAST && !(channel.role === 'admin' || channel.role === 'owner'))) {
       if (message.attachments && message.attachments.length) {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder

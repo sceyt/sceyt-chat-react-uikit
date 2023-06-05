@@ -38,6 +38,8 @@ function openRequestedSingleTab(url: any) {
 export const setNotification = (body: string, user: IUser, channel: IChannel, reaction?: string) => {
   const getFromContacts = getShowOnlyContactUsers()
 
+  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   /* chrome.runtime.onMessage.addListener(function (msg, sender) {
     const options = {
       type: 'basic',

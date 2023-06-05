@@ -124,17 +124,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   // voiceMessage = true
 }) => {
   const dispatch = useDispatch()
+  const ChatClient = getClient()
+  const { user } = ChatClient
 
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
-  const isBlockedUserChat = activeChannel.peer && activeChannel.peer.blocked
-  const isDeletedUserChat = activeChannel.peer && activeChannel.peer.activityState === 'Deleted'
   const messageToEdit = useSelector(messageToEditSelector)
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
-  const ChatClient = getClient()
-  const { user } = ChatClient
+  const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const isBlockedUserChat = directChannelUser && directChannelUser.blocked
+  const isDeletedUserChat = directChannelUser && directChannelUser.activityState === 'Deleted'
   /* const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -1317,7 +1319,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           Join
         </JoinChannelCont>
       ) : (
-          activeChannel.type === CHANNEL_TYPE.PUBLIC
+          activeChannel.type === CHANNEL_TYPE.BROADCAST
             ? !(activeChannel.role === 'admin' || activeChannel.role === 'owner')
             : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
         ) ? (

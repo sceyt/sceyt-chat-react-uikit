@@ -119,7 +119,7 @@ export interface IChannel {
   muted: boolean
   muteExpireTime: Date | number
   type: 'Public' | 'Private' | 'Direct'
-  peer?: any
+  members: IMember[]
   subject?: string
   label?: string
   metadata: any

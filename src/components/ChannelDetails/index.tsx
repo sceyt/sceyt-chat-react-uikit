@@ -26,6 +26,7 @@ import { contactsMapSelector } from '../../store/user/selector'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
+import { getClient } from '../../common/client'
 
 const Details = ({
   channelEditIcon,
@@ -116,6 +117,8 @@ const Details = ({
   showMakeMemberAdmin
 }: IDetailsProps) => {
   const dispatch = useDispatch()
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
@@ -131,6 +134,7 @@ const Details = ({
   // const tabsRef = useRef<any>(null)
   const detailsRef = useRef<any>(null)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
     // setCloseMenu(true)
@@ -199,8 +203,8 @@ const Details = ({
       >
         <DetailsHeader>
           <Avatar
-            image={channel.avatarUrl || (channel.peer && channel.peer.avatarUrl)}
-            name={channel.subject || (channel.peer && (channel.peer.firstName || channel.peer.id))}
+            image={channel.avatarUrl || (directChannelUser && directChannelUser.avatarUrl)}
+            name={channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id))}
             size={72}
             textSize={26}
             setDefaultAvatar={isDirectChannel}
@@ -208,22 +212,24 @@ const Details = ({
           <ChannelInfo>
             <ChannelName isDirect={isDirectChannel}>
               {channel.subject ||
-                (isDirectChannel ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts) : '')}
+                (isDirectChannel
+                  ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                  : '')}
             </ChannelName>
             {isDirectChannel ? (
               <SubTitle>
-                {hideUserPresence(channel.peer)
+                {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
-                  : channel.peer.presence &&
-                    (channel.peer.presence.state === PRESENCE_STATUS.ONLINE
+                  : directChannelUser.presence &&
+                    (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
                       ? 'Online'
-                      : channel.peer.presence.lastActiveAt &&
-                        userLastActiveDateFormat(channel.peer.presence.lastActiveAt))}
+                      : directChannelUser.presence.lastActiveAt &&
+                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
               </SubTitle>
             ) : (
               <SubTitle>
                 {channel.memberCount}{' '}
-                {channel.type === CHANNEL_TYPE.PUBLIC
+                {channel.type === CHANNEL_TYPE.BROADCAST
                   ? channel.memberCount > 1
                     ? 'subscribers'
                     : 'subscriber'

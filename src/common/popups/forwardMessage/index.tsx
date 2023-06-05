@@ -9,7 +9,7 @@ import {
   channelsForForwardSelector,
   channelsLoadingState
 } from '../../../store/channel/selector'
-import { IChannel } from '../../../types'
+import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
 import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
@@ -21,6 +21,7 @@ import CustomCheckbox from '../../customCheckbox'
 
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
+import { getClient } from '../../client'
 
 interface ISelectedChannelsData {
   id: string
@@ -36,6 +37,8 @@ interface IProps {
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const dispatch = useDispatch()
   const channels = useSelector(channelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
@@ -78,13 +81,15 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
+    const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+    const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (event.target.checked && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
           channel.subject ||
-          (channel.type === CHANNEL_TYPE.DIRECT
-            ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+          (isDirectChannel && directChannelUser
+            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
             : '')
       })
     } else {
@@ -148,12 +153,19 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
             {channels.map((channel: IChannel) => {
               const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+              const directChannelUser =
+                isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
               const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
               return (
                 <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
                   <Avatar
-                    name={channel.subject || (isDirectChannel ? channel.peer.firstName || channel.peer.id : '')}
-                    image={channel.avatarUrl || (isDirectChannel ? channel.peer.avatarUrl : '')}
+                    name={
+                      channel.subject ||
+                      (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
+                    }
+                    image={
+                      channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                    }
                     size={40}
                     textSize={12}
                     setDefaultAvatar={isDirectChannel}
@@ -161,22 +173,25 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   <ChannelInfo>
                     <ChannelTitle>
                       {channel.subject ||
-                        (isDirectChannel
-                          ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+                        (isDirectChannel && directChannelUser
+                          ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                           : '')}
                     </ChannelTitle>
                     <ChannelMembers>
-                      {isDirectChannel
+                      {isDirectChannel && directChannelUser
                         ? (
-                            hideUserPresence(channel.peer)
+                            hideUserPresence && hideUserPresence(directChannelUser)
                               ? ''
-                              : channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE
+                              : directChannelUser.presence &&
+                                directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
                           )
                           ? 'Online'
-                          : channel.peer.presence.lastActiveAt &&
-                            userLastActiveDateFormat(channel.peer.presence.lastActiveAt)
+                          : directChannelUser &&
+                            directChannelUser.presence &&
+                            directChannelUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
                         : `${channel.memberCount} ${
-                            channel.type === CHANNEL_TYPE.PUBLIC
+                            channel.type === CHANNEL_TYPE.BROADCAST
                               ? channel.memberCount > 1
                                 ? 'subscribers'
                                 : 'subscriber'
