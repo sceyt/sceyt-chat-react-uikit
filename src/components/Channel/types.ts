@@ -1,6 +1,5 @@
 export interface IChannelsCustomColors {
   selectedChannelBackground?: string
-  selectedChannelLeftBorder?: string
 }
 
 export type ICustomAvatarColors = [string, string, string, string, string, string]

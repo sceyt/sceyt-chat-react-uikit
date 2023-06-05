@@ -19,7 +19,7 @@ import DropDown from '../../../../../common/dropdown'
 import { IMember, IRole } from '../../../../../types'
 import { rolesSelector } from '../../../../../store/member/selector'
 import { changeMemberRoleAC, getRolesAC } from '../../../../../store/member/actions'
-import { colors, customColors } from '../../../../../UIHelper/constants'
+import { colors } from '../../../../../UIHelper/constants'
 
 interface IProps {
   channelId: string
@@ -75,7 +75,7 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
                   {!!roles.length &&
                     roles.map((role: IRole) => (
                       <DropdownOptionLi
-                        hoverBackground={customColors.selectedChannelBackground}
+                        hoverBackground={colors.primaryLight}
                         key={role.name}
                         onClick={() => onChangeFunction(role.name)}
                       >

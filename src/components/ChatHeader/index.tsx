@@ -3,7 +3,11 @@ import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
 import { CHANNEL_TYPE, PRESENCE_STATUS } from '../../helpers/constants'
-import { activeChannelSelector, channelInfoIsOpenSelector } from '../../store/channel/selector'
+import {
+  activeChannelSelector,
+  channelInfoIsOpenSelector,
+  channelListHiddenSelector
+} from '../../store/channel/selector'
 import Avatar from '../Avatar'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { switchChannelInfoAC } from '../../store/channel/actions'
@@ -11,12 +15,12 @@ import { AvatarWrapper, UserStatus } from '../Channel'
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
-import { IContactsMap } from '../../types'
+import { IContactsMap, IMember } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 
-const Container = styled.div`
+const Container = styled.div<{ background?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -24,6 +28,7 @@ const Container = styled.div`
   height: 64px;
   box-sizing: border-box;
   border-bottom: 1px solid ${colors.gray1};
+  background-color: ${(props) => props.background};
 `
 
 const ChannelInfo = styled.div`
@@ -59,14 +64,25 @@ const ChanelInfo = styled.span<{ infoIconColor?: string }>`
 `
 
 interface IProps {
+  backgroundColor?: string
+  titleColor?: string
+  memberInfoTextColor?: string
+  showMemberInfo?: boolean
   infoIcon?: JSX.Element
 }
 
-export default function ChatHeader({ infoIcon }: IProps) {
+export default function ChatHeader({
+  infoIcon,
+  backgroundColor,
+  titleColor,
+  memberInfoTextColor,
+  showMemberInfo = true
+}: IProps) {
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
+  const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -88,7 +104,7 @@ export default function ChatHeader({ infoIcon }: IProps) {
   }, [channelDetailsOpen])
 
   return (
-    <Container>
+    <Container background={backgroundColor}>
       <ChannelInfo>
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && activeChannel.peer)) && (
@@ -102,48 +118,51 @@ export default function ChatHeader({ infoIcon }: IProps) {
               setDefaultAvatar={isDirectChannel}
             />
           )}
-          {/* {isDirectChannel && activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
+          {/* {isDirectChannel && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
         </AvatarWrapper>
         <ChannelName>
-          <SectionHeader>
+          <SectionHeader color={titleColor}>
             {activeChannel.subject ||
               (isDirectChannel
                 ? makeUsername(contactsMap[activeChannel.peer.id], activeChannel.peer, getFromContacts)
                 : '')}
           </SectionHeader>
-          {isDirectChannel ? (
-            <SubTitle>
-              {hideUserPresence(activeChannel.peer)
-                ? ''
-                : activeChannel.peer.presence &&
-                  (activeChannel.peer.presence.state === PRESENCE_STATUS.ONLINE
-                    ? 'Online'
-                    : activeChannel.peer.presence.lastActiveAt &&
-                      userLastActiveDateFormat(activeChannel.peer.presence.lastActiveAt))}
-            </SubTitle>
-          ) : (
-            <SubTitle>
-              {!activeChannel.subject && !isDirectChannel
-                ? ''
-                : `${activeChannel.memberCount} ${
-                    activeChannel.type === CHANNEL_TYPE.PUBLIC
-                      ? activeChannel.memberCount > 1
-                        ? 'subscribers'
-                        : 'subscriber'
-                      : activeChannel.memberCount > 1
-                      ? 'members'
-                      : 'member'
-                  } `}
-            </SubTitle>
-          )}
+          {showMemberInfo &&
+            (isDirectChannel && directChannelUser ? (
+              <SubTitle color={memberInfoTextColor}>
+                {hideUserPresence(directChannelUser)
+                  ? ''
+                  : directChannelUser.presence &&
+                    (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                      ? 'Online'
+                      : directChannelUser.presence.lastActiveAt &&
+                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+              </SubTitle>
+            ) : (
+              <SubTitle color={memberInfoTextColor}>
+                {!activeChannel.subject && !isDirectChannel
+                  ? ''
+                  : `${activeChannel.memberCount} ${
+                      activeChannel.type === CHANNEL_TYPE.BROADCAST
+                        ? activeChannel.memberCount > 1
+                          ? 'subscribers'
+                          : 'subscriber'
+                        : activeChannel.memberCount > 1
+                        ? 'members'
+                        : 'member'
+                    } `}
+              </SubTitle>
+            ))}
         </ChannelName>
       </ChannelInfo>
-      <ChanelInfo
-        onClick={() => channelDetailsOnOpen()}
-        infoIconColor={channelDetailsIsOpen ? colors.primary : colors.gray4}
-      >
-        {infoButtonVisible && (infoIcon || <InfoIcon />)}
-      </ChanelInfo>
+      {!channelListHidden && (
+        <ChanelInfo
+          onClick={() => channelDetailsOnOpen()}
+          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.gray4}
+        >
+          {infoButtonVisible && (infoIcon || <InfoIcon />)}
+        </ChanelInfo>
+      )}
     </Container>
   )
 }

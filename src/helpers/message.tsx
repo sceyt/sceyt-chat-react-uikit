@@ -6,7 +6,7 @@ import moment from 'moment'
 import { colors } from '../UIHelper/constants'
 import { getClient } from '../common/client'
 import LinkifyIt from 'linkify-it'
-import { isAlphanumeric } from './index'
+import { hideUserPresence } from './userHelper'
 
 export const typingTextFormat = ({
   text,
@@ -20,83 +20,85 @@ export const typingTextFormat = ({
 }) => {
   // const messageText: any = [text]
   let messageText: any = ''
-  if (mentionedMembers.length > 0) {
-    const mentionsPositions: any = Array.isArray(mentionedMembers)
-      ? [...mentionedMembers].sort((a: any, b: any) => a.start - b.start)
-      : []
+  // if (mentionedMembers.length > 0) {
+  const mentionsPositions: any = Array.isArray(mentionedMembers)
+    ? [...mentionedMembers].sort((a: any, b: any) => a.start - b.start)
+    : []
 
-    let prevEnd = 0
-    // const currentLine = 0
-    const separateLines = text.split(/\r?\n|\r|\n/g)
-    // let textLine = separateLines[currentLine]
-    let addedMembers = 0
-    let textLengthInCurrentIteration = 0
-    for (let i = 0; i < separateLines.length; i++) {
-      let nextTextPart = ''
-      const currentLine = separateLines[i]
-      let lastFoundIndexOnTheLine = 0
-      textLengthInCurrentIteration += currentLine.length + 1
-      if (mentionsPositions.length > addedMembers) {
-        for (let j = addedMembers; j < mentionsPositions.length; j++) {
-          const mention = mentionsPositions[j]
+  let prevEnd = 0
+  // const currentLine = 0
+  const separateLines = text.split(/\r?\n|\r|\n/g)
+  // let textLine = separateLines[currentLine]
+  let addedMembers = 0
+  let textLengthInCurrentIteration = 0
+  console.log('separateLines. . .. ', separateLines)
+  for (let i = 0; i < separateLines.length; i++) {
+    console.log('i - - - ---- ', i)
+    let nextTextPart = ''
+    const currentLine = separateLines[i]
+    let lastFoundIndexOnTheLine = 0
+    textLengthInCurrentIteration += currentLine.length + 1
+    if (mentionsPositions.length > addedMembers) {
+      for (let j = addedMembers; j < mentionsPositions.length; j++) {
+        const mention = mentionsPositions[j]
 
-          if (mention.start >= textLengthInCurrentIteration) {
-            const addPart = (nextTextPart || currentLine.substring(prevEnd)).trimStart()
-            messageText = `${messageText} ${addPart}`
-            prevEnd = 0
-            break
-          }
-          if (!nextTextPart || nextTextPart === '') {
-            const mentionStartInCurrentLine = currentLine.indexOf(mention.displayName, lastFoundIndexOnTheLine)
-            lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
-
-            nextTextPart = currentLine.substring(mentionStartInCurrentLine + mention.displayName.length)
-            const setSpaceToEnd =
-              (currentMentionEnd && currentMentionEnd === mention.end) ||
-              (!nextTextPart.trim() && !separateLines[i + 1])
-
-            messageText += `${currentLine.substring(
-              0,
-              mentionStartInCurrentLine
-              // mention.start - (textLengthInCurrentIteration - 1 - currentLine.length) - prevEnd
-            )}<span class='mention_user'>${mention.displayName}</span>${setSpaceToEnd ? '&nbsp;' : ''}`
-
-            prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
-          } else {
-            const mentionStartInCurrentLine = nextTextPart.indexOf(mention.displayName)
-
-            lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
-            // prevEnd = mentionStartInCurrentLine + mention.displayName.length
-
-            const nextPart = nextTextPart.substring(mentionStartInCurrentLine + mention.displayName.length)
-            const setSpaceToEnd =
-              (currentMentionEnd && currentMentionEnd === mention.end) || (!nextPart.trim() && !separateLines[i + 1])
-
-            messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class="mention_user">${
-              mention.displayName
-            }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
-
-            nextTextPart = nextPart
-            prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
-          }
-          addedMembers++
-          if (addedMembers === mentionsPositions.length && nextTextPart.trim()) {
-            messageText += nextTextPart
-          }
+        if (mention.start >= textLengthInCurrentIteration) {
+          const addPart = (nextTextPart || currentLine.substring(prevEnd)).trimStart()
+          messageText = `${messageText} ${addPart}`
+          prevEnd = 0
+          break
         }
-      } else {
-        messageText += `${currentLine}`
+        if (!nextTextPart || nextTextPart === '') {
+          const mentionStartInCurrentLine = currentLine.indexOf(mention.displayName, lastFoundIndexOnTheLine)
+          lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
+
+          nextTextPart = currentLine.substring(mentionStartInCurrentLine + mention.displayName.length)
+          const setSpaceToEnd =
+            (currentMentionEnd && currentMentionEnd === mention.end) || (!nextTextPart.trim() && !separateLines[i + 1])
+
+          messageText += `${currentLine.substring(
+            0,
+            mentionStartInCurrentLine
+            // mention.start - (textLengthInCurrentIteration - 1 - currentLine.length) - prevEnd
+          )}<span class='mention_user'>${mention.displayName}</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+
+          prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+        } else {
+          const mentionStartInCurrentLine = nextTextPart.indexOf(mention.displayName)
+
+          lastFoundIndexOnTheLine = mentionStartInCurrentLine + mention.displayName.length
+          // prevEnd = mentionStartInCurrentLine + mention.displayName.length
+
+          const nextPart = nextTextPart.substring(mentionStartInCurrentLine + mention.displayName.length)
+          const setSpaceToEnd =
+            (currentMentionEnd && currentMentionEnd === mention.end) || (!nextPart.trim() && !separateLines[i + 1])
+
+          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class="mention_user">${
+            mention.displayName
+          }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+
+          nextTextPart = nextPart
+          prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+        }
+        addedMembers++
+        if (addedMembers === mentionsPositions.length && nextTextPart.trim()) {
+          messageText += nextTextPart
+        }
       }
-      if (separateLines.length > i + 1) {
-        messageText += '<br/>'
-      }
+    } else {
+      messageText += `${currentLine}`
+    }
+    if (separateLines.length > i + 1) {
+      messageText += '<br/>'
     }
   }
+  // }
   return messageText.length > 1 ? messageText : text
 }
 
 export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
-  if (user && isAlphanumeric(user.id)) {
+  if (hideUserPresence && user && user.id && hideUserPresence(user)) {
+    console.log('user. .. . . ', user)
     return user.id.charAt(0).toUpperCase() + user.id.slice(1)
   }
   return fromContact
@@ -106,12 +108,12 @@ export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boo
         : contact.id
       : user
       ? user.id || 'Deleted user'
-      : ''
+      : 'Deleted user'
     : user
     ? user.firstName
       ? `${user.firstName} ${user.lastName}`
       : user.id || 'Deleted user'
-    : ''
+    : 'Deleted user'
 }
 
 export const isJSON = (str: any) => {

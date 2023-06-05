@@ -7,6 +7,7 @@ type channelMap = {
 
 let channelsMap: channelMap = {}
 let activeChannelId = ''
+let UploadImageIcon: JSX.Element
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = channel
 }
@@ -88,4 +89,12 @@ export function getUnreadScrollTo() {
 
 export function setUnreadScrollTo(state: boolean) {
   unreadScrollTo.isScrolled = state
+}
+
+export function getUploadImageIcon() {
+  return UploadImageIcon
+}
+
+export function setUploadImageIcon(icon: JSX.Element) {
+  UploadImageIcon = icon
 }

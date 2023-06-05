@@ -8,6 +8,8 @@ export interface IUser {
   firstName: string
   lastName: string
   avatarUrl?: string
+  activityState: string
+  blocked?: boolean
   presence?: {
     state: string
     status?: string
@@ -100,6 +102,10 @@ export interface IMessage {
   }
 }
 
+export interface IMember extends IUser {
+  role: string
+}
+
 export interface IChannel {
   id: string
   createdAt: Date | number
@@ -174,10 +180,6 @@ export interface IRole {
   name: string
   permissions?: string[]
   priority?: number
-}
-
-export interface IMember extends IUser {
-  role: string
 }
 
 export interface IContact {

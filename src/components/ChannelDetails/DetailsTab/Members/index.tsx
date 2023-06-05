@@ -15,7 +15,7 @@ import { activeChannelMembersSelector, membersLoadingStateSelector } from '../..
 import Avatar from '../../../Avatar'
 import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../../helpers/constants'
 import DropDown from '../../../../common/dropdown'
-import { colors, customColors } from '../../../../UIHelper/constants'
+import { colors } from '../../../../UIHelper/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import ConfirmPopup from '../../../../common/popups/delete'
@@ -31,12 +31,6 @@ import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 interface IProps {
   channel: IChannel
   chekActionPermission: (permission: string) => boolean
-  publicChannelDeleteMemberPopupDescription?: string
-  privateChannelDeleteMemberPopupDescription?: string
-  publicChannelRevokeAdminPopupDescription?: string
-  privateChannelRevokeAdminPopupDescription?: string
-  publicChannelMakeAdminPopupDescription?: string
-  privateChannelMakeAdminPopupDescription?: string
   showChangeMemberRole?: boolean
   showMakeMemberAdmin?: boolean
   showKickMember?: boolean
@@ -46,12 +40,6 @@ interface IProps {
 const Members = ({
   channel,
   chekActionPermission,
-  publicChannelDeleteMemberPopupDescription,
-  privateChannelDeleteMemberPopupDescription,
-  publicChannelRevokeAdminPopupDescription,
-  privateChannelRevokeAdminPopupDescription,
-  publicChannelMakeAdminPopupDescription,
-  privateChannelMakeAdminPopupDescription,
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
   showKickMember = true,
@@ -67,7 +55,6 @@ const Members = ({
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
-  console.log('members', members)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const membersLoading = useSelector(membersLoadingStateSelector) || {}
   const user = getClient().user
@@ -162,7 +149,9 @@ const Members = ({
   }
 
   useEffect(() => {
-    dispatch(getContactsAC())
+    if (getFromContacts) {
+      dispatch(getContactsAC())
+    }
     dispatch(getMembersAC(channel.id))
   }, [channel])
   return (
@@ -170,7 +159,12 @@ const Members = ({
       <ActionsMenu>
         <MembersList onScroll={handleMembersListScroll}>
           {chekActionPermission('addMember') && (
-            <MemberItem key={1} onClick={handleAddMemberPopup} addMemberIconColor={colors.primary}>
+            <MemberItem
+              key={1}
+              onClick={handleAddMemberPopup}
+              hoverBackground={colors.primaryLight}
+              addMemberIconColor={colors.primary}
+            >
               <AddMemberIcon />
               {channel?.type === CHANNEL_TYPE.PUBLIC ? 'Add subscribers' : 'Add members'}
             </MemberItem>
@@ -178,7 +172,7 @@ const Members = ({
 
           {!!members.length &&
             members.map((member, index) => (
-              <MemberItem key={member.id + index} hoverBackground={customColors.selectedChannelBackground}>
+              <MemberItem key={member.id + index} hoverBackground={colors.primaryLight}>
                 <Avatar
                   name={member.firstName || member.id}
                   image={member.avatarUrl}
@@ -230,7 +224,7 @@ const Members = ({
                             toggleChangeRolePopup()
                           }}
                           key={1}
-                          hoverBackground={customColors.selectedChannelBackground}
+                          hoverBackground={colors.primaryLight}
                         >
                           Change role
                         </DropdownOptionLi>
@@ -243,7 +237,7 @@ const Members = ({
                           }}
                           textColor={member.role === 'admin' ? colors.red1 : ''}
                           key={2}
-                          hoverBackground={customColors.selectedChannelBackground}
+                          hoverBackground={colors.primaryLight}
                         >
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
@@ -256,7 +250,7 @@ const Members = ({
                           }}
                           textColor={colors.red1}
                           key={3}
-                          hoverBackground={customColors.selectedChannelBackground}
+                          hoverBackground={colors.primaryLight}
                         >
                           Remove
                         </DropdownOptionLi>
@@ -265,7 +259,7 @@ const Members = ({
                         <DropdownOptionLi
                           textColor={colors.red1}
                           key={4}
-                          hoverBackground={customColors.selectedChannelBackground}
+                          hoverBackground={colors.primaryLight}
                           onClick={() => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup()
@@ -287,7 +281,7 @@ const Members = ({
           handleFunction={handleKickMember}
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
-          title={channel.type === CHANNEL_TYPE.PRIVATE ? 'Remove member' : 'Remove subscriber'}
+          title={channel.type === CHANNEL_TYPE.GROUP ? 'Remove member' : 'Remove subscriber'}
           description={
             privateChannelDeleteMemberPopupDescription && channel.type === CHANNEL_TYPE.PRIVATE ? (
               privateChannelDeleteMemberPopupDescription
@@ -426,6 +420,7 @@ const MemberItem = styled.li<{ hoverBackground?: string; addMemberIconColor?: st
   display: flex;
   align-items: center;
   font-size: 15px;
+  font-weight: 500;
   padding: 6px 16px;
   transition: all 0.2s;
 

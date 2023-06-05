@@ -56,7 +56,7 @@ import {
   updateMessageOnMap,
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
-import { setNotification } from '../../helpers/notifications'
+import { getShowNotifications, setNotification } from '../../helpers/notifications'
 import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
 import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
@@ -346,10 +346,13 @@ export default function* watchForEvents(): any {
     switch (type) {
       case CHANNEL_EVENT_TYPES.CREATE: {
         const { createdChannel } = args
+        const getFromContacts = getShowOnlyContactUsers()
         console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
         const channelExists = checkChannelExists(createdChannel.id)
         if (!channelExists) {
-          yield put(getContactsAC())
+          if (getFromContacts) {
+            yield put(getContactsAC())
+          }
           yield call(setChannelInMap, createdChannel)
           yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
         }
@@ -522,7 +525,8 @@ export default function* watchForEvents(): any {
           updateChannelDataAC(channel.id, { ...channelForAdd, userMessageReactions: [], lastReactedMessage: null })
         )
         console.log('channel MESSAGE ... ', message)
-        if (!message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
+        const showNotifications = getShowNotifications()
+        if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
           if (Notification.permission === 'granted') {
             if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
               const contactsMap = yield select(contactsMapSelector)
@@ -763,7 +767,9 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
         // const { channel, unreadChannels, totalUnread, channelUnreadCount } = args
         const { channel, channelUnreadCount } = args
-        console.log('channel UNREAD_MESSAGES_INFO .', channelUnreadCount)
+        // console.log('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
+        // console.log('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
+        console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount)
 
         // yield put(setChannelUnreadCount(0, channel.id));
         const updatedChannel = JSON.parse(JSON.stringify(channel))
@@ -906,6 +912,7 @@ export default function* watchForEvents(): any {
       } */
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
+        console.log('connection status changed lst. . . . . ', status)
         yield put(setConnectionStatusAC(status))
         break
       }

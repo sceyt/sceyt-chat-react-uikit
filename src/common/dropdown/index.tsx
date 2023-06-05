@@ -3,10 +3,11 @@ import styled from 'styled-components'
 import { colors } from '../../UIHelper/constants'
 import { useDidUpdate, useEventListener } from '../../hooks'
 
-const DropDownContainer = styled.div<{ height?: string; center: boolean; order?: number }>`
+const DropDownContainer = styled.div<{ height?: string; center: boolean; order?: number; margin?: string }>`
   position: relative;
   height: ${(props) => (props.height ? props.height : '100%')};
-  order: ${(props) => props.order};
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 0)};
+  margin: ${(props) => props.margin};
   ${(props) =>
     props.center &&
     ` display: flex;
@@ -29,6 +30,10 @@ const DropDownTriggerContainer = styled.div<{
   border: none;
   padding: 0;
   outline: none !important;
+  -webkit-tap-highlight-color: transparent;
+  & svg {
+    color: ${(props) => props.iconColor};
+  }
   ${(props) =>
     props.withIcon &&
     `
@@ -59,11 +64,12 @@ const DropDownTriggerContainer = styled.div<{
         `};
 `
 
-const DropDownBody = styled.div<any>`
+const DropDownBody = styled.div<{ position?: string; onScroll?: any }>`
   position: absolute;
   z-index: 300;
   min-width: 200px;
-  right: 0;
+  right: ${(props) => props.position !== 'left' && '0'};
+  left: ${(props) => props.position === 'left' && '0'};
   top: 100%;
   display: flex;
   direction: initial;
@@ -110,6 +116,7 @@ interface IProps {
   isSelect?: boolean
   dropDownState?: boolean
   order?: number
+  margin?: string
   watchToggleState?: (state: boolean) => void
   height?: string
   children?: JSX.Element | JSX.Element[]
@@ -120,6 +127,7 @@ const DropDown = ({
   position,
   withIcon,
   iconColor,
+  margin,
   isStatic,
   forceClose,
   isSelect,
@@ -193,6 +201,7 @@ const DropDown = ({
   return (
     <DropDownContainer
       order={order}
+      margin={margin}
       className='dropdown-wrapper'
       center={position === 'center'}
       ref={dropDownRef}

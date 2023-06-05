@@ -34,6 +34,7 @@ import {
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
   SET_DRAGGED_ATTACHMENTS,
+  SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
   SET_TAB_IS_ACTIVE,
   SWITCH_CHANNEL,
@@ -402,6 +403,14 @@ export function setTabIsActiveAC(isActive: boolean) {
     type: SET_TAB_IS_ACTIVE,
     payload: {
       isActive
+    }
+  }
+}
+export function setHideChannelListAC(hide: boolean) {
+  return {
+    type: SET_HIDE_CHANNEL_LIST,
+    payload: {
+      hide
     }
   }
 }

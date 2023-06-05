@@ -18,6 +18,7 @@ import {
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
   SET_DRAGGED_ATTACHMENTS,
+  SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
   SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
@@ -27,7 +28,7 @@ import {
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel } from '../../types'
+import { IAction, IChannel, IMember } from '../../types'
 import { CHANNEL_TYPE } from '../../helpers/constants'
 
 const initialState: {
@@ -61,6 +62,7 @@ const initialState: {
   isDragging: boolean
   draggedAttachments: { attachment: File; type: 'media' | 'file' }[]
   tabIsActive: boolean
+  hideChannelList: boolean
 } = {
   channelsLoadingState: null,
   channelsForForwardLoadingState: null,
@@ -86,6 +88,7 @@ const initialState: {
   channelListWidth: 0,
   isDragging: false,
   tabIsActive: true,
+  hideChannelList: false,
   draggedAttachments: []
 }
 
@@ -340,6 +343,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_TAB_IS_ACTIVE: {
       const { isActive } = payload
       newState.tabIsActive = isActive
+      return newState
+    }
+    case SET_HIDE_CHANNEL_LIST: {
+      const { hide } = payload
+      newState.hideChannelList = hide
       return newState
     }
 

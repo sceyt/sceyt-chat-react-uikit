@@ -309,11 +309,11 @@ export const GlobalStyles = createGlobalStyle`
 
     &.blue {
       color: ${colors.blue1};
-      border: 1px solid ${colors.cobalt1};
+      border: 1px solid ${colors.primary};
 
       &.filled {
         color: white;
-        background-color: ${colors.cobalt1};
+        background-color: ${colors.primary};
       }
 
       &:hover, &:focus {
@@ -805,11 +805,11 @@ export const PopupFooter = styled(ButtonBlock)`
   border-radius: 0 0 8px 8px;
 `
 
-export const SectionHeader = styled.h4<{ margin?: string }>`
+export const SectionHeader = styled.h4<{ color?: string; margin?: string }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 20px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.gray6};
   margin: ${(props) => props.margin || 0};
 `
 
@@ -944,17 +944,11 @@ export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boole
 export const MessageOwner = styled.h3<any>`
   margin: 0 12px 2px 0;
   white-space: nowrap;
-  padding: ${(props) =>
-    props.withPadding &&
-    (props.isForwarded
-      ? '8px 0 2px 12px'
-      : !props.isReplied && !props.messageBody
-      ? '8px 0 8px 12px'
-      : '8px 0 0 12px')};
   color: ${(props) => props.color || colors.primary};
   margin-left: ${(props) => props.rtlDirection && 'auto'};
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
+  line-height: ${(props) => props.fontSize || '15px'};
 `
 
 export const MessageText = styled.pre<{
@@ -1041,7 +1035,7 @@ export const CloseIcon = styled(CloseSvg)`
 export const ClearTypedText = styled(CloseIcon)`
   position: absolute;
   top: 8px;
-  right: 10px;
+  right: 22px;
   cursor: pointer;
   padding: 4px;
 `
@@ -1050,13 +1044,13 @@ export const StyledSearchSvg = styled(SearchSvg)`
   cursor: pointer;
   position: absolute;
   top: 12px;
-  left: 14px;
+  left: ${(props) => props.left || '14px'};
 `
-export const SubTitle = styled.span`
+export const SubTitle = styled.span<{ color?: string }>`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${(props) => props.color || colors.gray9};
 `
 
 export const AttachmentIconCont = styled.span`
@@ -1164,7 +1158,7 @@ export const UploadProgress = styled.div<{
 
     ${UploadingIcon} {
         border: 4px solid rgba(238,238,238,0.8);
-        border-top: 4px solid ${colors.cobalt1};
+        border-top: 4px solid ${colors.primary};
     }
   `}
   ${(props) =>

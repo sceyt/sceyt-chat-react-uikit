@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 // @ts-ignore
-import WaveSurfer from 'wavesurfer.js'
 
 import { useDidUpdate } from '../../hooks'
 
@@ -27,6 +26,7 @@ interface AudioPlayerProps {
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
+  // const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -49,17 +49,19 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
   const intervalRef = useRef<any>(null)
 
   const handleSetAudioRate = () => {
-    if (audioRate === 1) {
-      setAudioRate(1.5)
-      wavesurfer.current.setPlaybackRate(1.5)
-    } else if (audioRate === 1.5) {
-      setAudioRate(2)
-      wavesurfer.current.audioRate = 2
-      wavesurfer.current.setPlaybackRate(2)
-    } else {
-      setAudioRate(1)
-      wavesurfer.current.audioRate = 1
-      wavesurfer.current.setPlaybackRate(1)
+    if (wavesurfer.current) {
+      if (audioRate === 1) {
+        setAudioRate(1.5)
+        wavesurfer.current.setPlaybackRate(1.5)
+      } else if (audioRate === 1.5) {
+        setAudioRate(2)
+        wavesurfer.current.audioRate = 2
+        wavesurfer.current.setPlaybackRate(2)
+      } else {
+        setAudioRate(1)
+        wavesurfer.current.audioRate = 1
+        wavesurfer.current.setPlaybackRate(1)
+      }
     }
   }
 
@@ -138,86 +140,89 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
 
     return () => clearInterval(recordingInterval)
   }, [recording.initRecording])
-
   useEffect(() => {
     if (url && !isRendered) {
-      wavesurfer.current = WaveSurfer.create({
-        container: wavesurferContainer.current,
-        waveColor: colors.gray9,
-        skipLength: 0,
-        progressColor: colors.primary,
-        // audioContext,
-        // cursorColor: 'transparent',
-        // splitChannels: true,
-        // barWidth: 1.5,
-        audioRate,
-        // barHeight: 3,
+      const initWaveSurfer = async () => {
+        const WaveSurfer = await import('wavesurfer.js')
+        wavesurfer.current = WaveSurfer.default.create({
+          container: wavesurferContainer.current,
+          waveColor: colors.gray9,
+          skipLength: 0,
+          progressColor: colors.primary,
+          // audioContext,
+          // cursorColor: 'transparent',
+          // splitChannels: true,
+          // barWidth: 1.5,
+          audioRate,
+          // barHeight: 3,
 
-        barWidth: 1,
-        barHeight: 3,
+          barWidth: 1,
+          barHeight: 3,
 
-        hideScrollbar: true,
-        barRadius: 1.5,
-        cursorWidth: 0,
-        barGap: 2,
-        barMinHeight: 1,
-        height: 20
-      })
-      /* .then((blob) => {
-        // Here's where you get access to the blob
-        // And you can use it for whatever you want
-        // Like calling ref().put(blob)
+          hideScrollbar: true,
+          barRadius: 1.5,
+          cursorWidth: 0,
+          barGap: 2,
+          barMinHeight: 1,
+          height: 20
+        })
+        /* .then((blob) => {
+          // Here's where you get access to the blob
+          // And you can use it for whatever you want
+          // Like calling ref().put(blob)
 
-        console.log('blob --- ', blob);
-        // wavesurfer.current.loadBlob(blob);
-        // Here, I use it to make an image appear on the page
-        const objectURL = URL.createObjectURL(blob);
+          console.log('blob --- ', blob);
+          // wavesurfer.current.loadBlob(blob);
+          // Here, I use it to make an image appear on the page
+          const objectURL = URL.createObjectURL(blob);
 
-        console.log('object url ........ ', objectURL);
-      }); */
-      // wavesurfer.current.load(url);
-      wavesurfer.current.load(url)
+          console.log('object url ........ ', objectURL);
+        }); */
+        // wavesurfer.current.load(url);
+        wavesurfer.current.load(url)
 
-      wavesurfer.current.on('ready', () => {
-        // wavesurfer.current.play();
-        const audioDuration = wavesurfer.current.getDuration()
-        const currentTime = wavesurfer.current.getCurrentTime()
-        setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+        wavesurfer.current.on('ready', () => {
+          // wavesurfer.current.play();
+          const audioDuration = wavesurfer.current.getDuration()
+          const currentTime = wavesurfer.current.getCurrentTime()
+          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
 
-        // const filters = wavesurfer.current.getFilters()
-        wavesurfer.current.drawBuffer = (d: any) => {
-          console.log('filters --- ', d)
-        }
-      })
-      /* wavesurfer.current.drawBuffer = () => {
-        return file.metadata.tmb
-      } */
-      wavesurfer.current.on('finish', () => {
-        setPlayAudio(false)
-        wavesurfer.current.seekTo(0)
-        const audioDuration = wavesurfer.current.getDuration()
-        const currentTime = wavesurfer.current.getCurrentTime()
-        setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
-        }
-        clearInterval(intervalRef.current)
-      })
+          // const filters = wavesurfer.current.getFilters()
+          wavesurfer.current.drawBuffer = (d: any) => {
+            console.log('filters --- ', d)
+          }
+        })
+        /* wavesurfer.current.drawBuffer = () => {
+          return file.metadata.tmb
+        } */
+        wavesurfer.current.on('finish', () => {
+          setPlayAudio(false)
+          wavesurfer.current.seekTo(0)
+          const audioDuration = wavesurfer.current.getDuration()
+          const currentTime = wavesurfer.current.getCurrentTime()
+          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+          if (payingAudioId === file.id) {
+            setPayingAudioId('')
+          }
+          clearInterval(intervalRef.current)
+        })
 
-      wavesurfer.current.on('pause', () => {
-        setPlayAudio(false)
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
-        }
-        clearInterval(intervalRef.current)
-      })
+        wavesurfer.current.on('pause', () => {
+          setPlayAudio(false)
+          if (payingAudioId === file.id) {
+            setPayingAudioId('')
+          }
+          clearInterval(intervalRef.current)
+        })
 
-      wavesurfer.current.on('interaction', () => {
-        const audioDuration = wavesurfer.current.getDuration()
-        const currentTime = wavesurfer.current.getCurrentTime()
-        setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
-      })
-      setIsRendered(true)
+        wavesurfer.current.on('interaction', () => {
+          const audioDuration = wavesurfer.current.getDuration()
+          const currentTime = wavesurfer.current.getCurrentTime()
+          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+        })
+        setIsRendered(true)
+      }
+      initWaveSurfer()
     }
     return () => {
       clearInterval(intervalRef.current)

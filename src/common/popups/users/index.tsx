@@ -49,6 +49,7 @@ import { useDidUpdate } from '../../../hooks'
 interface ISelectedUserData {
   id: string
   displayName?: string
+  avatarUrl?: string
   role: string
 }
 
@@ -125,7 +126,7 @@ const UsersPopup = ({
     }
   } */
 
-  const handleUserSelect = (event: any, contact: { id: string; displayName: string }) => {
+  const handleUserSelect = (event: any, contact: { id: string; displayName: string; avatarUrl?: string }) => {
     const newSelectedMembers = [...selectedMembers]
     if (event.target.checked) {
       newSelectedMembers.push({
@@ -294,6 +295,14 @@ const UsersPopup = ({
               {selectedMembers.map((member) => {
                 return (
                   <SelectedMemberBuble key={`selected-${member.id}`}>
+                    <Avatar
+                      image={member.avatarUrl}
+                      name={member.displayName || member.id}
+                      size={28}
+                      textSize={12}
+                      setDefaultAvatar
+                      border={'0.5px solid rgba(0, 0, 0, 0.1)'}
+                    />
                     <SelectedMemberName>{member.displayName}</SelectedMemberName>
                     <StyledSubtractSvg onClick={() => removeMember(member)} />
                   </SelectedMemberBuble>
@@ -370,7 +379,9 @@ const UsersPopup = ({
                     <CustomCheckbox
                       index={user.id}
                       state={isSelected}
-                      onChange={(e) => handleUserSelect(e, { id: user.id, displayName: memberDisplayName })}
+                      onChange={(e) =>
+                        handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
+                      }
                       size='18px'
                     />
                     /* <SelectMember
@@ -519,8 +530,8 @@ const UserNamePresence = styled.div`
 
 const MemberName = styled.h4`
   font-style: normal;
-  font-weight: normal;
   font-size: 15px;
+  font-weight: 500;
   line-height: 16px;
   color: ${colors.blue6};
   margin: 0;
@@ -548,8 +559,8 @@ const SelectedMemberBuble = styled.div`
   background: ${colors.gray5};
   border-radius: 16px;
   align-items: center;
-  padding: 4px 10px;
-  height: 26px;
+  padding: 4px 10px 4px 0;
+  height: 28px;
   margin: 8px 8px 0 0;
   box-sizing: border-box;
 `
@@ -559,6 +570,7 @@ const SelectedMemberName = styled.span`
   font-weight: 500;
   font-size: 14px;
   line-height: 16px;
+  margin-left: 8px;
   color: ${colors.blue6};
 `
 

@@ -14,14 +14,20 @@ interface IChannelListProps {
   showSearch?: boolean
   uriPrefixOnCreateChannel?: string
   createChannelIcon?: JSX.Element
-  createChannelIconHoverBackground?: string
+  newChannelIcon?: JSX.Element
+  newGroupIcon?: JSX.Element
+  newChatIcon?: JSX.Element
+  uploadPhotoIcon?: JSX.Element
 }
 
 const CreateChannelButton: React.FC<IChannelListProps> = ({
   showSearch,
   uriPrefixOnCreateChannel,
   createChannelIcon,
-  createChannelIconHoverBackground
+  newChannelIcon,
+  newGroupIcon,
+  newChatIcon,
+  uploadPhotoIcon
 }) => {
   // const dispatch = useDispatch()
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
@@ -41,8 +47,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         forceClose={showAddMemberPopup || !!showCreateChannel}
         position='center'
         trigger={
-          <CreateDropdownButton hoverBackground={createChannelIconHoverBackground} leftAuto={!showSearch}>
-            <IconWrapper />
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch}>
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -55,7 +60,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
             onClick={() => handleOpenCreateChannel('public')}
             iconWidth='20px'
           >
-            <CreateChannelIcon />
+            {newChannelIcon || <CreateChannelIcon />}
             New channel
           </DropdownOptionLi>
           <DropdownOptionLi
@@ -65,7 +70,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
             onClick={() => handleOpenCreateChannel('private')}
             iconWidth='20px'
           >
-            <CreateGrouplIcon />
+            {newGroupIcon || <CreateGrouplIcon />}
             New group
           </DropdownOptionLi>
           <DropdownOptionLi
@@ -75,7 +80,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
           >
-            <CreateChatIcon />
+            {newChatIcon || <CreateChatIcon />}
             New chat
           </DropdownOptionLi>
         </DropdownOptionsUl>
@@ -94,6 +99,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           handleClose={() => setShowCreateChannel('')}
           channelType={showCreateChannel}
           uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
+          uploadPhotoIcon={uploadPhotoIcon}
         />
       )}
     </React.Fragment>
@@ -102,13 +108,6 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
 
 export default CreateChannelButton
 
-const IconWrapper = styled.span`
-  position: absolute;
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  opacity: 0.2;
-`
 const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: string; iconColor?: string }>`
   //margin-left: 12px;
   display: flex;
@@ -121,10 +120,9 @@ const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: s
   width: 40px;
   height: 40px;
   border-radius: 50%;
+  transition: all 0.2s;
   &:hover {
-    & ${IconWrapper} {
-      background-color: ${(props) => props.iconColor || colors.primary};
-    }
+    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
   }
   & > svg {
     color: ${(props) => props.iconColor || colors.primary};

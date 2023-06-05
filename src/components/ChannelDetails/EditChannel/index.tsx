@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { ReactComponent as CameraIcon } from '../../../assets/svg/camera.svg'
+import { ReactComponent as CameraIcon } from '../../../assets/svg/cameraIcon.svg'
 import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteChannel.svg'
 import {
@@ -18,13 +18,15 @@ import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
 import { updateChannelAC } from '../../../store/channel/actions'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
-import { IChannel } from '../../../types'
+import { IChannel, IMember } from '../../../types'
 import { useDidUpdate, useStateComplex } from '../../../hooks'
 import ConfirmPopup from '../../../common/popups/delete'
 import ImageCrop from '../../../common/imageCrop'
 import { channelEditModeSelector } from '../../../store/channel/selector'
-import { colors, customColors } from '../../../UIHelper/constants'
+import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
+import { getUploadImageIcon } from '../../../helpers/channelHalper'
+import { getClient } from '../../../common/client'
 
 const Container = styled.div<{ active: boolean; heightOffset: any }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
@@ -192,11 +194,11 @@ const EditChannel = ({
         <AvatarCont>
           <DropDownWrapper>
             {!isDirectChannel && channel.role && (
-              <DropDown position='center' trigger={<CameraIcon />}>
+              <DropDown position='center' iconColor={colors.white} trigger={getUploadImageIcon() || <CameraIcon />}>
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
-                    hoverBackground={customColors.selectedChannelBackground}
+                    hoverBackground={colors.primaryLight}
                     onClick={() => onOpenFileUploader()}
                     iconWidth='20px'
                   >
@@ -207,7 +209,7 @@ const EditChannel = ({
                   {newAvatar.url && (
                     <DropdownOptionLi
                       key={2}
-                      hoverBackground={customColors.selectedChannelBackground}
+                      hoverBackground={colors.primaryLight}
                       textColor={colors.red1}
                       onClick={handleToggleDeleteAvatarPopup}
                       iconWidth='20px'

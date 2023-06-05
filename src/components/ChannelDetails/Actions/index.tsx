@@ -18,10 +18,10 @@ import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIH
 import ConfirmPopup from '../../../common/popups/delete'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors, customColors } from '../../../UIHelper/constants'
+import { colors } from '../../../UIHelper/constants'
 // import ReportPopup from '../../../../common/Popups/report';
 // import { reportUserAC } from '../../../../store/member/actions'
-import { IChannel, MuteTime } from '../../../types'
+import { IChannel, IMember, MuteTime } from '../../../types'
 import DropDown from '../../../common/dropdown'
 import {
   blockChannelAC,
@@ -109,18 +109,6 @@ interface IProps {
   blockAndLeaveChannelIconColor?: string
   blockAndLeaveChannelTextColor?: string
   unblockUserTextColor?: string
-
-  blockUserWarningText?: string
-  blockAndLeavePublicChannelWarningText?: string
-  blockAndLeavePrivateChannelWarningText?: string
-  leavePublicChannelWarningText?: string
-  leavePrivateChannelWarningText?: string
-  deletePublicChannelWarningText?: string
-  deletePrivateChannelWarningText?: string
-  deleteDirectChannelWarningText?: string
-  clearHistoryPublicChannelWarningText?: string
-  clearHistoryPrivateChannelWarningText?: string
-  clearHistoryDirectChannelWarningText?: string
 }
 
 const Actions = ({
@@ -158,7 +146,7 @@ const Actions = ({
   leaveChannelIcon,
   leaveChannelIconColor,
   leaveChannelTextColor,
-  showReportChannel = true,
+  showReportChannel = false,
   reportChannelIcon,
   reportChannelOrder,
   reportChannelIconColor,
@@ -175,14 +163,6 @@ const Actions = ({
   blockAndLeaveChannelIconColor,
   blockAndLeaveChannelTextColor,
   unblockUserTextColor,
-  blockUserWarningText,
-  blockAndLeavePublicChannelWarningText,
-  blockAndLeavePrivateChannelWarningText,
-  leavePublicChannelWarningText,
-  leavePrivateChannelWarningText,
-  deletePublicChannelWarningText,
-  deletePrivateChannelWarningText,
-  deleteDirectChannelWarningText,
   showClearHistoryForDirectChannel,
   showClearHistoryForPrivateChannel,
   showClearHistoryForPublicChannel,
@@ -194,10 +174,7 @@ const Actions = ({
   showDeleteAllMessagesForPublicChannel,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
-  deleteAllMessagesTextColor,
-  clearHistoryPublicChannelWarningText,
-  clearHistoryPrivateChannelWarningText,
-  clearHistoryDirectChannelWarningText
+  deleteAllMessagesTextColor
 }: IProps) => {
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
   const [deleteAllMessagesPopupOpen, setDeleteAllMessagesPopupOpenPopupOpen] = useState(false)
@@ -302,7 +279,8 @@ const Actions = ({
 
   const handleReportUser = (reportData: any) => {
     console.log('report data . ', reportData)
-    dispatch(reportUserAC({ ...reportData, userId: channel.peer.id }))
+    directChannelUser
+    dispatch(reportUserAC({ ...reportData, userId: directChannelUser.id }))
   } */
 
   /* const handleNotificationSwitch = () => {
@@ -333,6 +311,7 @@ const Actions = ({
       dispatch(markChannelAsUnReadAC(channel.id))
     }
   }
+
   return (
     <Container isDirect={isDirectChannel}>
       {toggleable && (
@@ -384,7 +363,7 @@ const Actions = ({
                     return (
                       <DropdownOptionLi
                         key={value + index}
-                        hoverBackground={customColors.selectedChannelBackground}
+                        hoverBackground={colors.primaryLight}
                         onClick={() => handleNotificationOnOff(value * oneHour)}
                       >
                         Mute for {value < 24 ? `${value} ${value > 1 ? 'hours' : 'hour'} ` : '1 day'}
@@ -395,21 +374,21 @@ const Actions = ({
                   <React.Fragment>
                     <DropdownOptionLi
                       key={1}
-                      hoverBackground={customColors.selectedChannelBackground}
+                      hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(oneHour)}
                     >
                       Mute for 1 hour
                     </DropdownOptionLi>
                     <DropdownOptionLi
                       key={2}
-                      hoverBackground={customColors.selectedChannelBackground}
+                      hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(twoHours)}
                     >
                       Mute for 2 hours
                     </DropdownOptionLi>
                     <DropdownOptionLi
                       key={3}
-                      hoverBackground={customColors.selectedChannelBackground}
+                      hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(oneDay)}
                     >
                       Mute for 1 day
@@ -419,7 +398,7 @@ const Actions = ({
 
                 <DropdownOptionLi
                   key={4}
-                  hoverBackground={customColors.selectedChannelBackground}
+                  hoverBackground={colors.primaryLight}
                   onClick={() => handleNotificationOnOff()}
                 >
                   Mute forever
@@ -755,7 +734,7 @@ const Actions = ({
           togglePopup={handleToggleBlockUserPopupOpen}
           buttonText={popupButtonText}
           description={`Are you sure you want to block ${
-            channel.type === CHANNEL_TYPE.DIRECT ? channel.peer.firstName : ''
+            channel.type === CHANNEL_TYPE.DIRECT ? directChannelUser.firstName : ''
           } ?`}
           title={popupTitle}
         />
@@ -778,7 +757,7 @@ const Actions = ({
           buttonText='Report'
           togglePopup={toggleReportUserPopup}
           reportFunction={handleReportUser}
-          userId={channel.peer.id}
+          userId={directChannelUser.id}
         />
       )} */}
     </Container>

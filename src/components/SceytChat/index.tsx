@@ -9,13 +9,13 @@ import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { ChatContainer } from './styled'
 import { browserTabIsActiveAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
-import { setContactsMap, setNotificationLogoSrc } from '../../helpers/notifications'
+import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { colors } from '../../UIHelper/constants'
-import { isDraggingSelector } from '../../store/channel/selector'
+import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 
@@ -28,12 +28,14 @@ const SceytChat = ({
   CustomUploader,
   sendAttachmentsAsSeparateMessages,
   customColors,
-  hideUserPresence
+  hideUserPresence,
+  showNotifications
 }: IChatClientProps) => {
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const childrenArr = Children.toArray(children)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
+  const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const OtherChildren = childrenArr.filter(({ type }: any) => type.name !== 'SceytChatHeader')
   // const channels = useSelector(channelsSelector)
   const SceytChatHeader = childrenArr.find(({ type }: any) => type.name === 'SceytChatHeader')
@@ -112,6 +114,9 @@ const SceytChat = ({
       if (customColors.primaryColor) {
         colors.primary = customColors.primaryColor
       }
+      if (customColors.primaryLight) {
+        colors.primaryLight = customColors.primaryLight
+      }
       if (customColors.textColor1) {
         colors.gray6 = customColors.textColor1
       }
@@ -135,24 +140,27 @@ const SceytChat = ({
     if (logoSrc) {
       setNotificationLogoSrc(logoSrc)
     }
+    setShowNotifications(showNotifications)
     if (avatarColors) {
       setAvatarColor(avatarColors)
     }
     if (showOnlyContactUsers) {
       setShowOnlyContactUsers(showOnlyContactUsers)
     }
-    try {
-      if (window.Notification && Notification.permission === 'default') {
-        // Notification.requestPermission().then(console.log).catch(console.error)
-        Promise.resolve(Notification.requestPermission()).then(function (permission) {
-          console.log('permission:', permission)
-        })
+    if (showNotifications) {
+      try {
+        if (window.Notification && Notification.permission === 'default') {
+          // Notification.requestPermission().then(console.log).catch(console.error)
+          Promise.resolve(Notification.requestPermission()).then(function (permission) {
+            console.log('permission:', permission)
+          })
+        }
+      } catch (e) {
+        console.error('safari Notification request permission', e)
       }
-    } catch (e) {
-      console.error('safari Notification request permission', e)
+      window.sceytTabNotifications = null
+      window.sceytTabUrl = window.location.href
     }
-    window.sceytTabNotifications = null
-    window.sceytTabUrl = window.location.href
 
     document.addEventListener(visibilityChange, handleVisibilityChange, false)
     return () => {
@@ -162,7 +170,7 @@ const SceytChat = ({
 
   useEffect(() => {
     dispatch(setTabIsActiveAC(tabIsActive))
-    if (tabIsActive) {
+    if (tabIsActive && showNotifications) {
       if (window.sceytTabNotifications) {
         window.sceytTabNotifications.close()
       }
@@ -186,6 +194,7 @@ const SceytChat = ({
             onDragOver={handleDragOver}
             className='sceyt-chat-container'
             withHeader={SceytChatHeader}
+            withChannelsList={channelsListWidth && channelsListWidth > 0}
           >
             {OtherChildren}
           </ChatContainer>

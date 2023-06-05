@@ -14,6 +14,8 @@ import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import usePermissions from '../../../hooks/usePermissions'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { IMember } from '../../../types'
+import { getClient } from '../../../common/client'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
@@ -240,6 +242,7 @@ const MessageActionsWrapper = styled.div<EditMessageContainerProps>`
   position: absolute;
   left: ${({ isThreadMessage, rtlDirection }) => !rtlDirection && (isThreadMessage ? '8px' : '0')};
   right: ${({ rtlDirection }) => rtlDirection && '0'};
+  direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   top: -46px;
   padding: 0 0 8px;
   z-index: 200;
@@ -270,7 +273,7 @@ const Action = styled.div<any>`
   order: ${(props) => props.order || 1};
 
   &:hover {
-    color: ${(props) => props.hoverIconColor || colors.cobalt1};
+    color: ${(props) => props.hoverIconColor || colors.primary};
 
     ${ItemNote} {
       display: block;

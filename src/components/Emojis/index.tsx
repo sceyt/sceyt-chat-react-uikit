@@ -104,11 +104,13 @@ function EmojisPopup({
   useEffect(() => {
     setRendered(true)
     setTimeout(() => {
-      const containerTop = emojiContainerRef.current.getBoundingClientRect().top + 10
-      const heights = collectionsRef.current.map((col: any) => {
-        return col.elem.current.getBoundingClientRect().top - 80 - containerTop
-      })
-      setCollectionHeights(heights)
+      if (emojiContainerRef.current) {
+        const containerTop = emojiContainerRef.current.getBoundingClientRect().top + 10
+        const heights = collectionsRef.current.map((col: any) => {
+          return col.elem.current.getBoundingClientRect().top - 80 - containerTop
+        })
+        setCollectionHeights(heights)
+      }
     }, 300)
   }, [])
 
@@ -206,8 +208,9 @@ const Container = styled.div<{
   emojisPopupPosition?: string
 }>`
   position: ${(props) => (props.relativePosition ? 'relative' : 'absolute')};
-  left: ${(props) => (props.rtlDirection ? '' : props.rightSide ? '-276px' : '0')};
-  right: ${(props) => props.rtlDirection && '0'};
+  left: ${(props) => (props.rtlDirection ? '' : props.rightSide ? '' : '5px')};
+  right: ${(props) => (props.rtlDirection ? '0' : props.rightSide ? '65px' : '')};
+  direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   bottom: ${(props) => props.bottomPosition};
   width: 306px;
   border: 1px solid ${colors.gray1};

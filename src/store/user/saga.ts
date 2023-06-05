@@ -1,7 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
 import { BLOCK_USERS, GET_CONTACTS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
-import { LOADING_STATE } from '../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import {
   addUsersAC,
   setContactsAC,
@@ -10,7 +10,7 @@ import {
   setUsersLoadingStateAC,
   updateUserProfileAC
 } from './actions'
-import { IAction } from '../../types'
+import { IAction, IMember } from '../../types'
 import { getActiveChannelId, getChannelFromMap, query } from '../../helpers/channelHalper'
 import { updateChannelDataAC } from '../channel/actions'
 
@@ -144,6 +144,7 @@ function* getUsers(action: IAction): any {
     if (params.filter === 'username') {
       usersQueryBuilder.filterByUsername()
     }
+    console.log('user query params ..... ', params)
     const usersQuery = yield call(usersQueryBuilder.build)
 
     query.usersQuery = usersQuery
