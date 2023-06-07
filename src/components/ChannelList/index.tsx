@@ -59,7 +59,7 @@ interface IChannelListProps {
   searchInputBorderRadius?: string
   getActiveChannel?: (channel: IChannel) => void
   Profile?: JSX.Element
-  filter?: { channelType?: 'Public' | 'Private' | 'Direct' }
+  filter?: { channelType: 'Public' | 'Private' | 'Direct' }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   avatar?: boolean

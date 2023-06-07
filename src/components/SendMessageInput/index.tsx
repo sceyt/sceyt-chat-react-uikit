@@ -1880,7 +1880,7 @@ const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
   & ${AttachmentFile} {
     width: ${(props) => props.fileBoxWidth || '200px'};
     padding: 6px 12px;
-    height: 36px;
+    height: 48px;
   }
 `
 
