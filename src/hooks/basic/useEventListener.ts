@@ -1,6 +1,14 @@
 import { useRef, useLayoutEffect } from 'react'
 
-const useEventListener = (eventName: string, handler: any, element = global, options: any = {}) => {
+const useEventListener = (eventName: string, handler: any, element?: any, options: any = {}) => {
+  const isBrowser = typeof window !== 'undefined'
+  if (isBrowser && !element) {
+    // Use the `window` object.
+    element = window
+  } else {
+    // Do not use the `window` object.
+    element = global
+  }
   const savedHandler: any = useRef()
   const { capture, passive, once } = options
 

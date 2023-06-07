@@ -98,17 +98,6 @@ const Details = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
-  blockUserWarningText,
-  blockAndLeavePublicChannelWarningText,
-  blockAndLeavePrivateChannelWarningText,
-  leavePublicChannelWarningText,
-  leavePrivateChannelWarningText,
-  deletePublicChannelWarningText,
-  deletePrivateChannelWarningText,
-  deleteDirectChannelWarningText,
-  clearHistoryPublicChannelWarningText,
-  clearHistoryPrivateChannelWarningText,
-  clearHistoryDirectChannelWarningText,
   showClearHistoryForDirectChannel,
   showClearHistoryForPrivateChannel,
   showClearHistoryForPublicChannel,
@@ -124,13 +113,7 @@ const Details = ({
   showChangeMemberRole,
   showKickMember,
   showKickAndBlockMember,
-  showMakeMemberAdmin,
-  publicChannelDeleteMemberPopupDescription,
-  privateChannelDeleteMemberPopupDescription,
-  publicChannelRevokeAdminPopupDescription,
-  privateChannelRevokeAdminPopupDescription,
-  publicChannelMakeAdminPopupDescription,
-  privateChannelMakeAdminPopupDescription
+  showMakeMemberAdmin
 }: IDetailsProps) => {
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -255,7 +238,7 @@ const Details = ({
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
-        {channel.role && (
+        {(channel.role || channel.type === CHANNEL_TYPE.DIRECT) && (
           <Actions
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}
@@ -317,17 +300,6 @@ const Details = ({
             muteNotificationIcon={muteNotificationIcon}
             channel={channel}
             toggleable={false}
-            blockUserWarningText={blockUserWarningText}
-            blockAndLeavePublicChannelWarningText={blockAndLeavePublicChannelWarningText}
-            blockAndLeavePrivateChannelWarningText={blockAndLeavePrivateChannelWarningText}
-            leavePublicChannelWarningText={leavePublicChannelWarningText}
-            leavePrivateChannelWarningText={leavePrivateChannelWarningText}
-            deletePublicChannelWarningText={deletePublicChannelWarningText}
-            deletePrivateChannelWarningText={deletePrivateChannelWarningText}
-            deleteDirectChannelWarningText={deleteDirectChannelWarningText}
-            clearHistoryPublicChannelWarningText={clearHistoryPublicChannelWarningText}
-            clearHistoryPrivateChannelWarningText={clearHistoryPrivateChannelWarningText}
-            clearHistoryDirectChannelWarningText={clearHistoryDirectChannelWarningText}
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
           />
         )}
@@ -359,12 +331,6 @@ const Details = ({
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
           showMakeMemberAdmin={showMakeMemberAdmin}
-          publicChannelDeleteMemberPopupDescription={publicChannelDeleteMemberPopupDescription}
-          privateChannelDeleteMemberPopupDescription={privateChannelDeleteMemberPopupDescription}
-          publicChannelRevokeAdminPopupDescription={publicChannelRevokeAdminPopupDescription}
-          privateChannelRevokeAdminPopupDescription={privateChannelRevokeAdminPopupDescription}
-          publicChannelMakeAdminPopupDescription={publicChannelMakeAdminPopupDescription}
-          privateChannelMakeAdminPopupDescription={privateChannelMakeAdminPopupDescription}
         />
         {/* </div> */}
       </ChatDetails>
@@ -379,7 +345,7 @@ const Container = styled.div<{ mounted: boolean }>`
   width: 0;
   border-left: 1px solid ${colors.gray1};
   //transition: all 0.1s;
-  ${(props) => props.mounted && ' width: 360px'}
+  ${(props) => props.mounted && ' width: 400px'}
 }
 `
 
@@ -399,7 +365,7 @@ const ChannelDetailsHeader = styled.div`
 
 const ChatDetails = styled.div<{ heightOffset: number }>`
   position: relative;
-  width: 360px;
+  width: 400px;
   height: ${(props) => (props.heightOffset ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   overflow-y: auto;
 `

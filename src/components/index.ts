@@ -7,6 +7,8 @@ import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
 import SceytChatHeader from './SceytChatHeader'
 import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
+import CreateChannel from './ChannelList/CreateChannelButton'
+import ChannelSearch from './ChannelList/ChannelSearch'
 import Avatar from './Avatar'
 
 export {
@@ -19,6 +21,8 @@ export {
   ChannelDetails,
   SceytChatHeader,
   MessagesScrollToBottomButton,
+  CreateChannel,
+  ChannelSearch,
   Avatar
 }
 

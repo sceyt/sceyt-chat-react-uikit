@@ -4,7 +4,7 @@ import { colors } from '../../UIHelper/constants'
 
 export const Container = styled.div<any>`
   text-align: center;
-  margin: ${(props) => (props.noMargin ? '0 auto' : '16px auto 0')};
+  margin: ${(props) => (props.noMargin ? '0 auto' : `${props.marginTop || '16px'} auto 0`)};
   margin-bottom: ${(props) => (props.marginBottom ? '8px' : '0')};
   display: ${(props) => (props.dividerVisibility ? 'flex' : 'none')};
   align-items: center;
@@ -83,6 +83,7 @@ interface IProps {
   newMessagesSeparatorLeftRightSpaceWidth?: string
   noMargin?: boolean
   marginBottom?: boolean
+  marginTop?: string
 }
 
 export default function MessageDivider({
@@ -103,12 +104,14 @@ export default function MessageDivider({
   newMessagesSeparatorBackground,
   newMessagesSeparatorLeftRightSpaceWidth,
   noMargin,
+  marginTop,
   marginBottom
 }: IProps) {
   return (
     <Container
       className={unread ? 'unread' : 'divider'}
       systemMessage={systemMessage}
+      marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}
       dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor}

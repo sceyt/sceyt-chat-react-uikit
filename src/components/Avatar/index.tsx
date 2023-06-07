@@ -16,6 +16,7 @@ interface IProps {
   marginAuto?: boolean
   setDefaultAvatar?: boolean
   DeletedIcon?: JSX.Element
+  border?: string
 }
 
 const Avatar: React.FC<IProps> = ({
@@ -25,7 +26,8 @@ const Avatar: React.FC<IProps> = ({
   textSize,
   DeletedIcon,
   marginAuto,
-  setDefaultAvatar
+  setDefaultAvatar,
+  border
   // customAvatarColors
 }) => {
   // const isMounted = useIsMounted()
@@ -70,6 +72,7 @@ const Avatar: React.FC<IProps> = ({
   // console.log('isDeletedUserAvatar .. ', isDeletedUserAvatar);
   return (
     <Container
+      border={border}
       marginAuto={marginAuto}
       size={size}
       isImage={!!(image || setDefaultAvatar)}
@@ -96,9 +99,9 @@ const Avatar: React.FC<IProps> = ({
           size={size}
           // onLoad={() => setImageLoaded(true)}
           /* onError={(e:any) => {
-                e.target.onerror = null; // prevents looping
-                setAvatarImage({ loaded: true, src: '' });
-              }} */
+                  e.target.onerror = null; // prevents looping
+                  setAvatarImage({ loaded: true, src: '' });
+                }} */
           alt=''
         />
       )}
@@ -114,6 +117,7 @@ interface ContainerProps {
   textSize?: number
   isImage?: boolean
   marginAuto?: boolean
+  border?: string
 }
 
 interface AvatarImageProps {
@@ -122,29 +126,34 @@ interface AvatarImageProps {
 }
 
 export const Container = styled.div<ContainerProps>`
-    display: flex;
-    align-items: center;
-    flex: 0 0 auto;
-    text-transform: uppercase;
-    justify-content: center;
-    width: ${(props) => (props.size ? `${props.size}px` : '38px')};
-    height: ${(props) => (props.size ? `${props.size}px` : '38px')};
-    border-radius: 50%;
-    color: #fff;
-    overflow: hidden;
-    margin: ${(props) => (props.marginAuto ? 'auto' : '')};
-    ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  text-transform: uppercase;
+  justify-content: center;
+  width: ${(props) => (props.size ? `${props.size}px` : '38px')};
+  height: ${(props) => (props.size ? `${props.size}px` : '38px')};
+  border: ${(props) => props.border};
+  border-radius: 50%;
+  color: #fff;
+  overflow: hidden;
+  margin: ${(props) => (props.marginAuto ? 'auto' : '')};
+  ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+
   span {
     text-transform: uppercase;
     font-style: normal;
     white-space: nowrap;
     font-weight: 500;
-    font-size: ${(props: ContainerProps) => (props.textSize ? `${props.textSize}px` : '14px')}};
+    font-size: ${(props: ContainerProps) => (props.textSize ? `${props.textSize}px` : '14px')}
   }
-  & > svg {
-    height: ${(props) => props.size && `${props.size}px`};
-    width: ${(props) => props.size && `${props.size}px`};
-  }
+;
+}
+
+& > svg {
+  height: ${(props) => props.size && `${props.size}px`};
+  width: ${(props) => props.size && `${props.size}px`};
+}
 
 `
 

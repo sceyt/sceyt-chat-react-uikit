@@ -38,16 +38,6 @@ interface IProps {
   showKickMember?: boolean
   showKickAndBlockMember?: boolean
   showMakeMemberAdmin?: boolean
-  publicChannelDeleteMemberPopupDescription?: string
-  privateChannelDeleteMemberPopupDescription?: string
-  publicChannelRevokeAdminPopupTitle?: string
-  publicChannelRevokeAdminPopupDescription?: string
-  privateChannelRevokeAdminPopupTitle?: string
-  privateChannelRevokeAdminPopupDescription?: string
-  publicChannelMakeAdminPopupTitle?: string
-  publicChannelMakeAdminPopupDescription?: string
-  privateChannelMakeAdminPopupTitle?: string
-  privateChannelMakeAdminPopupDescription?: string
 }
 
 const DetailsTab = ({
@@ -76,13 +66,7 @@ const DetailsTab = ({
   showChangeMemberRole,
   showKickMember,
   showKickAndBlockMember,
-  showMakeMemberAdmin,
-  publicChannelDeleteMemberPopupDescription,
-  privateChannelDeleteMemberPopupDescription,
-  publicChannelRevokeAdminPopupDescription,
-  privateChannelRevokeAdminPopupDescription,
-  publicChannelMakeAdminPopupDescription,
-  privateChannelMakeAdminPopupDescription
+  showMakeMemberAdmin
 }: IProps) => {
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
@@ -138,12 +122,6 @@ const DetailsTab = ({
       </DetailsTabHeader>
       {showMembers && activeTab === channelDetailsTabs.member && (
         <Members
-          publicChannelDeleteMemberPopupDescription={publicChannelDeleteMemberPopupDescription}
-          privateChannelDeleteMemberPopupDescription={privateChannelDeleteMemberPopupDescription}
-          publicChannelRevokeAdminPopupDescription={publicChannelRevokeAdminPopupDescription}
-          privateChannelRevokeAdminPopupDescription={privateChannelRevokeAdminPopupDescription}
-          publicChannelMakeAdminPopupDescription={publicChannelMakeAdminPopupDescription}
-          privateChannelMakeAdminPopupDescription={privateChannelMakeAdminPopupDescription}
           channel={channel}
           chekActionPermission={checkActionPermission}
           showChangeMemberRole={showChangeMemberRole}

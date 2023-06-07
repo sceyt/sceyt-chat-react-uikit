@@ -2,8 +2,16 @@
 // Create a new cache
 
 const ATTACHMENTS_CACHE = 'attachments-cache'
+const isBrowser = typeof window !== 'undefined'
+let cacheAvailable: any
+if (isBrowser) {
+  // Use the `window` object.
+  cacheAvailable = 'caches' in window
+} else {
+  // Do not use the `window` object.
+  cacheAvailable = 'caches' in global
+}
 
-const cacheAvailable = 'caches' in self
 export const setAttachmentToCache = (attachmentId: string, attachmentResponse: any) => {
   if (cacheAvailable) {
     caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
@@ -42,6 +50,7 @@ export const getAttachmentUrlFromCache = (attachmentId: string) => {
       }
     })
   } else {
+    console.error('Cache is not available')
     return new Promise((_resolve, reject) => reject(new Error('Cache not available')))
   }
 }

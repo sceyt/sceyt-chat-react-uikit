@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
 import {
@@ -13,7 +13,7 @@ import {
   PopupBody,
   InputErrorMessage
 } from '../../../UIHelper'
-import { ReactComponent as UploadImageIcon } from '../../../assets/svg/chosePicture.svg'
+import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIcon.svg'
 import { useStateComplex } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
@@ -29,18 +29,26 @@ interface ICreateChannelPopup {
   handleClose: () => void
   channelType: string
   uriPrefixOnCreateChannel?: string
+  uploadPhotoIcon?: JSX.Element
 }
 
-export default function CreateChannel({ handleClose, channelType, uriPrefixOnCreateChannel }: ICreateChannelPopup) {
+export default function CreateChannel({
+  handleClose,
+  channelType,
+  uriPrefixOnCreateChannel,
+  uploadPhotoIcon
+}: ICreateChannelPopup) {
   const dispatch = useDispatch()
-  const uriRegexp = new RegExp('^[A-Za-z0-9]*$')
+  const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
+  const uriPrefixRef = useRef<any>(null)
   const [usersPopupVisible, setUsersPopupVisible] = useState(false)
   const [createGroupChannelPopupVisible, setCreateGroupChannelPopupVisible] = useState(true)
   const [selectedMembers, setSelectedMembers] = useState<IAddMember[]>([])
   const [subjectValue, setSubjectValue] = useState('')
   const [URIValue, setURIValue] = useState('')
   const [wrongUri, setWrongUri] = useState('')
+  const [uriPrefixWidth, setUriPrefixWidth] = useState<any>('')
   const [metadataValue, setMetadataValue] = useState('')
   const [cropPopup, setCropPopup] = useState(false)
   const [newAvatar, setNewAvatar] = useStateComplex({
@@ -48,7 +56,7 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
     url: '' // channelDetails.avatar
   })
   // const [pagination, setPagination] = useState(false)
-  const createPrivateChannel = channelType === 'private'
+  const createPrivateChannel = channelType === CHANNEL_TYPE.PRIVATE
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
   }
@@ -174,7 +182,10 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
       fileUploader.current.click()
     }
   } */
-
+  useEffect(() => {
+    console.log('uriPrefixRef.width. . ', uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width)
+    setUriPrefixWidth(uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width + 15)
+  }, [])
   return (
     <Container>
       {usersPopupVisible && (
@@ -209,8 +220,12 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
                     </RemoveSelectedAvatar>
                   </AvatarWrapper>
                 ) : (
-                  <UploadAvatarLabel htmlFor='uploadImage'>
-                    <UploadImageIcon />
+                  <UploadAvatarLabel
+                    iconColor={colors.primary}
+                    backgroundColor={colors.primaryLight}
+                    htmlFor='uploadImage'
+                  >
+                    {uploadPhotoIcon || <UploadImageIcon />}
                   </UploadAvatarLabel>
                 )}
                 <FileUploaderInput
@@ -239,8 +254,8 @@ export default function CreateChannel({ handleClose, channelType, uriPrefixOnCre
               {!createPrivateChannel && (
                 <React.Fragment>
                   <Label>URL</Label>
-                  <UriInputWrapper>
-                    <UriPrefix>{uriPrefixOnCreateChannel}</UriPrefix>
+                  <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
+                    {uriPrefixOnCreateChannel && <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>}
                     <CustomInput
                       type='text'
                       value={URIValue}
@@ -312,15 +327,19 @@ const CrateChannelTitle = styled.h3`
   margin: 0 0 20px;
   color: ${colors.gray8};
 `
-const UploadAvatarLabel = styled.label`
+const UploadAvatarLabel = styled.label<{ backgroundColor?: string; iconColor?: string }>`
   display: flex;
   width: 90px;
   height: 90px;
   align-items: center;
   justify-content: center;
-  background-color: ${colors.gray5};
+  background-color: ${(props) => props.backgroundColor || colors.gray5};
   border-radius: 50%;
   cursor: pointer;
+
+  & > svg {
+    color: ${(props) => props.iconColor};
+  }
 `
 
 export const URILabel = styled.label`
@@ -372,11 +391,11 @@ const ChannelUriDescription = styled.p`
   color: ${colors.gray9};
 `
 
-const UriInputWrapper = styled.div`
+const UriInputWrapper = styled.div<{ uriPrefixWidth?: number }>`
   position: relative;
 
   & > input {
-    padding-left: 93px;
+    padding-left: ${(props) => props.uriPrefixWidth && `${props.uriPrefixWidth}px`};
   }
 `
 const UriPrefix = styled.span`

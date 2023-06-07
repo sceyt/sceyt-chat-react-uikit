@@ -32,11 +32,13 @@ export interface IChatClientProps {
   hideUserPresence?: (user: IUser) => boolean
   showOnlyContactUsers?: boolean
   sendAttachmentsAsSeparateMessages?: boolean
+  showNotifications?: boolean
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
   CustomUploader?: ICustomUploader
   customColors?: {
     primaryColor?: string
+    primaryLight?: string
     textColor1?: string
     textColor2?: string
     textColor3?: string
@@ -54,6 +56,7 @@ const SceytChatContainer = ({
   logoSrc,
   CustomUploader,
   customColors,
+  showNotifications = true,
   hideUserPresence
 }: IChatClientProps) => {
   return (
@@ -67,6 +70,7 @@ const SceytChatContainer = ({
         CustomUploader={CustomUploader}
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
         customColors={customColors}
+        showNotifications={showNotifications}
         hideUserPresence={hideUserPresence}
       />
     </Provider>

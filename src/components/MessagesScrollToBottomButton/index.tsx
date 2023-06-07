@@ -46,7 +46,6 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
 
   const handleScrollToBottom = () => {
-    console.log('scroll buttun cliced ... ')
     dispatch(scrollToNewMessageAC(true, true))
   }
   return (
@@ -125,7 +124,7 @@ const UnreadCount = styled.span<UnreadCountProps>`
   right: 16px;
   flex: 0 0 auto;
   margin-left: auto;
-  background-color: ${(props) => props.backgroundColor || colors.cobalt1};
+  background-color: ${(props) => props.backgroundColor || colors.primary};
   padding: 0 4px;
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: 20px;

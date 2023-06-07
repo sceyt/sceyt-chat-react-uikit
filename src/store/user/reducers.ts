@@ -30,7 +30,7 @@ const initialState: IUserStore = {
   usersLoadingState: null,
   contactsMap: {},
   updatedUserMap: {},
-  user: { id: '', firstName: '', lastName: '' },
+  user: { id: '', firstName: '', lastName: '', activityState: '' },
   browserTabIsActive: true
 }
 
@@ -80,7 +80,6 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
 
     case UPDATE_USER_PROFILE: {
-      console.log('update user.... ')
       newState.user = { ...newState.user, ...payload.profile }
       return newState
     }

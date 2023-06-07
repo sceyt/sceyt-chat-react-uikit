@@ -40,6 +40,11 @@ interface AttachmentPops {
   fileNameMaxLength?: number
   imageMinWidth?: string
   closeMessageActions?: (state: boolean) => void
+  fileAttachmentWidth?: number
+  imageAttachmentMaxWidth?: number
+  imageAttachmentMaxHeight?: number
+  videoAttachmentMaxWidth?: number
+  videoAttachmentMaxHeight?: number
 }
 
 const Attachment = ({
@@ -56,9 +61,14 @@ const Attachment = ({
   selectedFileAttachmentsTitleColor,
   selectedFileAttachmentsSizeColor,
   isDetailsView,
-  fileNameMaxLength,
+  // fileNameMaxLength,
   imageMinWidth,
-  closeMessageActions
+  closeMessageActions,
+  fileAttachmentWidth,
+  imageAttachmentMaxWidth,
+  imageAttachmentMaxHeight,
+  videoAttachmentMaxWidth,
+  videoAttachmentMaxHeight
 }: AttachmentPops) => {
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
@@ -77,7 +87,12 @@ const Attachment = ({
   const customDownloader = getCustomDownloader()
   const [renderWidth, renderHeight] =
     attachment.metadata && attachment.metadata.szw && attachment.metadata.szh
-      ? calculateRenderedImageWidth(attachment.metadata.szw, attachment.metadata.szh)
+      ? calculateRenderedImageWidth(
+          attachment.metadata.szw,
+          attachment.metadata.szh,
+          imageAttachmentMaxWidth,
+          imageAttachmentMaxHeight
+        )
       : []
   // const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
   // TODO check after and remove in not nedded
@@ -108,10 +123,9 @@ const Attachment = ({
       setAttachmentUrl(url)
     }
     image.onerror = () => {
-      console.error('Error on download image')
+      console.error('Error on download image', url)
     }
   }
-
   const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {
@@ -174,48 +188,65 @@ const Attachment = ({
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
-      getAttachmentUrlFromCache(attachment.id!).then((cachedUrl) => {
-        if (attachment.type === 'image' && !isPrevious) {
-          if (cachedUrl) {
-            // @ts-ignore
-            // downloadImage(cachedUrl)
-            setAttachmentUrl(cachedUrl)
-            setIsCached(true)
-          } else {
-            if (customDownloader) {
-              customDownloader(attachment.url).then(async (url) => {
-                const response = await fetch(url)
-                setAttachmentToCache(attachment.id!, response)
-                downloadImage(url)
-              })
+      getAttachmentUrlFromCache(attachment.id!)
+        .then((cachedUrl) => {
+          if (attachment.type === 'image' && !isPrevious) {
+            if (cachedUrl) {
+              // @ts-ignore
+              // downloadImage(cachedUrl)
+              setAttachmentUrl(cachedUrl)
+              setIsCached(true)
             } else {
-              downloadImage(attachment.url)
+              if (customDownloader) {
+                console.log('is not cached, download with custom downloader')
+                customDownloader(attachment.url).then(async (url) => {
+                  console.log('image is downloaded. . . should load image', url)
+                  downloadImage(url)
+                  const response = await fetch(url)
+                  setAttachmentToCache(attachment.id!, response)
+                })
+              } else {
+                console.log('is not cached, load attachment', attachment.url)
+                downloadImage(attachment.url)
+              }
+            }
+          } else {
+            if (cachedUrl) {
+              // @ts-ignore
+              setAttachmentUrl(cachedUrl)
+              setIsCached(true)
+            } else {
+              if (customDownloader) {
+                customDownloader(attachment.url).then(async (url) => {
+                  // if (attachment.type === attachmentTypes.video) {
+                  const response = await fetch(url)
+                  setAttachmentToCache(attachment.id!, response)
+                  // }
+                  setAttachmentUrl(url)
+                })
+              } else {
+                setAttachmentUrl(attachment.url)
+              }
             }
           }
-        } else {
-          if (cachedUrl) {
-            // @ts-ignore
-            setAttachmentUrl(cachedUrl)
-            setIsCached(true)
+        })
+        .catch((e: any) => {
+          console.log('error on get attachment url from cache. .. ', e)
+          if (customDownloader) {
+            customDownloader(attachment.url).then(async (url) => {
+              // if (attachment.type === attachmentTypes.video) {
+              const response = await fetch(url)
+              setAttachmentToCache(attachment.id!, response)
+              // }
+              setAttachmentUrl(url)
+            })
           } else {
-            if (customDownloader) {
-              customDownloader(attachment.url).then(async (url) => {
-                // if (attachment.type === attachmentTypes.video) {
-                const response = await fetch(url)
-                setAttachmentToCache(attachment.id!, response)
-                // }
-                setAttachmentUrl(url)
-              })
-            } else {
-              setAttachmentUrl(attachment.url)
-            }
+            setAttachmentUrl(attachment.url)
           }
-        }
-      })
+        })
     }
   }, [attachment.id])
 
-  // console.log('attachment ... ', attachment)
   // @ts-ignore
   return (
     <React.Fragment>
@@ -246,6 +277,9 @@ const Attachment = ({
               isRepliedMessage={isRepliedMessage}
               withBorder={!isPrevious && !isDetailsView}
               fitTheContainer={isDetailsView}
+              imageMaxHeight={
+                attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
+              }
               // onLoad={() => setImageLoading(false)}
             />
           )}
@@ -361,8 +395,24 @@ const Attachment = ({
               ) */
               ) : null}
               <VideoPreview
-                maxWidth={isRepliedMessage ? '40px' : isDetailsView ? '100%' : '320px'}
-                maxHeight={isRepliedMessage ? '40px' : isDetailsView ? '100%' : '240px'}
+                maxWidth={
+                  isRepliedMessage
+                    ? '40px'
+                    : isDetailsView
+                    ? '100%'
+                    : videoAttachmentMaxWidth
+                    ? `${videoAttachmentMaxWidth}px`
+                    : '320px'
+                }
+                maxHeight={
+                  isRepliedMessage
+                    ? '40px'
+                    : isDetailsView
+                    ? '100%'
+                    : videoAttachmentMaxHeight
+                    ? `${videoAttachmentMaxHeight}px`
+                    : '240px'
+                }
                 file={attachment}
                 src={attachmentUrl}
                 uploading={
@@ -418,6 +468,7 @@ const Attachment = ({
           background={backgroundColor}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder}
+          width={fileAttachmentWidth}
         >
           {attachment.metadata && attachment.metadata.tmb ? (
             <FileThumbnail src={`data:image/jpeg;base64,${attachment.metadata.tmb}`} />
@@ -467,7 +518,7 @@ const Attachment = ({
               <AttachmentName color={selectedFileAttachmentsTitleColor} ref={fileNameRef}>
                 {formatLargeText(
                   isPrevious ? attachment.data.name : attachment.name,
-                  fileNameMaxLength || isPrevious ? 18 : 30
+                  fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPrevious ? 18 : 30
                 )}
               </AttachmentName>
               <AttachmentSize color={selectedFileAttachmentsSizeColor}>
@@ -544,9 +595,11 @@ const AttachmentImgCont = styled.div<{
   min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '130px'};
   height: ${(props) => props.fitTheContainer && '100%'};
 
-  width: ${(props) => (props.fitTheContainer ? '100%' : props.width && `${props.width}px`)};
-  height: ${(props) => (props.fitTheContainer ? '100%' : props.height && `${props.height}px`)};
-  max-height: 396px;
+  width: ${(props) =>
+    props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
+  height: ${(props) =>
+    props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+  max-height: 400px;
   min-height: ${(props) => props.height && '90px'};
   cursor: pointer;
 
@@ -563,7 +616,7 @@ const AttachmentImgCont = styled.div<{
       transform: translate(2px, 3px);
     }
   `}
-  //background-image: ${(props) => props.backgroundImage && `url(data:image/jpeg;base64,${props.backgroundImage})`};
+
   &:hover ${DownloadImage} {
     visibility: visible;
     opacity: 1;
@@ -610,12 +663,13 @@ export const AttachmentFile = styled.div<{
   borderRadius?: string
   background?: string
   border?: string
+  width?: number
 }>`
   display: flex;
   position: relative;
   align-items: center;
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
-  width: ${(props) => !props.isRepliedMessage && '350px'};
+  width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
   //height: 70px;
   background: ${(props) => props.background || '#ffffff'};
   border: ${(props) => props.border || `1px solid  ${colors.gray1}`};
@@ -708,6 +762,7 @@ export const AttachmentImg = styled.img<{
   fitTheContainer?: boolean
   backgroundColor: string
   imageMinWidth?: string
+  imageMaxHeight?: string
 }>`
   position: ${(props) => props.absolute && 'absolute'};
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
@@ -717,7 +772,7 @@ export const AttachmentImg = styled.img<{
       : props.withBorder && `2px solid ${props.backgroundColor}`};
   box-sizing: border-box;
   max-width: 100%;
-  max-height: 400px;
+  max-height: ${(props) => props.imageMaxHeight || '400px'};
   width: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPrevious ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>

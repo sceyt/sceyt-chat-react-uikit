@@ -8,7 +8,7 @@ import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
 // import { ReactComponent as RecordIcon } from '../../assets/lib/svg/recordButton.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/edit.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
-import { ReactComponent as AttachmentIcon } from '../../assets/svg/attachment.svg'
+import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
@@ -39,7 +39,7 @@ import {
 } from '../../store/channel/selector'
 import { IMember, IMessage, IUser } from '../../types'
 import { joinChannelAC, sendTypingAC, setDraggedAttachments } from '../../store/channel/actions'
-import { createFileImageThumbnail, createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
+import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import DropDown from '../../common/dropdown'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
@@ -53,20 +53,30 @@ import { getClient } from '../../common/client'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import MentionMembersPopup from '../../common/popups/mentions'
 import LinkifyIt from 'linkify-it'
+
 let prevActiveChannelId: any
+
 interface SendMessageProps {
   draggedAttachments?: boolean
   handleAttachmentSelected?: (state: boolean) => void
   disabled?: boolean
-  hideEmojis?: boolean
+  showAddEmojis?: boolean
+  AddEmojisIcon?: JSX.Element
   emojiIcoOrder?: number
+  showAddAttachments?: boolean
+  AddAttachmentsIcon?: JSX.Element
   attachmentIcoOrder?: number
   sendIconOrder?: number
   inputOrder?: number
   CustomTypingIndicator?: FC<{ from: IUser; typingState: boolean }>
+  backgroundColor?: string
   margin?: string
+  minHeight?: string
   border?: string
   borderRadius?: string
+  inputBorderRadius?: string
+  inputBackgroundColor?: string
+  inputPaddings?: string
   selectedFileAttachmentsBoxWidth?: string
   selectedFileAttachmentsBoxBackground?: string
   selectedFileAttachmentsBoxBorder?: string
@@ -75,20 +85,32 @@ interface SendMessageProps {
   selectedFileAttachmentsIcon?: JSX.Element
   selectedAttachmentsBorderRadius?: string
   replyMessageIcon?: JSX.Element
+  voiceMessage?: boolean
+  sendAttachmentSeparately?: boolean
+  allowMentionUser?: boolean
 }
+
 const SendMessageInput: React.FC<SendMessageProps> = ({
   handleAttachmentSelected,
   // draggedAttachments,
   disabled = false,
-  emojiIcoOrder,
-  attachmentIcoOrder,
   sendIconOrder,
-  inputOrder,
-  hideEmojis,
+  inputOrder = 1,
+  showAddEmojis = true,
+  AddEmojisIcon,
+  emojiIcoOrder = 2,
+  showAddAttachments = true,
+  AddAttachmentsIcon,
+  attachmentIcoOrder = 0,
   CustomTypingIndicator,
   margin,
   border,
+  minHeight,
   borderRadius,
+  inputBorderRadius,
+  backgroundColor,
+  inputBackgroundColor,
+  inputPaddings,
   selectedAttachmentsBorderRadius,
   selectedFileAttachmentsIcon,
   selectedFileAttachmentsBoxWidth,
@@ -96,7 +118,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   selectedFileAttachmentsBoxBorder,
   selectedFileAttachmentsTitleColor,
   selectedFileAttachmentsSizeColor,
-  replyMessageIcon
+  replyMessageIcon,
+  sendAttachmentSeparately,
+  allowMentionUser = true
+  // voiceMessage = true
 }) => {
   const dispatch = useDispatch()
 
@@ -126,6 +151,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
   const [emojisInRightSide, setEmojisInRightSide] = useState(false)
+  const [addAttachmentsInRightSide, setAddAttachmentsInRightSide] = useState(false)
 
   // const [recording, setRecording] = useState<Recording>(recordingInitialState)
   // const [recordedFile, setRecordedFile] = useState<any>(null)
@@ -140,6 +166,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const [selectionPos, setSelectionPos] = useState<any>()
 
+  const [inputContainerHeight, setInputContainerHeight] = useState<any>()
+
   const [typingTimout, setTypingTimout] = useState<any>()
   const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
   const [inTypingState, setInTypingState] = useState(false)
@@ -150,9 +178,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const fileUploader = useRef<any>(null)
+  const inputWrapperRef = useRef<any>(null)
   const messageInputRef = useRef<any>(null)
   const emojiBtnRef = useRef<any>(null)
-  const mentionsRef = useRef<any>(null)
+  const addAttachmentsBtnRef = useRef<any>(null)
 
   const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
   const handleSendTypingState = (typingState: boolean) => {
@@ -306,6 +335,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setCurrentMentions(undefined)
   }
   const handleTyping = (e: any) => {
+    if (!e.currentTarget.innerText.trim()) {
+      setSendMessageIsActive(false)
+    } else {
+      setSendMessageIsActive(true)
+    }
     if (!(openMention && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) {
       if (messageToEdit) {
         setEditMessageText(e.currentTarget.innerText)
@@ -313,7 +347,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setMessageText(e.currentTarget.innerText)
       }
       // e.currentTarget.html = e.currentTarget.innerText
-      handleMentionDetect(e)
+      if (allowMentionUser) {
+        handleMentionDetect(e)
+      }
 
       if (typingTimout) {
         if (!inTypingStateTimout) {
@@ -350,7 +386,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     let shouldClose = false
-    if (e.key === 'Backspace') {
+    if (e.key === 'Backspace' || e.key === 'Delete') {
       // const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       // if (mentionToEdit) {
       //   const editingMentionPosition = 0
@@ -387,13 +423,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           // }
         })
         setMentionedMembers(updatedMentionedMembers)
+        const currentTextCont = typingTextFormat({
+          text: currentText,
+          mentionedMembers: [...mentionedMembersPositions]
+        })
+        messageInputRef.current.innerHTML = currentTextCont
       }
-      const currentTextCont = typingTextFormat({
-        text: currentText,
-        mentionedMembers: [...mentionedMembersPositions]
-      })
+
       setMessageText(currentText)
-      messageInputRef.current.innerHTML = currentTextCont
       if (selPos > 0) {
         setCursorPosition(messageInputRef.current, selPos)
       }
@@ -599,7 +636,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
            dispatch(sendMessageAC(messageToSend))
          } */
       }
-
       setAttachments([])
       handleCloseReply()
       setMentionedMembers([])
@@ -741,6 +777,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const browser = detectBrowser()
     if (os === 'Windows' && browser === 'Firefox') {
       e.preventDefault()
+      setMessageText(e.clipboardData.getData('text/plain').trim())
+      document.execCommand('inserttext', false, e.clipboardData.getData('text/plain').trim())
     } else {
       if (e.clipboardData.files && e.clipboardData.files.length > 0) {
         e.preventDefault()
@@ -750,6 +788,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
       } else {
         e.preventDefault()
+        setMessageText(e.clipboardData.getData('text/plain').trim())
         document.execCommand('inserttext', false, e.clipboardData.getData('text/plain').trim())
         //
         // e.currentTarget.innerText = e.clipboardData.getData('Text')
@@ -789,9 +828,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     ) {
       setIsEmojisOpened(false)
     }
-    /* if (!mentionsRef.current.contains(e.target) && !mentionsBtnRef.current.contains(e.target)) {
-      handleCloseMentionsPopup()
-    } */
   }
   useEffect(() => {
     if (mentionTyping) {
@@ -888,21 +924,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             // })
           })
         } else {
-          createFileImageThumbnail(file).then((thumbnail) => {
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                // type: file.type.split('/')[0],
-                type: 'file',
-                attachmentUrl: URL.createObjectURL(file as any),
-                attachmentId: uuidv4(),
-                metadata: JSON.stringify({
-                  tmb: thumbnail
-                })
-              }
-            ])
-          })
+          const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
+          setAttachments((prevState: any[]) => [
+            ...prevState,
+            {
+              data: file,
+              // type: file.type.split('/')[0],
+              type: 'file',
+              attachmentUrl: URL.createObjectURL(file as any),
+              attachmentId: uuidv4(),
+              metadata: JSON.stringify({
+                tmb: thumbnail
+              })
+            }
+          ])
         }
       } else if (fileType === 'video') {
         const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
@@ -1145,14 +1180,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [connectionStatus])
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (handleAttachmentSelected) {
       handleAttachmentSelected(!!attachments.length)
     }
-    if (messageContRef && messageContRef.current) {
-      dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+    if (sendAttachmentSeparately && attachments && attachments.length) {
+      handleSendEditMessage(new Event('click'))
+    } else {
+      if (messageContRef && messageContRef.current) {
+        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+      }
     }
   }, [attachments])
+
+  useEffect(() => {
+    if (emojiBtnRef.current && emojiBtnRef.current.offsetLeft > messageInputRef.current.offsetWidth) {
+      setEmojisInRightSide(true)
+    }
+    if (attachmentIcoOrder > inputOrder) {
+      setAddAttachmentsInRightSide(true)
+    }
+    if (!inputContainerHeight && inputWrapperRef && inputWrapperRef.current) {
+      setInputContainerHeight(inputWrapperRef.current.getBoundingClientRect().height)
+    }
+  })
 
   useEffect(() => {
     if (messageForReply && messageToEdit) {
@@ -1242,9 +1293,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       wavesurfer.current.play();
     }); */
 
-    if (emojiBtnRef.current && emojiBtnRef.current.offsetLeft > messageInputRef.current.offsetWidth) {
-      setEmojisInRightSide(true)
-    }
     document.addEventListener('mousedown', handleClick)
     return () => {
       document.removeEventListener('mousedown', handleClick)
@@ -1252,7 +1300,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [])
 
   return (
-    <Container margin={margin} border={border} borderRadius={borderRadius} ref={messageContRef}>
+    <Container margin={margin} border={border} ref={messageContRef}>
       {!activeChannel.id ? (
         <Loading />
       ) : isBlockedUserChat || isDeletedUserChat || disabled ? (
@@ -1279,15 +1327,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       ) : (
         <React.Fragment>
           <TypingIndicator>
-            {CustomTypingIndicator ? (
-              <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
-            ) : (
-              typingIndicator &&
-              typingIndicator.typingState && (
+            {typingIndicator &&
+              typingIndicator.typingState &&
+              (CustomTypingIndicator ? (
+                <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
+              ) : (
                 <TypingIndicatorCont>
                   <TypingFrom>
-                    {(contactsMap[typingIndicator.from.id] && contactsMap[typingIndicator.from.id].firstName) ||
-                      typingIndicator.from.id}{' '}
+                    {makeUsername(
+                      getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
+                      typingIndicator.from,
+                      getFromContacts
+                    )}{' '}
                     is typing
                   </TypingFrom>
                   <TypingAnimation>
@@ -1296,8 +1347,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <DotThree />
                   </TypingAnimation>
                 </TypingIndicatorCont>
-              )
-            )}
+              ))}
           </TypingIndicator>
           {/* <EmojiContainer rigthSide={emojisInRightSide} ref={emojisRef} isEmojisOpened={isEmojisOpened}> */}
           {isEmojisOpened && (
@@ -1377,24 +1427,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               </ReplyMessageCont>
             </EditReplyMessageCont>
           )}
-          {/* {messageForReply && (
-        <ReplyMessageContainer>
-          <CloseReply onClick={handleCloseReply}>
-            <CloseSvg />
-          </CloseReply>
-          <MessageOwner>
-            {messageForReply.user
-              ? messageForReply.user.firstName
-                ? `${messageForReply.user.firstName} ${messageForReply.user.lastName}`
-                : messageForReply.user.id
-              : 'Deleted user'}
-          </MessageOwner>
-          <MessageText>
-            <MessageTextFormat text={messageForReply.body} message={messageForReply} />
-          </MessageText>
-        </ReplyMessageContainer>
-      )} */}
-          {!!attachments.length && (
+
+          {!!attachments.length && !sendAttachmentSeparately && (
             <ChosenAttachments fileBoxWidth={selectedFileAttachmentsBoxWidth}>
               {attachments.map((attachment: any) => (
                 <Attachment
@@ -1413,72 +1447,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               ))}
             </ChosenAttachments>
           )}
-
-          {/* <div id="waveform" /> */}
-          {/* <SendMessageInput messageForReply={messageForReply}> */}
-          <SendMessageInputContainer border={border} borderRadius={borderRadius} iconColor={colors.primary}>
-            {/* <AddAttachmentIcon onClick={() => onOpenFileUploader()} isActive={!!attachments.length}> */}
-
-            {/* {!recording.initRecording && ( */}
-            <DropDown
-              forceClose={showChooseAttachmentType}
-              position='top'
-              order={attachmentIcoOrder === 0 || attachmentIcoOrder ? attachmentIcoOrder : 4}
-              trigger={
-                <AddAttachmentIcon color={colors.primary}>
-                  <AttachmentIcon />
-                </AddAttachmentIcon>
-              }
-            >
-              <DropdownOptionsUl>
-                <DropdownOptionLi
-                  key={1}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => onOpenFileUploader(mediaExtensions)}
-                  iconWidth='20px'
-                  iconColor={colors.gray4}
-                >
-                  <ChoseMediaIcon />
-                  Photo or video
-                </DropdownOptionLi>
-                <DropdownOptionLi
-                  key={2}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => onOpenFileUploader('')}
-                  iconWidth='20px'
-                  iconColor={colors.gray4}
-                >
-                  <ChoseFileIcon />
-                  File
-                </DropdownOptionLi>
-              </DropdownOptionsUl>
-            </DropDown>
-            {/* )} */}
-            {/* <MentionButton
-          ref={mentionsBtnRef}
-          // onClick={handleMentionButtonClick}
-        >
-          <MentionIcon />
-        </MentionButton> */}
-
-            {/* {!hideEmojis && !recording.initRecording && ( */}
-            {!hideEmojis && (
-              <EmojiButton
-                order={emojiIcoOrder}
-                isEmojisOpened={isEmojisOpened}
-                ref={emojiBtnRef}
-                hoverColor={colors.primary}
-                onClick={() => {
-                  setIsEmojisOpened(!isEmojisOpened)
-                }}
-              >
-                <EmojiSmileIcon />
-              </EmojiButton>
-            )}
-
-            <MentionsContainer ref={mentionsRef} mentionsIsOpen={openMention}>
+          <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
+            <MentionsContainer mentionsIsOpen={openMention}>
               {openMention && (
                 <MentionMembersPopup
                   channelId={activeChannel.id}
@@ -1489,18 +1459,83 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               )}
             </MentionsContainer>
             <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-            <MessageInputWrapper order={inputOrder} channelDetailsIsOpen={channelDetailsIsOpen}>
+            <MessageInputWrapper
+              borderRadius={borderRadius}
+              ref={inputWrapperRef}
+              backgroundColor={backgroundColor}
+              channelDetailsIsOpen={channelDetailsIsOpen}
+            >
+              {showAddEmojis && (
+                <EmojiButton
+                  order={emojiIcoOrder}
+                  isEmojisOpened={isEmojisOpened}
+                  ref={emojiBtnRef}
+                  hoverColor={colors.primary}
+                  height={inputContainerHeight || minHeight}
+                  onClick={() => {
+                    setIsEmojisOpened(!isEmojisOpened)
+                  }}
+                >
+                  {AddEmojisIcon || <EmojiSmileIcon />}
+                </EmojiButton>
+              )}
+              {showAddAttachments && (
+                <DropDown
+                  forceClose={showChooseAttachmentType}
+                  position={addAttachmentsInRightSide ? 'top' : 'topRight'}
+                  margin='auto 0 0'
+                  order={attachmentIcoOrder}
+                  trigger={
+                    <AddAttachmentIcon
+                      ref={addAttachmentsBtnRef}
+                      color={colors.primary}
+                      height={inputContainerHeight || minHeight}
+                    >
+                      {AddAttachmentsIcon || <AttachmentIcon />}
+                    </AddAttachmentIcon>
+                  }
+                >
+                  <DropdownOptionsUl>
+                    <DropdownOptionLi
+                      key={1}
+                      textColor={colors.gray6}
+                      hoverBackground={colors.gray5}
+                      onClick={() => onOpenFileUploader(mediaExtensions)}
+                      iconWidth='20px'
+                      iconColor={colors.gray4}
+                    >
+                      <ChoseMediaIcon />
+                      Photo or video
+                    </DropdownOptionLi>
+                    <DropdownOptionLi
+                      key={2}
+                      textColor={colors.gray6}
+                      hoverBackground={colors.gray5}
+                      onClick={() => onOpenFileUploader('')}
+                      iconWidth='20px'
+                      iconColor={colors.gray4}
+                    >
+                      <ChoseFileIcon />
+                      File
+                    </DropdownOptionLi>
+                  </DropdownOptionsUl>
+                </DropDown>
+              )}
               <MessageInput
                 contentEditable
                 suppressContentEditableWarning
                 onKeyUp={handleTyping}
-                // onChange={handleTyping}
+                onChange={handleTyping}
                 onPaste={handlePastAttachments}
                 onCut={handleCut}
                 onKeyPress={handleSendEditMessage}
                 data-placeholder='Type message here ...'
                 // onKeyDown={handleKeyDown}
                 // value={editMessageText || messageText}
+                borderRadius={inputBorderRadius}
+                order={inputOrder}
+                backgroundColor={inputBackgroundColor}
+                paddings={inputPaddings}
                 ref={messageInputRef}
                 mentionColor={colors.primary}
                 // placeholder='Type message here...'
@@ -1509,6 +1544,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <SendMessageIcon
               isActive={sendMessageIsActive}
               order={sendIconOrder}
+              height={inputContainerHeight || minHeight}
               onClick={sendMessageIsActive ? handleSendEditMessage : null}
             >
               <SendIcon />
@@ -1556,8 +1592,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 }
 
 const Container = styled.div<{ margin?: string; border?: string; borderRadius?: string; ref?: any; height?: number }>`
-  margin: ${(props) => props.margin || '30px 16px 16px'};
-  border-top: 1px solid ${colors.gray1};
+  margin: ${(props) => props.margin || '30px 0 16px'};
   border: ${(props) => props.border || ''};
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
@@ -1625,16 +1660,17 @@ const EditReplyMessageHeader = styled.h4<any>`
 
 const AddAttachmentIcon = styled.span<any>`
   display: flex;
-  height: 48px;
+  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
-  margin: 0 5px;
+  margin: 0 8px;
   cursor: pointer;
   line-height: 13px;
   z-index: 2;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
   > svg {
-    ${(props) => (props.isActive ? `color: ${props.color || colors.primary};` : 'color: #898B99;')}
+    ${(props) => (props.isActive ? `color: ${props.color || colors.primary};` : 'color: #898B99;')};
+    width: 24px;
   }
 
   &:hover > svg {
@@ -1642,23 +1678,25 @@ const AddAttachmentIcon = styled.span<any>`
   }
 `
 
-const SendMessageInputContainer = styled.div<any>`
+const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: string; messageForReply?: string }>`
   display: flex;
   align-items: flex-end;
   position: relative;
-  min-height: 48px;
+  min-height: ${(props) => props.minHeight || '36px'};
   box-sizing: border-box;
   border-radius: ${(props) => (props.messageForReply ? '0 0 4px 4px' : '4px')};
 
   & .dropdown-trigger.open {
     color: #ccc;
+
     & ${AddAttachmentIcon} {
       & > svg {
         color: ${(props) => props.iconColor || colors.primary};
-        };
       }
+    ;
     }
   }
+}
 `
 
 /*
@@ -1670,17 +1708,29 @@ const CloseReply = styled.span`
 `
 */
 
-const MessageInputWrapper = styled.div<any>`
+const MessageInputWrapper = styled.div<{
+  channelDetailsIsOpen?: boolean
+  backgroundColor?: string
+  borderRadius?: string
+}>`
+  display: flex;
   width: 100%;
   //max-width: ${(props) =>
     props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
-  max-width: calc(100% - 110px);
+  //max-width: calc(100% - 110px);
+  background-color: ${(props) => props.backgroundColor || colors.gray11};
+  border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 3)};
 `
-const MessageInput = styled.div<any>`
-  margin: 14px 12px 14px 12px;
-  //width: 100%;
+const MessageInput = styled.div<{
+  order?: number
+  borderRadius?: string
+  backgroundColor?: string
+  paddings?: string
+  mentionColor?: string
+}>`
+  margin: 8px 6px;
+  width: 100%;
   max-height: 80px;
   min-height: 20px;
   display: block;
@@ -1691,14 +1741,19 @@ const MessageInput = styled.div<any>`
   font-size: 15px;
   line-height: 20px;
   overflow: auto;
+  border-radius: ${(props) => props.borderRadius};
+  background-color: ${(props) => props.backgroundColor};
+  padding: ${(props) => props.paddings};
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
   &:empty:before {
     content: attr(data-placeholder);
   }
+
   &:before {
-    position: absolute;
-    top: 15px;
-    left: 12px;
+    position: relative;
+    top: calc(50% - 10px);
+    left: 0;
     font-size: 15px;
     color: ${colors.gray7};
     pointer-events: none;
@@ -1708,6 +1763,7 @@ const MessageInput = styled.div<any>`
     text-overflow: ellipsis;
     max-width: 100%;
   }
+
   &::placeholder {
     font-size: 15px;
     color: ${colors.gray7};
@@ -1718,21 +1774,25 @@ const MessageInput = styled.div<any>`
     color: ${(props) => props.mentionColor || colors.primary};
     user-modify: read-only;
   }
+
   //caret-color: #000;
 `
 
 const EmojiButton = styled.span<any>`
   display: flex;
-  height: 48px;
+  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
   position: relative;
-  margin: 0 5px;
+  margin: auto 8px 0 8px;
   cursor: pointer;
   line-height: 13px;
   z-index: 2;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
+  -webkit-tap-highlight-color: transparent;
+
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')}
+    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')};
+    width: 24px;
   }
 
   &:hover > svg {
@@ -1780,12 +1840,13 @@ export const MentionsContainer = styled.div<{ mentionsIsOpen?: boolean }>`
 
 const SendMessageIcon = styled.span<any>`
   display: flex;
-  height: 48px;
+  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
-  margin: 0 5px;
+  margin: 0 8px;
   cursor: pointer;
   line-height: 13px;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
+  -webkit-tap-highlight-color: transparent;
 
   color: ${(props) => (props.isActive ? colors.primary : '#ccc')};
 `
@@ -1849,6 +1910,11 @@ const sizeAnimation = keyframes`
     height: 2px;
     opacity: 0.4;
   }
+  50% {
+    width: 2px;
+    height: 2px;
+    opacity: 0.4;
+  }
   100% {
     width: 6px;
     height: 6px;
@@ -1884,16 +1950,19 @@ const TypingAnimation = styled.div`
       animation-iteration-count: infinite;
     }
   }
+
   & ${DotOne} {
     &:after {
       animation-delay: 0s;
     }
   }
+
   & ${DotTwo} {
     &:after {
       animation-delay: 0.2s;
     }
   }
+
   & ${DotThree} {
     &:after {
       animation-delay: 0.3s;
@@ -1901,7 +1970,7 @@ const TypingAnimation = styled.div`
   }
 `
 const Loading = styled.div`
-  height: 48px;
+  height: 36px;
 `
 const BlockedUserInfo = styled.div`
   display: flex;
@@ -1959,6 +2028,7 @@ const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
   height: 40px;
   background-color: ${(props) => props.backgroundColor || colors.primary};
   border-radius: 50%;
+
   & > svg {
     width: 20px;
     height: 20px;

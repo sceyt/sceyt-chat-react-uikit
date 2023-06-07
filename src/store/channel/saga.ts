@@ -137,7 +137,6 @@ function* getChannels(action: IAction): any {
       const groupChannelsData = yield call(groupChannelQuery.loadNextPage)
       // set all channels
       const allChannels: IChannel[] = directChannelsData.channels.concat(groupChannelsData.channels)
-      console.log('all channels. . .. ', allChannels)
       yield call(destroyChannelsMap)
       const { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
         setChannelsInMap,
@@ -217,6 +216,7 @@ function* getChannels(action: IAction): any {
           return channel
         })
       }
+
       yield put(setChannelsAC(mappedChannels))
       if (!channelId) {
         ;[activeChannel] = channelsData.channels

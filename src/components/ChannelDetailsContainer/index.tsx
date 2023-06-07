@@ -102,28 +102,10 @@ export interface IDetailsProps {
   filePreviewHoverBackgroundColor?: string
   filePreviewDownloadIcon?: JSX.Element
 
-  blockUserWarningText?: string
-  blockAndLeavePublicChannelWarningText?: string
-  blockAndLeavePrivateChannelWarningText?: string
-  leavePublicChannelWarningText?: string
-  leavePrivateChannelWarningText?: string
-  deletePublicChannelWarningText?: string
-  deletePrivateChannelWarningText?: string
-  deleteDirectChannelWarningText?: string
-  clearHistoryPublicChannelWarningText?: string
-  clearHistoryPrivateChannelWarningText?: string
-  clearHistoryDirectChannelWarningText?: string
-
   showChangeMemberRole?: boolean
   showKickMember?: boolean
   showKickAndBlockMember?: boolean
   showMakeMemberAdmin?: boolean
-  publicChannelDeleteMemberPopupDescription?: string
-  privateChannelDeleteMemberPopupDescription?: string
-  publicChannelRevokeAdminPopupDescription?: string
-  privateChannelRevokeAdminPopupDescription?: string
-  publicChannelMakeAdminPopupDescription?: string
-  privateChannelMakeAdminPopupDescription?: string
 }
 
 const ChannelDetailsContainer = ({
@@ -190,17 +172,6 @@ const ChannelDetailsContainer = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
-  blockUserWarningText,
-  blockAndLeavePublicChannelWarningText,
-  blockAndLeavePrivateChannelWarningText,
-  leavePublicChannelWarningText,
-  leavePrivateChannelWarningText,
-  deletePublicChannelWarningText,
-  deletePrivateChannelWarningText,
-  deleteDirectChannelWarningText,
-  clearHistoryPublicChannelWarningText,
-  clearHistoryPrivateChannelWarningText,
-  clearHistoryDirectChannelWarningText,
   showClearHistoryForDirectChannel,
   showClearHistoryForPrivateChannel,
   showClearHistoryForPublicChannel,
@@ -215,13 +186,7 @@ const ChannelDetailsContainer = ({
   deleteAllMessagesTextColor,
   showChangeMemberRole,
   showKickMember,
-  showKickAndBlockMember,
-  publicChannelDeleteMemberPopupDescription,
-  privateChannelDeleteMemberPopupDescription,
-  publicChannelRevokeAdminPopupDescription,
-  privateChannelRevokeAdminPopupDescription,
-  publicChannelMakeAdminPopupDescription,
-  privateChannelMakeAdminPopupDescription
+  showKickAndBlockMember
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -292,17 +257,6 @@ const ChannelDetailsContainer = ({
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
-          blockUserWarningText={blockUserWarningText}
-          blockAndLeavePublicChannelWarningText={blockAndLeavePublicChannelWarningText}
-          blockAndLeavePrivateChannelWarningText={blockAndLeavePrivateChannelWarningText}
-          leavePublicChannelWarningText={leavePublicChannelWarningText}
-          leavePrivateChannelWarningText={leavePrivateChannelWarningText}
-          deletePublicChannelWarningText={deletePublicChannelWarningText}
-          deletePrivateChannelWarningText={deletePrivateChannelWarningText}
-          deleteDirectChannelWarningText={deleteDirectChannelWarningText}
-          clearHistoryPublicChannelWarningText={clearHistoryPublicChannelWarningText}
-          clearHistoryPrivateChannelWarningText={clearHistoryPrivateChannelWarningText}
-          clearHistoryDirectChannelWarningText={clearHistoryDirectChannelWarningText}
           showClearHistoryForDirectChannel={showClearHistoryForDirectChannel}
           showClearHistoryForPrivateChannel={showClearHistoryForPrivateChannel}
           showClearHistoryForPublicChannel={showClearHistoryForPublicChannel}
@@ -318,12 +272,6 @@ const ChannelDetailsContainer = ({
           showChangeMemberRole={showChangeMemberRole}
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
-          publicChannelDeleteMemberPopupDescription={publicChannelDeleteMemberPopupDescription}
-          privateChannelDeleteMemberPopupDescription={privateChannelDeleteMemberPopupDescription}
-          publicChannelRevokeAdminPopupDescription={publicChannelRevokeAdminPopupDescription}
-          privateChannelRevokeAdminPopupDescription={privateChannelRevokeAdminPopupDescription}
-          publicChannelMakeAdminPopupDescription={publicChannelMakeAdminPopupDescription}
-          privateChannelMakeAdminPopupDescription={privateChannelMakeAdminPopupDescription}
         />
       )}
     </React.Fragment>

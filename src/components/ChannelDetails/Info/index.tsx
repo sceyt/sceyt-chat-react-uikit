@@ -16,7 +16,8 @@ import {
 import { CHANNEL_TYPE } from '../../../helpers/constants'
 // import DeletePopup from '../../../../../Common/Popups/delete'
 import { colors } from '../../../UIHelper/constants'
-import { IChannel } from '../../../types'
+import { IChannel, IMember } from '../../../types'
+import { getClient } from '../../../common/client'
 // import { IChannel } from "../../../../types";
 
 const Container = styled.div`
@@ -83,7 +84,7 @@ const EditSubject = styled.span`
 
 const SubjectEditMode = styled.div`
   width: 100%;
-  border-bottom: 2px solid ${colors.cobalt1};
+  border-bottom: 2px solid ${colors.primary};
 `
 
 const SubjectInput = styled.input`
@@ -208,10 +209,10 @@ const Info = ({ channel, handleToggleEditMode }: IProps) => {
             size={64}
             image={
               channel.avatarUrl ||
-              (isDirectChannel ? channel.peer.avatarUrl : '')
+              (isDirectChannel ? directChannelUser.avatarUrl : '')
             }
             name={
-              isDirectChannel ? channel.peer.id : channel.subject || channel.id
+              isDirectChannel ? directChannelUser.id : channel.subject || channel.id
             }
             textSize={18}
           />

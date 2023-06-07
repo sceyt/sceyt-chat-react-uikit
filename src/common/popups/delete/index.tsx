@@ -49,7 +49,7 @@ function ConfirmPopup({
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
     ? allowDeleteIncoming && !isDirectChannel && checkActionPermission('deleteAnyMessage')
-    : checkActionPermission('deleteOwnMessage')
+    : isDirectChannel || checkActionPermission('deleteOwnMessage')
   const [deleteMessageOption, setDeleteMessageOption] = useState(deleteForEveryoneIsPermitted ? 'forEveryone' : 'forMe')
 
   const handleDelete = () => {

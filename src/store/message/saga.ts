@@ -441,7 +441,7 @@ function* sendMessage(action: IAction): any {
               attachmentUrl: att.attachmentUrl
             }))
           }
-          yield put(
+          /* yield put(
             addMessageAC(
               JSON.parse(
                 JSON.stringify({
@@ -451,13 +451,23 @@ function* sendMessage(action: IAction): any {
                 })
               )
             )
-          )
+          ) */
+          const hasNextMessages = yield select(messagesHasNextSelector)
+          if (!getHasNextCached()) {
+            if (hasNextMessages) {
+              yield put(getMessagesAC(channel))
+            } else {
+              yield put(addMessageAC({ ...messageCopy }))
+            }
+          }
+          console.log('add pending message .. ', messageCopy)
+          addMessageToMap(channelId, messageCopy)
+          addAllMessages([messageCopy], MESSAGE_LOAD_DIRECTION.NEXT)
         }
+
         messageToSend.attachments = attachmentsToSend
         if (connectionState === CONNECTION_STATUS.CONNECTED) {
-          console.log('message to send .... ', messageToSend)
           const messageResponse = yield call(channel.sendMessage, messageToSend)
-          console.log('message response ... ', messageResponse)
           /* if (msgCount <= 200) {
             const messageToSend: any = {
               // metadata: mentionedMembersPositions,
@@ -1025,11 +1035,9 @@ function* deleteMessage(action: IAction): any {
   try {
     const { payload } = action
     const { messageId, channelId, deleteOption } = payload
-    console.log('saga delete message ... ', messageId)
     const channel = yield call(getChannelFromMap, channelId)
 
     const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-    console.log('deleted message ... ', deletedMessage)
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
     updateMessageOnMap(channel.id, {
       messageId: deletedMessage.id,
@@ -1137,7 +1145,7 @@ function* getMessagesQuery(action: IAction): any {
         setAllMessages([])
         messageQuery.limit = MESSAGES_MAX_LENGTH
         // result = await messageQuery.loadPreviousMessageId, '0')
-        if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
+        /* if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
           result.messages = getMessagesFromMap(channel.id)
 
           // TO DO - pending messages are repeated in the list, fix after uncommenting.
@@ -1146,10 +1154,14 @@ function* getMessagesQuery(action: IAction): any {
             result.messages = [...result.messages, ...pendingMessages]
           }
           yield put(setMessagesAC([...result.messages]))
-        } else {
+        } else { */
+        if (Number(channel.lastReadMessageId)) {
           result = yield call(messageQuery.loadNearMessageId, channel.lastReadMessageId)
-          setMessagesToMap(channel.id, result.messages)
+        } else {
+          result = yield call(messageQuery.loadPrevious)
         }
+        setMessagesToMap(channel.id, result.messages)
+        // }
 
         yield put(setMessagesHasPrevAC(true))
         yield put(

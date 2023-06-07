@@ -10,14 +10,14 @@ import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import Avatar from '../Avatar'
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
-import { lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
+import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
 // import useOnScreen from '../../hooks/useOnScrean'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
-import { colors, customColors } from '../../UIHelper/constants'
+import { colors } from '../../UIHelper/constants'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/notificationsOff3.svg'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
@@ -27,7 +27,13 @@ interface IChannelProps {
   avatar?: boolean
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
+  selectedChannelLeftBorder?: string
+  selectedChannelBackground?: string
   contactsMap: { [key: string]: IContact }
+  selectedChannelBorderRadius?: string
+  selectedChannelPaddings?: string
+  channelsPaddings?: string
+  channelsMargin?: string
 }
 
 const Channel: React.FC<IChannelProps> = ({
@@ -35,7 +41,13 @@ const Channel: React.FC<IChannelProps> = ({
   avatar,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
-  contactsMap
+  selectedChannelLeftBorder,
+  selectedChannelBackground,
+  contactsMap,
+  selectedChannelBorderRadius,
+  selectedChannelPaddings,
+  channelsPaddings,
+  channelsMargin
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -47,7 +59,10 @@ const Channel: React.FC<IChannelProps> = ({
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
-    lastMessage && lastMessage.type === 'system' && lastMessage.metadata && JSON.parse(lastMessage.metadata)
+    lastMessage &&
+    lastMessage.type === 'system' &&
+    lastMessage.metadata &&
+    (isJSON(lastMessage.metadata) ? JSON.parse(lastMessage.metadata) : lastMessage.metadata)
   const [statusWidth, setStatusWidth] = useState(0)
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
@@ -70,13 +85,16 @@ const Channel: React.FC<IChannelProps> = ({
       setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
     }
   }, [messageTimeAndStatusRef, lastMessage])
-
   return (
     <Container
       // ref={channelItemRef}
       selectedChannel={channel.id === activeChannel.id}
-      selectedBorderColor={customColors && customColors.selectedChannelLeftBorder}
-      selectedBackgroundColor={customColors && customColors.selectedChannelBackground}
+      selectedChannelLeftBorder={selectedChannelLeftBorder}
+      selectedBackgroundColor={selectedChannelBackground || colors.primaryLight}
+      selectedChannelPaddings={selectedChannelPaddings}
+      channelsPaddings={channelsPaddings}
+      selectedChannelBorderRadius={selectedChannelBorderRadius}
+      channelsMargin={channelsMargin}
       onClick={() => handleChangeActiveChannel(channel)}
     >
       {withAvatar && (
@@ -122,9 +140,11 @@ const Channel: React.FC<IChannelProps> = ({
                 >
                   <span ref={messageAuthorRef}>
                     {typingIndicator
-                      ? contactsMap[typingIndicator.from.id] && contactsMap[typingIndicator.from.id].firstName
-                        ? contactsMap[typingIndicator.from.id]!.firstName!.split(' ')[0]
-                        : typingIndicator.from.id
+                      ? getFromContacts
+                        ? contactsMap[typingIndicator.from.id] && contactsMap[typingIndicator.from.id].firstName
+                          ? contactsMap[typingIndicator.from.id]!.firstName!.split(' ')[0]
+                          : typingIndicator.from.id
+                        : (typingIndicator.from && typingIndicator.from.firstName) || typingIndicator.from.id
                       : ''}
                   </span>
                 </LastMessageAuthor>
@@ -161,7 +181,11 @@ const Channel: React.FC<IChannelProps> = ({
               )
             )}
             {(isDirectChannel
-              ? !typingIndicator && lastMessage.user && lastMessage.user.id === user.id && !channel.lastReactedMessage
+              ? !typingIndicator &&
+                lastMessage.user &&
+                lastMessage.user.id === user.id &&
+                !channel.lastReactedMessage &&
+                lastMessage.state !== MESSAGE_STATUS.DELETE
               : typingIndicator ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
               <Points>: </Points>
@@ -281,7 +305,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.user &&
               lastMessage.user.id === user.id &&
               lastMessage.type !== 'system' &&
-              messageStatusIcon(lastMessage.deliveryStatus, undefined, colors.primary)}
+              messageStatusIcon(lastMessage.deliveryStatus, 'ticks', undefined, colors.primary)}
           </DeliveryIconCont>
         )}
         <LastMessageDate>
@@ -321,21 +345,31 @@ export interface UnreadCountProps {
   fontSize?: string
 }
 
-export const Container = styled.div<any>(
-  {
-    position: 'relative',
-    padding: '2px 0',
-    display: 'flex',
-    alignItems: 'center',
-    cursor: 'pointer',
-    height: '48px'
-  },
-  ({ selectedChannel, selectedBorderColor, selectedBackgroundColor }: any) => ({
-    backgroundColor: selectedChannel ? selectedBackgroundColor || colors.gray0 : 'inherit',
-    borderLeft: selectedChannel ? `3px solid ${selectedBorderColor || colors.cobalt1}` : 'none',
-    padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
-  })
-)
+const Container = styled.div<{
+  selectedChannel: boolean
+  selectedChannelLeftBorder?: string
+  selectedBackgroundColor?: string
+  channelsPaddings?: string
+  selectedChannelPaddings?: string
+  channelsMargin?: string
+  selectedChannelBorderRadius?: string
+}>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  height: 48px;
+  background-color: ${(props) =>
+    props.selectedChannel ? props.selectedBackgroundColor || colors.primaryLight : 'inherit'};
+  border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
+  // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
+  padding: ${(props) =>
+    props.selectedChannel
+      ? props.selectedChannelPaddings || props.channelsPaddings || '8px'
+      : props.channelsPaddings || '8px'};
+  margin: ${(props) => props.channelsMargin || '0 8px'};
+  border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
+`
 
 export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; statusWidth: number }>`
   text-align: left;
@@ -489,7 +523,7 @@ export const UnreadInfo = styled.span`
 `
 const UnreadCount = styled.span<UnreadCountProps>`
   display: inline-block;
-  background-color: ${(props) => props.backgroundColor || colors.cobalt1};
+  background-color: ${(props) => props.backgroundColor || colors.primary};
   padding: 0 4px;
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: 20px;

@@ -144,6 +144,7 @@ function* getUsers(action: IAction): any {
     if (params.filter === 'username') {
       usersQueryBuilder.filterByUsername()
     }
+    console.log('user query params ..... ', params)
     const usersQuery = yield call(usersQueryBuilder.build)
 
     query.usersQuery = usersQuery

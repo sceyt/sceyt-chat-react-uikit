@@ -27,10 +27,12 @@ import { IChannel, IContactsMap } from '../../types'
 import { getUnreadScrollTo, setUnreadScrollTo } from '../../helpers/channelHalper'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import {
+  clearMessagesMap,
   getHasNextCached,
   getHasPrevCached,
   LOAD_MAX_MESSAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
+  removeAllMessages,
   setHasNextCached,
   setHasPrevCached
 } from '../../helpers/messagesHalper'
@@ -69,7 +71,8 @@ const CreateMessageDateDivider = ({
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
   noMargin,
-  marginBottom
+  marginBottom,
+  marginTop
 }: any) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
@@ -93,6 +96,7 @@ const CreateMessageDateDivider = ({
       dateDividerBorderRadius={dateDividerBorderRadius}
       noMargin={noMargin}
       marginBottom={marginBottom}
+      marginTop={marginTop}
     />
   )
 }
@@ -101,13 +105,18 @@ interface MessagesProps {
   fontFamily?: string
   ownMessageOnRightSide?: boolean
   messageWidthPercent?: string | number
-  messageTimePosition?: 'topOfMessage' | 'onMessage'
+  messageStatusAndTimePosition?: 'onMessage' | 'bottomOfMessage'
+  messageStatusDisplayingType?: 'ticks' | 'text'
   ownMessageBackground?: string
   incomingMessageBackground?: string
   showMessageStatus?: boolean
+  showMessageTime?: boolean
+  showMessageStatusForEachMessage?: boolean
+  showMessageTimeForEachMessage?: boolean
   hoverBackground?: boolean
   showSenderNameOnDirectChannel?: boolean
   showSenderNameOnOwnMessages?: boolean
+  showSenderNameOnGroupChannel?: boolean
   showOwnAvatar?: boolean
   messageReaction?: boolean
   editMessage?: boolean
@@ -180,25 +189,37 @@ interface MessagesProps {
   newMessagesSeparatorBorderRadius?: string
   newMessagesSeparatorBackground?: string
   newMessagesSeparatorTextLeftRightSpacesWidth?: string
-  fileAttachmentsBoxWidth?: string
+  fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
   fileAttachmentsBoxBorder?: string
   fileAttachmentsTitleColor?: string
   fileAttachmentsSizeColor?: string
   fileAttachmentsIcon?: JSX.Element
+  imageAttachmentMaxWidth?: number
+  imageAttachmentMaxHeight?: number
+  videoAttachmentMaxWidth?: number
+  videoAttachmentMaxHeight?: number
+  attachmentsPreview?: boolean
+  sameUserMessageSpacing?: string
+  differentUserMessageSpacing?: string
 }
 
 const MessageList: React.FC<MessagesProps> = ({
   fontFamily,
   ownMessageOnRightSide = true,
   messageWidthPercent,
-  messageTimePosition,
-  ownMessageBackground,
-  incomingMessageBackground,
+  messageStatusAndTimePosition,
+  messageStatusDisplayingType,
   showMessageStatus,
-  hoverBackground,
+  showMessageTime,
+  showMessageStatusForEachMessage,
+  showMessageTimeForEachMessage,
+  ownMessageBackground = colors.primaryLight,
+  incomingMessageBackground = colors.gray11,
+  hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
+  showSenderNameOnGroupChannel = true,
   showOwnAvatar = false,
   messageReaction = false,
   editMessage = false,
@@ -276,7 +297,14 @@ const MessageList: React.FC<MessagesProps> = ({
   fileAttachmentsBoxBackground,
   fileAttachmentsBoxBorder,
   fileAttachmentsTitleColor,
-  fileAttachmentsSizeColor
+  fileAttachmentsSizeColor,
+  imageAttachmentMaxWidth,
+  imageAttachmentMaxHeight,
+  videoAttachmentMaxWidth,
+  videoAttachmentMaxHeight,
+  attachmentsPreview = true,
+  sameUserMessageSpacing,
+  differentUserMessageSpacing
 }) => {
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -299,6 +327,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const [isDragging, setIsDragging] = useState<any>(null)
   const [showTopDate, setShowTopDate] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
+
   const hideTopDateTimeout = useRef<any>(null)
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
@@ -307,8 +336,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const messages = useSelector(activeChannelMessagesSelector) || []
   // eslint-disable-next-line max-len
   // const { handleGetMessages, handleAddMessages, pendingMessages, cachedMessages, hasNext, hasPrev } = useMessages(channel)
-  // const currentChannelPendingMessages = pendingMessages[channel.id] || []
-  const currentChannelPendingMessages: any = []
   const messageForReply: any = {}
   // const messagesLoading = useSelector(messagesLoadingState) || 2
   // TODO fix when will implement send message with attachment
@@ -352,6 +379,8 @@ const MessageList: React.FC<MessagesProps> = ({
     const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
     renderTopDate()
     const { target } = event
+    // console.log('target.scrollTop. ..  . ..  .. ', target.scrollTop)
+    // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
     const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
     if (scrollToReply) {
       target.scrollTop = scrollToReply
@@ -388,12 +417,13 @@ const MessageList: React.FC<MessagesProps> = ({
         }
        */
         // if (hasPrevMessages && lastVisibleMessage) {
+        nextDisable = false
         nextDisable = true
         // target.scrollTop = lastVisibleMessage.offsetTop
         // }
         // dispatch(loadMoreMessagesAC(10, 'prev', channel.id))
       }
-      if (lastVisibleMessagePos - 420 > target.scrollTop) {
+      if (lastVisibleMessagePos > 0) {
         nextDisable = false
       } else {
         prevDisable = false
@@ -520,7 +550,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const handleDropFile = (e: any) => {
     e.preventDefault()
     e.stopPropagation()
-    console.log('e.dataTransfer.files ********************* .. . .', e.dataTransfer.files)
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const fileList: File[] = Object.values(e.dataTransfer.files)
@@ -548,7 +577,6 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    console.log('e.dataTransfer.files ********************* .. . .', e.dataTransfer.files)
     const fileList = Array.from(e.dataTransfer.items)
     fileList.forEach((file: any) => {
       const fileType = file.type.split('/')[0]
@@ -599,10 +627,13 @@ const MessageList: React.FC<MessagesProps> = ({
 
   useEffect(() => {
     if (scrollToNewMessage.scrollToBottom) {
+      scrollRef.current.scrollTop = 0
       dispatch(showScrollToNewMessageButtonAC(false))
-      loading = false
+      // loading = true
       if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
-        dispatch(getMessagesAC(channel, !hasNextMessages))
+        setTimeout(() => {
+          dispatch(getMessagesAC(channel, !hasNextMessages))
+        }, 700)
       }
     }
   }, [scrollToNewMessage])
@@ -681,6 +712,8 @@ const MessageList: React.FC<MessagesProps> = ({
                 currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
                 i++
               }
+            } else {
+              break
             }
           }
 
@@ -737,9 +770,8 @@ const MessageList: React.FC<MessagesProps> = ({
       // }, 200)
     }
     if (scrollToNewMessage.scrollToBottom && messages.length) {
-      scrollRef.current.scrollTop = 0
       setTimeout(() => {
-        dispatch(scrollToNewMessageAC(false))
+        dispatch(scrollToNewMessageAC(false, false))
       }, 500)
     }
     /* let updatedAttachments: any = []
@@ -760,6 +792,16 @@ const MessageList: React.FC<MessagesProps> = ({
 
     // console.log('messages... ', messages)
   }, [messages])
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (channel.id) {
+        dispatch(getMessagesAC(channel))
+      }
+      clearMessagesMap()
+      removeAllMessages()
+      // dispatch(switchChannelActionAC(activeChannel.id))
+    }
+  }, [connectionStatus])
   /* useEffect(() => {
   }, [pendingMessages]) */
   useEffect(() => {
@@ -848,16 +890,16 @@ const MessageList: React.FC<MessagesProps> = ({
             >
               {messages.map((message: any, index: number) => {
                 const prevMessage = messages[index - 1]
-                const nextMessage =
-                  messages[index + 1] || (currentChannelPendingMessages.length > 0 && currentChannelPendingMessages[0])
+                const nextMessage = messages[index + 1]
                 const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
-                // @ts-ignore
                 return (
                   <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
-                      noMargin={!isUnreadMessage && prevMessage && prevMessage.type === 'system'}
+                      noMargin={
+                        !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
+                      }
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}
@@ -868,12 +910,18 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={prevMessage && prevMessage.type === 'system' && message.type !== 'system'}
+                      marginTop={differentUserMessageSpacing}
                     />
                     {message.type === 'system' ? (
                       <MessageTopDate
                         systemMessage
-                        marginTop={message.type === 'system'}
-                        marginBottom={message.type === 'system' && nextMessage.type !== 'system'}
+                        marginTop={message.type === 'system' && (differentUserMessageSpacing || '16px')}
+                        marginBottom={
+                          message.type === 'system' &&
+                          nextMessage &&
+                          nextMessage.type !== 'system' &&
+                          (differentUserMessageSpacing || '16px')
+                        }
                         visible={showTopFixedDate}
                         dividerText={message.body}
                         dateDividerFontSize={dateDividerFontSize}
@@ -935,21 +983,25 @@ const MessageList: React.FC<MessagesProps> = ({
                           handleScrollToRepliedMessage={handleScrollToRepliedMessage}
                           prevMessage={prevMessage}
                           nextMessage={nextMessage}
-                          firstMessage={index}
                           isUnreadMessage={isUnreadMessage}
                           setLastVisibleMessageId={(msgId) => setLastVisibleMessageId(msgId)}
                           isThreadMessage={false}
                           fontFamily={fontFamily}
                           ownMessageOnRightSide={ownMessageOnRightSide}
                           messageWidthPercent={messageWidthPercent}
-                          messageTimePosition={messageTimePosition}
+                          messageStatusAndTimePosition={messageStatusAndTimePosition}
+                          messageStatusDisplayingType={messageStatusDisplayingType}
                           ownMessageBackground={ownMessageBackground}
                           incomingMessageBackground={incomingMessageBackground}
                           showMessageStatus={showMessageStatus}
+                          showMessageTime={showMessageTime}
+                          showMessageStatusForEachMessage={showMessageStatusForEachMessage}
+                          showMessageTimeForEachMessage={showMessageTimeForEachMessage}
                           hoverBackground={hoverBackground}
                           showOwnAvatar={showOwnAvatar}
                           showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
                           showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
+                          showSenderNameOnGroupChannel={showSenderNameOnGroupChannel}
                           messageReaction={messageReaction}
                           editMessage={editMessage}
                           copyMessage={copyMessage}
@@ -999,6 +1051,10 @@ const MessageList: React.FC<MessagesProps> = ({
                           fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                           fileAttachmentsTitleColor={fileAttachmentsTitleColor}
                           fileAttachmentsSizeColor={fileAttachmentsSizeColor}
+                          imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+                          imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+                          videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+                          videoAttachmentMaxHeight={videoAttachmentMaxHeight}
                           reactionsDisplayCount={reactionsDisplayCount}
                           showEachReactionCount={showEachReactionCount}
                           reactionItemBorder={reactionItemBorder}
@@ -1013,6 +1069,8 @@ const MessageList: React.FC<MessagesProps> = ({
                           reactionsContainerPadding={reactionsContainerPadding}
                           reactionsContainerBackground={reactionsContainerBackground}
                           reactionsContainerTopPosition={reactionsContainerTopPosition}
+                          sameUserMessageSpacing={sameUserMessageSpacing}
+                          differentUserMessageSpacing={differentUserMessageSpacing}
                         />
                       </MessageWrapper>
                     )}
@@ -1045,7 +1103,7 @@ const MessageList: React.FC<MessagesProps> = ({
               </NoMessagesContainer>
             )
           )}
-          {mediaFile && (
+          {attachmentsPreview && mediaFile && (
             <SliderPopup channelId={channel.id} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />
           )}
         </Container>
@@ -1118,8 +1176,8 @@ export const MessageTopDate = styled.div<any>`
   width: 100%;
   top: ${(props) => (props.topOffset ? `${props.topOffset + 22}px` : '22px')};
   left: 0;
-  margin-top: ${(props) => props.marginTop && '16px'};
-  margin-bottom: ${(props) => props.marginBottom && '16px'};
+  margin-top: ${(props) => props.marginTop};
+  margin-bottom: ${(props) => props.marginBottom};
   text-align: center;
   z-index: 10;
   background: transparent;

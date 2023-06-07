@@ -4,8 +4,10 @@ import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
 import { CHANNEL_TYPE } from './constants'
+
 let contactsMap = {}
 let logoSrc = ''
+let showNotifications: boolean | undefined = true
 /* let windowObjectReference: any = null // global variable
 let previousURL: any /!* global variable that will store the
                     url currently in the secondary window *!/
@@ -50,50 +52,57 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
   }) */
 
   let notification: any
-  if (reaction) {
-    notification = new Notification(
-      `${
-        channel.type === CHANNEL_TYPE.DIRECT
-          ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
-          : channel.subject
-      }`,
-      {
-        body: `${
-          channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
-        } reacted ${reaction} to "${body}"`,
+  if (showNotifications) {
+    if (reaction) {
+      notification = new Notification(
+        `${
+          channel.peer && channel.peer.id
+            ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+            : channel.subject
+        }`,
+        {
+          body: `${
+            channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
+          } reacted ${reaction} to "${body}"`,
+          icon: logoSrc
+          // silent: false
+        }
+      )
+    } else {
+      notification = new Notification(`New Message from ${makeUsername(contactsMap[user.id], user, getFromContacts)}`, {
+        body,
         icon: logoSrc
         // silent: false
-      }
-    )
-  } else {
-    notification = new Notification(`New Message from ${makeUsername(contactsMap[user.id], user, getFromContacts)}`, {
-      body,
-      icon: logoSrc
-      // silent: false
-    })
+      })
+    }
+    // windowObjectReference = window.sceytTabUrl
+    notification.onclick = (event: any) => {
+      event.preventDefault() // prevent the browser from focusing the Notification's tab
+      window.focus()
+      store.dispatch({
+        type: SWITCH_CHANNEL,
+        payload: {
+          channel
+        }
+      })
+      notification.close()
+    }
+    if (window.sceytTabNotifications) {
+      window.sceytTabNotifications.close()
+    }
+    window.sceytTabNotifications = notification
   }
-  // windowObjectReference = window.sceytTabUrl
-  notification.onclick = (event: any) => {
-    event.preventDefault() // prevent the browser from focusing the Notification's tab
-    window.focus()
-    store.dispatch({
-      type: SWITCH_CHANNEL,
-      payload: {
-        channel
-      }
-    })
-    notification.close()
-  }
-  if (window.sceytTabNotifications) {
-    window.sceytTabNotifications.close()
-  }
-  window.sceytTabNotifications = notification
 }
 
 export const setNotificationLogoSrc = (src: string) => {
   logoSrc = src
 }
-
 export const setContactsMap = (contacts: IContactsMap) => {
   contactsMap = contacts
 }
+
+export const setShowNotifications = (show?: boolean) => {
+  showNotifications = show
+}
+
+export const getShowNotifications = () => showNotifications
