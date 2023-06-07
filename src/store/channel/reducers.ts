@@ -120,6 +120,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
         newState.channels = [payload.channel, ...newState.channels]
       }
+      // @ts-ignore
+      if (newState.hideChannelList && (!newState.activeChannel || !newState.activeChannel.id)) {
+        newState.activeChannel = payload.channel
+      }
       return newState
     }
 

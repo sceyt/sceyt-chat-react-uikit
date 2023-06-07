@@ -118,7 +118,7 @@ export interface IChannel {
   markedAsUnread: boolean
   muted: boolean
   muteExpireTime: Date | number
-  type: 'Public' | 'Private' | 'Direct'
+  type: string
   members: IMember[]
   subject?: string
   label?: string

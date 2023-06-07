@@ -20,16 +20,12 @@ export interface IDetailsProps {
   muteUnmuteNotificationTextColor?: string
   timeOptionsToMuteNotifications?: [MuteTime, ...MuteTime[]]
 
-  showClearHistoryForDirectChannel?: boolean
-  showClearHistoryForPrivateChannel?: boolean
-  showClearHistoryForPublicChannel?: boolean
+  showClearHistory?: boolean
   clearHistoryOrder?: number
   clearHistoryIcon?: JSX.Element
   clearHistoryTextColor?: string
 
-  showDeleteAllMessagesForDirectChannel?: boolean
-  showDeleteAllMessagesForPrivateChannel?: boolean
-  showDeleteAllMessagesForPublicChannel?: boolean
+  showDeleteAllMessages?: boolean
   deleteAllMessagesOrder?: number
   deleteAllMessagesIcon?: JSX.Element
   deleteAllMessagesTextColor?: string
@@ -172,15 +168,11 @@ const ChannelDetailsContainer = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
-  showClearHistoryForDirectChannel,
-  showClearHistoryForPrivateChannel,
-  showClearHistoryForPublicChannel,
+  showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessagesForDirectChannel,
-  showDeleteAllMessagesForPrivateChannel,
-  showDeleteAllMessagesForPublicChannel,
+  showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
@@ -257,15 +249,11 @@ const ChannelDetailsContainer = ({
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
-          showClearHistoryForDirectChannel={showClearHistoryForDirectChannel}
-          showClearHistoryForPrivateChannel={showClearHistoryForPrivateChannel}
-          showClearHistoryForPublicChannel={showClearHistoryForPublicChannel}
+          showClearHistory={showClearHistory}
           clearHistoryOrder={clearHistoryOrder}
           clearHistoryIcon={clearHistoryIcon}
           clearHistoryTextColor={clearHistoryTextColor}
-          showDeleteAllMessagesForDirectChannel={showDeleteAllMessagesForDirectChannel}
-          showDeleteAllMessagesForPrivateChannel={showDeleteAllMessagesForPrivateChannel}
-          showDeleteAllMessagesForPublicChannel={showDeleteAllMessagesForPublicChannel}
+          showDeleteAllMessages={showDeleteAllMessages}
           deleteAllMessagesOrder={deleteAllMessagesOrder}
           deleteAllMessagesIcon={deleteAllMessagesIcon}
           deleteAllMessagesTextColor={deleteAllMessagesTextColor}

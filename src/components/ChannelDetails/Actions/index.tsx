@@ -58,16 +58,12 @@ interface IProps {
   staredMessagesIconColor?: string
   staredMessagesTextColor?: string
 
-  showClearHistoryForDirectChannel?: boolean
-  showClearHistoryForPrivateChannel?: boolean
-  showClearHistoryForPublicChannel?: boolean
+  showClearHistory?: boolean
   clearHistoryOrder?: number
   clearHistoryIcon?: JSX.Element
   clearHistoryTextColor?: string
 
-  showDeleteAllMessagesForDirectChannel?: boolean
-  showDeleteAllMessagesForPrivateChannel?: boolean
-  showDeleteAllMessagesForPublicChannel?: boolean
+  showDeleteAllMessages?: boolean
   deleteAllMessagesOrder?: number
   deleteAllMessagesIcon?: JSX.Element
   deleteAllMessagesTextColor?: string
@@ -164,15 +160,11 @@ const Actions = ({
   blockAndLeaveChannelIconColor,
   blockAndLeaveChannelTextColor,
   unblockUserTextColor,
-  showClearHistoryForDirectChannel,
-  showClearHistoryForPrivateChannel,
-  showClearHistoryForPublicChannel,
+  showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessagesForDirectChannel,
-  showDeleteAllMessagesForPrivateChannel,
-  showDeleteAllMessagesForPublicChannel,
+  showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor
@@ -202,11 +194,6 @@ const Actions = ({
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
-  const isPublicChannel = channel.type === CHANNEL_TYPE.BROADCAST
-  const isPrivateChannel = channel.type === CHANNEL_TYPE.GROUP
-  const channelType =
-    channel.type.toLocaleLowerCase() === CHANNEL_TYPE.BROADCAST ? 'channel' : isDirectChannel ? 'chat' : 'group'
-  console.log('isPrivateChannel .. . ', isPrivateChannel)
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
   }
@@ -439,9 +426,7 @@ const Actions = ({
               color={pinChannelTextColor || colors.gray6}
               hoverColor={pinChannelTextColor || colors.gray6}
             >
-              <React.Fragment>
-                {pinChannelIcon || <PinIcon />} Pin {channelType}
-              </React.Fragment>
+              <React.Fragment>{pinChannelIcon || <PinIcon />} Pin</React.Fragment>
             </ActionItem>
           )}
         {showMarkAsReadUnread &&
@@ -479,11 +464,11 @@ const Actions = ({
             hoverColor={leaveChannelTextColor || colors.red1}
             onClick={() => {
               setPopupButtonText('Leave')
-              setPopupTitle(`Leave ${channelType}`)
+              setPopupTitle(`Leave ${channel.type}`)
               handleToggleLeaveChannelPopupOpen()
             }}
           >
-            {leaveChannelIcon || <LeaveIcon />} Leave {channelType}
+            {leaveChannelIcon || <LeaveIcon />} Leave {channel.type}
           </ActionItem>
         )}
         {isDirectChannel && otherMembers.length === 1 ? (
@@ -540,11 +525,11 @@ const Actions = ({
                 hoverColor={blockAndLeaveChannelTextColor || colors.red1}
                 onClick={() => {
                   setPopupButtonText('Block')
-                  setPopupTitle(`Block and Leave ${channelType}`)
+                  setPopupTitle(`Block and Leave ${channel.type}`)
                   handleToggleBlockChannelPopupOpen()
                 }}
               >
-                {blockAndLeaveChannelIcon || <BlockIcon />} Block and Leave {channelType}
+                {blockAndLeaveChannelIcon || <BlockIcon />} Block and Leave {channel.type}
               </ActionItem>
             )}
             {showReportChannel && (
@@ -571,47 +556,38 @@ const Actions = ({
             )}
           </React.Fragment>
         )}
-        {((isDirectChannel &&
-          showClearHistoryForDirectChannel &&
-          directChannelUser &&
-          directChannelUser.activityState !== 'Deleted') ||
-          (isPrivateChannel && showClearHistoryForPrivateChannel) ||
-          (isPublicChannel && showClearHistoryForPublicChannel)) &&
-          checkActionPermission('deleteAllMessagesForMe') && (
-            <ActionItem
-              key={10}
-              color={clearHistoryTextColor || colors.red1}
-              iconColor={clearHistoryTextColor || colors.red1}
-              order={clearHistoryOrder}
-              hoverColor={clearHistoryTextColor || colors.red1}
-              onClick={() => {
-                setPopupButtonText('Clear')
-                setPopupTitle('Clear history')
-                handleToggleClearHistoryPopup()
-              }}
-            >
-              {clearHistoryIcon || <CleareIcon />} Clear history
-            </ActionItem>
-          )}
-        {((isDirectChannel && showDeleteAllMessagesForDirectChannel) ||
-          (isPrivateChannel && showDeleteAllMessagesForPrivateChannel) ||
-          (isPublicChannel && showDeleteAllMessagesForPublicChannel)) &&
-          checkActionPermission('deleteAllMessagesForAll') && (
-            <ActionItem
-              key={11}
-              color={deleteAllMessagesTextColor || colors.red1}
-              iconColor={deleteAllMessagesTextColor || colors.red1}
-              order={deleteAllMessagesOrder}
-              hoverColor={deleteAllMessagesTextColor || colors.red1}
-              onClick={() => {
-                setPopupButtonText('Clear')
-                setPopupTitle(`Clear history`)
-                handleToggleDeleteAllMessagesPopup()
-              }}
-            >
-              {deleteAllMessagesIcon || <CleareIcon />} Clear history
-            </ActionItem>
-          )}
+        {showClearHistory && checkActionPermission('deleteAllMessagesForMe') && (
+          <ActionItem
+            key={10}
+            color={clearHistoryTextColor || colors.red1}
+            iconColor={clearHistoryTextColor || colors.red1}
+            order={clearHistoryOrder}
+            hoverColor={clearHistoryTextColor || colors.red1}
+            onClick={() => {
+              setPopupButtonText('Clear')
+              setPopupTitle('Clear history')
+              handleToggleClearHistoryPopup()
+            }}
+          >
+            {clearHistoryIcon || <CleareIcon />} Clear history
+          </ActionItem>
+        )}
+        {showDeleteAllMessages && checkActionPermission('deleteAllMessagesForAll') && (
+          <ActionItem
+            key={11}
+            color={deleteAllMessagesTextColor || colors.red1}
+            iconColor={deleteAllMessagesTextColor || colors.red1}
+            order={deleteAllMessagesOrder}
+            hoverColor={deleteAllMessagesTextColor || colors.red1}
+            onClick={() => {
+              setPopupButtonText('Clear')
+              setPopupTitle(`Clear history`)
+              handleToggleDeleteAllMessagesPopup()
+            }}
+          >
+            {deleteAllMessagesIcon || <CleareIcon />} Clear history
+          </ActionItem>
+        )}
 
         {showDeleteChannel && checkActionPermission('deleteChannel') && (
           <ActionItem
@@ -622,11 +598,11 @@ const Actions = ({
             hoverColor={deleteChannelTextColor || colors.red1}
             onClick={() => {
               setPopupButtonText('Delete')
-              setPopupTitle(`Delete  ${channelType}`)
+              setPopupTitle(`Delete  ${channel.type}`)
               handleToggleDeleteChannelPopupOpen()
             }}
           >
-            {deleteChannelIcon || <DeleteChannel />} Delete {channelType}
+            {deleteChannelIcon || <DeleteChannel />} Delete {channel.type}
           </ActionItem>
         )}
       </ActionsMenu>

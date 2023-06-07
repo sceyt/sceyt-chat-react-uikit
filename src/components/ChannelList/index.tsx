@@ -59,7 +59,7 @@ interface IChannelListProps {
   searchInputBorderRadius?: string
   getActiveChannel?: (channel: IChannel) => void
   Profile?: JSX.Element
-  filter?: { channelType?: 'Public' | 'Private' | 'Direct' }
+  filter?: { channelType?: string }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   avatar?: boolean
@@ -213,12 +213,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
-      /*  if (activeChannel.id) {
-        dispatch(getMessagesAC(activeChannel))
-      }
-      clearMessagesMap()
-      removeAllMessages() */
-      // dispatch(switchChannelActionAC(activeChannel.id))
     }
   }, [connectionStatus])
 

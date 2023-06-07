@@ -99,15 +99,11 @@ const Details = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
-  showClearHistoryForDirectChannel,
-  showClearHistoryForPrivateChannel,
-  showClearHistoryForPublicChannel,
+  showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessagesForDirectChannel,
-  showDeleteAllMessagesForPrivateChannel,
-  showDeleteAllMessagesForPublicChannel,
+  showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
@@ -258,15 +254,11 @@ const Details = ({
             staredMessagesIcon={staredMessagesIcon}
             staredMessagesIconColor={staredMessagesIconColor}
             staredMessagesTextColor={staredMessagesTextColor}
-            showClearHistoryForDirectChannel={showClearHistoryForDirectChannel}
-            showClearHistoryForPrivateChannel={showClearHistoryForPrivateChannel}
-            showClearHistoryForPublicChannel={showClearHistoryForPublicChannel}
+            showClearHistory={showClearHistory}
             clearHistoryOrder={clearHistoryOrder}
             clearHistoryIcon={clearHistoryIcon}
             clearHistoryTextColor={clearHistoryTextColor}
-            showDeleteAllMessagesForDirectChannel={showDeleteAllMessagesForDirectChannel}
-            showDeleteAllMessagesForPrivateChannel={showDeleteAllMessagesForPrivateChannel}
-            showDeleteAllMessagesForPublicChannel={showDeleteAllMessagesForPublicChannel}
+            showDeleteAllMessages={showDeleteAllMessages}
             deleteAllMessagesOrder={deleteAllMessagesOrder}
             deleteAllMessagesIcon={deleteAllMessagesIcon}
             deleteAllMessagesTextColor={deleteAllMessagesTextColor}
