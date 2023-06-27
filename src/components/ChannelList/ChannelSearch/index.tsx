@@ -5,8 +5,9 @@ import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
 const SearchInputContainer = styled.div<{ inline?: boolean }>`
   position: relative;
   width: 100%;
+  max-width: calc(100% - 24px);
   box-sizing: border-box;
-  padding: ${(props) => !props.inline && '0 12px'};
+  margin: ${(props) => !props.inline && '0 12px'};
   margin-bottom: ${(props) => !props.inline && '16px'};
 `
 
@@ -47,7 +48,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   borderRadius
 }) => (
   <SearchInputContainer inline={inline}>
-    <StyledSearchSvg left={!inline ? '26px' : ''} />
+    <StyledSearchSvg />
     <SearchInput
       borderRadius={borderRadius}
       type='text'

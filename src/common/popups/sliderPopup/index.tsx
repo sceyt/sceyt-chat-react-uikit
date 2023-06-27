@@ -10,8 +10,8 @@ import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRi
 import { ReactComponent as LeftArrow } from '../../../assets/svg/sliderButtonLeft.svg'
 import { bytesToSize, downloadFile } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
-import { IMedia } from '../../../types'
-import { getCustomDownloader, getCustomUploader } from '../../../helpers/customUploader'
+import { IAttachment, IMedia } from '../../../types'
+import { getCustomDownloader } from '../../../helpers/customUploader'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { attachmentsForPopupSelector } from '../../../store/message/selector'
 import { getAttachmentsAC } from '../../../store/message/actions'
@@ -39,6 +39,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   const ChatClient = getClient()
   const { user } = ChatClient
   const [currentFile, setCurrentFile] = useState<any>({ ...currentMediaFile })
+  const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const [attachmentsList, setAttachmentsList] = useState<IMedia[]>([])
   const [imageLoading, setImageLoading] = useState(true)
   const [downloadedFiles, setDownloadedFiles] = useState<{ [key: number]: any }>({})
@@ -46,7 +47,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
   const [visibleSlide, setVisibleSlide] = useState(false)
-  const customUploader = getCustomUploader()
+  // const customUploader = getCustomUploader()
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
   const attachments = useSelector(attachmentsForPopupSelector, shallowEqual) || []
@@ -80,22 +81,37 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
       // setCurrentFileUrl(src)
     }
   }
+  const handleCompleteDownload = (attachmentId: string, failed?: boolean) => {
+    if (failed) {
+      console.log('file download failed!')
+    }
+    const stateCopy = { ...downloadingFilesMap }
+    delete stateCopy[attachmentId]
+    setDownloadingFilesMap(stateCopy)
+  }
+  const handleDownloadFile = (attachment: IAttachment) => {
+    if (attachment.id) {
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
+    }
+    downloadFile(attachment, handleCompleteDownload)
+  }
 
   const handleClicks = (e: any) => {
     if (!e.target.closest('.custom_carousel_item') && !e.target.closest('.custom_carousel_arrow')) {
       handleClosePopup()
     }
   }
-  useDidUpdate(() => {
-    if (customUploader && currentFile) {
-      if (playedVideo) {
-        const videoElem: any = document.getElementById(playedVideo)
-        if (videoElem) {
-          videoElem.pause()
-        }
-      }
 
-      getAttachmentUrlFromCache(currentFile.id).then((cachedUrl) => {
+  useDidUpdate(() => {
+    if (playedVideo) {
+      const videoElem: any = document.getElementById(playedVideo)
+      if (videoElem) {
+        videoElem.pause()
+      }
+    }
+
+    getAttachmentUrlFromCache(currentFile.id).then((cachedUrl) => {
+      if (currentFile) {
         if (cachedUrl) {
           if (!downloadedFiles[currentFile.id]) {
             setVisibleSlide(false)
@@ -109,44 +125,58 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
                 setVisibleSlide(true)
               }, 100)
             }
-          }
-          if (currentFile.type === 'image') {
-            downloadImage(cachedUrl as string)
           } else {
-            setVisibleSlide(true)
+            if (currentFile.type === 'image') {
+              downloadImage(cachedUrl as string)
+            } else {
+              setVisibleSlide(true)
+            }
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentFile.url).then(async (url) => {
-              const response = await fetch(url)
-              setAttachmentToCache(currentFile.id, response)
+            customDownloader(currentFile.url)
+              .then(async (url) => {
+                const response = await fetch(url)
+                setAttachmentToCache(currentFile.id, response)
+                if (currentFile.type === 'image') {
+                  downloadImage(url, true)
+                } else {
+                  clearTimeout(visibilityTimeout.current)
+                  setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: url })
+                  // setCurrentFileUrl(url)
+                  setPlayedVideo(currentFile.id)
+                  visibilityTimeout.current = setTimeout(() => {
+                    setVisibleSlide(true)
+                  }, 100)
+                }
+              })
+              .catch((e) => {
+                console.log('fail to download image...... ', e)
+              })
+          } else {
+            if (!downloadedFiles[currentFile.id]) {
+              setVisibleSlide(false)
               if (currentFile.type === 'image') {
-                downloadImage(url)
+                downloadImage(currentFile.url as string, true)
               } else {
                 clearTimeout(visibilityTimeout.current)
-                setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: url })
-                // setCurrentFileUrl(url)
+                setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: currentFile.url })
                 setPlayedVideo(currentFile.id)
                 visibilityTimeout.current = setTimeout(() => {
                   setVisibleSlide(true)
                 }, 100)
               }
-            })
-          } else {
-            if (currentFile.type === 'image') {
-              downloadImage(currentFile.url)
             } else {
-              clearTimeout(visibilityTimeout.current)
-              setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: currentFile.url })
-              setPlayedVideo(currentFile.id)
-              visibilityTimeout.current = setTimeout(() => {
+              if (currentFile.type === 'image') {
+                downloadImage(cachedUrl as string)
+              } else {
                 setVisibleSlide(true)
-              }, 100)
+              }
             }
           }
         }
-      })
-    }
+      }
+    })
   }, [currentFile])
 
   useDidUpdate(() => {
@@ -172,6 +202,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   }, [attachments])
 
   useEffect(() => {
+    setImageLoading(true)
     if (customDownloader && currentMediaFile) {
       getAttachmentUrlFromCache(currentMediaFile.id!).then((cachedUrl) => {
         if (cachedUrl) {
@@ -230,15 +261,17 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
             <FileDateAndSize>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
               <FileSize>
-                {currentFile && currentFile.fileSize && currentFile.fileSize > 0
-                  ? bytesToSize(currentFile.fileSize, 1)
-                  : ''}
+                {currentFile && currentFile.size && currentFile.size > 0 ? bytesToSize(currentFile.size, 1) : ''}
               </FileSize>
             </FileDateAndSize>
           </Info>
         </FileInfo>
-        <ActionDownload onClick={() => downloadFile(currentFile)}>
-          <DownloadIcon />
+        <ActionDownload onClick={() => handleDownloadFile(currentFile)}>
+          {downloadingFilesMap[currentFile.id] ? (
+            <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.gray10} />
+          ) : (
+            <DownloadIcon />
+          )}
         </ActionDownload>
         <Actions>
           <ActionItem onClick={handleClosePopup}>
@@ -247,7 +280,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
         </Actions>
       </SliderHeader>
       <SliderBody onClick={handleClicks}>
-        {!!(attachmentsList && attachmentsList.length) && (
+        {attachmentsList && attachmentsList.length ? (
           // @ts-ignore
           <Carousel
             draggable={false}
@@ -330,6 +363,8 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
               </CarouselItem>
             ))}
           </Carousel>
+        ) : (
+          <UploadingIcon />
         )}
       </SliderBody>
     </Container>

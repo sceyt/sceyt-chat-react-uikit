@@ -20,6 +20,7 @@ import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
+import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 
 const Container = styled.div<{ background?: string }>`
   display: flex;
@@ -32,11 +33,12 @@ const Container = styled.div<{ background?: string }>`
   background-color: ${(props) => props.background};
 `
 
-const ChannelInfo = styled.div`
+const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any }>`
   display: flex;
   align-items: center;
   width: 650px;
   max-width: calc(100% - 70px);
+  cursor: ${(props) => props.clickable && 'pointer'};
 
   & ${UserStatus} {
     width: 10px;
@@ -90,11 +92,22 @@ export default function ChatHeader({
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
-
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const displayMemberText =
+    memberDisplayText && memberDisplayText[activeChannel.type]
+      ? activeChannel.memberCount > 1
+        ? `${memberDisplayText[activeChannel.type]}s`
+        : memberDisplayText[activeChannel.type]
+      : activeChannel.type === CHANNEL_TYPE.BROADCAST
+      ? activeChannel.memberCount > 1
+        ? 'subscribers'
+        : 'subscriber'
+      : activeChannel.memberCount > 1
+      ? 'members'
+      : 'member'
   const channelDetailsOnOpen = () => {
     dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
   }
-
   const channelDetailsOpen = false
 
   useEffect(() => {
@@ -109,7 +122,7 @@ export default function ChatHeader({
 
   return (
     <Container background={backgroundColor}>
-      <ChannelInfo>
+      <ChannelInfo onClick={!channelListHidden && channelDetailsOnOpen} clickable={!channelListHidden}>
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
             <Avatar
@@ -137,7 +150,7 @@ export default function ChatHeader({
           {showMemberInfo &&
             (isDirectChannel && directChannelUser ? (
               <SubTitle color={memberInfoTextColor}>
-                {hideUserPresence(directChannelUser)
+                {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
                   : directChannelUser.presence &&
                     (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
@@ -147,17 +160,7 @@ export default function ChatHeader({
               </SubTitle>
             ) : (
               <SubTitle color={memberInfoTextColor}>
-                {!activeChannel.subject && !isDirectChannel
-                  ? ''
-                  : `${activeChannel.memberCount} ${
-                      activeChannel.type === CHANNEL_TYPE.BROADCAST
-                        ? activeChannel.memberCount > 1
-                          ? 'subscribers'
-                          : 'subscriber'
-                        : activeChannel.memberCount > 1
-                        ? 'members'
-                        : 'member'
-                    } `}
+                {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} ${displayMemberText} `}
               </SubTitle>
             ))}
         </ChannelName>

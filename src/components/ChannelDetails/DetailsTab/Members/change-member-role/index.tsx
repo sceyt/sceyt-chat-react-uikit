@@ -58,7 +58,7 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
   return (
     <PopupContainer>
       <Popup maxWidth='400px' padding='0'>
-        <PopupBody padding={24}>
+        <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={() => handleClosePopup()} />
           <PopupName>Change member role</PopupName>
 

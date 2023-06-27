@@ -11,7 +11,7 @@ import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/ac
 import { loadMoreMembersAC } from '../../store/member/actions'
 import { membersLoadingStateSelector } from '../../store/member/selector'
 import { ReactComponent as ArrowLeft } from '../../assets/svg/arrowLeft.svg'
-import { ReactComponent as EditIcon } from '../../assets/svg/edit.svg'
+import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 // import * as ProfileSrc from '../../assets/img/profile.png'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
@@ -27,6 +27,7 @@ import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
+import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 
 const Details = ({
   channelEditIcon,
@@ -122,14 +123,27 @@ const Details = ({
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
   const channel = useSelector(activeChannelSelector, shallowEqual)
-  const [checkActionPermission] = usePermissions(channel.role)
+  const [checkActionPermission] = usePermissions(channel.userRole)
   const membersLoading = useSelector(membersLoadingStateSelector)
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
-  // const tabsRef = useRef<any>(null)
   const detailsRef = useRef<any>(null)
+  // const tabsRef = useRef<any>(null)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const displayMemberText =
+    memberDisplayText && memberDisplayText[channel.type]
+      ? channel.memberCount > 1
+        ? `${memberDisplayText[channel.type]}s`
+        : memberDisplayText[channel.type]
+      : channel.type === CHANNEL_TYPE.BROADCAST
+      ? channel.memberCount > 1
+        ? 'subscribers'
+        : 'subscriber'
+      : channel.memberCount > 1
+      ? 'members'
+      : 'member'
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
@@ -166,6 +180,7 @@ const Details = ({
   useEffect(() => {
     setMounted(true)
   }, [])
+
   return (
     <Container mounted={mounted}>
       <ChannelDetailsHeader>
@@ -208,15 +223,16 @@ const Details = ({
           <ChannelInfo>
             <ChannelName isDirect={isDirectChannel}>
               {channel.subject ||
-                (isDirectChannel
+                (isDirectChannel && directChannelUser
                   ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                   : '')}
             </ChannelName>
             {isDirectChannel ? (
               <SubTitle>
-                {hideUserPresence && hideUserPresence(directChannelUser)
+                {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                   ? ''
-                  : directChannelUser.presence &&
+                  : directChannelUser &&
+                    directChannelUser.presence &&
                     (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : directChannelUser.presence.lastActiveAt &&
@@ -224,14 +240,7 @@ const Details = ({
               </SubTitle>
             ) : (
               <SubTitle>
-                {channel.memberCount}{' '}
-                {channel.type === CHANNEL_TYPE.BROADCAST
-                  ? channel.memberCount > 1
-                    ? 'subscribers'
-                    : 'subscriber'
-                  : channel.memberCount > 1
-                  ? 'members'
-                  : 'member'}
+                {channel.memberCount} {displayMemberText}
               </SubTitle>
             )}
           </ChannelInfo>
@@ -240,7 +249,7 @@ const Details = ({
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
-        {channel.role && (
+        {channel.userRole && (
           <Actions
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}

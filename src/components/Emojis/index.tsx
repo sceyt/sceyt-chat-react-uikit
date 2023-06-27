@@ -27,10 +27,10 @@ const EmojiIcon = ({ collectionName }: any) => {
       return <TravelingEmoji />
     case 'Objects':
       return <ObjectEmoji />
-    case 'Symbols':
-      return <SymbolEmoji />
     case 'Flags':
       return <FlagEmoji />
+    case 'Symbols':
+      return <SymbolEmoji />
     default:
       return null
   }
@@ -44,8 +44,8 @@ function EmojisPopup({
   rightSide,
   bottomPosition,
   emojisContainerBorderRadius,
-  emojisCategoryIconsPosition,
-  separateEmojiCategoriesWithTitle,
+  emojisCategoryIconsPosition = 'top',
+  fixEmojiCategoriesTitleOnTop,
   emojisPopupPosition,
   relativePosition
 }: {
@@ -58,7 +58,7 @@ function EmojisPopup({
   emojisContainerBorderRadius?: string
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisPopupPosition?: string
-  separateEmojiCategoriesWithTitle?: boolean
+  fixEmojiCategoriesTitleOnTop?: boolean
 }) {
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')
@@ -68,9 +68,9 @@ function EmojisPopup({
   const handleEmojiListScroll = () => {
     const scrollPos = emojiContainerRef.current.scrollTop
     if (collectionHeights[6] < scrollPos) {
-      setActiveCollection('Flags')
-    } else if (collectionHeights[5] < scrollPos) {
       setActiveCollection('Symbols')
+    } else if (collectionHeights[5] < scrollPos) {
+      setActiveCollection('Flags')
     } else if (collectionHeights[4] < scrollPos) {
       setActiveCollection('Objects')
     } else if (collectionHeights[3] < scrollPos) {
@@ -138,7 +138,7 @@ function EmojisPopup({
           ))}
         </EmojiFooter>
       )}
-      {!separateEmojiCategoriesWithTitle && (
+      {fixEmojiCategoriesTitleOnTop && (
         <EmojiHeader padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
@@ -149,8 +149,8 @@ function EmojisPopup({
             const mainCollectionKey = emojiBigCollection.key
             return (
               <React.Fragment key={mainCollectionKey}>
-                {separateEmojiCategoriesWithTitle && (
-                  <EmojiHeader padding='6px 8px'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
+                {!fixEmojiCategoriesTitleOnTop && (
+                  <EmojiHeader padding='6px 8px 0'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
                 )}
                 {emojiBigCollection.array.map((emojiSmallCollection, bigIndex) => {
                   const label = emojiSmallCollection.key
@@ -216,7 +216,7 @@ const Container = styled.div<{
   border: 1px solid ${colors.gray1};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
-  border-radius: ${(props) => props.borderRadius || '6px'};
+  border-radius: ${(props) => props.borderRadius || '12px'};
   background: ${colors.white};
   z-index: 35;
   transform: scaleY(0);
@@ -240,7 +240,7 @@ const EmojiHeader = styled.div<{ padding?: string }>`
   padding: ${(props) => props.padding || '6px 18px'};
 `
 const EmojiSection = styled.div`
-  height: 200px;
+  height: 180px;
   overflow-x: hidden;
 `
 const EmojiCollection = styled.span<EmojiCollectionProps>`
@@ -257,7 +257,7 @@ const CollectionPointer = styled.span``
 
 const AllEmojis = styled.ul`
   overflow: hidden;
-  padding: 8px;
+  padding: 0 8px 8px;
   margin: 0;
 `
 const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom' }>`

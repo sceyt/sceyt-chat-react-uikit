@@ -1,14 +1,14 @@
 import React from 'react'
 import styled from 'styled-components'
-import { ReactComponent as DeleteIcon } from '../../../assets/svg/trash.svg'
+import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report_icon.svg'
-import { ReactComponent as EditIcon } from '../../../assets/svg/editSquare.svg'
+import { ReactComponent as EditIcon } from '../../../assets/svg/editIcon.svg'
 import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
-import { ReactComponent as ReactionIcon } from '../../../assets/svg/react.svg'
+import { ReactComponent as ReactionIcon } from '../../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
-import { ReactComponent as CopyIcon } from '../../../assets/svg/copy.svg'
-import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/thread_reply.svg'
+import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
+import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
@@ -259,10 +259,10 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
   align-items: center;
   direction: ${(props) => props.rtlDirection && 'initial'};
   background-color: #fff;
-  border: 1px solid ${colors.gray1};
+  padding: 8px 2px;
   box-sizing: border-box;
-  border-radius: 4px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;
@@ -272,14 +272,18 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
 const Action = styled.div<any>`
   position: relative;
   display: flex;
-  padding: 9px;
+  padding: 4px;
+  margin: 0 6px;
   cursor: pointer;
   color: ${(props) => props.iconColor || colors.gray6};
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
+  color: ${colors.gray10};
+  border-radius: 50%;
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};
+    background-color: ${colors.gray11};
 
     ${ItemNote} {
       display: block;

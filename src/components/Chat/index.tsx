@@ -55,7 +55,7 @@ const Container = styled.div<{ widthOffset: number; channelDetailsIsOpen?: boole
   width: 100%;
   max-width: ${(props) =>
     props.widthOffset || props.channelDetailsIsOpen
-      ? `calc(100% - ${props.widthOffset + (props.channelDetailsIsOpen ? 400 : 0)}px)`
+      ? `calc(100% - ${props.widthOffset + (props.channelDetailsIsOpen ? 402 : 0)}px)`
       : ''};
   display: flex;
   flex-direction: column;

@@ -137,7 +137,7 @@ interface MessagesProps {
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
-  separateEmojiCategoriesWithTitle?: boolean
+  fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
   reactionIconOrder?: number
@@ -169,6 +169,7 @@ interface MessagesProps {
   inlineReactionIcon?: JSX.Element
   reactionsDisplayCount?: number
   showEachReactionCount?: boolean
+  showTotalReactionCount?: boolean
   reactionItemBorder?: string
   reactionItemBorderRadius?: string
   reactionItemBackground?: string
@@ -181,6 +182,8 @@ interface MessagesProps {
   reactionsContainerPadding?: string
   reactionsContainerBackground?: string
   reactionsContainerTopPosition?: string
+  reactionsDetailsPopupBorderRadius?: string
+  reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
   newMessagesSeparatorText?: string
   newMessagesSeparatorFontSize?: string
   newMessagesSeparatorTextColor?: string
@@ -242,11 +245,12 @@ const MessageList: React.FC<MessagesProps> = ({
   reportIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions,
-  separateEmojiCategoriesWithTitle,
+  fixEmojiCategoriesTitleOnTop,
   emojisCategoryIconsPosition,
   emojisContainerBorderRadius,
   reactionsDisplayCount,
   showEachReactionCount,
+  showTotalReactionCount,
   reactionItemBorder,
   reactionItemBorderRadius,
   reactionItemBackground,
@@ -259,6 +263,8 @@ const MessageList: React.FC<MessagesProps> = ({
   reactionsContainerBackground,
   reactionsContainerPadding,
   reactionsContainerTopPosition,
+  reactionsDetailsPopupBorderRadius,
+  reactionsDetailsPopupHeaderItemsStyle = 'bubbles',
   editIconOrder,
   copyIconOrder,
   replyIconOrder,
@@ -501,8 +507,8 @@ const MessageList: React.FC<MessagesProps> = ({
         direction === MESSAGE_LOAD_DIRECTION.NEXT &&
         lastMessageId &&
         (hasNextMessages || hasNextCached)
-        // channel.unreadMessageCount &&
-        // channel.unreadMessageCount > 0
+        // channel.newMessageCount &&
+        // channel.newMessageCount > 0
       ) {
         loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
@@ -662,8 +668,8 @@ const MessageList: React.FC<MessagesProps> = ({
     setHasPrevCached(false)
     dispatch(getMessagesAC(channel))
     if (channel.id) {
-      if (channel.unreadMessageCount && channel.unreadMessageCount > 0) {
-        setUnreadMessageId(channel.lastReadMessageId)
+      if (channel.newMessageCount && channel.newMessageCount > 0) {
+        setUnreadMessageId(channel.lastDisplayedMsgId)
       } else {
         setUnreadMessageId('')
       }
@@ -790,7 +796,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages... ', messages)
+    console.log('messages... ', messages)
   }, [messages])
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -805,11 +811,11 @@ const MessageList: React.FC<MessagesProps> = ({
   /* useEffect(() => {
   }, [pendingMessages]) */
   useEffect(() => {
-    if (channel.unreadMessageCount && channel.unreadMessageCount > 0 && getUnreadScrollTo()) {
+    if (channel.newMessageCount && channel.newMessageCount > 0 && getUnreadScrollTo()) {
       if (scrollRef.current) {
         scrollRef.current.style.scrollBehavior = 'inherit'
       }
-      const lastReadMessageNode: any = document.getElementById(channel.lastReadMessageId)
+      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMsgId)
       if (lastReadMessageNode) {
         scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
         if (scrollRef.current) {
@@ -1025,7 +1031,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           openFrequentlyUsedReactions={openFrequentlyUsedReactions}
                           emojisCategoryIconsPosition={emojisCategoryIconsPosition}
                           emojisContainerBorderRadius={emojisContainerBorderRadius}
-                          separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
+                          fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
                           editIconOrder={editIconOrder}
                           copyIconOrder={copyIconOrder}
                           replyIconOrder={replyIconOrder}
@@ -1057,6 +1063,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           videoAttachmentMaxHeight={videoAttachmentMaxHeight}
                           reactionsDisplayCount={reactionsDisplayCount}
                           showEachReactionCount={showEachReactionCount}
+                          showTotalReactionCount={showTotalReactionCount}
                           reactionItemBorder={reactionItemBorder}
                           reactionItemBorderRadius={reactionItemBorderRadius}
                           reactionItemBackground={reactionItemBackground}
@@ -1069,6 +1076,8 @@ const MessageList: React.FC<MessagesProps> = ({
                           reactionsContainerPadding={reactionsContainerPadding}
                           reactionsContainerBackground={reactionsContainerBackground}
                           reactionsContainerTopPosition={reactionsContainerTopPosition}
+                          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+                          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
                           sameUserMessageSpacing={sameUserMessageSpacing}
                           differentUserMessageSpacing={differentUserMessageSpacing}
                         />
@@ -1197,6 +1206,8 @@ export const MessageTopDate = styled.div<any>`
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
 `
 

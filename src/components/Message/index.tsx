@@ -103,7 +103,7 @@ interface IMessageProps {
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
-  separateEmojiCategoriesWithTitle?: boolean
+  fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
   reactionIconOrder?: number
@@ -128,6 +128,7 @@ interface IMessageProps {
   inlineReactionIcon?: JSX.Element
   reactionsDisplayCount?: number
   showEachReactionCount?: boolean
+  showTotalReactionCount?: boolean
   reactionItemBorder?: string
   reactionItemBorderRadius?: string
   reactionItemBackground?: string
@@ -139,6 +140,8 @@ interface IMessageProps {
   reactionsContainerBorderRadius?: string
   reactionsContainerBackground?: string
   reactionsContainerTopPosition?: string
+  reactionsDetailsPopupBorderRadius?: string
+  reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
   reactionsContainerPadding?: string
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
@@ -203,7 +206,7 @@ const Message = ({
   staredIcon,
   reportIcon,
   reactionIconOrder,
-  openFrequentlyUsedReactions,
+  openFrequentlyUsedReactions = true,
   editIconOrder,
   copyIconOrder,
   replyIconOrder,
@@ -226,6 +229,7 @@ const Message = ({
   fileAttachmentsIcon,
   reactionsDisplayCount = 5,
   showEachReactionCount = true,
+  showTotalReactionCount,
   reactionItemBorder,
   reactionItemBorderRadius,
   reactionItemBackground,
@@ -238,6 +242,8 @@ const Message = ({
   reactionsContainerBackground,
   reactionsContainerPadding,
   reactionsContainerTopPosition,
+  reactionsDetailsPopupBorderRadius,
+  reactionsDetailsPopupHeaderItemsStyle,
   fileAttachmentsBoxWidth,
   // fileAttachmentsNameMaxLength,
   // fileAttachmentsBoxBackground,
@@ -250,7 +256,7 @@ const Message = ({
   videoAttachmentMaxHeight,
   emojisCategoryIconsPosition,
   emojisContainerBorderRadius,
-  separateEmojiCategoriesWithTitle,
+  fixEmojiCategoriesTitleOnTop,
   sameUserMessageSpacing,
   differentUserMessageSpacing
 }: IMessageProps) => {
@@ -275,10 +281,9 @@ const Message = ({
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
-  const reactionsList = message.reactionScores && Object.keys(message.reactionScores)
   const reactionsCount =
-    message.reactionScores &&
-    Object.values(message.reactionScores).reduce((prevValue, currentValue) => prevValue + currentValue, 0)
+    message.reactionTotals &&
+    message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const messageTextRef = useRef<any>(null)
   const messageActionsTimeout = useRef<any>(null)
@@ -489,16 +494,16 @@ const Message = ({
   }
 
   const handleReactionAddDelete = (selectedEmoji: any) => {
-    if (message.selfReactions && message.selfReactions.some((item: IReaction) => item.key === selectedEmoji)) {
+    if (message.userReactions && message.userReactions.some((item: IReaction) => item.key === selectedEmoji)) {
       dispatch(
         deleteReactionAC(
           channel.id,
           message.id,
           selectedEmoji,
-          channel.userMessageReactions &&
-            channel.userMessageReactions[0] &&
-            channel.userMessageReactions[0].messageId === message.id &&
-            channel.userMessageReactions[0].key === selectedEmoji
+          channel.newReactions &&
+            channel.newReactions[0] &&
+            channel.newReactions[0].messageId === message.id &&
+            channel.newReactions[0].key === selectedEmoji
         )
       )
     } else {
@@ -517,9 +522,13 @@ const Message = ({
     if (
       isVisible &&
       message.incoming &&
-      !(message.selfMarkers.length && message.selfMarkers.includes(MESSAGE_DELIVERY_STATUS.READ))
+      !(
+        message.userMarkers &&
+        message.userMarkers.length &&
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
+      )
     ) {
-      // console.log('send marker for message ... ', message)
+      console.log('send marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -667,6 +676,10 @@ const Message = ({
   useEffect(() => {
     if (emojisPopupOpen) {
       // const emojisContainer = document.getElementById(`${message.id}_emoji_popup_container`)
+      console.log(
+        'messageItemRef.current.getBoundingClientRect().bottom. . .. ',
+        messageItemRef.current.getBoundingClientRect().bottom
+      )
       const bottomPos = messageItemRef.current ? messageItemRef.current.getBoundingClientRect().bottom : 0
       const offsetBottom = window.innerHeight - bottomPos
       setEmojisPopupPosition(offsetBottom < 300 ? 'top' : 'bottom')
@@ -707,7 +720,7 @@ const Message = ({
           ? differentUserMessageSpacing || '16px'
           : sameUserMessageSpacing || '8px'
       }
-      bottomMargin={reactionsList && reactionsList.length ? reactionsContainerTopPosition : ''}
+      bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}
       // id={message.id}
       className='MessageItem'
@@ -876,7 +889,7 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.role}
+              myRole={channel.userRole}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />
@@ -1120,7 +1133,7 @@ const Message = ({
                   emojisPopupPosition={emojisPopupPosition}
                   emojisCategoryIconsPosition={emojisCategoryIconsPosition}
                   emojisContainerBorderRadius={emojisContainerBorderRadius}
-                  separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
+                  fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
                   handleEmojiPopupToggle={setEmojisPopupOpen}
                   handleAddEmoji={handleReactionAddDelete}
@@ -1137,7 +1150,7 @@ const Message = ({
                 rtlDirection={ownMessageOnRightSide && !message.incoming}
                 handleAddEmoji={handleReactionAddDelete}
                 handleEmojiPopupToggle={setEmojisPopupOpen}
-                frequentlyEmojis={message.selfReactions}
+                frequentlyEmojis={message.userReactions}
               />
             </FrequentlyEmojisContainer>
           )}
@@ -1171,14 +1184,16 @@ const Message = ({
           <ReactionsPopup
             bottomPosition={reactionsPopupPosition}
             horizontalPositions={reactionsPopupHorizontalPosition}
-            reactionScores={message.reactionScores || {}}
+            reactionTotals={message.reactionTotals || []}
             messageId={message.id}
             handleReactionsPopupClose={handleToggleReactionsPopup}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             handleAddDeleteEmoji={handleReactionAddDelete}
+            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
           />
         )}
-        {reactionsList && reactionsList.length && (
+        {message.reactionTotals && message.reactionTotals.length && (
           <ReactionsContainer
             id={`${message.id}_reactions_container`}
             border={reactionsContainerBorder}
@@ -1201,11 +1216,11 @@ const Message = ({
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               onClick={handleToggleReactionsPopup}
             >
-              {reactionsList.slice(0, reactionsDisplayCount || 5).map((key) => (
+              {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
                 <MessageReaction
-                  key={key}
+                  key={summery.key}
                   // onClick={() => handleReactionAddDelete(key)}
-                  self={!!message.selfReactions.find((selfReaction: IReaction) => selfReaction.key === key)}
+                  self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
                   backgroundColor={reactionItemBackground}
@@ -1214,12 +1229,13 @@ const Message = ({
                   isLastReaction={reactionsCount === 1}
                   fontSize={reactionsFontSize}
                 >
-                  <MessageReactionKey>{`${key} ${
-                    showEachReactionCount ? message.reactionScores![key] : ''
-                  }`}</MessageReactionKey>
+                  <MessageReactionKey>
+                    {summery.key}
+                    {showEachReactionCount && <ReactionItemCount>{summery.count}</ReactionItemCount>}
+                  </MessageReactionKey>
                 </MessageReaction>
               ))}
-              {reactionsCount && reactionsCount > 1 && (
+              {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
                 <MessageReaction
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
@@ -1243,7 +1259,7 @@ const Message = ({
           description='Who do you want to remove this message for?'
           isDeleteMessage
           isIncomingMessage={message.incoming}
-          myRole={channel.role}
+          myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
           isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
           title='Delete message'
@@ -1274,8 +1290,19 @@ const Message = ({
 export default Message
 
 const MessageReactionKey = styled.span`
+  display: inline-flex;
+  align-items: center;
   font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
     twemoji mozilla, segoe ui symbol;
+`
+
+const ReactionItemCount = styled.span`
+  margin-left: 2px;
+  font-family: Inter, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 16px;
+  color: ${colors.textColor1};
 `
 
 const MessageReaction = styled.span<{
@@ -1293,18 +1320,22 @@ const MessageReaction = styled.span<{
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin: ${(props) => props.margin || '0 6px 0 0'};
+  margin: ${(props) => props.margin || '0 8px 0 0'};
   margin-right: ${(props) => props.isLastReaction && '0'};
-  border: ${(props) => props.border || `1px solid ${colors.gray3}`};
+  border: ${(props) => props.border};
   border-color: ${(props) => props.self && colors.primary};
   color: ${(props) => (props.self ? colors.primary : '')};
   box-sizing: border-box;
   border-radius: ${(props) => props.borderRadius || '16px'};
-  font-size: ${(props) => props.fontSize || '13px'};
-  line-height: ${(props) => props.fontSize || '13px'};
-  padding: ${(props) => props.padding || '2px 6px'};
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  font-size: ${(props) => props.fontSize || '18px'};
+  line-height: ${(props) => props.fontSize || '18px'};
+  padding: ${(props) => props.padding || '0'};
+  background-color: ${(props) => props.backgroundColor};
   white-space: nowrap;
+
+  &:last-child {
+    margin-right: 0;
+  }
 `
 
 const ThreadMessageCountContainer = styled.div`
@@ -1365,10 +1396,11 @@ const ReactionsContainer = styled.div<{
   margin-top: 4px;
   justify-content: flex-end;
   border: ${(props) => props.border};
-  box-shadow: ${(props) => props.boxShadow};
-  border-radius: ${(props) => props.borderRadius};
-  background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => props.padding};
+  box-shadow: ${(props) => props.boxShadow || '0px 4px 12px -2px rgba(17, 21, 57, 0.08)'};
+  filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
+  border-radius: ${(props) => props.borderRadius || '16px'};
+  background-color: ${(props) => props.backgroundColor || colors.white};
+  padding: ${(props) => props.padding || '4px 8px'};
   z-index: 9;
   ${(props) =>
     props.topPosition &&
@@ -1724,7 +1756,9 @@ const EmojiContainer = styled.div<any>`
   position: absolute;
   left: ${(props) => (props.rtlDirection ? '' : '0')};
   right: ${(props) => props.rtlDirection && '0'};
-  top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
+  //top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
+  top: ${(props) => props.position === 'bottom' && 'calc(100% + 4px)'};
+  bottom: ${(props) => props.position === 'top' && 'calc(100% + 4px)'};
   z-index: 99;
 `
 const FrequentlyEmojisContainer = styled.div<any>`

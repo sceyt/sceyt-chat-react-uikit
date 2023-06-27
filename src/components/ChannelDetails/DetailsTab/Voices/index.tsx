@@ -7,6 +7,7 @@ import { activeTabAttachmentsSelector } from '../../../../store/message/selector
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import VoiceItem from './voiceItem'
+import { isJSON } from '../../../../helpers/message'
 
 interface IProps {
   channelId: string
@@ -42,7 +43,7 @@ const Voices = ({
       {attachments.map((file: IAttachment) => (
         <VoiceItem
           key={file.id}
-          file={file}
+          file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
           voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
           voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
           voicePreviewPlayHoverIcon={voicePreviewPlayIcon}

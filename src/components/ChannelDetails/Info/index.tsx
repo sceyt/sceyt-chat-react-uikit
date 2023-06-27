@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React, { useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { ReactComponent as EditIcon } from '../../../assets/svg/edit.svg'
+import { ReactComponent as EditIcon } from '../../../assets/svg/editIcon.svg'
 // import { ReactComponent as CameraIcon } from '../../../assets/lib/svg/camera.svg'
 import { ReactComponent as CheckIcon } from '../../../assets/svg/check.svg'
 import { SectionHeader } from '../../../UIHelper'
@@ -231,7 +231,7 @@ const Info = ({ channel, handleToggleEditMode }: IProps) => {
               </SectionHeader>
               <ChannelMembers>{channel.memberCount} members</ChannelMembers>
             </ChannelSubject>
-            {!isDirectChannel && channel.role && (
+            {!isDirectChannel && channel.userRole && (
               <EditSubject onClick={() => handleToggleEditMode()}>
                 <EditIcon />
               </EditSubject>

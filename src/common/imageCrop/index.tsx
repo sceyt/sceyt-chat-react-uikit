@@ -46,7 +46,7 @@ const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   return (
     <PopupContainer>
       <Popup minWidth='500px' maxWidth='600px' padding='0'>
-        <PopupBody padding={24}>
+        <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} />
           <Row align='center'>
             <PopupName>Crop image</PopupName>

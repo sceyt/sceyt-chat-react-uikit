@@ -130,7 +130,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   return (
     <PopupContainer>
       <Popup maxWidth='522px' minWidth='522px' height='540px' isLoading={loading} padding='0'>
-        <PopupBody padding={24} withFooter>
+        <PopupBody paddingH='24px' paddingV='24px' withFooter>
           <CloseIcon onClick={() => togglePopup()} />
           <PopupName isDelete marginBottom='20px'>
             {title}

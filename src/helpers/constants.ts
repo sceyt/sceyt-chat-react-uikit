@@ -34,7 +34,9 @@ export const LOADING_STATE = {
 export const CHANNEL_TYPE = {
   GROUP: 'group',
   BROADCAST: 'broadcast',
-  DIRECT: 'direct'
+  DIRECT: 'direct',
+  PUBLIC: 'public',
+  PRIVATE: 'private'
 }
 
 export const PRESENCE_STATUS = {

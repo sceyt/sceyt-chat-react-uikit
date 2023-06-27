@@ -8,6 +8,7 @@ import {
   getActiveChannelId,
   getChannelFromMap,
   getLastChannelFromMap,
+  handleNewMessages,
   removeChannelFromMap,
   setChannelInMap
 } from '../../helpers/channelHalper'
@@ -378,9 +379,9 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.LEAVE: {
         // const { channel, member } = args
-        console.log('channel LEAVE ... ')
         const { channel, member } = args
 
+        console.log('channel LEAVE ... ', channel, member)
         const channelExists = checkChannelExists(channel.id)
         const activeChannelId = yield call(getActiveChannelId)
         if (activeChannelId === channel.id) {
@@ -392,6 +393,11 @@ export default function* watchForEvents(): any {
               memberCount: channel.memberCount
             })
           )
+        }
+
+        if (member.id === SceytChatClient.user.id) {
+          removeChannelAC(channel.id)
+          removeChannelFromMap(channel.id)
         }
         // TODO notification
         /* const not = {
@@ -477,93 +483,96 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
         console.log('channel MESSAGE ... ', message, channel)
-        const activeChannelId = yield call(getActiveChannelId)
-        const channelExists = checkChannelExists(channel.id)
-        const channelForAdd = JSON.parse(JSON.stringify(channel))
-        yield put(addChannelAC(channelForAdd))
-        if (!channelExists) {
-          yield call(setChannelInMap, channel)
-        } else if (!message.repliedInThread) {
-          yield put(updateChannelLastMessageAC(message, channelForAdd))
-          yield put(updateChannelDataAC(message, channelForAdd))
-        }
-        if (channel.id === activeChannelId) {
-          // TODO message for thread reply
-          /* if (message.repliedInThread) {
-            // const messageForThreadReply = yield select(messageForThreadReplySelector);
-            let parentMessage;
-            if (!messageForThreadReply) {
-              const messageQueryBuilder = new sceytClient.MessageListQueryBuilder(channel.id);
-              messageQueryBuilder.limit(1);
-              const messageQuery = yield call(messageQueryBuilder.build);
-              const { messages } = yield call(messageQuery.loadNearMessageId, message.parent.id);
-              [parentMessage] = messages;
-              yield put(setMessageForThreadReply(parentMessage));
+        const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
+        if (messageToHandle && channel) {
+          const activeChannelId = yield call(getActiveChannelId)
+          const channelExists = checkChannelExists(channel.id)
+          const channelForAdd = JSON.parse(JSON.stringify(channel))
+          yield put(addChannelAC(channelForAdd))
+          if (!channelExists) {
+            yield call(setChannelInMap, channel)
+          } else if (!message.repliedInThread) {
+            yield put(updateChannelLastMessageAC(message, channelForAdd))
+            yield put(updateChannelDataAC(message, channelForAdd))
+          }
+          if (channel.id === activeChannelId) {
+            // TODO message for thread reply
+            /* if (message.repliedInThread) {
+              // const messageForThreadReply = yield select(messageForThreadReplySelector);
+              let parentMessage;
+              if (!messageForThreadReply) {
+                const messageQueryBuilder = new sceytClient.MessageListQueryBuilder(channel.id);
+                messageQueryBuilder.limit(1);
+                const messageQuery = yield call(messageQueryBuilder.build);
+                const { messages } = yield call(messageQuery.loadNearMessageId, message.parent.id);
+                [parentMessage] = messages;
+                yield put(setMessageForThreadReply(parentMessage));
+              } else {
+                parentMessage = messageForThreadReply;
+              }
+              yield put(addThreadReplyMessage(message));
+              yield put(updateMessageAC(message.parent.id, { replyCount: parentMessage.replyCount }));
+              yield put(updateMessageForThreadReply({ replyCount: parentMessage.replyCount }));
+            } else { */
+            if (!getHasNextCached()) {
+              yield put(addMessageAC(message))
+            }
+            addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
+            // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
+            // }
+            if (message.user.id !== SceytChatClient.user.id) {
+              // yield put(markMessagesAsReadAC(channel.id, [message.id]))
+            }
+          }
+
+          if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
+            addMessageToMap(channel.id, message)
+          }
+
+          yield put(
+            updateChannelDataAC(channel.id, { ...channelForAdd, userMessageReactions: [], lastReactedMessage: null })
+          )
+          console.log('channel MESSAGE ... ', message)
+          const showNotifications = getShowNotifications()
+          if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
+            if (Notification.permission === 'granted') {
+              if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
+                const contactsMap = yield select(contactsMapSelector)
+                const getFromContacts = getShowOnlyContactUsers()
+                const messageBody = MessageTextFormat({
+                  text: message.body,
+                  message,
+                  contactsMap,
+                  getFromContacts,
+                  isLastMessage: false,
+                  asSampleText: true
+                })
+                console.log('messageBody. . . . ', messageBody)
+                setNotification(messageBody, message.user, channel)
+              }
+            }
+            if (message.repliedInThread && message.parent.id) {
+              yield put(markMessagesAsDeliveredAC(message.parent.id, [message.id]))
             } else {
-              parentMessage = messageForThreadReply;
-            }
-            yield put(addThreadReplyMessage(message));
-            yield put(updateMessageAC(message.parent.id, { replyCount: parentMessage.replyCount }));
-            yield put(updateMessageForThreadReply({ replyCount: parentMessage.replyCount }));
-          } else { */
-          if (!getHasNextCached()) {
-            yield put(addMessageAC(message))
-          }
-          addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-          // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-          // }
-          if (message.user.id !== SceytChatClient.user.id) {
-            // yield put(markMessagesAsReadAC(channel.id, [message.id]))
-          }
-        }
-
-        if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
-          addMessageToMap(channel.id, message)
-        }
-
-        yield put(
-          updateChannelDataAC(channel.id, { ...channelForAdd, userMessageReactions: [], lastReactedMessage: null })
-        )
-        console.log('channel MESSAGE ... ', message)
-        const showNotifications = getShowNotifications()
-        if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
-          if (Notification.permission === 'granted') {
-            if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
-              const contactsMap = yield select(contactsMapSelector)
-              const getFromContacts = getShowOnlyContactUsers()
-              const messageBody = MessageTextFormat({
-                text: message.body,
-                message,
-                contactsMap,
-                getFromContacts,
-                isLastMessage: false,
-                asSampleText: true
-              })
-              console.log('messageBody. . . . ', messageBody)
-              setNotification(messageBody, message.user, channel)
+              yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
             }
           }
-          if (message.repliedInThread && message.parent.id) {
-            yield put(markMessagesAsDeliveredAC(message.parent.id, [message.id]))
-          } else {
-            yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
-          }
+          // TODO browser notification
+          /* const notificationStatus = yield call(Notification.requestPermission);
+          if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
+            const notification = new Notification(`New Message from ${message.user.firstName}`,
+            { body: message.body, icon: logo, silent: false });
+            // notification.onclick = (event) => {
+            //   event.preventDefault(); // prevent the browser from focusing the Notification's tab
+            //   window.open(window.sceytTabUrl, '_blank');
+            //   notification.close();
+            // };
+            if (window.sceytTabNotifications) {
+              window.sceytTabNotifications.close();
+            }
+            window.sceytTabNotifications = notification;
+          } */
         }
-        // TODO browser notification
-        /* const notificationStatus = yield call(Notification.requestPermission);
-        if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
-          const notification = new Notification(`New Message from ${message.user.firstName}`,
-          { body: message.body, icon: logo, silent: false });
-          // notification.onclick = (event) => {
-          //   event.preventDefault(); // prevent the browser from focusing the Notification's tab
-          //   window.open(window.sceytTabUrl, '_blank');
-          //   notification.close();
-          // };
-          if (window.sceytTabNotifications) {
-            window.sceytTabNotifications.close();
-          }
-          window.sceytTabNotifications = notification;
-        } */
         break
       }
       case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
@@ -572,10 +581,6 @@ export default function* watchForEvents(): any {
         console.log('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
         if (channel) {
           const activeChannelId = yield call(getActiveChannelId)
-          const lastMessage = {
-            ...channel.lastMessage,
-            deliveryStatus: markerList.name
-          }
           let updateLastMessage = false
           const markersMap: any = {}
           markerList.messageIds.forEach((messageId: string) => {
@@ -589,6 +594,10 @@ export default function* watchForEvents(): any {
             }
           })
           if (updateLastMessage) {
+            const lastMessage = {
+              ...channel.lastMessage,
+              deliveryStatus: markerList.name
+            }
             yield put(updateChannelLastMessageStatusAC(lastMessage, JSON.parse(JSON.stringify(channel))))
           }
 
@@ -614,8 +623,8 @@ export default function* watchForEvents(): any {
           yield put(updateChannelLastMessageStatus(lastMessage, channel));
           // use updateChannelDataAC instead
 
-          // yield put(setChannelUnreadCount(channel.unreadMessageCount, channel.id));
-          yield put(updateChannelDataAC(channel.id, { unreadMessageCount: channel.unreadMessageCount }));
+          // yield put(setChannelUnreadCount(channel.newMessageCount, channel.id));
+          yield put(updateChannelDataAC(channel.id, { unreadMessageCount: channel.newMessageCount }));
         }
         break;
       } */
@@ -642,19 +651,19 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.DELETE: {
         const { channelId } = args
         console.log('channel DELETE ... ')
-        const activeChannelId = yield call(getActiveChannelId)
+        // const activeChannelId = yield call(getActiveChannelId)
         const channel = getChannelFromMap(channelId)
 
-        if (channel) {
+        /*  if (channel) {
           yield put(removeChannelAC(channelId))
           yield call(removeChannelFromMap, channelId)
-        }
+        } */
 
         yield put(setChannelToRemoveAC(channel))
-        if (activeChannelId === channelId) {
+        /*   if (activeChannelId === channelId) {
           const activeChannel = yield call(getLastChannelFromMap)
           yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
-        }
+        } */
         break
       }
       case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
@@ -674,7 +683,7 @@ export default function* watchForEvents(): any {
         if (channelExists) {
           yield put(
             updateChannelDataAC(channel.id, {
-              unreadMessageCount: channel.unreadMessageCount
+              unreadMessageCount: channel.newMessageCount
             })
           )
           if (channel.lastMessage.id === deletedMessage.id) {
@@ -727,9 +736,9 @@ export default function* watchForEvents(): any {
             }
           }
 
-          if (channel.userMessageReactions && channel.userMessageReactions.length) {
+          if (channel.newReactions && channel.newReactions.length) {
             const channelUpdateParams = {
-              userMessageReactions: channel.userMessageReactions,
+              userMessageReactions: channel.newReactions,
               lastReactedMessage: message
             }
             yield put(updateChannelDataAC(channel.id, channelUpdateParams))
@@ -751,7 +760,7 @@ export default function* watchForEvents(): any {
           yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
           removeReactionOnAllMessages(message, reaction, true)
         }
-        if (!(channel.userMessageReactions && channel.userMessageReactions.length)) {
+        if (!(channel.newReactions && channel.newReactions.length)) {
           const channelUpdateParams = {
             userMessageReactions: [],
             lastReactedMessage: null
@@ -788,7 +797,7 @@ export default function* watchForEvents(): any {
         }
         removeMessagesFromMap(channel.id)
         if (channelExist) {
-          yield put(updateChannelDataAC(channel.id, { lastMessage: {}, unreadMessageCount: 0 }))
+          yield put(updateChannelDataAC(channel.id, { lastMessage: null, unreadMessageCount: 0 }))
         }
 
         break
@@ -800,7 +809,7 @@ export default function* watchForEvents(): any {
         yield put(
           updateChannelDataAC(channel.id, {
             muted: channel.muted,
-            muteExpireDate: channel.muteExpireDate
+            mutedTill: channel.mutedTill
           })
         )
 
@@ -813,7 +822,7 @@ export default function* watchForEvents(): any {
         yield put(
           updateChannelDataAC(channel.id, {
             muted: channel.muted,
-            muteExpireDate: channel.muteExpireDate
+            mutedTill: channel.mutedTill
           })
         )
 
@@ -834,13 +843,13 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.markedAsUnread }))
+        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
         break
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.markedAsUnread }))
+        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
         break
       }
       /*
@@ -870,7 +879,7 @@ export default function* watchForEvents(): any {
         }
         for (let i = 0; i < members.length; i++) {
           if (members[i].id === SceytChatClient.user.id) {
-            yield put(updateChannelDataAC(channel.id, { role: members[i].role }))
+            yield put(updateChannelDataAC(channel.id, { userRole: members[i].role }))
           }
         }
         break

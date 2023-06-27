@@ -45,6 +45,7 @@ import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate } from '../../../hooks'
+import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 
 interface ISelectedUserData {
   id: string
@@ -93,6 +94,16 @@ const UsersPopup = ({
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
   const [filteredUsers, setFilteredUsers] = useState([])
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
+
+  const popupTitleText =
+    channel &&
+    (memberDisplayText && memberDisplayText[channel.type]
+      ? `Add ${memberDisplayText[channel.type]}s`
+      : channel.type === CHANNEL_TYPE.BROADCAST
+      ? 'subscribers'
+      : 'members')
   /* const handleGetUsers = (option) => {
     dispatch(
       getUsers({
@@ -129,11 +140,18 @@ const UsersPopup = ({
   const handleUserSelect = (event: any, contact: { id: string; displayName: string; avatarUrl?: string }) => {
     const newSelectedMembers = [...selectedMembers]
     if (event.target.checked) {
+      const role = channel
+        ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
+          ? channelTypeRoleMap[channel.type]
+          : channel.type === CHANNEL_TYPE.BROADCAST
+          ? 'subscriber'
+          : 'participant'
+        : 'participant'
       newSelectedMembers.push({
         id: contact.id,
         displayName: contact.displayName,
         avatarUrl: contact.avatarUrl,
-        role: channel?.type === CHANNEL_TYPE.BROADCAST ? 'subscriber' : 'participant'
+        role
       })
     } else {
       const itemToDeleteIndex = newSelectedMembers.findIndex((member) => member.id === contact.id)
@@ -198,6 +216,7 @@ const UsersPopup = ({
       if (actionType === 'selectUsers' && getSelectedUsers) {
         getSelectedUsers(selectedMembersList, 'create')
       } else {
+        console.log('call add members ... ', selectedMembersList)
         dispatch(addMembersAC(channel!.id, selectedMembersList))
       }
     }
@@ -275,16 +294,10 @@ const UsersPopup = ({
         padding='0'
         display='flex'
       >
-        <PopupBody padding={24} withFooter={actionType !== 'createChat'}>
+        <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
           <CloseIcon onClick={handleClosePopup} />
 
-          <PopupName>
-            {actionType === 'createChat'
-              ? 'Creat a new chat'
-              : channel?.type === CHANNEL_TYPE.BROADCAST
-              ? 'Add subscribers'
-              : 'Add members'}
-          </PopupName>
+          <PopupName padding='0 12px'>{actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}</PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg />
             <SearchUsersInput
@@ -466,7 +479,7 @@ const MembersContainer = styled(List)<{
   flex-direction: column;
   //margin-top: 24px;
   position: relative;
-  max-height: ${(props) => `calc(100% - (${(props.isAdd ? 75 : 70) + props.selectedMembersHeight}px))`};
+  max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
 
   width: calc(100% + 16px);
@@ -475,8 +488,7 @@ const MembersContainer = styled(List)<{
 
 const SearchUserCont = styled.div`
   position: relative;
-  width: 100%;
-  margin-top: 24px;
+  margin: 24px 12px 0;
 
   ${ClearTypedText} {
     top: 10px;
@@ -514,9 +526,9 @@ const ListRow = styled.div<{ isAdd: boolean }>`
   justify-content: space-between;
   flex-direction: row;
   align-items: center;
-  min-height: 40px;
-  padding: 7px 0;
+  padding: 7px 12px;
   cursor: ${(props) => !props.isAdd && 'pointer'};
+  border-radius: 6px;
   transition: all 0.2s;
 
   &:hover {
@@ -556,7 +568,7 @@ const SelectedMembersContainer = styled.div`
   width: 100%;
   max-height: 85px;
   overflow-x: hidden;
-  padding-top: 2px;
+  padding: 2px 12px 0;
   box-sizing: border-box;
   //flex: 0 0 auto;
 `

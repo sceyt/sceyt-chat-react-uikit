@@ -5,7 +5,7 @@ import { Provider } from 'react-redux'
 import store from '../../store'
 import { ICustomAvatarColors } from '../Channel/types'
 import SceytChat from '../SceytChat'
-import { IAttachment, IUser } from '../../types'
+import { IAttachment, IChannel, IMessage, IUser } from '../../types'
 export interface IProgress {
   loaded: number
   total: number
@@ -30,12 +30,19 @@ export interface IChatClientProps {
   client: SceytChatClient
   avatarColors?: ICustomAvatarColors
   hideUserPresence?: (user: IUser) => boolean
+  handleNewMessages?: (message: IMessage, channel: IChannel) => IMessage | null
   showOnlyContactUsers?: boolean
   sendAttachmentsAsSeparateMessages?: boolean
   showNotifications?: boolean
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
   CustomUploader?: ICustomUploader
+  membersDisplayTextByChannelTypesMap?: {
+    [key: string]: string
+  }
+  defaultRolesByChannelTypesMap?: {
+    [key: string]: string
+  }
   customColors?: {
     primaryColor?: string
     primaryLight?: string
@@ -52,7 +59,10 @@ const SceytChatContainer = ({
   avatarColors,
   children,
   showOnlyContactUsers,
+  handleNewMessages,
   sendAttachmentsAsSeparateMessages,
+  membersDisplayTextByChannelTypesMap,
+  defaultRolesByChannelTypesMap,
   logoSrc,
   CustomUploader,
   customColors,
@@ -68,7 +78,10 @@ const SceytChatContainer = ({
         showOnlyContactUsers={showOnlyContactUsers}
         logoSrc={logoSrc}
         CustomUploader={CustomUploader}
+        handleNewMessages={handleNewMessages}
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
+        membersDisplayTextByChannelTypesMap={membersDisplayTextByChannelTypesMap}
+        defaultRolesByChannelTypesMap={defaultRolesByChannelTypesMap}
         customColors={customColors}
         showNotifications={showNotifications}
         hideUserPresence={hideUserPresence}

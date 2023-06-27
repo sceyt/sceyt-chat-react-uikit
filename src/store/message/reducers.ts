@@ -252,7 +252,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       // const messagesCopy = [...newState.activeChannelMessages]
       newState.activeChannelMessages = newState.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
-          let slfReactions = [...msg.selfReactions]
+          let slfReactions = [...msg.userReactions]
           if (isSelf) {
             if (slfReactions) {
               slfReactions.push(reaction)
@@ -262,9 +262,9 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           }
           return {
             ...msg,
-            selfReactions: slfReactions,
+            userReactions: slfReactions,
             lastReactions: message.lastReactions,
-            reactionScores: message.reactionScores
+            reactionTotals: message.reactionTotals
           }
         }
         return msg
@@ -278,15 +278,15 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       const messagesCopy = [...newState.activeChannelMessages]
       newState.activeChannelMessages = messagesCopy.map((msg) => {
         if (msg.id === message.id) {
-          let { selfReactions } = msg
+          let { userReactions } = msg
           if (isSelf) {
-            selfReactions = msg.selfReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+            userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
           }
           return {
             ...msg,
             lastReactions: message.lastReactions,
-            reactionScores: message.reactionScores,
-            selfReactions
+            reactionTotals: message.reactionTotals,
+            userReactions
           }
         }
         return msg

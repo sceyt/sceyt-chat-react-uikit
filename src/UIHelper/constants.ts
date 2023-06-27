@@ -1,5 +1,6 @@
 export const colors = {
   white: '#ffffff',
+  black: '#000000',
   textColor1: '#111539',
   black1: '#383B51',
 
@@ -27,7 +28,7 @@ export const colors = {
   gray7: '#898B99',
   gray8: '#3A3C3E',
   gray9: '#757D8B',
-  gray10: '#F3F5F7',
+  gray10: '#707388',
   gray11: '#F1F2F6',
   pink1: '#ff3e74',
 

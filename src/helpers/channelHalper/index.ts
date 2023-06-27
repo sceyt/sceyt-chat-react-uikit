@@ -1,13 +1,23 @@
-import { IChannel } from '../../types'
+import { IChannel, IMessage } from '../../types'
 import { isJSON } from '../message'
 
 type channelMap = {
   [key: string]: IChannel
 }
 
+type channelTypesMemberDisplayTextMap = {
+  [key: string]: string
+}
+type defaultRolesByChannelTypesMap = {
+  [key: string]: string
+}
+
 let channelsMap: channelMap = {}
+let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
+let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
 let UploadImageIcon: JSX.Element
+
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = channel
 }
@@ -28,11 +38,11 @@ export function setChannelsInMap(channels: IChannel[]) {
       channelsArr.push(channel)
     } */
     if (
-      channel.userMessageReactions &&
-      channel.userMessageReactions.length &&
+      channel.newReactions &&
+      channel.newReactions.length &&
       channel.lastMessage &&
-      channel.lastMessage.id < channel.userMessageReactions[0].id &&
-      channel.lastMessage.id !== channel.userMessageReactions[0].messageId
+      channel.lastMessage.id < channel.newReactions[0].id &&
+      channel.lastMessage.id !== channel.newReactions[0].messageId
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
@@ -97,4 +107,26 @@ export function getUploadImageIcon() {
 
 export function setUploadImageIcon(icon: JSX.Element) {
   UploadImageIcon = icon
+}
+
+export function getChannelTypesMemberDisplayTextMap() {
+  return channelTypesMemberDisplayTextMap
+}
+
+export function setChannelTypesMemberDisplayTextMap(map: channelTypesMemberDisplayTextMap) {
+  channelTypesMemberDisplayTextMap = map
+}
+
+export function getDefaultRolesByChannelTypesMap() {
+  return defaultRolesByChannelTypesMap
+}
+
+export function setDefaultRolesByChannelTypesMap(map: channelTypesMemberDisplayTextMap) {
+  defaultRolesByChannelTypesMap = map
+}
+
+export let handleNewMessages: (message: IMessage, channel: IChannel) => IMessage | null
+
+export function setHandleNewMessages(callback: (message: IMessage, channel: IChannel) => IMessage | null) {
+  handleNewMessages = callback
 }

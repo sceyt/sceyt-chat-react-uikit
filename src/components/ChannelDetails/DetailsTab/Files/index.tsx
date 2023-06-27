@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
@@ -9,7 +9,7 @@ import { activeTabAttachmentsSelector } from '../../../../store/message/selector
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { AttachmentPreviewTitle } from '../../../../UIHelper'
+import { AttachmentPreviewTitle, UploadingIcon } from '../../../../UIHelper'
 
 interface IProps {
   channelId: string
@@ -31,11 +31,24 @@ const Files = ({
   filePreviewDownloadIcon
 }: IProps) => {
   const dispatch = useDispatch()
+  const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const handleCompleteDownload = (attachmentId: string) => {
+    const stateCopy = { ...downloadingFilesMap }
+    delete stateCopy[attachmentId]
+    setDownloadingFilesMap(stateCopy)
+  }
+  const handleDownloadFile = (attachment: IAttachment) => {
+    if (attachment.id) {
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
+    }
+    downloadFile(attachment, handleCompleteDownload)
+  }
 
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
   }, [channelId])
+
   return (
     <Container>
       {attachments.map((file: IAttachment) => (
@@ -58,12 +71,14 @@ const Files = ({
             <AttachmentPreviewTitle color={filePreviewTitleColor}>
               {formatLargeText(file.name, 32)}
             </AttachmentPreviewTitle>
-            <FileSizeAndDate color={filePreviewSizeColor}>
-              {file.fileSize ? bytesToSize(file.fileSize) : ''}
-            </FileSizeAndDate>
+            <FileSizeAndDate color={filePreviewSizeColor}>{file.size ? bytesToSize(file.size) : ''}</FileSizeAndDate>
           </div>
-          <DownloadWrapper onClick={() => downloadFile(file)}>
-            {filePreviewDownloadIcon || <Download />}
+          <DownloadWrapper onClick={() => handleDownloadFile(file)}>
+            {downloadingFilesMap[file.id!] ? (
+              <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.gray10} />
+            ) : (
+              filePreviewDownloadIcon || <Download />
+            )}
           </DownloadWrapper>
         </FileItem>
         // </FileItemWrapper>

@@ -164,11 +164,15 @@ const EditChannel = ({
   }
 
   const handleSave = () => {
+    console.log('channel. . . . .', channel)
+    console.log('newDescription. . . . .', newDescription)
+    console.log('newAvatar. . . . .', newAvatar)
     if (
       newSubject !== channel.subject ||
       newDescription !== (channel.metadata.d || channel.metadata) ||
       newAvatar.url !== channel.avatarUrl
     ) {
+      console.log('dispatch channel edit........ ...... .. ... ...')
       handleUpdateChannel({
         ...(newSubject !== channel.subject && { subject: newSubject }),
         ...(newDescription !== (channel.metadata.d || channel.metadata) && { metadata: { d: newDescription } }),
@@ -196,7 +200,7 @@ const EditChannel = ({
       <Container ref={editContainer} heightOffset={offsetTop} active={isEditMode}>
         <AvatarCont>
           <DropDownWrapper>
-            {!isDirectChannel && channel.role && (
+            {!isDirectChannel && channel.userRole && (
               <DropDown position='center' iconColor={colors.white} trigger={getUploadImageIcon() || <CameraIcon />}>
                 <DropdownOptionsUl>
                   <DropdownOptionLi

@@ -31,7 +31,7 @@ import { LOADING_STATE } from '../../helpers/constants'
 
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
-import { removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
+import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { colors, device } from '../../UIHelper/constants'
 import { IChannel, IContactsMap } from '../../types'
 // import { ReactComponent as BottomIcon } from '../../assets/svg/chevronBottom.svg'
@@ -55,10 +55,11 @@ interface IChannelListProps {
     children?: React.ReactNode
   }>
   ListItem?: FC<any>
+  Profile?: JSX.Element
+  CreateChannel?: JSX.Element
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
   getActiveChannel?: (channel: IChannel) => void
-  Profile?: JSX.Element
   filter?: { channelType?: string }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
@@ -82,11 +83,31 @@ interface IChannelListProps {
   selectedChannelPaddings?: string
   channelsPaddings?: string
   channelsMargin?: string
-  onChannelDeleted?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
-  onChannelCreated?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
-  onChannelHidden?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
-  onChannelVisible?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
-  onAddedToChannel?: (setChannels: (channels: IChannel[]) => void, channel: IChannel) => void
+  onChannelDeleted?: (
+    channelList: IChannel[],
+    deletedChannel: IChannel,
+    setChannels: (updatedChannelList: IChannel[]) => void
+  ) => void
+  onChannelCreated?: (
+    channelList: IChannel[],
+    createdChannel: IChannel,
+    setChannels: (updatedChannelList: IChannel[]) => void
+  ) => void
+  onChannelHidden?: (
+    channelList: IChannel[],
+    hiddenChannel: IChannel,
+    setChannels: (updatedChannelList: IChannel[]) => void
+  ) => void
+  onChannelVisible?: (
+    channelList: IChannel[],
+    visibleChannel: IChannel,
+    setChannels: (updatedChannelList: IChannel[]) => void
+  ) => void
+  onAddedToChannel?: (
+    channelList: IChannel[],
+    channel: IChannel,
+    setChannels: (updatedChannelList: IChannel[]) => void
+  ) => void
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
@@ -102,6 +123,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   ListItem,
   getActiveChannel,
   Profile,
+  CreateChannel,
   filter,
   limit,
   sort,
@@ -161,6 +183,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       }
       channelsForAction.forEach((channelToDelete: any) => removeChannelFromMap(channelToDelete.id))
     }
+    console.log('dispatch setChannel s.... ', updatedChannels)
     dispatch(setChannelsAC(updatedChannels))
   }
 
@@ -201,10 +224,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (deletedChannel) {
       if (onChannelDeleted) {
-        onChannelDeleted((updatedChannels) => handleSetChannelList(updatedChannels, true), deletedChannel)
+        onChannelDeleted(channels, deletedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         removeChannelFromMap(deletedChannel.id)
         dispatch(removeChannelAC(deletedChannel.id))
+        if (activeChannel.id === deletedChannel.id) {
+          const activeChannel = getLastChannelFromMap()
+          dispatch(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
+        }
       }
       dispatch(setChannelToRemoveAC(null))
     }
@@ -216,10 +243,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [connectionStatus])
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (addedChannel) {
       if (onChannelCreated) {
-        onChannelCreated((updatedChannels) => handleSetChannelList(updatedChannels, false), addedChannel)
+        onChannelCreated(channels, addedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
         dispatch(addChannelAC(addedChannel))
       }
@@ -230,7 +257,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (addedToChannel) {
       if (onAddedToChannel) {
-        onAddedToChannel((updatedChannels) => handleSetChannelList(updatedChannels, false), addedToChannel)
+        onAddedToChannel(channels, addedToChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
         dispatch(addChannelAC(addedToChannel))
       }
@@ -241,7 +268,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (hiddenChannel) {
       if (onChannelHidden) {
-        onChannelHidden((updatedChannels) => handleSetChannelList(updatedChannels, true), hiddenChannel)
+        onChannelHidden(channels, hiddenChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         dispatch(removeChannelAC(hiddenChannel.id))
       }
@@ -252,7 +279,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (visibleChannel) {
       if (onChannelVisible) {
-        onChannelVisible((updatedChannels) => handleSetChannelList(updatedChannels, true), visibleChannel)
+        onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         dispatch(addChannelAC(hiddenChannel))
       }
@@ -280,6 +307,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
+
+  /* useEffect(() => {
+    console.log('channels. ...........................', channels)
+  }, [channels]) */
   return (
     <Container withCustomList={!!List} ref={channelListRef}>
       <ChannelListHeader
@@ -303,17 +334,18 @@ const ChannelList: React.FC<IChannelListProps> = ({
           <ChannelsTitle>Chats</ChannelsTitle>
         )}
 
-        {showCreateChannelIcon && (
-          <CreateChannelButton
-            newChannelIcon={newChannelIcon}
-            newGroupIcon={newGroupIcon}
-            newChatIcon={newChatIcon}
-            uploadPhotoIcon={uploadPhotoIcon}
-            createChannelIcon={createChannelIcon}
-            showSearch={showSearch}
-            uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
-          />
-        )}
+        {showCreateChannelIcon &&
+          (CreateChannel || (
+            <CreateChannelButton
+              newChannelIcon={newChannelIcon}
+              newGroupIcon={newGroupIcon}
+              newChatIcon={newChatIcon}
+              uploadPhotoIcon={uploadPhotoIcon}
+              createChannelIcon={createChannelIcon}
+              showSearch={showSearch}
+              uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
+            />
+          ))}
       </ChannelListHeader>
       {showSearch && searchChannelsPosition === 'bottom' && (
         <ChannelSearch

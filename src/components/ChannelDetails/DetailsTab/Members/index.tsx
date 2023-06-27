@@ -27,6 +27,10 @@ import UsersPopup from '../../../../common/popups/users'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
+import {
+  getChannelTypesMemberDisplayTextMap,
+  getDefaultRolesByChannelTypesMap
+} from '../../../../helpers/channelHalper'
 
 interface IProps {
   channel: IChannel
@@ -45,6 +49,7 @@ const Members = ({
   showKickMember = true,
   showKickAndBlockMember = true
 }: IProps) => {
+  const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
   const [kickMemberPopupOpen, setKickMemberPopupOpen] = useState(false)
@@ -58,7 +63,14 @@ const Members = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const membersLoading = useSelector(membersLoadingStateSelector) || {}
   const user = getClient().user
-  const dispatch = useDispatch()
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
+  const displayMemberText =
+    memberDisplayText && memberDisplayText[channel.type]
+      ? `${memberDisplayText[channel.type]}s`
+      : channel.type === CHANNEL_TYPE.BROADCAST
+      ? 'subscribers'
+      : 'members'
   const noMemberEditPermissions =
     !chekActionPermission('changeMemberRole') &&
     !chekActionPermission('kickAndBlockMember') &&
@@ -135,9 +147,15 @@ const Members = ({
 
   const handleRevokeAdmin = () => {
     if (selectedMember) {
+      const role =
+        channelTypeRoleMap && channelTypeRoleMap[channel.type]
+          ? channelTypeRoleMap[channel.type]
+          : channel.type === CHANNEL_TYPE.BROADCAST
+          ? 'subscriber'
+          : 'participant'
       const updateMember: IMember = {
         ...selectedMember,
-        role: channel.type === CHANNEL_TYPE.BROADCAST ? 'subscriber' : 'participant'
+        role
       }
 
       dispatch(changeMemberRoleAC(channel.id, [updateMember]))
@@ -166,7 +184,7 @@ const Members = ({
               addMemberIconColor={colors.primary}
             >
               <AddMemberIcon />
-              {channel?.type === CHANNEL_TYPE.BROADCAST ? 'Add subscribers' : 'Add members'}
+              {`Add ${displayMemberText}`}
             </MemberItem>
           )}
 
@@ -181,14 +199,16 @@ const Members = ({
                   setDefaultAvatar
                 />
                 <MemberNamePresence>
-                  <MemberName>
-                    {member.id === user.id
-                      ? 'You'
-                      : makeUsername(
-                          member.id === user.id ? (member as unknown as IContact) : contactsMap[member.id],
-                          member,
-                          getFromContacts
-                        )}
+                  <MemberNameWrapper>
+                    <MemberName>
+                      {member.id === user.id
+                        ? 'You'
+                        : makeUsername(
+                            member.id === user.id ? (member as unknown as IContact) : contactsMap[member.id],
+                            member,
+                            getFromContacts
+                          )}
+                    </MemberName>
                     {member.role === 'owner' ? (
                       <RoleBadge color={colors.primary}>Owner</RoleBadge>
                     ) : member.role === 'admin' ? (
@@ -196,8 +216,9 @@ const Members = ({
                     ) : (
                       ''
                     )}
-                  </MemberName>
-                  <SubTitle>
+                  </MemberNameWrapper>
+
+                  <SubTitle margin='1px 0 0'>
                     {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
@@ -288,7 +309,8 @@ const Members = ({
               {!!selectedMember && (
                 <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
               )}
-              from this {channel.type === CHANNEL_TYPE.BROADCAST ? 'channel' : 'group'}?
+              from this{' '}
+              {channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
             </span>
           }
         />
@@ -370,12 +392,20 @@ const ActionsMenu = styled.div`
 
 const MemberNamePresence = styled.div`
   margin-left: 12px;
-  max-width: calc(100% - 64px);
+  max-width: calc(100% - 54px);
+
+  & > ${SubTitle} {
+    display: block;
+  }
+`
+
+const MemberNameWrapper = styled.div`
+  display: flex;
+  align-items: center;
 `
 
 const MemberName = styled.h4`
   margin: 0;
-  width: 100%;
   font-weight: 400;
   white-space: nowrap;
   text-overflow: ellipsis;

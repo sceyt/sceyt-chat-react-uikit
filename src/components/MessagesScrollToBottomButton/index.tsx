@@ -62,7 +62,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
           onClick={handleScrollToBottom}
           bottomPos={sendMessageInputHeight}
         >
-          {!!(channel.unreadMessageCount && channel.unreadMessageCount > 0) && (
+          {!!(channel.newMessageCount && channel.newMessageCount > 0) && (
             <UnreadCount
               width={unreadCountWidth}
               height={unreadCountHeight}
@@ -71,7 +71,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
               backgroundColor={colors.primary}
               isMuted={channel.muted}
             >
-              {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}
+              {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
             </UnreadCount>
           )}
           {buttonIcon || <BottomIcon />}

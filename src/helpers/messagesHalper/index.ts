@@ -9,12 +9,20 @@ export const MESSAGE_LOAD_DIRECTION = {
 }
 export type IAttachmentMeta = { thumbnail?: string; imageWidth?: number; imageHeight?: number; duration?: number }
 
+type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any } }
+
 type pendingMessagesMap = {
   [key: string]: IMessage[]
 }
 
 type messagesMap = {
   [key: string]: IMessage[]
+}
+
+export let sendMessageHandler: (message: IMessage, channelId: string) => Promise<IMessage>
+
+export const setSendMessageHandler = (handler: (message: IMessage, channelId: string) => Promise<IMessage>) => {
+  sendMessageHandler = handler
 }
 
 const pendingAttachments: { [key: string]: File } = {}
@@ -188,7 +196,7 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
   if (messagesMap[channelId]) {
     messagesMap[channelId] = messagesMap[channelId].map((msg) => {
       if (msg.id === message.id) {
-        let slfReactions = [...msg.selfReactions]
+        let slfReactions = [...msg.userReactions]
         if (isSelf) {
           if (slfReactions) {
             slfReactions.push(reaction)
@@ -198,9 +206,8 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
         }
         return {
           ...msg,
-          selfReactions: slfReactions,
-          lastReactions: message.lastReactions,
-          reactionScores: message.reactionScores
+          userReactions: slfReactions,
+          reactionTotals: message.reactionTotals
         }
       }
       return msg
@@ -211,7 +218,7 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
 export const addReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
   activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
     if (msg.id === message.id) {
-      let slfReactions = [...msg.selfReactions]
+      let slfReactions = [...msg.userReactions]
       if (isSelf) {
         if (slfReactions) {
           slfReactions.push(reaction)
@@ -221,9 +228,8 @@ export const addReactionOnAllMessages = (message: IMessage, reaction: IReaction,
       }
       return {
         ...msg,
-        selfReactions: slfReactions,
-        lastReactions: message.lastReactions,
-        reactionScores: message.reactionScores
+        userReactions: slfReactions,
+        reactionTotals: message.reactionTotals
       }
     }
     return msg
@@ -239,15 +245,14 @@ export function removeReactionToMessageOnMap(
   if (messagesMap[channelId]) {
     messagesMap[channelId] = messagesMap[channelId].map((msg) => {
       if (msg.id === message.id) {
-        let { selfReactions } = msg
+        let { userReactions } = msg
         if (isSelf) {
-          selfReactions = msg.selfReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+          userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
         }
         return {
           ...msg,
-          lastReactions: message.lastReactions,
-          reactionScores: message.reactionScores,
-          selfReactions
+          reactionTotals: message.reactionTotals,
+          userReactions
         }
       }
       return msg
@@ -258,15 +263,14 @@ export function removeReactionToMessageOnMap(
 export const removeReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
   activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
     if (msg.id === message.id) {
-      let { selfReactions } = msg
+      let { userReactions } = msg
       if (isSelf) {
-        selfReactions = msg.selfReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
+        userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
       }
       return {
         ...msg,
-        lastReactions: message.lastReactions,
-        reactionScores: message.reactionScores,
-        selfReactions
+        reactionTotals: message.reactionTotals,
+        userReactions
       }
     }
     return msg
@@ -321,10 +325,9 @@ export const messagesDiff = (message: IMessage, updatedMessage: IMessage) =>
   message.deliveryStatus !== updatedMessage.deliveryStatus ||
   message.body !== updatedMessage.body ||
   message.state !== updatedMessage.state ||
-  !checkArraysEqual(message.selfMarkers, updatedMessage.selfMarkers) ||
+  !checkArraysEqual(message.markerTotals, updatedMessage.markerTotals) ||
   !checkArraysEqual(message.mentionedUsers, updatedMessage.mentionedUsers) ||
-  !checkArraysEqual(message.selfReactions, updatedMessage.selfReactions) ||
-  !checkArraysEqual(message.lastReactions, updatedMessage.lastReactions)
+  !checkArraysEqual(message.userReactions, updatedMessage.userReactions)
 
 const pendingVideoAttachmentsThumbs: { [key: string]: IAttachmentMeta } = {}
 
@@ -350,3 +353,17 @@ export const deletePendingAttachment = (attachmentId: string) => delete pendingA
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
 export const getPendingMessagesMap = () => pendingMessagesMap
+
+export const draftMessagesMap: draftMessagesMap = {}
+
+export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]
+
+export const checkDraftMessagesIsEmpty = () => Object.keys(draftMessagesMap).length === 0
+
+export const removeDraftMessageFromMap = (channelId: string) => {
+  delete draftMessagesMap[channelId]
+}
+
+export const setDraftMessageToMap = (channelId: string, draftMessage: { text: string; mentionedMembers: any }) => {
+  draftMessagesMap[channelId] = draftMessage
+}

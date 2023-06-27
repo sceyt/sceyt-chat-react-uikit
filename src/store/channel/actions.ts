@@ -10,6 +10,7 @@ import {
   DELETE_ALL_MESSAGES,
   DELETE_CHANNEL,
   DESTROY_SESSION,
+  DRAFT_IS_REMOVED,
   GET_CHANNELS,
   GET_CHANNELS_FOR_FORWARD,
   JOIN_TO_CHANNEL,
@@ -411,6 +412,15 @@ export function setHideChannelListAC(hide: boolean) {
     type: SET_HIDE_CHANNEL_LIST,
     payload: {
       hide
+    }
+  }
+}
+
+export function setChannelDraftMessageIsRemovedAC(channelId?: string) {
+  return {
+    type: DRAFT_IS_REMOVED,
+    payload: {
+      channelId
     }
   }
 }

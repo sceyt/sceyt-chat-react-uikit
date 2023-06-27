@@ -70,7 +70,7 @@ function ConfirmPopup({
   return (
     <PopupContainer>
       <Popup maxWidth='520px' minWidth='520px' isLoading={loading} padding='0'>
-        <PopupBody padding={24}>
+        <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={() => togglePopup()} />
           <PopupName isDelete marginBottom='20px'>
             {title}

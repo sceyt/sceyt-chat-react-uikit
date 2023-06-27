@@ -675,6 +675,7 @@ export const Button = styled.button<{
 export const PopupName = styled.h3<{
   marginTop?: string
   marginBottom?: string
+  padding?: string
   isDelete?: boolean
 }>`
   font-style: normal;
@@ -685,6 +686,7 @@ export const PopupName = styled.h3<{
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
   margin-bottom: ${(props: any) => props.marginBottom};
+  padding: ${(props: any) => props.padding};
   word-break: break-word;
 
   ${(props: any) => {
@@ -770,11 +772,10 @@ export const Popup = styled.div<any>`
     `};
 `
 
-export const PopupBody = styled.div<{ padding: number; withFooter?: boolean }>`
-  padding: ${(props) => `${props.padding}px`};
+export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; paddingV?: string }>`
+  padding: ${(props) => `${props.paddingV || 0} ${props.paddingH || 0}`};
   margin-bottom: 8px;
-
-  height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.padding}px))` : 'calc(100% - 54px)')};
+  height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 
 export const PopupDescription = styled.span`
@@ -803,6 +804,7 @@ export const PopupFooter = styled(ButtonBlock)`
   margin-top: ${(props) => props.marginTop || '0'};
   padding: 8px 16px;
   border-radius: 0 0 8px 8px;
+  z-index: 2;
 `
 
 export const SectionHeader = styled.h4<{ color?: string; margin?: string }>`
@@ -818,8 +820,8 @@ export const ItemNote = styled.div<{ direction: string }>`
   position: absolute;
   z-index: 301;
   padding: 10px 12px;
-  background-color: ${colors.blue6};
-  border-radius: 4px;
+  background-color: ${colors.textColor1};
+  border-radius: 12px;
   font-size: 0.75rem;
   white-space: nowrap;
   font-weight: 600;
@@ -831,8 +833,8 @@ export const ItemNote = styled.div<{ direction: string }>`
     content: '';
     position: absolute;
     z-index: -1;
-    background-color: ${colors.blue6};
-    border-radius: 1px;
+    background-color: ${colors.textColor1};
+    border-radius: 3px;
     width: 14px;
     height: 14px;
 
@@ -963,19 +965,21 @@ export const MessageText = styled.pre<{
 }>`
   display: flow-root;
   position: relative;
-  font-family: ${(props) => props.fontFamily || 'Inter, sans-serif'};
+  font-family: ${(props) => props.fontFamily || 'sans-serif'};
   margin: 0;
   padding: ${(props) =>
     props.withAttachment &&
     (props.showMessageSenderName ? '0 12px 10px' : props.isForwarded ? '4px 12px 10px' : '8px 12px 10px')};
   padding-bottom: ${(props) => props.withAttachment && !props.withMediaAttachment && '2px'};
-  font-size: ${(props) => props.fontSize || '15px'};
+  //font-size: ${(props) => props.fontSize || '15px'};
+  font-size: ${(props) => props.fontSize || '16px'};
   font-weight: 400;
   word-wrap: break-word;
   white-space: pre-wrap;
   //white-space: normal;
   line-height: ${(props) => props.lineHeight || '20px'};
-  letter-spacing: -0.2px;
+  //letter-spacing: -0.2px;
+  letter-spacing: 0.3px;
   color: ${colors.gray6};
   user-select: text;
 
@@ -1035,7 +1039,7 @@ export const CloseIcon = styled(CloseSvg)`
 export const ClearTypedText = styled(CloseIcon)`
   position: absolute;
   top: 8px;
-  right: 22px;
+  right: 10px;
   cursor: pointer;
   padding: 4px;
 `
@@ -1046,24 +1050,35 @@ export const StyledSearchSvg = styled(SearchSvg)`
   top: 12px;
   left: ${(props) => props.left || '14px'};
 `
-export const SubTitle = styled.span<{ color?: string }>`
+export const SubTitle = styled.span<{ color?: string; margin?: string }>`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
   color: ${(props) => props.color || colors.gray9};
+  margin: ${(props) => props.margin};
 `
 
 export const AttachmentIconCont = styled.span`
   display: inline-flex;
 `
 
-export const UploadingIcon = styled.span<{ fileAttachment?: boolean; isRepliedMessage?: boolean }>`
+export const UploadingIcon = styled.span<{
+  width?: string
+  height?: string
+  color?: string
+  borderWidth?: string
+  fileAttachment?: boolean
+  isRepliedMessage?: boolean
+}>`
   display: inline-block;
-  border: ${(props) => (props.fileAttachment ? '2px' : '3px')} solid rgba(255, 255, 255, 0.8);
-  border-top: ${(props) => (props.fileAttachment ? '2px' : '3px')} solid rgba(0, 0, 0, 0);
+  border-style: solid;
+  border-color: ${(props) => props.color || 'rgba(255, 255, 255, 0.8)'};
+  border-width: ${(props) => props.borderWidth || (props.fileAttachment ? '2px' : '3px')};
+  border-top-width: ${(props) => props.borderWidth || (props.fileAttachment ? '2px' : '3px')};
+  border-top-color: rgba(0, 0, 0, 0);
   border-radius: 50%;
-  width: ${(props) => (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
-  height: ${(props) => (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
+  width: ${(props) => props.width || (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
+  height: ${(props) => props.height || (props.fileAttachment ? '26px' : props.isRepliedMessage ? '28px' : '40px')};
 
   animation: preloader 1.5s linear infinite;
 

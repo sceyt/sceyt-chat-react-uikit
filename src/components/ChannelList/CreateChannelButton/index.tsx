@@ -32,9 +32,9 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   // const dispatch = useDispatch()
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
-  const [creatingChannelType, setCreatingChannelType] = useState<'group' | 'broadcast' | 'direct'>('group')
+  const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
 
-  const handleOpenCreateChannel = (channelType: 'group' | 'broadcast' | 'direct') => {
+  const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
       // dispatch(setChannelEditModeAC(true))

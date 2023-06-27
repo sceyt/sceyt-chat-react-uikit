@@ -23,6 +23,7 @@ const Media = ({ channelId }: IProps) => {
   const handleMediaItemClick = (file: IAttachment) => {
     setMediaFile(file)
   }
+  console.log('attachments. .. . . . . ', attachments)
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.media))

@@ -69,7 +69,7 @@ const VoiceItem = ({
           } else {
             audioDuration = audioRef.current?.duration
           }
-        }, 10)
+        }, 100)
         setAudioIsPlaying(true)
         if (setVoiceIsPlaying) {
           setVoiceIsPlaying(file.id!)
@@ -130,7 +130,7 @@ const VoiceItem = ({
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
         <AudioSendTime>
-          {currentTime || file.metadata.dur ? formatAudioVideoTime(file.metadata.dur, 0) : ''}
+          {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur, 0) : '')}
         </AudioSendTime>
       </AudioInfo>
 

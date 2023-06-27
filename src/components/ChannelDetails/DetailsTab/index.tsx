@@ -10,6 +10,7 @@ import Links from './Links'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 import { IChannel } from '../../../types'
 import Voices from './Voices'
+import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 
 interface IProps {
   channel: IChannel
@@ -71,7 +72,13 @@ const DetailsTab = ({
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
-
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const displayMemberText =
+    memberDisplayText && memberDisplayText[channel.type]
+      ? `${memberDisplayText[channel.type]}s`
+      : channel.type === CHANNEL_TYPE.BROADCAST
+      ? 'subscribers'
+      : 'members'
   const handleTabClick = (tabIndex: string) => {
     dispatch(emptyChannelAttachmentsAC())
     setActiveTab(tabIndex)
@@ -97,11 +104,7 @@ const DetailsTab = ({
                   onClick={() => handleTabClick(channelDetailsTabs[key])}
                   key={key}
                 >
-                  {channelDetailsTabs[key] === channelDetailsTabs.member
-                    ? channel.type === CHANNEL_TYPE.BROADCAST
-                      ? 'Subscribers'
-                      : channelDetailsTabs[key]
-                    : channelDetailsTabs[key]}
+                  {channelDetailsTabs[key] === channelDetailsTabs.member ? displayMemberText : channelDetailsTabs[key]}
                 </button>
               )
             } else {
@@ -189,6 +192,7 @@ const DetailsTabHeader = styled.div<{ activeTabColor?: string }>`
     background: transparent;
     outline: none;
     padding: 13px 0 11px;
+    text-transform: capitalize;
     font-style: normal;
     font-weight: 500;
     font-size: 15px;

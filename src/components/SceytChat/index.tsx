@@ -3,7 +3,13 @@ import React, { Children, useEffect, useState } from 'react'
 import SceytChatClient from 'sceyt-chat'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { setClient } from '../../common/client'
-import { destroyChannelsMap, setActiveChannelId } from '../../helpers/channelHalper'
+import {
+  destroyChannelsMap,
+  setActiveChannelId,
+  setChannelTypesMemberDisplayTextMap,
+  setDefaultRolesByChannelTypesMap,
+  setHandleNewMessages
+} from '../../helpers/channelHalper'
 import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { ChatContainer } from './styled'
@@ -26,7 +32,10 @@ const SceytChat = ({
   showOnlyContactUsers,
   logoSrc,
   CustomUploader,
+  handleNewMessages,
   sendAttachmentsAsSeparateMessages,
+  membersDisplayTextByChannelTypesMap,
+  defaultRolesByChannelTypesMap,
   customColors,
   hideUserPresence,
   showNotifications
@@ -100,6 +109,7 @@ const SceytChat = ({
       setTabIsActive(true)
     }
   }, [client])
+
   useEffect(() => {
     if (CustomUploader) {
       setCustomUploader(CustomUploader)
@@ -109,6 +119,15 @@ const SceytChat = ({
         console.log('my file url ,,, ', file)
         setVideoBlob(file)
       }) */
+    }
+    if (membersDisplayTextByChannelTypesMap) {
+      setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
+    }
+    if (defaultRolesByChannelTypesMap) {
+      setDefaultRolesByChannelTypesMap(defaultRolesByChannelTypesMap)
+    }
+    if (handleNewMessages) {
+      setHandleNewMessages(handleNewMessages)
     }
     if (customColors) {
       if (customColors.primaryColor) {
@@ -133,6 +152,7 @@ const SceytChat = ({
         colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
       }
     }
+    console.log('sendAttachmentsAsSeparateMessages. . . . .', sendAttachmentsAsSeparateMessages)
     if (sendAttachmentsAsSeparateMessages) {
       setSendAttachmentsAsSeparateMessages(sendAttachmentsAsSeparateMessages)
     }

@@ -40,7 +40,7 @@ const LinkItem = ({
   }, [])
   return (
     <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor}>
-      <a draggable={false} href={link} target='_blank' rel='noreferrer'>
+      <a draggable={false} href={link.startsWith('http') ? link : `https://${link}`} target='_blank' rel='noreferrer'>
         {/* {loading ? (
           <Loading />
         ) : imageSrc ? (

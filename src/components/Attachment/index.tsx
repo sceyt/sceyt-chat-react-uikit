@@ -76,6 +76,7 @@ const Attachment = ({
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
   // const [imageLoading, setImageLoading] = useState(true)
+  const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
   const [isCached, setIsCached] = useState(true)
   // const [linkTitle, setLinkTitle] = useState('')
@@ -160,6 +161,15 @@ const Attachment = ({
   }
 
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
+  const handleCompleteDownload = (attachmentId: string) => {
+    if (attachmentId === attachment.id) {
+      setDownloadingFile(false)
+    }
+  }
+  const handleDownloadFile = (attachment: IAttachment) => {
+    setDownloadingFile(true)
+    downloadFile(attachment, handleCompleteDownload)
+  }
 
   useEffect(() => {
     if (downloadIsCancelled) {
@@ -206,7 +216,8 @@ const Attachment = ({
                   setAttachmentToCache(attachment.id!, response)
                 })
               } else {
-                console.log('is not cached, load attachment', attachment.url)
+                console.log('is not cached, load attachment.url', attachment.url)
+                console.log('is not cached, load attachment.attachmentUrl', attachment.attachmentUrl)
                 downloadImage(attachment.url)
               }
             }
@@ -480,11 +491,11 @@ const Attachment = ({
           {!isRepliedMessage && !isPrevious && (
             <DownloadFile
               backgroundColor={colors.primary}
-              onClick={() => downloadFile(attachment)}
+              onClick={() => handleDownloadFile(attachment)}
               onMouseEnter={() => handleMouseEvent(true)}
               onMouseLeave={() => handleMouseEvent(false)}
             >
-              <DownloadIcon />
+              {downloadingFile ? <UploadingIcon fileAttachment /> : <DownloadIcon />}
             </DownloadFile>
           )}
 
@@ -522,8 +533,8 @@ const Attachment = ({
                 )}
               </AttachmentName>
               <AttachmentSize color={selectedFileAttachmentsSizeColor}>
-                {((attachment.data && attachment.data.size) || attachment.fileSize) &&
-                  bytesToSize(isPrevious ? attachment.data.size : +attachment.fileSize)}
+                {((attachment.data && attachment.data.size) || attachment.size) &&
+                  bytesToSize(isPrevious ? attachment.data.size : +attachment.size)}
                 {/* <span>
                   {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL && 'Upload error'}
                 </span> */}

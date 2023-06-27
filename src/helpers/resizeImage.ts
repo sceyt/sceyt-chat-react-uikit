@@ -15,7 +15,6 @@ export function resizeImage(
   maxHeight?: number,
   quality?: number
 ): Promise<{ file: File; blob: Blob | null; newWidth: number; newHeight: number }> {
-  console.log('resize image. .. ', quality)
   return new Promise((resolve) => {
     // const resizedFiles: any[] = []
     // files.forEach((file: File, index) => {

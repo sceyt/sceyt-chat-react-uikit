@@ -24,19 +24,34 @@ import { IAddMember } from '../../../types'
 import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
+import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 
 interface ICreateChannelPopup {
   handleClose: () => void
-  channelType: 'group' | 'broadcast' | 'direct'
+  channelType: string
   uriPrefixOnCreateChannel?: string
   uploadPhotoIcon?: JSX.Element
+  channelTypeRequiredFieldsMap?: {
+    [key: string]: { subject?: boolean; description?: boolean; uri?: boolean; members?: boolean }
+  }
+  showSubject?: boolean
+  showDescription?: boolean
+  showUri?: boolean
+  showUploadAvatar?: boolean
+  withoutConfig?: boolean
 }
 
 export default function CreateChannel({
   handleClose,
   channelType,
   uriPrefixOnCreateChannel,
-  uploadPhotoIcon
+  channelTypeRequiredFieldsMap,
+  uploadPhotoIcon,
+  showSubject = true,
+  showDescription = true,
+  showUri = true,
+  showUploadAvatar = true,
+  withoutConfig
 }: ICreateChannelPopup) {
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
@@ -48,6 +63,7 @@ export default function CreateChannel({
   const [subjectValue, setSubjectValue] = useState('')
   const [URIValue, setURIValue] = useState('')
   const [wrongUri, setWrongUri] = useState('')
+  const [nextButtonDisable, setNextButtonDisable] = useState(true)
   const [uriPrefixWidth, setUriPrefixWidth] = useState<any>('')
   const [metadataValue, setMetadataValue] = useState('')
   const [cropPopup, setCropPopup] = useState(false)
@@ -55,8 +71,10 @@ export default function CreateChannel({
     src: {},
     url: '' // channelDetails.avatar
   })
+  const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   // const [pagination, setPagination] = useState(false)
   const createGroupChannel = channelType === CHANNEL_TYPE.GROUP
+  const requiredFields = channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType]
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
   }
@@ -87,9 +105,19 @@ export default function CreateChannel({
   }
 
   const GoToAddMember = () => {
-    if (subjectValue && (createGroupChannel || (URIValue && uriRegexp.test(URIValue)))) {
+    if (requiredFields) {
+      if (
+        !(
+          (requiredFields.subject && !subjectValue) ||
+          (requiredFields.description && !metadataValue) ||
+          (requiredFields.uri && !URIValue)
+        )
+      ) {
+        setUsersPopupVisible(true)
+        setCreateGroupChannelPopupVisible(false)
+      }
+    } else {
       setUsersPopupVisible(true)
-      // setPagination(true)
       setCreateGroupChannelPopupVisible(false)
     }
   }
@@ -103,14 +131,39 @@ export default function CreateChannel({
       type: channelType,
       avatarFile: newAvatar.src.file
     }
-    if (createGroupChannel && members.length > 0) {
+    let membersToAdd = members
+    if (channelTypeRoleMap) {
+      membersToAdd = members.map((mem) => ({ ...mem, role: channelTypeRoleMap[channelType] }))
+    } else {
+      if (!createGroupChannel) {
+        membersToAdd = members.map((mem) => ({ ...mem, role: 'subscriber' }))
+      }
+    }
+
+    if (requiredFields) {
+      if (requiredFields.members && members.length > 0) {
+        dispatch(createChannelAC({ ...createChannelParams, members: membersToAdd }))
+        toggleCreateGroupChannelPopup()
+      } else if (!requiredFields.members) {
+        dispatch(createChannelAC({ ...createChannelParams, members: membersToAdd }))
+        toggleCreateGroupChannelPopup()
+      }
+    } else {
+      dispatch(createChannelAC({ ...createChannelParams, members: membersToAdd }))
+      toggleCreateGroupChannelPopup()
+    }
+
+    /* if (createGroupChannel && members.length > 0) {
+      console.log('data for create group ,,,... ', createChannelParams)
       dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()
     } else if (!createGroupChannel) {
-      const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
-      dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
+      // const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
+      console.log('data for create channel ... ', createChannelParams)
+      // dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
+      dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()
-    }
+    } */
   }
 
   const handleTypeSubject = (e: any) => {
@@ -183,119 +236,155 @@ export default function CreateChannel({
     }
   } */
   useEffect(() => {
-    console.log('uriPrefixRef.width. . ', uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width)
     setUriPrefixWidth(uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width + 15)
   }, [])
+  useEffect(() => {
+    if (requiredFields) {
+      if (
+        (requiredFields.subject && !subjectValue) ||
+        (requiredFields.description && !metadataValue) ||
+        (requiredFields.uri && !URIValue)
+      ) {
+        setNextButtonDisable(true)
+      } else {
+        setNextButtonDisable(false)
+      }
+    } else {
+      setNextButtonDisable(false)
+    }
+  }, [subjectValue, createGroupChannel, URIValue])
   return (
     <Container>
-      {usersPopupVisible && (
-        <UsersPopup
-          toggleCreatePopup={toggleCreatePopup}
-          getSelectedUsers={handleAddMembersForCreateChannel}
-          creatChannelSelectedMembers={selectedMembers}
-          actionType='selectUsers'
-          selectIsRequired={createGroupChannel}
-          popupHeight='540px'
-          popupWidth='520px'
-        />
-      )}
+      {withoutConfig ? (
+        <UsersPopup popupHeight='540px' popupWidth='520px' toggleCreatePopup={handleClose} actionType='createChat' />
+      ) : (
+        <React.Fragment>
+          {usersPopupVisible && (
+            <UsersPopup
+              toggleCreatePopup={toggleCreatePopup}
+              getSelectedUsers={handleAddMembersForCreateChannel}
+              creatChannelSelectedMembers={selectedMembers}
+              actionType='selectUsers'
+              selectIsRequired={channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType].members}
+              channel={{ type: channelType } as any}
+              popupHeight='540px'
+              popupWidth='520px'
+            />
+          )}
 
-      {createGroupChannelPopupVisible && (
-        <PopupContainer>
-          <Popup maxHeight='600px' width='520px' maxWidth='520px' padding='0'>
-            <PopupBody padding={24}>
-              <CloseIcon onClick={toggleCreateGroupChannelPopup} />
+          {createGroupChannelPopupVisible && (
+            <PopupContainer>
+              <Popup maxHeight='600px' width='520px' maxWidth='520px' padding='0'>
+                <PopupBody paddingH='24px' paddingV='24px'>
+                  <CloseIcon onClick={toggleCreateGroupChannelPopup} />
 
-              <PopupName marginBottom='20px'>Create {createGroupChannel ? 'Group' : 'Channel'}</PopupName>
-              {!createGroupChannel && (
-                <CrateChannelTitle>Create a Channel to post your content to a large audience.</CrateChannelTitle>
-              )}
+                  <PopupName marginBottom='20px'>Create {createGroupChannel ? 'Group' : 'Channel'}</PopupName>
+                  {!createGroupChannel && (
+                    <CrateChannelTitle>Create a Channel to post your content to a large audience.</CrateChannelTitle>
+                  )}
 
-              <UploadChannelAvatar>
-                {newAvatar.url ? (
-                  <AvatarWrapper>
-                    <Avatar image={newAvatar.url} size={90} name={subjectValue} />
-                    <RemoveSelectedAvatar onClick={() => setNewAvatar({ src: {}, url: '' })}>
-                      Remove
-                    </RemoveSelectedAvatar>
-                  </AvatarWrapper>
-                ) : (
-                  <UploadAvatarLabel
-                    iconColor={colors.primary}
-                    backgroundColor={colors.primaryLight}
-                    htmlFor='uploadImage'
+                  {showUploadAvatar && (
+                    <UploadChannelAvatar>
+                      {newAvatar.url ? (
+                        <AvatarWrapper>
+                          <Avatar image={newAvatar.url} size={90} name={subjectValue} />
+                          <RemoveSelectedAvatar onClick={() => setNewAvatar({ src: {}, url: '' })}>
+                            Remove
+                          </RemoveSelectedAvatar>
+                        </AvatarWrapper>
+                      ) : (
+                        <UploadAvatarLabel
+                          iconColor={colors.primary}
+                          backgroundColor={colors.primaryLight}
+                          htmlFor='uploadImage'
+                        >
+                          {uploadPhotoIcon || <UploadImageIcon />}
+                        </UploadAvatarLabel>
+                      )}
+                      <FileUploaderInput
+                        ref={fileUploader}
+                        type='file'
+                        accept='.png,.jpeg,.jpg'
+                        id='uploadImage'
+                        onChange={handleSelectImage}
+                      />
+                    </UploadChannelAvatar>
+                  )}
+                  {showSubject && (
+                    <React.Fragment>
+                      <Label> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
+                      <CustomInput
+                        type='text'
+                        value={subjectValue}
+                        onChange={handleTypeSubject}
+                        placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
+                      />
+                    </React.Fragment>
+                  )}
+
+                  {showDescription && (
+                    <React.Fragment>
+                      <Label>Description</Label>
+                      <CustomInput
+                        type='text'
+                        value={metadataValue}
+                        onChange={handleTypeMetadata}
+                        placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
+                      />
+                    </React.Fragment>
+                  )}
+                  {showUri && (
+                    <React.Fragment>
+                      <Label>URL</Label>
+                      <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
+                        {uriPrefixOnCreateChannel && (
+                          <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>
+                        )}
+                        <CustomInput
+                          type='text'
+                          value={URIValue}
+                          onChange={handleTypeURI}
+                          onBlur={checkURIRegexp}
+                          placeholder='chan12'
+                          error={!!wrongUri}
+                        />
+                        {!!wrongUri && (
+                          <InputErrorMessage>
+                            {wrongUri === 'short'
+                              ? 'The name should be 5-50 characters long'
+                              : 'The name is invalid. Please provide na name from the allowed range of characters'}
+                          </InputErrorMessage>
+                        )}
+                      </UriInputWrapper>
+                      <ChannelUriDescription>
+                        Give a URL to your channel so you can share it with others inviting them to join. Choose a name
+                        from the allowed range: a-z, 0-9, and _(underscores) between 5-50 characters.
+                      </ChannelUriDescription>
+                    </React.Fragment>
+                  )}
+                </PopupBody>
+                <PopupFooter backgroundColor={colors.gray5}>
+                  <Button
+                    type='button'
+                    color={colors.gray6}
+                    backgroundColor='transparent'
+                    onClick={() => handleClose()}
                   >
-                    {uploadPhotoIcon || <UploadImageIcon />}
-                  </UploadAvatarLabel>
-                )}
-                <FileUploaderInput
-                  ref={fileUploader}
-                  type='file'
-                  accept='.png,.jpeg,.jpg'
-                  id='uploadImage'
-                  onChange={handleSelectImage}
-                />
-              </UploadChannelAvatar>
-              <Label> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
-              <CustomInput
-                type='text'
-                value={subjectValue}
-                onChange={handleTypeSubject}
-                placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
-              />
-
-              <Label>Description</Label>
-              <CustomInput
-                type='text'
-                value={metadataValue}
-                onChange={handleTypeMetadata}
-                placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
-              />
-              {!createGroupChannel && (
-                <React.Fragment>
-                  <Label>URL</Label>
-                  <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
-                    {uriPrefixOnCreateChannel && <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>}
-                    <CustomInput
-                      type='text'
-                      value={URIValue}
-                      onChange={handleTypeURI}
-                      onBlur={checkURIRegexp}
-                      placeholder='chan12'
-                      error={!!wrongUri}
-                    />
-                    {!!wrongUri && (
-                      <InputErrorMessage>
-                        {wrongUri === 'short'
-                          ? 'The name should be 5-50 characters long'
-                          : 'The name is invalid. Please provide na name from the allowed range of characters'}
-                      </InputErrorMessage>
-                    )}
-                  </UriInputWrapper>
-                  <ChannelUriDescription>
-                    Give a URL to your channel so you can share it with others inviting them to join. Choose a name from
-                    the allowed range: a-z, 0-9, and _(underscores) between 5-50 characters.
-                  </ChannelUriDescription>
-                </React.Fragment>
-              )}
-            </PopupBody>
-            <PopupFooter backgroundColor={colors.gray5}>
-              <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => handleClose()}>
-                Cancel
-              </Button>
-              {/*  <button type='button' className='button gray' onClick={handleClose}>
+                    Cancel
+                  </Button>
+                  {/*  <button type='button' className='button gray' onClick={handleClose}>
                 Cancel
               </button> */}
-              <Button
-                type='button'
-                backgroundColor={colors.primary}
-                borderRadius='8px'
-                onClick={() => GoToAddMember()}
-                disabled={!subjectValue || (!createGroupChannel && (!URIValue || !!wrongUri))}
-              >
-                Next
-              </Button>
-              {/* <button
+                  <Button
+                    type='button'
+                    backgroundColor={colors.primary}
+                    borderRadius='8px'
+                    onClick={() => GoToAddMember()}
+                    disabled={nextButtonDisable}
+                  >
+                    Next
+                  </Button>
+                  {/* <button
                 type='button'
                 className='button blue filled'
                 disabled={!subjectValue ? !subjectValue : !createGroupChannel && !URIValue}
@@ -303,17 +392,19 @@ export default function CreateChannel({
               >
                 Next
               </button> */}
-            </PopupFooter>
-          </Popup>
+                </PopupFooter>
+              </Popup>
 
-          {cropPopup && (
-            <ImageCrop
-              image={newAvatar}
-              onAccept={handleImageCrop}
-              handleClosePopup={(cropped?: boolean) => handleCloseCropPopup(cropped)}
-            />
+              {cropPopup && (
+                <ImageCrop
+                  image={newAvatar}
+                  onAccept={handleImageCrop}
+                  handleClosePopup={(cropped?: boolean) => handleCloseCropPopup(cropped)}
+                />
+              )}
+            </PopupContainer>
           )}
-        </PopupContainer>
+        </React.Fragment>
       )}
     </Container>
   )
