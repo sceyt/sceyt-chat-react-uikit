@@ -146,7 +146,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         const WaveSurfer = await import('wavesurfer.js')
         wavesurfer.current = WaveSurfer.default.create({
           container: wavesurferContainer.current,
-          waveColor: colors.gray9,
+          waveColor: colors.textColor2,
           skipLength: 0,
           progressColor: colors.primary,
           // audioContext,
@@ -284,7 +284,7 @@ const AudioRate = styled.div`
   font-weight: 600;
   font-size: 12px;
   line-height: 14px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   height: 18px;
   box-sizing: border-box;
   margin-left: 14px;
@@ -311,5 +311,5 @@ const Timer = styled.div`
   font-weight: 400;
   font-size: 11px;
   line-height: 12px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `

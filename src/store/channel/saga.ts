@@ -169,7 +169,7 @@ function* getChannels(action: IAction): any {
         channelQueryBuilder.type(params.filter.channelType)
       }
       channelQueryBuilder.sortByLastMessage()
-      channelQueryBuilder.limit(params.limit || 20)
+      channelQueryBuilder.limit(params.limit || 50)
       const channelQuery = yield call(channelQueryBuilder.build)
       const channelsData = yield call(channelQuery.loadNextPage)
       yield put(channelHasNextAC(channelsData.hasNext))
@@ -209,7 +209,79 @@ function* getChannels(action: IAction): any {
           return channel
         })
       }
+      /* if (!('indexedDB' in window)) {
+        console.log("This browser doesn't support IndexedDB")
+      } else {
+        console.log('should open db with name ... . ', DB_NAME)
+        const openRequest = indexedDB.open(DB_NAME, 1)
+        openRequest.onupgradeneeded = function (event) {
+          // срабатывает, если на клиенте нет базы данных
+          // ...выполнить инициализацию...
+          // версия существующей базы данных меньше 2 (или база данных не существует)
+          const db = openRequest.result
+          console.log('onupgradeneeded --  db. . . . ', db)
+          console.log('onupgradeneeded ---  event.oldVersion. . . . ', event.oldVersion)
+          if (!db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS)) {
+            const objectStore = db.createObjectStore(DB_STORE_NAMES.CHANNELS, { keyPath: 'id' })
+            // Create the 'channels' object store with the appropriate keyPath
+            objectStore.transaction.oncomplete = () => {
+              const channelObjectStore = db
+                .transaction(DB_STORE_NAMES.CHANNELS, 'readwrite')
+                .objectStore(DB_STORE_NAMES.CHANNELS)
+              mappedChannels.forEach((channel: IChannel) => {
+                const request = channelObjectStore.put(channel)
+                request.onsuccess = function () {
+                  console.log('channel added to db.. ', request.result)
+                }
 
+                request.onerror = function () {
+                  console.log('Error on put channel to db .. ', request.error)
+                }
+              })
+            }
+            // если хранилище "books" не существует
+          } else {
+            console.log('channels object is exist ... ')
+            const transaction = db.transaction(DB_STORE_NAMES.CHANNELS, 'readwrite')
+            const channelsStore = transaction.objectStore(DB_STORE_NAMES.CHANNELS)
+
+            mappedChannels.forEach((channel: IChannel) => {
+              const request = channelsStore.put(channel)
+              request.onsuccess = function () {
+                console.log('channel added to db.. ', request.result)
+              }
+
+              request.onerror = function () {
+                console.log('Error on put channel to db .. ', request.error)
+              }
+            })
+          }
+        }
+
+        openRequest.onerror = function () {
+          console.error('Error', openRequest.error)
+        }
+
+        openRequest.onsuccess = function () {
+          const db = openRequest.result
+
+          console.log('db  open is success.... .. ', db)
+          db.onversionchange = function () {
+            db.close()
+            alert('The database is out of date, please reload the page.')
+          }
+          console.log(
+            'db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS). ..  ',
+            db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS)
+          )
+        }
+        openRequest.onblocked = function () {
+          // это событие не должно срабатывать, если мы правильно обрабатываем onversionchange
+          // это означает, что есть ещё одно открытое соединение с той же базой данных
+          // и он не был закрыт после того, как для него сработал db.onversionchange
+        }
+        console.log('openRequest.  . . .', openRequest)
+      } */
       yield put(setChannelsAC(mappedChannels))
       if (!channelId) {
         ;[activeChannel] = channelsData.channels

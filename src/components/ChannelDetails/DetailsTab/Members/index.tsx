@@ -34,7 +34,8 @@ import {
 
 interface IProps {
   channel: IChannel
-  chekActionPermission: (permission: string) => boolean
+  theme: string
+  checkActionPermission: (permission: string) => boolean
   showChangeMemberRole?: boolean
   showMakeMemberAdmin?: boolean
   showKickMember?: boolean
@@ -43,7 +44,8 @@ interface IProps {
 
 const Members = ({
   channel,
-  chekActionPermission,
+  theme,
+  checkActionPermission,
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
   showKickMember = true,
@@ -72,9 +74,9 @@ const Members = ({
       ? 'subscribers'
       : 'members'
   const noMemberEditPermissions =
-    !chekActionPermission('changeMemberRole') &&
-    !chekActionPermission('kickAndBlockMember') &&
-    !chekActionPermission('kickMember')
+    !checkActionPermission('changeMemberRole') &&
+    !checkActionPermission('kickAndBlockMember') &&
+    !checkActionPermission('kickMember')
 
   const handleMembersListScroll = (event: any) => {
     // setCloseMenu(true)
@@ -173,14 +175,16 @@ const Members = ({
     dispatch(getMembersAC(channel.id))
   }, [channel])
   return (
-    <Container>
+    <Container theme={theme}>
       <ActionsMenu>
         <MembersList onScroll={handleMembersListScroll}>
-          {chekActionPermission('addMember') && (
+          {checkActionPermission('addMember') && (
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
+              color={colors.textColor1}
               hoverBackground={colors.primaryLight}
+              addMemberBackground={colors.backgroundColor}
               addMemberIconColor={colors.primary}
             >
               <AddMemberIcon />
@@ -190,7 +194,11 @@ const Members = ({
 
           {!!members.length &&
             members.map((member, index) => (
-              <MemberItem key={member.id + index} hoverBackground={colors.primaryLight}>
+              <MemberItem
+                key={member.id + index}
+                color={colors.textColor1}
+                hoverBackground={colors.hoverBackgroundColor}
+              >
                 <Avatar
                   name={member.firstName || member.id}
                   image={member.avatarUrl}
@@ -228,6 +236,7 @@ const Members = ({
                 </MemberNamePresence>
                 {!noMemberEditPermissions && member.role !== 'owner' && member.id !== user.id && (
                   <DropDown
+                    theme={theme}
                     isSelect
                     forceClose={!!(closeMenu && closeMenu !== member.id)}
                     watchToggleState={(state) => watchDropdownState(state, member.id)}
@@ -238,19 +247,19 @@ const Members = ({
                     }
                   >
                     <DropdownOptionsUl>
-                      {showChangeMemberRole && chekActionPermission('changeMemberRole') && (
+                      {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
                         <DropdownOptionLi
                           onClick={() => {
                             setSelectedMember(member)
                             toggleChangeRolePopup()
                           }}
                           key={1}
-                          hoverBackground={colors.primaryLight}
+                          hoverBackground={colors.hoverBackgroundColor}
                         >
                           Change role
                         </DropdownOptionLi>
                       )}
-                      {showMakeMemberAdmin && chekActionPermission('changeMemberRole') && member.role !== 'owner' && (
+                      {showMakeMemberAdmin && checkActionPermission('changeMemberRole') && member.role !== 'owner' && (
                         <DropdownOptionLi
                           onClick={() => {
                             setSelectedMember(member)
@@ -258,12 +267,12 @@ const Members = ({
                           }}
                           textColor={member.role === 'admin' ? colors.red1 : ''}
                           key={2}
-                          hoverBackground={colors.primaryLight}
+                          hoverBackground={colors.hoverBackgroundColor}
                         >
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
                       )}
-                      {showKickMember && chekActionPermission('kickMember') && member.role !== 'owner' && (
+                      {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
                         <DropdownOptionLi
                           onClick={() => {
                             setSelectedMember(member)
@@ -271,16 +280,16 @@ const Members = ({
                           }}
                           textColor={colors.red1}
                           key={3}
-                          hoverBackground={colors.primaryLight}
+                          hoverBackground={colors.hoverBackgroundColor}
                         >
                           Remove
                         </DropdownOptionLi>
                       )}
-                      {showKickAndBlockMember && chekActionPermission('kickAndBlockMember') && (
+                      {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
                         <DropdownOptionLi
                           textColor={colors.red1}
                           key={4}
-                          hoverBackground={colors.primaryLight}
+                          hoverBackground={colors.hoverBackgroundColor}
                           onClick={() => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup()
@@ -299,6 +308,7 @@ const Members = ({
 
       {kickMemberPopupOpen && (
         <ConfirmPopup
+          theme={theme}
           handleFunction={handleKickMember}
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
@@ -317,6 +327,7 @@ const Members = ({
       )}
       {blockMemberPopupOpen && (
         <ConfirmPopup
+          theme={theme}
           handleFunction={handleBlockMember}
           togglePopup={toggleBlockMemberPopup}
           buttonText='Block'
@@ -328,6 +339,7 @@ const Members = ({
       )}
       {makeAdminPopup && (
         <ConfirmPopup
+          theme={theme}
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(false)}
           buttonText='Promote'
@@ -350,6 +362,7 @@ const Members = ({
           togglePopup={() => toggleMakeAdminPopup(true)}
           buttonText='Revoke'
           title='Revoke admin'
+          theme={theme}
           description={
             <span>
               Are you sure you want to revoke
@@ -364,7 +377,12 @@ const Members = ({
         />
       )}
       {changeMemberRolePopup && (
-        <ChangeMemberRole channelId={channel.id} member={selectedMember!} handleClosePopup={toggleChangeRolePopup} />
+        <ChangeMemberRole
+          theme={theme}
+          channelId={channel.id}
+          member={selectedMember!}
+          handleClosePopup={toggleChangeRolePopup}
+        />
       )}
       {addMemberPopupOpen && (
         <UsersPopup
@@ -383,7 +401,7 @@ const Members = ({
 
 export default Members
 
-const Container = styled.div``
+const Container = styled.div<{ theme?: string }>``
 
 const ActionsMenu = styled.div`
   position: relative;
@@ -410,7 +428,6 @@ const MemberName = styled.h4`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${colors.gray6};
 `
 
 const EditMemberIcon = styled.span`
@@ -428,18 +445,23 @@ const MembersList = styled.ul`
   list-style: none;
   transition: all 0.2s;
 `
-const MemberItem = styled.li<{ hoverBackground?: string; addMemberIconColor?: string }>`
+const MemberItem = styled.li<{
+  color?: string
+  hoverBackground?: string
+  addMemberIconColor?: string
+  addMemberBackground?: string
+}>`
   display: flex;
   align-items: center;
   font-size: 15px;
   font-weight: 500;
   padding: 6px 16px;
   transition: all 0.2s;
+  color: ${(props) => props.color || colors.textColor1};
 
   &:first-child {
-    color: ${colors.gray6};
     cursor: pointer;
-    background-color: #fff;
+    background-color: ${(props) => props.addMemberBackground || colors.backgroundColor}};
 
     > svg {
       color: ${(props) => props.addMemberIconColor || colors.primary};

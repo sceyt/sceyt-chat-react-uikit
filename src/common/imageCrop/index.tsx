@@ -10,8 +10,9 @@ interface IProps {
   image: any
   onAccept: (file: File) => void
   handleClosePopup: (cropped?: boolean) => void
+  theme?: string
 }
-const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
+const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
 
   const [state, setState] = useStateComplex({
@@ -45,7 +46,7 @@ const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   }, [area])
   return (
     <PopupContainer>
-      <Popup minWidth='500px' maxWidth='600px' padding='0'>
+      <Popup theme={theme} backgroundColor={colors.backgroundColor} minWidth='500px' maxWidth='600px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} />
           <Row align='center'>
@@ -81,8 +82,13 @@ const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
             </Controls>
           </div>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.gray5}>
-          <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => handleClosePopup()}>
+        <PopupFooter backgroundColor={colors.backgroundColor}>
+          <Button
+            type='button'
+            color={colors.textColor1}
+            backgroundColor='transparent'
+            onClick={() => handleClosePopup()}
+          >
             Cancel
           </Button>
           <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={returnCroppedImage}>

@@ -13,6 +13,7 @@ import { AttachmentPreviewTitle, UploadingIcon } from '../../../../UIHelper'
 
 interface IProps {
   channelId: string
+  theme?: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
   filePreviewTitleColor?: string
@@ -23,6 +24,7 @@ interface IProps {
 
 const Files = ({
   channelId,
+  theme,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
@@ -50,14 +52,14 @@ const Files = ({
   }, [channelId])
 
   return (
-    <Container>
+    <Container theme={theme}>
       {attachments.map((file: IAttachment) => (
         // <FileItemWrapper >
         <FileItem
           key={file.url}
           // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
           // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-          hoverBackgroundColor={filePreviewHoverBackgroundColor}
+          hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}
         >
           {file.metadata && file.metadata.tmb ? (
             <FileThumb draggable={false} src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
@@ -75,7 +77,7 @@ const Files = ({
           </div>
           <DownloadWrapper onClick={() => handleDownloadFile(file)}>
             {downloadingFilesMap[file.id!] ? (
-              <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.gray10} />
+              <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
             ) : (
               filePreviewDownloadIcon || <Download />
             )}
@@ -174,6 +176,6 @@ const FileSizeAndDate = styled.span`
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
   margin-top: 2px;
 `

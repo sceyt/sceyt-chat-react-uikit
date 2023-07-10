@@ -1,8 +1,9 @@
 import styled, { createGlobalStyle } from 'styled-components'
-import { device, colors } from './constants'
+import { colors } from './constants'
 import { getAvatarColors } from './avatarColors'
 import { ReactComponent as CloseSvg } from '../assets/svg/close.svg'
 import { ReactComponent as SearchSvg } from '../assets/svg/search.svg'
+import { THEME } from '../helpers/constants'
 export function md5(inputString: string) {
   const hc = '0123456789abcdef'
   function rh(n: any) {
@@ -150,254 +151,8 @@ export const hashCode = (str: string) => {
 
 export const GlobalStyles = createGlobalStyle`
 
-  .rc-mentions {
-    position: relative;
-
-    // ================= Input Area =================
-    > textarea {
-
-      resize: none;
-      //padding: 16px 45px 16px 108px;
-      padding: 16px 45px 16px 80px;
-      width: 100%;
-      display: block;
-      border: none;
-      font: inherit;
-      box-sizing: border-box;
-      border-radius: 6px;
-      font-size: 15px;
-      line-height: 17px;
-
-      &::placeholder {
-        font-size: 15px;
-        color: ${colors.gray7};
-        opacity: 1;
-      }
-
-      & {
-        border: none;
-        outline: none !important;
-      }
-    }
-
-    & .rc-mentions-measure {
-      position: absolute;
-      left: 0;
-      right: 0;
-      top: 0;
-      bottom: 0;
-      pointer-events: none;
-      // color: rgba(255, 0, 0, 0.3);
-      color: transparent;
-      z-index: -1;
-
-      font-size: inherit;
-      font-size-adjust: inherit;
-      font-style: inherit;
-      font-variant: inherit;
-      font-stretch: inherit;
-      font-weight: inherit;
-      font-family: inherit;
-
-      padding: 0;
-      margin: 0;
-      line-height: inherit;
-      vertical-align: top;
-      overflow: inherit;
-      word-break: inherit;
-      white-space: inherit;
-      word-wrap: break-word;
-      overflow-x: initial;
-      overflow-y: auto;
-      text-align: inherit;
-      letter-spacing: inherit;
-      white-space: inherit;
-      tab-size: inherit;
-      direction: inherit;
-    }
-
-    // ================== Dropdown ==================
-    & .rc-mentions-dropdown {
-      position: absolute;
-
-      & .rc-mentions-menu {
-        list-style: none;
-        margin: 0;
-        padding: 0;
-
-        & .rc-mentions-item {
-          cursor: pointer;
-        }
-      }
-    }
-  }
-
-  // Customize style
-  .rc-mentions-dropdown {
-    width: 300px;
-    height: 237px;
-    overflow-y: auto;
-    background: #FFFFFF;
-    border: 1px solid ${colors.gray1};
-    box-sizing: border-box;
-    box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.08);
-    border-radius: 6px;
-    & ul {
-      padding: 16px 0;
-      margin: 0;
-      list-style: none;
-    }
-  }
-
   .mention_menu_item-active {
     background: #e6f7ff;
-  }
-  /*.mention_menu_item {
-    display: flex;
-    align-items: center;
-    font-size: 15px;
-    padding: 6px 16px;
-    transition: all 0.2s;
-    cursor: pointer;
-
-    &:hover {
-      background-color: ${colors.gray0};
-    }
-
-    & .dropdown-wrapper {
-      margin-left: auto;
-    }
-
-    & .dropdown-body {
-      bottom: -100px;
-      right: 0;
-    }
-  }*/
-  .rc-mentions-dropdown-menu-item-active {
-    background-color: ${colors.gray0};
-  }
-
-  .rc-mentions-disabled {
-    opacity: 0.5;
-  }
-
-  .button {
-    display: inline-block;
-    box-sizing: border-box;
-    text-decoration: none;
-    outline: none;
-    cursor: pointer;
-    text-align: center;
-    font-style: normal;
-    border-radius: 4px;
-    font-weight: 500;
-    font-size: 0.875rem;
-    line-height: 1.25rem;
-    padding: 0.375rem 0.75rem;
-    background-color: white;
-    border: 1px solid ${colors.gray2};
-    margin: 0;
-    user-select: none;
-    //border: none;
-    //transition: all 0.2s;
-    //box-shadow: 0 0 4px rgba(0,0,0,0.1);
-
-    //&:hover, &:focus {
-    //    box-shadow: 0 0 10px -2px rgba(0,0,0,0.25);
-    //}
-
-
-    &.blue {
-      color: ${colors.blue1};
-      border: 1px solid ${colors.primary};
-
-      &.filled {
-        color: white;
-        background-color: ${colors.primary};
-      }
-
-      &:hover, &:focus {
-        &:not(.loading).filled {
-          background-color: ${colors.blue2};
-        }
-      }
-
-      &:disabled {
-        background-color: #D7D8E3;
-        border: 1px solid #D7D8E3;
-        pointer-events: none;
-      }
-    }
-
-    &.blue-dark {
-      color: ${colors.blue5};
-      border: 1px solid ${colors.blue5};
-
-      &.filled {
-        color: white;
-        background-color: ${colors.blue5};
-      }
-
-      &:hover, &:focus {
-        &:not(.loading).filled {
-          background-color: ${colors.blue4};
-        }
-      }
-    }
-
-    &.green {
-      color: ${colors.primary};
-      border: 1px solid ${colors.primary};
-
-      &.filled {
-        color: white;
-        background-color: ${colors.primary};
-      }
-
-      &:hover, &:focus {
-        &:not(.loading).filled {
-          background-color: ${colors.primary};
-        }
-      }
-    }
-
-    &.red {
-      color: ${colors.red1};
-      border: 1px solid ${colors.red1};
-
-      &.filled {
-        color: white;
-        background-color: ${colors.red1};
-      }
-
-      &:hover, &:focus {
-        &:not(.loading).filled {
-          background-color: ${colors.red2};
-        }
-      }
-    }
-
-    &.gray {
-      color: black;
-      border: 1px solid ${colors.gray2};
-
-      &.filled {
-        color: white;
-        background-color: ${colors.gray2};
-      }
-
-      &:hover, &:focus {
-        &:not(.loading).filled {
-          background-color: ${colors.gray2};
-        }
-      }
-    }
-
-    @media ${device.tablet} {
-      font-size: 0.812rem;
-      line-height: 1.25rem;
-      padding: 0.375rem 0.625rem;
-    }
   }
 
   @keyframes makeVisible {
@@ -448,7 +203,7 @@ export const DropdownOptionLi = styled.li<{
   align-items: center;
   font-size: 14px;
   line-height: 20px;
-  color: ${(props: any) => props.textColor || colors.blue6};
+  color: ${(props: any) => props.textColor || colors.textColor1};
   margin: ${(props: any) => props.margin};
   padding: 6px 6px 6px 16px;
 
@@ -465,30 +220,37 @@ export const DropdownOptionLi = styled.li<{
   }
 `
 
-export const CustomSelect = styled.div`
+export const CustomSelect = styled.div<{
+  isError?: boolean
+  minWidth?: string
+  maxWidth?: string
+  marginTop?: string
+  backgroundColor?: string
+  color?: string
+}>`
   display: flex;
   height: 40px;
   min-height: 40px;
   width: 100%;
-  min-width: ${(props: any) => props.minWidth};
-  max-width: ${(props: any) => props.maxWidth};
-  background: #ffffff;
-  border: ${(props: any) => (props.isError ? `1px solid ${colors.red1}` : `1px solid ${colors.gray2}`)};
+  min-width: ${(props) => props.minWidth};
+  max-width: ${(props) => props.maxWidth};
+  background: ${(props) => props.backgroundColor || colors.white};
+  border: ${(props) => (props.isError ? `1px solid ${colors.red1}` : `1px solid ${colors.gray1}`)};
   box-sizing: border-box;
   border-radius: 4px;
   font-style: normal;
   font-weight: normal;
   font-size: 14px;
   line-height: 16px;
-  color: ${colors.blue7};
-  margin-top: ${(props: any) => props.marginTop};
+  color: ${(props) => props.color || colors.textColor1};
+  margin-top: ${(props) => props.marginTop};
 
   ::placeholder {
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
   }
 
   &:disabled {
-    background-color: ${colors.gray2};
+    background-color: ${colors.gray1};
   }
 
   .dropdown-wrapper {
@@ -501,18 +263,14 @@ export const CustomSelect = styled.div`
 
   .dropdown-trigger {
     & .default-selection {
-      color: ${colors.gray7};
+      color: ${colors.textColor3};
     }
 
     //width: calc(100% - 20px);
-
-    &::after {
-      border-color: black;
-    }
   }
 `
 
-export const CustomSelectTrigger = styled.span`
+export const CustomSelectTrigger = styled.span<{ color?: string }>`
   display: block;
   width: calc(100% - 22px);
   padding: 8px 10px 8px 15px;
@@ -520,12 +278,12 @@ export const CustomSelectTrigger = styled.span`
   font-style: normal;
   font-weight: normal;
   font-size: 14px;
-  line-height: 16px;
-  color: ${colors.blue7};
+  line-height: 23px;
+  color: ${(props) => props.color || colors.textColor1};
   text-transform: capitalize;
 `
 
-export const Label = styled.label`
+export const Label = styled.label<{ color?: string }>`
   display: inline-block;
   font-style: normal;
   font-weight: 500;
@@ -533,7 +291,7 @@ export const Label = styled.label`
   line-height: 20px;
   margin-top: 20px;
   margin-bottom: 4px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 `
 
 export const UploadFile = styled.input`
@@ -552,11 +310,13 @@ export const InputErrorMessage = styled.p`
   margin: 4px 0 0;
 `
 
-export const CustomInput = styled.input<{ error?: boolean }>`
+export const CustomInput = styled.input<{ error?: boolean; theme?: string; color?: string }>`
   height: 40px;
   width: 100%;
-  background: #ffffff;
-  border: ${(props) => (props.error ? `1px solid ${colors.red1}` : '1px solid #ededed')};
+  background: ${(props) => (props.theme === THEME.DARK ? colors.backgroundColor : colors.white)};
+  border: ${(props) =>
+    props.error ? `1px solid ${colors.red1}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
+  color: ${(props) => props.color || colors.textColor1};
   box-sizing: border-box;
   border-radius: 8px;
   padding: 11px 14px;
@@ -570,7 +330,12 @@ export const CustomInput = styled.input<{ error?: boolean }>`
 
   &:focus {
     border: 1px solid ${(props) => (props.error ? `1px solid ${colors.red1}` : colors.primary)};
-    outline: 2px solid ${(props) => (props.error ? `1px solid ${colors.red2}` : '#ebf7f1')};
+    outline: ${(props) =>
+      props.error
+        ? `1px solid ${colors.red2}`
+        : props.theme !== THEME.DARK
+        ? `2px solid ${colors.backgroundColor}`
+        : 'none'};
   }
   &:disabled {
     background-color: ${colors.gray0};
@@ -579,7 +344,7 @@ export const CustomInput = styled.input<{ error?: boolean }>`
   }
   &::placeholder {
     opacity: 1;
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
   }
 `
 
@@ -588,10 +353,6 @@ export const FilterField = styled.div`
   border-radius: 4px;
   background-color: transparent;
   margin-left: 12px;
-
-  .dropdown-trigger::after {
-    border-color: black;
-  }
 `
 
 export const FilterFieldSpan = styled.span`
@@ -610,7 +371,7 @@ export const CustomRadioWrapper = styled.div`
   label {
     font-size: 14px;
     line-height: 16px;
-    color: ${colors.blue7};
+    color: ${colors.textColor1};
   }
 `
 
@@ -660,8 +421,8 @@ export const Button = styled.button<{
   line-height: 20px;
   padding: 8px 16px;
   background-color: ${(props) => props.backgroundColor || colors.white};
-  color: ${(props) => props.color || (props.backgroundColor ? colors.white : colors.gray6)};
-  border: 1px solid ${(props) => props.backgroundColor || colors.gray2};
+  color: ${(props) => props.color || (props.backgroundColor ? colors.white : colors.textColor1)};
+  border: 1px solid ${(props) => props.backgroundColor || colors.gray1};
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
@@ -677,12 +438,13 @@ export const PopupName = styled.h3<{
   marginBottom?: string
   padding?: string
   isDelete?: boolean
+  color?: string
 }>`
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 23px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
   margin-bottom: ${(props: any) => props.marginBottom};
@@ -736,19 +498,30 @@ export const ButtonBlock = styled.div<any>`
   }
 `
 
-export const Popup = styled.div<any>`
+export const Popup = styled.div<{
+  minWidth?: string
+  maxWidth?: string
+  maxHeight?: string
+  width?: string
+  height?: string
+  display?: string
+  padding?: string
+  backgroundColor?: string
+  boxShadow?: string
+  isLoading?: boolean
+}>`
   position: relative;
   min-height: 150px;
-  min-width: ${(props: any) => props.minWidth || '400px'};
-  max-width: ${(props: any) => props.maxWidth || '600px'};
-  max-height: ${(props: any) => props.maxHeight || '650px'};
-  width: ${(props: any) => props.width || 'unset'};
-  height: ${(props: any) => props.height || 'unset'};
-  display: ${(props: any) => props.display || 'flex'};
+  min-width: ${(props) => props.minWidth || '400px'};
+  max-width: ${(props) => props.maxWidth || '600px'};
+  max-height: ${(props) => props.maxHeight || '650px'};
+  width: ${(props) => props.width || 'unset'};
+  height: ${(props) => props.height || 'unset'};
+  display: ${(props) => props.display || 'flex'};
   flex-direction: column;
-  padding: ${(props: any) => (props.padding ? props.padding : '22px 24px')};
-  background: #ffffff;
-  box-shadow: 4px 4px 30px rgba(0, 0, 0, 0.06);
+  padding: ${(props) => (props.padding ? props.padding : '22px 24px')};
+  background: ${(props) => props.backgroundColor || colors.white};
+  box-shadow: ${(props) => props.boxShadow || '4px 4px 30px rgba(0, 0, 0, 0.06)'};
   border-radius: 8px;
   box-sizing: border-box;
 
@@ -783,7 +556,7 @@ export const PopupDescription = styled.span`
   font-weight: normal;
   font-size: 15px;
   line-height: 22px;
-  color: ${colors.gray8};
+  color: ${colors.textColor2};
   cursor: default;
   white-space: pre-line;
   margin-top: ${(props: any) => props.marginTop || '10px'};
@@ -793,7 +566,7 @@ export const PopupDescription = styled.span`
   .highlight {
     text-decoration: underline;
     font-weight: 500;
-    color: ${colors.blue1};
+    color: ${colors.primary};
   }
 `
 
@@ -807,11 +580,11 @@ export const PopupFooter = styled(ButtonBlock)`
   z-index: 2;
 `
 
-export const SectionHeader = styled.h4<{ color?: string; margin?: string }>`
+export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 20px;
-  color: ${(props) => props.color || colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
   margin: ${(props) => props.margin || 0};
 `
 
@@ -872,7 +645,7 @@ export const ItemNote = styled.div<{ direction: string }>`
     `} ${(props: any) =>
     props.disabled &&
     `
-        color: ${colors.gray4};
+        color: ${colors.textColor2};
     `}
 `
 export const CustomSwitcher = styled.div`
@@ -925,7 +698,7 @@ export const UploadAvatarButton = styled.button`
   color: #fff;
   font-weight: 500;
   font-size: 14px;
-  background: ${colors.blue5};
+  background: ${colors.primary};
   border-radius: 4px;
   outline: none !important;
   cursor: pointer;
@@ -935,16 +708,16 @@ export const UploadAvatarButton = styled.button`
 export const UploadAvatarHandler = styled.div`
   margin-left: 18px;
   font-size: 13px;
-  color: ${colors.blue7};
+  color: ${colors.textColor1};
 `
 
 export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boolean }>`
-  color: ${(props) => (props.isLastMessage ? colors.gray9 : props.color || colors.primary)};
+  color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
   font-weight: ${(props) => props.isLastMessage && '500'};
 `
 
 export const MessageOwner = styled.h3<any>`
-  margin: 0 12px 2px 0;
+  margin: 0 12px 4px 0;
   white-space: nowrap;
   color: ${(props) => props.color || colors.primary};
   margin-left: ${(props) => props.rtlDirection && 'auto'};
@@ -955,6 +728,7 @@ export const MessageOwner = styled.h3<any>`
 
 export const MessageText = styled.pre<{
   fontFamily?: string
+  color?: string
   withAttachment?: boolean
   fontSize?: string
   lineHeight?: string
@@ -962,6 +736,7 @@ export const MessageText = styled.pre<{
   isRepliedMessage?: boolean
   withMediaAttachment?: boolean
   isForwarded?: boolean
+  withPaddings?: boolean
 }>`
   display: flow-root;
   position: relative;
@@ -969,7 +744,15 @@ export const MessageText = styled.pre<{
   margin: 0;
   padding: ${(props) =>
     props.withAttachment &&
-    (props.showMessageSenderName ? '0 12px 10px' : props.isForwarded ? '4px 12px 10px' : '8px 12px 10px')};
+    (props.showMessageSenderName
+      ? props.withPaddings
+        ? '0 12px 10px'
+        : '0 0 10px'
+      : props.isForwarded
+      ? props.withPaddings
+        ? '4px 12px 10px'
+        : '4px 0px 10px'
+      : '8px 12px 10px')};
   padding-bottom: ${(props) => props.withAttachment && !props.withMediaAttachment && '2px'};
   //font-size: ${(props) => props.fontSize || '15px'};
   font-size: ${(props) => props.fontSize || '16px'};
@@ -980,7 +763,7 @@ export const MessageText = styled.pre<{
   line-height: ${(props) => props.lineHeight || '20px'};
   //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
   user-select: text;
 
   ${(props) =>
@@ -1002,7 +785,7 @@ export const MessageText = styled.pre<{
   }
 
   & a {
-    color: ${colors.blue2};
+    color: ${colors.blue};
   }
 `
 export const ReplyMessageText = styled.span<{
@@ -1020,7 +803,7 @@ export const ReplyMessageText = styled.span<{
   font-weight: 400;
   line-height: ${(props) => props.lineHeight || '20px'};
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   user-select: text;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -1034,6 +817,8 @@ export const CloseIcon = styled(CloseSvg)`
   right: 13px;
   cursor: pointer;
   padding: 15px;
+  box-sizing: content-box;
+  color: ${(props) => props.color};
 `
 
 export const ClearTypedText = styled(CloseIcon)`
@@ -1054,7 +839,7 @@ export const SubTitle = styled.span<{ color?: string; margin?: string }>`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${(props) => props.color || colors.gray9};
+  color: ${(props) => props.color || colors.textColor2};
   margin: ${(props) => props.margin};
 `
 
@@ -1196,5 +981,5 @@ export const AttachmentPreviewTitle = styled.span<{ color?: string }>`
   font-size: 15px;
   line-height: 20px;
   height: 20px;
-  color: ${(props) => props.color || colors.blue10};
+  color: ${(props) => props.color || colors.textColor1};
 `

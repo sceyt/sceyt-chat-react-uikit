@@ -268,7 +268,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
         </FileInfo>
         <ActionDownload onClick={() => handleDownloadFile(currentFile)}>
           {downloadingFilesMap[currentFile.id] ? (
-            <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.gray10} />
+            <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
           ) : (
             <DownloadIcon />
           )}
@@ -384,7 +384,7 @@ const Container = styled.div`
 `
 const SliderHeader = styled.div`
   height: 60px;
-  background: ${colors.gray6};
+  background: ${colors.textColor1};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -445,7 +445,7 @@ const FileDateAndSize = styled.span`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `
 
 const FileSize = styled.span`
@@ -460,7 +460,7 @@ const FileSize = styled.span`
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background-color: ${colors.gray9};
+    background-color: ${colors.textColor2};
   }
 `
 
@@ -521,7 +521,7 @@ const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
   height: 60px;
   margin-right: ${(props) => !props.leftButton && '24px'};
   margin-left: ${(props) => props.leftButton && '24px'};
-  background: ${colors.gray6};
+  background: ${colors.textColor1};
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   border-radius: 50%;

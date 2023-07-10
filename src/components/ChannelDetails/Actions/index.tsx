@@ -40,6 +40,7 @@ import { getClient } from '../../../common/client'
 
 interface IProps {
   channel: IChannel
+  theme?: string
   actionMenuOpen?: () => void
   menuIsOpen?: boolean
   toggleable: boolean
@@ -111,6 +112,7 @@ interface IProps {
 const Actions = ({
   channel,
   actionMenuOpen,
+  theme,
   menuIsOpen,
   toggleable,
   showMuteUnmuteNotifications = true,
@@ -310,7 +312,7 @@ const Actions = ({
   }
 
   return (
-    <Container isDirect={isDirectChannel}>
+    <Container isDirect={isDirectChannel} theme={theme} borderColor={colors.backgroundColor}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader>ACTIONS</SectionHeader>
@@ -327,9 +329,9 @@ const Actions = ({
               key={0}
               order={muteUnmuteNotificationsOrder}
               onClick={() => handleNotificationOnOff()}
-              iconColor={muteNotificationIconColor || colors.gray4}
-              color={muteUnmuteNotificationTextColor || colors.gray6}
-              hoverColor={muteUnmuteNotificationTextColor || colors.gray6}
+              iconColor={muteNotificationIconColor || colors.textColor2}
+              color={muteUnmuteNotificationTextColor || colors.textColor1}
+              hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
             >
               <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
               {/* <ToggleSwitch backgroundColor={muteUnmuteNotificationSwitcherColor} state={channel.muted} /> */}
@@ -337,6 +339,7 @@ const Actions = ({
           ) : (
             <DropDown
               isSelect
+              theme={theme}
               height='auto'
               position='left'
               order={muteUnmuteNotificationsOrder}
@@ -344,9 +347,9 @@ const Actions = ({
                 <ActionItem
                   key={0}
                   disableEvent
-                  iconColor={unmuteNotificationIconColor || colors.gray4}
-                  color={muteUnmuteNotificationTextColor || colors.gray6}
-                  hoverColor={muteUnmuteNotificationTextColor || colors.gray6}
+                  iconColor={unmuteNotificationIconColor || colors.textColor2}
+                  color={muteUnmuteNotificationTextColor || colors.textColor1}
+                  hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
                 >
                   <React.Fragment>{unmuteNotificationIcon || <NotificationIcon />} Mute notifications</React.Fragment>
                   {/* <ToggleSwitch state={channel.muted} /> */}
@@ -409,9 +412,9 @@ const Actions = ({
             key={1}
             onClick={() => console.log('stared messages')}
             order={starredMessagesOrder}
-            iconColor={staredMessagesIconColor || colors.gray4}
-            color={staredMessagesTextColor || colors.gray6}
-            hoverColor={staredMessagesTextColor || colors.gray6}
+            iconColor={staredMessagesIconColor || colors.textColor2}
+            color={staredMessagesTextColor || colors.textColor1}
+            hoverColor={staredMessagesTextColor || colors.textColor1}
           >
             <React.Fragment>{staredMessagesIcon || <StarIcon />} Starred messages </React.Fragment>
           </ActionItem>
@@ -422,9 +425,9 @@ const Actions = ({
               key={2}
               onClick={() => console.log('pin channel')}
               order={pinChannelOrder}
-              iconColor={pinChannelIconColor || colors.gray4}
-              color={pinChannelTextColor || colors.gray6}
-              hoverColor={pinChannelTextColor || colors.gray6}
+              iconColor={pinChannelIconColor || colors.textColor2}
+              color={pinChannelTextColor || colors.textColor1}
+              hoverColor={pinChannelTextColor || colors.textColor1}
             >
               <React.Fragment>{pinChannelIcon || <PinIcon />} Pin</React.Fragment>
             </ActionItem>
@@ -436,9 +439,9 @@ const Actions = ({
               key={3}
               onClick={handleToggleChannelMarkAs}
               order={markAsReadUnreadOrder}
-              iconColor={markAsReadIconColor || colors.gray4}
-              color={markAsReadUnreadTextColor || colors.gray6}
-              hoverColor={markAsReadUnreadTextColor || colors.gray6}
+              iconColor={markAsReadIconColor || colors.textColor2}
+              color={markAsReadUnreadTextColor || colors.textColor1}
+              hoverColor={markAsReadUnreadTextColor || colors.textColor1}
             >
               <React.Fragment>{markAsReadIcon || <MarkAsRead />} Mark as read</React.Fragment>
             </ActionItem>
@@ -447,9 +450,9 @@ const Actions = ({
               key={3}
               order={markAsReadUnreadOrder}
               onClick={handleToggleChannelMarkAs}
-              iconColor={markAsUnreadIconColor || colors.gray4}
-              color={markAsReadUnreadTextColor || colors.gray6}
-              hoverColor={markAsReadUnreadTextColor || colors.gray6}
+              iconColor={markAsUnreadIconColor || colors.textColor2}
+              color={markAsReadUnreadTextColor || colors.textColor1}
+              hoverColor={markAsReadUnreadTextColor || colors.textColor1}
             >
               <React.Fragment>{markAsUnreadIcon || <MarkAsUnRead />} Mark as unread</React.Fragment>
             </ActionItem>
@@ -493,8 +496,8 @@ const Actions = ({
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}
-                  color={unblockUserTextColor || colors.gray6}
-                  hoverColor={unblockUserTextColor || colors.gray6}
+                  color={unblockUserTextColor || colors.textColor1}
+                  hoverColor={unblockUserTextColor || colors.textColor1}
                   onClick={() => {
                     handleUnblockUser()
                   }}
@@ -796,12 +799,10 @@ const Actions = ({
 
 export default Actions
 
-const Container = styled.div<{ isDirect: boolean }>`
+const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor?: string }>`
   padding: 10px 16px;
-  border-top: 0.5px solid ${colors.gray1};
-  border-bottom: 6px solid ${colors.gray0};
-  /*${(props) => !props.isDirect && `border-bottom: 6px solid ${colors.gray0}`}*/
-`
+  border-bottom: 6px solid ${(props) => props.borderColor || colors.backgroundColor};
+]`
 
 const ActionHeader = styled.div`
   display: flex;
@@ -841,7 +842,7 @@ const ActionItem = styled.li<{
   align-items: center;
   padding: 10px 0;
   font-size: 15px;
-  color: ${(props) => props.color || colors.blue6};
+  color: ${(props) => props.color || colors.textColor1};
   cursor: pointer;
   order: ${(props) => props.order};
   pointer-events: ${(props) => props.disableEvent && 'none'};
@@ -852,7 +853,7 @@ const ActionItem = styled.li<{
 
   & > svg {
     margin-right: 16px;
-    color: ${(props) => props.iconColor || colors.gray4};
+    color: ${(props) => props.iconColor || colors.textColor2};
   }
 
   & > ${DefaultMutedIcon} {
@@ -861,7 +862,7 @@ const ActionItem = styled.li<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverColor || colors.blue2};
+    color: ${(props) => props.hoverColor || colors.blue};
   }
 
   &:last-child {

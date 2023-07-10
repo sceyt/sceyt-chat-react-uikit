@@ -102,7 +102,7 @@ export interface IMessage {
   attachments: IAttachment[] | []
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
-  parent?: IMessage | null
+  parentMessage?: IMessage | null
   parentId?: string
   repliedInThread?: boolean
   replyCount?: number

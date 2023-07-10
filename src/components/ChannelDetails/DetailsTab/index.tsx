@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
-import { CHANNEL_TYPE, channelDetailsTabs } from '../../../helpers/constants'
+import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import Members from './Members'
 import Media from './Media'
@@ -15,6 +15,7 @@ import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHal
 interface IProps {
   channel: IChannel
   activeTab: string
+  theme: string
   setActiveTab: (activeTab: string) => void
   checkActionPermission: (permission: string) => boolean
   linkPreviewIcon?: JSX.Element
@@ -43,6 +44,7 @@ interface IProps {
 
 const DetailsTab = ({
   channel,
+  theme,
   activeTab,
   checkActionPermission,
   setActiveTab,
@@ -92,8 +94,11 @@ const DetailsTab = ({
   }, [showMembers])
 
   return (
-    <Container>
-      <DetailsTabHeader activeTabColor={colors.primary}>
+    <Container theme={theme}>
+      <DetailsTabHeader
+        activeTabColor={colors.primary}
+        backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      >
         {Object.keys(channelDetailsTabs).map((key) => {
           if (key === 'member') {
             if (showMembers) {
@@ -125,8 +130,9 @@ const DetailsTab = ({
       </DetailsTabHeader>
       {showMembers && activeTab === channelDetailsTabs.member && (
         <Members
+          theme={theme}
           channel={channel}
-          chekActionPermission={checkActionPermission}
+          checkActionPermission={checkActionPermission}
           showChangeMemberRole={showChangeMemberRole}
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
@@ -137,6 +143,7 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}
+          theme={theme}
           filePreviewIcon={filePreviewIcon}
           filePreviewHoverIcon={filePreviewHoverIcon}
           filePreviewTitleColor={filePreviewTitleColor}
@@ -173,19 +180,19 @@ const DetailsTab = ({
 
 export default DetailsTab
 
-const Container = styled.div`
-  border-top: 1px solid ${colors.gray1};
+const Container = styled.div<{ theme?: string }>`
+  //border-top: 1px solid ${colors.gray1};
 `
 
-const DetailsTabHeader = styled.div<{ activeTabColor?: string }>`
+const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: string; backgroundColor?: string }>`
   padding: 0 20px;
-  border-bottom: 1px solid ${colors.gray1};
+  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor || colors.white};
   display: flex;
   justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 12;
-  background: #fff;
   button {
     position: relative;
     border: none;
@@ -197,11 +204,11 @@ const DetailsTabHeader = styled.div<{ activeTabColor?: string }>`
     font-weight: 500;
     font-size: 15px;
     line-height: 20px;
-    color: ${colors.gray9};
+    color: ${colors.textColor2};
     cursor: pointer;
   }
   & .active {
-    color: ${colors.gray6};
+    color: ${(props) => props.activeTabColor || colors.primary};
 
     &:after {
       content: '';

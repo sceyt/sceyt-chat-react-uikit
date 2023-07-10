@@ -69,6 +69,7 @@ import { getClient } from '../../common/client'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import MentionMembersPopup from '../../common/popups/mentions'
 import LinkifyIt from 'linkify-it'
+import { themeSelector } from '../../store/theme/selector'
 // import { activeChannelMembersSelector } from '../../store/member/selector'
 
 let prevActiveChannelId: any
@@ -147,6 +148,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const { user } = ChatClient
 
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const messageToEdit = useSelector(messageToEditSelector)
@@ -578,7 +580,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
 
         if (messageForReply) {
-          messageToSend.parent = messageForReply
+          messageToSend.parentMessage = messageForReply
         }
 
         if (messageTexToSend && !attachments.length) {
@@ -1441,7 +1443,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [])
 
   return (
-    <Container margin={margin} border={border} ref={messageContRef}>
+    <Container margin={margin} border={border} ref={messageContRef} theme={theme}>
       {/* <Editor
         wrapperClassName='demo-wrapper'
         editorClassName='demo-editor'
@@ -1593,13 +1595,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               {attachments.map((attachment: any) => (
                 <Attachment
                   attachment={attachment}
-                  isPrevious
+                  isPreview
                   removeSelected={removeUpload}
                   key={attachment.attachmentId}
                   setVideoIsReadyToSend={setVideoIsReadyToSend}
                   borderRadius={selectedAttachmentsBorderRadius}
                   selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                  backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                  backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
                   selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
                   selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
                   selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
@@ -1611,6 +1613,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MentionsContainer mentionsIsOpen={openMention}>
               {openMention && (
                 <MentionMembersPopup
+                  theme={theme}
                   channelId={activeChannel.id}
                   addMentionMember={handleSetMention}
                   searchMention={currentMentions.typed}
@@ -1622,7 +1625,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageInputWrapper
               borderRadius={borderRadius}
               ref={inputWrapperRef}
-              backgroundColor={backgroundColor}
+              backgroundColor={backgroundColor || colors.backgroundColor}
               channelDetailsIsOpen={channelDetailsIsOpen}
             >
               {showAddEmojis && (
@@ -1641,6 +1644,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               )}
               {showAddAttachments && (
                 <DropDown
+                  theme={theme}
                   forceClose={showChooseAttachmentType}
                   position={addAttachmentsInRightSide ? 'top' : 'topRight'}
                   margin='auto 0 0'
@@ -1658,22 +1662,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   <DropdownOptionsUl>
                     <DropdownOptionLi
                       key={1}
-                      textColor={colors.gray6}
-                      hoverBackground={colors.gray5}
+                      textColor={colors.textColor1}
+                      hoverBackground={colors.hoverBackgroundColor}
                       onClick={() => onOpenFileUploader(mediaExtensions)}
                       iconWidth='20px'
-                      iconColor={colors.gray4}
+                      iconColor={colors.textColor2}
                     >
                       <ChoseMediaIcon />
                       Photo or video
                     </DropdownOptionLi>
                     <DropdownOptionLi
                       key={2}
-                      textColor={colors.gray6}
-                      hoverBackground={colors.gray5}
+                      textColor={colors.textColor1}
+                      hoverBackground={colors.hoverBackgroundColor}
                       onClick={() => onOpenFileUploader('')}
                       iconWidth='20px'
-                      iconColor={colors.gray4}
+                      iconColor={colors.textColor2}
                     >
                       <ChoseFileIcon />
                       File
@@ -1687,6 +1691,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 onKeyUp={handleTyping}
                 onChange={handleTyping}
                 onPaste={handlePastAttachments}
+                color={colors.textColor1}
                 onCut={handleCut}
                 onKeyPress={handleSendEditMessage}
                 data-placeholder='Type message here ...'
@@ -1704,6 +1709,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <SendMessageIcon
               isActive={sendMessageIsActive}
               order={sendIconOrder}
+              color={colors.backgroundColor}
               height={inputContainerHeight || minHeight}
               onClick={sendMessageIsActive ? handleSendEditMessage : null}
             >
@@ -1751,7 +1757,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 }
 
-const Container = styled.div<{ margin?: string; border?: string; borderRadius?: string; ref?: any; height?: number }>`
+const Container = styled.div<{
+  margin?: string
+  border?: string
+  borderRadius?: string
+  ref?: any
+  height?: number
+  theme?: string
+}>`
   margin: ${(props) => props.margin || '30px 0 16px'};
   border: ${(props) => props.border || ''};
   border-radius: ${(props) => props.borderRadius || '4px'};
@@ -1788,8 +1801,8 @@ const EditReplyMessageCont = styled.div<any>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
-  background-color: ${colors.gray5};
+  color: ${colors.textColor1};
+  background-color: ${colors.backgroundColor};
   z-index: 19;
   border-bottom: 1px solid ${colors.gray1};
 `
@@ -1814,7 +1827,7 @@ const CloseEditMode = styled.span`
   cursor: pointer;
 
   & > svg {
-    color: ${colors.gray4};
+    color: ${colors.textColor2};
   }
 `
 
@@ -1899,12 +1912,13 @@ const MessageInputWrapper = styled.div<{
   //max-width: ${(props) =>
     props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
   //max-width: calc(100% - 110px);
-  background-color: ${(props) => props.backgroundColor || colors.gray11};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
 `
 const MessageInput = styled.div<{
   order?: number
+  color?: string
   borderRadius?: string
   backgroundColor?: string
   paddings?: string
@@ -1917,6 +1931,7 @@ const MessageInput = styled.div<{
   display: block;
   border: none;
   font: inherit;
+  color: ${(props) => props.color};
   box-sizing: border-box;
   outline: none !important;
   font-size: 15px;
@@ -1936,7 +1951,7 @@ const MessageInput = styled.div<{
     top: calc(50% - 10px);
     left: 0;
     font-size: 15px;
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
     pointer-events: none;
     unicode-bidi: plaintext;
     white-space: nowrap;
@@ -1947,7 +1962,7 @@ const MessageInput = styled.div<{
 
   &::placeholder {
     font-size: 15px;
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
     opacity: 1;
   }
 
@@ -1974,6 +1989,7 @@ const EmojiButton = styled.span<any>`
   > svg {
     ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')};
     width: 24px;
+    height: 24px;
   }
 
   &:hover > svg {
@@ -2029,7 +2045,7 @@ const SendMessageIcon = styled.span<any>`
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
   -webkit-tap-highlight-color: transparent;
 
-  color: ${(props) => (props.isActive ? colors.primary : '#ccc')};
+  color: ${(props) => (props.isActive ? colors.primary : props.color)};
 `
 
 /* const AudioCont = styled.div<any>`
@@ -2083,7 +2099,7 @@ const TypingFrom = styled.h5`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.2px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `
 const sizeAnimation = keyframes`
   0% {
@@ -2161,7 +2177,7 @@ const BlockedUserInfo = styled.div`
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
 
   & > svg {
     margin-right: 12px;
@@ -2178,7 +2194,7 @@ const JoinChannelCont = styled.div<{ color?: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   color: ${(props) => props.color || colors.primary};
-  background-color: ${colors.gray5};
+  background-color: ${colors.backgroundColor};
   cursor: pointer;
 `
 const ReadOnlyCont = styled.div<{ iconColor?: string }>`
@@ -2190,7 +2206,7 @@ const ReadOnlyCont = styled.div<{ iconColor?: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
 
   & > svg {
     margin-right: 12px;

@@ -9,6 +9,7 @@ import { IChannel } from '../../types'
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 import { UnreadCountProps } from '../Channel'
 import { sendMessageInputHeightSelector, showScrollToNewMessageButtonSelector } from '../../store/message/selector'
+import { themeSelector } from '../../store/theme/selector'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
@@ -42,6 +43,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
 }) => {
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
+  const theme = useSelector(themeSelector)
   const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
 
@@ -52,11 +54,12 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
     <React.Fragment>
       {showScrollToNewMessageButton && (
         <BottomButton
+          theme={theme}
           width={buttonWidth}
           height={buttonHeight}
           border={buttonBorder}
           borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor}
+          backgroundColor={buttonBackgroundColor || colors.backgroundColor}
           hoverBackgroundColor={buttonHoverBackgroundColor}
           shadow={buttonShadow}
           onClick={handleScrollToBottom}
@@ -84,6 +87,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
 export default MessagesScrollToBottomButton
 
 const BottomButton = styled.div<{
+  theme?: string
   width?: string
   height?: string
   border?: string
@@ -100,7 +104,7 @@ const BottomButton = styled.div<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${colors.white};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 50px;
   width: 48px;

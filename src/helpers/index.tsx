@@ -12,7 +12,7 @@ import { colors } from '../UIHelper/constants'
 import { getCustomDownloader } from './customUploader'
 
 const StatusText = styled.span`
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   font-weight: 400;
   font-size: 12px;
 `
@@ -20,13 +20,13 @@ const ReadIconWrapper = styled(ReadIcon)`
   color: ${(props) => props.color || colors.primary};
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 const SentIconWrapper = styled(SentIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 const PendingIconWrapper = styled(PendingIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 
 export const messageStatusIcon = (

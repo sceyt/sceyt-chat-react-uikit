@@ -126,7 +126,8 @@ const VoiceItem = ({
       )}
       <AudioInfo>
         <AudioTitle color={voicePreviewTitleColor}>
-          {file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts)}
+          {file.user &&
+            (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
         <AudioSendTime>
@@ -196,7 +197,7 @@ const AudioTitle = styled.span<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: calc(100% - 72px);
-  color: ${(props) => props.color || colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 `
 
 const AudioDate = styled.span<{ color?: string }>`
@@ -209,14 +210,14 @@ const AudioDate = styled.span<{ color?: string }>`
   font-weight: normal;
   font-size: 12px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.gray9};
+  color: ${(props) => props.color || colors.textColor2};
 `
 
 const AudioSendTime = styled.span<{ color?: string }>`
   position: absolute;
   right: 0;
   top: 11px;
-  color: ${(props) => props.color || colors.gray9};
+  color: ${(props) => props.color || colors.textColor2};
   font-size: 12px;
   line-height: 16px;
 `

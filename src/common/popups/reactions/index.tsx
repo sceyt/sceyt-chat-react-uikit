@@ -319,7 +319,7 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
   font-weight: 500;
   font-size: 13px;
   border-bottom: ${(props) => !props.bubbleStyle && `1px solid ${colors.gray1}`};
-  color: ${(props) => (props.active ? colors.gray6 : colors.gray9)};
+  color: ${(props) => (props.active ? colors.textColor1 : colors.textColor2)};
   margin-bottom: -1px;
   cursor: pointer;
   & > span {

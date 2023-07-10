@@ -28,6 +28,7 @@ export interface ICustomUploader {
 
 export interface IChatClientProps {
   client: SceytChatClient
+  theme?: 'dark' | 'light'
   avatarColors?: ICustomAvatarColors
   hideUserPresence?: (user: IUser) => boolean
   handleNewMessages?: (message: IMessage, channel: IChannel) => IMessage | null
@@ -56,6 +57,7 @@ export interface IChatClientProps {
 
 const SceytChatContainer = ({
   client,
+  theme,
   avatarColors,
   children,
   showOnlyContactUsers,
@@ -73,6 +75,7 @@ const SceytChatContainer = ({
     <Provider store={store}>
       <SceytChat
         client={client}
+        theme={theme}
         avatarColors={avatarColors}
         children={children}
         showOnlyContactUsers={showOnlyContactUsers}

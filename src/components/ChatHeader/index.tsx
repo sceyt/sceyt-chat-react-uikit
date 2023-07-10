@@ -21,15 +21,16 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
+import { themeSelector } from '../../store/theme/selector'
 
-const Container = styled.div<{ background?: string }>`
+const Container = styled.div<{ background?: string; borderColor?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: 1px solid ${colors.gray1};
+  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
   background-color: ${(props) => props.background};
 `
 
@@ -87,6 +88,7 @@ export default function ChatHeader({
   const getFromContacts = getShowOnlyContactUsers()
   const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
+  const theme = useSelector(themeSelector)
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
@@ -121,7 +123,7 @@ export default function ChatHeader({
   }, [channelDetailsOpen])
 
   return (
-    <Container background={backgroundColor}>
+    <Container background={backgroundColor} borderColor={colors.backgroundColor}>
       <ChannelInfo onClick={!channelListHidden && channelDetailsOnOpen} clickable={!channelListHidden}>
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
@@ -141,7 +143,7 @@ export default function ChatHeader({
           {/* {isDirectChannel && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
         </AvatarWrapper>
         <ChannelName>
-          <SectionHeader color={titleColor}>
+          <SectionHeader color={titleColor || colors.textColor1} theme={theme}>
             {activeChannel.subject ||
               (isDirectChannel && directChannelUser
                 ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
@@ -168,7 +170,7 @@ export default function ChatHeader({
       {!channelListHidden && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.gray4}
+          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.textColor2}
         >
           {infoButtonVisible && (infoIcon || <InfoIcon />)}
         </ChanelInfo>

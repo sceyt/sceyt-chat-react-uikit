@@ -98,6 +98,7 @@ import { createImageThumbnail, getImageSize } from '../../helpers/resizeImage'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { attachmentCompilationStateSelector, messagesHasNextSelector } from './selector'
+import { isJSON } from '../../helpers/message'
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
   try {
@@ -152,8 +153,8 @@ function* sendMessage(action: IAction): any {
           .setDisplayCount(message.type === 'system' ? 0 : 1)
           .setSilent(message.type === 'system')
           .setMetadata(JSON.stringify(message.metadata))
-        if (message.parent) {
-          messageBuilder.setParentMessageId(message.parent ? message.parent.id : null)
+        if (message.parentMessage) {
+          messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
         }
         if (message.repliedInThread) {
           messageBuilder.setReplyInThread()
@@ -167,7 +168,7 @@ function* sendMessage(action: IAction): any {
           JSON.stringify({
             ...messageCopy,
             createdAt: new Date(Date.now()),
-            parent: message.parent
+            parentMessage: message.parentMessage
           })
         )
         const hasNextMessages = yield select(messagesHasNextSelector)
@@ -274,7 +275,7 @@ function* sendMessage(action: IAction): any {
                 attachments: messageResponse.attachments,
                 mentionedUsers: messageResponse.mentionedUsers,
                 metadata: messageResponse.metadata,
-                parent: messageResponse.parent,
+                parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
               }
@@ -354,7 +355,7 @@ function* sendMessage(action: IAction): any {
             attachments: messageResponse.attachments,
             mentionedUsers: messageResponse.mentionedUsers,
             metadata: messageResponse.metadata,
-            parent: messageResponse.parent,
+            parentMessage: messageResponse.parentMessage,
             repliedInThread: messageResponse.repliedInThread,
             createdAt: messageResponse.createdAt
           }
@@ -410,8 +411,8 @@ function* sendMessage(action: IAction): any {
           .setDisplayCount(message.type === 'system' ? 0 : 1)
           .setSilent(message.type === 'system')
           .setMetadata(JSON.stringify(message.metadata))
-        if (message.parent) {
-          messageBuilder.setParentMessageId(message.parent ? message.parent.id : null)
+        if (message.parentMessage) {
+          messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
         }
         if (message.repliedInThread) {
           messageBuilder.setReplyInThread()
@@ -451,7 +452,7 @@ function* sendMessage(action: IAction): any {
                               JSON.stringify({
                                 ...messageCopy,
                                 createdAt: new Date(Date.now()),
-                                parent: message.parent
+                                parentMessage: message.parentMessage
                               })
                             )
                           }
@@ -547,7 +548,7 @@ function* sendMessage(action: IAction): any {
             attachments: messageResponse.attachments,
             mentionedUsers: messageResponse.mentionedUsers,
             metadata: messageResponse.metadata,
-            parent: messageResponse.parent,
+            parentMessage: messageResponse.parentMessage,
             repliedInThread: messageResponse.repliedInThread,
             createdAt: messageResponse.createdAt
           }
@@ -735,8 +736,8 @@ function* sendTextMessage(action: IAction): any {
       .setDisplayCount(message.type === 'system' ? 0 : 1)
       .setSilent(message.type === 'system')
       .setMetadata(JSON.stringify(message.metadata))
-    if (message.parent) {
-      messageBuilder.setParentMessageId(message.parent ? message.parent.id : null)
+    if (message.parentMessage) {
+      messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
     }
     if (message.repliedInThread) {
       messageBuilder.setReplyInThread()
@@ -746,7 +747,7 @@ function* sendTextMessage(action: IAction): any {
       JSON.stringify({
         ...messageToSend,
         createdAt: new Date(Date.now()),
-        parent: message.parent
+        parentMessage: message.parentMessage
       })
     )
     sendMessageTid = messageToSend.tid
@@ -789,7 +790,7 @@ function* sendTextMessage(action: IAction): any {
         attachments: messageResponse.attachments,
         mentionedUsers: messageResponse.mentionedUsers,
         metadata: messageResponse.metadata,
-        parent: messageResponse.parent,
+        parentMessage: messageResponse.parentMessage,
         repliedInThread: messageResponse.repliedInThread,
         createdAt: messageResponse.createdAt
       }
@@ -879,7 +880,7 @@ function* forwardMessage(action: IAction): any {
           attachments: messageResponse.attachments,
           mentionedUsers: messageResponse.mentionedUsers,
           metadata: messageResponse.metadata,
-          parent: messageResponse.parent,
+          parentMessage: messageResponse.parentMessage,
           repliedInThread: messageResponse.repliedInThread,
           createdAt: messageResponse.createdAt
         }
@@ -1029,7 +1030,7 @@ function* resendMessage(action: IAction): any {
                 ],
                 mentionedUsers: messageResponse.mentionedUsers,
                 metadata: messageResponse.metadata,
-                parent: messageResponse.parent,
+                parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
               }
@@ -1072,7 +1073,7 @@ function* resendMessage(action: IAction): any {
           attachments: [],
           mentionedUsers: messageResponse.mentionedUsers,
           metadata: messageResponse.metadata,
-          parent: messageResponse.parent,
+          parentMessage: messageResponse.parentMessage,
           repliedInThread: messageResponse.repliedInThread,
           createdAt: messageResponse.createdAt
         }
@@ -1128,10 +1129,10 @@ function* editMessage(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
     const editedMessage = yield call(channel.editMessage, {
       ...message,
-      metadata: JSON.stringify(message.metadata),
+      metadata: isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata),
       attachments: message.attachments.map((att: IAttachment) => ({
         ...att,
-        metadata: JSON.stringify(att.metadata)
+        metadata: isJSON(att.metadata) ? att.metadata : JSON.stringify(att.metadata)
       }))
     })
     yield put(updateMessageAC(editedMessage.id, editedMessage))

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector } from 'react-redux'
 import {
   Popup,
   PopupContainer,
@@ -17,7 +17,7 @@ import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIco
 import { useStateComplex } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
-import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
@@ -25,6 +25,7 @@ import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
+import { themeSelector } from '../../../store/theme/selector'
 
 interface ICreateChannelPopup {
   handleClose: () => void
@@ -57,6 +58,7 @@ export default function CreateChannel({
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
   const uriPrefixRef = useRef<any>(null)
+  const theme = useSelector(themeSelector)
   const [usersPopupVisible, setUsersPopupVisible] = useState(false)
   const [createGroupChannelPopupVisible, setCreateGroupChannelPopupVisible] = useState(true)
   const [selectedMembers, setSelectedMembers] = useState<IAddMember[]>([])
@@ -77,6 +79,7 @@ export default function CreateChannel({
   const requiredFields = channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType]
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
+    handleClose()
   }
 
   const handleAddMembersForCreateChannel = (members: IAddMember[], action: 'create' | 'back') => {
@@ -84,6 +87,8 @@ export default function CreateChannel({
     setCreateGroupChannelPopupVisible(true)
     if (action === 'create') {
       handleCreateChannel(members)
+    } else {
+      setUsersPopupVisible(!usersPopupVisible)
     }
   }
 
@@ -237,6 +242,16 @@ export default function CreateChannel({
   } */
   useEffect(() => {
     setUriPrefixWidth(uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width + 15)
+    const body = document.querySelector('body')
+    if (body) {
+      body.style.overflow = 'hidden'
+    }
+
+    return () => {
+      if (body) {
+        body.style.overflow = 'auto'
+      }
+    }
   }, [])
   useEffect(() => {
     if (requiredFields) {
@@ -254,7 +269,7 @@ export default function CreateChannel({
     }
   }, [subjectValue, createGroupChannel, URIValue])
   return (
-    <Container>
+    <React.Fragment>
       {withoutConfig ? (
         <UsersPopup popupHeight='540px' popupWidth='520px' toggleCreatePopup={handleClose} actionType='createChat' />
       ) : (
@@ -265,7 +280,11 @@ export default function CreateChannel({
               getSelectedUsers={handleAddMembersForCreateChannel}
               creatChannelSelectedMembers={selectedMembers}
               actionType='selectUsers'
-              selectIsRequired={channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType].members}
+              selectIsRequired={
+                channelTypeRequiredFieldsMap &&
+                channelTypeRequiredFieldsMap[channelType] &&
+                channelTypeRequiredFieldsMap[channelType].members
+              }
               channel={{ type: channelType } as any}
               popupHeight='540px'
               popupWidth='520px'
@@ -274,11 +293,20 @@ export default function CreateChannel({
 
           {createGroupChannelPopupVisible && (
             <PopupContainer>
-              <Popup maxHeight='600px' width='520px' maxWidth='520px' padding='0'>
+              <Popup
+                backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
+                boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
+                maxHeight='600px'
+                width='520px'
+                maxWidth='520px'
+                padding='0'
+              >
                 <PopupBody paddingH='24px' paddingV='24px'>
-                  <CloseIcon onClick={toggleCreateGroupChannelPopup} />
+                  <CloseIcon color={colors.textColor1} onClick={toggleCreateGroupChannelPopup} />
 
-                  <PopupName marginBottom='20px'>Create {createGroupChannel ? 'Group' : 'Channel'}</PopupName>
+                  <PopupName color={colors.textColor1} marginBottom='20px'>
+                    Create {createGroupChannel ? 'Group' : 'Channel'}
+                  </PopupName>
                   {!createGroupChannel && (
                     <CrateChannelTitle>Create a Channel to post your content to a large audience.</CrateChannelTitle>
                   )}
@@ -312,30 +340,34 @@ export default function CreateChannel({
                   )}
                   {showSubject && (
                     <React.Fragment>
-                      <Label> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
+                      <Label color={colors.textColor1}> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
                       <CustomInput
                         type='text'
                         value={subjectValue}
                         onChange={handleTypeSubject}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
+                        theme={theme}
+                        color={colors.textColor1}
                       />
                     </React.Fragment>
                   )}
 
                   {showDescription && (
                     <React.Fragment>
-                      <Label>Description</Label>
+                      <Label color={colors.textColor1}>Description</Label>
                       <CustomInput
                         type='text'
                         value={metadataValue}
                         onChange={handleTypeMetadata}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
+                        theme={theme}
+                        color={colors.textColor1}
                       />
                     </React.Fragment>
                   )}
                   {showUri && (
                     <React.Fragment>
-                      <Label>URL</Label>
+                      <Label color={colors.textColor1}>URL</Label>
                       <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
                         {uriPrefixOnCreateChannel && (
                           <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>
@@ -347,6 +379,8 @@ export default function CreateChannel({
                           onBlur={checkURIRegexp}
                           placeholder='chan12'
                           error={!!wrongUri}
+                          theme={theme}
+                          color={colors.textColor1}
                         />
                         {!!wrongUri && (
                           <InputErrorMessage>
@@ -363,10 +397,10 @@ export default function CreateChannel({
                     </React.Fragment>
                   )}
                 </PopupBody>
-                <PopupFooter backgroundColor={colors.gray5}>
+                <PopupFooter backgroundColor={colors.backgroundColor}>
                   <Button
                     type='button'
-                    color={colors.gray6}
+                    color={colors.textColor1}
                     backgroundColor='transparent'
                     onClick={() => handleClose()}
                   >
@@ -406,17 +440,16 @@ export default function CreateChannel({
           )}
         </React.Fragment>
       )}
-    </Container>
+    </React.Fragment>
   )
 }
 
-const Container = styled.div``
-const CrateChannelTitle = styled.h3`
+const CrateChannelTitle = styled.p`
   font-size: 15px;
   font-weight: 400;
   line-height: 150%;
   margin: 0 0 20px;
-  color: ${colors.gray8};
+  color: ${colors.textColor2};
 `
 const UploadAvatarLabel = styled.label<{ backgroundColor?: string; iconColor?: string }>`
   display: flex;
@@ -424,7 +457,7 @@ const UploadAvatarLabel = styled.label<{ backgroundColor?: string; iconColor?: s
   height: 90px;
   align-items: center;
   justify-content: center;
-  background-color: ${(props) => props.backgroundColor || colors.gray5};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   border-radius: 50%;
   cursor: pointer;
 
@@ -479,7 +512,7 @@ const ChannelUriDescription = styled.p`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `
 
 const UriInputWrapper = styled.div<{ uriPrefixWidth?: number }>`

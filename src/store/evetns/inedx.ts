@@ -551,8 +551,8 @@ export default function* watchForEvents(): any {
                 setNotification(messageBody, message.user, channel)
               }
             }
-            if (message.repliedInThread && message.parent.id) {
-              yield put(markMessagesAsDeliveredAC(message.parent.id, [message.id]))
+            if (message.repliedInThread && message.parentMessage.id) {
+              yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
             } else {
               yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
             }

@@ -5,11 +5,11 @@ import ChatHeader from './ChatHeader'
 import MessageList from './Messages'
 import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
-import SceytChatHeader from './SceytChatHeader'
 import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
 import CreateChannel from './../common/popups/createChannel'
 import ChannelSearch from './ChannelList/ChannelSearch'
 import Avatar from './Avatar'
+import DropDown from '../common/dropdown'
 
 export {
   SceytChat,
@@ -19,11 +19,11 @@ export {
   MessageList,
   SendMessage,
   ChannelDetails,
-  SceytChatHeader,
   MessagesScrollToBottomButton,
   CreateChannel,
   ChannelSearch,
-  Avatar
+  Avatar,
+  DropDown
 }
 
 declare global {

@@ -10,12 +10,12 @@ import {
   CustomInput,
   UploadAvatarButton,
   UploadAvatarHandler
-} from '../../../../UIHelper'
+} from '../../../UIHelper'
 import { ReactComponent as UploadImageIcon } from '../../../../assets/svg/uploadImage.svg'
-import { ReactComponent as DeleteUpload } from '../../../../assets/svg/deleteUpload.svg'
-import { useStateComplex } from '../../../../hooks'
-import ImageCrop from '../../../../common/imageCrop'
-import Avatar from '../../../Avatar'
+import { ReactComponent as DeleteUpload } from '../../../assets/svg/deleteUpload.svg'
+import { useStateComplex } from '../../../hooks'
+import ImageCrop from '../../../common/imageCrop'
+import Avatar from '../../Avatar'
 // import { updateUser } from '../../../../store/user/actions';
 // import { setErrorNotification } from '../../../../store/channel/actions';
 
@@ -134,7 +134,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
           <button type='button' className='button gray' onClick={toggleEditPopup}>
             Cancel
           </button>
-          <button type='button' className='button blue filled' onClick={handleUpdateProfile}>
+          <button type='button' className='button filled' onClick={handleUpdateProfile}>
             Save
           </button>
         </PopupButtons>

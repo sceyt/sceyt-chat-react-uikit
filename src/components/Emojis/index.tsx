@@ -10,6 +10,9 @@ import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
 import { colors } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
+import { useSelector } from 'react-redux'
+import { themeSelector } from '../../store/theme/selector'
+import { THEME } from '../../helpers/constants'
 
 interface EmojiCollectionProps {
   activeCollection: boolean
@@ -60,6 +63,7 @@ function EmojisPopup({
   emojisPopupPosition?: string
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
+  const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')
   const [collectionHeights, setCollectionHeights] = useState<number[]>([])
@@ -116,6 +120,8 @@ function EmojisPopup({
 
   return (
     <Container
+      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      noBorder={theme === THEME.DARK}
       relativePosition={relativePosition}
       borderRadius={emojisContainerBorderRadius}
       rightSide={rightSide}
@@ -126,7 +132,10 @@ function EmojisPopup({
       emojisPopupPosition={emojisPopupPosition}
     >
       {emojisCategoryIconsPosition === 'top' && (
-        <EmojiFooter emojisCategoryIconsPosition={emojisCategoryIconsPosition}>
+        <EmojiFooter
+          borderColor={colors.hoverBackgroundColor}
+          emojisCategoryIconsPosition={emojisCategoryIconsPosition}
+        >
           {EMOJIS.map((emoji) => (
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
@@ -156,7 +165,12 @@ function EmojisPopup({
                   const label = emojiSmallCollection.key
                   const { array } = emojiSmallCollection
                   return array.map((emoji, i) => (
-                    <Emoji key={`${emoji}`} className='emoji-cont' onClick={() => chooseEmoji(emoji)}>
+                    <Emoji
+                      hoverBackgroundColor={colors.hoverBackgroundColor}
+                      key={`${emoji}`}
+                      className='emoji-cont'
+                      onClick={() => chooseEmoji(emoji)}
+                    >
                       {bigIndex === 0 && i === 0 && (
                         <CollectionPointer
                           ref={collectionsRef.current[bigColIndex].elem}
@@ -206,6 +220,8 @@ const Container = styled.div<{
   bottomPosition?: string
   borderRadius?: string
   emojisPopupPosition?: string
+  backgroundColor?: string
+  noBorder?: boolean
 }>`
   position: ${(props) => (props.relativePosition ? 'relative' : 'absolute')};
   left: ${(props) => (props.rtlDirection ? '' : props.rightSide ? '' : '5px')};
@@ -213,11 +229,11 @@ const Container = styled.div<{
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   bottom: ${(props) => props.bottomPosition};
   width: 306px;
-  border: 1px solid ${colors.gray1};
+  border: ${(props) => (props.noBorder ? 'none' : `1px solid ${colors.gray1}`)};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: ${(props) => props.borderRadius || '12px'};
-  background: ${colors.white};
+  background: ${(props) => props.backgroundColor};
   z-index: 35;
   transform: scaleY(0);
   transform-origin: ${(props) => (props.emojisPopupPosition === 'bottom' ? '0 0' : '0 100%')};
@@ -235,7 +251,7 @@ const EmojiHeader = styled.div<{ padding?: string }>`
   font-size: 12px;
   line-height: 22px;
   text-transform: uppercase;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `
@@ -250,7 +266,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.primary : colors.gray7)};
+    color: ${(props) => (props.activeCollection ? colors.primary : colors.textColor3)};
   }
 `
 const CollectionPointer = styled.span``
@@ -260,13 +276,15 @@ const AllEmojis = styled.ul`
   padding: 0 8px 8px;
   margin: 0;
 `
-const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom' }>`
+const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom'; borderColor?: string }>`
   height: 42px;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  border-top: ${(props) => props.emojisCategoryIconsPosition !== 'top' && `1px solid ${colors.gray1}`};
-  border-bottom: ${(props) => props.emojisCategoryIconsPosition === 'top' && `1px solid ${colors.gray1}`};
+  border-top: ${(props) =>
+    props.emojisCategoryIconsPosition !== 'top' && `1px solid ${props.borderColor || colors.gray1}`};
+  border-bottom: ${(props) =>
+    props.emojisCategoryIconsPosition === 'top' && `1px solid ${props.borderColor || colors.gray1}`};
   padding: 0 10px;
   & > span {
     width: 100%;
@@ -274,7 +292,7 @@ const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom' 
   }
 `
 
-const Emoji = styled.li`
+const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -291,6 +309,6 @@ const Emoji = styled.li`
     font-size: 22px;
   }
   &:hover {
-    background: #f5f5f8;
+    background: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
   }
 `

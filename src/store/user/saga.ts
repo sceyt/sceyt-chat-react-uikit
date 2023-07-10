@@ -176,6 +176,7 @@ function* getUsers(action: IAction): any {
     query.usersQuery = usersQuery
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADING))
+
     const { users } = yield call(usersQuery.loadNextPage)
 
     yield put(setUsersAC(users))

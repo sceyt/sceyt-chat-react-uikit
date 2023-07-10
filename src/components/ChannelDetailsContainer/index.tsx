@@ -3,7 +3,10 @@ import { shallowEqual, useSelector } from 'react-redux'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
+import styled from 'styled-components'
 export interface IDetailsProps {
+  showAboutChannel?: boolean
+  avatarAndNameDirection?: 'row' | 'column'
   channelEditIcon?: JSX.Element
   editChannelSaveButtonBackgroundColor?: string
   editChannelSaveButtonTextColor?: string
@@ -106,6 +109,8 @@ export interface IDetailsProps {
 
 const ChannelDetailsContainer = ({
   channelEditIcon,
+  showAboutChannel,
+  avatarAndNameDirection = 'row',
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
   editChannelCancelButtonBackgroundColor,
@@ -183,9 +188,11 @@ const ChannelDetailsContainer = ({
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
   return (
-    <React.Fragment>
+    <DetailsWrapper id='channel_details_wrapper'>
       {channelDetailsIsOpen && (
         <Details
+          showAboutChannel={showAboutChannel}
+          avatarAndNameDirection={avatarAndNameDirection}
           channelEditIcon={channelEditIcon}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
           editChannelSaveButtonTextColor={editChannelSaveButtonTextColor}
@@ -262,8 +269,9 @@ const ChannelDetailsContainer = ({
           showKickAndBlockMember={showKickAndBlockMember}
         />
       )}
-    </React.Fragment>
+    </DetailsWrapper>
   )
 }
 
+const DetailsWrapper = styled.div``
 export default ChannelDetailsContainer

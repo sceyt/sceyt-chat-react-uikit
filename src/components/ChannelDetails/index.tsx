@@ -28,8 +28,11 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
+import { themeSelector } from '../../store/theme/selector'
 
 const Details = ({
+  showAboutChannel,
+  avatarAndNameDirection,
   channelEditIcon,
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
@@ -116,9 +119,11 @@ const Details = ({
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
+  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
+  const [channelDetailsHeight, setChannelDetailsHeight] = useState<number>(0)
   // const [tabFixed, setTabFixed] = useState(false)
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
@@ -129,6 +134,7 @@ const Details = ({
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const detailsRef = useRef<any>(null)
+  const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
@@ -171,6 +177,7 @@ const Details = ({
   }
 
   const handleDetailsClose = () => {
+    clearTimeout(openTimeOut.current)
     setMounted(false)
     // setTimeout(() => {
     dispatch(switchChannelInfoAC(false))
@@ -179,25 +186,32 @@ const Details = ({
 
   useEffect(() => {
     setMounted(true)
+    const detailsContainer = document.getElementById('channel_details_wrapper')
+    if (detailsContainer) {
+      setChannelDetailsHeight(detailsContainer.offsetHeight)
+    }
   }, [])
-
   return (
-    <Container mounted={mounted}>
-      <ChannelDetailsHeader>
+    <Container mounted={mounted} theme={theme} borderColor={colors.backgroundColor}>
+      <ChannelDetailsHeader borderColor={colors.backgroundColor}>
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader margin='0 0 0 12px'> Edit details </SectionHeader>
+            <SectionHeader margin='0 0 0 12px' color={colors.textColor1}>
+              Edit details
+            </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader>Details</SectionHeader> <CloseIcon onClick={handleDetailsClose} />
+            <SectionHeader color={colors.textColor1}>Details</SectionHeader>{' '}
+            <CloseIcon color={colors.textColor1} onClick={handleDetailsClose} />
           </React.Fragment>
         )}
       </ChannelDetailsHeader>
 
       {editMode && (
         <EditChannel
+          theme={theme}
           channel={channel}
           handleToggleEditMode={setEditMode}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
@@ -210,47 +224,60 @@ const Details = ({
       <ChatDetails
         onScroll={handleMembersListScroll}
         heightOffset={detailsRef && detailsRef.current && detailsRef.current.offsetTop}
+        height={channelDetailsHeight}
         ref={detailsRef}
       >
-        <DetailsHeader>
-          <Avatar
-            image={channel.avatarUrl || (directChannelUser && directChannelUser.avatarUrl)}
-            name={channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id))}
-            size={72}
-            textSize={26}
-            setDefaultAvatar={isDirectChannel}
-          />
-          <ChannelInfo>
-            <ChannelName isDirect={isDirectChannel}>
-              {channel.subject ||
-                (isDirectChannel && directChannelUser
-                  ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                  : '')}
-            </ChannelName>
-            {isDirectChannel ? (
-              <SubTitle>
-                {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                  ? ''
-                  : directChannelUser &&
-                    directChannelUser.presence &&
-                    (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
-                      ? 'Online'
-                      : directChannelUser.presence.lastActiveAt &&
-                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
-              </SubTitle>
-            ) : (
-              <SubTitle>
-                {channel.memberCount} {displayMemberText}
-              </SubTitle>
-            )}
-          </ChannelInfo>
-          {!isDirectChannel && checkActionPermission('editChannel') && (
-            <EditButton onClick={() => setEditMode(true)}>{channelEditIcon || <EditIcon />}</EditButton>
+        <DetailsHeader borderColor={colors.backgroundColor}>
+          <ChannelAvatarAndName direction={avatarAndNameDirection}>
+            <Avatar
+              image={channel.avatarUrl || (directChannelUser && directChannelUser.avatarUrl)}
+              name={channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id))}
+              size={72}
+              textSize={26}
+              setDefaultAvatar={isDirectChannel}
+            />
+            <ChannelInfo direction={avatarAndNameDirection}>
+              <ChannelName isDirect={isDirectChannel}>
+                {channel.subject ||
+                  (isDirectChannel && directChannelUser
+                    ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                    : '')}
+              </ChannelName>
+              {isDirectChannel ? (
+                <SubTitle>
+                  {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
+                    ? ''
+                    : directChannelUser &&
+                      directChannelUser.presence &&
+                      (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                        ? 'Online'
+                        : directChannelUser.presence.lastActiveAt &&
+                          userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                </SubTitle>
+              ) : (
+                <SubTitle>
+                  {channel.memberCount} {displayMemberText}
+                </SubTitle>
+              )}
+              {!isDirectChannel && checkActionPermission('editChannel') && (
+                <EditButton onClick={() => setEditMode(true)}>{channelEditIcon || <EditIcon />}</EditButton>
+              )}
+            </ChannelInfo>
+          </ChannelAvatarAndName>
+
+          {showAboutChannel && channel.metadata && channel.metadata.d && (
+            <AboutChannel>
+              <AboutChannelTitle>About</AboutChannelTitle>
+              <AboutChannelText color={colors.textColor1}>
+                {channel.metadata && channel.metadata.d ? channel.metadata.d : ''}
+              </AboutChannelText>
+            </AboutChannel>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
         {channel.userRole && (
           <Actions
+            theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}
             unmuteNotificationIcon={unmuteNotificationIcon}
@@ -312,6 +339,7 @@ const Details = ({
         )}
         {/* <div ref={tabsRef}> */}
         <DetailsTab
+          theme={theme}
           channel={channel}
           activeTab={activeTab}
           setActiveTab={setActiveTab}
@@ -347,34 +375,52 @@ const Details = ({
 
 export default Details
 
-const Container = styled.div<{ mounted: boolean }>`
+const Container = styled.div<{ mounted: boolean; theme?: string; borderColor?: string }>`
   flex: 0 0 auto;
   width: 0;
-  border-left: 1px solid ${colors.gray1};
+  border-left: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
   //transition: all 0.1s;
   ${(props) => props.mounted && ' width: 400px'}
 }
 `
 
-const ChannelDetailsHeader = styled.div`
+const ChannelDetailsHeader = styled.div<{ borderColor?: string }>`
   display: flex;
   align-items: center;
   padding: 16px;
   position: relative;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: 1px solid ${colors.gray1};
+  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
 
   & svg {
     cursor: pointer;
   }
 `
 
-const ChatDetails = styled.div<{ heightOffset: number }>`
+const ChatDetails = styled.div<{ height: number; heightOffset?: number }>`
   position: relative;
   width: 400px;
-  height: ${(props) => (props.heightOffset ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
+  //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
+  height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;
+`
+const AboutChannel = styled.div`
+  margin-top: 20px;
+`
+const AboutChannelTitle = styled.h4`
+  font-size: 12px;
+  margin: 0;
+  line-height: 16px;
+  color: ${colors.textColor3};
+`
+
+const AboutChannelText = styled.h3`
+  font-size: 16px;
+  margin: 0;
+  font-weight: 400;
+  line-height: 22px;
+  color: ${(props) => props.color};
 `
 
 /* const DetailsBody = styled.div`
@@ -389,17 +435,26 @@ const ChatDetails = styled.div<{ heightOffset: number }>`
   object-fit: cover;
 ` */
 
-const ChannelInfo = styled.div`
-  margin-left: 16px;
+const ChannelInfo = styled.div<{ direction?: 'column' | 'row' }>`
+  position: relative;
+  margin-left: ${(props) => (!props.direction || props.direction !== 'column') && '16px'};
+  margin-top: ${(props) => props.direction && props.direction === 'column' && '16px'};
+  text-align: ${(props) => props.direction && props.direction === 'column' && 'center'};
 `
 
-const DetailsHeader = styled.div`
-  display: flex;
-  position: relative;
-  border-bottom: 6px solid ${colors.gray0};
+const DetailsHeader = styled.div<{ borderColor?: string }>`
+  border-bottom: 6px solid ${(props) => props.borderColor || colors.backgroundColor};
   align-items: center;
   box-sizing: border-box;
   padding: 20px 16px;
+`
+
+const ChannelAvatarAndName = styled.div<{ direction?: string }>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  flex-direction: ${(props) => props.direction};
 `
 
 const ChannelName = styled(SectionHeader)<any>`
@@ -410,6 +465,9 @@ const ChannelName = styled(SectionHeader)<any>`
 `
 
 const EditButton = styled.span`
+  position: absolute;
+  right: -28px;
+  top: 8px;
   margin-left: 8px;
   cursor: pointer;
   color: #b2b6be;

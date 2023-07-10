@@ -15,6 +15,7 @@ import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 interface IVideoPreviewProps {
   maxWidth?: string
   maxHeight?: string
+  theme?: string
   file: IAttachment
   borderRadius?: string
   isPreview?: boolean

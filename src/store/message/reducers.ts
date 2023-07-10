@@ -263,7 +263,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           return {
             ...msg,
             userReactions: slfReactions,
-            lastReactions: message.lastReactions,
             reactionTotals: message.reactionTotals
           }
         }
@@ -284,7 +283,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           }
           return {
             ...msg,
-            lastReactions: message.lastReactions,
             reactionTotals: message.reactionTotals,
             userReactions
           }

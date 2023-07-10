@@ -3,6 +3,9 @@ import styled from 'styled-components'
 import { colors } from '../../../UIHelper/constants'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
+import { useSelector } from 'react-redux'
+import { themeSelector } from '../../../store/theme/selector'
+import { THEME } from '../../../helpers/constants'
 
 function FrequentlyEmojis({
   handleAddEmoji,
@@ -23,6 +26,7 @@ function FrequentlyEmojis({
     '😂': { key: '😂', reacted: false },
     '😏': { key: '😏', reacted: false }
   }
+  const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [emojis, setEmojis] = useState<any>([
     { key: '👍', reacted: false },
@@ -71,13 +75,27 @@ function FrequentlyEmojis({
   }, [])
 
   return (
-    <Container id='emojisContainer' rendered={rendered} rightSide={rtlDirection}>
+    <Container
+      id='emojisContainer'
+      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      rendered={rendered}
+      rightSide={rtlDirection}
+    >
       {emojis.map((emoji: any) => (
-        <EmojiItem active={emoji.reacted} key={emoji.key} onClick={() => chooseEmoji(emoji.key)}>
+        <EmojiItem
+          hoverBackground={colors.hoverBackgroundColor}
+          active={emoji.reacted}
+          key={emoji.key}
+          onClick={() => chooseEmoji(emoji.key)}
+        >
           {emoji.key}
         </EmojiItem>
       ))}
-      <OpenMoreEmojis onClick={() => handleEmojiPopupToggle(true)}>
+      <OpenMoreEmojis
+        onClick={() => handleEmojiPopupToggle(true)}
+        iconBackgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+        hoverBackground={colors.hoverBackgroundColor}
+      >
         <PlusIcon />
       </OpenMoreEmojis>
     </Container>
@@ -86,13 +104,13 @@ function FrequentlyEmojis({
 
 export default FrequentlyEmojis
 
-const Container = styled.div<{ rendered?: boolean; rightSide?: boolean }>`
+const Container = styled.div<{ rendered?: boolean; rightSide?: boolean; backgroundColor?: string }>`
   transform: scale(0, 0);
   transform-origin: ${(props) => (props.rightSide ? '100% 100%' : '0 100%')};
   display: flex;
   align-items: center;
   padding: 6px;
-  background: ${colors.white};
+  background-color: ${(props) => props.backgroundColor || colors.white};
   box-shadow: 0 3px 10px -4px rgba(0, 0, 0, 0.2);
   border-radius: 24px;
   overflow: hidden;
@@ -105,7 +123,7 @@ const Container = styled.div<{ rendered?: boolean; rightSide?: boolean }>`
   `};
 `
 
-const EmojiItem = styled.span<{ active?: boolean }>`
+const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
   font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
     twemoji mozilla, segoe ui symbol;
   display: flex;
@@ -118,25 +136,28 @@ const EmojiItem = styled.span<{ active?: boolean }>`
   border-radius: 50%;
   width: 36px;
   height: 36px;
-  background-color: ${(props) => props.active && colors.gray5};
+  background-color: ${(props) => props.active && colors.backgroundColor};
   &:hover {
-    background-color: ${colors.gray5};
+    background-color: ${(props) => props.hoverBackground || colors.backgroundColor};
   }
 `
 
-const OpenMoreEmojis = styled.span`
+const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackground?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
   width: 28px;
   height: 28px;
-  background-color: ${colors.gray5};
+  background-color: ${(props) => props.iconBackgroundColor || colors.backgroundColor};
   cursor: pointer;
 
   & > svg {
-    color: ${colors.gray4};
+    color: ${colors.textColor2};
     height: 18px;
     width: 18px;
+  }
+  &:hover {
+    background-color: ${(props) => props.hoverBackground || colors.hoverBackgroundColor};
   }
   border-radius: 50%;
 `

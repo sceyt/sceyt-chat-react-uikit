@@ -27,7 +27,7 @@ import {
   switchChannelActionAC
 } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
-import { LOADING_STATE } from '../../helpers/constants'
+import { LOADING_STATE, THEME } from '../../helpers/constants'
 
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
@@ -40,6 +40,7 @@ import { getContactsAC } from '../../store/user/actions'
 import ProfileSettings from './ProfileSettings'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
+import { themeSelector } from '../../store/theme/selector'
 
 interface IChannelGroup {
   groupName: string
@@ -50,13 +51,19 @@ interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
     loadMoreChannels: (count?: number) => void
-    searchValue?: string
-    handleSetChannelListWithGroups?: (channelListGroups: IChannelGroup[]) => void
-    children?: React.ReactNode
+    searchValue: string
+    handleSetChannelListWithGroups: (channelGroupList: IChannelGroup[]) => void
+    children: React.ReactNode
+    activeChannel?: IChannel
+    setActiveChannel?: (channel: IChannel) => void
   }>
   ListItem?: FC<any>
   Profile?: JSX.Element
   CreateChannel?: JSX.Element
+  ChannelsTitle?: JSX.Element
+  backgroundColor?: string
+  searchInputBackgroundColor?: string
+  searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
   getActiveChannel?: (channel: IChannel) => void
@@ -113,6 +120,9 @@ interface IChannelListProps {
 const ChannelList: React.FC<IChannelListProps> = ({
   selectedChannelBackground,
   selectedChannelLeftBorder,
+  backgroundColor,
+  searchInputBackgroundColor,
+  searchInputTextColor,
   searchChannelsPosition = 'bottom',
   searchInputBorderRadius,
   selectedChannelBorderRadius,
@@ -124,6 +134,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   getActiveChannel,
   Profile,
   CreateChannel,
+  ChannelsTitle,
   filter,
   limit,
   sort,
@@ -149,6 +160,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const dispatch = useDispatch()
   // const [searchValue, setSearchValue] = useState('');
   const getFromContacts = getShowOnlyContactUsers()
+  const theme = useSelector(themeSelector)
   const channelListRef = useRef<HTMLInputElement>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
@@ -307,15 +319,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
-
   /* useEffect(() => {
     console.log('channels. ...........................', channels)
   }, [channels]) */
   return (
-    <Container withCustomList={!!List} ref={channelListRef}>
+    <Container withCustomList={!!List} ref={channelListRef} backgroundColor={backgroundColor}>
       <ChannelListHeader
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current.clientWidth) || 0}
+        borderColor={colors.backgroundColor}
       >
         {Profile /* || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} /> */}
         {/* <ProfileCont onClick={handleOpenProfile}>
@@ -329,14 +341,17 @@ const ChannelList: React.FC<IChannelListProps> = ({
             searchValue={searchValue}
             handleSearchValueChange={handleSearchValueChange}
             getMyChannels={getMyChannels}
+            searchInputBackgroundColor={searchInputBackgroundColor}
+            searchInputTextColor={searchInputTextColor}
           />
         ) : (
-          <ChannelsTitle>Chats</ChannelsTitle>
+          ChannelsTitle || <ChatsTitle theme={theme}>Chats</ChatsTitle>
         )}
 
         {showCreateChannelIcon &&
           (CreateChannel || (
             <CreateChannelButton
+              theme={theme}
               newChannelIcon={newChannelIcon}
               newGroupIcon={newGroupIcon}
               newChatIcon={newChatIcon}
@@ -353,12 +368,16 @@ const ChannelList: React.FC<IChannelListProps> = ({
           borderRadius={searchInputBorderRadius}
           handleSearchValueChange={handleSearchValueChange}
           getMyChannels={getMyChannels}
+          searchInputBackgroundColor={searchInputBackgroundColor}
+          searchInputTextColor={searchInputTextColor}
         />
       )}
       {/* <ChannelTabs /> */}
       {List ? (
         <List
           channels={channels}
+          activeChannel={activeChannel}
+          setActiveChannel={handleChangeActiveChannel}
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
           handleSetChannelListWithGroups={handleSetChannelListWithGroups}
@@ -390,27 +409,31 @@ const ChannelList: React.FC<IChannelListProps> = ({
             channelsLoading === LOADING_STATE.LOADED &&
             searchValue &&
             (searchOption === 'custom' ? (
-              <div>
+              <div className='custom_channel_list'>
                 {channelGroupsList
                   ? channelGroupsList.map((channelGroup) => (
                       <React.Fragment>
                         <SearchedChannelsHeader>{channelGroup.groupName}</SearchedChannelsHeader>
-                        {channelGroup.channelList.map((channel) => (
-                          <Channel
-                            selectedChannelLeftBorder={selectedChannelLeftBorder}
-                            selectedChannelBackground={selectedChannelBackground}
-                            selectedChannelBorderRadius={selectedChannelBorderRadius}
-                            selectedChannelPaddings={selectedChannelPaddings}
-                            channelsPaddings={channelsPaddings}
-                            channelsMargin={channelsMargin}
-                            notificationsIsMutedIcon={notificationsIsMutedIcon}
-                            notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                            avatar={avatar}
-                            channel={channel}
-                            key={channel.id}
-                            contactsMap={contactsMap}
-                          />
-                        ))}
+                        {channelGroup.channelList.map((channel) =>
+                          ListItem ? (
+                            <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                          ) : (
+                            <Channel
+                              selectedChannelLeftBorder={selectedChannelLeftBorder}
+                              selectedChannelBackground={selectedChannelBackground}
+                              selectedChannelBorderRadius={selectedChannelBorderRadius}
+                              selectedChannelPaddings={selectedChannelPaddings}
+                              channelsPaddings={channelsPaddings}
+                              channelsMargin={channelsMargin}
+                              notificationsIsMutedIcon={notificationsIsMutedIcon}
+                              notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                              avatar={avatar}
+                              channel={channel}
+                              key={channel.id}
+                              contactsMap={contactsMap}
+                            />
+                          )
+                        )}
                       </React.Fragment>
                     ))
                   : ''}
@@ -490,6 +513,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                 ) : (
                   <Channel
+                    theme={theme}
                     selectedChannelLeftBorder={selectedChannelLeftBorder}
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -581,14 +605,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
 export default ChannelList
 
-const Container = styled.div<{ withCustomList?: boolean; ref?: any }>`
+const Container = styled.div<{ withCustomList?: boolean; ref?: any; backgroundColor?: string }>`
   position: relative;
   display: flex;
   flex-direction: column;
   width: ${(props) => (props.withCustomList ? '' : '400px')};
   min-width: ${(props) => (props.withCustomList ? '' : '400px')};
-  border-right: ${(props) => (props.withCustomList ? '' : '1px solid rgb(237, 237, 237)')};
-
+  border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${colors.backgroundColor}`)};
+  background-color: ${(props) => props.backgroundColor};
   ${(props) =>
     props.withCustomList
       ? ''
@@ -619,17 +643,22 @@ const SearchedChannelsHeader = styled.p`
 const DirectChannels = styled.div``
 const GroupChannels = styled.div``
 
-const ChannelsTitle = styled.h3`
+const ChatsTitle = styled.h3<{ theme?: string }>`
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 28px;
   margin: 0 auto;
-  color: ${colors.textColor1};
+  color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
 `
 
-const ChannelListHeader = styled.div<{ maxWidth?: number; withoutProfile?: any; withCustomList?: boolean }>`
+const ChannelListHeader = styled.div<{
+  maxWidth?: number
+  withoutProfile?: any
+  withCustomList?: boolean
+  borderColor?: string
+}>`
   display: flex;
   align-items: center;
   flex-direction: row;
@@ -639,5 +668,5 @@ const ChannelListHeader = styled.div<{ maxWidth?: number; withoutProfile?: any; 
   box-sizing: border-box;
   max-width: ${(props) => props.maxWidth && `${props.maxWidth}px`};
   padding-left: ${(props) => props.withoutProfile && '52px'};
-  border-right: ${(props) => (props.withCustomList ? '1px solid rgb(237, 237, 237)' : '')};
+  border-right: ${(props) => props.withCustomList && `1px solid ${props.borderColor}`};
 `

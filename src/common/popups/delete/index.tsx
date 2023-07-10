@@ -18,6 +18,7 @@ interface IProps {
   title: string
   description: string | JSX.Element
   buttonText: string
+  theme?: string
   buttonTextColor?: string
   buttonBackground?: string
   togglePopup: () => void
@@ -33,6 +34,7 @@ interface IProps {
 function ConfirmPopup({
   title,
   description,
+  theme,
   buttonText,
   buttonTextColor,
   buttonBackground,
@@ -69,10 +71,17 @@ function ConfirmPopup({
   // @ts-ignore
   return (
     <PopupContainer>
-      <Popup maxWidth='520px' minWidth='520px' isLoading={loading} padding='0'>
+      <Popup
+        theme={theme}
+        backgroundColor={colors.backgroundColor}
+        maxWidth='520px'
+        minWidth='520px'
+        isLoading={loading}
+        padding='0'
+      >
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon onClick={() => togglePopup()} />
-          <PopupName isDelete marginBottom='20px'>
+          <CloseIcon color={colors.textColor1} onClick={() => togglePopup()} />
+          <PopupName color={colors.textColor1} isDelete marginBottom='20px'>
             {title}
           </PopupName>
           <PopupDescription>{description}</PopupDescription>
@@ -101,8 +110,8 @@ function ConfirmPopup({
             </DeleteMessageOptions>
           )}
         </PopupBody>
-        <PopupFooter backgroundColor={colors.gray5}>
-          <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => togglePopup()}>
+        <PopupFooter backgroundColor={colors.backgroundColor}>
+          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button
@@ -132,7 +141,7 @@ const DeleteOptionItem = styled.div`
   cursor: pointer;
   font-size: 15px;
   line-height: 160%;
-  color: ${colors.gray8};
+  color: ${colors.textColor2};
   margin-bottom: 12px;
 
   & > label {

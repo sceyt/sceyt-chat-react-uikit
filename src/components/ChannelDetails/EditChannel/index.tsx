@@ -17,7 +17,7 @@ import {
 import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
 import { updateChannelAC } from '../../../store/channel/actions'
-import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { IChannel, IMember } from '../../../types'
 import { useDidUpdate, useStateComplex } from '../../../hooks'
 import ConfirmPopup from '../../../common/popups/delete'
@@ -28,12 +28,12 @@ import { resizeImage } from '../../../helpers/resizeImage'
 import { getUploadImageIcon } from '../../../helpers/channelHalper'
 import { getClient } from '../../../common/client'
 
-const Container = styled.div<{ active: boolean; heightOffset: any }>`
+const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor?: string }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
   height: ${(props) => `calc(100vh - ${props.heightOffset ? props.heightOffset + 48 : 48}px)`};
   position: absolute;
   padding: 24px 16px;
-  background-color: #fff;
+  background-color: ${(props) => props.backgroundColor || colors.white};
   z-index: 25;
 `
 
@@ -76,6 +76,7 @@ const EditChannelFooter = styled(ButtonBlock)`
 
 interface IProps {
   channel: IChannel
+  theme?: string
   handleToggleEditMode: (state: boolean) => void
   editChannelSaveButtonBackgroundColor?: string
   editChannelSaveButtonTextColor?: string
@@ -85,6 +86,7 @@ interface IProps {
 
 const EditChannel = ({
   channel,
+  theme,
   handleToggleEditMode,
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
@@ -197,11 +199,21 @@ const EditChannel = ({
   }, [])
   return (
     <React.Fragment>
-      <Container ref={editContainer} heightOffset={offsetTop} active={isEditMode}>
+      <Container
+        ref={editContainer}
+        heightOffset={offsetTop}
+        active={isEditMode}
+        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
+      >
         <AvatarCont>
           <DropDownWrapper>
             {!isDirectChannel && channel.userRole && (
-              <DropDown position='center' iconColor={colors.white} trigger={getUploadImageIcon() || <CameraIcon />}>
+              <DropDown
+                theme={theme}
+                position='center'
+                iconColor={colors.white}
+                trigger={getUploadImageIcon() || <CameraIcon />}
+              >
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
@@ -238,10 +250,18 @@ const EditChannel = ({
         </AvatarCont>
 
         <Label> Name </Label>
-        <CustomInput placeholder='Channel Subject' value={newSubject} onChange={(e) => setNewSubject(e.target.value)} />
+        <CustomInput
+          theme={theme}
+          color={colors.textColor1}
+          placeholder='Channel Subject'
+          value={newSubject}
+          onChange={(e) => setNewSubject(e.target.value)}
+        />
 
         <Label> Description </Label>
         <CustomInput
+          theme={theme}
+          color={colors.textColor1}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e) => setNewDescription(e.target.value)}
@@ -251,8 +271,8 @@ const EditChannel = ({
           <Button
             type='button'
             borderRadius='8px'
-            color={editChannelCancelButtonTextColor || colors.gray6}
-            backgroundColor={editChannelCancelButtonBackgroundColor || colors.gray5}
+            color={editChannelCancelButtonTextColor || colors.textColor1}
+            backgroundColor={editChannelCancelButtonBackgroundColor || colors.backgroundColor}
             onClick={() => handleToggleEditMode(false)}
           >
             Cancel
@@ -270,6 +290,7 @@ const EditChannel = ({
 
       {cropPopup && (
         <ImageCrop
+          theme={theme}
           image={{ name: newAvatar.name, url: selectedImageUrl }}
           onAccept={handleImageCrop}
           handleClosePopup={() => setCropPopup(false)}

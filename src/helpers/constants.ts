@@ -85,3 +85,14 @@ export const channelDetailsTabs = {
   link: 'Links',
   voice: 'Voice'
 }
+
+export const DB_NAME = 'sceytChatDatabase'
+export const DB_STORE_NAMES = {
+  CHANNELS: 'channels',
+  MESSAGES: 'messages'
+}
+
+export const THEME = {
+  DARK: 'dark',
+  LIGHT: 'light'
+}

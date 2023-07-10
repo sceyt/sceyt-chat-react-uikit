@@ -15,7 +15,7 @@ import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.sv
 import Avatar from '../Avatar'
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS, THEME } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
@@ -30,6 +30,7 @@ import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 interface IChannelProps {
   channel: IChannel
   avatar?: boolean
+  theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
   selectedChannelLeftBorder?: string
@@ -43,6 +44,7 @@ interface IChannelProps {
 
 const Channel: React.FC<IChannelProps> = ({
   channel,
+  theme,
   avatar,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
@@ -112,9 +114,12 @@ const Channel: React.FC<IChannelProps> = ({
   return (
     <Container
       // ref={channelItemRef}
+      theme={theme}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
-      selectedBackgroundColor={selectedChannelBackground || colors.primaryLight}
+      selectedBackgroundColor={
+        selectedChannelBackground || (theme === THEME.DARK ? colors.darkModePrimaryLight : colors.primaryLight)
+      }
       selectedChannelPaddings={selectedChannelPaddings}
       channelsPaddings={channelsPaddings}
       selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -144,7 +149,7 @@ const Channel: React.FC<IChannelProps> = ({
             )}
         </AvatarWrapper>
       )}
-      <ChannelInfo avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
+      <ChannelInfo theme={theme} avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
         <h3>
           {channel.subject ||
             (isDirectChannel && directChannelUser
@@ -163,10 +168,7 @@ const Channel: React.FC<IChannelProps> = ({
           >
             {typingIndicator ? (
               !isDirectChannel ? (
-                <LastMessageAuthor
-                  typing={typingIndicator}
-                  minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}
-                >
+                <LastMessageAuthor theme={theme} typing={typingIndicator}>
                   <span ref={messageAuthorRef}>
                     {typingIndicator
                       ? getFromContacts
@@ -184,7 +186,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
               ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
               lastMessage.type !== 'system' && (
-                <LastMessageAuthor minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}>
+                <LastMessageAuthor theme={theme}>
                   <span ref={messageAuthorRef}>
                     {channel.newReactions[0].user.id === user.id
                       ? 'You'
@@ -199,7 +201,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
               ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
               lastMessage.type !== 'system' && (
-                <LastMessageAuthor minWidth={messageAuthorRef.current && messageAuthorRef.current.offsetWidth}>
+                <LastMessageAuthor theme={theme}>
                   <span ref={messageAuthorRef}>
                     {lastMessage.user.id === user.id
                       ? 'You'
@@ -248,9 +250,9 @@ const Channel: React.FC<IChannelProps> = ({
                     : lastMessage.user.id)
                 } ${
                   lastMessage.body === 'CC'
-                    ? 'Created this channel'
+                    ? 'created this channel'
                     : lastMessage.body === 'CG'
-                    ? 'Created this group'
+                    ? 'created this group'
                     : lastMessage.body === 'AM'
                     ? ` added ${
                         lastMessageMetas &&
@@ -387,6 +389,7 @@ const Container = styled.div<{
   selectedChannelPaddings?: string
   channelsMargin?: string
   selectedChannelBorderRadius?: string
+  theme?: string
 }>`
   position: relative;
   display: flex;
@@ -404,7 +407,7 @@ const Container = styled.div<{
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
 `
 
-export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; statusWidth: number }>`
+export const ChannelInfo = styled.div<{ statusWidth: number; avatar?: boolean; isMuted?: boolean; theme?: string }>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
@@ -421,7 +424,7 @@ export const ChannelInfo = styled.div<{ avatar?: boolean; isMuted?: boolean; sta
     max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 20 : 0) + 2}px)`};
     overflow: hidden;
     white-space: nowrap;
-    color: ${colors.gray6};
+    color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
   }
 `
 
@@ -438,7 +441,7 @@ export const LastMessage = styled.div<{ markedAsUnread?: boolean; unreadMentions
   display: flex;
   align-items: center;
   font-size: 14px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   max-width: ${(props) =>
     props.markedAsUnread || props.unreadMentions
       ? // @ts-ignore
@@ -468,13 +471,13 @@ export const DraftMessageTitle = styled.span<any>`
   color: ${colors.red1};
 `
 export const DraftMessageText = styled.span<any>`
-  color: ${colors.gray8};
+  color: ${colors.textColor2};
 `
-export const LastMessageAuthor = styled.div<any>`
+export const LastMessageAuthor = styled.div<{ theme?: string; typing?: boolean }>`
   max-width: 120px;
   font-weight: 500;
   font-style: ${(props) => props.typing && 'italic'};
-  color: ${colors.gray8};
+  color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
 
   & > span {
     display: block;
@@ -498,7 +501,7 @@ export const LastMessageText = styled.span<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   font-style: ${(props) => props.deletedMessage && 'italic'};
   transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
 
@@ -506,7 +509,7 @@ export const LastMessageText = styled.span<{
     width: 16px;
     height: 16px;
     margin-right: 4px;
-    color: ${colors.gray4};
+    color: ${colors.textColor2};
     transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
   }
 `
@@ -522,7 +525,7 @@ export const ChannelStatus = styled.div`
 `
 
 export const LastMessageDate = styled.span`
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   font-size: 12px;
   line-height: 16px;
 `

@@ -52,7 +52,7 @@ const CustomLabel = styled.label<{
   border: ${(props) =>
     props.isChecked
       ? props.checkedBorder || `6px solid ${colors.primary}`
-      : props.border || `1px solid ${colors.gray4}`};
+      : props.border || `1px solid ${colors.textColor2}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
 `
 

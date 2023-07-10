@@ -213,8 +213,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             })}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.gray5}>
-          <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => togglePopup()}>
+        <PopupFooter backgroundColor={colors.backgroundColor}>
+          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleForwardMessage}>
@@ -253,7 +253,7 @@ const ChannelTitle = styled.h3<any>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -265,7 +265,7 @@ const ChannelMembers = styled.h4<any>`
   font-size: 14px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -286,7 +286,7 @@ const SelectedChannelsContainer = styled.div<any>`
 const SelectedChannelBuble = styled.div`
   display: flex;
   justify-content: space-between;
-  background: ${colors.gray5};
+  background: ${colors.backgroundColor};
   border-radius: 16px;
   align-items: center;
   padding: 4px 10px;
@@ -300,7 +300,7 @@ const SelectedChannelName = styled.span`
   font-weight: 500;
   font-size: 14px;
   line-height: 16px;
-  color: ${colors.blue6};
+  color: ${colors.textColor1};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

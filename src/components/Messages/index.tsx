@@ -47,6 +47,7 @@ import { useDidUpdate } from '../../hooks'
 import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { themeSelector } from '../../store/theme/selector'
 
 let loading = false
 let loadFromServer = false
@@ -71,6 +72,7 @@ const CreateMessageDateDivider = ({
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
   noMargin,
+  theme,
   marginBottom,
   marginTop
 }: any) => {
@@ -87,6 +89,7 @@ const CreateMessageDateDivider = ({
   }
   return !differentDays ? null : (
     <MessageDivider
+      theme={theme}
       dividerText={dividerText}
       visibility={messagesHasNext && lastIndex}
       dateDividerFontSize={dateDividerFontSize}
@@ -110,6 +113,7 @@ interface MessagesProps {
   ownMessageBackground?: string
   incomingMessageBackground?: string
   showMessageStatus?: boolean
+  showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
   showMessageStatusForEachMessage?: boolean
   showMessageTimeForEachMessage?: boolean
@@ -214,11 +218,12 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimePosition,
   messageStatusDisplayingType,
   showMessageStatus,
+  showMessageTimeAndStatusOnlyOnHover,
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.gray11,
+  incomingMessageBackground = colors.backgroundColor,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -313,6 +318,7 @@ const MessageList: React.FC<MessagesProps> = ({
   differentUserMessageSpacing
 }) => {
   const dispatch = useDispatch()
+  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const channel: IChannel = useSelector(activeChannelSelector)
   const ChatClient = getClient()
@@ -796,7 +802,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    console.log('messages... ', messages)
+    // console.log('messages... ', messages)
   }, [messages])
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -869,9 +875,9 @@ const MessageList: React.FC<MessagesProps> = ({
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor}
+            dateDividerTextColor={dateDividerTextColor || colors.textColor1}
             dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor}
+            dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >
@@ -906,6 +912,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       noMargin={
                         !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
                       }
+                      theme={theme}
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}
@@ -931,9 +938,9 @@ const MessageList: React.FC<MessagesProps> = ({
                         visible={showTopFixedDate}
                         dividerText={message.body}
                         dateDividerFontSize={dateDividerFontSize}
-                        dateDividerTextColor={dateDividerTextColor}
+                        dateDividerTextColor={dateDividerTextColor || colors.textColor1}
                         dateDividerBorder={dateDividerBorder}
-                        dateDividerBackgroundColor={dateDividerBackgroundColor}
+                        dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
                         dateDividerBorderRadius={dateDividerBorderRadius}
                       >
                         <span>
@@ -1000,6 +1007,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           ownMessageBackground={ownMessageBackground}
                           incomingMessageBackground={incomingMessageBackground}
                           showMessageStatus={showMessageStatus}
+                          showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                           showMessageTime={showMessageTime}
                           showMessageStatusForEachMessage={showMessageStatusForEachMessage}
                           showMessageTimeForEachMessage={showMessageTimeForEachMessage}
@@ -1085,6 +1093,7 @@ const MessageList: React.FC<MessagesProps> = ({
                     )}
                     {isUnreadMessage ? (
                       <MessageDivider
+                        theme={theme}
                         newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
                         newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
                         newMessagesSeparatorWidth={newMessagesSeparatorWidth}
@@ -1102,7 +1111,7 @@ const MessageList: React.FC<MessagesProps> = ({
             </MessagesBox>
           ) : (
             messagesLoading === LOADING_STATE.LOADED && (
-              <NoMessagesContainer>
+              <NoMessagesContainer color={colors.textColor1}>
                 No messages in this
                 {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
@@ -1199,9 +1208,9 @@ export const MessageTopDate = styled.div<any>`
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
-    color: ${(props) => props.dateDividerTextColor || colors.blue6};
+    color: ${(props) => props.dateDividerTextColor || colors.textColor1};
     background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
-    border: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
+    border: ${(props) => props.dateDividerBorder};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
@@ -1233,7 +1242,7 @@ export const IconWrapper = styled.span<{ iconColor?: string }>`
   justify-content: center;
   height: 64px;
   width: 64px;
-  background-color: ${colors.gray5};
+  background-color: ${colors.backgroundColor};
   border-radius: 50%;
   text-align: center;
   margin-bottom: 16px;
@@ -1252,18 +1261,18 @@ export const DropAttachmentArea = styled.div<{ margin?: string }>`
   justify-content: center;
   flex-direction: column;
   height: 100%;
-  border: 1px dashed ${colors.gray3};
+  border: 1px dashed ${colors.textColor2};
   border-radius: 16px;
   margin: ${(props) => props.margin || '12px 32px 32px'};
   font-weight: 400;
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   transition: all 0.1s;
 
   &.dragover {
-    background-color: ${colors.gray5};
+    background-color: ${colors.backgroundColor};
 
     ${IconWrapper} {
       background-color: ${colors.white};
@@ -1280,7 +1289,7 @@ export const MessageWrapper = styled.div<{}>`
   }
 `
 
-export const NoMessagesContainer = styled.div<{}>`
+export const NoMessagesContainer = styled.div<{ color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1291,5 +1300,5 @@ export const NoMessagesContainer = styled.div<{}>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 `

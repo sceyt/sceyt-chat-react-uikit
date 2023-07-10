@@ -1,4 +1,4 @@
-import React, { Children, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 // @ts-ignore
 import SceytChatClient from 'sceyt-chat'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
@@ -24,9 +24,12 @@ import { colors } from '../../UIHelper/constants'
 import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
+import { setThemeAC } from '../../store/theme/actions'
+import { THEME } from '../../helpers/constants'
 
 const SceytChat = ({
   client,
+  theme,
   avatarColors,
   children,
   showOnlyContactUsers,
@@ -42,12 +45,10 @@ const SceytChat = ({
 }: IChatClientProps) => {
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
-  const childrenArr = Children.toArray(children)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
-  const OtherChildren = childrenArr.filter(({ type }: any) => type.name !== 'SceytChatHeader')
   // const channels = useSelector(channelsSelector)
-  const SceytChatHeader = childrenArr.find(({ type }: any) => type.name === 'SceytChatHeader')
+  const [darkTheme, setDarkTheme] = useState(false)
   const [SceytChatClient, setSceytChatClient] = useState<null | SceytChatClient>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
   let hidden: any = null
@@ -137,13 +138,13 @@ const SceytChat = ({
         colors.primaryLight = customColors.primaryLight
       }
       if (customColors.textColor1) {
-        colors.gray6 = customColors.textColor1
+        colors.textColor1 = customColors.textColor1
       }
       if (customColors.textColor2) {
-        colors.gray8 = customColors.textColor2
+        colors.textColor2 = customColors.textColor2
       }
       if (customColors.textColor3) {
-        colors.gray9 = customColors.textColor3
+        colors.textColor3 = customColors.textColor3
       }
       if (customColors.defaultAvatarBackground) {
         colors.defaultAvatarBackground = customColors.defaultAvatarBackground
@@ -152,7 +153,6 @@ const SceytChat = ({
         colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
       }
     }
-    console.log('sendAttachmentsAsSeparateMessages. . . . .', sendAttachmentsAsSeparateMessages)
     if (sendAttachmentsAsSeparateMessages) {
       setSendAttachmentsAsSeparateMessages(sendAttachmentsAsSeparateMessages)
     }
@@ -197,6 +197,25 @@ const SceytChat = ({
     }
   }, [tabIsActive])
   useEffect(() => {
+    if (theme === THEME.DARK) {
+      dispatch(setThemeAC(THEME.DARK))
+      colors.primary = colors.darkModePrimary
+      colors.textColor1 = colors.darkModeTextColor1
+      colors.primaryLight = colors.darkModePrimaryLight
+      colors.backgroundColor = colors.darkModeBackgroundColor
+      colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
+      setDarkTheme(true)
+    } else {
+      dispatch(setThemeAC(THEME.LIGHT))
+      colors.primary = colors.lightModePrimary
+      colors.textColor1 = colors.lightModeTextColor1
+      colors.primaryLight = colors.lightModePrimaryLight
+      colors.backgroundColor = colors.lightModeBackgroundColor
+      colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
+      setDarkTheme(false)
+    }
+  }, [theme])
+  useEffect(() => {
     if (hideUserPresence) {
       setHideUserPresence(hideUserPresence)
     }
@@ -207,18 +226,14 @@ const SceytChat = ({
   return (
     <React.Fragment>
       {SceytChatClient ? (
-        <React.Fragment>
-          {SceytChatHeader}
-          <ChatContainer
-            onDrop={handleDropFile}
-            onDragOver={handleDragOver}
-            className='sceyt-chat-container'
-            withHeader={SceytChatHeader}
-            withChannelsList={channelsListWidth && channelsListWidth > 0}
-          >
-            {OtherChildren}
-          </ChatContainer>
-        </React.Fragment>
+        <ChatContainer
+          onDrop={handleDropFile}
+          onDragOver={handleDragOver}
+          withChannelsList={channelsListWidth && channelsListWidth > 0}
+          backgroundColor={darkTheme ? colors.dark : colors.white}
+        >
+          {children}
+        </ChatContainer>
       ) : (
         ''
       )}
