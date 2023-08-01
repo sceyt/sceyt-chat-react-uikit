@@ -1,4 +1,4 @@
-import { IChannel, IContactsMap, IUser } from '../types'
+import { IChannel, IContactsMap, IMember, IUser } from '../types'
 import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
@@ -58,8 +58,8 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
     if (reaction) {
       notification = new Notification(
         `${
-          channel.peer && channel.peer.id
-            ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+          isDirectChannel && directChannelUser
+            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
             : channel.subject
         }`,
         {
