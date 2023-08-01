@@ -22,7 +22,7 @@ import { clearMessagesAC } from '../../store/message/actions'
 // import useOnScreen from '../../hooks/useOnScrean'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
 import { colors } from '../../UIHelper/constants'
-import { ReactComponent as NotificationOffIcon } from '../../assets/svg/notificationsOff3.svg'
+import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
@@ -118,7 +118,7 @@ const Channel: React.FC<IChannelProps> = ({
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
       selectedBackgroundColor={
-        selectedChannelBackground || (theme === THEME.DARK ? colors.darkModePrimaryLight : colors.primaryLight)
+        selectedChannelBackground || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
       }
       selectedChannelPaddings={selectedChannelPaddings}
       channelsPaddings={channelsPaddings}

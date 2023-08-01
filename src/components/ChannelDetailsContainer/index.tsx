@@ -5,6 +5,7 @@ import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
 import styled from 'styled-components'
 export interface IDetailsProps {
+  size?: 'small' | 'medium' | 'large'
   showAboutChannel?: boolean
   avatarAndNameDirection?: 'row' | 'column'
   channelEditIcon?: JSX.Element
@@ -108,6 +109,7 @@ export interface IDetailsProps {
 }
 
 const ChannelDetailsContainer = ({
+  size = 'large',
   channelEditIcon,
   showAboutChannel,
   avatarAndNameDirection = 'row',
@@ -191,6 +193,7 @@ const ChannelDetailsContainer = ({
     <DetailsWrapper id='channel_details_wrapper'>
       {channelDetailsIsOpen && (
         <Details
+          size={size}
           showAboutChannel={showAboutChannel}
           avatarAndNameDirection={avatarAndNameDirection}
           channelEditIcon={channelEditIcon}

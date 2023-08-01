@@ -185,7 +185,11 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
   if (messagesMap[channelId]) {
     messagesMap[channelId] = messagesMap[channelId].map((mes) => {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
-        return { ...mes, ...updatedMessage.params }
+        if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
+          return { ...updatedMessage.params }
+        } else {
+          return { ...mes, ...updatedMessage.params }
+        }
       }
       return mes
     })

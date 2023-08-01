@@ -13,7 +13,7 @@ import {
 } from '../../../../store/member/actions'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
 import Avatar from '../../../Avatar'
-import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
 import DropDown from '../../../../common/dropdown'
 import { colors } from '../../../../UIHelper/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
@@ -183,8 +183,7 @@ const Members = ({
               key={1}
               onClick={handleAddMemberPopup}
               color={colors.textColor1}
-              hoverBackground={colors.primaryLight}
-              addMemberBackground={colors.backgroundColor}
+              hoverBackground={theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight}
               addMemberIconColor={colors.primary}
             >
               <AddMemberIcon />
@@ -461,7 +460,6 @@ const MemberItem = styled.li<{
 
   &:first-child {
     cursor: pointer;
-    background-color: ${(props) => props.addMemberBackground || colors.backgroundColor}};
 
     > svg {
       color: ${(props) => props.addMemberIconColor || colors.primary};

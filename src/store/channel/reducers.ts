@@ -18,15 +18,18 @@ import {
   SET_CHANNELS,
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
+  SET_CLOSE_SEARCH_CHANNELS,
   SET_DRAGGED_ATTACHMENTS,
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
+  SET_SEARCHED_CHANNELS,
   SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
   UPDATE_CHANNEL_LAST_MESSAGE,
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
+  UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
 import { IAction, IChannel, IMember } from '../../types'
@@ -40,6 +43,11 @@ const initialState: {
   channelsHasNext: boolean
   channelsForForwardHasNext: boolean
   channels: IChannel[]
+  searchedChannels: {
+    groups: IChannel[]
+    directs: IChannel[]
+  }
+  closeSearchChannel: boolean
   channelsForForward: IChannel[]
   activeChannel: IChannel | {}
   roles: []
@@ -73,6 +81,8 @@ const initialState: {
   channelsHasNext: true,
   channelsForForwardHasNext: true,
   channels: [],
+  searchedChannels: { groups: [], directs: [] },
+  closeSearchChannel: false,
   channelsForForward: [],
   activeChannel: {},
   roles: [],
@@ -111,6 +121,16 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
     case SET_CHANNELS: {
       newState.channels = [...payload.channels]
+      return newState
+    }
+
+    case SET_SEARCHED_CHANNELS: {
+      newState.searchedChannels = payload.searchedChannels
+      return newState
+    }
+
+    case SET_CLOSE_SEARCH_CHANNELS: {
+      newState.closeSearchChannel = payload.close
       return newState
     }
 
@@ -228,6 +248,27 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       return newState
     }
 
+    case UPDATE_SEARCHED_CHANNEL_DATA: {
+      const { updateData, groupName, channelId } = payload
+      if (newState.searchedChannels[groupName] && newState.searchedChannels[groupName].length) {
+        const updatedChannels = newState.searchedChannels[groupName].map((channel: IChannel) => {
+          if (channel.id === channelId) {
+            return { ...channel, ...updateData }
+          }
+          return channel
+        })
+        if ((newState.activeChannel as IChannel).id === channelId) {
+          const activeChannelCopy = { ...newState.activeChannel }
+          newState.activeChannel = {
+            ...activeChannelCopy,
+            ...updateData
+          }
+        }
+        newState.searchedChannels = updatedChannels
+      }
+      return newState
+    }
+
     case UPDATE_USER_STATUS_ON_CHANNEL: {
       const usersMap = payload.usersMap
       // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
@@ -237,7 +278,14 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
         const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
         if (channel.type === CHANNEL_TYPE.DIRECT && directChannelUser && usersMap[directChannelUser.id]) {
-          return { ...channel, peer: { ...directChannelUser, presence: usersMap[directChannelUser.id].presence } }
+          const membersToUpdate = channel.members.map((member) => {
+            if (member.id === usersMap[directChannelUser.id].id) {
+              return { ...member, presence: usersMap[directChannelUser.id].presence }
+            } else {
+              return member
+            }
+          })
+          return { ...channel, members: membersToUpdate }
         }
         return channel
       })

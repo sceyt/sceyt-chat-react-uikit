@@ -31,6 +31,7 @@ import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper
 import { themeSelector } from '../../store/theme/selector'
 
 const Details = ({
+  size,
   showAboutChannel,
   avatarAndNameDirection,
   channelEditIcon,
@@ -192,7 +193,7 @@ const Details = ({
     }
   }, [])
   return (
-    <Container mounted={mounted} theme={theme} borderColor={colors.backgroundColor}>
+    <Container mounted={mounted} size={size} theme={theme} borderColor={colors.backgroundColor}>
       <ChannelDetailsHeader borderColor={colors.backgroundColor}>
         {editMode ? (
           <React.Fragment>
@@ -222,6 +223,7 @@ const Details = ({
       )}
 
       <ChatDetails
+        size={size}
         onScroll={handleMembersListScroll}
         heightOffset={detailsRef && detailsRef.current && detailsRef.current.offsetTop}
         height={channelDetailsHeight}
@@ -375,12 +377,18 @@ const Details = ({
 
 export default Details
 
-const Container = styled.div<{ mounted: boolean; theme?: string; borderColor?: string }>`
+const Container = styled.div<{
+  mounted: boolean
+  theme?: string
+  borderColor?: string
+  size?: 'small' | 'medium' | 'large'
+}>`
   flex: 0 0 auto;
   width: 0;
   border-left: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
   //transition: all 0.1s;
-  ${(props) => props.mounted && ' width: 400px'}
+  ${(props) =>
+    props.mounted && ` width: ${props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px'};`}
 }
 `
 
@@ -398,9 +406,9 @@ const ChannelDetailsHeader = styled.div<{ borderColor?: string }>`
   }
 `
 
-const ChatDetails = styled.div<{ height: number; heightOffset?: number }>`
-  position: relative;
-  width: 400px;
+const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: 'small' | 'medium' | 'large' }>`
+  //position: relative;
+  width: ${(props) => (props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px')};
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;

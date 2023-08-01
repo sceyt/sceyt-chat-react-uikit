@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { ReactComponent as BottomIcon } from '../../../assets/svg/bottom.svg'
 // import { ReactComponent as DeleteIcon } from '../../../assets/lib/svg/clearHistory.svg'
 import { ReactComponent as NotificationIcon } from '../../../assets/svg/notifications.svg'
-import { ReactComponent as NotificationOffIcon } from '../../../assets/svg/notificationsOff2.svg'
+import { ReactComponent as NotificationOffIcon } from '../../../assets/svg/unmuteNotifications.svg'
 import { ReactComponent as MarkAsUnRead } from '../../../assets/svg/markAsUnRead.svg'
 import { ReactComponent as MarkAsRead } from '../../../assets/svg/markAsRead.svg'
 import { ReactComponent as LeaveIcon } from '../../../assets/svg/leave.svg'
@@ -854,11 +854,6 @@ const ActionItem = styled.li<{
   & > svg {
     margin-right: 16px;
     color: ${(props) => props.iconColor || colors.textColor2};
-  }
-
-  & > ${DefaultMutedIcon} {
-    margin-right: 12px;
-    margin-left: 2px;
   }
 
   &:hover {

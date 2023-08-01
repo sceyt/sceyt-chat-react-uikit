@@ -161,7 +161,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
     <Component ref={containerRef} fullScreen={isFullScreen} className='custom_video_player'>
       <video
         onClick={() => videoHandler(playing ? 'pause' : 'play')}
-        id={'my_video'}
+        id='video1'
         ref={videoRef}
         className='video'
         // src='https://res.cloudinary.com/dssvrf9oz/video/upload/v1635662987/pexels-pavel-danilyuk-5359634_1_gmixla.mp4'

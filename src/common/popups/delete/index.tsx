@@ -1,18 +1,10 @@
 import React, { useEffect, useState } from 'react'
-import {
-  Popup,
-  PopupContainer,
-  PopupDescription,
-  PopupName,
-  CloseIcon,
-  PopupBody,
-  Button,
-  PopupFooter
-} from '../../../UIHelper'
+import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
 import usePermissions from '../../../hooks/usePermissions'
+import PopupContainer from '../popupContainer'
 
 interface IProps {
   title: string
@@ -68,7 +60,6 @@ function ConfirmPopup({
     setInitialRender(false)
   }, [])
 
-  // @ts-ignore
   return (
     <PopupContainer>
       <Popup

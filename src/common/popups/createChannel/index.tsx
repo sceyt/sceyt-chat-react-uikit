@@ -3,7 +3,6 @@ import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Popup,
-  PopupContainer,
   PopupName,
   CloseIcon,
   CustomInput,
@@ -26,6 +25,7 @@ import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
+import PopupContainer from '../popupContainer'
 
 interface ICreateChannelPopup {
   handleClose: () => void
@@ -75,7 +75,7 @@ export default function CreateChannel({
   })
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   // const [pagination, setPagination] = useState(false)
-  const createGroupChannel = channelType === CHANNEL_TYPE.GROUP
+  const createGroupChannel = channelType === CHANNEL_TYPE.GROUP || channelType === CHANNEL_TYPE.PRIVATE
   const requiredFields = channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType]
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
@@ -242,7 +242,7 @@ export default function CreateChannel({
   } */
   useEffect(() => {
     setUriPrefixWidth(uriPrefixRef.current && uriPrefixRef.current.getBoundingClientRect().width + 15)
-    const body = document.querySelector('body')
+    /* const body = document.querySelector('body')
     if (body) {
       body.style.overflow = 'hidden'
     }
@@ -251,7 +251,7 @@ export default function CreateChannel({
       if (body) {
         body.style.overflow = 'auto'
       }
-    }
+    } */
   }, [])
   useEffect(() => {
     if (requiredFields) {

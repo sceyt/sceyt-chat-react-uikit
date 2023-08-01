@@ -4,7 +4,8 @@ import Cropper from 'react-easy-crop'
 import { useStateComplex } from '../../hooks'
 import getCroppedImg from './crop-image'
 import { colors } from '../../UIHelper/constants'
-import { Popup, PopupContainer, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
+import { Popup, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
+import PopupContainer from '../popups/popupContainer'
 
 interface IProps {
   image: any

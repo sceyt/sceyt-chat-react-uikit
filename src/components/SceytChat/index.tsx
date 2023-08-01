@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react'
+import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // @ts-ignore
 import SceytChatClient from 'sceyt-chat'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import styled from 'styled-components'
 import { setClient } from '../../common/client'
 import {
   destroyChannelsMap,
@@ -12,8 +13,7 @@ import {
 } from '../../helpers/channelHalper'
 import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
-import { ChatContainer } from './styled'
-import { browserTabIsActiveAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
+import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
@@ -26,6 +26,8 @@ import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setThemeAC } from '../../store/theme/actions'
 import { THEME } from '../../helpers/constants'
+import { useDidUpdate } from '../../hooks'
+import { getRolesAC } from '../../store/member/actions'
 
 const SceytChat = ({
   client,
@@ -51,6 +53,7 @@ const SceytChat = ({
   const [darkTheme, setDarkTheme] = useState(false)
   const [SceytChatClient, setSceytChatClient] = useState<null | SceytChatClient>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
+
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -85,6 +88,7 @@ const SceytChat = ({
     }
   }
   useEffect(() => {
+    console.log('client is changed.... ', client)
     if (client) {
       setClient(client)
       setSceytChatClient(client)
@@ -95,6 +99,10 @@ const SceytChat = ({
 
       dispatch(watchForEventsAC())
       dispatch(setConnectionStatusAC(client.connectionState))
+      if (showOnlyContactUsers) {
+        dispatch(getContactsAC())
+      }
+      dispatch(getRolesAC())
     } else {
       clearMessagesMap()
       removeAllMessages()
@@ -108,6 +116,13 @@ const SceytChat = ({
     }
     window.onfocus = () => {
       setTabIsActive(true)
+    }
+    return () => {
+      clearMessagesMap()
+      removeAllMessages()
+      setActiveChannelId('')
+      destroyChannelsMap()
+      dispatch(destroySession())
     }
   }, [client])
 
@@ -130,6 +145,7 @@ const SceytChat = ({
     if (handleNewMessages) {
       setHandleNewMessages(handleNewMessages)
     }
+
     if (customColors) {
       if (customColors.primaryColor) {
         colors.primary = customColors.primaryColor
@@ -196,7 +212,7 @@ const SceytChat = ({
       }
     }
   }, [tabIsActive])
-  useEffect(() => {
+  useDidUpdate(() => {
     if (theme === THEME.DARK) {
       dispatch(setThemeAC(THEME.DARK))
       colors.primary = colors.darkModePrimary
@@ -231,6 +247,7 @@ const SceytChat = ({
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
           backgroundColor={darkTheme ? colors.dark : colors.white}
+          id='sceyt_chat_container'
         >
           {children}
         </ChatContainer>
@@ -242,3 +259,16 @@ const SceytChat = ({
 }
 
 export default SceytChat
+
+export const Container = styled.div`
+  display: flex;
+  height: 100vh;
+`
+
+const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor?: string }>`
+  display: flex;
+  height: 100%;
+  max-height: 100vh;
+  min-width: ${(props) => props.withChannelsList && '1200px'};
+  background-color: ${(props) => props.backgroundColor || colors.white};
+`

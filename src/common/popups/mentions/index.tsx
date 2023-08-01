@@ -48,7 +48,6 @@ export default function MentionMembersPopup({
       }
     }
   }
-
   const handleMentionMember = () => {
     addMentionMember(filteredMembers[activeIndex])
     handleMentionsPopupClose()
@@ -90,7 +89,14 @@ export default function MentionMembersPopup({
   }
 
   useEventListener('click', handleClicks)
-
+  const handleSearchMembers = () => {
+    const searchedMembers = [...members].filter((member: IMember) => {
+      const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
+      return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
+    })
+    filteredMembersLength.current = searchedMembers.length
+    setFilteredMembers(sortMembers(searchedMembers))
+  }
   useEffect(() => {
     dispatch(getMembersAC(channelId))
   }, [channelId])
@@ -104,21 +110,20 @@ export default function MentionMembersPopup({
   }, [filteredMembers, activeIndex])
 
   useEffect(() => {
-    if (members && members.length && !searchMention) {
-      const sortedMembers = sortMembers(members.filter((member: IMember) => member.id !== user.id))
-      filteredMembersLength.current = sortedMembers.length
-      setFilteredMembers(sortedMembers)
+    if (members && members.length) {
+      if (searchMention) {
+        handleSearchMembers()
+      } else {
+        const sortedMembers = sortMembers(members.filter((member: IMember) => member.id !== user.id))
+        filteredMembersLength.current = sortedMembers.length
+        setFilteredMembers(sortedMembers)
+      }
     }
   }, [members])
 
   useDidUpdate(() => {
     if (searchMention) {
-      const searchedMembers = [...members].filter((member: IMember) => {
-        const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-        return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
-      })
-      filteredMembersLength.current = searchedMembers.length
-      setFilteredMembers(sortMembers(searchedMembers))
+      handleSearchMembers()
     } else {
       const searchedMembers = [...members].filter((member: IMember) => member.id !== user.id)
       filteredMembersLength.current = searchedMembers.length || 0

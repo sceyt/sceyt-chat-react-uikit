@@ -3,7 +3,6 @@ import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import {
   Popup,
-  PopupContainer,
   PopupName,
   CloseIcon,
   DropdownOptionsUl,
@@ -20,6 +19,7 @@ import { IMember, IRole } from '../../../../../types'
 import { rolesSelector } from '../../../../../store/member/selector'
 import { changeMemberRoleAC, getRolesAC } from '../../../../../store/member/actions'
 import { colors } from '../../../../../UIHelper/constants'
+import PopupContainer from '../../../../../common/popups/popupContainer'
 
 interface IProps {
   theme: string

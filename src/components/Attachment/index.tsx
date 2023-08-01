@@ -281,8 +281,7 @@ const Attachment = ({
             <AttachmentImg
               draggable={false}
               // hidden={imageLoading}
-              backgroundColor={backgroundColor}
-              // absolute={attachment.metadata && attachment.metadata.tmb}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
               src={attachment.attachmentUrl || attachmentUrl}
               borderRadius={borderRadius}
               imageMinWidth={imageMinWidth}
@@ -306,7 +305,7 @@ const Attachment = ({
               width={renderWidth}
               height={renderHeight}
               withBorder={!isPreview && !isDetailsView}
-              backgroundColor={backgroundColor}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
             >
@@ -440,7 +439,9 @@ const Attachment = ({
                 borderRadius={isRepliedMessage ? '4px' : borderRadius}
                 isRepliedMessage={isRepliedMessage}
                 isDetailsView={isDetailsView}
-                backgroundColor={backgroundColor}
+                backgroundColor={
+                  backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight
+                }
               />
             </VideoCont>
           ) : (
@@ -453,7 +454,9 @@ const Attachment = ({
                 src={attachment.attachmentUrl || attachmentUrl}
                 borderRadius={borderRadius}
                 setVideoIsReadyToSend={setVideoIsReadyToSend}
-                backgroundColor={backgroundColor}
+                backgroundColor={
+                  backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight
+                }
                 isPreview
               />
               <RemoveChosenFile
@@ -485,7 +488,7 @@ const Attachment = ({
             attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED
           }
           borderRadius={borderRadius}
-          background={backgroundColor}
+          background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}

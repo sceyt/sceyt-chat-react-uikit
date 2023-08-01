@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Popup, PopupContainer, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
+import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import { getChannelsForForwardAC, loadMoreChannelsForForward } from '../../../store/channel/actions'
@@ -22,6 +22,7 @@ import CustomCheckbox from '../../customCheckbox'
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
+import PopupContainer from '../popupContainer'
 
 interface ISelectedChannelsData {
   id: string

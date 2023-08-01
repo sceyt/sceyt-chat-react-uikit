@@ -60,6 +60,7 @@ let loadDirection = ''
 let nextDisable = false
 let prevDisable = false
 let prevMessageId = ''
+const messagesIndexMap = {}
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -388,12 +389,13 @@ const MessageList: React.FC<MessagesProps> = ({
     }, 1000)
 
     // const nextMessageNode: any = document.getElementById(nextTargetMessage)
-    const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+    // const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
     renderTopDate()
     const { target } = event
-    // console.log('target.scrollTop. ..  . ..  .. ', target.scrollTop)
+    // console.log('target.scrollTop. ..  . ..  .. ', -target.scrollTop)
+    // console.log('target.scrollHeight. ..  . ..  .. ', target.scrollHeight)
     // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
-    const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
+    // const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
     if (scrollToReply) {
       target.scrollTop = scrollToReply
     } else {
@@ -402,45 +404,70 @@ const MessageList: React.FC<MessagesProps> = ({
       } else {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
-      const scrollHeightQuarter = (target.scrollHeight * 20) / 100
+      // const scrollHeightTarget = (target.scrollHeight * 10) / 100
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !prevDisable &&
         messagesLoading !== LOADING_STATE.LOADING &&
+        messagesIndexMap[lastVisibleMessageId] < 15
+      ) {
+        loadDirection = 'prev'
+        prevMessageId = messages[0].id
+        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
+        if (!getHasPrevCached()) {
+          loadFromServer = true
+        }
+        nextDisable = true
+      }
+
+      if (
+        !nextDisable &&
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        messagesLoading !== LOADING_STATE.LOADING &&
+        (hasNextMessages || getHasNextCached()) &&
+        messagesIndexMap[lastVisibleMessageId] > messages.length - 15
+      ) {
+        loadDirection = 'next'
+
+        prevDisable = true
+        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
+      }
+      /* if (
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        !prevDisable &&
+        messagesLoading !== LOADING_STATE.LOADING &&
         !scrollToRepliedMessage &&
-        -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightQuarter &&
-        /* hasPrev && */ !loading &&
+        -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightTarget &&
+        /!* hasPrev && *!/ !loading &&
         !scrollToNewMessage.scrollToBottom &&
         messages.length
       ) {
         loadDirection = 'prev'
         // console.log('load prev messages........ ')
         prevMessageId = messages[0].id
+        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.PREV)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
         if (!getHasPrevCached()) {
           // console.log('load from server ..... ', true)
           loadFromServer = true
         }
-        /*   if (cachedMessages.prev) {
+        /!*   if (cachedMessages.prev) {
           loading = true
           handleAddMessages([], 'prev', true)
         } else if (hasPrevMessages) {
           await handleLoadMoreMessages('prev', 15)
         }
-       */
+       *!/
         // if (hasPrevMessages && lastVisibleMessage) {
-        nextDisable = false
         nextDisable = true
         // target.scrollTop = lastVisibleMessage.offsetTop
         // }
         // dispatch(loadMoreMessagesAC(10, 'prev', channel.id))
-      }
-      if (lastVisibleMessagePos > 0) {
+      } */
+      if (messagesIndexMap[lastVisibleMessageId] > messages.length - 10) {
         nextDisable = false
-      } else {
-        prevDisable = false
       }
-      if (
+      /*  if (
         !nextDisable &&
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         messagesLoading !== LOADING_STATE.LOADING &&
@@ -453,21 +480,22 @@ const MessageList: React.FC<MessagesProps> = ({
         loadDirection = 'next'
 
         // console.log('load next......... ')
-        /* if (lastVisibleMessage) {
+        /!* if (lastVisibleMessage) {
           target.scrollTop = lastVisibleMessage.offsetTop - 10
-        } */
+        } *!/
         // dispatch(loadMoreMessagesAC(10, 'next', channel.id))
         // if (hasNextMessages && lastVisibleMessage) {
         prevDisable = true
         // }
+        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.NEXT)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-        /* if (cachedMessages.next) {
+        /!* if (cachedMessages.next) {
           loading = true
           handleAddMessages([], 'next', true)
         } else if (hasNextMessages) {
           await handleLoadMoreMessages('next', 15)
-        } */
-      }
+        } *!/
+      } */
     }
   }
 
@@ -712,33 +740,58 @@ const MessageList: React.FC<MessagesProps> = ({
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
         } */
         if (prevMessageId) {
-          let i: any = 0
+          console.log('set scroll position to a last visibla message ,,,,,,,,,,,,,,,,,,,,,')
+          /* let i: any = 0
           let messagesHeight = 0
+          let prevMessagesHeight = 0
           while (i !== prevMessageId) {
             if (messages[i]) {
               if (messages[i].id === prevMessageId) {
+                while (i !== lastVisibleMessageId && messages[i]) {
+                  if (messages[i]) {
+                    if (messages[i].id === lastVisibleMessageId) {
+                      i = lastVisibleMessageId
+                    }
+                    if (messages[i]) {
+                      const currentMessage = document.getElementById(messages[i].id)
+                      // eslint-disable-next-line no-unused-expressions
+                      if (currentMessage) {
+                        prevMessagesHeight += currentMessage.getBoundingClientRect().height
+                      }
+                    }
+                  }
+                  i++
+                }
                 i = prevMessageId
               } else {
                 const currentMessage = document.getElementById(messages[i].id)
                 // eslint-disable-next-line no-unused-expressions
-                currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
+                if (currentMessage) {
+                  messagesHeight += currentMessage.getBoundingClientRect().height
+                }
                 i++
               }
             } else {
               break
             }
-          }
-
+          } */
+          // console.log('prevMessagesHeight.  . ... . .. ', prevMessagesHeight)
+          // console.log('messagesHeight.  . ... . .. ', messagesHeight)
           scrollRef.current.style.scrollBehavior = 'inherit'
-          if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
-            // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
-            // console.log('last message pos........ ')
+          // if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
+          // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
+          // console.log('last message pos........ ')
+          if (lastVisibleMessage) {
+            // console.log('prevMessagesHeight  + messagesHeight ... ', prevMessagesHeight + messagesHeight)
+            // console.log('lastVisibleMessage.offsetTop ... ', -lastVisibleMessage.offsetTop)
+            // scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
             scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
-            // }
-          } else {
-            // console.log('messages height. . .')
-            scrollRef.current.scrollTop = -messagesHeight
           }
+          // }
+          // } else {
+          // console.log('messages height. . .')
+          // scrollRef.current.scrollTop = -messagesHeight
+          // }
 
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
@@ -746,6 +799,7 @@ const MessageList: React.FC<MessagesProps> = ({
           setTimeout(() => {
             loading = false
             loadFromServer = false
+            nextDisable = false
           }, 50)
         } else {
           loading = false
@@ -774,10 +828,22 @@ const MessageList: React.FC<MessagesProps> = ({
         // console.log('scrollRef.current.scrollTop ... ', scrollRef.current.scrollTop)
         // console.log('hasNextMessages ... ', hasNextMessages)
         // console.log('getHasNextCached() ... ', getHasNextCached())
-        if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
+        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+        // console.log('lastVisibleMessageId. . . . . .  .', lastVisibleMessageId)
+        // console.log('lastVisibleMessage. . . . . .  .', lastVisibleMessage)
+        // console.log('scrollRef. height. . . . . .  .', scrollRef.current.offsetHeight)
+        scrollRef.current.style.scrollBehavior = 'inherit'
+        scrollRef.current.scrollTop =
+          lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
+        scrollRef.current.style.scrollBehavior = 'smooth'
+        /* if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
+          console.log('set scroll top ... ', -200)
           scrollRef.current.scrollTop = -200
-        }
+        } */
         loading = false
+        setTimeout(() => {
+          prevDisable = false
+        }, 100)
       }
       // }, 200)
     }
@@ -802,7 +868,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages... ', messages)
+    console.log('messages... ', messages)
   }, [messages])
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -838,6 +904,7 @@ const MessageList: React.FC<MessagesProps> = ({
       } */
     }
   })
+
   return (
     <React.Fragment>
       {isDragging && (
@@ -905,6 +972,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 const nextMessage = messages[index + 1]
                 const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+                messagesIndexMap[message.id] = index
                 return (
                   <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider

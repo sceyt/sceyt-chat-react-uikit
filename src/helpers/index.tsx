@@ -284,7 +284,7 @@ export const getCaretPosition = (element: any) => {
       // textNodes += 1
     }
     if (element.childNodes[i + 1] && element.childNodes[i + 1].nodeName === 'BR') {
-      console.log('add line. ...   1 .. ', 1)
+      // console.log('add line. ...   1 .. ', 1)
       caretOffset += 1
     }
     /* if (element.childNodes.length === i + 1 && !textNodesAdded) {
@@ -315,10 +315,14 @@ export const setCursorPosition = (
       if (!currentNodeIsFind && node.nodeType === Node.TEXT_NODE) {
         currentNode = node
         const textLength = node.nodeValue.length
+        // console.log('currentNode .. .. . 1 .. ', currentNode)
+        // console.log('node.nodeValue .. .. . 1 .. ', node.nodeValue)
+        // console.log('textLength .. .. . 1 .. ', textLength)
         // console.log('caretOffset + textLength .. .. . 1 .. caretOffset ', caretOffset)
         // console.log('caretOffset + textLength .. .. . 1 .. textLength ', textLength)
         // console.log('caretOffset + textLength .. .. . 1 .. res ', caretOffset + textLength)
         caretOffset = caretOffset + textLength
+        // console.log('caretOffset .. .. . 1 .. ', caretOffset)
         if (element.childNodes.length === index + 1) {
           textNodesAdded = true
           // console.log('add text nodes. ...   1 .. ', textNodes)
@@ -367,7 +371,7 @@ export const setCursorPosition = (
           // textNodes += 1
         }
       }
-      if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
+      if (element.childNodes[index + 1] && !currentNodeIsFind && element.childNodes[index + 1].nodeName === 'BR') {
         // console.log('add line. ...   1 .. ', 1)
         caretOffset += 1
       }
@@ -378,6 +382,7 @@ export const setCursorPosition = (
         }
         currentNodeIsFind = true
         if (position > caretOffset) {
+          // console.log('add line. ...   2 .. ', 1)
           caretOffset++
         }
         currentNode = node

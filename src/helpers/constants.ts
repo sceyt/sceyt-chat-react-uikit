@@ -13,10 +13,10 @@ export const MESSAGE_DELIVERY_STATUS = {
 }
 
 export const MESSAGE_STATUS = {
-  NONE: 'None',
-  EDIT: 'Edited',
-  DELETE: 'Deleted',
-  FAILED: 'Failed'
+  NONE: 'none',
+  EDIT: 'edited',
+  DELETE: 'deleted',
+  FAILED: 'failed'
 }
 
 export const UPLOAD_STATE = {

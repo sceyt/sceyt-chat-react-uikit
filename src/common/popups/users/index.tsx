@@ -3,7 +3,6 @@ import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   Popup,
-  PopupContainer,
   PopupName,
   CloseIcon,
   StyledSearchSvg,
@@ -47,6 +46,7 @@ import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate } from '../../../hooks'
 import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
+import PopupContainer from '../popupContainer'
 
 interface ISelectedUserData {
   id: string
@@ -492,8 +492,29 @@ const MembersContainer = styled(List)<{
   max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
 
-  width: calc(100% + 16px);
+  //width: calc(100% + 16px);
   padding-right: 16px;
+
+  /* width */
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  /* Track */
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Handle */
+  &::-webkit-scrollbar-thumb {
+    background: #b6b6b6;
+    border-radius: 4px;
+  }
+
+  /* Handle on hover */
+  &::-webkit-scrollbar-thumb:hover {
+    background: #555;
+  }
 `
 
 const SearchUserCont = styled.div`

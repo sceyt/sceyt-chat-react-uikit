@@ -8,8 +8,10 @@ import {
   channelsHasNextSelector,
   channelsLoadingState,
   channelsSelector,
+  closeSearchChannelSelector,
   deletedChannelSelector,
   hiddenChannelSelector,
+  searchedChannelsSelector,
   visibleChannelSelector
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
@@ -18,12 +20,15 @@ import {
   getChannelsAC,
   loadMoreChannels,
   removeChannelAC,
+  searchChannelsAC,
   setChannelListWithAC,
   setChannelsAC,
   setChannelToAddAC,
   setChannelToHideAC,
   setChannelToRemoveAC,
   setChannelToUnHideAC,
+  setCloseSearchChannelsAC,
+  setSearchedChannelsAC,
   switchChannelActionAC
 } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -42,17 +47,12 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
 import { themeSelector } from '../../store/theme/selector'
 
-interface IChannelGroup {
-  groupName: string
-  channelList: IChannel[]
-}
-
 interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
+    searchedChannels: { groups: []; directs: [] }
     loadMoreChannels: (count?: number) => void
     searchValue: string
-    handleSetChannelListWithGroups: (channelGroupList: IChannelGroup[]) => void
     children: React.ReactNode
     activeChannel?: IChannel
     setActiveChannel?: (channel: IChannel) => void
@@ -140,7 +140,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   sort,
   avatar,
   showSearch = true,
-  searchOption = 'default',
   showCreateChannelIcon = true,
   uriPrefixOnCreateChannel,
   onChannelDeleted,
@@ -162,23 +161,25 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
   const channelListRef = useRef<HTMLInputElement>(null)
+  const channelsScrollRef = useRef<HTMLInputElement>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
   // const searchValue = useSelector(searchValueSelector) || ''
   const channels = useSelector(channelsSelector, shallowEqual) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const addedChannel = useSelector(addedChannelSelector)
+  const closeSearchChannels = useSelector(closeSearchChannelSelector)
   const addedToChannel = useSelector(addedToChannelSelector)
   const deletedChannel = useSelector(deletedChannelSelector)
   const hiddenChannel = useSelector(hiddenChannelSelector)
   const visibleChannel = useSelector(visibleChannelSelector)
   const channelsHasNext = useSelector(channelsHasNextSelector) || false
-  const directChannels = searchValue ? channels.filter((channel: any) => channel.type === 'Direct') : []
-  const groupChannels = searchValue ? channels.filter((channel: any) => channel.type !== 'Direct') : []
+  const searchedChannels = useSelector(searchedChannelsSelector) || []
+  // const directChannels = searchValue ? channels.filter((channel: any) => channel.type === 'Direct') : []
+  // const groupChannels = searchValue ? channels.filter((channel: any) => channel.type !== 'Direct') : []
   const channelsLoading = useSelector(channelsLoadingState) || {}
   const activeChannel = useSelector(activeChannelSelector) || {}
   const [profileIsOpen, setProfileIsOpen] = useState(false)
-  const [channelGroupsList, setChannelGroupsList] = useState<IChannelGroup[] | undefined>()
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -199,10 +200,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     dispatch(setChannelsAC(updatedChannels))
   }
 
-  const handleSetChannelListWithGroups = (channelGroupsList: IChannelGroup[]) => {
-    setChannelGroupsList(channelGroupsList)
-  }
-
   const handleLoadMoreChannels = (count?: number) => {
     if (channelsLoading === LOADING_STATE.LOADED && !searchValue) {
       dispatch(loadMoreChannels(count))
@@ -218,6 +215,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
       dispatch(switchChannelActionAC(chan))
+    }
+    console.log('handleChangeActiveChannel .... searchValue... ', searchValue)
+    if (searchValue) {
+      getMyChannels()
     }
   }
 
@@ -236,6 +237,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (deletedChannel) {
       if (onChannelDeleted) {
+        console.log('onChannelDeleted .... ', deletedChannel)
         onChannelDeleted(channels, deletedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         removeChannelFromMap(deletedChannel.id)
@@ -258,8 +260,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (addedChannel) {
       if (onChannelCreated) {
+        console.log('onChannelCreated .... ', addedChannel)
         onChannelCreated(channels, addedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
+        console.log('dispatch addChannelAC 1 .... ', addedChannel)
         dispatch(addChannelAC(addedChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -269,8 +273,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (addedToChannel) {
       if (onAddedToChannel) {
+        console.log('onAddedToChannel .... ', addedToChannel)
         onAddedToChannel(channels, addedToChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
+        console.log('dispatch addChannelAC 2 .... ', addedToChannel)
         dispatch(addChannelAC(addedToChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -280,6 +286,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (hiddenChannel) {
       if (onChannelHidden) {
+        console.log('onChannelHidden .... ', hiddenChannel)
         onChannelHidden(channels, hiddenChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         dispatch(removeChannelAC(hiddenChannel.id))
@@ -291,8 +298,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (visibleChannel) {
       if (onChannelVisible) {
+        console.log('onChannelVisible .... ', visibleChannel)
         onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
+        console.log('dispatch addChannelAC 3 .... ', visibleChannel)
         dispatch(addChannelAC(hiddenChannel))
       }
       dispatch(setChannelToUnHideAC(null))
@@ -300,15 +309,36 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [visibleChannel])
 
   useDidUpdate(() => {
-    if (searchOption === 'default') {
-      dispatch(getChannelsAC({ filter, limit, sort, search: searchValue }))
+    // if (searchOption === 'default') {
+    console.log('searchValue', searchValue)
+    if (searchValue) {
+      dispatch(searchChannelsAC({ filter, limit, sort, search: searchValue }, contactsMap))
+    } else {
+      console.log('should be empty....... . ... ')
+      dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
     }
+    // }
   }, [searchValue])
   useDidUpdate(() => {
     if (getActiveChannel) {
       getActiveChannel(activeChannel)
     }
+    if (searchValue) {
+      if (channelsScrollRef.current) {
+        channelsScrollRef.current.scrollTop = 0
+      }
+      getMyChannels()
+    }
   }, [activeChannel.id])
+
+  useDidUpdate(() => {
+    console.log('close search channels. ... ', closeSearchChannels)
+    if (closeSearchChannels) {
+      getMyChannels()
+      dispatch(setCloseSearchChannelsAC(false))
+    }
+  }, [closeSearchChannels])
+
   useEffect(() => {
     if (uploadPhotoIcon) {
       setUploadImageIcon(uploadPhotoIcon)
@@ -319,11 +349,19 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
-  /* useEffect(() => {
+
+  useEffect(() => {
     console.log('channels. ...........................', channels)
-  }, [channels]) */
+  }, [channels])
+  /*  useEffect(() => {
+     console.log('contactsMap. ...........................', contactsMap)
+   }, [contactsMap]) */
   return (
-    <Container withCustomList={!!List} ref={channelListRef} backgroundColor={backgroundColor}>
+    <Container
+      withCustomList={!!List}
+      ref={channelListRef}
+      backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.darkModeSecondaryBackgroundColor : '')}
+    >
       <ChannelListHeader
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current.clientWidth) || 0}
@@ -365,6 +403,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       {showSearch && searchChannelsPosition === 'bottom' && (
         <ChannelSearch
           searchValue={searchValue}
+          theme={theme}
           borderRadius={searchInputBorderRadius}
           handleSearchValueChange={handleSearchValueChange}
           getMyChannels={getMyChannels}
@@ -376,19 +415,20 @@ const ChannelList: React.FC<IChannelListProps> = ({
       {List ? (
         <List
           channels={channels}
+          searchedChannels={searchedChannels}
           activeChannel={activeChannel}
           setActiveChannel={handleChangeActiveChannel}
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
-          handleSetChannelListWithGroups={handleSetChannelListWithGroups}
         >
-          {!directChannels.length && !searchValue ? (
+          {!searchValue ? (
             <React.Fragment>
               {channels.map((channel: IChannel) =>
                 ListItem ? (
                   <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                 ) : (
                   <Channel
+                    theme={theme}
                     selectedChannelLeftBorder={selectedChannelLeftBorder}
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -407,47 +447,17 @@ const ChannelList: React.FC<IChannelListProps> = ({
             </React.Fragment>
           ) : (
             channelsLoading === LOADING_STATE.LOADED &&
-            searchValue &&
-            (searchOption === 'custom' ? (
-              <div className='custom_channel_list'>
-                {channelGroupsList
-                  ? channelGroupsList.map((channelGroup) => (
-                      <React.Fragment>
-                        <SearchedChannelsHeader>{channelGroup.groupName}</SearchedChannelsHeader>
-                        {channelGroup.channelList.map((channel) =>
-                          ListItem ? (
-                            <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
-                          ) : (
-                            <Channel
-                              selectedChannelLeftBorder={selectedChannelLeftBorder}
-                              selectedChannelBackground={selectedChannelBackground}
-                              selectedChannelBorderRadius={selectedChannelBorderRadius}
-                              selectedChannelPaddings={selectedChannelPaddings}
-                              channelsPaddings={channelsPaddings}
-                              channelsMargin={channelsMargin}
-                              notificationsIsMutedIcon={notificationsIsMutedIcon}
-                              notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                              avatar={avatar}
-                              channel={channel}
-                              key={channel.id}
-                              contactsMap={contactsMap}
-                            />
-                          )
-                        )}
-                      </React.Fragment>
-                    ))
-                  : ''}
-              </div>
-            ) : (
+            searchValue && (
               <React.Fragment>
-                {!!directChannels.length && (
+                {!!searchedChannels.directs.length && (
                   <DirectChannels>
                     <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
-                    {directChannels.map((channel: IChannel) =>
+                    {searchedChannels.directs.map((channel: IChannel) =>
                       ListItem ? (
                         <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                       ) : (
                         <Channel
+                          theme={theme}
                           selectedChannelLeftBorder={selectedChannelLeftBorder}
                           selectedChannelBackground={selectedChannelBackground}
                           selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -465,14 +475,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     )}
                   </DirectChannels>
                 )}
-                {!!groupChannels.length && (
+                {!!searchedChannels.groups.length && (
                   <GroupChannels>
                     <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
-                    {groupChannels.map((channel: IChannel) =>
+                    {searchedChannels.groups.map((channel: IChannel) =>
                       ListItem ? (
                         <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                       ) : (
                         <Channel
+                          theme={theme}
                           selectedChannelLeftBorder={selectedChannelLeftBorder}
                           selectedChannelBackground={selectedChannelBackground}
                           selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -501,13 +512,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
             />
           )} */}
               </React.Fragment>
-            ))
+            )
           )}
         </List>
       ) : (
         <React.Fragment>
-          {!directChannels.length && !searchValue && (
-            <ChannelsList onScroll={handleAllChannelsListScroll}>
+          {!searchValue && (
+            <ChannelsList ref={channelsScrollRef} onScroll={handleAllChannelsListScroll}>
               {channels.map((channel: IChannel) =>
                 ListItem ? (
                   <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
@@ -533,14 +544,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
           )}
           {channelsLoading === LOADING_STATE.LOADED && searchValue && (
             <SearchedChannels>
-              {!!directChannels.length && (
+              {!!searchedChannels.directs.length && (
                 <DirectChannels>
                   <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
-                  {directChannels.map((channel: IChannel) =>
+                  {searchedChannels.directs.map((channel: IChannel) =>
                     ListItem ? (
                       <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                     ) : (
                       <Channel
+                        theme={theme}
                         selectedChannelLeftBorder={selectedChannelLeftBorder}
                         selectedChannelBackground={selectedChannelBackground}
                         selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -558,14 +570,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                 </DirectChannels>
               )}
-              {!!groupChannels.length && (
+              {!!searchedChannels.groups.length && (
                 <GroupChannels>
                   <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
-                  {groupChannels.map((channel: IChannel) =>
+                  {searchedChannels.groups.map((channel: IChannel) =>
                     ListItem ? (
                       <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
                     ) : (
                       <Channel
+                        theme={theme}
                         selectedChannelLeftBorder={selectedChannelLeftBorder}
                         selectedChannelBackground={selectedChannelBackground}
                         selectedChannelBorderRadius={selectedChannelBorderRadius}

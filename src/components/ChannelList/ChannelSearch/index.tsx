@@ -2,6 +2,7 @@ import styled from 'styled-components'
 import React from 'react'
 import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
+import { THEME } from '../../../helpers/constants'
 
 const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string }>`
   position: relative;
@@ -10,6 +11,10 @@ const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string
   box-sizing: border-box;
   padding: ${(props) => !props.inline && '0 12px 16px'};
   border-right: ${(props) => !props.inline && `1px solid ${props.borderColor}`};
+
+  & ${ClearTypedText} {
+    ${(props) => !props.inline && 'right: 20px'};
+  }
 `
 
 const SearchInput = styled.input<{ inline?: boolean; borderRadius?: string; backgroundColor?: string; color?: string }>`
@@ -36,6 +41,7 @@ const SearchInput = styled.input<{ inline?: boolean; borderRadius?: string; back
 
 interface IChannelSearchProps {
   searchValue: string
+  theme?: string
   handleSearchValueChange: (e: any) => void
   getMyChannels: () => void
   inline?: boolean
@@ -46,6 +52,7 @@ interface IChannelSearchProps {
 
 const ChannelSearch: React.FC<IChannelSearchProps> = ({
   searchValue,
+  theme,
   handleSearchValueChange,
   getMyChannels,
   inline,
@@ -56,7 +63,9 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
     <StyledSearchSvg left={!inline ? '22px' : ''} />
     <SearchInput
-      backgroundColor={searchInputBackgroundColor || colors.primaryLight}
+      backgroundColor={
+        searchInputBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
+      }
       color={searchInputTextColor || colors.textColor1}
       borderRadius={borderRadius}
       type='text'

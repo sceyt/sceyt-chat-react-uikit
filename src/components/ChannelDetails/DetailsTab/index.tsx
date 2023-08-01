@@ -97,7 +97,7 @@ const DetailsTab = ({
     <Container theme={theme}>
       <DetailsTabHeader
         activeTabColor={colors.primary}
-        backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
       >
         {Object.keys(channelDetailsTabs).map((key) => {
           if (key === 'member') {
@@ -185,6 +185,7 @@ const Container = styled.div<{ theme?: string }>`
 `
 
 const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: string; backgroundColor?: string }>`
+  overflow: auto;
   padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
   background-color: ${(props) => props.backgroundColor || colors.white};
@@ -193,6 +194,26 @@ const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: str
   position: sticky;
   top: 0;
   z-index: 12;
+  /* width */
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  /* Track */
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Handle */
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  /* Handle on hover */
+  &::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+  }
   button {
     position: relative;
     border: none;
@@ -205,6 +226,7 @@ const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: str
     font-size: 15px;
     line-height: 20px;
     color: ${colors.textColor2};
+    min-width: 70px;
     cursor: pointer;
   }
   & .active {

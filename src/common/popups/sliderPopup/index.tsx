@@ -246,7 +246,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   }, [])
   return (
     <Container>
-      <SliderHeader>
+      <SliderHeader backgroundColor={colors.textColor1}>
         <FileInfo>
           <Avatar
             name={attachmentUserName}
@@ -309,6 +309,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
                   className='custom_carousel_arrow'
                   leftButton={type === 'PREV'}
                   type='button'
+                  backgroundColor={colors.textColor1}
                   onClick={(e) => {
                     e.preventDefault()
                     onClick()
@@ -382,9 +383,9 @@ const Container = styled.div`
   height: 100vh;
   z-index: 999;
 `
-const SliderHeader = styled.div`
+const SliderHeader = styled.div<{ backgroundColor?: string }>`
   height: 60px;
-  background: ${colors.textColor1};
+  background: ${(props) => props.backgroundColor || colors.textColor1};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -393,7 +394,7 @@ const SliderHeader = styled.div`
 const SliderBody = styled.div`
   width: 100%;
   height: calc(100% - 60px);
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -515,13 +516,13 @@ const UploadCont = styled.div`
   align-items: center;
   justify-content: center;
 `
-const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
+const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; backgroundColor?: string }>`
   min-width: 60px;
   max-width: 60px;
   height: 60px;
   margin-right: ${(props) => !props.leftButton && '24px'};
   margin-left: ${(props) => props.leftButton && '24px'};
-  background: ${colors.textColor1};
+  background: ${(props) => props.backgroundColor || colors.textColor1};
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   border-radius: 50%;

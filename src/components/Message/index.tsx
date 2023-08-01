@@ -335,8 +335,13 @@ const Message = ({
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
+
   const borderRadius =
-    !message.incoming && ownMessageOnRightSide
+    message.incoming && incomingMessageBackground === 'inherit'
+      ? '0px'
+      : !message.incoming && ownMessageBackground === 'inherit'
+      ? '0px'
+      : !message.incoming && ownMessageOnRightSide
       ? prevMessageUserID !== messageUserID || firstMessageInInterval
         ? '16px 16px 4px 16px'
         : nextMessageUserID !== messageUserID || lastMessageInInterval
@@ -852,10 +857,9 @@ const Message = ({
                 editMessage &&
                 !message.forwardingDetails &&
                 !(
-                  (message.attachments &&
-                    message.attachments.length &&
-                    message.attachments[0].type === attachmentTypes.voice) ||
-                  !message.body
+                  message.attachments &&
+                  message.attachments.length &&
+                  message.attachments[0].type === attachmentTypes.voice
                 )
               }
               showCopyMessage={copyMessage && message.body}
@@ -1717,7 +1721,7 @@ const MessageBody = styled.div<{
       ? ' 0'
       : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  overflow: ${(props) => props.noBody && 'hidden'};
+  //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
   transform-origin: right;
 `
@@ -1759,7 +1763,7 @@ const MessageItem = styled.div<{
   padding: 0 4%;
   padding-left: ${(props) => !props.withAvatar && !props.rtl && 'calc(4% + 32px)'};
   padding-right: ${(props) => !props.withAvatar && props.rtl && 'calc(4% + 32px)'};
-  transition: all 0.2s;
+  //transition: all 0.2s;
   width: 100%;
   box-sizing: border-box;
 

@@ -1,15 +1,15 @@
 import { useEffect } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 // import { CHANNEL_TYPE } from '../../helpers/constants'
-import { IChannel, IMember } from '../../types'
+import { IChannel, IMember, IUser } from '../../types'
 import { updateUserStatusOnChannelAC } from '../../store/channel/actions'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { checkUserStatusAC } from '../../store/user/actions'
 import { CHANNEL_TYPE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
+import { deleteUserFromMap, setUserToMap, usersMap } from '../../helpers/userHelper'
 // import { checkUserStatusAC } from '../../store/user/actions'
-const usersMap = {}
 let updateInterval: any
 export default function useUpdatePresence(channel: IChannel, isVisible: boolean) {
   const dispatch = useDispatch()
@@ -23,10 +23,11 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   // if (isDirectChannel) {
   const userId = directChannelUser && directChannelUser.id
   if (userId && usersMap[userId] && !isVisible) {
-    delete usersMap[userId]
+    deleteUserFromMap(userId)
   }
-  if (userId && !usersMap[userId] && isVisible) {
-    usersMap[userId] = directChannelUser && directChannelUser.presence
+  if (userId && !usersMap[userId] && isVisible && directChannelUser) {
+    setUserToMap(directChannelUser as IUser)
+    // usersMap[userId] = directChannelUser && directChannelUser.presence
   }
   if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
     clearInterval(updateInterval)

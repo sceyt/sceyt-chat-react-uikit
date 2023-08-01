@@ -465,20 +465,6 @@ export const PopupName = styled.h3<{
   }}
 `
 
-export const PopupContainer = styled.div`
-  direction: initial;
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 200;
-  width: 100%;
-  height: 100%;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  background: rgba(0, 0, 0, 0.4);
-`
-
 export const ButtonBlock = styled.div<any>`
   display: flex;
   align-items: center;
