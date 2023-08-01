@@ -447,7 +447,6 @@ function* channelsForForwardLoadMore(action: IAction): any {
   try {
     const { payload } = action
     const { limit } = payload
-    const SceytChatClient = getClient()
     const { channelQueryForward } = query
     if (limit) {
       channelQueryForward.limit = limit

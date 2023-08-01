@@ -32,7 +32,7 @@ import {
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel, IMember } from '../../types'
+import { IAction, IChannel } from '../../types'
 import { CHANNEL_TYPE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 

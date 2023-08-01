@@ -1306,6 +1306,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
   }, [activeChannel.id])
+
   useEffect(() => {
     if (
       messageText.trim() ||
