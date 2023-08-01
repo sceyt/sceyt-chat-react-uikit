@@ -31,7 +31,9 @@ import {
   SET_REACTIONS_LOADING_STATE,
   DELETE_REACTION_FROM_LIST,
   ADD_REACTION_TO_LIST,
-  SET_MESSAGE_MENU_OPENED
+  SET_MESSAGE_MENU_OPENED,
+  REMOVE_UPLOAD_PROGRESS,
+  UPDATE_UPLOAD_PROGRESS
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -69,6 +71,13 @@ export interface IMessageStore {
   reactionsHasNext: boolean
   reactionsLoadingState: number | null
   openedMessageMenu: string
+  attachmentsUploadingProgress: {
+    [key: string]: {
+      uploaded: number
+      total: number
+      progress?: number
+    }
+  }
 }
 const initialState: IMessageStore = {
   messagesLoadingState: null,
@@ -98,7 +107,8 @@ const initialState: IMessageStore = {
   reactionsList: [],
   reactionsHasNext: true,
   reactionsLoadingState: null,
-  openedMessageMenu: ''
+  openedMessageMenu: '',
+  attachmentsUploadingProgress: {}
 }
 
 export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
@@ -351,6 +361,22 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_ATTACHMENTS_COMPLETE_FOR_POPUP: {
       const { hasPrev } = payload
       newState.attachmentForPopupHasNext = hasPrev
+      return newState
+    }
+
+    case UPDATE_UPLOAD_PROGRESS: {
+      const { uploaded, total, attachmentId, progress } = payload
+      const attachmentsUploadingProgressCopy = { ...newState.attachmentsUploadingProgress }
+      attachmentsUploadingProgressCopy[attachmentId] = { uploaded, total, progress }
+      newState.attachmentsUploadingProgress = attachmentsUploadingProgressCopy
+      return newState
+    }
+
+    case REMOVE_UPLOAD_PROGRESS: {
+      const { attachmentId } = payload
+      const attachmentsUploadingProgressCopy = { ...newState.attachmentsUploadingProgress }
+      delete attachmentsUploadingProgressCopy[attachmentId]
+      newState.attachmentsUploadingProgress = attachmentsUploadingProgressCopy
       return newState
     }
 

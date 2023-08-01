@@ -254,6 +254,26 @@ export function updateAttachmentUploadingStateAC(attachmentUploadingState: strin
   }
 }
 
+export function updateAttachmentUploadingProgressAC(uploaded: number, total: number, attachmentId: any) {
+  return {
+    type: UPDATE_UPLOAD_PROGRESS,
+    payload: {
+      uploaded,
+      total,
+      attachmentId
+    }
+  }
+}
+
+export function removeAttachmentProgressAC(attachmentId: any) {
+  return {
+    type: REMOVE_UPLOAD_PROGRESS,
+    payload: {
+      attachmentId
+    }
+  }
+}
+
 export function emptyChannelAttachmentsAC() {
   return {
     type: EMPTY_CHANNEL_ATTACHMENTS

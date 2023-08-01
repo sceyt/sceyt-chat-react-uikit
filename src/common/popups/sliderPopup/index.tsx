@@ -93,7 +93,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
     if (attachment.id) {
       setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
     }
-    downloadFile(attachment, handleCompleteDownload)
+    downloadFile(attachment, true, handleCompleteDownload)
   }
 
   const handleClicks = (e: any) => {
@@ -134,7 +134,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentFile.url)
+            customDownloader(currentFile.url, false)
               .then(async (url) => {
                 const response = await fetch(url)
                 setAttachmentToCache(currentFile.id, response)
@@ -214,7 +214,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentMediaFile.url).then(async (url) => {
+            customDownloader(currentMediaFile.url, false).then(async (url) => {
               const response = await fetch(url)
               setAttachmentToCache(currentMediaFile.id!, response)
               if (currentMediaFile.type === 'image') {

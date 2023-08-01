@@ -10,7 +10,7 @@ export const messagesHasPrevSelector = (store: any) => store.MessageReducer.mess
 export const threadMessagesHasNextSelector = (store: any) => store.MessageReducer.threadMessagesHasNext
 export const threadMessagesHasPrevSelector = (store: any) => store.MessageReducer.threadMessagesHasPrev
 export const attachmentCompilationStateSelector = (store: any) => store.MessageReducer.attachmentsUploadingState
-export const attachmentUploadProgressSelector = (store: any) => store.MessageReducer.uploadAttachmentProgress
+export const attachmentsUploadProgressSelector = (store: any) => store.MessageReducer.attachmentsUploadingProgress
 export const activeTabAttachmentsSelector = (store: any) => store.MessageReducer.activeTabAttachments
 export const activeTabAttachmentsHasNextSelector = (store: any) => store.MessageReducer.attachmentHasNext
 export const attachmentsForPopupSelector = (store: any) => store.MessageReducer.attachmentsForPopup

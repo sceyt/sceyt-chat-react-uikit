@@ -7,7 +7,12 @@ export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
 }
-export type IAttachmentMeta = { thumbnail?: string; imageWidth?: number; imageHeight?: number; duration?: number }
+export type IAttachmentMeta = {
+  thumbnail?: string
+  imageWidth?: number
+  imageHeight?: number
+  duration?: number
+}
 
 type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any } }
 

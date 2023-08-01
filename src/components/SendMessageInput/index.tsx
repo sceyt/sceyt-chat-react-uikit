@@ -955,6 +955,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (customUploader) {
       if (fileType === 'image') {
         resizeImage(file).then(async (resizedFile: any) => {
+          console.log('resizedFile. .. . ', resizedFile)
+          console.log('URL.createObjectURL(resizedFile.blob as any).  . ', URL.createObjectURL(resizedFile.blob as any))
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -986,7 +988,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             data: file,
             upload: false,
             type: 'file',
-            attachmentUrl: URL.createObjectURL(file),
             attachmentId: uuidv4(),
             size: file.size
           }

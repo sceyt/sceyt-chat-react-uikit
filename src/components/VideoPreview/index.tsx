@@ -5,12 +5,13 @@ import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { colors } from '../../UIHelper/constants'
 import { getFileExtension } from '../../helpers/message'
-import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
-import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
+// import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
+// import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { getFrame3 } from '../../helpers/getVideoFrame'
 import { setVideoThumb } from '../../helpers/messagesHalper'
-import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from '../../UIHelper'
+import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
+import { base64ToToDataURL } from '../../helpers/resizeImage'
 
 interface IVideoPreviewProps {
   maxWidth?: string
@@ -47,7 +48,17 @@ const VideoPreview = ({
   const [videoUrl, setVideoUrl] = useState(src)
   const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  let attachmentThumb
+  let withPrefix = true
 
+  if (file.metadata && file.metadata.tmb) {
+    if (file.metadata.tmb.length < 70) {
+      attachmentThumb = base64ToToDataURL(file.metadata.tmb)
+      withPrefix = false
+    } else {
+      attachmentThumb = file.metadata && file.metadata.tmb
+    }
+  }
   const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {
@@ -130,6 +141,9 @@ const VideoPreview = ({
       }
     })
   }, [src])
+  useEffect(() => {
+    console.log('file . ..  . . ', file)
+  }, [file])
   return (
     <Component
       maxWidth={maxWidth}
@@ -146,15 +160,16 @@ const VideoPreview = ({
           onClick={handlePauseResumeDownload}
           isRepliedMessage={isRepliedMessage}
           borderRadius={borderRadius}
-          backgroundImage={file.metadata && file.metadata.tmb ? file.metadata.tmb : ''}
+          backgroundImage={attachmentThumb}
+          withPrefix={withPrefix}
         >
           {/* {!isCached && ( */}
-          <React.Fragment>
+          {/*    <React.Fragment>
             <UploadPercent isRepliedMessage={isRepliedMessage}>
               {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
             </UploadPercent>
             {!downloadIsCancelled && <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />}
-          </React.Fragment>
+          </React.Fragment> */}
           {/* )} */}
         </UploadProgress>
       )}
@@ -164,12 +179,15 @@ const VideoPreview = ({
         preload='auto'
         id='video'
         // crossOrigin='anonymous'
-        src={videoUrl}
+        src={file.attachmentUrl || videoUrl}
         onPause={() => setVideoPlaying(false)}
         onPlay={() => setVideoPlaying(true)}
       >
-        <source src={videoUrl || file.url} type={`video/${getFileExtension(file.name || file.data.name)}`} />
-        <source src={videoUrl || file.url} type='video/ogg' />
+        <source
+          src={file.attachmentUrl || videoUrl || file.url}
+          type={`video/${getFileExtension(file.name || file.data.name)}`}
+        />
+        <source src={file.attachmentUrl || videoUrl || file.url} type='video/ogg' />
         {/* <track default kind='captions' srcLang='en' src='../../assets/img/defaultAvatar.png' /> */}
         Your browser does not support the video tag.
       </video>

@@ -9,7 +9,7 @@ import { IAttachment, IContact } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
-import { getCustomDownloader } from './customUploader'
+import { getCustomDownloader, getCustomUploader } from './customUploader'
 
 const StatusText = styled.span`
   color: ${colors.textColor2};
@@ -74,22 +74,53 @@ export const systemMessageUserName = (contact: IContact, userId: string) => {
   return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
 }
 
+const filesPromisesOnDownload: { [key: string]: any } = {}
+
 export const downloadFile = async (
   attachment: IAttachment,
-  done?: (attachmentId: string, failed?: boolean) => void
+  download: boolean,
+  done?: (attachmentId: string, failed?: boolean) => void,
+  progressCallback?: (progress: { loaded: number; total: number }) => void
 ) => {
   try {
     const customDownloader = getCustomDownloader()
     let response
     if (customDownloader) {
-      customDownloader(attachment.url).then(async (url) => {
+      const urlPromise = customDownloader(attachment.url, download, (progress) => {
+        if (progressCallback) {
+          progressCallback(progress)
+        }
+      })
+      filesPromisesOnDownload[attachment.id!] = urlPromise
+      const url = await urlPromise
+      response = await fetch(url)
+      const data = await response.blob()
+      if (done) {
+        delete filesPromisesOnDownload[attachment.id!]
+        done(attachment.id || '')
+      }
+      FileSaver.saveAs(data, attachment.name)
+      /* urlPromise.then(async (url) => {
+        response = await fetch(url)
+        const data = await response.blob()
+        if (done) {
+          delete filesPromisesOnDownload[attachment.id!]
+          done(attachment.id || '')
+        }
+        FileSaver.saveAs(data, attachment.name)
+      }) */
+      /*  customDownloader(attachment.url, (progress) => {
+        if (progressCallback) {
+          progressCallback(progress)
+        }
+      }).then(async (url) => {
         response = await fetch(url)
         const data = await response.blob()
         if (done) {
           done(attachment.id || '')
         }
         FileSaver.saveAs(data, attachment.name)
-      })
+      }) */
     } else {
       response = await fetch(attachment.url)
       const data = await response.blob()
@@ -102,6 +133,18 @@ export const downloadFile = async (
     console.log('error on download... ', e)
     if (done) {
       done(attachment.id || '', true)
+    }
+  }
+}
+
+export const cancelDownloadFile = (attachmentId: string) => {
+  console.log('cancelDownloadFile... ', attachmentId)
+  const promise = filesPromisesOnDownload[attachmentId]
+  if (promise) {
+    console.log('cancelDownloadFile... promise exist - --')
+    const customUploader = getCustomUploader()
+    if (customUploader) {
+      customUploader.cancelRequest(promise)
     }
   }
 }

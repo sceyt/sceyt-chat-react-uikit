@@ -829,8 +829,12 @@ export const SubTitle = styled.span<{ color?: string; margin?: string }>`
   margin: ${(props) => props.margin};
 `
 
-export const AttachmentIconCont = styled.span`
+export const AttachmentIconCont = styled.span<{ backgroundColor?: string }>`
   display: inline-flex;
+  width: 40px;
+  height: 40px;
+  background-color: ${(props) => props.backgroundColor || colors.primary};
+  border-radius: 50%;
 `
 
 export const UploadingIcon = styled.span<{
@@ -870,10 +874,22 @@ export const TextInOneLine = styled.span`
   overflow: hidden;
   text-overflow: ellipsis;
 `
+export const CancelResumeWrapper = styled.span<{ isRepliedMessage?: boolean; onClick?: any }>`
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  z-index: 3;
+
+  > svg {
+    width: 20px;
+    height: 20px;
+  }
+`
 export const UploadPercent = styled.span<{
   fileAttachment?: boolean
   isRepliedMessage?: boolean
   borderRadius?: string
+  backgroundColor?: string
 }>`
   display: flex;
   align-items: center;
@@ -882,7 +898,8 @@ export const UploadPercent = styled.span<{
   color: #fff;
   width: ${(props) => (props.fileAttachment || props.isRepliedMessage ? '40px' : '56px')};
   height: ${(props) => (props.fileAttachment || props.isRepliedMessage ? '40px' : '56px')};
-  background-color: rgba(0,0,0,0.4);
+  //background-color: rgba(0,0,0,0.4);
+  background-color: ${(props) => props.backgroundColor};
   border-radius: ${(props) =>
     props.borderRadius ? props.borderRadius : props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%'};
 }
@@ -899,6 +916,7 @@ export const UploadProgress = styled.div<{
   isFailedAttachment?: boolean
   whiteBackground?: boolean
   fileAttachment?: boolean
+  withPrefix?: boolean
   isRepliedMessage?: boolean
   onClick?: any
   backgroundImage?: string
@@ -924,8 +942,9 @@ export const UploadProgress = styled.div<{
   align-items: center;
   justify-content: center;
   //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
-  background-image: url(${(props) => 'data:image/jpeg;base64,' + props.backgroundImage});
+  background-image: url(${(props) => `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
   background-size: cover;
+  background-position: center;
   border-radius: ${(props) =>
     props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
   z-index: 5;

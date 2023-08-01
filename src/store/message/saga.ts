@@ -20,6 +20,7 @@ import {
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
   UPDATE_MESSAGE,
+  UPDATE_UPLOAD_PROGRESS,
   UPLOAD_ATTACHMENT_COMPILATION
 } from './constants'
 
@@ -44,6 +45,7 @@ import {
   deleteReactionFromListAC,
   deleteReactionFromMessageAC,
   getMessagesAC,
+  removeAttachmentProgressAC,
   scrollToNewMessageAC,
   // sendTextMessageAC,
   setAttachmentsAC,
@@ -57,6 +59,7 @@ import {
   setReactionsListAC,
   setReactionsLoadingStateAC,
   setScrollToMessagesAC,
+  updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
 } from './actions'
@@ -208,26 +211,38 @@ function* sendMessage(action: IAction): any {
         let filePath: any
         yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.attachmentId))
         if (customUploader) {
+          console.log('set uploading progress to 0 ... for attachment ... ', messageAttachment.attachmentId)
+          yield put(updateAttachmentUploadingProgressAC(0, messageAttachment.data.size, messageAttachment.attachmentId))
+
           const handleUploadProgress = ({ loaded, total }: IProgress) => {
-            console.log('progress  ... ', loaded / total)
-          }
-          const handleUpdateLocalPath = (updatedLink: string) => {
-            filePath = updatedLink
-            thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
-            messageCopy.attachments[0] = { ...messageCopy.attachments[0], attachmentUrl: updatedLink }
-            const updateAttachmentPath = {
-              attachments: [{ ...messageCopy.attachments[0], attachmentUrl: updatedLink }]
-            }
             store.dispatch({
-              type: UPDATE_MESSAGE,
+              type: UPDATE_UPLOAD_PROGRESS,
               payload: {
-                message: JSON.parse(
-                  JSON.stringify({
-                    ...updateAttachmentPath
-                  })
-                )
+                uploaded: loaded,
+                total,
+                progress: loaded / total,
+                attachmentId: messageAttachment.attachmentId
               }
             })
+          }
+          const handleUpdateLocalPath = (updatedLink: string) => {
+            if (fileType === 'image') {
+              filePath = updatedLink
+              messageCopy.attachments[0] = { ...messageCopy.attachments[0], attachmentUrl: updatedLink }
+              const updateAttachmentPath = {
+                attachments: [{ ...messageCopy.attachments[0], attachmentUrl: updatedLink }]
+              }
+              store.dispatch({
+                type: UPDATE_MESSAGE,
+                payload: {
+                  message: JSON.parse(
+                    JSON.stringify({
+                      ...updateAttachmentPath
+                    })
+                  )
+                }
+              })
+            }
           }
           let uri
           try {
@@ -264,12 +279,15 @@ function* sendMessage(action: IAction): any {
                 .setUpload(false)
                 .create()
               // not for SDK, for displaying attachments and their progress
-              attachmentToSend.attachmentId = messageAttachment.attachmentId
-              attachmentToSend.attachmentUrl = messageAttachment.attachmentUrl
 
               messageToSend.attachments = [attachmentToSend]
-
+              console.log('send message .................. ', messageToSend)
               const messageResponse = yield call(channel.sendMessage, messageToSend)
+              messageResponse.attachments[0] = {
+                ...messageResponse.attachments[0],
+                attachmentId: messageAttachment.attachmentId,
+                attachmentUrl: messageAttachment.attachmentUrl
+              }
               /* if (msgCount <= 200) {
                 const messageToSend: any = {
                   // metadata: mentionedMembersPositions,
@@ -281,6 +299,7 @@ function* sendMessage(action: IAction): any {
                 yield put(sendMessageAC(messageToSend, channelId, 'Connected'))
                 msgCount++
               } */
+              yield put(removeAttachmentProgressAC(messageAttachment.attachmentId))
               deletePendingAttachment(messageAttachment.attachmentId)
               const messageUpdateData = {
                 id: messageResponse.id,
@@ -292,6 +311,7 @@ function* sendMessage(action: IAction): any {
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
               }
+              console.log('messageUpdateData. .  . . . . .  . ', messageUpdateData)
               yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
 
               if (fileType === 'video') {
