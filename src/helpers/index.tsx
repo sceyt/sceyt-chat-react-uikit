@@ -82,7 +82,7 @@ export const downloadFile = async (
     const customDownloader = getCustomDownloader()
     let response
     if (customDownloader) {
-      customDownloader(attachment.url).then(async (url) => {
+      customDownloader(attachment.url).then(async (url: any) => {
         response = await fetch(url)
         const data = await response.blob()
         if (done) {

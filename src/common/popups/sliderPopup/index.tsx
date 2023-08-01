@@ -135,7 +135,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
         } else {
           if (customDownloader) {
             customDownloader(currentFile.url)
-              .then(async (url) => {
+              .then(async (url: any) => {
                 const response = await fetch(url)
                 setAttachmentToCache(currentFile.id, response)
                 if (currentFile.type === 'image') {
@@ -150,7 +150,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
                   }, 100)
                 }
               })
-              .catch((e) => {
+              .catch((e: any) => {
                 console.log('fail to download image...... ', e)
               })
           } else {
@@ -214,7 +214,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentMediaFile.url).then(async (url) => {
+            customDownloader(currentMediaFile.url).then(async (url: any) => {
               const response = await fetch(url)
               setAttachmentToCache(currentMediaFile.id!, response)
               if (currentMediaFile.type === 'image') {

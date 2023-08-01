@@ -23,7 +23,6 @@ export interface IUploadTask {
 
 export interface ICustomUploader {
   upload: (attachment: IAttachment, uploadTask: IUploadTask) => void
-  download: (uri: string, download: boolean, progressCallback?: (progress: any) => void) => Promise<string>
   cancelRequest: (requestPromise: any) => void
 }
 

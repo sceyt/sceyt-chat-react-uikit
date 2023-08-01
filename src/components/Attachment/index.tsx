@@ -134,7 +134,7 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(attachment.url).then((url) => {
+        customDownloader(attachment.url).then((url: string) => {
           downloadImage(url)
         })
       } else {
@@ -211,7 +211,7 @@ const Attachment = ({
             } else {
               if (customDownloader) {
                 // console.log('is not cached, download with custom downloader')
-                customDownloader(attachment.url).then(async (url) => {
+                customDownloader(attachment.url).then(async (url: any) => {
                   // console.log('image is downloaded. . . should load image', url)
                   downloadImage(url)
                   const response = await fetch(url)
@@ -230,7 +230,7 @@ const Attachment = ({
               setIsCached(true)
             } else {
               if (customDownloader) {
-                customDownloader(attachment.url).then(async (url) => {
+                customDownloader(attachment.url).then(async (url: any) => {
                   // if (attachment.type === attachmentTypes.video) {
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.id!, response)
@@ -246,7 +246,7 @@ const Attachment = ({
         .catch((e: any) => {
           console.log('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
-            customDownloader(attachment.url).then(async (url) => {
+            customDownloader(attachment.url).then(async (url: any) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.id!, response)
