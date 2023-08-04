@@ -4,7 +4,6 @@ import styled, { keyframes } from 'styled-components'
 // import { Editor } from 'react-draft-wysiwyg'
 // import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css'
 // import { convertToRaw, EditorState } from 'draft-js'
-
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
@@ -77,7 +76,9 @@ let prevActiveChannelId: any
 
 interface SendMessageProps {
   draggedAttachments?: boolean
+  // eslint-disable-next-line no-unused-vars
   handleAttachmentSelected?: (state: boolean) => void
+  // eslint-disable-next-line no-unused-vars
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
   inputCustomClassname?: string
   inputAutofocus?: boolean
@@ -261,7 +262,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const mentions =
       editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
     if (mentions.length && mentions.length > 0) {
-      const currentTextCont = typingTextFormat({
+      messageInputRef.current.innerHTML = typingTextFormat({
         text: newText,
         mentionedMembers: [
           ...mentions.map((menMem: any) => ({
@@ -270,7 +271,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }))
         ]
       })
-      messageInputRef.current.innerHTML = currentTextCont
     } else {
       messageInputRef.current.innerText = newText
     }
@@ -486,11 +486,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
         // console.log('set mentioned members,,., ', updatedMentionedMembers)
         setMentionedMembers(updatedMentionedMembers)
-        const currentTextCont = typingTextFormat({
+        messageInputRef.current.innerHTML = typingTextFormat({
           text: currentText,
           mentionedMembers: [...mentionedMembersPositions]
         })
-        messageInputRef.current.innerHTML = currentTextCont
       }
       if (messageToEdit) {
         setEditMessageText(currentText)
@@ -1316,7 +1315,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (attachments.length) {
         let videoAttachment = false
         attachments.forEach((att: any) => {
-          if (att.type === 'video') {
+          if (att.type === 'video' || att.data.type.split('/')[0] === 'video') {
             videoAttachment = true
             if (!readyVideoAttachments[att.attachmentId]) {
               setSendMessageIsActive(false)
@@ -1442,11 +1441,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           // }
         })
         setMentionedMembers(editingMentionedMembers)
-        const currentTextCont = typingTextFormat({
+        messageInputRef.current.innerHTML = typingTextFormat({
           text: messageToEdit.body,
           mentionedMembers: [...mentionedMembersPositions]
         })
-        messageInputRef.current.innerHTML = currentTextCont
       } else {
         setEditMessageText(messageToEdit.body || '')
         messageInputRef.current.innerText = messageToEdit.body
@@ -1757,7 +1755,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 onPaste={handlePastAttachments}
                 color={colors.textColor1}
                 onCut={handleCut}
-                onKeyPress={handleSendEditMessage}
+                onKeyDown={handleSendEditMessage}
                 data-placeholder='Type message here ...'
                 // onKeyDown={handleKeyDown}
                 // value={editMessageText || messageText}

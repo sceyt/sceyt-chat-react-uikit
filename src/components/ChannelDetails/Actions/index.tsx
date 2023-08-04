@@ -166,7 +166,7 @@ const Actions = ({
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessages,
+  // showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor
@@ -594,38 +594,43 @@ const Actions = ({
             )}
           </React.Fragment>
         )}
-        {showClearHistory && checkActionPermission('deleteAllMessagesForMe') && (
-          <ActionItem
-            key={10}
-            color={clearHistoryTextColor || colors.red1}
-            iconColor={clearHistoryTextColor || colors.red1}
-            order={clearHistoryOrder}
-            hoverColor={clearHistoryTextColor || colors.red1}
-            onClick={() => {
-              setPopupButtonText('Clear')
-              setPopupTitle('Clear history')
-              handleToggleClearHistoryPopup()
-            }}
-          >
-            {clearHistoryIcon || <CleareIcon />} Clear history
-          </ActionItem>
-        )}
-        {showDeleteAllMessages && checkActionPermission('deleteAllMessagesForAll') && (
-          <ActionItem
-            key={11}
-            color={deleteAllMessagesTextColor || colors.red1}
-            iconColor={deleteAllMessagesTextColor || colors.red1}
-            order={deleteAllMessagesOrder}
-            hoverColor={deleteAllMessagesTextColor || colors.red1}
-            onClick={() => {
-              setPopupButtonText('Clear')
-              setPopupTitle(`Clear history`)
-              handleToggleDeleteAllMessagesPopup()
-            }}
-          >
-            {deleteAllMessagesIcon || <CleareIcon />} Clear history
-          </ActionItem>
-        )}
+        {showClearHistory &&
+          (channel.type === CHANNEL_TYPE.GROUP ||
+            channel.type === CHANNEL_TYPE.PRIVATE ||
+            channel.type === CHANNEL_TYPE.DIRECT) && (
+            <ActionItem
+              key={10}
+              color={clearHistoryTextColor || colors.red1}
+              iconColor={clearHistoryTextColor || colors.red1}
+              order={clearHistoryOrder}
+              hoverColor={clearHistoryTextColor || colors.red1}
+              onClick={() => {
+                setPopupButtonText('Clear')
+                setPopupTitle('Clear history')
+                handleToggleClearHistoryPopup()
+              }}
+            >
+              {clearHistoryIcon || <CleareIcon />} Clear history
+            </ActionItem>
+          )}
+        {showClearHistory &&
+          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
+          checkActionPermission('clearAllMessages') && (
+            <ActionItem
+              key={11}
+              color={deleteAllMessagesTextColor || colors.red1}
+              iconColor={deleteAllMessagesTextColor || colors.red1}
+              order={deleteAllMessagesOrder}
+              hoverColor={deleteAllMessagesTextColor || colors.red1}
+              onClick={() => {
+                setPopupButtonText('Clear')
+                setPopupTitle(`Clear history`)
+                handleToggleDeleteAllMessagesPopup()
+              }}
+            >
+              {deleteAllMessagesIcon || <CleareIcon />} Clear history
+            </ActionItem>
+          )}
 
         {showDeleteChannel && checkActionPermission('deleteChannel') && (
           <ActionItem

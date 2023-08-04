@@ -11,6 +11,14 @@
   "engines": {
     "node": ">=10"
   },
+  "babel": {
+    "presets": [
+      "@babel/preset-react"
+    ],
+    "plugins": [
+        "@babel/plugin-transform-react-pure-annotations"
+    ]
+  },
   "scripts": {
     "build": "microbundle-crl --no-compress --format modern,cjs && cp -r src/assets dist/",
     "start": "microbundle-crl watch --no-compress --format cjs --jsxFragment React.Fragment && cp -r src/assets dist/",
@@ -72,6 +80,7 @@
     "assets"
   ],
   "dependencies": {
+    "@babel/preset-react": "^7.22.5",
     "@types/react-draft-wysiwyg": "^1.13.4",
     "draft-js": "^0.11.7",
     "file-saver": "^2.0.5",

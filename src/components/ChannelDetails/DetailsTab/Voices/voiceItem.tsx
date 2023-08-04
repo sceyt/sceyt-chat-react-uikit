@@ -25,6 +25,7 @@ interface IProps {
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
   playingVoiceId?: string
+  // eslint-disable-next-line no-unused-vars
   setVoiceIsPlaying?: (attachmentId: string) => void
 }
 
@@ -92,7 +93,7 @@ const VoiceItem = ({
   }, [playingVoiceId])
   useEffect(() => {
     if (customDownloader) {
-      customDownloader(file.url).then((url) => {
+      customDownloader(file.url, false).then((url) => {
         setFileUrl(url)
       })
     } else {

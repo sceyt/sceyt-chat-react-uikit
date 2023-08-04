@@ -32,7 +32,8 @@ import {
   getChannelFromMap,
   query,
   setChannelInMap,
-  updateChannelLastMessageOnAllChannels
+  updateChannelLastMessageOnAllChannels,
+  updateChannelOnAllChannels
 } from '../../helpers/channelHalper'
 import {
   addAttachmentsAC,
@@ -59,7 +60,7 @@ import {
   setReactionsListAC,
   setReactionsLoadingStateAC,
   setScrollToMessagesAC,
-  updateAttachmentUploadingProgressAC,
+  // updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
 } from './actions'
@@ -132,9 +133,10 @@ function* sendMessage(action: IAction): any {
       if (sendAttachmentsAsSeparateMessage) {
         let thumbnailMetas: IAttachmentMeta = {}
         const messageAttachment = { ...message.attachments[0], url: message.attachments[0].data }
-        const fileType = messageAttachment.type
+        const fileType = messageAttachment.url.type.split('/')[0]
         if (fileType === 'video') {
           thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
+          console.log('thumbnailMetas ... ', thumbnailMetas)
         } else if (fileType === 'image') {
           thumbnailMetas = yield call(
             createImageThumbnail,
@@ -149,14 +151,15 @@ function* sendMessage(action: IAction): any {
             thumbnail: messageAttachment.metadata.tmb
           }
         }
+
         messageAttachment.metadata = {
           ...messageAttachment.metadata,
-          ...{
+          ...(thumbnailMetas && {
             tmb: thumbnailMetas.thumbnail,
             szw: thumbnailMetas.imageWidth,
             szh: thumbnailMetas.imageHeight,
             dur: thumbnailMetas.duration && Math.floor(thumbnailMetas.duration)
-          }
+          })
         }
         messageAttachment.size = message.attachments[0].data.size
         setPendingAttachment(messageAttachment.attachmentId, messageAttachment.data)
@@ -212,7 +215,11 @@ function* sendMessage(action: IAction): any {
         yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.attachmentId))
         if (customUploader) {
           console.log('set uploading progress to 0 ... for attachment ... ', messageAttachment.attachmentId)
-          yield put(updateAttachmentUploadingProgressAC(0, messageAttachment.data.size, messageAttachment.attachmentId))
+          if (messageAttachment.type !== attachmentTypes.image) {
+            /* yield put(
+              updateAttachmentUploadingProgressAC(0, messageAttachment.data.size, messageAttachment.attachmentId)
+            ) */
+          }
 
           const handleUploadProgress = ({ loaded, total }: IProgress) => {
             store.dispatch({
@@ -225,8 +232,18 @@ function* sendMessage(action: IAction): any {
               }
             })
           }
+          let fileSize = messageAttachment.size
           const handleUpdateLocalPath = (updatedLink: string) => {
             if (fileType === 'image') {
+              /* fileSize = getImageSize(updatedLink).then((size: any) => {
+                store.dispatch({
+                  type: UPDATE_UPLOAD_PROGRESS,
+                  payload: {
+                    total: size,
+                    attachmentId: messageAttachment.attachmentId
+                  }
+                })
+              }) */
               filePath = updatedLink
               messageCopy.attachments[0] = { ...messageCopy.attachments[0], attachmentUrl: updatedLink }
               const updateAttachmentPath = {
@@ -250,7 +267,6 @@ function* sendMessage(action: IAction): any {
               uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
               // console.log('upload res .... uri, ,, ', uri)
               yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment.attachmentId))
-              let fileSize = messageAttachment.size
               if (messageAttachment.url.type.split('/')[0] === 'image') {
                 fileSize = yield call(getImageSize, filePath)
                 thumbnailMetas = yield call(
@@ -325,8 +341,14 @@ function* sendMessage(action: IAction): any {
 
               const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
               updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-              yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+              // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+              const channelUpdateParam = {
+                lastMessage: messageToUpdate,
+                lastReactedMessage: null
+              }
+              yield put(updateChannelDataAC(channel.id, channelUpdateParam))
             } else {
+              // eslint-disable-next-line
               throw Error('Network error')
             }
           } catch (e) {
@@ -405,7 +427,12 @@ function* sendMessage(action: IAction): any {
           updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
           const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
           updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-          yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+          // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+          const channelUpdateParam = {
+            lastMessage: messageToUpdate,
+            lastReactedMessage: null
+          }
+          yield put(updateChannelDataAC(channel.id, channelUpdateParam))
         }
       } else {
         let attachmentsToSend: IAttachment[] = message.attachments.map((attachment: any) => {
@@ -593,7 +620,12 @@ function* sendMessage(action: IAction): any {
           })
           const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
           updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-          yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+          // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+          const channelUpdateParam = {
+            lastMessage: messageToUpdate,
+            lastReactedMessage: null
+          }
+          yield put(updateChannelDataAC(channel.id, channelUpdateParam))
         }
       }
     }
@@ -841,8 +873,14 @@ function* sendTextMessage(action: IAction): any {
       updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
       updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-      yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+      // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+      const channelUpdateParam = {
+        lastMessage: messageToUpdate,
+        lastReactedMessage: null
+      }
+      yield put(updateChannelDataAC(channel.id, channelUpdateParam))
     } else {
+      // eslint-disable-next-line
       throw new Error('Connection required to send message')
     }
     // messageForCatch = messageToSend
@@ -1448,6 +1486,7 @@ function* addReaction(action: IAction): any {
         lastReactedMessage: message
       }
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+      updateChannelOnAllChannels(channel.id, channelUpdateParam)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
 
@@ -1557,7 +1596,7 @@ function* getMessageAttachments(action: IAction): any {
       AttachmentByTypeQuery.reverse = true
     }
 
-    let result: { attachments: any; hasNext: boolean } = { attachments: [], hasNext: true }
+    let result: { attachments: any; hasNext: boolean }
     if (direction === queryDirection.NEXT) {
       result = yield call(AttachmentByTypeQuery.loadPrevious)
     } else if (direction === queryDirection.NEAR) {

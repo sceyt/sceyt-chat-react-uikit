@@ -367,7 +367,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case UPDATE_UPLOAD_PROGRESS: {
       const { uploaded, total, attachmentId, progress } = payload
       const attachmentsUploadingProgressCopy = { ...newState.attachmentsUploadingProgress }
-      attachmentsUploadingProgressCopy[attachmentId] = { uploaded, total, progress }
+      const updateData = { uploaded, total, progress }
+      attachmentsUploadingProgressCopy[attachmentId] = {
+        ...attachmentsUploadingProgressCopy[attachmentId],
+        ...updateData
+      }
       newState.attachmentsUploadingProgress = attachmentsUploadingProgressCopy
       return newState
     }

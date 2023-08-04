@@ -523,7 +523,7 @@ export default function* watchForEvents(): any {
             yield call(setChannelInMap, channel)
           } else if (!message.repliedInThread) {
             yield put(updateChannelLastMessageAC(message, channelForAdd))
-            yield put(updateChannelDataAC(message, channelForAdd))
+            yield put(updateChannelDataAC(message, { ...channelForAdd, lastReactedMessage: null }))
           }
           if (channel.id === activeChannelId) {
             // TODO message for thread reply
@@ -807,7 +807,8 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
         const { channel, user, message, reaction } = args
-        console.log('channel REACTION_DELETED ... ')
+        console.log('channel REACTION_DELETED ... ', channel)
+        const channelFromMap = getChannelFromMap(channel.id)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
@@ -815,14 +816,24 @@ export default function* watchForEvents(): any {
           yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
           removeReactionOnAllMessages(message, reaction, true)
         }
-        if (!(channel.newReactions && channel.newReactions.length)) {
+        const channelUpdateParams = JSON.parse(JSON.stringify(channel))
+        if (
+          channelFromMap &&
+          channelFromMap.lastReactedMessage &&
+          channelFromMap.lastReactedMessage.id === message.id
+        ) {
+          channelUpdateParams.lastReactedMessage = null
+        }
+        yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+        updateChannelOnAllChannels(channel.id, channelUpdateParams)
+        /* if (!(channel.newReactions && channel.newReactions.length)) {
           const channelUpdateParams = {
             userMessageReactions: [],
             lastReactedMessage: null
           }
           yield put(updateChannelDataAC(channel.id, channelUpdateParams))
           updateChannelOnAllChannels(channel.id, channelUpdateParams)
-        }
+        } */
         if (checkChannelExistsOnMessagesMap(channel.id)) {
           removeReactionToMessageOnMap(channel.id, message, reaction, true)
         }

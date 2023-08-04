@@ -25,9 +25,11 @@ import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../../helpers/attachmentsCache'
 import VideoPlayer from '../../../components/VideoPlayer'
+import { CircularProgressbar } from 'react-circular-progressbar'
 
 interface IProps {
   channelId: string
+  // eslint-disable-next-line no-unused-vars
   setIsSliderOpen: (state: any) => void
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
@@ -91,9 +93,13 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   }
   const handleDownloadFile = (attachment: IAttachment) => {
     if (attachment.id) {
-      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent: 1 } }))
     }
-    downloadFile(attachment, true, handleCompleteDownload)
+    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
+      const loadedRes = progress.loaded && progress.loaded / progress.total
+      const uploadPercent = loadedRes && loadedRes * 100
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
+    })
   }
 
   const handleClicks = (e: any) => {
@@ -268,7 +274,30 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
         </FileInfo>
         <ActionDownload onClick={() => handleDownloadFile(currentFile)}>
           {downloadingFilesMap[currentFile.id] ? (
-            <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
+            // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
+            <ProgressWrapper>
+              <CircularProgressbar
+                minValue={0}
+                maxValue={100}
+                value={downloadingFilesMap[currentFile.id].uploadPercent || 0}
+                backgroundPadding={6}
+                background={true}
+                text=''
+                styles={{
+                  background: {
+                    fill: 'transparent'
+                  },
+                  path: {
+                    stroke: colors.white,
+                    strokeLinecap: 'butt',
+                    strokeWidth: '6px',
+                    transition: 'stroke-dashoffset 0.5s ease 0s',
+                    transform: 'rotate(0turn)',
+                    transformOrigin: 'center center'
+                  }
+                }}
+              />
+            </ProgressWrapper>
           ) : (
             <DownloadIcon />
           )}
@@ -311,6 +340,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
                   type='button'
                   backgroundColor={colors.textColor1}
                   onClick={(e) => {
+                    setImageLoading(true)
                     e.preventDefault()
                     onClick()
                   }}
@@ -330,37 +360,37 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
                 draggable={false}
                 visibleSlide={visibleSlide}
               >
-                {downloadedFiles[file.id!] ? (
-                  <React.Fragment>
-                    {file.type === 'image' ? (
-                      <React.Fragment>
-                        {imageLoading ? (
-                          <UploadCont>
-                            <UploadingIcon />
-                          </UploadCont>
-                        ) : (
-                          <img draggable={false} src={downloadedFiles[file.id!]} alt={file.name} />
-                        )}
-                      </React.Fragment>
-                    ) : (
-                      <React.Fragment>
-                        <VideoPlayer
-                          activeFileId={currentFile.id}
-                          videoFileId={file.id}
-                          src={downloadedFiles[file.id!]}
-                        />
-                        {/* <video controls autoPlay id={file.url} src={downloadedFiles[file.url]}>
+                {/* {downloadedFiles[file.id!] ? ( */}
+                <React.Fragment>
+                  {file.type === 'image' ? (
+                    <React.Fragment>
+                      {!downloadedFiles[file.id!] && imageLoading ? (
+                        <UploadCont>
+                          <UploadingIcon />
+                        </UploadCont>
+                      ) : (
+                        <img draggable={false} src={downloadedFiles[file.id!]} alt={file.name} />
+                      )}
+                    </React.Fragment>
+                  ) : (
+                    <React.Fragment>
+                      <VideoPlayer
+                        activeFileId={currentFile.id}
+                        videoFileId={file.id}
+                        src={downloadedFiles[file.id!]}
+                      />
+                      {/* <video controls autoPlay id={file.url} src={downloadedFiles[file.url]}>
                           <source src={downloadedFiles[file.url]} type={`video/${getFileExtension(file.name)}`} />
                           <source src={downloadedFiles[file.url]} type='video/ogg' />
                           <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
                           Your browser does not support the video tag.
                         </video> */}
-                      </React.Fragment>
-                    )}
-                  </React.Fragment>
-                ) : (
-                  <UploadingIcon />
-                )}
+                    </React.Fragment>
+                  )}
+                </React.Fragment>
+                {/* ) : ( */}
+                {/*  <UploadingIcon /> */}
+                {/* )} */}
               </CarouselItem>
             ))}
           </Carousel>
@@ -382,6 +412,21 @@ const Container = styled.div`
   bottom: 0;
   height: 100vh;
   z-index: 999;
+`
+const ProgressWrapper = styled.span`
+  display: inline-block;
+  width: 35px;
+  height: 35px;
+  animation: preloader 1.5s linear infinite;
+
+  @keyframes preloader {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
 `
 const SliderHeader = styled.div<{ backgroundColor?: string }>`
   height: 60px;
@@ -505,7 +550,7 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   }
 `
 const UploadCont = styled.div`
-  position: absolute;
+  //position: absolute;
   left: 0;
   top: 0;
   width: 100%;

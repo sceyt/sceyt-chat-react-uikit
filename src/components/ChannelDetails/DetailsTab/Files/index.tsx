@@ -9,7 +9,8 @@ import { activeTabAttachmentsSelector } from '../../../../store/message/selector
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { AttachmentPreviewTitle, UploadingIcon } from '../../../../UIHelper'
+import { AttachmentPreviewTitle } from '../../../../UIHelper'
+import { CircularProgressbar } from 'react-circular-progressbar'
 
 interface IProps {
   channelId: string
@@ -42,9 +43,13 @@ const Files = ({
   }
   const handleDownloadFile = (attachment: IAttachment) => {
     if (attachment.id) {
-      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent: 1 } }))
     }
-    downloadFile(attachment, handleCompleteDownload)
+    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
+      const loadedRes = progress.loaded && progress.loaded / progress.total
+      const uploadPercent = loadedRes && loadedRes * 100
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
+    })
   }
 
   useEffect(() => {
@@ -77,7 +82,30 @@ const Files = ({
           </div>
           <DownloadWrapper onClick={() => handleDownloadFile(file)}>
             {downloadingFilesMap[file.id!] ? (
-              <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
+              // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
+              <ProgressWrapper>
+                <CircularProgressbar
+                  minValue={0}
+                  maxValue={100}
+                  value={downloadingFilesMap[file.id!].uploadPercent || 0}
+                  backgroundPadding={6}
+                  background={true}
+                  text=''
+                  styles={{
+                    background: {
+                      fill: 'transparent'
+                    },
+                    path: {
+                      stroke: colors.textColor2,
+                      strokeLinecap: 'butt',
+                      strokeWidth: '6px',
+                      transition: 'stroke-dashoffset 0.5s ease 0s',
+                      transform: 'rotate(0turn)',
+                      transformOrigin: 'center center'
+                    }
+                  }}
+                />
+              </ProgressWrapper>
             ) : (
               filePreviewDownloadIcon || <Download />
             )}
@@ -110,7 +138,21 @@ const DownloadWrapper = styled.a`
   right: 16px;
   cursor: pointer;
 `
+const ProgressWrapper = styled.span`
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  animation: preloader 1.5s linear infinite;
 
+  @keyframes preloader {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`
 /* const FileItemWrapper = styled.li`
   padding: 0 16px;
   &:hover {

@@ -61,9 +61,13 @@ interface IMessageProps {
   isPendingMessage?: boolean
   prevMessage?: IMessage
   nextMessage: IMessage
+  // eslint-disable-next-line no-unused-vars
   stopScrolling: (stop: boolean) => void
-  setLastVisibleMessageId: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
+  setLastVisibleMessageId?: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleScrollToRepliedMessage?: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleMediaItemClick?: (attachment: IAttachment) => void
   isUnreadMessage: boolean
   isThreadMessage: boolean
@@ -508,10 +512,7 @@ const Message = ({
           channel.id,
           message.id,
           selectedEmoji,
-          channel.newReactions &&
-            channel.newReactions[0] &&
-            channel.newReactions[0].messageId === message.id &&
-            channel.newReactions[0].key === selectedEmoji
+          channel.lastReactedMessage && channel.lastReactedMessage.id === message.id
         )
       )
     } else {
@@ -536,7 +537,7 @@ const Message = ({
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       )
     ) {
-      console.log('send marker for message ... ', message)
+      console.log('send received marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -671,7 +672,7 @@ const Message = ({
   useEffect(() => {
     // console.log('message body .. .', message.body)
     // console.log('isVisible - -- - ', isVisible)
-    if (isVisible && tabIsActive) {
+    if (isVisible && tabIsActive && setLastVisibleMessageId) {
       setLastVisibleMessageId(message.id)
       handleSendReadMarker()
     }
@@ -704,6 +705,11 @@ const Message = ({
       setMessageActionsShow(false)
     }
   }, [openedMessageMenuId])
+  /*
+  useDidUpdate(() => {
+    console.log('message  ............................................................... ', message)
+  }, [message])
+*/
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
@@ -711,6 +717,7 @@ const Message = ({
       document.removeEventListener('mousedown', handleClick)
     }
   }, [])
+
   return (
     <MessageItem
       key={message.id || message.tid}
@@ -850,7 +857,7 @@ const Message = ({
               handleReportMessage={handleToggleReportPopupOpen}
               handleAddEmoji={handleReactionAddDelete}
               selfMessage={message.user && messageUserID === user.id}
-              isThreadMessage={!!isThreadMessage}
+              isThreadMessage={isThreadMessage}
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               showMessageReaction={messageReaction}
               showEditMessage={
@@ -1315,7 +1322,17 @@ const Message = ({
   )
 }
 
-export default Message
+export default React.memo(Message, (prevProps, nextProps) => {
+  // Custom comparison function to check if only 'messages' prop has changed
+  return (
+    prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
+    prevProps.message.state === nextProps.message.state &&
+    prevProps.message.userReactions === nextProps.message.userReactions &&
+    prevProps.message.body === nextProps.message.body &&
+    prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
+    prevProps.message.attachments === nextProps.message.attachments
+  )
+})
 
 const MessageReactionKey = styled.span`
   display: inline-flex;
