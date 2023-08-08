@@ -437,7 +437,7 @@ const Message = ({
     if (message.attachments && message.attachments.length) {
       messageToResend.attachments = (message.attachments as IAttachment[]).map((att) => {
         const pendingAttachment = getPendingAttachment(att.attachmentId!)
-        return { ...att, data: new File([pendingAttachment], att.data.name) }
+        return { ...att, data: new File([pendingAttachment.file], att.data.name) }
       })
     }
 

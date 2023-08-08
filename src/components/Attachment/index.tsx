@@ -296,9 +296,6 @@ const Attachment = ({
   }, [attachmentUrl])
 
   useEffect(() => {
-    if (isPreview) {
-      console.log('attachment - - - - -', attachment)
-    }
     /* if (attachment.type === 'link' && !isPreview) {
       getMetadataFromUrl(attachment.url).then((res) => {
         if (res) {

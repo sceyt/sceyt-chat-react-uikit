@@ -46,7 +46,6 @@ const VideoPreview = memo(function VideoPreview({
   setVideoIsReadyToSend
 }: IVideoPreviewProps) {
   // const VideoPreview =
-  const [videoPlaying, setVideoPlaying] = useState(false)
   const [videoDuration, setVideoDuration] = useState(0)
   const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -87,33 +86,6 @@ const VideoPreview = memo(function VideoPreview({
     }
   } */
   useEffect(() => {
-    let checkVideoInterval: any = 0
-    if (videoRef.current) {
-      if (videoPlaying) {
-        checkVideoInterval = setInterval(() => {
-          if (videoRef.current && videoRef.current.readyState > 0) {
-            const minutes = Math.floor((videoDuration - videoRef.current.currentTime) / 60)
-            const seconds = Math.floor((videoDuration - videoRef.current.currentTime) % 60)
-            setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-            if (videoRef.current.currentTime >= videoDuration) {
-              setVideoPlaying(false)
-              const minutes = Math.floor(videoDuration / 60)
-              const seconds = Math.floor(videoDuration % 60)
-              setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-            }
-          }
-        }, 500)
-        videoRef.current.play()
-      } else {
-        clearInterval(checkVideoInterval)
-        videoRef.current.pause()
-      }
-    }
-
-    return () => clearInterval(checkVideoInterval)
-  }, [videoPlaying])
-
-  useEffect(() => {
     let checkVideoInterval: any
 
     if (videoRef.current) {
@@ -127,7 +99,7 @@ const VideoPreview = memo(function VideoPreview({
           const seconds = Math.floor(videoRef.current.duration % 60)
           setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
           if (isPreview) {
-            const thumb = await getFrame3(videoRef.current, 1)
+            const thumb = await getFrame3(videoRef.current, 0)
             if (thumb) {
               setVideoThumb(file.attachmentId!, { ...thumb, duration: videoRef.current.duration })
               if (setVideoIsReadyToSend) {
@@ -245,8 +217,6 @@ const VideoPreview = memo(function VideoPreview({
         id='video'
         // crossOrigin='anonymous'
         src={file.attachmentUrl || videoUrl}
-        onPause={() => setVideoPlaying(false)}
-        onPlay={() => setVideoPlaying(true)}
         // onProgress={handleVideoProgress}
       >
         <source
@@ -270,7 +240,7 @@ const VideoPreview = memo(function VideoPreview({
         <VideoControls>
           {!isPreview && !!videoDuration && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
-            <VideoPlayButton showOnHover={videoPlaying}>
+            <VideoPlayButton>
               <PlayIcon />
             </VideoPlayButton>
           )}

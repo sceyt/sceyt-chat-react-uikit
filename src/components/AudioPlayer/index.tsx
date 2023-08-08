@@ -70,12 +70,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
         setPlayingAudioId(file.id!)
-        const audioDuration = wavesurfer.current.getDuration()
+        // const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
           setPayingAudioId(getPlayingAudioId())
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
-            setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+            setCurrentTime(formatAudioVideoTime(currentTime))
           }
           /*   setCurrentTime(() => {
             if (time <= 9) {
@@ -184,8 +184,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         wavesurfer.current.on('ready', () => {
           // wavesurfer.current.play();
           const audioDuration = wavesurfer.current.getDuration()
-          const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+          // const currentTime = wavesurfer.current.getCurrentTime()
+          setCurrentTime(formatAudioVideoTime(audioDuration))
 
           // const filters = wavesurfer.current.getFilters()
           wavesurfer.current.drawBuffer = (d: any) => {
@@ -199,8 +199,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           setPlayAudio(false)
           wavesurfer.current.seekTo(0)
           const audioDuration = wavesurfer.current.getDuration()
-          const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+          // const currentTime = wavesurfer.current.getCurrentTime()
+          setCurrentTime(formatAudioVideoTime(audioDuration))
           if (payingAudioId === file.id) {
             setPayingAudioId('')
           }
@@ -216,9 +216,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         })
 
         wavesurfer.current.on('interaction', () => {
-          const audioDuration = wavesurfer.current.getDuration()
+          // const audioDuration = wavesurfer.current.getDuration()
           const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+          setCurrentTime(formatAudioVideoTime(currentTime))
         })
         setIsRendered(true)
       }

@@ -1,4 +1,4 @@
-import { IChannel, IContactsMap, IMember, IUser } from '../types'
+import { IChannel, IContactsMap, IUser } from '../types'
 import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
@@ -39,29 +39,12 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
   const getFromContacts = getShowOnlyContactUsers()
 
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-  /* chrome.runtime.onMessage.addListener(function (msg, sender) {
-    const options = {
-      type: 'basic',
-      title: msg.title,
-      message: 'Price: ' + msg.price + '\nFinished ',
-      iconUrl: 'icon.png'
-    }
-
-    chrome.notifications.create(options, function (notifId) {
-      linkMap[notifId] = msg.link
-    })
-  }) */
 
   let notification: any
   if (showNotifications) {
     if (reaction) {
       notification = new Notification(
-        `${
-          isDirectChannel && directChannelUser
-            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-            : channel.subject
-        }`,
+        `${isDirectChannel ? makeUsername(contactsMap[user.id], user, getFromContacts) : channel.subject}`,
         {
           body: `${
             channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
@@ -71,11 +54,15 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
         }
       )
     } else {
-      notification = new Notification(`New Message from ${makeUsername(contactsMap[user.id], user, getFromContacts)}`, {
-        body,
-        icon: logoSrc
-        // silent: false
-      })
+      notification = new Notification(
+        `${isDirectChannel ? makeUsername(contactsMap[user.id], user, getFromContacts) : channel.subject}`,
+        {
+          body: isDirectChannel ? body : `${makeUsername(contactsMap[user.id], user, getFromContacts)}\n${body}`,
+          icon: logoSrc
+          // silent: false
+          // silent: false
+        }
+      )
     }
     // windowObjectReference = window.sceytTabUrl
     notification.onclick = (event: any) => {

@@ -2,12 +2,18 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
-import { getChannelsForForwardAC, loadMoreChannelsForForward } from '../../../store/channel/actions'
+import {
+  getChannelsForForwardAC,
+  loadMoreChannelsForForward,
+  searchChannelsAC,
+  setSearchedChannelsAC
+} from '../../../store/channel/actions'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
-  channelsLoadingState
+  channelsLoadingState,
+  searchedChannelsSelector
 } from '../../../store/channel/selector'
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
@@ -42,6 +48,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const { user } = ChatClient
   const dispatch = useDispatch()
   const channels = useSelector(channelsForForwardSelector) || []
+  const searchedChannels = useSelector(searchedChannelsSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const channelsLoading = useSelector(channelsLoadingState)
@@ -123,10 +130,18 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   useEffect(() => {
     dispatch(getChannelsForForwardAC())
+    return () => {
+      dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
+    }
   }, [])
 
   useEffect(() => {
-    dispatch(getChannelsForForwardAC(searchValue))
+    // dispatch(getChannelsForForwardAC(searchValue))
+    if (searchValue) {
+      dispatch(searchChannelsAC({ search: searchValue }, contactsMap))
+    } else {
+      dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
+    }
   }, [searchValue])
   return (
     <PopupContainer>
@@ -152,66 +167,162 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             })}
           </SelectedChannelsContainer>
           <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
-            {channels.map((channel: IChannel) => {
-              const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-              const directChannelUser =
-                isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-              const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
-              return (
-                <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
-                  <Avatar
-                    name={
-                      channel.subject ||
-                      (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
-                    }
-                    image={
-                      channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
-                    }
-                    size={40}
-                    textSize={12}
-                    setDefaultAvatar={isDirectChannel}
-                  />
-                  <ChannelInfo>
-                    <ChannelTitle>
-                      {channel.subject ||
+            {searchValue ? (
+              <React.Fragment>
+                {!!(searchedChannels.directs && searchedChannels.directs.length) && (
+                  <React.Fragment>
+                    <ChannelsGroupTitle>DIRECT</ChannelsGroupTitle>
+                    {searchedChannels.directs.map((channel: IChannel) => {
+                      const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
+                      const directChannelUser = channel.members.find((member: IMember) => member.id !== user.id)
+                      return (
+                        <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                          <Avatar
+                            name={directChannelUser ? directChannelUser.firstName || directChannelUser.id : ''}
+                            image={directChannelUser && directChannelUser.avatarUrl}
+                            size={40}
+                            textSize={12}
+                            setDefaultAvatar={true}
+                          />
+                          <ChannelInfo>
+                            <ChannelTitle>
+                              {directChannelUser
+                                ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                                : 'Deleted User'}
+                            </ChannelTitle>
+                            <ChannelMembers>
+                              {directChannelUser
+                                ? (
+                                    hideUserPresence && hideUserPresence(directChannelUser)
+                                      ? ''
+                                      : directChannelUser.presence &&
+                                        directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                                  )
+                                  ? 'Online'
+                                  : directChannelUser &&
+                                    directChannelUser.presence &&
+                                    directChannelUser.presence.lastActiveAt &&
+                                    userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
+                                : ''}
+                            </ChannelMembers>
+                          </ChannelInfo>
+                          <CustomCheckbox
+                            index={channel.id}
+                            disabled={selectedChannels.length >= 5 && !isSelected}
+                            state={isSelected}
+                            onChange={(e) => handleChannelSelect(e, channel)}
+                            size='18px'
+                          />
+                        </ChannelItem>
+                      )
+                    })}
+                  </React.Fragment>
+                )}
+                {!!(searchedChannels.groups && searchedChannels.groups.length) && (
+                  <React.Fragment>
+                    <ChannelsGroupTitle>GROUPS</ChannelsGroupTitle>
+                    {searchedChannels.groups.map((channel: IChannel) => {
+                      const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
+                      return (
+                        <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                          <Avatar
+                            name={channel.subject || ''}
+                            image={channel.avatarUrl}
+                            size={40}
+                            textSize={12}
+                            setDefaultAvatar={false}
+                          />
+                          <ChannelInfo>
+                            <ChannelTitle>{channel.subject}</ChannelTitle>
+                            <ChannelMembers>
+                              {`${channel.memberCount} ${
+                                channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                                  ? channel.memberCount > 1
+                                    ? 'subscribers'
+                                    : 'subscriber'
+                                  : channel.memberCount > 1
+                                  ? 'members'
+                                  : 'member'
+                              } `}
+                            </ChannelMembers>
+                          </ChannelInfo>
+                          <CustomCheckbox
+                            index={channel.id}
+                            disabled={selectedChannels.length >= 5 && !isSelected}
+                            state={isSelected}
+                            onChange={(e) => handleChannelSelect(e, channel)}
+                            size='18px'
+                          />
+                        </ChannelItem>
+                      )
+                    })}
+                  </React.Fragment>
+                )}
+              </React.Fragment>
+            ) : (
+              channels.map((channel: IChannel) => {
+                const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                const directChannelUser =
+                  isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+                const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
+                return (
+                  <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                    <Avatar
+                      name={
+                        channel.subject ||
                         (isDirectChannel && directChannelUser
-                          ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                          : '')}
-                    </ChannelTitle>
-                    <ChannelMembers>
-                      {isDirectChannel && directChannelUser
-                        ? (
-                            hideUserPresence && hideUserPresence(directChannelUser)
-                              ? ''
-                              : directChannelUser.presence &&
-                                directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
-                          )
-                          ? 'Online'
-                          : directChannelUser &&
-                            directChannelUser.presence &&
-                            directChannelUser.presence.lastActiveAt &&
-                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
-                        : `${channel.memberCount} ${
-                            channel.type === CHANNEL_TYPE.BROADCAST
-                              ? channel.memberCount > 1
-                                ? 'subscribers'
-                                : 'subscriber'
-                              : channel.memberCount > 1
-                              ? 'members'
-                              : 'member'
-                          } `}
-                    </ChannelMembers>
-                  </ChannelInfo>
-                  <CustomCheckbox
-                    index={channel.id}
-                    disabled={selectedChannels.length >= 5 && !isSelected}
-                    state={isSelected}
-                    onChange={(e) => handleChannelSelect(e, channel)}
-                    size='18px'
-                  />
-                </ChannelItem>
-              )
-            })}
+                          ? directChannelUser.firstName || directChannelUser.id
+                          : '')
+                      }
+                      image={
+                        channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                      }
+                      size={40}
+                      textSize={12}
+                      setDefaultAvatar={isDirectChannel}
+                    />
+                    <ChannelInfo>
+                      <ChannelTitle>
+                        {channel.subject ||
+                          (isDirectChannel && directChannelUser
+                            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                            : '')}
+                      </ChannelTitle>
+                      <ChannelMembers>
+                        {isDirectChannel && directChannelUser
+                          ? (
+                              hideUserPresence && hideUserPresence(directChannelUser)
+                                ? ''
+                                : directChannelUser.presence &&
+                                  directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                            )
+                            ? 'Online'
+                            : directChannelUser &&
+                              directChannelUser.presence &&
+                              directChannelUser.presence.lastActiveAt &&
+                              userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
+                          : `${channel.memberCount} ${
+                              channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                                ? channel.memberCount > 1
+                                  ? 'subscribers'
+                                  : 'subscriber'
+                                : channel.memberCount > 1
+                                ? 'members'
+                                : 'member'
+                            } `}
+                      </ChannelMembers>
+                    </ChannelInfo>
+                    <CustomCheckbox
+                      index={channel.id}
+                      disabled={selectedChannels.length >= 5 && !isSelected}
+                      state={isSelected}
+                      onChange={(e) => handleChannelSelect(e, channel)}
+                      size='18px'
+                    />
+                  </ChannelItem>
+                )
+              })
+            )}
           </ForwardChannelsCont>
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
@@ -233,7 +344,7 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
   overflow-y: auto;
   margin-top: 16px;
   max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 64}px)`};
-  padding-right: 14px;
+  padding-right: 22px;
 `
 
 const ChannelItem = styled.div<any>`
@@ -248,6 +359,13 @@ const ChannelInfo = styled.div<any>`
   max-width: calc(100% - 74px);
 `
 
+const ChannelsGroupTitle = styled.h4`
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 14px;
+  margin: 20px 0 12px;
+  color: ${colors.textColor2};
+`
 const ChannelTitle = styled.h3<any>`
   margin: 0 0 2px;
   font-weight: 500;

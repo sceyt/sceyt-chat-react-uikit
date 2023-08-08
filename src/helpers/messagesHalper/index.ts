@@ -24,13 +24,15 @@ type messagesMap = {
   [key: string]: IMessage[]
 }
 
+// eslint-disable-next-line no-unused-vars
 export let sendMessageHandler: (message: IMessage, channelId: string) => Promise<IMessage>
 
+// eslint-disable-next-line no-unused-vars
 export const setSendMessageHandler = (handler: (message: IMessage, channelId: string) => Promise<IMessage>) => {
   sendMessageHandler = handler
 }
 
-const pendingAttachments: { [key: string]: File } = {}
+const pendingAttachments: { [key: string]: { file: File; signature: string } } = {}
 let messagesMap: messagesMap = {}
 const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
@@ -352,8 +354,8 @@ export const deleteVideoThumb = (attachmentId: string) => {
   delete pendingVideoAttachmentsThumbs[attachmentId]
 }
 
-export const setPendingAttachment = (attachmentId: string, file: File) => {
-  pendingAttachments[attachmentId] = file
+export const setPendingAttachment = (attachmentId: string, data: { file?: File; signature?: string }) => {
+  pendingAttachments[attachmentId] = { ...pendingAttachments[attachmentId], ...data }
 }
 
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]

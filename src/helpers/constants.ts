@@ -86,10 +86,13 @@ export const channelDetailsTabs = {
   voice: 'Voice'
 }
 
-export const DB_NAME = 'sceytChatDatabase'
+export const DB_NAMES = {
+  FILES_STORAGE: 'files-storage'
+}
 export const DB_STORE_NAMES = {
   CHANNELS: 'channels',
-  MESSAGES: 'messages'
+  MESSAGES: 'messages',
+  ATTACHMENTS: 'attachments'
 }
 
 export const THEME = {

@@ -261,9 +261,9 @@ export const getMetadataFromUrl = (url: string): Promise<any> => {
     .catch((error) => console.log(error))
 }
 
-export const formatAudioVideoTime = (duration: number, currentTime: number) => {
-  const minutes = Math.floor((duration - currentTime) / 60)
-  const seconds = Math.floor((duration - currentTime) % 60)
+export const formatAudioVideoTime = (currentTime: number) => {
+  const minutes = Math.floor(currentTime / 60)
+  const seconds = Math.floor(currentTime % 60)
   return `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`
 }
 

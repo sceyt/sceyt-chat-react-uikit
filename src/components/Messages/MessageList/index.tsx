@@ -975,7 +975,7 @@ const MessageList: React.FC<MessagesProps> = ({
               {messageList.map((message: any, index: number) => {
                 const prevMessage = messages[index - 1]
                 const nextMessage = messages[index + 1]
-                const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
+                const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id && nextMessage)
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
                 messagesIndexMap[message.id] = index
                 return (

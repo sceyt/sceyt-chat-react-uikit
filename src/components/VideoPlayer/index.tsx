@@ -8,6 +8,7 @@ import { ReactComponent as FullScreenIcon } from '../../assets/svg/fullscreen.sv
 import { ReactComponent as FullScreenExitIcon } from '../../assets/svg/fullscreenExit.svg'
 import { colors } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
+import { formatAudioVideoTime } from '../../helpers'
 
 interface IVideoPlayerProps {
   src: string
@@ -204,8 +205,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
           )}
 
           <ControlTime>
-            {Math.floor(currentTime / 60) + ':' + ('0' + Math.floor(currentTime % 60)).slice(-2)} /{' '}
-            {Math.floor(videoTime / 60) + ':' + ('0' + Math.floor(videoTime % 60)).slice(-2)}
+            {formatAudioVideoTime(currentTime)} / {formatAudioVideoTime(videoTime)}
           </ControlTime>
           <VolumeController>
             <VolumeIconWrapper onClick={handleMuteUnmute}>

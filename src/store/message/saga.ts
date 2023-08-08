@@ -68,6 +68,8 @@ import {
   attachmentTypes,
   CHANNEL_TYPE,
   channelDetailsTabs,
+  DB_NAMES,
+  DB_STORE_NAMES,
   LOADING_STATE,
   MESSAGE_STATUS,
   UPLOAD_STATE
@@ -110,6 +112,7 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { attachmentCompilationStateSelector, messagesHasNextSelector } from './selector'
 import { isJSON } from '../../helpers/message'
+import { setDataToDB } from '../../helpers/indexedDB'
 
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
@@ -129,39 +132,39 @@ function* sendMessage(action: IAction): any {
 
     if (message.attachments && message.attachments.length) {
       // const attachmentsCopy = [...message.attachments]
-      console.log('saga sendAttachmentsAsSeparateMessage. .... ', sendAttachmentsAsSeparateMessage)
       if (sendAttachmentsAsSeparateMessage) {
         let thumbnailMetas: IAttachmentMeta = {}
         const messageAttachment = { ...message.attachments[0], url: message.attachments[0].data }
         const fileType = messageAttachment.url.type.split('/')[0]
-        if (fileType === 'video') {
-          thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
-          console.log('thumbnailMetas ... ', thumbnailMetas)
-        } else if (fileType === 'image') {
-          thumbnailMetas = yield call(
-            createImageThumbnail,
-            message.attachments[0].data,
-            undefined,
-            messageAttachment.type === 'file' ? 50 : undefined,
-            messageAttachment.type === 'file' ? 50 : undefined
-          )
-        } else if (fileType === attachmentTypes.voice) {
-          thumbnailMetas = {
-            duration: 3,
-            thumbnail: messageAttachment.metadata.tmb
+        if (!messageAttachment.cachedUrl) {
+          if (fileType === 'video') {
+            thumbnailMetas = getVideoThumb(messageAttachment.attachmentId)
+          } else if (fileType === 'image') {
+            thumbnailMetas = yield call(
+              createImageThumbnail,
+              message.attachments[0].data,
+              undefined,
+              messageAttachment.type === 'file' ? 50 : undefined,
+              messageAttachment.type === 'file' ? 50 : undefined
+            )
+          } else if (fileType === attachmentTypes.voice) {
+            thumbnailMetas = {
+              duration: 3,
+              thumbnail: messageAttachment.metadata.tmb
+            }
+          }
+          messageAttachment.metadata = {
+            ...messageAttachment.metadata,
+            ...(thumbnailMetas && {
+              tmb: thumbnailMetas.thumbnail,
+              szw: thumbnailMetas.imageWidth,
+              szh: thumbnailMetas.imageHeight,
+              dur: thumbnailMetas.duration && Math.floor(thumbnailMetas.duration)
+            })
           }
         }
 
-        messageAttachment.metadata = {
-          ...messageAttachment.metadata,
-          ...(thumbnailMetas && {
-            tmb: thumbnailMetas.thumbnail,
-            szw: thumbnailMetas.imageWidth,
-            szh: thumbnailMetas.imageHeight,
-            dur: thumbnailMetas.duration && Math.floor(thumbnailMetas.duration)
-          })
-        }
-        messageAttachment.size = message.attachments[0].data.size
+        // messageAttachment.size = message.attachments[0].data.size
         setPendingAttachment(messageAttachment.attachmentId, messageAttachment.data)
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder
@@ -198,7 +201,6 @@ function* sendMessage(action: IAction): any {
             yield put(addMessageAC({ ...pendingMessage }))
           }
         }
-        console.log('add pending message .. ', pendingMessage)
         addMessageToMap(channelId, pendingMessage)
         addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
         yield put(scrollToNewMessageAC(true, true))
@@ -214,13 +216,6 @@ function* sendMessage(action: IAction): any {
         let filePath: any
         yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.attachmentId))
         if (customUploader) {
-          console.log('set uploading progress to 0 ... for attachment ... ', messageAttachment.attachmentId)
-          if (messageAttachment.type !== attachmentTypes.image) {
-            /* yield put(
-              updateAttachmentUploadingProgressAC(0, messageAttachment.data.size, messageAttachment.attachmentId)
-            ) */
-          }
-
           const handleUploadProgress = ({ loaded, total }: IProgress) => {
             store.dispatch({
               type: UPDATE_UPLOAD_PROGRESS,
@@ -264,10 +259,22 @@ function* sendMessage(action: IAction): any {
           let uri
           try {
             if (connectionState === CONNECTION_STATUS.CONNECTED) {
-              uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
-              // console.log('upload res .... uri, ,, ', uri)
+              if (messageAttachment.cachedUrl) {
+                uri = messageAttachment.cachedUrl
+                store.dispatch({
+                  type: UPDATE_UPLOAD_PROGRESS,
+                  payload: {
+                    uploaded: messageAttachment.data.size,
+                    total: messageAttachment.data.size,
+                    progress: 1,
+                    attachmentId: messageAttachment.attachmentId
+                  }
+                })
+              } else {
+                uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
+              }
               yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment.attachmentId))
-              if (messageAttachment.url.type.split('/')[0] === 'image') {
+              if (!messageAttachment.cachedUrl && messageAttachment.url.type.split('/')[0] === 'image') {
                 fileSize = yield call(getImageSize, filePath)
                 thumbnailMetas = yield call(
                   createImageThumbnail,
@@ -278,31 +285,41 @@ function* sendMessage(action: IAction): any {
                 )
               }
 
-              const attachmentMeta = JSON.stringify({
-                ...messageAttachment.metadata,
-                ...(thumbnailMetas &&
-                  thumbnailMetas.thumbnail && {
-                    tmb: thumbnailMetas.thumbnail,
-                    szw: thumbnailMetas.imageWidth,
-                    szh: thumbnailMetas.imageHeight
+              const attachmentMeta = messageAttachment.cachedUrl
+                ? messageAttachment.metadata
+                : JSON.stringify({
+                    ...messageAttachment.metadata,
+                    ...(thumbnailMetas &&
+                      thumbnailMetas.thumbnail && {
+                        tmb: thumbnailMetas.thumbnail,
+                        szw: thumbnailMetas.imageWidth,
+                        szh: thumbnailMetas.imageHeight
+                      })
                   })
-              })
               const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
               const attachmentToSend = attachmentBuilder
                 .setName(messageAttachment.name)
                 .setMetadata(attachmentMeta)
-                .setFileSize(fileSize)
+                .setFileSize(fileSize || messageAttachment.size)
                 .setUpload(false)
                 .create()
               // not for SDK, for displaying attachments and their progress
-
               messageToSend.attachments = [attachmentToSend]
-              console.log('send message .................. ', messageToSend)
               const messageResponse = yield call(channel.sendMessage, messageToSend)
               messageResponse.attachments[0] = {
                 ...messageResponse.attachments[0],
+                user: JSON.parse(JSON.stringify(messageResponse.user)),
                 attachmentId: messageAttachment.attachmentId,
                 attachmentUrl: messageAttachment.attachmentUrl
+              }
+              const pendingAttachment = getPendingAttachment(messageAttachment.attachmentId)
+              if (!messageAttachment.cachedUrl) {
+                setDataToDB(
+                  DB_NAMES.FILES_STORAGE,
+                  DB_STORE_NAMES.ATTACHMENTS,
+                  [{ ...messageResponse.attachments[0], signature: pendingAttachment.signature }],
+                  'signature'
+                )
               }
               /* if (msgCount <= 200) {
                 const messageToSend: any = {
@@ -327,7 +344,6 @@ function* sendMessage(action: IAction): any {
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
               }
-              console.log('messageUpdateData. .  . . . . .  . ', messageUpdateData)
               yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
 
               if (fileType === 'video') {
@@ -363,7 +379,6 @@ function* sendMessage(action: IAction): any {
             yield put(updateMessageAC(messageToSend.tid, { state: MESSAGE_STATUS.FAILED }))
           }
         } else {
-          console.log('messageAttachment. . . .. . .  .', messageAttachment)
           const attachmentBuilder = channel.createAttachmentBuilder(messageAttachment.url, messageAttachment.type)
           const attachmentToSend = attachmentBuilder
             .setName(messageAttachment.name)
@@ -390,9 +405,7 @@ function* sendMessage(action: IAction): any {
           attachmentToSend.attachmentId = messageAttachment.attachmentId
           attachmentToSend.attachmentUrl = messageAttachment.attachmentUrl
           messageToSend.attachments = [attachmentToSend]
-          console.log('messageToSend, , , ,  ', messageToSend)
           const messageResponse = yield call(channel.sendMessage, messageToSend)
-          console.log('message response ... ', messageResponse)
           /* if (msgCount <= 200) {
             const messageToSend: any = {
               // metadata: mentionedMembersPositions,
@@ -788,6 +801,7 @@ function* sendTextMessage(action: IAction): any {
     channel = getChannelFromAllChannels(channelId)
     setChannelInMap(channel)
   }
+  console.log('add channel ac')
   yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
   let sendMessageTid
   try {
@@ -873,7 +887,7 @@ function* sendTextMessage(action: IAction): any {
       updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
       updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-      // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+      yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
       const channelUpdateParam = {
         lastMessage: messageToUpdate,
         lastReactedMessage: null
@@ -1027,8 +1041,8 @@ function* resendMessage(action: IAction): any {
         attachmentCompilation[messageAttachment.attachmentId] === UPLOAD_STATE.FAIL
       ) {
         const pendingAttachment = getPendingAttachment(message.attachments[0].attachmentId)
-        messageAttachment.data = pendingAttachment
-        messageAttachment.url = pendingAttachment
+        messageAttachment.data = pendingAttachment.file
+        messageAttachment.url = pendingAttachment.file
         const fileType = messageAttachment.data.type.split('/')[0]
         yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.attachmentId))
         if (customUploader) {
@@ -1063,7 +1077,7 @@ function* resendMessage(action: IAction): any {
 
             delete messageCopy.createdAt
             let thumbnailMetas: IAttachmentMeta = {}
-            let fileSize = pendingAttachment.size
+            let fileSize = pendingAttachment.file.size
             if (messageAttachment.url.type.split('/')[0] === 'image') {
               fileSize = yield call(getImageSize, filePath)
               thumbnailMetas = yield call(

@@ -591,21 +591,6 @@ export default function* watchForEvents(): any {
           yield put(updateSearchedChannelDataAC(channel.id, channelForAdd, groupName))
           updateChannelOnAllChannels(channel.id, channelForAdd)
           updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
-          // TODO browser notification
-          /* const notificationStatus = yield call(Notification.requestPermission);
-          if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
-            const notification = new Notification(`New Message from ${message.user.firstName}`,
-            { body: message.body, icon: logo, silent: false });
-            // notification.onclick = (event) => {
-            //   event.preventDefault(); // prevent the browser from focusing the Notification's tab
-            //   window.open(window.sceytTabUrl, '_blank');
-            //   notification.close();
-            // };
-            if (window.sceytTabNotifications) {
-              window.sceytTabNotifications.close();
-            }
-            window.sceytTabNotifications = notification;
-          } */
         }
         break
       }
