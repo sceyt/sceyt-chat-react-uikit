@@ -873,7 +873,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    console.log('messages...', messages)
+    // console.log('messages...', messages)
   }, [messages])
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -1070,6 +1070,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           prevMessage={prevMessage}
                           nextMessage={nextMessage}
                           isUnreadMessage={isUnreadMessage}
+                          unreadMessageId={unreadMessageId}
                           setLastVisibleMessageId={(msgId) => setLastVisibleMessageId(msgId)}
                           isThreadMessage={false}
                           fontFamily={fontFamily}

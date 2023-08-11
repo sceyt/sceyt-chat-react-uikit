@@ -29,7 +29,14 @@ import {
   setMessageToEditAC,
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
-import { detectBrowser, detectOS, getCaretPosition, placeCaretAtEnd, setCursorPosition } from '../../helpers'
+import {
+  detectBrowser,
+  detectOS,
+  getCaretPosition,
+  hashString,
+  placeCaretAtEnd,
+  setCursorPosition
+} from '../../helpers'
 import { getDuplicateMentionsFromMeta, makeUsername, MessageTextFormat, typingTextFormat } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
@@ -963,15 +970,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     reader.onload = async () => {
       // @ts-ignore
       const length = reader.result && reader.result.length
-      const firstPart = reader.result && reader.result.slice(0, 100)
-      const middlePart = reader.result && reader.result.slice(length / 2 - 50, length / 2)
-      const lastPart = reader.result && reader.result.slice(length - 100, length)
-      const fileSignature = `${firstPart}${middlePart}${lastPart}`
-      const dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, fileSignature)
+      let fileChecksum = ''
+      if (length > 500) {
+        const firstPart = reader.result && reader.result.slice(0, 100)
+        const middlePart = reader.result && reader.result.slice(length / 2 - 50, length / 2)
+        const lastPart = reader.result && reader.result.slice(length - 100, length)
+        fileChecksum = `${firstPart}${middlePart}${lastPart}`
+      } else {
+        fileChecksum = `${reader.result}`
+      }
+      const checksumHash = await hashString(fileChecksum)
+      let dataFromDb: any
+      try {
+        dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
+      } catch (e) {
+        console.log('error in get data from db . . . . ', e)
+      }
       if (dataFromDb) {
         cachedUrl = dataFromDb.url
       } else {
-        setPendingAttachment(attachmentId, { signature: fileSignature })
+        setPendingAttachment(attachmentId, { checksum: checksumHash })
       }
       if (customUploader) {
         if (fileType === 'image') {
@@ -1930,6 +1948,7 @@ const Container = styled.div<{
 
   & .rdw-suggestion-option {
   }
+
   & .rdw-suggestion-option-active {
     background-color: rgb(243, 245, 248);
   }

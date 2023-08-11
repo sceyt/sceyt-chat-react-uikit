@@ -27,7 +27,6 @@ import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalpe
 import { setThemeAC } from '../../store/theme/actions'
 import { THEME } from '../../helpers/constants'
 import { useDidUpdate } from '../../hooks'
-import { getRolesAC } from '../../store/member/actions'
 
 const SceytChat = ({
   client,
@@ -102,7 +101,6 @@ const SceytChat = ({
       if (showOnlyContactUsers) {
         dispatch(getContactsAC())
       }
-      dispatch(getRolesAC())
     } else {
       clearMessagesMap()
       removeAllMessages()

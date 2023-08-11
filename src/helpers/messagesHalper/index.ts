@@ -32,7 +32,7 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
   sendMessageHandler = handler
 }
 
-const pendingAttachments: { [key: string]: { file: File; signature: string } } = {}
+const pendingAttachments: { [key: string]: { file: File; checksum: string } } = {}
 let messagesMap: messagesMap = {}
 const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
@@ -354,7 +354,7 @@ export const deleteVideoThumb = (attachmentId: string) => {
   delete pendingVideoAttachmentsThumbs[attachmentId]
 }
 
-export const setPendingAttachment = (attachmentId: string, data: { file?: File; signature?: string }) => {
+export const setPendingAttachment = (attachmentId: string, data: { file?: File; checksum?: string }) => {
   pendingAttachments[attachmentId] = { ...pendingAttachments[attachmentId], ...data }
 }
 

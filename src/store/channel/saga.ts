@@ -57,7 +57,8 @@ import {
   setChannelInMap,
   addChannelsToAllChannels,
   getAllChannels,
-  getChannelFromAllChannels
+  getChannelFromAllChannels,
+  updateChannelOnAllChannels
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IMember, IMessage } from '../../types'
@@ -137,6 +138,7 @@ function* getChannels(action: IAction): any {
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
+    // console.log('channelsData. . . . . .', channelsData)
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
@@ -145,7 +147,7 @@ function* getChannels(action: IAction): any {
       setChannelsInMap,
       channelsData.channels
     )
-
+    // console.log('channelsForUpdateLastReactionMessage . . .. ', channelsForUpdateLastReactionMessage)
     if (channelsForUpdateLastReactionMessage.length) {
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
@@ -488,7 +490,7 @@ function* markMessagesRead(action: IAction): any {
     // yield put(setChannelUnreadCount(0, channel.id));
     yield put(
       updateChannelDataAC(channel.id, {
-        markedAsUnread: channel.unread,
+        unread: channel.unread,
         lastReadMessageId: channel.lastDisplayedMsgId,
         unreadMessageCount: channel.newMessageCount
       })
@@ -531,14 +533,18 @@ function* markMessagesRead(action: IAction): any {
 function* markMessagesDelivered(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
-  let channel = yield call(getChannelFromMap, channelId)
-  if (!channel) {
-    channel = getChannelFromAllChannels(channelId)
-    setChannelInMap(channel)
-  }
+  try {
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      setChannelInMap(channel)
+    }
 
-  if (channel) {
-    yield call(channel.markMessagesAsReceived, messageIds)
+    if (channel) {
+      yield call(channel.markMessagesAsReceived, messageIds)
+    }
+  } catch (e) {
+    console.log(e, 'Error on mark messages delivered')
   }
 }
 
@@ -615,6 +621,7 @@ function* markChannelAsRead(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     const updatedChannel = yield call(channel.markAsRead)
+    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
     yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
@@ -631,8 +638,7 @@ function* markChannelAsUnRead(action: IAction): any {
     }
 
     const updatedChannel = yield call(channel.markAsUnRead)
-    console.log(' channel -- ', channel)
-    console.log('updated channel -- ', updatedChannel)
+    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
     yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
@@ -777,10 +783,19 @@ function* checkUsersStatus(/* action: IAction */): any {
     // const { usersMap } = payload
     const SceytChatClient = getClient()
     const usersForUpdate = Object.keys(usersMap)
+    const activeChannelId = getActiveChannelId()
+    const activeChannel = getChannelFromMap(activeChannelId)
+    let activeChannelUser: any
+    if (activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT) {
+      activeChannelUser = activeChannel.members.find((member) => member.id !== SceytChatClient.user.id)
+    }
     const updatedUsers = yield call(SceytChatClient.getUsers as any, usersForUpdate)
     const usersToUpdateMap: { [key: string]: IMember } = {}
     let update: boolean = false
     updatedUsers.forEach((updatedUser: IMember) => {
+      if (activeChannelUser && activeChannelUser.id === updatedUser.id) {
+        console.log('active channel user is updated - ', updatedUser)
+      }
       if (
         updatedUser.presence &&
         (updatedUser.presence.state !== usersMap[updatedUser.id].state ||

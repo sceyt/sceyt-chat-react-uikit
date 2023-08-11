@@ -10,7 +10,7 @@ export const Container = styled.div<any>`
   display: ${(props) => (props.dividerVisibility ? 'flex' : 'none')};
   align-items: center;
   width: ${(props) => props.width || '100%'};
-  height: 26px;
+  height: 25px;
   z-index: 5;
   top: 0;
   background: transparent;
@@ -23,7 +23,7 @@ export const Container = styled.div<any>`
     background: transparent;
     span {
       position: absolute;
-      top: -13px;
+      top: -12px;
       font-style: normal;
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};

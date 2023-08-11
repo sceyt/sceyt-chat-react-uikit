@@ -554,3 +554,11 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
   }
   return category
 }
+
+export const hashString = async (str: string) => {
+  const encoder = new TextEncoder()
+  const encodedData = encoder.encode(str)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}

@@ -61,7 +61,7 @@ const Files = ({
       {attachments.map((file: IAttachment) => (
         // <FileItemWrapper >
         <FileItem
-          key={file.url}
+          key={file.id}
           // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
           // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
           hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}

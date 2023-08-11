@@ -40,7 +40,7 @@ import {
   updateMessageAC,
   updateMessagesStatusAC
 } from '../message/actions'
-import { CONNECTION_EVENT_TYPES } from '../user/constants'
+import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
   addAllMessages,
@@ -63,7 +63,7 @@ import {
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
-import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
+import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
 import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -903,20 +903,20 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
+        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
         const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
-        yield put(updateSearchedChannelDataAC(channel.id, { markedAsUnread: channel.unread }, groupName))
+        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
 
-        updateChannelOnAllChannels(channel.id, { markedAsUnread: channel.unread })
+        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
         break
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
+        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
         const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
-        yield put(updateSearchedChannelDataAC(channel.id, { markedAsUnread: channel.unread }, groupName))
-        updateChannelOnAllChannels(channel.id, { markedAsUnread: channel.unread })
+        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
+        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
         break
       }
       /*
@@ -991,6 +991,9 @@ export default function* watchForEvents(): any {
         const { status } = args
         console.log('connection status changed lst. . . . . ', status)
         yield put(setConnectionStatusAC(status))
+        if (status === CONNECTION_STATUS.CONNECTED) {
+          yield put(getRolesAC())
+        }
         break
       }
       default:

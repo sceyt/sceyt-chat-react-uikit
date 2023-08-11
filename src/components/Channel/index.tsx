@@ -216,7 +216,6 @@ const Channel: React.FC<IChannelProps> = ({
               ? !typingIndicator &&
                 lastMessage.user &&
                 lastMessage.user.id === user.id &&
-                !channel.lastReactedMessage &&
                 lastMessage.state !== MESSAGE_STATUS.DELETE
               : typingIndicator ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (

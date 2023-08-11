@@ -130,11 +130,6 @@ const VideoPreview = memo(function VideoPreview({
       })
     }
   }, [src])
-  /*  useEffect(() => {
-    if (!isCachedFile && !file.attachmentUrl) {
-      setShowProgress(true)
-    }
-  }, [isCachedFile]) */
 
   /* useEffect(() => {
     console.log('render video *********************************************')
@@ -221,7 +216,7 @@ const VideoPreview = memo(function VideoPreview({
       >
         <source
           src={file.attachmentUrl || videoUrl || file.url}
-          type={`video/${getFileExtension(file.name || file.data.name)}`}
+          type={`video/${!!(file.name || file.data) && getFileExtension(file.name || file.data.name)}`}
         />
         <source src={file.attachmentUrl || videoUrl || file.url} type='video/ogg' />
         {/* <track default kind='captions' srcLang='en' src='../../assets/img/defaultAvatar.png' /> */}

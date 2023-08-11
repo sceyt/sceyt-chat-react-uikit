@@ -69,6 +69,7 @@ interface IMessageProps {
   handleScrollToRepliedMessage?: (msgId: string) => void
   // eslint-disable-next-line no-unused-vars
   handleMediaItemClick?: (attachment: IAttachment) => void
+  unreadMessageId: string
   isUnreadMessage: boolean
   isThreadMessage: boolean
   fontFamily?: string
@@ -174,6 +175,7 @@ const Message = ({
   nextMessage,
   setLastVisibleMessageId,
   isUnreadMessage,
+  unreadMessageId,
   isThreadMessage,
   fontFamily,
   ownMessageOnRightSide,
@@ -733,6 +735,8 @@ const Message = ({
       topMargin={
         prevMessage?.type === 'system'
           ? '0'
+          : prevMessage && unreadMessageId === prevMessage.id
+          ? '16px'
           : prevMessageUserID !== messageUserID || firstMessageInInterval
           ? differentUserMessageSpacing || '16px'
           : sameUserMessageSpacing || '8px'

@@ -18,24 +18,17 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   const { user } = ChatClient
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-  // const updatedUsersMap = useSelector(usersMapSelector)
-  // const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-  // if (isDirectChannel) {
+
   const userId = directChannelUser && directChannelUser.id
   if (userId && usersMap[userId] && !isVisible) {
     deleteUserFromMap(userId)
   }
   if (userId && !usersMap[userId] && isVisible && directChannelUser) {
     setUserToMap(directChannelUser as IUser)
-    // usersMap[userId] = directChannelUser && directChannelUser.presence
   }
   if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
     clearInterval(updateInterval)
     updateInterval = setInterval(() => {
-      /* const date = new Date()
-      console.info(
-        `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : get users `
-      ) */
       dispatch(checkUserStatusAC(usersMap))
     }, 4000)
   } else if (!Object.keys(usersMap).length && updateInterval) {
@@ -52,15 +45,6 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
       clearInterval(updateInterval)
     }
   }, [connectionStatus])
-
-  /* useEffect(() => {
-    console.log('updatedUsersMap', updatedUsersMap)
-    if (updatedUsersMap) {
-      Object.keys(updatedUsersMap).forEach((key) => {
-        usersMap[key] = updatedUsersMap[key]
-      })
-    }
-  }, [updatedUsersMap]) */
 
   useEffect(() => {
     if (

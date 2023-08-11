@@ -368,7 +368,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
 
-  /*  useEffect(() => {
+  /* useEffect(() => {
     console.log('channels. ...........................', channels)
   }, [channels]) */
   /*  useEffect(() => {

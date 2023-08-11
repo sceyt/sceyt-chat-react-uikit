@@ -74,7 +74,7 @@ import {
   MESSAGE_STATUS,
   UPLOAD_STATE
 } from '../../helpers/constants'
-import { addChannelAC, updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
+import { addChannelAC, markChannelAsReadAC, updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import {
   addReactionToMessageOnMap,
   getAllMessages,
@@ -317,8 +317,8 @@ function* sendMessage(action: IAction): any {
                 setDataToDB(
                   DB_NAMES.FILES_STORAGE,
                   DB_STORE_NAMES.ATTACHMENTS,
-                  [{ ...messageResponse.attachments[0], signature: pendingAttachment.signature }],
-                  'signature'
+                  [{ ...messageResponse.attachments[0], checksum: pendingAttachment.checksum }],
+                  'checksum'
                 )
               }
               /* if (msgCount <= 200) {
@@ -361,6 +361,9 @@ function* sendMessage(action: IAction): any {
               const channelUpdateParam = {
                 lastMessage: messageToUpdate,
                 lastReactedMessage: null
+              }
+              if (channel.unread) {
+                yield put(markChannelAsReadAC(channel.id))
               }
               yield put(updateChannelDataAC(channel.id, channelUpdateParam))
             } else {
@@ -445,7 +448,11 @@ function* sendMessage(action: IAction): any {
             lastMessage: messageToUpdate,
             lastReactedMessage: null
           }
+          if (channel.unread) {
+            yield put(markChannelAsReadAC(channel.id))
+          }
           yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+          updateChannelOnAllChannels(channel.id, channelUpdateParam)
         }
       } else {
         let attachmentsToSend: IAttachment[] = message.attachments.map((attachment: any) => {
@@ -638,7 +645,11 @@ function* sendMessage(action: IAction): any {
             lastMessage: messageToUpdate,
             lastReactedMessage: null
           }
+          if (channel.unread) {
+            yield put(markChannelAsReadAC(channel.id))
+          }
           yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+          updateChannelOnAllChannels(channel.id, channelUpdateParam)
         }
       }
     }
@@ -893,6 +904,10 @@ function* sendTextMessage(action: IAction): any {
         lastReactedMessage: null
       }
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+      updateChannelOnAllChannels(channel.id, channelUpdateParam)
+      if (channel.unread) {
+        yield put(markChannelAsReadAC(channel.id))
+      }
     } else {
       // eslint-disable-next-line
       throw new Error('Connection required to send message')
@@ -996,6 +1011,7 @@ function* forwardMessage(action: IAction): any {
           })
         }
         yield put(addChannelAC(channel))
+        updateChannelOnAllChannels(channel.id, channel)
         const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
         updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
         yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
@@ -1497,7 +1513,8 @@ function* addReaction(action: IAction): any {
     if (user.id === message.user.id) {
       const channelUpdateParam = {
         userMessageReactions: [reaction],
-        lastReactedMessage: message
+        lastReactedMessage: message,
+        newReactions: [reaction]
       }
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
       updateChannelOnAllChannels(channel.id, channelUpdateParam)
