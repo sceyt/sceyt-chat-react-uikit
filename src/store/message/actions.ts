@@ -46,9 +46,7 @@ import {
   SET_REACTIONS_LOADING_STATE,
   DELETE_REACTION_FROM_LIST,
   ADD_REACTION_TO_LIST,
-  SET_MESSAGE_MENU_OPENED,
-  UPDATE_UPLOAD_PROGRESS,
-  REMOVE_UPLOAD_PROGRESS
+  SET_MESSAGE_MENU_OPENED
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 

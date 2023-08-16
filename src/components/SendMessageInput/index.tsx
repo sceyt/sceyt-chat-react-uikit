@@ -1423,6 +1423,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
   }, [activeChannel.id])
+
   useEffect(() => {
     // console.log('attachments. . . . .  . .', attachments)
     // console.log('readyVideoAttachments. . . . .  . .', readyVideoAttachments)
