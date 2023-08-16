@@ -9,11 +9,14 @@ import { IChannel } from '../../types'
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 import { UnreadCountProps } from '../Channel'
 import { sendMessageInputHeightSelector, showScrollToNewMessageButtonSelector } from '../../store/message/selector'
+import { themeSelector } from '../../store/theme/selector'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
   buttonWidth?: string
   buttonHeight?: string
+  bottomPosition?: number
+  rightPosition?: number
   buttonBorder?: string
   buttonBackgroundColor?: string
   buttonHoverBackgroundColor?: string
@@ -30,6 +33,8 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   buttonIcon,
   buttonWidth,
   buttonHeight,
+  bottomPosition,
+  rightPosition,
   buttonBorder,
   buttonBackgroundColor,
   buttonHoverBackgroundColor,
@@ -42,9 +47,9 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
 }) => {
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
+  const theme = useSelector(themeSelector)
   const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
-
   const handleScrollToBottom = () => {
     dispatch(scrollToNewMessageAC(true, true))
   }
@@ -52,17 +57,20 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
     <React.Fragment>
       {showScrollToNewMessageButton && (
         <BottomButton
+          theme={theme}
           width={buttonWidth}
           height={buttonHeight}
           border={buttonBorder}
           borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor}
+          backgroundColor={buttonBackgroundColor || colors.backgroundColor}
           hoverBackgroundColor={buttonHoverBackgroundColor}
           shadow={buttonShadow}
           onClick={handleScrollToBottom}
-          bottomPos={sendMessageInputHeight}
+          bottomOffset={sendMessageInputHeight}
+          bottomPosition={bottomPosition}
+          rightPosition={rightPosition}
         >
-          {!!(channel.unreadMessageCount && channel.unreadMessageCount > 0) && (
+          {!!(channel.newMessageCount && channel.newMessageCount > 0) && (
             <UnreadCount
               width={unreadCountWidth}
               height={unreadCountHeight}
@@ -71,7 +79,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
               backgroundColor={colors.primary}
               isMuted={channel.muted}
             >
-              {channel.unreadMessageCount ? (channel.unreadMessageCount > 99 ? '99+' : channel.unreadMessageCount) : ''}
+              {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
             </UnreadCount>
           )}
           {buttonIcon || <BottomIcon />}
@@ -84,6 +92,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
 export default MessagesScrollToBottomButton
 
 const BottomButton = styled.div<{
+  theme?: string
   width?: string
   height?: string
   border?: string
@@ -91,16 +100,18 @@ const BottomButton = styled.div<{
   backgroundColor?: string
   hoverBackgroundColor?: string
   shadow?: string
-  bottomPos: number
+  bottomOffset: number
+  bottomPosition?: number
+  rightPosition?: number
 }>`
   position: absolute;
-  bottom: ${(props) => `${props.bottomPos + 45}px`};
-  right: 16px;
+  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition || 45)}px`};
+  right: ${(props) => `${props.rightPosition || 16}px`};
   margin-right: 16px;
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${colors.white};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 50px;
   width: 48px;

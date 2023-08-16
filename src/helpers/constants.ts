@@ -13,10 +13,10 @@ export const MESSAGE_DELIVERY_STATUS = {
 }
 
 export const MESSAGE_STATUS = {
-  NONE: 'None',
-  EDIT: 'Edited',
-  DELETE: 'Deleted',
-  FAILED: 'Failed'
+  NONE: 'none',
+  EDIT: 'edited',
+  DELETE: 'deleted',
+  FAILED: 'failed'
 }
 
 export const UPLOAD_STATE = {
@@ -32,9 +32,11 @@ export const LOADING_STATE = {
 }
 
 export const CHANNEL_TYPE = {
-  PRIVATE: 'Private',
-  PUBLIC: 'Public',
-  DIRECT: 'Direct'
+  GROUP: 'group',
+  BROADCAST: 'broadcast',
+  DIRECT: 'direct',
+  PUBLIC: 'public',
+  PRIVATE: 'private'
 }
 
 export const PRESENCE_STATUS = {
@@ -82,4 +84,15 @@ export const channelDetailsTabs = {
   file: 'Files',
   link: 'Links',
   voice: 'Voice'
+}
+
+export const DB_NAME = 'sceytChatDatabase'
+export const DB_STORE_NAMES = {
+  CHANNELS: 'channels',
+  MESSAGES: 'messages'
+}
+
+export const THEME = {
+  DARK: 'dark',
+  LIGHT: 'light'
 }

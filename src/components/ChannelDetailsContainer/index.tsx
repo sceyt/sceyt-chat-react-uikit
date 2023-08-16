@@ -3,7 +3,11 @@ import { shallowEqual, useSelector } from 'react-redux'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
+import styled from 'styled-components'
 export interface IDetailsProps {
+  size?: 'small' | 'medium' | 'large'
+  showAboutChannel?: boolean
+  avatarAndNameDirection?: 'row' | 'column'
   channelEditIcon?: JSX.Element
   editChannelSaveButtonBackgroundColor?: string
   editChannelSaveButtonTextColor?: string
@@ -20,16 +24,12 @@ export interface IDetailsProps {
   muteUnmuteNotificationTextColor?: string
   timeOptionsToMuteNotifications?: [MuteTime, ...MuteTime[]]
 
-  showClearHistoryForDirectChannel?: boolean
-  showClearHistoryForPrivateChannel?: boolean
-  showClearHistoryForPublicChannel?: boolean
+  showClearHistory?: boolean
   clearHistoryOrder?: number
   clearHistoryIcon?: JSX.Element
   clearHistoryTextColor?: string
 
-  showDeleteAllMessagesForDirectChannel?: boolean
-  showDeleteAllMessagesForPrivateChannel?: boolean
-  showDeleteAllMessagesForPublicChannel?: boolean
+  showDeleteAllMessages?: boolean
   deleteAllMessagesOrder?: number
   deleteAllMessagesIcon?: JSX.Element
   deleteAllMessagesTextColor?: string
@@ -109,7 +109,10 @@ export interface IDetailsProps {
 }
 
 const ChannelDetailsContainer = ({
+  size = 'large',
   channelEditIcon,
+  showAboutChannel,
+  avatarAndNameDirection = 'row',
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
   editChannelCancelButtonBackgroundColor,
@@ -172,15 +175,11 @@ const ChannelDetailsContainer = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
-  showClearHistoryForDirectChannel,
-  showClearHistoryForPrivateChannel,
-  showClearHistoryForPublicChannel,
+  showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessagesForDirectChannel,
-  showDeleteAllMessagesForPrivateChannel,
-  showDeleteAllMessagesForPublicChannel,
+  showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
@@ -191,9 +190,12 @@ const ChannelDetailsContainer = ({
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
   return (
-    <React.Fragment>
+    <DetailsWrapper id='channel_details_wrapper'>
       {channelDetailsIsOpen && (
         <Details
+          size={size}
+          showAboutChannel={showAboutChannel}
+          avatarAndNameDirection={avatarAndNameDirection}
           channelEditIcon={channelEditIcon}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
           editChannelSaveButtonTextColor={editChannelSaveButtonTextColor}
@@ -257,15 +259,11 @@ const ChannelDetailsContainer = ({
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
-          showClearHistoryForDirectChannel={showClearHistoryForDirectChannel}
-          showClearHistoryForPrivateChannel={showClearHistoryForPrivateChannel}
-          showClearHistoryForPublicChannel={showClearHistoryForPublicChannel}
+          showClearHistory={showClearHistory}
           clearHistoryOrder={clearHistoryOrder}
           clearHistoryIcon={clearHistoryIcon}
           clearHistoryTextColor={clearHistoryTextColor}
-          showDeleteAllMessagesForDirectChannel={showDeleteAllMessagesForDirectChannel}
-          showDeleteAllMessagesForPrivateChannel={showDeleteAllMessagesForPrivateChannel}
-          showDeleteAllMessagesForPublicChannel={showDeleteAllMessagesForPublicChannel}
+          showDeleteAllMessages={showDeleteAllMessages}
           deleteAllMessagesOrder={deleteAllMessagesOrder}
           deleteAllMessagesIcon={deleteAllMessagesIcon}
           deleteAllMessagesTextColor={deleteAllMessagesTextColor}
@@ -274,8 +272,9 @@ const ChannelDetailsContainer = ({
           showKickAndBlockMember={showKickAndBlockMember}
         />
       )}
-    </React.Fragment>
+    </DetailsWrapper>
   )
 }
 
+const DetailsWrapper = styled.div``
 export default ChannelDetailsContainer

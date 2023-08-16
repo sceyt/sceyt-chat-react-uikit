@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
@@ -9,10 +9,11 @@ import { activeTabAttachmentsSelector } from '../../../../store/message/selector
 import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { AttachmentPreviewTitle } from '../../../../UIHelper'
+import { AttachmentPreviewTitle, UploadingIcon } from '../../../../UIHelper'
 
 interface IProps {
   channelId: string
+  theme?: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
   filePreviewTitleColor?: string
@@ -23,6 +24,7 @@ interface IProps {
 
 const Files = ({
   channelId,
+  theme,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
@@ -31,20 +33,33 @@ const Files = ({
   filePreviewDownloadIcon
 }: IProps) => {
   const dispatch = useDispatch()
+  const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const handleCompleteDownload = (attachmentId: string) => {
+    const stateCopy = { ...downloadingFilesMap }
+    delete stateCopy[attachmentId]
+    setDownloadingFilesMap(stateCopy)
+  }
+  const handleDownloadFile = (attachment: IAttachment) => {
+    if (attachment.id) {
+      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: true }))
+    }
+    downloadFile(attachment, handleCompleteDownload)
+  }
 
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
   }, [channelId])
+
   return (
-    <Container>
+    <Container theme={theme}>
       {attachments.map((file: IAttachment) => (
         // <FileItemWrapper >
         <FileItem
           key={file.url}
           // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
           // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-          hoverBackgroundColor={filePreviewHoverBackgroundColor}
+          hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}
         >
           {file.metadata && file.metadata.tmb ? (
             <FileThumb draggable={false} src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
@@ -58,12 +73,14 @@ const Files = ({
             <AttachmentPreviewTitle color={filePreviewTitleColor}>
               {formatLargeText(file.name, 32)}
             </AttachmentPreviewTitle>
-            <FileSizeAndDate color={filePreviewSizeColor}>
-              {file.fileSize ? bytesToSize(file.fileSize) : ''}
-            </FileSizeAndDate>
+            <FileSizeAndDate color={filePreviewSizeColor}>{file.size ? bytesToSize(file.size) : ''}</FileSizeAndDate>
           </div>
-          <DownloadWrapper onClick={() => downloadFile(file)}>
-            {filePreviewDownloadIcon || <Download />}
+          <DownloadWrapper onClick={() => handleDownloadFile(file)}>
+            {downloadingFilesMap[file.id!] ? (
+              <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
+            ) : (
+              filePreviewDownloadIcon || <Download />
+            )}
           </DownloadWrapper>
         </FileItem>
         // </FileItemWrapper>
@@ -159,6 +176,6 @@ const FileSizeAndDate = styled.span`
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
   margin-top: 2px;
 `

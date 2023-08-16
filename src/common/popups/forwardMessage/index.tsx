@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { Popup, PopupContainer, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
+import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import { getChannelsForForwardAC, loadMoreChannelsForForward } from '../../../store/channel/actions'
@@ -9,7 +9,7 @@ import {
   channelsForForwardSelector,
   channelsLoadingState
 } from '../../../store/channel/selector'
-import { IChannel } from '../../../types'
+import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
 import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
@@ -21,6 +21,8 @@ import CustomCheckbox from '../../customCheckbox'
 
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
+import { getClient } from '../../client'
+import PopupContainer from '../popupContainer'
 
 interface ISelectedChannelsData {
   id: string
@@ -36,6 +38,8 @@ interface IProps {
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const dispatch = useDispatch()
   const channels = useSelector(channelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
@@ -78,13 +82,15 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
+    const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+    const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (event.target.checked && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
           channel.subject ||
-          (channel.type === CHANNEL_TYPE.DIRECT
-            ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+          (isDirectChannel && directChannelUser
+            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
             : '')
       })
     } else {
@@ -125,7 +131,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   return (
     <PopupContainer>
       <Popup maxWidth='522px' minWidth='522px' height='540px' isLoading={loading} padding='0'>
-        <PopupBody padding={24} withFooter>
+        <PopupBody paddingH='24px' paddingV='24px' withFooter>
           <CloseIcon onClick={() => togglePopup()} />
           <PopupName isDelete marginBottom='20px'>
             {title}
@@ -148,12 +154,19 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
             {channels.map((channel: IChannel) => {
               const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+              const directChannelUser =
+                isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
               const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
               return (
                 <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
                   <Avatar
-                    name={channel.subject || (isDirectChannel ? channel.peer.firstName || channel.peer.id : '')}
-                    image={channel.avatarUrl || (isDirectChannel ? channel.peer.avatarUrl : '')}
+                    name={
+                      channel.subject ||
+                      (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
+                    }
+                    image={
+                      channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                    }
                     size={40}
                     textSize={12}
                     setDefaultAvatar={isDirectChannel}
@@ -161,22 +174,25 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   <ChannelInfo>
                     <ChannelTitle>
                       {channel.subject ||
-                        (isDirectChannel
-                          ? makeUsername(contactsMap[channel.peer.id], channel.peer, getFromContacts)
+                        (isDirectChannel && directChannelUser
+                          ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                           : '')}
                     </ChannelTitle>
                     <ChannelMembers>
-                      {isDirectChannel
+                      {isDirectChannel && directChannelUser
                         ? (
-                            hideUserPresence(channel.peer)
+                            hideUserPresence && hideUserPresence(directChannelUser)
                               ? ''
-                              : channel.peer.presence && channel.peer.presence.state === PRESENCE_STATUS.ONLINE
+                              : directChannelUser.presence &&
+                                directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
                           )
                           ? 'Online'
-                          : channel.peer.presence.lastActiveAt &&
-                            userLastActiveDateFormat(channel.peer.presence.lastActiveAt)
+                          : directChannelUser &&
+                            directChannelUser.presence &&
+                            directChannelUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
                         : `${channel.memberCount} ${
-                            channel.type === CHANNEL_TYPE.PUBLIC
+                            channel.type === CHANNEL_TYPE.BROADCAST
                               ? channel.memberCount > 1
                                 ? 'subscribers'
                                 : 'subscriber'
@@ -198,8 +214,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             })}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.gray5}>
-          <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => togglePopup()}>
+        <PopupFooter backgroundColor={colors.backgroundColor}>
+          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleForwardMessage}>
@@ -238,7 +254,7 @@ const ChannelTitle = styled.h3<any>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -250,7 +266,7 @@ const ChannelMembers = styled.h4<any>`
   font-size: 14px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -271,7 +287,7 @@ const SelectedChannelsContainer = styled.div<any>`
 const SelectedChannelBuble = styled.div`
   display: flex;
   justify-content: space-between;
-  background: ${colors.gray5};
+  background: ${colors.backgroundColor};
   border-radius: 16px;
   align-items: center;
   padding: 4px 10px;
@@ -285,7 +301,7 @@ const SelectedChannelName = styled.span`
   font-weight: 500;
   font-size: 14px;
   line-height: 16px;
-  color: ${colors.blue6};
+  color: ${colors.textColor1};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

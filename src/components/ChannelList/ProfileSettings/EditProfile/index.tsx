@@ -56,7 +56,12 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
       </EditProfileBody>
 
       <PopupFooter>
-        <Button onClick={handleCloseEditProfile} backgroundColor={colors.gray0} color={colors.gray6} borderRadius='8px'>
+        <Button
+          onClick={handleCloseEditProfile}
+          backgroundColor={colors.gray0}
+          color={colors.textColor1}
+          borderRadius='8px'
+        >
           Cancel
         </Button>
         <Button onClick={handleEditProfile} backgroundColor={colors.primary} borderRadius='8px' margin='0 0 0 12px'>

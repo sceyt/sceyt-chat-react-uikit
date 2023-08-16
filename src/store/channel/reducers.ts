@@ -5,6 +5,7 @@ import {
   CHANNEL_INFO_OPEN_CLOSE,
   CHANNELS_HAS_NEXT,
   DESTROY_SESSION,
+  DRAFT_IS_REMOVED,
   GET_CHANNELS,
   REMOVE_CHANNEL,
   SET_ACTIVE_CHANNEL,
@@ -17,19 +18,23 @@ import {
   SET_CHANNELS,
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
+  SET_CLOSE_SEARCH_CHANNELS,
   SET_DRAGGED_ATTACHMENTS,
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
+  SET_SEARCHED_CHANNELS,
   SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
   UPDATE_CHANNEL_LAST_MESSAGE,
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
+  UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel } from '../../types'
+import { IAction, IChannel, IMember } from '../../types'
 import { CHANNEL_TYPE } from '../../helpers/constants'
+import { getClient } from '../../common/client'
 
 const initialState: {
   channelsLoadingState: string | null
@@ -38,6 +43,11 @@ const initialState: {
   channelsHasNext: boolean
   channelsForForwardHasNext: boolean
   channels: IChannel[]
+  searchedChannels: {
+    groups: IChannel[]
+    directs: IChannel[]
+  }
+  closeSearchChannel: boolean
   channelsForForward: IChannel[]
   activeChannel: IChannel | {}
   roles: []
@@ -63,6 +73,7 @@ const initialState: {
   draggedAttachments: { attachment: File; type: 'media' | 'file' }[]
   tabIsActive: boolean
   hideChannelList: boolean
+  draftIsRemoved: string
 } = {
   channelsLoadingState: null,
   channelsForForwardLoadingState: null,
@@ -70,6 +81,8 @@ const initialState: {
   channelsHasNext: true,
   channelsForForwardHasNext: true,
   channels: [],
+  searchedChannels: { groups: [], directs: [] },
+  closeSearchChannel: false,
   channelsForForward: [],
   activeChannel: {},
   roles: [],
@@ -89,7 +102,8 @@ const initialState: {
   isDragging: false,
   tabIsActive: true,
   hideChannelList: false,
-  draggedAttachments: []
+  draggedAttachments: [],
+  draftIsRemoved: ''
 }
 
 export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
@@ -110,14 +124,29 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       return newState
     }
 
+    case SET_SEARCHED_CHANNELS: {
+      newState.searchedChannels = payload.searchedChannels
+      return newState
+    }
+
+    case SET_CLOSE_SEARCH_CHANNELS: {
+      newState.closeSearchChannel = payload.close
+      return newState
+    }
+
     case SET_CHANNELS_FOR_FORWARD: {
       newState.channelsForForward = [...payload.channels]
       return newState
     }
 
     case ADD_CHANNEL: {
+      console.log('add channel...... ', payload.channel)
       if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
         newState.channels = [payload.channel, ...newState.channels]
+      }
+      // @ts-ignore
+      if (newState.hideChannelList && (!newState.activeChannel || !newState.activeChannel.id)) {
+        newState.activeChannel = payload.channel
       }
       return newState
     }
@@ -219,27 +248,60 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       return newState
     }
 
+    case UPDATE_SEARCHED_CHANNEL_DATA: {
+      const { updateData, groupName, channelId } = payload
+      if (newState.searchedChannels[groupName] && newState.searchedChannels[groupName].length) {
+        const updatedChannels = newState.searchedChannels[groupName].map((channel: IChannel) => {
+          if (channel.id === channelId) {
+            return { ...channel, ...updateData }
+          }
+          return channel
+        })
+        if ((newState.activeChannel as IChannel).id === channelId) {
+          const activeChannelCopy = { ...newState.activeChannel }
+          newState.activeChannel = {
+            ...activeChannelCopy,
+            ...updateData
+          }
+        }
+        newState.searchedChannels = updatedChannels
+      }
+      return newState
+    }
+
     case UPDATE_USER_STATUS_ON_CHANNEL: {
       const usersMap = payload.usersMap
       // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
+      const ChatClient = getClient()
+      const { user } = ChatClient
       const updatedChannels = newState.channels.map((channel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT && usersMap[channel.peer.id]) {
-          return { ...channel, peer: { ...channel.peer, presence: usersMap[channel.peer.id].presence } }
+        const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+        const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+        if (channel.type === CHANNEL_TYPE.DIRECT && directChannelUser && usersMap[directChannelUser.id]) {
+          const membersToUpdate = channel.members.map((member) => {
+            if (member.id === usersMap[directChannelUser.id].id) {
+              return { ...member, presence: usersMap[directChannelUser.id].presence }
+            } else {
+              return member
+            }
+          })
+          return { ...channel, members: membersToUpdate }
         }
         return channel
       })
-      if (
+      const activeChannelUser =
         (newState.activeChannel as IChannel).type === CHANNEL_TYPE.DIRECT &&
-        usersMap[(newState.activeChannel as IChannel).peer.id]
-      ) {
-        if ('peer' in newState.activeChannel) {
-          newState.activeChannel = {
-            ...newState.activeChannel,
-            peer: {
-              ...(newState.activeChannel.peer && newState.activeChannel.peer),
-              presence: usersMap[(newState.activeChannel as IChannel).peer.id].presence
+        (newState.activeChannel as IChannel).members.find((member: IMember) => member.id !== user.id)
+      if (activeChannelUser && usersMap[activeChannelUser.id]) {
+        newState.activeChannel = {
+          ...newState.activeChannel,
+          members: (newState.activeChannel as IChannel).members.map((member) => {
+            if (member.id !== user.id) {
+              return { ...member, presence: usersMap[activeChannelUser.id].presence }
+            } else {
+              return member
             }
-          }
+          })
         }
       }
       newState.channels = [...updatedChannels]
@@ -278,7 +340,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
             lastMessage: {
               ...channel.lastMessage,
               deliveryStatus: message.deliveryStatus,
-              selfMarkers: message.selfMarkers,
+              userMarkers: message.userMarkers,
               state: message.state
             }
           }
@@ -348,6 +410,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_HIDE_CHANNEL_LIST: {
       const { hide } = payload
       newState.hideChannelList = hide
+      return newState
+    }
+
+    case DRAFT_IS_REMOVED: {
+      const { channelId } = payload
+      newState.draftIsRemoved = channelId
       return newState
     }
 

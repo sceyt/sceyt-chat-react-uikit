@@ -79,6 +79,7 @@ interface IMessageProps {
   incomingMessageBackground?: string
   showOwnAvatar?: boolean
   showMessageStatus?: boolean
+  showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
   showMessageStatusForEachMessage?: boolean
   showMessageTimeForEachMessage?: boolean
@@ -103,7 +104,7 @@ interface IMessageProps {
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
-  separateEmojiCategoriesWithTitle?: boolean
+  fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
   reactionIconOrder?: number
@@ -128,6 +129,7 @@ interface IMessageProps {
   inlineReactionIcon?: JSX.Element
   reactionsDisplayCount?: number
   showEachReactionCount?: boolean
+  showTotalReactionCount?: boolean
   reactionItemBorder?: string
   reactionItemBorderRadius?: string
   reactionItemBackground?: string
@@ -139,6 +141,8 @@ interface IMessageProps {
   reactionsContainerBorderRadius?: string
   reactionsContainerBackground?: string
   reactionsContainerTopPosition?: string
+  reactionsDetailsPopupBorderRadius?: string
+  reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
   reactionsContainerPadding?: string
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
@@ -179,6 +183,7 @@ const Message = ({
   incomingMessageBackground = '',
   showOwnAvatar = true,
   showMessageStatus = true,
+  showMessageTimeAndStatusOnlyOnHover,
   showMessageTime = true,
   showMessageStatusForEachMessage = true,
   showMessageTimeForEachMessage = true,
@@ -203,7 +208,7 @@ const Message = ({
   staredIcon,
   reportIcon,
   reactionIconOrder,
-  openFrequentlyUsedReactions,
+  openFrequentlyUsedReactions = true,
   editIconOrder,
   copyIconOrder,
   replyIconOrder,
@@ -226,6 +231,7 @@ const Message = ({
   fileAttachmentsIcon,
   reactionsDisplayCount = 5,
   showEachReactionCount = true,
+  showTotalReactionCount,
   reactionItemBorder,
   reactionItemBorderRadius,
   reactionItemBackground,
@@ -238,6 +244,8 @@ const Message = ({
   reactionsContainerBackground,
   reactionsContainerPadding,
   reactionsContainerTopPosition,
+  reactionsDetailsPopupBorderRadius,
+  reactionsDetailsPopupHeaderItemsStyle,
   fileAttachmentsBoxWidth,
   // fileAttachmentsNameMaxLength,
   // fileAttachmentsBoxBackground,
@@ -250,7 +258,7 @@ const Message = ({
   videoAttachmentMaxHeight,
   emojisCategoryIconsPosition,
   emojisContainerBorderRadius,
-  separateEmojiCategoriesWithTitle,
+  fixEmojiCategoriesTitleOnTop,
   sameUserMessageSpacing,
   differentUserMessageSpacing
 }: IMessageProps) => {
@@ -275,10 +283,9 @@ const Message = ({
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
-  const reactionsList = message.reactionScores && Object.keys(message.reactionScores)
   const reactionsCount =
-    message.reactionScores &&
-    Object.values(message.reactionScores).reduce((prevValue, currentValue) => prevValue + currentValue, 0)
+    message.reactionTotals &&
+    message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const messageTextRef = useRef<any>(null)
   const messageActionsTimeout = useRef<any>(null)
@@ -310,9 +317,9 @@ const Message = ({
   const notLinkAttachment =
     withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
   const parentNotLinkAttachment =
-    message.parent &&
-    message.parent.attachments &&
-    message.parent.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
+    message.parentMessage &&
+    message.parentMessage.attachments &&
+    message.parentMessage.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
   const mediaAttachment =
     withAttachments &&
     message.attachments.find(
@@ -328,9 +335,13 @@ const Message = ({
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
-  // const selfReactionKeys = message.lastReactions.filter((reaction) => reaction.user.id === user.id);
+
   const borderRadius =
-    !message.incoming && ownMessageOnRightSide
+    message.incoming && incomingMessageBackground === 'inherit'
+      ? '0px'
+      : !message.incoming && ownMessageBackground === 'inherit'
+      ? '0px'
+      : !message.incoming && ownMessageOnRightSide
       ? prevMessageUserID !== messageUserID || firstMessageInInterval
         ? '16px 16px 4px 16px'
         : nextMessageUserID !== messageUserID || lastMessageInInterval
@@ -455,10 +466,12 @@ const Message = ({
   }
 
   const handleMouseEnter = () => {
-    messageActionsTimeout.current = setTimeout(() => {
-      setMessageActionsShow(true)
-      dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
-    }, 450)
+    if (message.state !== MESSAGE_STATUS.DELETE) {
+      messageActionsTimeout.current = setTimeout(() => {
+        setMessageActionsShow(true)
+        dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
+      }, 450)
+    }
   }
 
   const closeMessageActions = (close: boolean) => {
@@ -489,16 +502,16 @@ const Message = ({
   }
 
   const handleReactionAddDelete = (selectedEmoji: any) => {
-    if (message.selfReactions && message.selfReactions.some((item: IReaction) => item.key === selectedEmoji)) {
+    if (message.userReactions && message.userReactions.some((item: IReaction) => item.key === selectedEmoji)) {
       dispatch(
         deleteReactionAC(
           channel.id,
           message.id,
           selectedEmoji,
-          channel.userMessageReactions &&
-            channel.userMessageReactions[0] &&
-            channel.userMessageReactions[0].messageId === message.id &&
-            channel.userMessageReactions[0].key === selectedEmoji
+          channel.newReactions &&
+            channel.newReactions[0] &&
+            channel.newReactions[0].messageId === message.id &&
+            channel.newReactions[0].key === selectedEmoji
         )
       )
     } else {
@@ -517,9 +530,13 @@ const Message = ({
     if (
       isVisible &&
       message.incoming &&
-      !(message.selfMarkers.length && message.selfMarkers.includes(MESSAGE_DELIVERY_STATUS.READ))
+      !(
+        message.userMarkers &&
+        message.userMarkers.length &&
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
+      )
     ) {
-      // console.log('send marker for message ... ', message)
+      console.log('send marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -605,11 +622,13 @@ const Message = ({
     ) */
   const MessageHeader = () => (
     <MessageHeaderCont
-      isReplied={!!message.parent}
+      isReplied={!!message.parentMessage}
       isForwarded={!!message.forwardingDetails}
       messageBody={!!message.body}
       withPadding={
-        withAttachments && notLinkAttachment /* ||
+        withAttachments &&
+        notLinkAttachment &&
+        (message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit') /* ||
             (message.parent &&
               message.parent.attachments &&
               !!message.parent.attachments.length &&
@@ -667,6 +686,10 @@ const Message = ({
   useEffect(() => {
     if (emojisPopupOpen) {
       // const emojisContainer = document.getElementById(`${message.id}_emoji_popup_container`)
+      console.log(
+        'messageItemRef.current.getBoundingClientRect().bottom. . .. ',
+        messageItemRef.current.getBoundingClientRect().bottom
+      )
       const bottomPos = messageItemRef.current ? messageItemRef.current.getBoundingClientRect().bottom : 0
       const offsetBottom = window.innerHeight - bottomPos
       setEmojisPopupPosition(offsetBottom < 300 ? 'top' : 'bottom')
@@ -707,7 +730,7 @@ const Message = ({
           ? differentUserMessageSpacing || '16px'
           : sameUserMessageSpacing || '8px'
       }
-      bottomMargin={reactionsList && reactionsList.length ? reactionsContainerTopPosition : ''}
+      bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}
       // id={message.id}
       className='MessageItem'
@@ -769,13 +792,13 @@ const Message = ({
         <MessageBody
           className='messageBody'
           isSelfMessage={!message.incoming}
-          isReplyMessage={!!(message.parent && message.parent.id && !isThreadMessage)}
+          isReplyMessage={!!(message.parentMessage && message.parentMessage.id && !isThreadMessage)}
           rtlDirection={ownMessageOnRightSide && !message.incoming}
           parentMessageIsVoice={
-            message.parent &&
-            message.parent.attachments &&
-            message.parent.attachments[0] &&
-            message.parent.attachments[0].type === attachmentTypes.voice
+            message.parentMessage &&
+            message.parentMessage.attachments &&
+            message.parentMessage.attachments[0] &&
+            message.parentMessage.attachments[0].type === attachmentTypes.voice
           }
           ownMessageBackground={ownMessageBackground}
           incomingMessageBackground={incomingMessageBackground}
@@ -834,10 +857,9 @@ const Message = ({
                 editMessage &&
                 !message.forwardingDetails &&
                 !(
-                  (message.attachments &&
-                    message.attachments.length &&
-                    message.attachments[0].type === attachmentTypes.voice) ||
-                  !message.body
+                  message.attachments &&
+                  message.attachments.length &&
+                  message.attachments[0].type === attachmentTypes.voice
                 )
               }
               showCopyMessage={copyMessage && message.body}
@@ -876,26 +898,26 @@ const Message = ({
               starIconTooltipText={starIconTooltipText}
               reportIconTooltipText={reportIconTooltipText}
               messageActionIconsColor={messageActionIconsColor}
-              myRole={channel.role || (channel.peer && channel.peer.role)}
+              myRole={channel.userRole}
               isIncoming={message.incoming}
               handleOpenEmojis={handleOpenEmojis}
             />
           )}
-          {message.parent && message.parent.id && !isThreadMessage && (
+          {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
             <ReplyMessageContainer
               withSenderName={showMessageSenderName}
               withBody={!!message.body}
               withAttachments={withAttachments && notLinkAttachment}
               leftBorderColor={colors.primary}
-              onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parent!.id)}
+              onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parentMessage!.id)}
             >
               {
-                message.parent.attachments &&
-                  !!message.parent.attachments.length &&
-                  message.parent.attachments[0].type !== attachmentTypes.voice &&
+                message.parentMessage.attachments &&
+                  !!message.parentMessage.attachments.length &&
+                  message.parentMessage.attachments[0].type !== attachmentTypes.voice &&
                   parentNotLinkAttachment &&
                   // <MessageAttachments>
-                  (message.parent.attachments as any[]).map((attachment, index) => (
+                  (message.parentMessage.attachments as any[]).map((attachment, index) => (
                     <Attachment
                       key={attachment.attachmentId || attachment.url}
                       backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
@@ -906,7 +928,7 @@ const Message = ({
                       removeSelected={handleRemoveFailedAttachment}
                       selectedFileAttachmentsIcon={fileAttachmentsIcon}
                       isRepliedMessage
-                      borderRadius={index === message.parent!.attachments.length - 1 ? borderRadius : '16px'}
+                      borderRadius={index === message.parentMessage!.attachments.length - 1 ? borderRadius : '16px'}
                       selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                       selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                       selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
@@ -927,29 +949,33 @@ const Message = ({
                   fontSize='12px'
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
                 >
-                  {message.parent.user.id === user.id
+                  {message.parentMessage.user.id === user.id
                     ? 'You'
-                    : makeUsername(contactsMap[message.parent.user.id], message.parent.user, getFromContacts)}
+                    : makeUsername(
+                        contactsMap[message.parentMessage.user.id],
+                        message.parentMessage.user,
+                        getFromContacts
+                      )}
                 </MessageOwner>
 
                 <ReplyMessageText fontSize='14px' lineHeight='16px'>
-                  {!!message.parent.attachments.length &&
-                    message.parent.attachments[0].type === attachmentTypes.voice && (
+                  {!!message.parentMessage.attachments.length &&
+                    message.parentMessage.attachments[0].type === attachmentTypes.voice && (
                       <VoiceIconWrapper color={colors.primary} />
                     )}
-                  {message.parent.body
+                  {message.parentMessage.body
                     ? MessageTextFormat({
-                        text: message.parent.body,
-                        message: message.parent,
+                        text: message.parentMessage.body,
+                        message: message.parentMessage,
                         contactsMap,
                         getFromContacts
                       })
                     : parentNotLinkAttachment &&
-                      (message.parent.attachments[0].type === attachmentTypes.image
+                      (message.parentMessage.attachments[0].type === attachmentTypes.image
                         ? 'Photo'
-                        : message.parent.attachments[0].type === attachmentTypes.video
+                        : message.parentMessage.attachments[0].type === attachmentTypes.video
                         ? 'Video'
-                        : message.parent.attachments[0].type === attachmentTypes.voice
+                        : message.parentMessage.attachments[0].type === attachmentTypes.voice
                         ? ' Voice'
                         : 'File')}
                 </ReplyMessageText>
@@ -966,6 +992,9 @@ const Message = ({
                 withMediaAttachment={withMediaAttachment}
                 withBody={!!message.body}
                 showSenderName={showMessageSenderName}
+                leftPadding={
+                  message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
+                }
                 color={colors.primary}
               >
                 <ForwardIcon />
@@ -990,7 +1019,11 @@ const Message = ({
           ) : ( */}
           <MessageText
             draggable={false}
+            color={colors.textColor1}
             showMessageSenderName={showMessageSenderName}
+            withPaddings={
+              message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
+            }
             withAttachment={notLinkAttachment && !!message.body}
             withMediaAttachment={withMediaAttachment}
             fontFamily={fontFamily}
@@ -1013,7 +1046,11 @@ const Message = ({
             {messageStatusAndTimePosition === 'onMessage' &&
             (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) &&
             (messageStatusVisible || messageTimeVisible) ? (
-              <MessageStatusAndTime leftMargin isSelfMessage={!message.incoming}>
+              <MessageStatusAndTime
+                showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+                leftMargin
+                isSelfMessage={!message.incoming}
+              >
                 {message.state === MESSAGE_STATUS.EDIT ? <MessageStatusUpdated>edited</MessageStatusUpdated> : ''}
                 {messageTimeVisible && (
                   <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
@@ -1031,6 +1068,7 @@ const Message = ({
             messageStatusAndTimePosition === 'onMessage' &&
             (messageStatusVisible || messageTimeVisible) && (
               <MessageStatusAndTime
+                showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                 withAttachment
                 leftMargin
                 isSelfMessage={!message.incoming}
@@ -1085,10 +1123,10 @@ const Message = ({
                   }}
                   removeSelected={handleRemoveFailedAttachment}
                   imageMinWidth={
-                    message.parent &&
-                    message.parent.attachments &&
-                    message.parent.attachments[0] &&
-                    message.parent.attachments[0].type === attachmentTypes.voice
+                    message.parentMessage &&
+                    message.parentMessage.attachments &&
+                    message.parentMessage.attachments[0] &&
+                    message.parentMessage.attachments[0].type === attachmentTypes.voice
                       ? '210px'
                       : undefined
                   }
@@ -1120,7 +1158,7 @@ const Message = ({
                   emojisPopupPosition={emojisPopupPosition}
                   emojisCategoryIconsPosition={emojisCategoryIconsPosition}
                   emojisContainerBorderRadius={emojisContainerBorderRadius}
-                  separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
+                  fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
                   handleEmojiPopupToggle={setEmojisPopupOpen}
                   handleAddEmoji={handleReactionAddDelete}
@@ -1137,7 +1175,7 @@ const Message = ({
                 rtlDirection={ownMessageOnRightSide && !message.incoming}
                 handleAddEmoji={handleReactionAddDelete}
                 handleEmojiPopupToggle={setEmojisPopupOpen}
-                frequentlyEmojis={message.selfReactions}
+                frequentlyEmojis={message.userReactions}
               />
             </FrequentlyEmojisContainer>
           )}
@@ -1145,6 +1183,7 @@ const Message = ({
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
           // (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) ? (
           <MessageStatusAndTime
+            showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
             isSelfMessage={!message.incoming}
             marginBottom={sameUserMessageSpacing}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
@@ -1171,14 +1210,16 @@ const Message = ({
           <ReactionsPopup
             bottomPosition={reactionsPopupPosition}
             horizontalPositions={reactionsPopupHorizontalPosition}
-            reactionScores={message.reactionScores || {}}
+            reactionTotals={message.reactionTotals || []}
             messageId={message.id}
             handleReactionsPopupClose={handleToggleReactionsPopup}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             handleAddDeleteEmoji={handleReactionAddDelete}
+            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
           />
         )}
-        {reactionsList && reactionsList.length && (
+        {message.reactionTotals && message.reactionTotals.length && (
           <ReactionsContainer
             id={`${message.id}_reactions_container`}
             border={reactionsContainerBorder}
@@ -1186,7 +1227,7 @@ const Message = ({
             borderRadius={reactionsContainerBorderRadius}
             topPosition={reactionsContainerTopPosition}
             padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground}
+            backgroundColor={reactionsContainerBackground || colors.backgroundColor}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
           >
             {/* <ReactionEmojis>
@@ -1201,27 +1242,30 @@ const Message = ({
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               onClick={handleToggleReactionsPopup}
             >
-              {reactionsList.slice(0, reactionsDisplayCount || 5).map((key) => (
+              {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
                 <MessageReaction
-                  key={key}
+                  key={summery.key}
+                  color={colors.textColor1}
                   // onClick={() => handleReactionAddDelete(key)}
-                  self={!!message.selfReactions.find((selfReaction: IReaction) => selfReaction.key === key)}
+                  self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground}
+                  backgroundColor={reactionItemBackground || colors.backgroundColor}
                   padding={reactionItemPadding}
                   margin={reactionItemMargin}
                   isLastReaction={reactionsCount === 1}
                   fontSize={reactionsFontSize}
                 >
-                  <MessageReactionKey>{`${key} ${
-                    showEachReactionCount ? message.reactionScores![key] : ''
-                  }`}</MessageReactionKey>
+                  <MessageReactionKey>
+                    {summery.key}
+                    {showEachReactionCount && <ReactionItemCount>{summery.count}</ReactionItemCount>}
+                  </MessageReactionKey>
                 </MessageReaction>
               ))}
-              {reactionsCount && reactionsCount > 1 && (
+              {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
                 <MessageReaction
                   border={reactionItemBorder}
+                  color={colors.textColor1}
                   borderRadius={reactionItemBorderRadius}
                   backgroundColor={reactionItemBackground}
                   padding={reactionItemPadding}
@@ -1243,7 +1287,7 @@ const Message = ({
           description='Who do you want to remove this message for?'
           isDeleteMessage
           isIncomingMessage={message.incoming}
-          myRole={channel.role}
+          myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
           isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
           title='Delete message'
@@ -1274,14 +1318,26 @@ const Message = ({
 export default Message
 
 const MessageReactionKey = styled.span`
+  display: inline-flex;
+  align-items: center;
   font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
     twemoji mozilla, segoe ui symbol;
+`
+
+const ReactionItemCount = styled.span<{ color?: string }>`
+  margin-left: 2px;
+  font-family: Inter, sans-serif;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 16px;
+  color: ${(props) => props.color || colors.textColor1};
 `
 
 const MessageReaction = styled.span<{
   self?: boolean
   isLastReaction?: boolean
   border?: string
+  color?: string
   borderRadius?: string
   backgroundColor?: string
   fontSize?: string
@@ -1293,18 +1349,22 @@ const MessageReaction = styled.span<{
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin: ${(props) => props.margin || '0 6px 0 0'};
+  margin: ${(props) => props.margin || '0 8px 0 0'};
   margin-right: ${(props) => props.isLastReaction && '0'};
-  border: ${(props) => props.border || `1px solid ${colors.gray3}`};
+  border: ${(props) => props.border};
   border-color: ${(props) => props.self && colors.primary};
-  color: ${(props) => (props.self ? colors.primary : '')};
+  color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: ${(props) => props.borderRadius || '16px'};
-  font-size: ${(props) => props.fontSize || '13px'};
-  line-height: ${(props) => props.fontSize || '13px'};
-  padding: ${(props) => props.padding || '2px 6px'};
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  font-size: ${(props) => props.fontSize || '18px'};
+  line-height: ${(props) => props.fontSize || '18px'};
+  padding: ${(props) => props.padding || '0'};
+  background-color: ${(props) => props.backgroundColor};
   white-space: nowrap;
+
+  &:last-child {
+    margin-right: 0;
+  }
 `
 
 const ThreadMessageCountContainer = styled.div`
@@ -1365,10 +1425,11 @@ const ReactionsContainer = styled.div<{
   margin-top: 4px;
   justify-content: flex-end;
   border: ${(props) => props.border};
-  box-shadow: ${(props) => props.boxShadow};
-  border-radius: ${(props) => props.borderRadius};
-  background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => props.padding};
+  box-shadow: ${(props) => props.boxShadow || '0px 4px 12px -2px rgba(17, 21, 57, 0.08)'};
+  filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
+  border-radius: ${(props) => props.borderRadius || '16px'};
+  background-color: ${(props) => props.backgroundColor || colors.white};
+  padding: ${(props) => props.padding || '4px 8px'};
   z-index: 9;
   ${(props) =>
     props.topPosition &&
@@ -1473,6 +1534,7 @@ const ForwardedTitle = styled.h3<{
   withBody?: boolean
   showSenderName?: boolean
   withPadding?: boolean
+  leftPadding?: boolean
   withMediaAttachment?: boolean
   color?: string
 }>`
@@ -1484,7 +1546,7 @@ const ForwardedTitle = styled.h3<{
   color: ${(props) => props.color || colors.primary};
   //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
-  padding: ${(props) => props.withPadding && '8px 0 0 12px'};
+  padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
   padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};
   padding-bottom: ${(props) =>
     props.withBody
@@ -1556,7 +1618,7 @@ const HiddenMessageTime = styled.span<{ hide?: boolean }>`
   display: ${(props) => props.hide && 'none'};
   font-weight: 400;
   font-size: 12px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `
 
 export const MessageStatusAndTime = styled.div<{
@@ -1568,7 +1630,9 @@ export const MessageStatusAndTime = styled.div<{
   leftMargin?: boolean
   rtlDirection?: boolean
   bottomOfMessage?: boolean
+  showOnlyOnHover?: boolean
 }>`
+  visibility: ${(props) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
   align-items: flex-end;
   border-radius: 16px;
@@ -1591,7 +1655,7 @@ export const MessageStatusAndTime = styled.div<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? colors.gray9 : props.withAttachment ? colors.white : '')};
+    color: ${(props) => (props.fileAttachment ? colors.textColor2 : props.withAttachment ? colors.white : '')};
   }
 
   ${(props) =>
@@ -1609,11 +1673,11 @@ const MessageStatusUpdated = styled.span<{ color?: string }>`
   font-style: italic;
   font-weight: 400;
   font-size: 12px;
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 
 const MessageStatusDeleted = styled.span<{ withAttachment?: boolean }>`
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   font-style: italic;
 `
 
@@ -1650,10 +1714,14 @@ const MessageBody = styled.div<{
         ? '1px 0 0 '
         : '0'
       : props.isSelfMessage
-      ? '8px 12px'
-      : '8px 12px 8px 12px'};
+      ? props.ownMessageBackground === 'inherit'
+        ? '0'
+        : '8px 12px'
+      : props.incomingMessageBackground === 'inherit'
+      ? ' 0'
+      : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  overflow: ${(props) => props.noBody && 'hidden'};
+  //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
   transform-origin: right;
 `
@@ -1695,7 +1763,7 @@ const MessageItem = styled.div<{
   padding: 0 4%;
   padding-left: ${(props) => !props.withAvatar && !props.rtl && 'calc(4% + 32px)'};
   padding-right: ${(props) => !props.withAvatar && props.rtl && 'calc(4% + 32px)'};
-  transition: all 0.2s;
+  //transition: all 0.2s;
   width: 100%;
   box-sizing: border-box;
 
@@ -1713,6 +1781,7 @@ const MessageItem = styled.div<{
   }
   &:hover ${MessageStatusAndTime} {
     display: flex;
+    visibility: visible;
   }
 
   &:hover ${MessageStatus} {
@@ -1724,10 +1793,12 @@ const EmojiContainer = styled.div<any>`
   position: absolute;
   left: ${(props) => (props.rtlDirection ? '' : '0')};
   right: ${(props) => props.rtlDirection && '0'};
-  top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
+  //top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
+  top: ${(props) => props.position === 'bottom' && 'calc(100% + 4px)'};
+  bottom: ${(props) => props.position === 'top' && 'calc(100% + 4px)'};
   z-index: 99;
 `
-const FrequentlyEmojisContainer = styled.div<any>`
+const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   position: absolute;
   left: ${(props) => (props.rtlDirection ? '' : '0')};
   right: ${(props) => props.rtlDirection && '0'};

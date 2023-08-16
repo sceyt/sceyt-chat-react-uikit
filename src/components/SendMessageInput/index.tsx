@@ -1,12 +1,15 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
+// import { Editor } from 'react-draft-wysiwyg'
+// import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css'
+// import { convertToRaw, EditorState } from 'draft-js'
 
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
 // import { ReactComponent as RecordIcon } from '../../assets/lib/svg/recordButton.svg'
-import { ReactComponent as EditIcon } from '../../assets/svg/edit.svg'
+import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
@@ -38,13 +41,27 @@ import {
   typingIndicatorSelector
 } from '../../store/channel/selector'
 import { IMember, IMessage, IUser } from '../../types'
-import { joinChannelAC, sendTypingAC, setDraggedAttachments } from '../../store/channel/actions'
+import {
+  joinChannelAC,
+  sendTypingAC,
+  setChannelDraftMessageIsRemovedAC,
+  setCloseSearchChannelsAC,
+  setDraggedAttachments
+} from '../../store/channel/actions'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import DropDown from '../../common/dropdown'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { getFrame } from '../../helpers/getVideoFrame'
-import { deleteVideoThumb, getPendingMessagesMap } from '../../helpers/messagesHalper'
+import {
+  checkDraftMessagesIsEmpty,
+  deleteVideoThumb,
+  getDraftMessageFromMap,
+  getPendingMessagesMap,
+  removeDraftMessageFromMap,
+  setDraftMessageToMap,
+  setSendMessageHandler
+} from '../../helpers/messagesHalper'
 import { attachmentTypes, CHANNEL_TYPE } from '../../helpers/constants'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -53,12 +70,17 @@ import { getClient } from '../../common/client'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import MentionMembersPopup from '../../common/popups/mentions'
 import LinkifyIt from 'linkify-it'
+import { themeSelector } from '../../store/theme/selector'
+// import { activeChannelMembersSelector } from '../../store/member/selector'
 
 let prevActiveChannelId: any
 
 interface SendMessageProps {
   draggedAttachments?: boolean
   handleAttachmentSelected?: (state: boolean) => void
+  handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
+  inputCustomClassname?: string
+  inputAutofocus?: boolean
   disabled?: boolean
   showAddEmojis?: boolean
   AddEmojisIcon?: JSX.Element
@@ -77,7 +99,6 @@ interface SendMessageProps {
   inputBorderRadius?: string
   inputBackgroundColor?: string
   inputPaddings?: string
-  selectedFileAttachmentsBoxWidth?: string
   selectedFileAttachmentsBoxBackground?: string
   selectedFileAttachmentsBoxBorder?: string
   selectedFileAttachmentsTitleColor?: string
@@ -85,6 +106,7 @@ interface SendMessageProps {
   selectedFileAttachmentsIcon?: JSX.Element
   selectedAttachmentsBorderRadius?: string
   replyMessageIcon?: JSX.Element
+  editMessageIcon?: JSX.Element
   voiceMessage?: boolean
   sendAttachmentSeparately?: boolean
   allowMentionUser?: boolean
@@ -93,6 +115,7 @@ interface SendMessageProps {
 const SendMessageInput: React.FC<SendMessageProps> = ({
   handleAttachmentSelected,
   // draggedAttachments,
+  handleSendMessage,
   disabled = false,
   sendIconOrder,
   inputOrder = 1,
@@ -110,31 +133,37 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   inputBorderRadius,
   backgroundColor,
   inputBackgroundColor,
+  inputCustomClassname,
+  inputAutofocus = true,
   inputPaddings,
   selectedAttachmentsBorderRadius,
   selectedFileAttachmentsIcon,
-  selectedFileAttachmentsBoxWidth,
   selectedFileAttachmentsBoxBackground,
   selectedFileAttachmentsBoxBorder,
   selectedFileAttachmentsTitleColor,
   selectedFileAttachmentsSizeColor,
   replyMessageIcon,
+  editMessageIcon,
   sendAttachmentSeparately,
   allowMentionUser = true
   // voiceMessage = true
 }) => {
   const dispatch = useDispatch()
+  const ChatClient = getClient()
+  const { user } = ChatClient
 
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
-  const isBlockedUserChat = activeChannel.peer && activeChannel.peer.blocked
-  const isDeletedUserChat = activeChannel.peer && activeChannel.peer.activityState === 'Deleted'
   const messageToEdit = useSelector(messageToEditSelector)
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
-  const ChatClient = getClient()
-  const { user } = ChatClient
+  // const members = useSelector(activeChannelMembersSelector, shallowEqual)
+  const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const isBlockedUserChat = directChannelUser && directChannelUser.blocked
+  const isDeletedUserChat = directChannelUser && directChannelUser.activityState === 'Deleted'
   /* const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -144,8 +173,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     audio: undefined
   } */
   const messageContRef = useRef<any>(null)
-  const [checkActionPermission] = usePermissions(activeChannel.role)
+  const [checkActionPermission] = usePermissions(activeChannel.userRole)
+  const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
+  // const [messageTextWs, setMessageTextWs] = useState(EditorState.createEmpty())
   const [editMessageText, setEditMessageText] = useState('')
   const [readyVideoAttachments, setReadyVideoAttachments] = useState({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
@@ -161,6 +192,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>({})
 
   const [currentMentions, setCurrentMentions] = useState<any>(undefined)
+  const [pendingMentions, setPendingMentions] = useState<any>([])
 
   const [mentionTyping, setMentionTyping] = useState(false)
 
@@ -184,6 +216,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const addAttachmentsBtnRef = useRef<any>(null)
 
   const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
+
+  /* const onEditorStateChange = (editorState: any) => {
+    const entityMap = convertToRaw(messageTextWs.getCurrentContent()).entityMap
+    const mentions: any = []
+
+    Object.values(entityMap).forEach((entity) => {
+      if (entity.type === 'MENTION') {
+        mentions.push(entity.data)
+      }
+    })
+    console.log('mentions . .. . . ', mentions)
+    setMessageTextWs(editorState)
+  }
+*/
   const handleSendTypingState = (typingState: boolean) => {
     if (typingState) {
       setInTypingStateTimout(
@@ -276,17 +322,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
     )}`
     const mentionedMembersPositions: any = []
-    let editingMentions: any = []
-    if (messageToEdit && messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length > 0) {
-      // Get duplicate mentions from metadata
-      editingMentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
-    }
-    const mentions =
-      editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
-    if (mentions && mentions.length > 0) {
+    if (mentionedMembers && mentionedMembers.length > 0) {
       let lastFoundIndex = 0
       const starts: any = {}
-      mentions.forEach((menMem: any) => {
+      mentionedMembers.forEach((menMem: any) => {
         const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
         const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
         lastFoundIndex = menIndex + mentionDisplayName.length
@@ -320,18 +359,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setMessageText(currentText)
     }
     messageInputRef.current.innerHTML = currentTextCont
-    setCursorPosition(messageInputRef.current, currentMentions.start + 2 + mentionDisplayName.length)
+    setCursorPosition(messageInputRef.current, currentMentions.start + 2 + mentionDisplayName.length, true)
     const updateCurrentMentions = { ...currentMentions }
     updateCurrentMentions.typed = mentionDisplayName
     updateCurrentMentions.id = member.id
     updateCurrentMentions.end = updateCurrentMentions.start + mentionDisplayName.length
 
     setCurrentMentions(updateCurrentMentions)
+    setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== updateCurrentMentions.start))
     messageInputRef.current.focus()
   }
-  const handleCloseMentionsPopup = () => {
+  const handleCloseMentionsPopup = (setPending?: boolean) => {
     setOpenMention(false)
     setMentionTyping(false)
+    if (setPending) {
+      setPendingMentions([
+        ...pendingMentions,
+        { ...currentMentions, end: currentMentions.start + 1 + currentMentions.typed.length }
+      ])
+
+      console.log('set pending mentions... .', [
+        ...pendingMentions,
+        { ...currentMentions, end: currentMentions.start + 1 + currentMentions.typed.length }
+      ])
+    }
     setCurrentMentions(undefined)
   }
   const handleTyping = (e: any) => {
@@ -369,6 +420,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleMentionDetect = (e: any) => {
     const selPos = getCaretPosition(e.currentTarget)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
+      console.log('selPos pos .. . ', selPos)
       setSelectionPos(selPos)
     }
     if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
@@ -376,7 +428,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
-    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
+    if (
+      lastTwoChar.trimStart() === '@' &&
+      !mentionTyping &&
+      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === 'private')
+    ) {
       setCurrentMentions({
         start: selPos - 1,
         typed: ''
@@ -387,6 +443,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     let shouldClose = false
     if (e.key === 'Backspace' || e.key === 'Delete') {
+      // const selPos2 = getCaretPosition(e.currentTarget)
+      // console.log('selPos 2 pos .. . ', selPos2)
       // const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       // if (mentionToEdit) {
       //   const editingMentionPosition = 0
@@ -400,10 +458,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         let lastFoundIndex = 0
         const starts: any = {}
         const updatedMentionedMembers: any = []
+        // console.log('mentionedMembers . . . . .  92133', mentionedMembers)
         mentionedMembers.forEach((menMem: any) => {
-          const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
-
+          const mentionDisplayName = menMem.displayName || mentionedMembersDisplayName[menMem.id].displayName
+          // console.log('find index of mentionDisplayName. .. .  .', mentionDisplayName)
+          // console.log('find index on text . .. .  .', currentText)
+          // console.log('find index from . .. .  .', lastFoundIndex)
           const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
+          // console.log('found in index .. ', menIndex)
           lastFoundIndex = menIndex + mentionDisplayName.length
           /* if (menMem.start === mentionToEdit.start) {
               editingMentionPosition = menIndex
@@ -412,7 +474,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           if (menIndex >= 0 && !starts[menMem.start]) {
             updatedMentionedMembers.push({ ...menMem, start: menIndex, end: menIndex + mentionDisplayName.length })
             mentionedMembersPositions.push({
-              displayName: mentionedMembersDisplayName[menMem.id].displayName,
+              displayName: mentionDisplayName,
               start: menIndex,
               // loc: menMem.start - trimLength,
               end: menIndex + mentionDisplayName.length
@@ -422,6 +484,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           starts[menMem.start] = true
           // }
         })
+        // console.log('set mentioned members,,., ', updatedMentionedMembers)
         setMentionedMembers(updatedMentionedMembers)
         const currentTextCont = typingTextFormat({
           text: currentText,
@@ -429,13 +492,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
         messageInputRef.current.innerHTML = currentTextCont
       }
-
-      setMessageText(currentText)
+      if (messageToEdit) {
+        setEditMessageText(currentText)
+      } else {
+        setMessageText(currentText)
+      }
+      // console.log('set pos .. . ', selPos)
+      // if (mentionedMembers && mentionedMembers.length && selPos > 0) {
       if (selPos > 0) {
         setCursorPosition(messageInputRef.current, selPos)
       }
       // } else
       if (currentMentions) {
+        // console.log('currentMentions.start . ..  . .. ', currentMentions.start)
+        // console.log('selPos . ..  . .. ', selPos)
         if (currentMentions.start >= selPos) {
           shouldClose = true
           setCurrentMentions(undefined)
@@ -451,10 +521,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     if (mentionTyping) {
       if (e.key === ' ') {
-        handleCloseMentionsPopup()
+        // console.log('lastTwoChar. . . . . . ', lastTwoChar)
+        // if (/  /.test(str)lastTwoChar === '  ') {
+        console.log('should close mentions ............................... ****** ')
+        handleCloseMentionsPopup(true)
       } else if (!currentMentions.end && !shouldClose) {
         const typedMessage = e.currentTarget.innerText
         const updateCurrentMentions = { ...currentMentions }
+        console.log('set current mention typed... .. .', typedMessage.slice(updateCurrentMentions.start + 1, selPos))
         updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1, selPos)
         setCurrentMentions(updateCurrentMentions)
       }
@@ -531,7 +605,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
 
         if (messageForReply) {
-          messageToSend.parent = messageForReply
+          messageToSend.parentMessage = messageForReply
         }
 
         if (messageTexToSend && !attachments.length) {
@@ -567,7 +641,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-
+          console.log('send as separate message ... ', sendAsSeparateMessage)
           messageToSend.attachments = attachments.map((attachment: any, index: any) => {
             const attachmentToSend = {
               name: attachment.data.name,
@@ -643,80 +717,82 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(false)
       setMentionTyping(false)
       setCurrentMentions(undefined)
+      dispatch(setCloseSearchChannelsAC(true))
     }
   }
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
-    const mentionedMembersPositions: any = []
-    const mentionedUserForSend: any = []
-    if (messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length) {
-      const mentions = [...messageToEdit.mentionedUsers, ...mentionedMembers]
-      let lastFoundIndex = 0
-      const starts: any = {}
-      mentions.forEach((menMem: any) => {
-        const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
-        const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
-        if (menIndex >= 0) {
-          lastFoundIndex = menIndex + mentionDisplayName.length
-          if (!starts[menIndex]) {
-            mentionedMembersPositions.push({
-              id: menMem.id,
-              loc: menIndex,
-              len: mentionDisplayName.length
-            })
-          }
-          starts[menIndex] = true
-
-          mentionedUserForSend.push(menMem)
-        }
-
-        // }
-      })
-
-      /* const findIndexes: any[] = []
-      mentionedUserForSend.forEach((menMem: any) => {
-        // eslint-disable-next-line max-len
-        const mentionedMembersDisplayName = `@${menMem.firstName}${menMem.lastName !== '' ? ` ${menMem.lastName}` : ''}`
-        let menIndex = messageTexToSend.indexOf(mentionedMembersDisplayName)
-        let existingIndex = findIndexes.includes(menIndex)
-        let i = 0
-        if (menIndex < 0) {
-          mentionedUserForSend = messageToEdit.mentionedUsers.filter((menUs: any) => menUs.id !== menMem.id)
-        } else {
-          while (existingIndex) {
-            menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-            existingIndex = findIndexes.includes(menIndex)
-            // eslint-disable-next-line no-plusplus
-            i++
-            if (i > mentionedUserForSend.length) {
-              break
-            }
-          }
-
-          const mentionDisplayLength = mentionedMembersDisplayName.length
-          if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-            findIndexes.push(menIndex)
-            mentionedMembersPositions = {
-              ...mentionedMembersPositions,
-              [menMem.id]: {
+    if (messageTexToSend) {
+      const mentionedMembersPositions: any = []
+      const mentionedUserForSend: any = []
+      if (mentionedMembers && mentionedMembers.length) {
+        let lastFoundIndex = 0
+        const starts: any = {}
+        mentionedMembers.forEach((menMem: any) => {
+          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
+          const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
+          if (menIndex >= 0) {
+            lastFoundIndex = menIndex + mentionDisplayName.length
+            if (!starts[menIndex]) {
+              mentionedMembersPositions.push({
+                id: menMem.id,
                 loc: menIndex,
-                len: mentionDisplayLength
+                len: mentionDisplayName.length
+              })
+            }
+            starts[menIndex] = true
+
+            mentionedUserForSend.push(menMem)
+          }
+
+          // }
+        })
+
+        /* const findIndexes: any[] = []
+        mentionedUserForSend.forEach((menMem: any) => {
+          // eslint-disable-next-line max-len
+          const mentionedMembersDisplayName = `@${menMem.firstName}${menMem.lastName !== '' ? ` ${menMem.lastName}` : ''}`
+          let menIndex = messageTexToSend.indexOf(mentionedMembersDisplayName)
+          let existingIndex = findIndexes.includes(menIndex)
+          let i = 0
+          if (menIndex < 0) {
+            mentionedUserForSend = messageToEdit.mentionedUsers.filter((menUs: any) => menUs.id !== menMem.id)
+          } else {
+            while (existingIndex) {
+              menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
+              existingIndex = findIndexes.includes(menIndex)
+              // eslint-disable-next-line no-plusplus
+              i++
+              if (i > mentionedUserForSend.length) {
+                break
+              }
+            }
+
+            const mentionDisplayLength = mentionedMembersDisplayName.length
+            if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
+              findIndexes.push(menIndex)
+              mentionedMembersPositions = {
+                ...mentionedMembersPositions,
+                [menMem.id]: {
+                  loc: menIndex,
+                  len: mentionDisplayLength
+                }
               }
             }
           }
-        }
-      }) */
-    }
-    const messageToSend = {
-      ...messageToEdit,
-      metadata: mentionedMembersPositions,
-      mentionedUsers: mentionedUserForSend,
-      body: messageTexToSend
-    }
+        }) */
+      }
+      const messageToSend = {
+        ...messageToEdit,
+        metadata: mentionedMembersPositions,
+        mentionedUsers: mentionedUserForSend,
+        body: messageTexToSend
+      }
 
-    messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
-    dispatch(editMessageAC(activeChannel.id, messageToSend))
-    handleCloseEditMode()
+      messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
+      dispatch(editMessageAC(activeChannel.id, messageToSend))
+      handleCloseEditMode()
+    }
   }
   const handleCloseEditMode = () => {
     setEditMessageText('')
@@ -831,8 +907,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   useEffect(() => {
     if (mentionTyping) {
-      if (selectionPos <= currentMentions.start) {
-        handleCloseMentionsPopup()
+      if (
+        selectionPos <= currentMentions.start ||
+        selectionPos > currentMentions.start + 1 + currentMentions.typed.length
+      ) {
+        handleCloseMentionsPopup(true)
+      }
+    } else if (pendingMentions && pendingMentions.length) {
+      const currentPendingMention = pendingMentions.find(
+        (mention: any) => selectionPos <= mention.end && selectionPos > mention.start
+      )
+      if (currentPendingMention) {
+        delete currentPendingMention.end
+        setCurrentMentions(currentPendingMention)
+        setMentionTyping(true)
+        setOpenMention(true)
+        setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== currentPendingMention.start))
       }
     }
     /* if (mentionedMembers.length) {
@@ -860,6 +950,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
+    const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
     const fileType = file.type.split('/')[0]
     if (customUploader) {
       if (fileType === 'image') {
@@ -904,25 +995,48 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } else {
       if (fileType === 'image') {
         if (isMediaAttachment) {
-          resizeImage(file).then(async (resizedFile: any) => {
-            const { thumbnail } = await createImageThumbnail(file)
-            // resizedFiles.forEach((file: any, index: number) => {
+          const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+          if (file.type === 'image/gif') {
+            console.log('imageWidth', imageWidth)
+            console.log('imageHeight', imageHeight)
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
-                data: new File([resizedFile.blob], resizedFile.file.name),
+                data: file,
                 attachmentUrl: URL.createObjectURL(file),
                 attachmentId: uuidv4(),
                 type: fileType,
-                metadata: JSON.stringify({
-                  tmb: thumbnail,
-                  szw: resizedFile.newWidth,
-                  szh: resizedFile.newHeight
-                })
+                metadata: sendAsSeparateMessage
+                  ? ''
+                  : JSON.stringify({
+                      tmb: thumbnail,
+                      szw: imageWidth,
+                      szh: imageHeight
+                    })
               }
             ])
-            // })
-          })
+          } else {
+            resizeImage(file).then(async (resizedFile: any) => {
+              // resizedFiles.forEach((file: any, index: number) => {
+              setAttachments((prevState: any[]) => [
+                ...prevState,
+                {
+                  data: new File([resizedFile.blob], resizedFile.file.name),
+                  attachmentUrl: URL.createObjectURL(file),
+                  attachmentId: uuidv4(),
+                  type: fileType,
+                  metadata: sendAsSeparateMessage
+                    ? ''
+                    : JSON.stringify({
+                        tmb: thumbnail,
+                        szw: resizedFile.newWidth,
+                        szh: resizedFile.newHeight
+                      })
+                }
+              ])
+              // })
+            })
+          }
         } else {
           const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
           setAttachments((prevState: any[]) => [
@@ -933,9 +1047,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               type: 'file',
               attachmentUrl: URL.createObjectURL(file as any),
               attachmentId: uuidv4(),
-              metadata: JSON.stringify({
-                tmb: thumbnail
-              })
+              metadata: sendAsSeparateMessage
+                ? ''
+                : JSON.stringify({
+                    tmb: thumbnail
+                  })
             }
           ])
         }
@@ -949,11 +1065,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             type: 'video',
             attachmentUrl: URL.createObjectURL(file as any),
             attachmentId: uuidv4(),
-            metadata: JSON.stringify({
-              tmb: thumb,
-              szw: width,
-              szh: height
-            })
+            metadata: sendAsSeparateMessage
+              ? ''
+              : JSON.stringify({
+                  tmb: thumb,
+                  szw: width,
+                  szh: height
+                })
           }
         ])
       } else {
@@ -1130,20 +1248,71 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setAttachments([])
       handleCloseEditMode()
       clearTimeout(typingTimout)
-    } else if (activeChannel.id) {
+      if (messageInputRef && messageInputRef.current) {
+        messageInputRef.current.focus()
+      }
+    } /* else if (activeChannel.id) {
+      prevActiveChannelId = activeChannel.id
+    } */
+    if (activeChannel.id) {
       prevActiveChannelId = activeChannel.id
     }
-    if (messageInputRef.current) {
+    if (messageInputRef.current && inputAutofocus) {
       messageInputRef.current.focus()
     }
+
     setMentionedMembers([])
     setOpenMention(false)
     setCurrentMentions(undefined)
     setMentionTyping(false)
+    /* if (allowMentionUser) {
+      dispatch(getMembersAC(activeChannel.id))
+    } */
+    const draftMessage = getDraftMessageFromMap(activeChannel.id)
+    if (draftMessage) {
+      setMessageText(draftMessage.text)
+      setMentionedMembers(draftMessage.mentionedMembers)
+      const mentionedMembersPositions: any = []
+      if (draftMessage.mentionedMembers && draftMessage.mentionedMembers.length > 0) {
+        let lastFoundIndex = 0
+        const starts: any = {}
+        draftMessage.mentionedMembers.forEach((menMem: any) => {
+          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
+          const menIndex = draftMessage.text.indexOf(mentionDisplayName, lastFoundIndex)
+          lastFoundIndex = menIndex + mentionDisplayName.length
+          setMentionedMembersDisplayName((prevState: any) => ({
+            ...prevState,
+            [menMem.id]: { id: menMem.id, displayName: mentionDisplayName }
+          }))
+          if (!starts[menIndex]) {
+            mentionedMembersPositions.push({
+              displayName: mentionDisplayName,
+              start: menIndex,
+              end: menIndex + mentionDisplayName.length
+            })
+          }
+          starts[menIndex] = true
+          // }
+        })
+      }
+
+      messageInputRef.current.innerHTML = typingTextFormat({
+        text: draftMessage.text,
+        mentionedMembers: [...mentionedMembersPositions]
+      })
+      setCursorPosition(messageInputRef.current, draftMessage.text.length)
+      if (inputAutofocus) {
+        messageInputRef.current.focus()
+      }
+    }
   }, [activeChannel.id])
 
   useEffect(() => {
-    if (messageText || (editMessageText && editMessageText !== messageToEdit.body) || attachments.length) {
+    if (
+      messageText.trim() ||
+      (editMessageText.trim() && editMessageText !== messageToEdit.body) ||
+      attachments.length
+    ) {
       if (attachments.length) {
         let videoAttachment = false
         attachments.forEach((att: any) => {
@@ -1165,7 +1334,28 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } else {
       setSendMessageIsActive(false)
     }
+
+    if (messageText) {
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+      if (!listenerIsAdded) {
+        setListenerIsAdded(true)
+        document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
+      }
+    } else if (getDraftMessageFromMap(activeChannel.id)) {
+      removeDraftMessageFromMap(activeChannel.id)
+      if (checkDraftMessagesIsEmpty() && listenerIsAdded) {
+        dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
+        setListenerIsAdded(false)
+        document.body.removeAttribute('onbeforeunload')
+      }
+    }
   }, [messageText, attachments, editMessageText, readyVideoAttachments])
+
+  useDidUpdate(() => {
+    if (mentionedMembers && mentionedMembers.length) {
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+    }
+  }, [mentionedMembers])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -1205,7 +1395,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   })
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
     }
@@ -1218,7 +1408,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [messageForReply])
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (messageToEdit && messageInputRef.current) {
       if (messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length) {
         const formattedText = MessageTextFormat({
@@ -1232,6 +1422,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         // Get duplicate mentions from metadata
         const mentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
         const mentionedMembersPositions: any = []
+        const editingMentionedMembers: any = []
         let lastFoundIndex = 0
         const starts: any = {}
         mentions.forEach((menMem: any) => {
@@ -1239,15 +1430,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           const menIndex = formattedText.indexOf(mentionDisplayName, lastFoundIndex)
           lastFoundIndex = menIndex + mentionDisplayName.length
           if (!starts[menIndex]) {
-            mentionedMembersPositions.push({
+            const mentionInfo = {
               displayName: mentionDisplayName,
               start: menIndex,
               end: menIndex + mentionDisplayName.length
-            })
+            }
+            editingMentionedMembers.push({ ...menMem, ...mentionInfo })
+            mentionedMembersPositions.push(mentionInfo)
           }
           starts[menIndex] = true
           // }
         })
+        setMentionedMembers(editingMentionedMembers)
         const currentTextCont = typingTextFormat({
           text: messageToEdit.body,
           mentionedMembers: [...mentionedMembersPositions]
@@ -1293,14 +1487,46 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       wavesurfer.current.play();
     }); */
 
+    if (handleSendMessage) {
+      setSendMessageHandler(handleSendMessage)
+    }
+    let inputHeightTimeout: any = null
+    if (messageContRef && messageContRef.current) {
+      inputHeightTimeout = setTimeout(() => {
+        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+      }, 800)
+    }
     document.addEventListener('mousedown', handleClick)
     return () => {
+      if (inputHeightTimeout) {
+        clearTimeout(inputHeightTimeout)
+      }
+      prevActiveChannelId = undefined
       document.removeEventListener('mousedown', handleClick)
     }
   }, [])
 
   return (
-    <Container margin={margin} border={border} ref={messageContRef}>
+    <Container margin={margin} border={border} ref={messageContRef} theme={theme}>
+      {/* <Editor
+        wrapperClassName='demo-wrapper'
+        editorClassName='demo-editor'
+        editorState={messageTextWs}
+        mention={{
+          separator: ' ',
+          trigger: '@',
+          suggestions: members.map((member: IMember) => {
+            const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
+            return {
+              text: displayName,
+              value: displayName,
+              url: member.id
+            }
+          })
+        }}
+        onEditorStateChange={onEditorStateChange}
+        toolbar={{ options: [] }}
+      /> */}
       {!activeChannel.id ? (
         <Loading />
       ) : isBlockedUserChat || isDeletedUserChat || disabled ? (
@@ -1312,16 +1538,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ? "Sender doesn't support replies"
             : 'You blocked this user.'}
         </BlockedUserInfo>
-      ) : !activeChannel.role && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
+      ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
         <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
           Join
         </JoinChannelCont>
       ) : (
-          activeChannel.type === CHANNEL_TYPE.PUBLIC
-            ? !(activeChannel.role === 'admin' || activeChannel.role === 'owner')
+          activeChannel.type === CHANNEL_TYPE.BROADCAST
+            ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
             : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
         ) ? (
-        <ReadOnlyCont iconColor={colors.primary}>
+        <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
           <EyeIcon /> Read only
         </ReadOnlyCont>
       ) : (
@@ -1367,7 +1593,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 <CloseIcon />
               </CloseEditMode>
               <EditReplyMessageHeader color={colors.primary}>
-                <EditIcon />
+                {editMessageIcon || <EditIcon />}
                 Edit Message
               </EditReplyMessageHeader>
               <EditMessageText>{messageToEdit.body}</EditMessageText>
@@ -1429,17 +1655,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           )}
 
           {!!attachments.length && !sendAttachmentSeparately && (
-            <ChosenAttachments fileBoxWidth={selectedFileAttachmentsBoxWidth}>
+            <ChosenAttachments>
               {attachments.map((attachment: any) => (
                 <Attachment
                   attachment={attachment}
-                  isPrevious
+                  isPreview
                   removeSelected={removeUpload}
                   key={attachment.attachmentId}
                   setVideoIsReadyToSend={setVideoIsReadyToSend}
                   borderRadius={selectedAttachmentsBorderRadius}
                   selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                  backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                  backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
                   selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
                   selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
                   selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
@@ -1451,6 +1677,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MentionsContainer mentionsIsOpen={openMention}>
               {openMention && (
                 <MentionMembersPopup
+                  theme={theme}
                   channelId={activeChannel.id}
                   addMentionMember={handleSetMention}
                   searchMention={currentMentions.typed}
@@ -1462,7 +1689,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageInputWrapper
               borderRadius={borderRadius}
               ref={inputWrapperRef}
-              backgroundColor={backgroundColor}
+              backgroundColor={backgroundColor || colors.backgroundColor}
               channelDetailsIsOpen={channelDetailsIsOpen}
             >
               {showAddEmojis && (
@@ -1481,6 +1708,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               )}
               {showAddAttachments && (
                 <DropDown
+                  theme={theme}
                   forceClose={showChooseAttachmentType}
                   position={addAttachmentsInRightSide ? 'top' : 'topRight'}
                   margin='auto 0 0'
@@ -1498,22 +1726,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   <DropdownOptionsUl>
                     <DropdownOptionLi
                       key={1}
-                      textColor={colors.gray6}
-                      hoverBackground={colors.gray5}
+                      textColor={colors.textColor1}
+                      hoverBackground={colors.hoverBackgroundColor}
                       onClick={() => onOpenFileUploader(mediaExtensions)}
                       iconWidth='20px'
-                      iconColor={colors.gray4}
+                      iconColor={colors.textColor2}
                     >
                       <ChoseMediaIcon />
                       Photo or video
                     </DropdownOptionLi>
                     <DropdownOptionLi
                       key={2}
-                      textColor={colors.gray6}
-                      hoverBackground={colors.gray5}
+                      textColor={colors.textColor1}
+                      hoverBackground={colors.hoverBackgroundColor}
                       onClick={() => onOpenFileUploader('')}
                       iconWidth='20px'
-                      iconColor={colors.gray4}
+                      iconColor={colors.textColor2}
                     >
                       <ChoseFileIcon />
                       File
@@ -1527,6 +1755,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 onKeyUp={handleTyping}
                 onChange={handleTyping}
                 onPaste={handlePastAttachments}
+                color={colors.textColor1}
                 onCut={handleCut}
                 onKeyPress={handleSendEditMessage}
                 data-placeholder='Type message here ...'
@@ -1538,12 +1767,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 paddings={inputPaddings}
                 ref={messageInputRef}
                 mentionColor={colors.primary}
+                className={inputCustomClassname}
                 // placeholder='Type message here...'
               />
             </MessageInputWrapper>
             <SendMessageIcon
               isActive={sendMessageIsActive}
               order={sendIconOrder}
+              color={colors.backgroundColor}
               height={inputContainerHeight || minHeight}
               onClick={sendMessageIsActive ? handleSendEditMessage : null}
             >
@@ -1591,12 +1822,39 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   )
 }
 
-const Container = styled.div<{ margin?: string; border?: string; borderRadius?: string; ref?: any; height?: number }>`
+const Container = styled.div<{
+  margin?: string
+  border?: string
+  borderRadius?: string
+  ref?: any
+  height?: number
+  theme?: string
+}>`
   margin: ${(props) => props.margin || '30px 0 16px'};
   border: ${(props) => props.border || ''};
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
   padding: 0 12px;
+
+  & span.rdw-suggestion-dropdown {
+    position: absolute;
+    bottom: 100%;
+    height: 160px;
+    min-width: 150px;
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    padding: 6px 12px;
+    border: 1px solid #ccc;
+    background: #fff;
+    z-index: 99;
+  }
+
+  & .rdw-suggestion-option {
+  }
+  & .rdw-suggestion-option-active {
+    background-color: rgb(243, 245, 248);
+  }
 `
 
 const EditReplyMessageCont = styled.div<any>`
@@ -1608,8 +1866,8 @@ const EditReplyMessageCont = styled.div<any>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
-  background-color: ${colors.gray5};
+  color: ${colors.textColor1};
+  background-color: ${colors.backgroundColor};
   z-index: 19;
   border-bottom: 1px solid ${colors.gray1};
 `
@@ -1634,7 +1892,7 @@ const CloseEditMode = styled.span`
   cursor: pointer;
 
   & > svg {
-    color: ${colors.gray4};
+    color: ${colors.textColor2};
   }
 `
 
@@ -1715,15 +1973,17 @@ const MessageInputWrapper = styled.div<{
 }>`
   display: flex;
   width: 100%;
+  max-width: calc(100% - 50px);
   //max-width: ${(props) =>
     props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
   //max-width: calc(100% - 110px);
-  background-color: ${(props) => props.backgroundColor || colors.gray11};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
 `
 const MessageInput = styled.div<{
   order?: number
+  color?: string
   borderRadius?: string
   backgroundColor?: string
   paddings?: string
@@ -1736,6 +1996,7 @@ const MessageInput = styled.div<{
   display: block;
   border: none;
   font: inherit;
+  color: ${(props) => props.color};
   box-sizing: border-box;
   outline: none !important;
   font-size: 15px;
@@ -1755,7 +2016,7 @@ const MessageInput = styled.div<{
     top: calc(50% - 10px);
     left: 0;
     font-size: 15px;
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
     pointer-events: none;
     unicode-bidi: plaintext;
     white-space: nowrap;
@@ -1766,7 +2027,7 @@ const MessageInput = styled.div<{
 
   &::placeholder {
     font-size: 15px;
-    color: ${colors.gray7};
+    color: ${colors.textColor3};
     opacity: 1;
   }
 
@@ -1793,6 +2054,7 @@ const EmojiButton = styled.span<any>`
   > svg {
     ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')};
     width: 24px;
+    height: 24px;
   }
 
   &:hover > svg {
@@ -1848,7 +2110,7 @@ const SendMessageIcon = styled.span<any>`
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
   -webkit-tap-highlight-color: transparent;
 
-  color: ${(props) => (props.isActive ? colors.primary : '#ccc')};
+  color: ${(props) => (props.isActive ? colors.primary : props.color)};
 `
 
 /* const AudioCont = styled.div<any>`
@@ -1878,9 +2140,10 @@ const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
   }
 
   & ${AttachmentFile} {
-    width: ${(props) => props.fileBoxWidth || '200px'};
-    padding: 6px 12px;
-    height: 48px;
+    width: 240px;
+    padding: 5px 12px;
+    border-radius: 8px;
+    height: 50px;
   }
 `
 
@@ -1902,7 +2165,7 @@ const TypingFrom = styled.h5`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.2px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `
 const sizeAnimation = keyframes`
   0% {
@@ -1980,7 +2243,7 @@ const BlockedUserInfo = styled.div`
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
 
   & > svg {
     margin-right: 12px;
@@ -1997,10 +2260,10 @@ const JoinChannelCont = styled.div<{ color?: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   color: ${(props) => props.color || colors.primary};
-  background-color: ${colors.gray5};
+  background-color: ${colors.backgroundColor};
   cursor: pointer;
 `
-const ReadOnlyCont = styled.div<{ iconColor?: string }>`
+const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2009,7 +2272,7 @@ const ReadOnlyCont = styled.div<{ iconColor?: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 
   & > svg {
     margin-right: 12px;

@@ -10,6 +10,7 @@ import {
   DELETE_ALL_MESSAGES,
   DELETE_CHANNEL,
   DESTROY_SESSION,
+  DRAFT_IS_REMOVED,
   GET_CHANNELS,
   GET_CHANNELS_FOR_FORWARD,
   JOIN_TO_CHANNEL,
@@ -22,6 +23,7 @@ import {
   MARK_MESSAGES_AS_READ,
   REMOVE_CHANNEL,
   REMOVE_CHANNEL_CACHES,
+  SEARCH_CHANNELS,
   SEND_TYPING,
   SET_ACTIVE_CHANNEL,
   SET_ADDED_TO_CHANNEL,
@@ -33,9 +35,11 @@ import {
   SET_CHANNELS,
   SET_CHANNELS_FOR_FORWARD,
   SET_CHANNELS_LOADING_STATE,
+  SET_CLOSE_SEARCH_CHANNELS,
   SET_DRAGGED_ATTACHMENTS,
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
+  SET_SEARCHED_CHANNELS,
   SET_TAB_IS_ACTIVE,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
@@ -50,7 +54,7 @@ import {
   WATCH_FOR_EVENTS
 } from './constants'
 import { ChannelQueryParams } from '../../components/Channel/types'
-import { IChannel, ICreateChannel, IMessage, IUser } from '../../types'
+import { IChannel, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
 export function createChannelAC(channelData: ICreateChannel) {
   return {
@@ -70,6 +74,26 @@ export function loadMoreChannels(limit?: number) {
   return {
     type: LOAD_MORE_CHANNEL,
     payload: { limit }
+  }
+}
+
+export function searchChannelsAC(params: ChannelQueryParams, contactsMap: IContactsMap) {
+  return {
+    type: SEARCH_CHANNELS,
+    payload: { params, contactsMap }
+  }
+}
+
+export function setSearchedChannelsAC(searchedChannels: { groups: IChannel[]; directs: IChannel[] }) {
+  return {
+    type: SET_SEARCHED_CHANNELS,
+    payload: { searchedChannels }
+  }
+}
+export function setCloseSearchChannelsAC(close: boolean) {
+  return {
+    type: SET_CLOSE_SEARCH_CHANNELS,
+    payload: { close }
   }
 }
 
@@ -231,6 +255,17 @@ export function updateChannelDataAC(channelId: string, config: any) {
     payload: {
       channelId,
       config
+    }
+  }
+}
+
+export function updateSearchedChannelDataAC(channelId: string, config: any, groupName: 'groups' | 'directs') {
+  return {
+    type: UPDATE_CHANNEL_DATA,
+    payload: {
+      channelId,
+      updateData: config,
+      groupName
     }
   }
 }
@@ -411,6 +446,15 @@ export function setHideChannelListAC(hide: boolean) {
     type: SET_HIDE_CHANNEL_LIST,
     payload: {
       hide
+    }
+  }
+}
+
+export function setChannelDraftMessageIsRemovedAC(channelId?: string) {
+  return {
+    type: DRAFT_IS_REMOVED,
+    payload: {
+      channelId
     }
   }
 }

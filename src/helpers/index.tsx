@@ -12,7 +12,7 @@ import { colors } from '../UIHelper/constants'
 import { getCustomDownloader } from './customUploader'
 
 const StatusText = styled.span`
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
   font-weight: 400;
   font-size: 12px;
 `
@@ -20,13 +20,13 @@ const ReadIconWrapper = styled(ReadIcon)`
   color: ${(props) => props.color || colors.primary};
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 const SentIconWrapper = styled(SentIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 const PendingIconWrapper = styled(PendingIcon)`
-  color: ${(props) => props.color || colors.gray4};
+  color: ${(props) => props.color || colors.textColor2};
 `
 
 export const messageStatusIcon = (
@@ -74,19 +74,35 @@ export const systemMessageUserName = (contact: IContact, userId: string) => {
   return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
 }
 
-export const downloadFile = async (attachment: IAttachment) => {
-  const customDownloader = getCustomDownloader()
-  let response
-  if (customDownloader) {
-    customDownloader(attachment.url).then(async (url) => {
-      response = await fetch(url)
+export const downloadFile = async (
+  attachment: IAttachment,
+  done?: (attachmentId: string, failed?: boolean) => void
+) => {
+  try {
+    const customDownloader = getCustomDownloader()
+    let response
+    if (customDownloader) {
+      customDownloader(attachment.url).then(async (url: any) => {
+        response = await fetch(url)
+        const data = await response.blob()
+        if (done) {
+          done(attachment.id || '')
+        }
+        FileSaver.saveAs(data, attachment.name)
+      })
+    } else {
+      response = await fetch(attachment.url)
       const data = await response.blob()
+      if (done) {
+        done(attachment.id || '')
+      }
       FileSaver.saveAs(data, attachment.name)
-    })
-  } else {
-    response = await fetch(attachment.url)
-    const data = await response.blob()
-    FileSaver.saveAs(data, attachment.name)
+    }
+  } catch (e) {
+    console.log('error on download... ', e)
+    if (done) {
+      done(attachment.id || '', true)
+    }
   }
 }
 
@@ -231,7 +247,7 @@ export const formatLargeText = (text: string, maxLength: number): any => {
 
 export const getCaretPosition = (element: any) => {
   let caretOffset = 0
-  let textNodes = 0
+  // const textNodes = 0
   const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
   const focusOffset = win.getSelection().focusOffset
@@ -242,64 +258,82 @@ export const getCaretPosition = (element: any) => {
   // console.log('element innerText.. . . . .', text)
   // const separateLines = text.split(/\r?\n|\r|\n/g)
   // console.log('setperate lines .... ', separateLines)
-  let textNodesAdded = false
+  // let textNodesAdded = false
+  // console.log('element.childNodes. . . ', element.childNodes)
   for (let i = 0; i < element.childNodes.length; i++) {
     const node = element.childNodes[i]
     if (node.nodeType === Node.TEXT_NODE) {
       if (node === focusNode) {
-        textNodesAdded = true
-        caretOffset += focusOffset + textNodes
+        // textNodesAdded = true
+        // caretOffset += focusOffset + textNodes
+        caretOffset += focusOffset
         break
       } else {
         caretOffset += node.nodeValue.length
       }
     } else if (node.nodeName === 'SPAN') {
       if (node.contains(focusNode)) {
-        textNodesAdded = true
-        caretOffset += focusOffset + textNodes
+        // textNodesAdded = true
+        caretOffset += focusOffset
+        // caretOffset += focusOffset + textNodes
         break
       } else {
         caretOffset += node.innerText.length
       }
     } else {
-      textNodes += 1
+      // textNodes += 1
     }
-    if (element.childNodes.length === i + 1 && !textNodesAdded) {
+    if (element.childNodes[i + 1] && element.childNodes[i + 1].nodeName === 'BR') {
+      // console.log('add line. ...   1 .. ', 1)
+      caretOffset += 1
+    }
+    /* if (element.childNodes.length === i + 1 && !textNodesAdded) {
       caretOffset += textNodes
-    }
+    } */
   }
   return caretOffset
 }
 
-export const setCursorPosition = (element: any, position: number, attempt: number | undefined = 0) => {
+export const setCursorPosition = (
+  element: any,
+  position: number,
+  isAddMention?: boolean,
+  attempt: number | undefined = 0
+) => {
   try {
-    // console.log('set pos ... ', position)
+    console.log('attamt ...... ', attempt)
+    console.log('set pos ... ', position)
     const range = document.createRange()
     const sel = window.getSelection()
     let currentNode = element.childNodes[0]
     let caretOffset = 0
-    let textNodes = 0
+    // let textNodes = 0
     let textNodesAdded = false
     let currentNodeIsFind = false
+    // console.log('element.childNodes. . . .', element.childNodes)
     element.childNodes.forEach((node: any, index: number) => {
       if (!currentNodeIsFind && node.nodeType === Node.TEXT_NODE) {
         currentNode = node
         const textLength = node.nodeValue.length
+        // console.log('currentNode .. .. . 1 .. ', currentNode)
+        // console.log('node.nodeValue .. .. . 1 .. ', node.nodeValue)
+        // console.log('textLength .. .. . 1 .. ', textLength)
         // console.log('caretOffset + textLength .. .. . 1 .. caretOffset ', caretOffset)
         // console.log('caretOffset + textLength .. .. . 1 .. textLength ', textLength)
         // console.log('caretOffset + textLength .. .. . 1 .. res ', caretOffset + textLength)
         caretOffset = caretOffset + textLength
+        // console.log('caretOffset .. .. . 1 .. ', caretOffset)
         if (element.childNodes.length === index + 1) {
           textNodesAdded = true
           // console.log('add text nodes. ...   1 .. ', textNodes)
-          caretOffset += textNodes
+          // caretOffset += textNodes
         }
         if (caretOffset >= position) {
           currentNodeIsFind = true
           currentNode = node
           if (!textNodesAdded) {
             // console.log('add text nodes. ...   2 .. ', textNodes)
-            caretOffset += textNodes
+            // caretOffset += textNodes
           }
           // console.log('position - (caretOffset - textLength) .. .. . 2 .. caretOffset ', caretOffset)
           // console.log('position - (caretOffset - textLength) .. .. . 2 .. textLength ', textLength)
@@ -307,41 +341,60 @@ export const setCursorPosition = (element: any, position: number, attempt: numbe
           caretOffset = position - (caretOffset - textLength)
           return
         }
+        // caretOffset += 1
       } else if (!currentNodeIsFind) {
         if (node.nodeName === 'SPAN') {
           caretOffset += node.innerText.length
+
+          // console.log('caretOffset +. 2  - 1 .. caretOffset ', caretOffset)
+          // console.log('node.innerText.length +. 2  - 1 ..  ', node.innerText.length)
+          // console.log('caretOffset +innerText.length. 2  - 1 .. caretOffset ', caretOffset + node.innerText.length)
           if (caretOffset >= position) {
             currentNodeIsFind = true
             currentNode = element.childNodes[index + 1]
+            /* if (!mentionFound && isAddMention) {
+              console.log('!mentionFound && isAddMention . . . . . . .', !mentionFound && isAddMention)
+              caretOffset += 1
+            } */
+            // console.log('set current node .... ', currentNode)
+            // console.log('caretOffset .... ', caretOffset)
             // caretOffset = position - (caretOffset - node.innerText.length)
-            caretOffset = position - caretOffset
+            if (isAddMention) {
+              caretOffset = 1
+            } else {
+              caretOffset = position - caretOffset
+            }
+            // console.log('set caretOffset 2  - 1 .... ', caretOffset)
             return
           }
-          if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
-            // console.log('add line. ...   1 .. ', 1)
-            caretOffset += 1
-          }
         } else {
-          textNodes += 1
+          // textNodes += 1
         }
+      }
+      if (element.childNodes[index + 1] && !currentNodeIsFind && element.childNodes[index + 1].nodeName === 'BR') {
+        // console.log('add line. ...   1 .. ', 1)
+        caretOffset += 1
       }
       if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
         if (!textNodesAdded) {
-          console.log('add text nodes. ...   3 .. ', textNodes)
-          caretOffset += textNodes
+          // console.log('add text nodes. ...   3 .. ', textNodes)
+          // caretOffset += textNodes
         }
         currentNodeIsFind = true
         if (position > caretOffset) {
+          // console.log('add line. ...   2 .. ', 1)
           caretOffset++
         }
-        console.log('caretOffset - position .. .. . 3 .. caretOffset ', caretOffset)
-        console.log('caretOffset - position .. .. . 3 .. position ', position)
-        console.log('caretOffset - position .. .. . 3 .. res ', caretOffset - position)
+        currentNode = node
+        // console.log('caretOffset - position .. .. . 3 .. caretOffset ', caretOffset)
+        // console.log('caretOffset - position .. .. . 3 .. position ', position)
+        // console.log('caretOffset - position .. .. . 3 .. res ', caretOffset - position)
         caretOffset = caretOffset - position
       }
     })
-    console.log('caretOffset. . . . .', caretOffset)
-    console.log('currentNode. . . . .', currentNode)
+
+    // console.log('caretOffset. . . . .', caretOffset)
+    // console.log('currentNode. . . . .', currentNode)
     range.setStart(currentNode, caretOffset)
     range.collapse(true)
     if (sel) {
@@ -349,9 +402,9 @@ export const setCursorPosition = (element: any, position: number, attempt: numbe
       sel.addRange(range)
     }
   } catch (e) {
-    console.log('position not exist attempt', attempt, 'e.', e)
+    // console.log('position not exist attempt', attempt, 'e.', e)
     if (attempt <= 5) {
-      setCursorPosition(element, position - 1, attempt++)
+      setCursorPosition(element, position - 1, isAddMention, ++attempt)
     }
   }
 }

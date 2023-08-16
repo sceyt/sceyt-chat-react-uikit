@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
-import { LOADING_STATE, PRESENCE_STATUS } from '../../../Helpers/constants'
+import { LOADING_STATE, PRESENCE_STATUS, THEME } from '../../../Helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
@@ -18,6 +18,7 @@ import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
   channelId: string
+  theme?: string
   addMentionMember: (member: IMember) => void
   handleMentionsPopupClose: () => void
   searchMention: string
@@ -25,6 +26,7 @@ interface IMentionsPopupProps {
 
 export default function MentionMembersPopup({
   channelId,
+  theme,
   addMentionMember,
   handleMentionsPopupClose,
   searchMention
@@ -46,7 +48,6 @@ export default function MentionMembersPopup({
       }
     }
   }
-
   const handleMentionMember = () => {
     addMentionMember(filteredMembers[activeIndex])
     handleMentionsPopupClose()
@@ -88,7 +89,14 @@ export default function MentionMembersPopup({
   }
 
   useEventListener('click', handleClicks)
-
+  const handleSearchMembers = () => {
+    const searchedMembers = [...members].filter((member: IMember) => {
+      const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
+      return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
+    })
+    filteredMembersLength.current = searchedMembers.length
+    setFilteredMembers(sortMembers(searchedMembers))
+  }
   useEffect(() => {
     dispatch(getMembersAC(channelId))
   }, [channelId])
@@ -102,21 +110,20 @@ export default function MentionMembersPopup({
   }, [filteredMembers, activeIndex])
 
   useEffect(() => {
-    if (members && members.length && !searchMention) {
-      const sortedMembers = sortMembers(members.filter((member: IMember) => member.id !== user.id))
-      filteredMembersLength.current = sortedMembers.length
-      setFilteredMembers(sortedMembers)
+    if (members && members.length) {
+      if (searchMention) {
+        handleSearchMembers()
+      } else {
+        const sortedMembers = sortMembers(members.filter((member: IMember) => member.id !== user.id))
+        filteredMembersLength.current = sortedMembers.length
+        setFilteredMembers(sortedMembers)
+      }
     }
   }, [members])
 
   useDidUpdate(() => {
     if (searchMention) {
-      const searchedMembers = [...members].filter((member: IMember) => {
-        const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-        return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
-      })
-      filteredMembersLength.current = searchedMembers.length
-      setFilteredMembers(sortMembers(searchedMembers))
+      handleSearchMembers()
     } else {
       const searchedMembers = [...members].filter((member: IMember) => member.id !== user.id)
       filteredMembersLength.current = searchedMembers.length || 0
@@ -138,6 +145,8 @@ export default function MentionMembersPopup({
       className='mention_member_popup'
       hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
+      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      withBorder={theme !== THEME.DARK}
     >
       <MembersList onScroll={handleMembersListScroll}>
         {filteredMembers.map((member: IMember, index: number) => (
@@ -148,6 +157,7 @@ export default function MentionMembersPopup({
             }}
             isActiveItem={activeIndex === index}
             onMouseEnter={() => setActiveIndex(index)}
+            activeBackgroundColor={colors.hoverBackgroundColor}
           >
             <AvatarWrapper>
               <Avatar
@@ -159,7 +169,7 @@ export default function MentionMembersPopup({
               />
             </AvatarWrapper>
             <UserNamePresence>
-              <MemberName>
+              <MemberName color={colors.textColor1}>
                 {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
               <SubTitle>
@@ -177,14 +187,15 @@ export default function MentionMembersPopup({
   )
 }
 
-const Container = styled.div<{ height?: number; hidden?: boolean }>`
+const Container = styled.div<{ height?: number; hidden?: boolean; backgroundColor?: string; withBorder?: boolean }>`
   width: 300px;
   height: ${(props) => props.height && props.height + 22}px;
   max-height: 240px;
-  background: #ffffff;
-  border: 1px solid #dfe0eb;
+  padding: 2px 0 0;
+  background: ${(props) => props.backgroundColor || colors.white};
+  border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};
   box-sizing: border-box;
-  box-shadow: 0px 0px 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
 `
@@ -194,7 +205,7 @@ const UserNamePresence = styled.div`
   margin-left: 12px;
 `
 
-const MemberName = styled.h3`
+const MemberName = styled.h3<{ color?: string }>`
   margin: 0;
   max-width: calc(100% - 1px);
   font-weight: 500;
@@ -204,10 +215,7 @@ const MemberName = styled.h3`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-
-  & > span {
-    color: #abadb7;
-  }
+  color: ${(props) => props.color || colors.textColor1};
 `
 
 const EditMemberIcon = styled.span`
@@ -220,21 +228,21 @@ const EditMemberIcon = styled.span`
 `
 
 const MembersList = styled.ul`
-  margin: 10px 0 0;
+  margin: 4px 0 0;
   padding: 0;
   overflow-x: hidden;
   list-style: none;
   transition: all 0.2s;
   height: calc(100% - 10px); ;
 `
-const MemberItem = styled.li<{ isActiveItem?: boolean }>`
+const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
   cursor: pointer;
-  background-color: ${(props) => props.isActiveItem && colors.gray0};
+  background-color: ${(props) => props.isActiveItem && (props.activeBackgroundColor || colors.hoverBackgroundColor)};
 
   &:hover ${EditMemberIcon} {
     opacity: 1;

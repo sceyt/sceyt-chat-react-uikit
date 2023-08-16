@@ -1,6 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import { colors } from '../../UIHelper/constants'
+import { THEME } from '../../helpers/constants'
 
 export const Container = styled.div<any>`
   text-align: center;
@@ -15,7 +16,7 @@ export const Container = styled.div<any>`
   background: transparent;
   div {
     position: relative;
-    border-bottom: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
+    border-bottom: ${(props) => props.dateDividerBorder};
     width: 100%;
     display: flex;
     justify-content: center;
@@ -26,8 +27,8 @@ export const Container = styled.div<any>`
       font-style: normal;
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};
-      color: ${(props) => props.dateDividerTextColor || colors.blue6};
-      background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
+      color: ${(props) => props.dateDividerTextColor || colors.textColor1};
+      background: ${(props) => props.dateDividerBackgroundColor};
       //border: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
       box-sizing: border-box;
       border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
@@ -44,7 +45,7 @@ export const Container = styled.div<any>`
         height: 100%;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
-        background-color: #fff;
+        background-color: ${(props) => (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
 
       &::after {
@@ -58,7 +59,7 @@ export const Container = styled.div<any>`
         height: 100%;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
-        background-color: #fff;
+        background-color: ${(props) => (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
     }
   }
@@ -66,6 +67,7 @@ export const Container = styled.div<any>`
 
 interface IProps {
   dividerText: string
+  theme?: string
   visibility?: boolean
   unread?: boolean
   dateDividerFontSize?: string
@@ -105,18 +107,22 @@ export default function MessageDivider({
   newMessagesSeparatorLeftRightSpaceWidth,
   noMargin,
   marginTop,
+  theme,
   marginBottom
 }: IProps) {
   return (
     <Container
       className={unread ? 'unread' : 'divider'}
+      theme={theme}
       systemMessage={systemMessage}
       marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}
-      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor}
+      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor || colors.textColor1}
       dateDividerBorder={dateDividerBorder || newMessagesSeparatorBorder}
-      dateDividerBackgroundColor={dateDividerBackgroundColor || newMessagesSeparatorBackground}
+      dateDividerBackgroundColor={
+        dateDividerBackgroundColor || newMessagesSeparatorBackground || colors.backgroundColor
+      }
       dateDividerBorderRadius={dateDividerBorderRadius || newMessagesSeparatorBorderRadius}
       width={newMessagesSeparatorWidth}
       newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorLeftRightSpaceWidth}

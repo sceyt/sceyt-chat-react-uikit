@@ -39,16 +39,16 @@ const LinkItem = ({
     ) */
   }, [])
   return (
-    <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor}>
-      <a draggable={false} href={link} target='_blank' rel='noreferrer'>
+    <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor || colors.hoverBackgroundColor}>
+      <a draggable={false} href={link.startsWith('http') ? link : `https://${link}`} target='_blank' rel='noreferrer'>
         {/* {loading ? (
           <Loading />
         ) : imageSrc ? (
           <LinkMetaImage src={imageSrc} />
         ) : ( */}
         <React.Fragment>
-          <LinkIconCont>{linkPreviewIcon || <LinkIcon />}</LinkIconCont>
-          <LinkHoverIconCont>{linkPreviewHoverIcon || <LinkIcon />}</LinkHoverIconCont>
+          <LinkIconCont color={colors.primaryLight}>{linkPreviewIcon || <LinkIcon />}</LinkIconCont>
+          <LinkHoverIconCont color={colors.primaryLight}>{linkPreviewHoverIcon || <LinkIcon />}</LinkHoverIconCont>
         </React.Fragment>
         {/* )} */}
         <LinkInfoCont>
@@ -63,11 +63,13 @@ const LinkItem = ({
 
 export default LinkItem
 
-const LinkIconCont = styled.span`
+const LinkIconCont = styled.span<{ color?: string }>`
   display: inline-flex;
+  color: ${(props) => props.color};
 `
-const LinkHoverIconCont = styled.span`
+const LinkHoverIconCont = styled.span<{ color?: string }>`
   display: none;
+  color: ${(props) => props.color};
 `
 const LinkInfoCont = styled.div`
   margin-left: 12px;
@@ -102,7 +104,7 @@ const LinkUrl = styled.span<{ color?: string }>`
   font-size: 13px;
   line-height: 16px;
   text-decoration: underline;
-  color: ${(props) => props.color || colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 `
 
 /*

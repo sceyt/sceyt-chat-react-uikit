@@ -172,7 +172,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = () => {
       if (!wavesurfer.current) {
         wavesurfer.current = WaveSurfer.create({
           container: wavesurferContainer.current,
-          waveColor: 'black',
+          waveColor: colors.black,
           interact: false,
           cursorWidth: 0,
           audioContext: context || null,
@@ -310,5 +310,5 @@ const Timer = styled.div`
   font-weight: 400;
   font-size: 11px;
   line-height: 12px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `

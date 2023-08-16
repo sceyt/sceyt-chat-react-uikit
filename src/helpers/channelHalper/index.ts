@@ -1,13 +1,25 @@
-import { IChannel } from '../../types'
+import { IChannel, IMessage } from '../../types'
 import { isJSON } from '../message'
+import { MESSAGE_DELIVERY_STATUS } from '../constants'
 
 type channelMap = {
   [key: string]: IChannel
 }
 
+type channelTypesMemberDisplayTextMap = {
+  [key: string]: string
+}
+type defaultRolesByChannelTypesMap = {
+  [key: string]: string
+}
+
+let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
+let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
+let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
 let UploadImageIcon: JSX.Element
+
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = channel
 }
@@ -28,11 +40,11 @@ export function setChannelsInMap(channels: IChannel[]) {
       channelsArr.push(channel)
     } */
     if (
-      channel.userMessageReactions &&
-      channel.userMessageReactions.length &&
+      channel.newReactions &&
+      channel.newReactions.length &&
       channel.lastMessage &&
-      channel.lastMessage.id < channel.userMessageReactions[0].id &&
-      channel.lastMessage.id !== channel.userMessageReactions[0].messageId
+      channel.lastMessage.id < channel.newReactions[0].id &&
+      channel.lastMessage.id !== channel.newReactions[0].messageId
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
@@ -62,6 +74,10 @@ export function checkChannelExists(channelId: string) {
 
 export function destroyChannelsMap() {
   channelsMap = {}
+  activeChannelId = ''
+  allChannels = []
+  defaultRolesByChannelTypesMap = {}
+  channelTypesMemberDisplayTextMap = {}
 }
 
 export const query: any = {
@@ -97,4 +113,96 @@ export function getUploadImageIcon() {
 
 export function setUploadImageIcon(icon: JSX.Element) {
   UploadImageIcon = icon
+}
+
+export function getChannelTypesMemberDisplayTextMap() {
+  return channelTypesMemberDisplayTextMap
+}
+
+export function setChannelTypesMemberDisplayTextMap(map: channelTypesMemberDisplayTextMap) {
+  channelTypesMemberDisplayTextMap = map
+}
+
+export function getDefaultRolesByChannelTypesMap() {
+  return defaultRolesByChannelTypesMap
+}
+
+export function setDefaultRolesByChannelTypesMap(map: channelTypesMemberDisplayTextMap) {
+  defaultRolesByChannelTypesMap = map
+}
+
+export let handleNewMessages: (message: IMessage, channel: IChannel) => IMessage | null
+
+export function setHandleNewMessages(callback: (message: IMessage, channel: IChannel) => IMessage | null) {
+  handleNewMessages = callback
+}
+
+export function addChannelsToAllChannels(channels: IChannel[]) {
+  allChannels = [...allChannels, ...channels]
+}
+
+export function addChannelToAllChannels(channel: IChannel) {
+  allChannels.push(channel)
+}
+
+export function getAllChannels() {
+  return allChannels
+}
+export function getChannelFromAllChannels(channelId: string) {
+  return allChannels.find((channel) => channel.id === channelId)
+}
+
+export function deleteChannelFromAllChannels(channelId: string) {
+  allChannels = allChannels.filter((channel) => channel.id !== channelId)
+}
+
+export function updateChannelLastMessageOnAllChannels(channelId: string, message: IMessage) {
+  let updateChannel = allChannels.find((chan) => chan.id === channelId)
+  if (message.state === 'Deleted' || message.state === 'Edited') {
+    if (updateChannel?.lastMessage.id === message.id) {
+      allChannels = allChannels.map((chan) => {
+        if (chan.id === channelId) {
+          // update channel on channel map
+          channelsMap[channelId] = { ...chan, lastMessage: message }
+          // update channel on all channels
+          return { ...chan, lastMessage: message }
+        }
+        return chan
+      })
+    }
+  } else {
+    const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
+    if (updateChannel) {
+      const updateMessage = message
+      if (
+        updateChannel.lastMessage.id === message.id &&
+        updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
+      ) {
+        updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+      }
+      updateChannel = { ...updateChannel, lastMessage: updateMessage }
+      // update channel on channel map
+      channelsMap[channelId] = updateChannel
+      // update channel on all channels
+      allChannels = [updateChannel, ...updatedChannels]
+    }
+  }
+}
+export function updateChannelOnAllChannels(channelId: string, config: any, messageUpdateData?: any) {
+  allChannels = allChannels.map((channel) => {
+    if (channel.id === channelId) {
+      channel = { ...channel, ...config }
+      if (messageUpdateData && channel.lastMessage && messageUpdateData.id === channel.lastMessage.id) {
+        const updateMessage = messageUpdateData
+        if (
+          channel.lastMessage.id === messageUpdateData.id &&
+          channel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
+        ) {
+          updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+        }
+        channel.lastMessage = { ...channel.lastMessage, ...updateMessage }
+      }
+    }
+    return channel
+  })
 }

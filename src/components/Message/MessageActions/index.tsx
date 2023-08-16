@@ -1,23 +1,28 @@
 import React from 'react'
 import styled from 'styled-components'
-import { ReactComponent as DeleteIcon } from '../../../assets/svg/trash.svg'
+import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report_icon.svg'
-import { ReactComponent as EditIcon } from '../../../assets/svg/editSquare.svg'
+import { ReactComponent as EditIcon } from '../../../assets/svg/editIcon.svg'
 import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
-import { ReactComponent as ReactionIcon } from '../../../assets/svg/react.svg'
+import { ReactComponent as ReactionIcon } from '../../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
-import { ReactComponent as CopyIcon } from '../../../assets/svg/copy.svg'
-import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/thread_reply.svg'
+import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
+import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import usePermissions from '../../../hooks/usePermissions'
-import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME } from '../../../helpers/constants'
+import { IMember } from '../../../types'
+import { getClient } from '../../../common/client'
+import { useSelector } from 'react-redux'
+import { themeSelector } from '../../../store/theme/selector'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
   rtlDirection?: boolean
+  backgroundColor?: string
 }
 
 export default function MessageActions({
@@ -76,8 +81,12 @@ export default function MessageActions({
   handleOpenEmojis
 }: any) {
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const [checkActionPermission] = usePermissions(myRole)
+  const theme = useSelector(themeSelector)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const editMessagePermitted = isIncoming
     ? checkActionPermission('editAnyMessage')
     : checkActionPermission('editOwnMessage')
@@ -113,13 +122,17 @@ export default function MessageActions({
 
   return (
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
-      <EditMessageContainer className='message_actions_cont '>
+      <EditMessageContainer
+        backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+        className='message_actions_cont '
+      >
         {showMessageReaction &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           checkActionPermission('addMessageReaction') && (
             <Action
               order={reactionIconOrder || 0}
-              iconColor={messageActionIconsColor}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
               onClick={handleOpenReaction}
             >
@@ -131,10 +144,13 @@ export default function MessageActions({
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
-          (isDirectChannel ? !isIncoming && channel.peer.activityState !== 'Deleted' : true) && (
+          (isDirectChannel && directChannelUser
+            ? !isIncoming && directChannelUser.activityState !== 'Deleted'
+            : true) && (
             <Action
               order={editIconOrder || 1}
-              iconColor={messageActionIconsColor}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
               onClick={() => editModeToggle()}
             >
@@ -144,7 +160,8 @@ export default function MessageActions({
           )}
         {messageStatus === MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
-            iconColor={messageActionIconsColor}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleResendMessage()}
           >
@@ -156,10 +173,11 @@ export default function MessageActions({
           <React.Fragment>
             {showReplyMessage &&
               replyMessagePermitted &&
-              (isDirectChannel ? channel.peer.activityState !== 'Deleted' : true) && (
+              (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) && (
                 <Action
                   order={replyIconOrder || 2}
-                  iconColor={messageActionIconsColor}
+                  iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+                  hoverBackgroundColor={colors.hoverBackgroundColor}
                   hoverIconColor={colors.primary}
                   onClick={() => handleReplyMessage()}
                 >
@@ -171,7 +189,8 @@ export default function MessageActions({
             {showReplyMessageInThread && replyMessagePermitted && (
               <Action
                 order={replyInThreadIconOrder || 3}
-                iconColor={messageActionIconsColor}
+                iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+                hoverBackgroundColor={colors.hoverBackgroundColor}
                 hoverIconColor={colors.primary}
                 onClick={() => handleReplyMessage(true)}
               >
@@ -184,7 +203,8 @@ export default function MessageActions({
         {showCopyMessage && (
           <Action
             order={copyIconOrder || 4}
-            iconColor={messageActionIconsColor}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleCopyMessage()}
           >
@@ -196,7 +216,8 @@ export default function MessageActions({
         {showForwardMessage && forwardMessagePermitted && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={forwardIconOrder || 5}
-            iconColor={messageActionIconsColor}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleOpenForwardMessage()}
           >
@@ -205,25 +226,28 @@ export default function MessageActions({
           </Action>
         )}
 
-        {showDeleteMessage && (channel.type === CHANNEL_TYPE.PUBLIC ? myRole === 'owner' || myRole === 'admin' : true) && (
-          <Action
-            order={deleteIconOrder || 6}
-            iconColor={messageActionIconsColor}
-            hoverIconColor={colors.primary}
-            onClick={() =>
-              messageStatus === MESSAGE_DELIVERY_STATUS.PENDING
-                ? handleDeletePendingMessage()
-                : handleOpenDeleteMessage()
-            }
-          >
-            <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
-            {deleteIcon || <DeleteIcon />}
-          </Action>
-        )}
+        {showDeleteMessage &&
+          (channel.type === CHANNEL_TYPE.BROADCAST ? myRole === 'owner' || myRole === 'admin' : true) && (
+            <Action
+              order={deleteIconOrder || 6}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              hoverBackgroundColor={colors.hoverBackgroundColor}
+              hoverIconColor={colors.primary}
+              onClick={() =>
+                messageStatus === MESSAGE_DELIVERY_STATUS.PENDING
+                  ? handleDeletePendingMessage()
+                  : handleOpenDeleteMessage()
+              }
+            >
+              <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
+              {deleteIcon || <DeleteIcon />}
+            </Action>
+          )}
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={reportIconOrder || 7}
-            iconColor={messageActionIconsColor}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleReportMessage()}
           >
@@ -250,28 +274,37 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
   display: flex;
   align-items: center;
   direction: ${(props) => props.rtlDirection && 'initial'};
-  background-color: #fff;
-  border: 1px solid ${colors.gray1};
+  background-color: ${(props) => props.backgroundColor};
+  padding: 8px 2px;
   box-sizing: border-box;
-  border-radius: 4px;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  border-radius: 12px;
+  box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;
   z-index: 100;
 `
 
-const Action = styled.div<any>`
+const Action = styled.div<{
+  color?: string
+  iconColor?: string
+  order?: number
+  hoverIconColor?: string
+  hoverBackgroundColor?: string
+}>`
   position: relative;
   display: flex;
-  padding: 9px;
+  padding: 4px;
+  margin: 0 6px;
   cursor: pointer;
-  color: ${(props) => props.iconColor || colors.gray6};
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
+  color: ${(props) => props.iconColor || colors.textColor2};
+  border-radius: 50%;
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};
+    background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
 
     ${ItemNote} {
       display: block;

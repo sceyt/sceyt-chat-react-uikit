@@ -1,7 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
 import { BLOCK_USERS, GET_CONTACTS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
-import { LOADING_STATE } from '../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import {
   addUsersAC,
   setContactsAC,
@@ -10,7 +10,7 @@ import {
   setUsersLoadingStateAC,
   updateUserProfileAC
 } from './actions'
-import { IAction } from '../../types'
+import { IAction, IMember } from '../../types'
 import { getActiveChannelId, getChannelFromMap, query } from '../../helpers/channelHalper'
 import { updateChannelDataAC } from '../channel/actions'
 
@@ -37,8 +37,21 @@ function* blockUser(action: IAction): any {
 
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    if (activeChannel.peer && activeChannel.peer.id === blockedUsers[0].id) {
-      yield put(updateChannelDataAC(activeChannelId, { peer: blockedUsers[0] }))
+    const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+    const directChannelUser =
+      isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
+    if (directChannelUser && directChannelUser.id === blockedUsers[0].id) {
+      yield put(
+        updateChannelDataAC(activeChannelId, {
+          members: activeChannel.members.map((member: IMember) => {
+            if (member.id === blockedUsers[0].id) {
+              return blockedUsers[0]
+            } else {
+              return member
+            }
+          })
+        })
+      )
     }
   } catch (error) {
     console.log('error in block users', error.message)
@@ -54,8 +67,21 @@ function* unblockUser(action: IAction): any {
     const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    if (activeChannel.peer && activeChannel.peer.id === unblockedUsers[0].id) {
-      yield put(updateChannelDataAC(activeChannelId, { peer: unblockedUsers[0] }))
+    const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+    const directChannelUser =
+      isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
+    if (directChannelUser && directChannelUser.id === unblockedUsers[0].id) {
+      yield put(
+        updateChannelDataAC(activeChannelId, {
+          members: activeChannel.members.map((member: IMember) => {
+            if (member.id === unblockedUsers[0].id) {
+              return unblockedUsers[0]
+            } else {
+              return member
+            }
+          })
+        })
+      )
     }
   } catch (error) {
     console.log('error in unblock users', error.message)
@@ -150,6 +176,7 @@ function* getUsers(action: IAction): any {
     query.usersQuery = usersQuery
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADING))
+
     const { users } = yield call(usersQuery.loadNextPage)
 
     yield put(setUsersAC(users))

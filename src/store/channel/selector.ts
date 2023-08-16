@@ -1,4 +1,6 @@
 export const channelsSelector = (store: any) => store.ChannelReducer.channels
+export const searchedChannelsSelector = (store: any) => store.ChannelReducer.searchedChannels
+export const closeSearchChannelSelector = (store: any) => store.ChannelReducer.closeSearchChannel
 export const channelsForForwardSelector = (store: any) => store.ChannelReducer.channelsForForward
 export const deletedChannelSelector = (store: any) => store.ChannelReducer.deletedChannel
 export const addedChannelSelector = (store: any) => store.ChannelReducer.addedChannel
@@ -19,3 +21,4 @@ export const channelListHiddenSelector = (store: any) => store.ChannelReducer.hi
 export const isDraggingSelector = (store: any) => store.ChannelReducer.isDragging
 export const draggedAttachmentsSelector = (store: any) => store.ChannelReducer.draggedAttachments
 export const tabIsActiveSelector = (store: any) => store.ChannelReducer.tabIsActive
+export const channelMessageDraftIsRemovedSelector = (store: any) => store.ChannelReducer.draftIsRemoved

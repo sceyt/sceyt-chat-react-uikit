@@ -12,7 +12,7 @@ import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 import { bytesToSize, calculateRenderedImageWidth, downloadFile, formatLargeText } from '../../helpers'
 import { attachmentCompilationStateSelector } from '../../store/message/selector'
 import { IAttachment } from '../../types'
-import { attachmentTypes, UPLOAD_STATE } from '../../helpers/constants'
+import { attachmentTypes, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { colors } from '../../UIHelper/constants'
 import VideoPreview from '../VideoPreview'
 import { getCustomDownloader } from '../../helpers/customUploader'
@@ -22,10 +22,11 @@ import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { themeSelector } from '../../store/theme/selector'
 
 interface AttachmentPops {
   attachment: IAttachment
-  isPrevious?: boolean
+  isPreview?: boolean
   isRepliedMessage?: boolean
   isDetailsView?: boolean
   removeSelected?: (attachmentUrl: string) => void
@@ -49,7 +50,7 @@ interface AttachmentPops {
 
 const Attachment = ({
   attachment,
-  isPrevious = false,
+  isPreview = false,
   removeSelected,
   isRepliedMessage,
   borderRadius,
@@ -73,9 +74,11 @@ const Attachment = ({
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const connectionStatus = useSelector(connectionStatusSelector)
+  const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
   // const [imageLoading, setImageLoading] = useState(true)
+  const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
   const [isCached, setIsCached] = useState(true)
   // const [linkTitle, setLinkTitle] = useState('')
@@ -131,7 +134,7 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(attachment.url).then((url) => {
+        customDownloader(attachment.url).then((url: string) => {
           downloadImage(url)
         })
       } else {
@@ -160,6 +163,15 @@ const Attachment = ({
   }
 
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
+  const handleCompleteDownload = (attachmentId: string) => {
+    if (attachmentId === attachment.id) {
+      setDownloadingFile(false)
+    }
+  }
+  const handleDownloadFile = (attachment: IAttachment) => {
+    setDownloadingFile(true)
+    downloadFile(attachment, handleCompleteDownload)
+  }
 
   useEffect(() => {
     if (downloadIsCancelled) {
@@ -168,7 +180,7 @@ const Attachment = ({
   }, [attachmentUrl])
 
   useEffect(() => {
-    /* if (attachment.type === 'link' && !isPrevious) {
+    /* if (attachment.type === 'link' && !isPreview) {
       getMetadataFromUrl(attachment.url).then((res) => {
         if (res) {
           if (res.title) {
@@ -190,7 +202,7 @@ const Attachment = ({
     ) {
       getAttachmentUrlFromCache(attachment.id!)
         .then((cachedUrl) => {
-          if (attachment.type === 'image' && !isPrevious) {
+          if (attachment.type === 'image' && !isPreview) {
             if (cachedUrl) {
               // @ts-ignore
               // downloadImage(cachedUrl)
@@ -198,15 +210,16 @@ const Attachment = ({
               setIsCached(true)
             } else {
               if (customDownloader) {
-                console.log('is not cached, download with custom downloader')
-                customDownloader(attachment.url).then(async (url) => {
-                  console.log('image is downloaded. . . should load image', url)
+                // console.log('is not cached, download with custom downloader')
+                customDownloader(attachment.url).then(async (url: any) => {
+                  // console.log('image is downloaded. . . should load image', url)
                   downloadImage(url)
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.id!, response)
                 })
               } else {
-                console.log('is not cached, load attachment', attachment.url)
+                // console.log('is not cached, load attachment.url', attachment.url)
+                // console.log('is not cached, load attachment.attachmentUrl', attachment.attachmentUrl)
                 downloadImage(attachment.url)
               }
             }
@@ -217,7 +230,7 @@ const Attachment = ({
               setIsCached(true)
             } else {
               if (customDownloader) {
-                customDownloader(attachment.url).then(async (url) => {
+                customDownloader(attachment.url).then(async (url: any) => {
                   // if (attachment.type === attachmentTypes.video) {
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.id!, response)
@@ -233,7 +246,7 @@ const Attachment = ({
         .catch((e: any) => {
           console.log('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
-            customDownloader(attachment.url).then(async (url) => {
+            customDownloader(attachment.url).then(async (url: any) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.id!, response)
@@ -255,27 +268,26 @@ const Attachment = ({
         <AttachmentImgCont
           draggable={false}
           onClick={() => handleMediaItemClick && handleMediaItemClick(attachment)}
-          isPrevious={isPrevious}
+          isPreview={isPreview}
           ref={imageContRef}
           borderRadius={borderRadius}
           backgroundImage={attachment.metadata && attachment.metadata.tmb}
           isRepliedMessage={isRepliedMessage}
           fitTheContainer={isDetailsView}
-          width={!isPrevious && !isRepliedMessage ? renderWidth : undefined}
-          height={!isPrevious && !isRepliedMessage ? renderHeight : undefined}
+          width={!isPreview && !isRepliedMessage ? renderWidth : undefined}
+          height={!isPreview && !isRepliedMessage ? renderHeight : undefined}
         >
           {(attachment.attachmentUrl || attachmentUrl) && (
             <AttachmentImg
               draggable={false}
               // hidden={imageLoading}
-              backgroundColor={backgroundColor}
-              // absolute={attachment.metadata && attachment.metadata.tmb}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
               src={attachment.attachmentUrl || attachmentUrl}
               borderRadius={borderRadius}
               imageMinWidth={imageMinWidth}
-              isPrevious={isPrevious}
+              isPreview={isPreview}
               isRepliedMessage={isRepliedMessage}
-              withBorder={!isPrevious && !isDetailsView}
+              withBorder={!isPreview && !isDetailsView}
               fitTheContainer={isDetailsView}
               imageMaxHeight={
                 attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
@@ -284,7 +296,7 @@ const Attachment = ({
             />
           )}
 
-          {!isPrevious && !(attachment.attachmentUrl || attachmentUrl) && (
+          {!isPreview && !(attachment.attachmentUrl || attachmentUrl) && (
             <UploadProgress
               // positionStatic
               backgroundImage={attachment.metadata && attachment.metadata.tmb}
@@ -292,8 +304,8 @@ const Attachment = ({
               onClick={handlePauseResumeDownload}
               width={renderWidth}
               height={renderHeight}
-              withBorder={!isPrevious && !isDetailsView}
-              backgroundColor={backgroundColor}
+              withBorder={!isPreview && !isDetailsView}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
             >
@@ -310,7 +322,7 @@ const Attachment = ({
             </UploadProgress>
           )}
           {/* {!imgIsLoaded && ( */}
-          {/*    {!isPrevious && attachment.metadata && attachment.metadata.tmb && (
+          {/*    {!isPreview && attachment.metadata && attachment.metadata.tmb && (
             <ImageThumbnail
               src={attachment.metadata.tmb}
               fitTheContainer={isDetailsView}
@@ -323,7 +335,7 @@ const Attachment = ({
           )} */}
 
           {/* )} */}
-          {!isPrevious &&
+          {!isPreview &&
           attachmentCompilationState[attachment.attachmentId!] &&
           (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
             attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED) ? (
@@ -347,13 +359,16 @@ const Attachment = ({
               </UploadProgress>
             </React.Fragment>
           ) : */ null}
-          {isPrevious && (
-            <RemoveChosenFile onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
+          {isPreview && (
+            <RemoveChosenFile
+              color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+              onClick={() => removeSelected && removeSelected(attachment.attachmentId!)}
+            />
           )}
         </AttachmentImgCont>
       ) : attachment.type === 'video' ? (
         <React.Fragment>
-          {!isPrevious ? (
+          {!isPreview ? (
             <VideoCont
               onClick={() =>
                 handleMediaItemClick &&
@@ -395,6 +410,7 @@ const Attachment = ({
               ) */
               ) : null}
               <VideoPreview
+                theme={theme}
                 maxWidth={
                   isRepliedMessage
                     ? '40px'
@@ -423,11 +439,13 @@ const Attachment = ({
                 borderRadius={isRepliedMessage ? '4px' : borderRadius}
                 isRepliedMessage={isRepliedMessage}
                 isDetailsView={isDetailsView}
-                backgroundColor={backgroundColor}
+                backgroundColor={
+                  backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight
+                }
               />
             </VideoCont>
           ) : (
-            <AttachmentImgCont isPrevious={isPrevious} backgroundColor={colors.defaultAvatarBackground}>
+            <AttachmentImgCont isPreview={isPreview} backgroundColor={colors.defaultAvatarBackground}>
               {/* <PlayIcon /> */}
               <VideoPreview
                 maxWidth='48px'
@@ -436,10 +454,15 @@ const Attachment = ({
                 src={attachment.attachmentUrl || attachmentUrl}
                 borderRadius={borderRadius}
                 setVideoIsReadyToSend={setVideoIsReadyToSend}
-                backgroundColor={backgroundColor}
+                backgroundColor={
+                  backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight
+                }
                 isPreview
               />
-              <RemoveChosenFile onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
+              <RemoveChosenFile
+                color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+                onClick={() => removeSelected && removeSelected(attachment.attachmentId!)}
+              />
             </AttachmentImgCont>
           )}
         </React.Fragment>
@@ -459,15 +482,15 @@ const Attachment = ({
         </LinkAttachmentCont> */
         <AttachmentFile
           draggable={false}
-          isPrevious={isPrevious}
+          isPreview={isPreview}
           isUploading={
             attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
             attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED
           }
           borderRadius={borderRadius}
-          background={backgroundColor}
+          background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
           isRepliedMessage={isRepliedMessage}
-          border={selectedFileAttachmentsBoxBorder}
+          border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}
         >
           {attachment.metadata && attachment.metadata.tmb ? (
@@ -477,18 +500,18 @@ const Attachment = ({
               {selectedFileAttachmentsIcon || <FileIcon />}
             </AttachmentIconCont>
           )}
-          {!isRepliedMessage && !isPrevious && (
+          {!isRepliedMessage && !isPreview && (
             <DownloadFile
               backgroundColor={colors.primary}
-              onClick={() => downloadFile(attachment)}
+              onClick={() => handleDownloadFile(attachment)}
               onMouseEnter={() => handleMouseEvent(true)}
               onMouseLeave={() => handleMouseEvent(false)}
             >
-              <DownloadIcon />
+              {downloadingFile ? <UploadingIcon fileAttachment /> : <DownloadIcon />}
             </DownloadFile>
           )}
 
-          {!isPrevious &&
+          {!isPreview &&
           attachmentCompilationState[attachment.attachmentId!] &&
           (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
             attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED) ? (
@@ -513,17 +536,17 @@ const Attachment = ({
           ) */
           ) : null}
           {!isRepliedMessage && (
-            <AttachmentFileInfo isPrevious={isPrevious}>
+            <AttachmentFileInfo isPreview={isPreview}>
               {/* @ts-ignore */}
               <AttachmentName color={selectedFileAttachmentsTitleColor} ref={fileNameRef}>
                 {formatLargeText(
-                  isPrevious ? attachment.data.name : attachment.name,
-                  fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPrevious ? 18 : 30
+                  isPreview ? attachment.data.name : attachment.name,
+                  fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
               <AttachmentSize color={selectedFileAttachmentsSizeColor}>
-                {((attachment.data && attachment.data.size) || attachment.fileSize) &&
-                  bytesToSize(isPrevious ? attachment.data.size : +attachment.fileSize)}
+                {((attachment.data && attachment.data.size) || attachment.size) &&
+                  bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
                 {/* <span>
                   {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL && 'Upload error'}
                 </span> */}
@@ -531,8 +554,11 @@ const Attachment = ({
             </AttachmentFileInfo>
           )}
           {
-            isPrevious && (
-              <RemoveChosenFile onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
+            isPreview && (
+              <RemoveChosenFile
+                color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+                onClick={() => removeSelected && removeSelected(attachment.attachmentId!)}
+              />
             ) /*: attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.FAIL &&
             attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.UPLOADING ? (
             <DownloadFile download={attachment.name} onClick={() => downloadFile(attachment)}>
@@ -573,7 +599,7 @@ const DownloadImage = styled.div<any>`
   }
 `
 const AttachmentImgCont = styled.div<{
-  isPrevious: boolean
+  isPreview: boolean
   backgroundColor?: string
   backgroundImage?: string
   ref?: any
@@ -589,7 +615,7 @@ const AttachmentImgCont = styled.div<{
   align-items: center;
   justify-content: flex-end;
   //flex-direction: column;
-  margin-right: ${(props) => (props.isPrevious ? '16px' : props.isRepliedMessage ? '8px' : '')};
+  margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
   //max-width: 420px;
   //max-height: 400px;
   min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '130px'};
@@ -623,7 +649,7 @@ const AttachmentImgCont = styled.div<{
   }
 
   ${(props) =>
-    props.isPrevious &&
+    props.isPreview &&
     `
       width: 48px;
       min-width: 48px;
@@ -657,7 +683,7 @@ const DownloadFile = styled.span<{ backgroundColor?: string }>`
 `
 
 export const AttachmentFile = styled.div<{
-  isPrevious?: boolean
+  isPreview?: boolean
   isRepliedMessage?: boolean
   isUploading?: boolean
   borderRadius?: string
@@ -671,15 +697,15 @@ export const AttachmentFile = styled.div<{
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
   width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
   //height: 70px;
-  background: ${(props) => props.background || '#ffffff'};
+  background: ${(props) => props.background};
   border: ${(props) => props.border || `1px solid  ${colors.gray1}`};
   box-sizing: border-box;
-  margin-right: ${(props) => (props.isPrevious ? '16px' : props.isRepliedMessage ? '8px' : '')};
+  margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
   border-radius: ${(props) => props.borderRadius || '6px'};
 
   ${(props) =>
     !props.isRepliedMessage &&
-    !props.isPrevious &&
+    !props.isPreview &&
     !props.isUploading &&
     `
       &:hover ${DownloadFile} {
@@ -712,6 +738,7 @@ const RemoveChosenFile = styled(RemoveAttachment)`
   right: -11px;
   padding: 2px;
   cursor: pointer;
+  color: ${(props) => props.color || colors.textColor3};
   z-index: 4;
 `
 /*
@@ -729,23 +756,23 @@ const AttachmentName = styled.h3<{ color?: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 18px;
-  color: ${(props) => props.color || colors.blue6};
+  color: ${(props) => props.color || colors.textColor1};
   max-width: 275px;
   white-space: nowrap;
   margin: 0;
 `
 const AttachmentSize = styled.span<{ color?: string }>`
   font-size: 13px;
-  color: ${(props) => props.color || colors.blue6};
+  color: ${(props) => props.color || colors.textColor1};
   & > span {
     color: ${colors.red1};
     margin-left: 8px;
   }
 `
-const AttachmentFileInfo = styled.div<{ isPrevious: boolean }>`
+const AttachmentFileInfo = styled.div<{ isPreview: boolean }>`
   margin-left: 12px;
   ${(props) =>
-    props.isPrevious &&
+    props.isPreview &&
     `line-height: 14px;
       max-width: calc(100% - 44px);
   `}
@@ -756,7 +783,7 @@ export const AttachmentImg = styled.img<{
   borderRadius?: string
   ref?: any
   withBorder?: boolean
-  isPrevious?: boolean
+  isPreview?: boolean
   hidden?: boolean
   isRepliedMessage?: boolean
   fitTheContainer?: boolean
@@ -774,17 +801,17 @@ export const AttachmentImg = styled.img<{
   max-width: 100%;
   max-height: ${(props) => props.imageMaxHeight || '400px'};
   width: ${(props) =>
-    props.isRepliedMessage ? '40px' : props.isPrevious ? '48px' : props.fitTheContainer ? '100%' : ''};
+    props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>
-    props.isRepliedMessage ? '40px' : props.isPrevious ? '48px' : props.fitTheContainer ? '100%' : ''};
+    props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPrevious && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
       ? '90px'
       : props.isRepliedMessage
       ? '40px'
       : ''};
   min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPrevious && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
       ? props.imageMinWidth || '130px'
       : props.isRepliedMessage
       ? '40px'

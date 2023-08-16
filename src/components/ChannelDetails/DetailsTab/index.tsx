@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
-import { CHANNEL_TYPE, channelDetailsTabs } from '../../../helpers/constants'
+import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import Members from './Members'
 import Media from './Media'
@@ -10,10 +10,12 @@ import Links from './Links'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 import { IChannel } from '../../../types'
 import Voices from './Voices'
+import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 
 interface IProps {
   channel: IChannel
   activeTab: string
+  theme: string
   setActiveTab: (activeTab: string) => void
   checkActionPermission: (permission: string) => boolean
   linkPreviewIcon?: JSX.Element
@@ -42,6 +44,7 @@ interface IProps {
 
 const DetailsTab = ({
   channel,
+  theme,
   activeTab,
   checkActionPermission,
   setActiveTab,
@@ -71,7 +74,13 @@ const DetailsTab = ({
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
-
+  const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const displayMemberText =
+    memberDisplayText && memberDisplayText[channel.type]
+      ? `${memberDisplayText[channel.type]}s`
+      : channel.type === CHANNEL_TYPE.BROADCAST
+      ? 'subscribers'
+      : 'members'
   const handleTabClick = (tabIndex: string) => {
     dispatch(emptyChannelAttachmentsAC())
     setActiveTab(tabIndex)
@@ -85,8 +94,11 @@ const DetailsTab = ({
   }, [showMembers])
 
   return (
-    <Container>
-      <DetailsTabHeader activeTabColor={colors.primary}>
+    <Container theme={theme}>
+      <DetailsTabHeader
+        activeTabColor={colors.primary}
+        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
+      >
         {Object.keys(channelDetailsTabs).map((key) => {
           if (key === 'member') {
             if (showMembers) {
@@ -97,11 +109,7 @@ const DetailsTab = ({
                   onClick={() => handleTabClick(channelDetailsTabs[key])}
                   key={key}
                 >
-                  {channelDetailsTabs[key] === channelDetailsTabs.member
-                    ? channel.type === CHANNEL_TYPE.PUBLIC
-                      ? 'Subscribers'
-                      : channelDetailsTabs[key]
-                    : channelDetailsTabs[key]}
+                  {channelDetailsTabs[key] === channelDetailsTabs.member ? displayMemberText : channelDetailsTabs[key]}
                 </button>
               )
             } else {
@@ -122,8 +130,9 @@ const DetailsTab = ({
       </DetailsTabHeader>
       {showMembers && activeTab === channelDetailsTabs.member && (
         <Members
+          theme={theme}
           channel={channel}
-          chekActionPermission={checkActionPermission}
+          checkActionPermission={checkActionPermission}
           showChangeMemberRole={showChangeMemberRole}
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
@@ -134,6 +143,7 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}
+          theme={theme}
           filePreviewIcon={filePreviewIcon}
           filePreviewHoverIcon={filePreviewHoverIcon}
           filePreviewTitleColor={filePreviewTitleColor}
@@ -170,34 +180,57 @@ const DetailsTab = ({
 
 export default DetailsTab
 
-const Container = styled.div`
-  border-top: 1px solid ${colors.gray1};
+const Container = styled.div<{ theme?: string }>`
+  //border-top: 1px solid ${colors.gray1};
 `
 
-const DetailsTabHeader = styled.div<{ activeTabColor?: string }>`
+const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: string; backgroundColor?: string }>`
+  overflow: auto;
   padding: 0 20px;
-  border-bottom: 1px solid ${colors.gray1};
+  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor || colors.white};
   display: flex;
   justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 12;
-  background: #fff;
+  /* width */
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+
+  /* Track */
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  /* Handle */
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  /* Handle on hover */
+  &::-webkit-scrollbar-thumb:hover {
+    background: transparent;
+  }
   button {
     position: relative;
     border: none;
     background: transparent;
     outline: none;
     padding: 13px 0 11px;
+    text-transform: capitalize;
     font-style: normal;
     font-weight: 500;
     font-size: 15px;
     line-height: 20px;
-    color: ${colors.gray9};
+    color: ${colors.textColor2};
+    min-width: 70px;
     cursor: pointer;
   }
   & .active {
-    color: ${colors.gray6};
+    color: ${(props) => props.activeTabColor || colors.primary};
 
     &:after {
       content: '';

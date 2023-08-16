@@ -32,17 +32,18 @@ export interface ICreateChannel {
 
 export interface IAttachment {
   id?: string
-  attachmentId?: string
-  createdAt: Date
-  url: any
-  attachmentUrl: string
-  type: string
+  messageId: string
   name: string
-  data: any
-  fileSize: number
-  title?: string
+  type: string
   metadata?: any
-  user: IUser
+  url: any
+  size: number
+  createdAt: Date
+  upload: boolean
+  user?: IUser
+  attachmentId?: string
+  attachmentUrl: string
+  data: any
 }
 
 declare class AttachmentBuilder {
@@ -69,6 +70,7 @@ export interface IReaction {
   messageId: string
   user: IUser
 }
+
 export interface IMessage {
   id: string
   tid?: string
@@ -78,17 +80,29 @@ export interface IMessage {
   updatedAt?: Date | number
   type: string
   deliveryStatus: string
-  selfMarkers: string[]
+  markerTotals: {
+    name: string
+    count: number
+  }[]
+  userMarkers?: {
+    name: string
+    messageId: string
+    createdAt: Date
+    user: IUser | null
+  }[]
   incoming: boolean
   metadata: any
   state: string
-  selfReactions: IReaction[] | []
-  lastReactions: IReaction[] | []
-  reactionScores: { [key: string]: number } | null
+  userReactions: IReaction[] | []
+  reactionTotals: {
+    key: string
+    count: number
+    score: number
+  }[]
   attachments: IAttachment[] | []
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
-  parent?: IMessage | null
+  parentMessage?: IMessage | null
   parentId?: string
   repliedInThread?: boolean
   replyCount?: number
@@ -108,36 +122,45 @@ export interface IMember extends IUser {
 
 export interface IChannel {
   id: string
-  createdAt: Date | number
-  updatedAt: Date | number
-  lastReadMessageId: string
-  lastDeliveredMessageId: string
-  lastMessage: any | null
-  lastReactedMessage?: IMessage
-  memberCount: number
-  markedAsUnread: boolean
-  muted: boolean
-  muteExpireTime: Date | number
-  type: 'Public' | 'Private' | 'Direct'
-  peer?: any
+  parentId?: string
+  uri?: string
+  type: string
   subject?: string
-  label?: string
-  metadata: any
-  role: string
   avatarUrl?: string
-  unreadMessageCount?: number
-  unreadMentionsCount?: number
-  unreadReactionsCount?: number
-  userMessageReactions?: IReaction[]
+  metadata: any
+  createdAt: Date
+  updatedAt: Date | null
+  messagesClearedAt: Date | null
+  memberCount: number
+  messageCount: number
+  createdBy: IUser
+  userRole: string
+  unread: boolean
+  newMessageCount: number
+  newMentionCount: number
+  newReactedMessageCount: number
+  hidden: boolean
+  archived: boolean
+  muted: boolean
+  mutedTill: Date | null
+  pinnedAt: Date | null
+  lastReceivedMsgId: string
+  lastDisplayedMsgId: string
+  messageRetentionPeriod?: number
+  lastMessage: IMessage
+  messages: IMessage[]
+  members: IMember[]
+  newReactions: IReaction[]
+  lastReactedMessage?: IMessage
   delete: () => Promise<void>
-  deleteAllMessages: (deleteForMe?: boolean) => Promise<void>
+  deleteAllMessages: (forEveryone?: boolean) => Promise<void>
   hide: () => Promise<boolean>
   unhide: () => Promise<boolean>
   markAsUnRead: () => Promise<IChannel>
   mute: (_muteExpireTime: number) => Promise<IChannel>
   unmute: () => Promise<IChannel>
-  markMessagesAsDelivered: (_messageIds: string[]) => Promise<void>
-  markMessagesAsRead: (_messageIds: string[]) => Promise<void>
+  markMessagesAsReceived: (_messageIds: string[]) => Promise<void>
+  markMessagesAsDisplayed: (_messageIds: string[]) => Promise<void>
   startTyping: () => void
   stopTyping: () => void
   sendMessage: (message: any) => Promise<any>

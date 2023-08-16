@@ -27,8 +27,14 @@ interface IReactionsPopupProps {
   handleReactionsPopupClose: () => void
   bottomPosition: number
   horizontalPositions: { left: number; right: number }
-  reactionScores: { [key: string]: number }
+  reactionTotals: {
+    key: string
+    count: number
+    score: number
+  }[]
   rtlDirection?: boolean
+  reactionsDetailsPopupBorderRadius?: string
+  reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
 }
 let reactionsPrevLength: any = 0
 export default function ReactionsPopup({
@@ -37,7 +43,9 @@ export default function ReactionsPopup({
   handleAddDeleteEmoji,
   bottomPosition,
   // horizontalPositions,
-  reactionScores,
+  reactionTotals,
+  reactionsDetailsPopupBorderRadius,
+  reactionsDetailsPopupHeaderItemsStyle,
   rtlDirection
 }: IReactionsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
@@ -56,13 +64,13 @@ export default function ReactionsPopup({
   const [calculateSizes, setCalculateSizes] = useState(false)
   const [closeIsApproved, setCloseIsApproved] = useState(false)
   let totalReactions = 0
-  const reactionsList = Object.keys(reactionScores).map((key) => {
-    totalReactions += reactionScores[key]
-    return {
-      key,
-      count: reactionScores[key]
-    }
-  })
+  console.log('reactionTotals. . . . ', reactionTotals)
+  if (reactionTotals) {
+    reactionTotals.forEach((summery) => {
+      totalReactions += summery.count
+    })
+  }
+
   const user = getClient().user
   const dispatch = useDispatch()
   const handleReactionsListScroll = (event: any) => {
@@ -96,6 +104,13 @@ export default function ReactionsPopup({
       dispatch(setReactionsListAC([], true))
     }
   }, [messageId])
+
+  useEffect(() => {
+    if (!reactionTotals || !reactionTotals.length) {
+      handleReactionsPopupClose()
+    }
+  }, [reactionTotals])
+
   useEffect(() => {
     if (reactions && reactionsPrevLength < reactions.length) {
       const reactionsHeight = reactions.length * 44 + 45
@@ -106,9 +121,7 @@ export default function ReactionsPopup({
     } else {
       reactionsPrevLength = !reactions ? 0 : reactions.length
     }
-  }, [reactions])
 
-  useEffect(() => {
     if (reactions && reactions.length) {
       if (calculateSizes) {
         // const popupPos = popupRef.current?.getBoundingClientRect()
@@ -134,16 +147,23 @@ export default function ReactionsPopup({
       // popupHorizontalPosition={popupHorizontalPosition}
       className='reactions_popup'
       height={popupHeight}
-      visible={!!(reactions && reactions.length && reactionsLoadingState === LOADING_STATE.LOADED)}
+      visible={!calculateSizes}
       rtlDirection={rtlDirection}
+      borderRadius={reactionsDetailsPopupBorderRadius}
     >
       <ReactionScoresCont>
-        <ReactionScoresList>
-          <ReactionScoreItem active={activeTabKey === 'all'} onClick={() => handleGetReactions()}>
+        <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
+          <ReactionScoreItem
+            bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
+            active={activeTabKey === 'all'}
+            activeColor={colors.primary}
+            onClick={() => handleGetReactions()}
+          >
             <span>{`All ${totalReactions}`}</span>
           </ReactionScoreItem>
-          {reactionsList.map((reaction) => (
+          {reactionTotals.map((reaction) => (
             <ReactionScoreItem
+              bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
               key={reaction.key}
               onClick={() => handleGetReactions(reaction.key)}
               active={activeTabKey === reaction.key}
@@ -196,6 +216,7 @@ export default function ReactionsPopup({
 const Container = styled.div<{
   popupVerticalPosition: string
   popupHorizontalPosition?: string
+  borderRadius?: string
   height: number
   visible?: any
   rtlDirection?: boolean
@@ -217,7 +238,7 @@ const Container = styled.div<{
   box-shadow: 0 6px 24px -6px rgba(15, 34, 67, 0.12), 0px 1px 3px rgba(24, 23, 37, 0.14);
   box-sizing: border-box;
   //box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
-  border-radius: 6px;
+  border-radius: ${(props) => props.borderRadius || '12px'};
   visibility: ${(props) => (props.visible ? 'visible' : 'hidden')};
   transition: all 0.2s;
 
@@ -283,27 +304,41 @@ const ReactionScoresCont = styled.div`
   overflow-y: auto;
 `
 
-const ReactionScoresList = styled.div`
+const ReactionScoresList = styled.div<{ borderBottom: boolean }>`
   display: flex;
-  border-bottom: 1px solid ${colors.gray1};
+  border-bottom: ${(props) => props.borderBottom && `1px solid ${colors.gray1}`};
+  padding: 2px 8px 0;
 `
 
-const ReactionScoreItem = styled.div<any>`
+const TabKey = styled.span``
+const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; activeColor?: string }>`
   position: relative;
   display: flex;
   white-space: nowrap;
-  padding: 12px;
+  padding: ${(props) => (props.bubbleStyle ? '12px 4px' : '12px')};
   font-weight: 500;
   font-size: 13px;
-  line-height: 20px;
-  border-bottom: 1px solid ${colors.gray1};
-  color: ${(props) => (props.active ? colors.gray6 : colors.gray9)};
+  border-bottom: ${(props) => !props.bubbleStyle && `1px solid ${colors.gray1}`};
+  color: ${(props) => (props.active ? colors.textColor1 : colors.textColor2)};
   margin-bottom: -1px;
   cursor: pointer;
   & > span {
     position: relative;
+    border: ${(props) => props.bubbleStyle && !props.active && `1px solid ${colors.gray1}`};
+    padding: ${(props) => props.bubbleStyle && '6px 12px'};
+    border-radius: 16px;
+    height: 30px;
+    box-sizing: border-box;
+    font-family: Inter, sans-serif;
+    font-style: normal;
+    font-weight: 600;
+    font-size: 14px;
+    line-height: ${(props) => (props.bubbleStyle ? '18px' : '30px')};
+    background-color: ${(props) => props.active && props.bubbleStyle && colors.primary};
+    color: ${(props) => props.active && props.bubbleStyle && colors.white};
     ${(props) =>
       props.active &&
+      !props.bubbleStyle &&
       `
     &::after {
     content: '';
@@ -314,15 +349,16 @@ const ReactionScoreItem = styled.div<any>`
     height: 2px;
     background-color: ${props.activeColor || colors.primary};
     border-radius: 2px;
-  }`}
-  }
-`
+    }
+  `}
 
-const TabKey = styled.span`
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
-  margin-right: 4px;
-  font-size: 15px;
+    & ${TabKey} {
+      font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
+        twemoji mozilla, segoe ui symbol;
+      margin-right: 4px;
+      font-size: 15px;
+    }
+  }
 `
 
 const ReactionKey = styled.span`

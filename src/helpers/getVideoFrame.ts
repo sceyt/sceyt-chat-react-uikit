@@ -28,7 +28,7 @@ export async function getFrame(
           console.log('canvas.toDataURL() resized ... ', canvas.toDataURL('', 0.7))
           const thumb = canvas.toDataURL('', 0.7).replace('data:image/jpeg;base64,', '')
           clearInterval(b)
-          resolve({ thumb: thumb, width: video.videoWidth, height: video.videoHeight })
+          resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
         }
       }, 500)
     } else {
@@ -65,7 +65,7 @@ export async function getFrame2(videoSrc: any, time: number) {
         const thumb = await createImageThumbnail(null, canvas.toDataURL(), 200, 100)
         console.log('thumb new version .... ', thumb)
         clearInterval(b)
-        resolve({ thumb: thumb, width: video.videoWidth, height: video.videoHeight })
+        resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
       }
     }, 500)
     // } else {

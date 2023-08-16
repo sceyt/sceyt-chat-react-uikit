@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React, { useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
-import { ReactComponent as EditIcon } from '../../../assets/svg/edit.svg'
+import { ReactComponent as EditIcon } from '../../../assets/svg/editIcon.svg'
 // import { ReactComponent as CameraIcon } from '../../../assets/lib/svg/camera.svg'
 import { ReactComponent as CheckIcon } from '../../../assets/svg/check.svg'
 import { SectionHeader } from '../../../UIHelper'
@@ -108,6 +108,8 @@ interface IProps {
 
 const Info = ({ channel, handleToggleEditMode }: IProps) => {
   // const fileUploader = useRef<any>(null)
+  const ChatClient = getClient()
+  const { user } = ChatClient
   const updateSubject = useRef<any>(null)
   const dispatch = useDispatch()
   // const [cropPopup, setCropPopup] = useState(false)
@@ -119,7 +121,7 @@ const Info = ({ channel, handleToggleEditMode }: IProps) => {
   }) */
 
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-
+  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   /* const onOpenFileUploader = () => {
     fileUploader.current.click()
   } */
@@ -221,15 +223,15 @@ const Info = ({ channel, handleToggleEditMode }: IProps) => {
           <React.Fragment>
             <ChannelSubject>
               <SectionHeader>
-                {isDirectChannel
-                  ? channel.peer.firstName
-                    ? `${channel.peer.firstName} ${channel.peer.lastName}`
-                    : channel.peer.id
+                {isDirectChannel && directChannelUser
+                  ? directChannelUser.firstName
+                    ? `${directChannelUser.firstName} ${directChannelUser.lastName}`
+                    : directChannelUser.id
                   : channel.subject}
               </SectionHeader>
               <ChannelMembers>{channel.memberCount} members</ChannelMembers>
             </ChannelSubject>
-            {!isDirectChannel && channel.role && (
+            {!isDirectChannel && channel.userRole && (
               <EditSubject onClick={() => handleToggleEditMode()}>
                 <EditIcon />
               </EditSubject>

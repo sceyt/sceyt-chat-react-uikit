@@ -31,7 +31,7 @@ const Links = ({
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link))
   }, [channelId])
-
+  console.log('attachments. .. . . ', attachments)
   return (
     <Container>
       {attachments.map((file: IAttachment) => (

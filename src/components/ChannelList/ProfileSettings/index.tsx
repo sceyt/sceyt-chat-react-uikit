@@ -52,8 +52,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.gray6}
-          iconColor={colors.gray4}
+          textColor={colors.textColor1}
+          iconColor={colors.textColor2}
           margin='0 0 24px'
           onClick={handleOpenEditProfile}
         >
@@ -62,8 +62,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.gray6}
-          iconColor={colors.gray4}
+          textColor={colors.textColor1}
+          iconColor={colors.textColor2}
           margin='0 0 24px'
         >
           <NotificationsIcon /> Notifications
@@ -71,8 +71,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.gray6}
-          iconColor={colors.gray4}
+          textColor={colors.textColor1}
+          iconColor={colors.textColor2}
           margin='0 0 24px'
         >
           <LockIcon /> About
@@ -132,7 +132,7 @@ const Username = styled.h3`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
 `
 
 const UserNumber = styled.h4`
@@ -141,5 +141,5 @@ const UserNumber = styled.h4`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.gray9};
+  color: ${colors.textColor2};
 `

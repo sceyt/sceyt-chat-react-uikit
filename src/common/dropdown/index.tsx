@@ -1,9 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
-import { colors } from '../../UIHelper/constants'
 import { useDidUpdate, useEventListener } from '../../hooks'
+import { colors } from '../../UIHelper/constants'
+import { THEME } from '../../helpers/constants'
 
-const DropDownContainer = styled.div<{ height?: string; center: boolean; order?: number; margin?: string }>`
+const DropDownContainer = styled.div<{
+  height?: string
+  center: boolean
+  order?: number
+  margin?: string
+  theme?: string
+}>`
   position: relative;
   height: ${(props) => (props.height ? props.height : '100%')};
   order: ${(props) => (props.order === 0 || props.order ? props.order : 0)};
@@ -45,10 +52,8 @@ const DropDownTriggerContainer = styled.div<{
             width: 7px;
             height: 7px;
             border-width: 1px 1px 0 0;
-            //border-color: ${colors.gray2};
-            border-color: ${props.iconColor || 'white'};
+            border-color: ${props.iconColor || 'black'};
             border-style: solid;
-            //border-radius: 2px;
             top: calc(50% - 2px);
             right: 14px;
             transform: translateY(-50%) rotate(135deg);
@@ -64,7 +69,7 @@ const DropDownTriggerContainer = styled.div<{
         `};
 `
 
-const DropDownBody = styled.div<{ position?: string; onScroll?: any }>`
+const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor?: string }>`
   position: absolute;
   z-index: 300;
   min-width: 200px;
@@ -74,7 +79,7 @@ const DropDownBody = styled.div<{ position?: string; onScroll?: any }>`
   display: flex;
   direction: initial;
   flex-direction: column;
-  background: #ffffff;
+  background: ${(props) => props.backgroundColor || colors.backgroundColor};
   border-radius: 8px;
   max-height: 220px;
   overflow-y: auto;
@@ -120,6 +125,7 @@ interface IProps {
   watchToggleState?: (state: boolean) => void
   height?: string
   children?: JSX.Element | JSX.Element[]
+  theme?: string
 }
 
 const DropDown = ({
@@ -135,6 +141,7 @@ const DropDown = ({
   watchToggleState,
   height,
   children,
+  theme,
   order
 }: IProps) => {
   const [isOpen, setIsOpen] = useState(false)
@@ -197,9 +204,9 @@ const DropDown = ({
       setIsOpen(dropDownState)
     }
   }, [dropDownState])
-
   return (
     <DropDownContainer
+      theme={theme}
       order={order}
       margin={margin}
       className='dropdown-wrapper'
@@ -215,13 +222,19 @@ const DropDown = ({
         withIcon={React.isValidElement(trigger) ? withIcon : true}
         isOpen={isOpen}
         className={`dropdown-trigger ${isOpen ? 'open' : ''}`}
-        iconColor={iconColor}
+        iconColor={iconColor || (theme === THEME.DARK ? colors.white : '')}
       >
         {React.isValidElement(trigger) ? trigger : <span>{trigger}</span>}
         {/* {React.cloneElement(trigger, { onClick: toggleDropdown })} */}
       </DropDownTriggerContainer>
       {isOpen && (
-        <DropDownBody onScroll={handleScrolling} className='dropdown-body' ref={dropDownBodyRef} position={position}>
+        <DropDownBody
+          backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+          onScroll={handleScrolling}
+          className='dropdown-body'
+          ref={dropDownBodyRef}
+          position={position}
+        >
           {children}
         </DropDownBody>
       )}

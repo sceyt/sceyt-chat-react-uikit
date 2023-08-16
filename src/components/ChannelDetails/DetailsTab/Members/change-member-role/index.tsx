@@ -3,7 +3,6 @@ import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import {
   Popup,
-  PopupContainer,
   PopupName,
   CloseIcon,
   DropdownOptionsUl,
@@ -20,14 +19,16 @@ import { IMember, IRole } from '../../../../../types'
 import { rolesSelector } from '../../../../../store/member/selector'
 import { changeMemberRoleAC, getRolesAC } from '../../../../../store/member/actions'
 import { colors } from '../../../../../UIHelper/constants'
+import PopupContainer from '../../../../../common/popups/popupContainer'
 
 interface IProps {
+  theme: string
   channelId: string
   member: IMember
   handleClosePopup: () => void
 }
 
-const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
+const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
@@ -57,27 +58,33 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
 
   return (
     <PopupContainer>
-      <Popup maxWidth='400px' padding='0'>
-        <PopupBody padding={24}>
-          <CloseIcon onClick={() => handleClosePopup()} />
-          <PopupName>Change member role</PopupName>
+      <Popup backgroundColor={colors.backgroundColor} maxWidth='400px' padding='0'>
+        <PopupBody paddingH='24px' paddingV='24px'>
+          <CloseIcon color={colors.textColor1} onClick={() => handleClosePopup()} />
+          <PopupName color={colors.textColor1}>Change member role</PopupName>
 
           <RolesSelect>
-            <RoleLabel>Roles</RoleLabel>
+            <RoleLabel color={colors.textColor1}>Roles</RoleLabel>
 
-            <CustomSelect>
+            <CustomSelect backgroundColor={colors.backgroundColor} color={colors.textColor1}>
               <DropDown
                 withIcon
+                theme={theme}
                 isSelect
-                trigger={<CustomSelectTrigger>{selectedRole || member.role || 'Select'}</CustomSelectTrigger>}
+                trigger={
+                  <CustomSelectTrigger color={colors.textColor1}>
+                    {selectedRole || member.role || 'Select'}
+                  </CustomSelectTrigger>
+                }
               >
-                <DropdownOptionsUl>
+                <DropdownOptionsUl theme={theme}>
                   {!!roles.length &&
                     roles.map((role: IRole) => (
                       <DropdownOptionLi
                         hoverBackground={colors.primaryLight}
                         key={role.name}
                         onClick={() => onChangeFunction(role.name)}
+                        textColor={colors.textColor1}
                       >
                         <RoleSpan>{role.name}</RoleSpan>
                       </DropdownOptionLi>
@@ -87,8 +94,13 @@ const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
             </CustomSelect>
           </RolesSelect>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.gray5}>
-          <Button type='button' color={colors.gray6} backgroundColor='transparent' onClick={() => handleClosePopup()}>
+        <PopupFooter backgroundColor={colors.backgroundColor}>
+          <Button
+            type='button'
+            color={colors.textColor1}
+            backgroundColor='transparent'
+            onClick={() => handleClosePopup()}
+          >
             Cancel
           </Button>
           <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleSave}>
@@ -104,19 +116,18 @@ const RolesSelect = styled.div`
   margin-bottom: 32px;
 `
 
-const RoleLabel = styled.div`
+const RoleLabel = styled.div<{ color?: string }>`
   font-style: normal;
   font-weight: 500;
   font-size: 14px;
   margin: 20px 0 8px;
-  color: #1f233c;
+  color: ${({ color }) => color || colors.textColor1};
 `
 
 const RoleSpan = styled.span`
   font-style: normal;
   font-weight: normal;
   font-size: 14px;
-  color: #383b51;
   text-transform: capitalize;
 `
 

@@ -47,6 +47,7 @@ import { useDidUpdate } from '../../hooks'
 import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { themeSelector } from '../../store/theme/selector'
 
 let loading = false
 let loadFromServer = false
@@ -59,6 +60,7 @@ let loadDirection = ''
 let nextDisable = false
 let prevDisable = false
 let prevMessageId = ''
+const messagesIndexMap = {}
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -71,6 +73,7 @@ const CreateMessageDateDivider = ({
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
   noMargin,
+  theme,
   marginBottom,
   marginTop
 }: any) => {
@@ -87,6 +90,7 @@ const CreateMessageDateDivider = ({
   }
   return !differentDays ? null : (
     <MessageDivider
+      theme={theme}
       dividerText={dividerText}
       visibility={messagesHasNext && lastIndex}
       dateDividerFontSize={dateDividerFontSize}
@@ -110,6 +114,7 @@ interface MessagesProps {
   ownMessageBackground?: string
   incomingMessageBackground?: string
   showMessageStatus?: boolean
+  showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
   showMessageStatusForEachMessage?: boolean
   showMessageTimeForEachMessage?: boolean
@@ -137,7 +142,7 @@ interface MessagesProps {
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
-  separateEmojiCategoriesWithTitle?: boolean
+  fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
   reactionIconOrder?: number
@@ -169,6 +174,7 @@ interface MessagesProps {
   inlineReactionIcon?: JSX.Element
   reactionsDisplayCount?: number
   showEachReactionCount?: boolean
+  showTotalReactionCount?: boolean
   reactionItemBorder?: string
   reactionItemBorderRadius?: string
   reactionItemBackground?: string
@@ -181,6 +187,8 @@ interface MessagesProps {
   reactionsContainerPadding?: string
   reactionsContainerBackground?: string
   reactionsContainerTopPosition?: string
+  reactionsDetailsPopupBorderRadius?: string
+  reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
   newMessagesSeparatorText?: string
   newMessagesSeparatorFontSize?: string
   newMessagesSeparatorTextColor?: string
@@ -211,11 +219,12 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimePosition,
   messageStatusDisplayingType,
   showMessageStatus,
+  showMessageTimeAndStatusOnlyOnHover,
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.gray11,
+  incomingMessageBackground = colors.backgroundColor,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -242,11 +251,12 @@ const MessageList: React.FC<MessagesProps> = ({
   reportIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions,
-  separateEmojiCategoriesWithTitle,
+  fixEmojiCategoriesTitleOnTop,
   emojisCategoryIconsPosition,
   emojisContainerBorderRadius,
   reactionsDisplayCount,
   showEachReactionCount,
+  showTotalReactionCount,
   reactionItemBorder,
   reactionItemBorderRadius,
   reactionItemBackground,
@@ -259,6 +269,8 @@ const MessageList: React.FC<MessagesProps> = ({
   reactionsContainerBackground,
   reactionsContainerPadding,
   reactionsContainerTopPosition,
+  reactionsDetailsPopupBorderRadius,
+  reactionsDetailsPopupHeaderItemsStyle = 'bubbles',
   editIconOrder,
   copyIconOrder,
   replyIconOrder,
@@ -307,6 +319,7 @@ const MessageList: React.FC<MessagesProps> = ({
   differentUserMessageSpacing
 }) => {
   const dispatch = useDispatch()
+  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const channel: IChannel = useSelector(activeChannelSelector)
   const ChatClient = getClient()
@@ -376,12 +389,13 @@ const MessageList: React.FC<MessagesProps> = ({
     }, 1000)
 
     // const nextMessageNode: any = document.getElementById(nextTargetMessage)
-    const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+    // const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
     renderTopDate()
     const { target } = event
-    // console.log('target.scrollTop. ..  . ..  .. ', target.scrollTop)
+    // console.log('target.scrollTop. ..  . ..  .. ', -target.scrollTop)
+    // console.log('target.scrollHeight. ..  . ..  .. ', target.scrollHeight)
     // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
-    const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
+    // const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
     if (scrollToReply) {
       target.scrollTop = scrollToReply
     } else {
@@ -390,45 +404,70 @@ const MessageList: React.FC<MessagesProps> = ({
       } else {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
-      const scrollHeightQuarter = (target.scrollHeight * 20) / 100
+      // const scrollHeightTarget = (target.scrollHeight * 10) / 100
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !prevDisable &&
         messagesLoading !== LOADING_STATE.LOADING &&
+        messagesIndexMap[lastVisibleMessageId] < 15
+      ) {
+        loadDirection = 'prev'
+        prevMessageId = messages[0].id
+        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
+        if (!getHasPrevCached()) {
+          loadFromServer = true
+        }
+        nextDisable = true
+      }
+
+      if (
+        !nextDisable &&
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        messagesLoading !== LOADING_STATE.LOADING &&
+        (hasNextMessages || getHasNextCached()) &&
+        messagesIndexMap[lastVisibleMessageId] > messages.length - 15
+      ) {
+        loadDirection = 'next'
+
+        prevDisable = true
+        handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
+      }
+      /* if (
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        !prevDisable &&
+        messagesLoading !== LOADING_STATE.LOADING &&
         !scrollToRepliedMessage &&
-        -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightQuarter &&
-        /* hasPrev && */ !loading &&
+        -target.scrollTop >= target.scrollHeight - target.offsetHeight - scrollHeightTarget &&
+        /!* hasPrev && *!/ !loading &&
         !scrollToNewMessage.scrollToBottom &&
         messages.length
       ) {
         loadDirection = 'prev'
         // console.log('load prev messages........ ')
         prevMessageId = messages[0].id
+        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.PREV)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
         if (!getHasPrevCached()) {
           // console.log('load from server ..... ', true)
           loadFromServer = true
         }
-        /*   if (cachedMessages.prev) {
+        /!*   if (cachedMessages.prev) {
           loading = true
           handleAddMessages([], 'prev', true)
         } else if (hasPrevMessages) {
           await handleLoadMoreMessages('prev', 15)
         }
-       */
+       *!/
         // if (hasPrevMessages && lastVisibleMessage) {
-        nextDisable = false
         nextDisable = true
         // target.scrollTop = lastVisibleMessage.offsetTop
         // }
         // dispatch(loadMoreMessagesAC(10, 'prev', channel.id))
-      }
-      if (lastVisibleMessagePos > 0) {
+      } */
+      if (messagesIndexMap[lastVisibleMessageId] > messages.length - 10) {
         nextDisable = false
-      } else {
-        prevDisable = false
       }
-      if (
+      /*  if (
         !nextDisable &&
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         messagesLoading !== LOADING_STATE.LOADING &&
@@ -441,21 +480,22 @@ const MessageList: React.FC<MessagesProps> = ({
         loadDirection = 'next'
 
         // console.log('load next......... ')
-        /* if (lastVisibleMessage) {
+        /!* if (lastVisibleMessage) {
           target.scrollTop = lastVisibleMessage.offsetTop - 10
-        } */
+        } *!/
         // dispatch(loadMoreMessagesAC(10, 'next', channel.id))
         // if (hasNextMessages && lastVisibleMessage) {
         prevDisable = true
         // }
+        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.NEXT)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-        /* if (cachedMessages.next) {
+        /!* if (cachedMessages.next) {
           loading = true
           handleAddMessages([], 'next', true)
         } else if (hasNextMessages) {
           await handleLoadMoreMessages('next', 15)
-        } */
-      }
+        } *!/
+      } */
     }
   }
 
@@ -501,8 +541,8 @@ const MessageList: React.FC<MessagesProps> = ({
         direction === MESSAGE_LOAD_DIRECTION.NEXT &&
         lastMessageId &&
         (hasNextMessages || hasNextCached)
-        // channel.unreadMessageCount &&
-        // channel.unreadMessageCount > 0
+        // channel.newMessageCount &&
+        // channel.newMessageCount > 0
       ) {
         loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
@@ -662,8 +702,8 @@ const MessageList: React.FC<MessagesProps> = ({
     setHasPrevCached(false)
     dispatch(getMessagesAC(channel))
     if (channel.id) {
-      if (channel.unreadMessageCount && channel.unreadMessageCount > 0) {
-        setUnreadMessageId(channel.lastReadMessageId)
+      if (channel.newMessageCount && channel.newMessageCount > 0) {
+        setUnreadMessageId(channel.lastDisplayedMsgId)
       } else {
         setUnreadMessageId('')
       }
@@ -700,33 +740,58 @@ const MessageList: React.FC<MessagesProps> = ({
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
         } */
         if (prevMessageId) {
-          let i: any = 0
+          console.log('set scroll position to a last visibla message ,,,,,,,,,,,,,,,,,,,,,')
+          /* let i: any = 0
           let messagesHeight = 0
+          let prevMessagesHeight = 0
           while (i !== prevMessageId) {
             if (messages[i]) {
               if (messages[i].id === prevMessageId) {
+                while (i !== lastVisibleMessageId && messages[i]) {
+                  if (messages[i]) {
+                    if (messages[i].id === lastVisibleMessageId) {
+                      i = lastVisibleMessageId
+                    }
+                    if (messages[i]) {
+                      const currentMessage = document.getElementById(messages[i].id)
+                      // eslint-disable-next-line no-unused-expressions
+                      if (currentMessage) {
+                        prevMessagesHeight += currentMessage.getBoundingClientRect().height
+                      }
+                    }
+                  }
+                  i++
+                }
                 i = prevMessageId
               } else {
                 const currentMessage = document.getElementById(messages[i].id)
                 // eslint-disable-next-line no-unused-expressions
-                currentMessage ? (messagesHeight += currentMessage.getBoundingClientRect().height) : messagesHeight
+                if (currentMessage) {
+                  messagesHeight += currentMessage.getBoundingClientRect().height
+                }
                 i++
               }
             } else {
               break
             }
-          }
-
+          } */
+          // console.log('prevMessagesHeight.  . ... . .. ', prevMessagesHeight)
+          // console.log('messagesHeight.  . ... . .. ', messagesHeight)
           scrollRef.current.style.scrollBehavior = 'inherit'
-          if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
-            // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
-            // console.log('last message pos........ ')
+          // if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
+          // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
+          // console.log('last message pos........ ')
+          if (lastVisibleMessage) {
+            // console.log('prevMessagesHeight  + messagesHeight ... ', prevMessagesHeight + messagesHeight)
+            // console.log('lastVisibleMessage.offsetTop ... ', -lastVisibleMessage.offsetTop)
+            // scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
             scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
-            // }
-          } else {
-            // console.log('messages height. . .')
-            scrollRef.current.scrollTop = -messagesHeight
           }
+          // }
+          // } else {
+          // console.log('messages height. . .')
+          // scrollRef.current.scrollTop = -messagesHeight
+          // }
 
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
@@ -734,6 +799,7 @@ const MessageList: React.FC<MessagesProps> = ({
           setTimeout(() => {
             loading = false
             loadFromServer = false
+            nextDisable = false
           }, 50)
         } else {
           loading = false
@@ -762,10 +828,22 @@ const MessageList: React.FC<MessagesProps> = ({
         // console.log('scrollRef.current.scrollTop ... ', scrollRef.current.scrollTop)
         // console.log('hasNextMessages ... ', hasNextMessages)
         // console.log('getHasNextCached() ... ', getHasNextCached())
-        if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
+        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+        // console.log('lastVisibleMessageId. . . . . .  .', lastVisibleMessageId)
+        // console.log('lastVisibleMessage. . . . . .  .', lastVisibleMessage)
+        // console.log('scrollRef. height. . . . . .  .', scrollRef.current.offsetHeight)
+        scrollRef.current.style.scrollBehavior = 'inherit'
+        scrollRef.current.scrollTop =
+          lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
+        scrollRef.current.style.scrollBehavior = 'smooth'
+        /* if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
+          console.log('set scroll top ... ', -200)
           scrollRef.current.scrollTop = -200
-        }
+        } */
         loading = false
+        setTimeout(() => {
+          prevDisable = false
+        }, 100)
       }
       // }, 200)
     }
@@ -790,7 +868,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages... ', messages)
+    console.log('messages... ', messages)
   }, [messages])
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -805,11 +883,11 @@ const MessageList: React.FC<MessagesProps> = ({
   /* useEffect(() => {
   }, [pendingMessages]) */
   useEffect(() => {
-    if (channel.unreadMessageCount && channel.unreadMessageCount > 0 && getUnreadScrollTo()) {
+    if (channel.newMessageCount && channel.newMessageCount > 0 && getUnreadScrollTo()) {
       if (scrollRef.current) {
         scrollRef.current.style.scrollBehavior = 'inherit'
       }
-      const lastReadMessageNode: any = document.getElementById(channel.lastReadMessageId)
+      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMsgId)
       if (lastReadMessageNode) {
         scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
         if (scrollRef.current) {
@@ -826,6 +904,7 @@ const MessageList: React.FC<MessagesProps> = ({
       } */
     }
   })
+
   return (
     <React.Fragment>
       {isDragging && (
@@ -863,9 +942,9 @@ const MessageList: React.FC<MessagesProps> = ({
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor}
+            dateDividerTextColor={dateDividerTextColor || colors.textColor1}
             dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor}
+            dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >
@@ -893,6 +972,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 const nextMessage = messages[index + 1]
                 const isUnreadMessage = !!(unreadMessageId && unreadMessageId === message.id)
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+                messagesIndexMap[message.id] = index
                 return (
                   <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider
@@ -900,6 +980,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       noMargin={
                         !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
                       }
+                      theme={theme}
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}
@@ -925,9 +1006,9 @@ const MessageList: React.FC<MessagesProps> = ({
                         visible={showTopFixedDate}
                         dividerText={message.body}
                         dateDividerFontSize={dateDividerFontSize}
-                        dateDividerTextColor={dateDividerTextColor}
+                        dateDividerTextColor={dateDividerTextColor || colors.textColor1}
                         dateDividerBorder={dateDividerBorder}
-                        dateDividerBackgroundColor={dateDividerBackgroundColor}
+                        dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
                         dateDividerBorderRadius={dateDividerBorderRadius}
                       >
                         <span>
@@ -994,6 +1075,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           ownMessageBackground={ownMessageBackground}
                           incomingMessageBackground={incomingMessageBackground}
                           showMessageStatus={showMessageStatus}
+                          showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                           showMessageTime={showMessageTime}
                           showMessageStatusForEachMessage={showMessageStatusForEachMessage}
                           showMessageTimeForEachMessage={showMessageTimeForEachMessage}
@@ -1025,7 +1107,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           openFrequentlyUsedReactions={openFrequentlyUsedReactions}
                           emojisCategoryIconsPosition={emojisCategoryIconsPosition}
                           emojisContainerBorderRadius={emojisContainerBorderRadius}
-                          separateEmojiCategoriesWithTitle={separateEmojiCategoriesWithTitle}
+                          fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
                           editIconOrder={editIconOrder}
                           copyIconOrder={copyIconOrder}
                           replyIconOrder={replyIconOrder}
@@ -1057,6 +1139,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           videoAttachmentMaxHeight={videoAttachmentMaxHeight}
                           reactionsDisplayCount={reactionsDisplayCount}
                           showEachReactionCount={showEachReactionCount}
+                          showTotalReactionCount={showTotalReactionCount}
                           reactionItemBorder={reactionItemBorder}
                           reactionItemBorderRadius={reactionItemBorderRadius}
                           reactionItemBackground={reactionItemBackground}
@@ -1069,6 +1152,8 @@ const MessageList: React.FC<MessagesProps> = ({
                           reactionsContainerPadding={reactionsContainerPadding}
                           reactionsContainerBackground={reactionsContainerBackground}
                           reactionsContainerTopPosition={reactionsContainerTopPosition}
+                          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+                          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
                           sameUserMessageSpacing={sameUserMessageSpacing}
                           differentUserMessageSpacing={differentUserMessageSpacing}
                         />
@@ -1076,6 +1161,7 @@ const MessageList: React.FC<MessagesProps> = ({
                     )}
                     {isUnreadMessage ? (
                       <MessageDivider
+                        theme={theme}
                         newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
                         newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
                         newMessagesSeparatorWidth={newMessagesSeparatorWidth}
@@ -1093,11 +1179,11 @@ const MessageList: React.FC<MessagesProps> = ({
             </MessagesBox>
           ) : (
             messagesLoading === LOADING_STATE.LOADED && (
-              <NoMessagesContainer>
+              <NoMessagesContainer color={colors.textColor1}>
                 No messages in this
                 {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
-                  : channel.type === CHANNEL_TYPE.PRIVATE
+                  : channel.type === CHANNEL_TYPE.GROUP
                   ? ' group chat'
                   : ' channel'}
               </NoMessagesContainer>
@@ -1190,13 +1276,15 @@ export const MessageTopDate = styled.div<any>`
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
-    color: ${(props) => props.dateDividerTextColor || colors.blue6};
+    color: ${(props) => props.dateDividerTextColor || colors.textColor1};
     background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
-    border: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
+    border: ${(props) => props.dateDividerBorder};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
     box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+    text-overflow: ellipsis;
+    overflow: hidden;
   }
 `
 
@@ -1222,7 +1310,7 @@ export const IconWrapper = styled.span<{ iconColor?: string }>`
   justify-content: center;
   height: 64px;
   width: 64px;
-  background-color: ${colors.gray5};
+  background-color: ${colors.backgroundColor};
   border-radius: 50%;
   text-align: center;
   margin-bottom: 16px;
@@ -1241,18 +1329,18 @@ export const DropAttachmentArea = styled.div<{ margin?: string }>`
   justify-content: center;
   flex-direction: column;
   height: 100%;
-  border: 1px dashed ${colors.gray3};
+  border: 1px dashed ${colors.textColor2};
   border-radius: 16px;
   margin: ${(props) => props.margin || '12px 32px 32px'};
   font-weight: 400;
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${colors.textColor1};
   transition: all 0.1s;
 
   &.dragover {
-    background-color: ${colors.gray5};
+    background-color: ${colors.backgroundColor};
 
     ${IconWrapper} {
       background-color: ${colors.white};
@@ -1269,7 +1357,7 @@ export const MessageWrapper = styled.div<{}>`
   }
 `
 
-export const NoMessagesContainer = styled.div<{}>`
+export const NoMessagesContainer = styled.div<{ color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1280,5 +1368,5 @@ export const NoMessagesContainer = styled.div<{}>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.gray6};
+  color: ${(props) => props.color || colors.textColor1};
 `

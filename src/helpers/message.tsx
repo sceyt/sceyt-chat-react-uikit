@@ -31,9 +31,9 @@ export const typingTextFormat = ({
   // let textLine = separateLines[currentLine]
   let addedMembers = 0
   let textLengthInCurrentIteration = 0
-  console.log('separateLines. . .. ', separateLines)
+  // console.log('separateLines. . .. ', separateLines)
   for (let i = 0; i < separateLines.length; i++) {
-    console.log('i - - - ---- ', i)
+    // console.log('i - - - ---- ', i)
     let nextTextPart = ''
     const currentLine = separateLines[i]
     let lastFoundIndexOnTheLine = 0
@@ -98,7 +98,6 @@ export const typingTextFormat = ({
 
 export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
   if (hideUserPresence && user && user.id && hideUserPresence(user)) {
-    console.log('user. .. . . ', user)
     return user.id.charAt(0).toUpperCase() + user.id.slice(1)
   }
   return fromContact
@@ -306,7 +305,7 @@ export const getAttachmentType = (dataName: string) => {
       return attachmentTypes.file
   }
 }
-export const lastMessageDateFormat = (date: Date) => {
+export const lastMessageDateFormat = (date: Date | number) => {
   // check for current day
   const currentTime = moment()
   const startOfDay = currentTime.startOf('day')

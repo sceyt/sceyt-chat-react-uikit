@@ -435,7 +435,7 @@ import { updateChannelLastMessageAC } from '../../store/channel/actions' */
     })
   }
   const handleGetMessages = async (cachedMessages?: IMessage[], messageId?: string) => {
-    if (cachedMessages && cachedMessages.length && !channel.unreadMessageCount) {
+    if (cachedMessages && cachedMessages.length && !channel.newMessageCount) {
       setAllMessages(cachedMessages)
       setMessages(cachedMessages)
     }
@@ -463,13 +463,13 @@ import { updateChannelLastMessageAC } from '../../store/channel/actions' */
         return
       }
     } else {
-      if (channel.unreadMessageCount && channel.lastReadMessageId) {
-        if (channel.lastReadMessageId) {
+      if (channel.newMessageCount && channel.lastDisplayedMsgId) {
+        if (channel.lastDisplayedMsgId) {
           // dispatch(setMessagesNextCompleteAC(true))
           // dispatch(setMessagesPrevCompleteAC(true))
           messageQuery.limit = 60
           // result = await messageQuery.loadPreviousMessageId, '0')
-          result = await messageQuery.loadNearMessageId(channel.lastReadMessageId)
+          result = await messageQuery.loadNearMessageId(channel.lastDisplayedMsgId)
           setHasNext(channel.lastMessage.id !== result.messages[result.messages.length - 1].id)
         }
         setMessages(result.messages)
@@ -499,7 +499,7 @@ import { updateChannelLastMessageAC } from '../../store/channel/actions' */
         }
       }
     }
-    // addMessagesAC(result.messages, 1, channel.unreadMessageCount));
+    // addMessagesAC(result.messages, 1, channel.newMessageCount));
     dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 
