@@ -435,10 +435,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
+    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
     if (
       lastTwoChar.trimStart() === '@' &&
       !mentionTyping &&
-      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === 'private')
+      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === CHANNEL_TYPE.PRIVATE)
     ) {
       setCurrentMentions({
         start: selPos - 1,
@@ -450,8 +451,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     let shouldClose = false
     if (e.key === 'Backspace' || e.key === 'Delete') {
-      // const selPos2 = getCaretPosition(e.currentTarget)
-      // console.log('selPos 2 pos .. . ', selPos2)
       // const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       // if (mentionToEdit) {
       //   const editingMentionPosition = 0
