@@ -14,7 +14,7 @@ export type IAttachmentMeta = {
   duration?: number
 }
 
-type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any } }
+type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
 
 type pendingMessagesMap = {
   [key: string]: IMessage[]
@@ -110,7 +110,6 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
         setHasNextCached(true)
       } else {
         const toMessage = fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-
         messagesForAdd = activeChannelAllMessages.slice(fromMessageIndex + 1, toMessage)
         if (toMessage > activeChannelAllMessages.length - 1) {
           setHasNextCached(false)
@@ -177,16 +176,21 @@ export function addMessagesToMap(channelId: string, messages: IMessage[], direct
 }
 
 export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
-  if (
-    updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
-    updatedMessage.params.state !== MESSAGE_STATUS.FAILED &&
-    pendingMessagesMap[channelId]
-  ) {
-    const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
-    if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
-      pendingMessagesMap[channelId] = filteredMessages
+  if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
+    if (updatedMessage.params.state === MESSAGE_STATUS.FAILED) {
+      pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
+        if (msg.tid === updatedMessage.messageId) {
+          return { ...msg, ...updatedMessage.params }
+        }
+        return msg
+      })
     } else {
-      delete pendingMessagesMap[channelId]
+      const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
+      if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
+        pendingMessagesMap[channelId] = filteredMessages
+      } else {
+        delete pendingMessagesMap[channelId]
+      }
     }
   }
   if (messagesMap[channelId]) {
@@ -375,6 +379,9 @@ export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
 }
 
-export const setDraftMessageToMap = (channelId: string, draftMessage: { text: string; mentionedMembers: any }) => {
+export const setDraftMessageToMap = (
+  channelId: string,
+  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage }
+) => {
   draftMessagesMap[channelId] = draftMessage
 }

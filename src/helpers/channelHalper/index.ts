@@ -43,8 +43,7 @@ export function setChannelsInMap(channels: IChannel[]) {
       channel.newReactions &&
       channel.newReactions.length &&
       channel.lastMessage &&
-      channel.lastMessage.id < channel.newReactions[0].id &&
-      channel.lastMessage.id !== channel.newReactions[0].messageId
+      channel.lastMessage.id < channel.newReactions[0].id
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
@@ -177,6 +176,7 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
     if (updateChannel) {
       const updateMessage = message
       if (
+        updateChannel.lastMessage &&
         updateChannel.lastMessage.id === message.id &&
         updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
       ) {

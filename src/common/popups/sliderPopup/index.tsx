@@ -116,7 +116,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
       }
     }
 
-    getAttachmentUrlFromCache(currentFile.id).then((cachedUrl) => {
+    getAttachmentUrlFromCache(currentFile.url).then((cachedUrl) => {
       if (currentFile) {
         if (cachedUrl) {
           if (!downloadedFiles[currentFile.id]) {
@@ -143,7 +143,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
             customDownloader(currentFile.url, false)
               .then(async (url) => {
                 const response = await fetch(url)
-                setAttachmentToCache(currentFile.id, response)
+                setAttachmentToCache(currentFile.url, response)
                 if (currentFile.type === 'image') {
                   downloadImage(url, true)
                 } else {
@@ -210,7 +210,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   useEffect(() => {
     setImageLoading(true)
     if (customDownloader && currentMediaFile) {
-      getAttachmentUrlFromCache(currentMediaFile.id!).then((cachedUrl) => {
+      getAttachmentUrlFromCache(currentMediaFile.url).then((cachedUrl) => {
         if (cachedUrl) {
           if (currentMediaFile.type === 'image') {
             downloadImage(cachedUrl as string)
@@ -222,7 +222,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           if (customDownloader) {
             customDownloader(currentMediaFile.url, false).then(async (url) => {
               const response = await fetch(url)
-              setAttachmentToCache(currentMediaFile.id!, response)
+              setAttachmentToCache(currentMediaFile.url, response)
               if (currentMediaFile.type === 'image') {
                 downloadImage(url)
               } else {

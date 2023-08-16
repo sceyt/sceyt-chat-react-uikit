@@ -14,7 +14,8 @@ import {
   GET_ROLES,
   GET_ROLES_SUCCESS,
   SET_MEMBERS_TO_LIST,
-  UPDATE_MEMBERS_PRESENCE
+  UPDATE_MEMBERS_PRESENCE,
+  GET_ROLES_FAIL
 } from './constants'
 import { IAddMember, IMember, IRole } from '../../types'
 
@@ -108,9 +109,16 @@ export function removeMemberFromListAC(members: IMember[]) {
   }
 }
 
-export function getRolesAC() {
+export function getRolesAC(timeout?: number, attempts?: number) {
   return {
-    type: GET_ROLES
+    type: GET_ROLES,
+    payload: { timeout, attempts }
+  }
+}
+export function getRolesFailAC(timeout?: number, attempts?: number) {
+  return {
+    type: GET_ROLES_FAIL,
+    payload: { timeout, attempts }
   }
 }
 

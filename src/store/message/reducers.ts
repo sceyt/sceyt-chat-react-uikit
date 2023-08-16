@@ -179,10 +179,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       const newMessagesLength = messages.length
       const currentMessagesLength = newState.activeChannelMessages.length
       if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-        if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+        if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_LENGTH) {
           setHasNextCached(true)
           // newState.messagesHasNext = true
-          messagesCopy.splice(-newMessagesLength)
+          if (newMessagesLength > 0) {
+            messagesCopy.splice(-newMessagesLength)
+          }
           newState.activeChannelMessages = [...messages, ...messagesCopy]
         } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
           const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
@@ -244,8 +246,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case UPDATE_MESSAGE: {
       const { messageId, params } = payload
       const messagesCopy = [...newState.activeChannelMessages]
+      // let messageFound = false
       newState.activeChannelMessages = messagesCopy.map((message) => {
         if (message.tid === messageId || message.id === messageId) {
+          // messageFound = true
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
@@ -254,6 +258,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return message
       })
+      /*     if (!messageFound) {
+        console.log('message not found on update message, add message to list .. ...', params)
+        newState.activeChannelMessages = [...newState.activeChannelMessages, params]
+      } */
       return newState
     }
 

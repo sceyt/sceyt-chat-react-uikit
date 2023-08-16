@@ -27,6 +27,8 @@ import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalpe
 import { setThemeAC } from '../../store/theme/actions'
 import { THEME } from '../../helpers/constants'
 import { useDidUpdate } from '../../hooks'
+import { getRolesAC } from '../../store/member/actions'
+import { getRolesFailSelector } from '../../store/member/selector'
 
 const SceytChat = ({
   client,
@@ -48,6 +50,7 @@ const SceytChat = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
+  const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
   // const channels = useSelector(channelsSelector)
   const [darkTheme, setDarkTheme] = useState(false)
   const [SceytChatClient, setSceytChatClient] = useState<null | SceytChatClient>(null)
@@ -101,7 +104,9 @@ const SceytChat = ({
       if (showOnlyContactUsers) {
         dispatch(getContactsAC())
       }
+      dispatch(getRolesAC())
     } else {
+      console.log('clearing all data  1 ....')
       clearMessagesMap()
       removeAllMessages()
       setActiveChannelId('')
@@ -229,6 +234,16 @@ const SceytChat = ({
       setDarkTheme(false)
     }
   }, [theme])
+  useDidUpdate(() => {
+    if (getRolesFail) {
+      console.log('getRolesFail ... ', getRolesFail)
+    }
+    if (getRolesFail && getRolesFail.attempts <= 5) {
+      setTimeout(() => {
+        dispatch(getRolesAC(getRolesFail.timeout, getRolesFail.attempts))
+      }, getRolesFail.timeout)
+    }
+  }, [getRolesFail])
   useEffect(() => {
     if (hideUserPresence) {
       setHideUserPresence(hideUserPresence)

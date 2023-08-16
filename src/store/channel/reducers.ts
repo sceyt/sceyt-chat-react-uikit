@@ -32,8 +32,8 @@ import {
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel } from '../../types'
-import { CHANNEL_TYPE } from '../../helpers/constants'
+import { IAction, IChannel, IMember } from '../../types'
+import { CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 
 const initialState: {
@@ -140,7 +140,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case ADD_CHANNEL: {
-      console.log('add channel...... ', payload.channel)
       if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
         newState.channels = [payload.channel, ...newState.channels]
       }
@@ -164,6 +163,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case REMOVE_CHANNEL: {
       const { channelId } = payload
       const channelsCpy = newState.channels
+      console.log(
+        'updated channels. . ..',
+        channelsCpy.filter((chan) => chan.id !== channelId)
+      )
       newState.channels = channelsCpy.filter((chan) => chan.id !== channelId)
 
       return newState
@@ -230,41 +233,50 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case UPDATE_CHANNEL_DATA: {
-      const updateData = payload.config
-      const updatedChannels = newState.channels.map((channel) => {
-        if (channel.id === payload.channelId) {
-          return { ...channel, ...updateData }
+      const { config, channelId, moveUp } = payload
+      if (moveUp) {
+        let updateChannel: any
+        const updatedChannels = newState.channels.filter((chan) => {
+          if (chan.id === channelId) {
+            updateChannel = chan
+          }
+          return chan.id !== channelId
+        })
+        if (updateChannel) {
+          updateChannel = { ...updateChannel, ...config }
+          newState.channels = [updateChannel, ...updatedChannels]
         }
-        return channel
-      })
-      if ((newState.activeChannel as IChannel).id === payload.channelId) {
+      } else {
+        newState.channels = newState.channels.map((channel) => {
+          if (channel.id === channelId) {
+            return { ...channel, ...config }
+          }
+          return channel
+        })
+      }
+
+      if ((newState.activeChannel as IChannel).id === channelId) {
         const activeChannelCopy = { ...newState.activeChannel }
         newState.activeChannel = {
           ...activeChannelCopy,
-          ...updateData
+          ...config
         }
       }
-      newState.channels = updatedChannels
       return newState
     }
 
     case UPDATE_SEARCHED_CHANNEL_DATA: {
       const { updateData, groupName, channelId } = payload
       if (newState.searchedChannels[groupName] && newState.searchedChannels[groupName].length) {
-        const updatedChannels = newState.searchedChannels[groupName].map((channel: IChannel) => {
-          if (channel.id === channelId) {
-            return { ...channel, ...updateData }
-          }
-          return channel
-        })
-        if ((newState.activeChannel as IChannel).id === channelId) {
-          const activeChannelCopy = { ...newState.activeChannel }
-          newState.activeChannel = {
-            ...activeChannelCopy,
-            ...updateData
-          }
+        newState.searchedChannels = {
+          ...newState.searchedChannels,
+          [groupName]: [...newState.searchedChannels[groupName]].map((channel: IChannel) => {
+            if (channel.id === channelId) {
+              return { ...channel, ...updateData }
+            }
+            return channel
+          })
         }
-        newState.searchedChannels = updatedChannels
       }
       return newState
     }
@@ -311,7 +323,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case UPDATE_CHANNEL_LAST_MESSAGE: {
       const { channel, message } = payload
       let updateChannel = newState.channels.find((chan) => chan.id === channel.id)
-      if (message.state === 'Deleted' || message.state === 'Edited') {
+      if (message.state === MESSAGE_STATUS.DELETE || message.state === MESSAGE_STATUS.EDIT) {
         if (updateChannel?.lastMessage.id === message.id) {
           newState.channels = newState.channels.map((chan) => {
             if (chan.id === channel.id) {

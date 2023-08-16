@@ -1,6 +1,7 @@
 import {
   ADD_MEMBERS_TO_LIST,
   CLEAR_MEMBERS,
+  GET_ROLES_FAIL,
   GET_ROLES_SUCCESS,
   REMOVE_MEMBER_FROM_LIST,
   SET_MEMBERS_LOADING_STATE,
@@ -16,6 +17,7 @@ export interface IMembersStore {
   membersHasNext: boolean
   roles: IRole[] | []
   rolesMap: { [key: string]: IRole }
+  getRolesFail: { attempts: number; timeout: number } | undefined
   activeChannelMembers: IMember[] | []
 }
 
@@ -24,6 +26,7 @@ const initialState: IMembersStore = {
   membersHasNext: true,
   activeChannelMembers: [],
   roles: [],
+  getRolesFail: undefined,
   rolesMap: {}
 }
 
@@ -114,6 +117,15 @@ export default (state = initialState, { type, payload }: IAction) => {
       })
       newState.rolesMap = rolesMap
       newState.roles = roles
+      return newState
+    }
+    case GET_ROLES_FAIL: {
+      const { attempts, timeout } = payload
+      if (attempts || timeout) {
+        newState.getRolesFail = { attempts, timeout }
+      } else {
+        newState.getRolesFail = undefined
+      }
       return newState
     }
 

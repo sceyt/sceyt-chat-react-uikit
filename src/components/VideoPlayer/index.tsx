@@ -313,14 +313,14 @@ const PlayPauseWrapper = styled.span`
 `
 const ControlsContainer = styled.div`
   position: absolute;
-  bottom: 16px;
+  bottom: 0;
   left: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   width: calc(100% - 32px);
-  background-color: transparent;
-  padding: 0 16px;
+  background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0) 100%);
+  padding: 10px 16px 16px;
   z-index: 20;
 
   @media (max-width: 768px) {

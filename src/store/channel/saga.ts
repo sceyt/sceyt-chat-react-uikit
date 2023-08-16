@@ -71,7 +71,12 @@ import {
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
-import { removeAllMessages, removeMessagesFromMap } from '../../helpers/messagesHalper'
+import {
+  removeAllMessages,
+  removeMessagesFromMap,
+  updateMessageOnAllMessages,
+  updateMessageOnMap
+} from '../../helpers/messagesHalper'
 import { updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { makeUsername } from '../../helpers/message'
@@ -147,7 +152,6 @@ function* getChannels(action: IAction): any {
       setChannelsInMap,
       channelsData.channels
     )
-    // console.log('channelsForUpdateLastReactionMessage . . .. ', channelsForUpdateLastReactionMessage)
     if (channelsForUpdateLastReactionMessage.length) {
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
@@ -449,6 +453,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
   try {
     const { payload } = action
     const { limit } = payload
+    const SceytChatClient = getClient()
     const { channelQueryForward } = query
     if (limit) {
       channelQueryForward.limit = limit
@@ -478,25 +483,25 @@ function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
   let channel = yield call(getChannelFromMap, channelId)
-  if (!channel) {
-    channel = getChannelFromAllChannels(channelId)
-    setChannelInMap(channel)
-  }
-  // const activeChannelId = yield call(getActiveChannelId)
-  if (channel) {
-    const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
-    // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
-    // yield put(setChannelUnreadCount(0, channel.id));
-    yield put(
-      updateChannelDataAC(channel.id, {
-        unread: channel.unread,
-        lastReadMessageId: channel.lastDisplayedMsgId,
-        unreadMessageCount: channel.newMessageCount
-      })
-    )
-    for (const messageId of messageListMarker.messageIds) {
+  try {
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      setChannelInMap(channel)
+    }
+    // const activeChannelId = yield call(getActiveChannelId)
+    if (channel) {
+      const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
+      // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
+      // yield put(setChannelUnreadCount(0, channel.id));
       yield put(
-        updateMessageAC(messageId, {
+        updateChannelDataAC(channel.id, {
+          unread: channel.unread,
+          lastReadMessageId: channel.lastDisplayedMsgId,
+          unreadMessageCount: channel.newMessageCount
+        })
+      )
+      for (const messageId of messageListMarker.messageIds) {
+        const updateParams = {
           deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
           userMarkers: [
             {
@@ -506,26 +511,31 @@ function* markMessagesRead(action: IAction): any {
               name: MESSAGE_DELIVERY_STATUS.READ
             }
           ]
-        })
-      )
-    }
+        }
+        yield put(updateMessageAC(messageId, updateParams))
+        updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        updateMessageOnAllMessages(messageId, updateParams)
+      }
 
-    /* if (channelId === activeChannelId) {
-      yield put(
-        updateChannelDataAC(channel.id, {
-          markedAsUnread: channel.unread,
-          lastReadMessageId: channel.lastDisplayedMsgId,
-          unreadMessageCount: channel.newMessageCount
-        })
-      )
-    } else {
-      yield put(
-        updateChannelDataAC(channel.id, {
-          markedAsUnread: channel.unread,
-          lastReadMessageId: channel.lastDisplayedMsgId
-        })
-      )
-    } */
+      /* if (channelId === activeChannelId) {
+        yield put(
+          updateChannelDataAC(channel.id, {
+            markedAsUnread: channel.unread,
+            lastReadMessageId: channel.lastDisplayedMsgId,
+            unreadMessageCount: channel.newMessageCount
+          })
+        )
+      } else {
+        yield put(
+          updateChannelDataAC(channel.id, {
+            markedAsUnread: channel.unread,
+            lastReadMessageId: channel.lastDisplayedMsgId
+          })
+        )
+      } */
+    }
+  } catch (e) {
+    console.log(e, 'Error on mark messages read')
   }
 }
 
@@ -669,7 +679,7 @@ function* leaveChannel(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     if (channel) {
-      if (channel.type === CHANNEL_TYPE.GROUP) {
+      if (channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE) {
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder.setBody('LG').setType('system').setDisplayCount(0).setSilent(true)
         const messageToSend = messageBuilder.create()
@@ -826,12 +836,16 @@ function* sendTyping(action: IAction): any {
   const activeChannelId = yield call(getActiveChannelId)
   const channel = yield call(getChannelFromMap, activeChannelId)
 
-  if (channel) {
-    if (state) {
-      yield call(channel.startTyping)
-    } else {
-      yield call(channel.stopTyping)
+  try {
+    if (channel) {
+      if (state) {
+        yield call(channel.startTyping)
+      } else {
+        yield call(channel.stopTyping)
+      }
     }
+  } catch (e) {
+    console.log('ERROR in send typing')
   }
 }
 

@@ -399,6 +399,15 @@ const MessageList: React.FC<MessagesProps> = ({
     // console.log('target.scrollHeight. ..  . ..  .. ', target.scrollHeight)
     // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
     // const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
+    if (
+      target.scrollTop === 0 &&
+      scrollToNewMessage.scrollToBottom &&
+      scrollToNewMessage.updateMessageList &&
+      messagesLoading !== LOADING_STATE.LOADING
+    ) {
+      console.log('scrollToNewMessage.scrollToBottom. ..  . .. getMessagesAC .. ')
+      dispatch(getMessagesAC(channel, true))
+    }
     if (scrollToReply) {
       target.scrollTop = scrollToReply
     } else {
@@ -407,16 +416,16 @@ const MessageList: React.FC<MessagesProps> = ({
       } else {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
-      // const scrollHeightTarget = (target.scrollHeight * 10) / 100
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !prevDisable &&
         messagesLoading !== LOADING_STATE.LOADING &&
+        !scrollToNewMessage.scrollToBottom &&
         hasPrevMessages &&
         messagesIndexMap[lastVisibleMessageId] < 15
       ) {
         loadDirection = 'prev'
-        prevMessageId = messages[0].id
+        prevMessageId = (messages[0] && messages[0].id) || ''
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
         if (!getHasPrevCached()) {
           loadFromServer = true
@@ -428,6 +437,7 @@ const MessageList: React.FC<MessagesProps> = ({
         !nextDisable &&
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         messagesLoading !== LOADING_STATE.LOADING &&
+        !scrollToNewMessage.scrollToBottom &&
         (hasNextMessages || getHasNextCached()) &&
         messagesIndexMap[lastVisibleMessageId] > messages.length - 15
       ) {
@@ -675,11 +685,13 @@ const MessageList: React.FC<MessagesProps> = ({
       scrollRef.current.scrollTop = 0
       dispatch(showScrollToNewMessageButtonAC(false))
       // loading = true
-      if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
+      /* if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
         setTimeout(() => {
-          dispatch(getMessagesAC(channel, !hasNextMessages))
-        }, 700)
-      }
+          if (getHasNextCached()) {
+            dispatch(getMessagesAC(channel, true))
+          }
+        }, 800)
+      } */
     }
   }, [scrollToNewMessage])
 
@@ -837,10 +849,12 @@ const MessageList: React.FC<MessagesProps> = ({
         // console.log('lastVisibleMessageId. . . . . .  .', lastVisibleMessageId)
         // console.log('lastVisibleMessage. . . . . .  .', lastVisibleMessage)
         // console.log('scrollRef. height. . . . . .  .', scrollRef.current.offsetHeight)
-        scrollRef.current.style.scrollBehavior = 'inherit'
-        scrollRef.current.scrollTop =
-          lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
-        scrollRef.current.style.scrollBehavior = 'smooth'
+        if (lastVisibleMessage) {
+          scrollRef.current.style.scrollBehavior = 'inherit'
+          scrollRef.current.scrollTop =
+            lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
+          scrollRef.current.style.scrollBehavior = 'smooth'
+        }
         /* if (scrollRef.current.scrollTop > -5 && (hasNextMessages || getHasNextCached())) {
           console.log('set scroll top ... ', -200)
           scrollRef.current.scrollTop = -200
@@ -873,15 +887,17 @@ const MessageList: React.FC<MessagesProps> = ({
 
     renderTopDate()
 
-    // console.log('messages...', messages)
+    console.log('messages...', messages)
   }, [messages])
   useDidUpdate(() => {
+    console.log('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (channel.id) {
-        dispatch(getMessagesAC(channel))
-      }
       clearMessagesMap()
       removeAllMessages()
+      if (channel.id) {
+        console.log('should get messages...')
+        dispatch(getMessagesAC(channel))
+      }
       // dispatch(switchChannelActionAC(activeChannel.id))
     }
   }, [connectionStatus])
@@ -1189,7 +1205,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 No messages in this
                 {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
-                  : channel.type === CHANNEL_TYPE.GROUP
+                  : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                   ? ' group chat'
                   : ' channel'}
               </NoMessagesContainer>

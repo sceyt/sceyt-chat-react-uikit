@@ -118,17 +118,15 @@ const VideoPreview = memo(function VideoPreview({
   }, [])
 
   useEffect(() => {
-    if (file.id) {
-      getAttachmentUrlFromCache(file.id).then((cachedUrl: string) => {
-        if (!videoUrl) {
-          if (!cachedUrl && src) {
-            setVideoUrl(src)
-          } else if (cachedUrl) {
-            setVideoUrl(cachedUrl)
-          }
+    getAttachmentUrlFromCache(file.url).then((cachedUrl: string) => {
+      if (!videoUrl) {
+        if (!cachedUrl && src) {
+          setVideoUrl(src)
+        } else if (cachedUrl) {
+          setVideoUrl(cachedUrl)
         }
-      })
-    }
+      }
+    })
   }, [src])
 
   /* useEffect(() => {

@@ -110,8 +110,8 @@ const Attachment = ({
       ? calculateRenderedImageWidth(
           attachment.metadata.szw,
           attachment.metadata.szh,
-          imageAttachmentMaxWidth,
-          imageAttachmentMaxHeight
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
         )
       : []
   const isInUploadingState =
@@ -274,7 +274,7 @@ const Attachment = ({
       const url = URL.createObjectURL(result.Body)
       setSizeProgress(undefined)
       const response = await fetch(url)
-      setAttachmentToCache(attachment.id!, response)
+      setAttachmentToCache(attachment.url, response)
       setIsCached(true)
       // }
       setDownloadingFile(false)
@@ -283,7 +283,7 @@ const Attachment = ({
     } else {
       setAttachmentUrl(attachment.url)
       fetch(attachment.url).then(async (response) => {
-        setAttachmentToCache(attachment.id!, response)
+        setAttachmentToCache(attachment.url, response)
         setIsCached(true)
       })
     }
@@ -317,7 +317,7 @@ const Attachment = ({
       attachment.id &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
-      getAttachmentUrlFromCache(attachment.id!)
+      getAttachmentUrlFromCache(attachment.url)
         .then(async (cachedUrl) => {
           if (attachment.type === 'image' && !isPreview) {
             if (cachedUrl) {
@@ -333,7 +333,7 @@ const Attachment = ({
                   // console.log('image is downloaded. . . should load image', url)
                   downloadImage(url)
                   const response = await fetch(url)
-                  setAttachmentToCache(attachment.id!, response)
+                  setAttachmentToCache(attachment.url, response)
                   setIsCached(true)
                 })
               } else {
@@ -341,7 +341,7 @@ const Attachment = ({
                 // console.log('is not cached, load attachment.attachmentUrl', attachment.attachmentUrl)
                 downloadImage(attachment.url)
                 fetch(attachment.url).then(async (response) => {
-                  setAttachmentToCache(attachment.id!, response)
+                  setAttachmentToCache(attachment.url, response)
                   setIsCached(true)
                 })
               }
@@ -368,7 +368,7 @@ const Attachment = ({
             customDownloader(attachment.url, false).then(async (url) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
-              setAttachmentToCache(attachment.id!, response)
+              setAttachmentToCache(attachment.url, response)
               // }
               setAttachmentUrl(url)
             })
@@ -679,24 +679,8 @@ const Attachment = ({
               null}
               <VideoPreview
                 theme={theme}
-                maxWidth={
-                  isRepliedMessage
-                    ? '40px'
-                    : isDetailsView
-                    ? '100%'
-                    : videoAttachmentMaxWidth
-                    ? `${videoAttachmentMaxWidth}px`
-                    : '320px'
-                }
-                maxHeight={
-                  isRepliedMessage
-                    ? '40px'
-                    : isDetailsView
-                    ? '100%'
-                    : videoAttachmentMaxHeight
-                    ? `${videoAttachmentMaxHeight}px`
-                    : '240px'
-                }
+                maxWidth={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderWidth}px`}
+                maxHeight={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderHeight}px`}
                 file={attachment}
                 src={attachmentUrl}
                 isCachedFile={isCached}

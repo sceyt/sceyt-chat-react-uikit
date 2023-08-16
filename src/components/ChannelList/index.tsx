@@ -278,8 +278,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (addedChannel) {
       if (onChannelCreated) {
+        console.log('onChannelCreated .... ', addedChannel)
         onChannelCreated(channels, addedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
+        console.log('dispatch addChannelAC 1 .... ', addedChannel)
         dispatch(addChannelAC(addedChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -289,8 +291,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (addedToChannel) {
       if (onAddedToChannel) {
+        console.log('onAddedToChannel .... ', addedToChannel)
         onAddedToChannel(channels, addedToChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
+        console.log('dispatch addChannelAC 2 .... ', addedToChannel)
         dispatch(addChannelAC(addedToChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -300,6 +304,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (hiddenChannel) {
       if (onChannelHidden) {
+        console.log('onChannelHidden .... ', hiddenChannel)
         onChannelHidden(channels, hiddenChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         dispatch(removeChannelAC(hiddenChannel.id))
@@ -311,8 +316,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (visibleChannel) {
       if (onChannelVisible) {
+        console.log('onChannelVisible .... ', visibleChannel)
         onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
+        console.log('dispatch addChannelAC 3 .... ', visibleChannel)
         dispatch(addChannelAC(hiddenChannel))
       }
       dispatch(setChannelToUnHideAC(null))
@@ -321,9 +328,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     // if (searchOption === 'default') {
+    console.log('searchValue', searchValue)
     if (searchValue) {
       dispatch(searchChannelsAC({ filter, limit, sort, search: searchValue }, contactsMap))
     } else {
+      console.log('should be empty....... . ... ')
       dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
     }
     // }
@@ -341,6 +350,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [activeChannel.id])
 
   useDidUpdate(() => {
+    console.log('close search channels. ... ', closeSearchChannels)
     if (closeSearchChannels) {
       getMyChannels()
       dispatch(setCloseSearchChannelsAC(false))
@@ -360,7 +370,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   /* useEffect(() => {
     console.log('channels. ...........................', channels)
-  }, [channels]) */
+  }, [channels])
+  useEffect(() => {
+    console.log('searchedChannels. ...........................', searchedChannels)
+  }, [searchedChannels]) */
   /*  useEffect(() => {
      console.log('contactsMap. ...........................', contactsMap)
    }, [contactsMap]) */
@@ -457,7 +470,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             channelsLoading === LOADING_STATE.LOADED &&
             searchValue && (
               <React.Fragment>
-                {!!searchedChannels.directs.length && (
+                {!!(searchedChannels.directs && searchedChannels.directs.length) && (
                   <DirectChannels>
                     <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
                     {searchedChannels.directs.map((channel: IChannel) =>
@@ -483,7 +496,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     )}
                   </DirectChannels>
                 )}
-                {!!searchedChannels.groups.length && (
+                {!!(searchedChannels.groups && searchedChannels.groups.length) && (
                   <GroupChannels>
                     <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
                     {searchedChannels.groups.map((channel: IChannel) =>

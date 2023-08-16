@@ -250,12 +250,13 @@ export function updateChannelAC(channelId: string, config: any) {
   }
 }
 
-export function updateChannelDataAC(channelId: string, config: any) {
+export function updateChannelDataAC(channelId: string, config: any, moveUp?: boolean) {
   return {
     type: UPDATE_CHANNEL_DATA,
     payload: {
       channelId,
-      config
+      config,
+      moveUp
     }
   }
 }

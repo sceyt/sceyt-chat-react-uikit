@@ -61,6 +61,7 @@ import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../h
 import {
   checkDraftMessagesIsEmpty,
   deleteVideoThumb,
+  draftMessagesMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
@@ -435,11 +436,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
-    if (lastTwoChar.trimStart() === '@' && !mentionTyping && activeChannel.type === CHANNEL_TYPE.PRIVATE) {
     if (
       lastTwoChar.trimStart() === '@' &&
       !mentionTyping &&
-      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === CHANNEL_TYPE.PRIVATE)
+      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === 'private')
     ) {
       setCurrentMentions({
         start: selPos - 1,
@@ -451,6 +451,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     let shouldClose = false
     if (e.key === 'Backspace' || e.key === 'Delete') {
+      // const selPos2 = getCaretPosition(e.currentTarget)
+      // console.log('selPos 2 pos .. . ', selPos2)
       // const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
       // if (mentionToEdit) {
       //   const editingMentionPosition = 0
@@ -569,6 +571,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
     } else { */
+    console.log('handle send message . . . . connectionState ', connectionStatus)
     const { shiftKey, charCode, type } = event
     const isEnter: boolean = charCode === 13 && shiftKey === false && !openMention
     const shouldSend =
@@ -965,7 +968,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const attachmentId = uuidv4()
     let cachedUrl: any
     const reader = new FileReader()
-
+    console.log('file is opened. .. ', file)
     reader.onload = async () => {
       // @ts-ignore
       const length = reader.result && reader.result.length
@@ -982,13 +985,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       let dataFromDb: any
       try {
         dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
+        console.log('data from db . . . . ', dataFromDb)
       } catch (e) {
         console.log('error in get data from db . . . . ', e)
       }
       if (dataFromDb) {
         cachedUrl = dataFromDb.url
+        setPendingAttachment(attachmentId, { file: cachedUrl })
       } else {
-        setPendingAttachment(attachmentId, { checksum: checksumHash })
+        setPendingAttachment(attachmentId, { file, checksum: checksumHash })
       }
       if (customUploader) {
         if (fileType === 'image') {
@@ -1008,6 +1013,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ])
           })
         } else if (fileType === 'video') {
+          console.log('handle set attachments ... .', {
+            data: file,
+            cachedUrl,
+            upload: false,
+            type: isMediaAttachment ? fileType : 'file',
+            attachmentUrl: URL.createObjectURL(file),
+            attachmentId,
+            size: dataFromDb ? dataFromDb.size : file.size,
+            metadata: dataFromDb && dataFromDb.metadata
+          })
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -1182,7 +1197,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       }
     }
-
+    reader.onerror = (e: any) => {
+      console.log(' error on read file onError', e)
+    }
     reader.readAsBinaryString(file)
   }
 
@@ -1367,6 +1384,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } */
     const draftMessage = getDraftMessageFromMap(activeChannel.id)
     if (draftMessage) {
+      if (draftMessage.messageForReply) {
+        dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+      }
       setMessageText(draftMessage.text)
       setMentionedMembers(draftMessage.mentionedMembers)
       const mentionedMembersPositions: any = []
@@ -1404,6 +1424,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [activeChannel.id])
   useEffect(() => {
+    // console.log('attachments. . . . .  . .', attachments)
+    // console.log('readyVideoAttachments. . . . .  . .', readyVideoAttachments)
     if (
       messageText.trim() ||
       (editMessageText.trim() && editMessageText !== messageToEdit.body) ||
@@ -1432,7 +1454,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     if (messageText) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
       if (!listenerIsAdded) {
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
@@ -1449,7 +1471,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
     }
   }, [mentionedMembers])
 
@@ -1492,6 +1514,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
+    if (draftMessagesMap[activeChannel.id]) {
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+    }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
     }

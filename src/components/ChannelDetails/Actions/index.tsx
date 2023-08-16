@@ -675,7 +675,7 @@ const Actions = ({
           togglePopup={handleToggleLeaveChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.GROUP
+            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you leave this group it will be removed for you along with its entire history.'
               : 'Once you leave this channel it will be removed for you along with its entire history.'
           }
@@ -739,9 +739,9 @@ const Actions = ({
           description={
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP
+              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST
+              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
               ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
               : 'Are you sure you want to clear history? This action cannot be undone.'
           }
@@ -756,9 +756,9 @@ const Actions = ({
           description={
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP
+              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST
+              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
               ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
               : 'Are you sure you want to delete all messages? This action cannot be undone.'
           }

@@ -672,9 +672,7 @@ const Message = ({
   }
 
   useEffect(() => {
-    // console.log('message body .. .', message.body)
-    // console.log('isVisible - -- - ', isVisible)
-    if (isVisible && tabIsActive && setLastVisibleMessageId) {
+    if (isVisible && setLastVisibleMessageId) {
       setLastVisibleMessageId(message.id)
       handleSendReadMarker()
     }
@@ -829,7 +827,7 @@ const Message = ({
                       imageAttachmentMaxHeight
                     )[0]
                   : mediaAttachment.type === attachmentTypes.video
-                  ? videoAttachmentMaxWidth || 320
+                  ? videoAttachmentMaxWidth || 420
                   : undefined
                 : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */

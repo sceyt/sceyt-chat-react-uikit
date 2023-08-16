@@ -214,9 +214,12 @@ const Channel: React.FC<IChannelProps> = ({
             )}
             {(isDirectChannel
               ? !typingIndicator &&
-                lastMessage.user &&
-                lastMessage.user.id === user.id &&
-                lastMessage.state !== MESSAGE_STATUS.DELETE
+                (draftMessageText ||
+                  (lastMessage.user &&
+                    lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                    (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
+                      ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
+                      : lastMessage.user.id === user.id)))
               : typingIndicator ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
               <Points color={draftMessageText && colors.red1}>: </Points>
@@ -502,14 +505,17 @@ export const LastMessageText = styled.span<{
   white-space: nowrap;
   color: ${colors.textColor2};
   font-style: ${(props) => props.deletedMessage && 'italic'};
-  transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
+  //transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
+  height: 17px;
+  display: flex;
 
   > svg {
     width: 16px;
     height: 16px;
     margin-right: 4px;
     color: ${colors.textColor2};
-    transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
+    //transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
+    transform: translate(0px, 1px);
   }
 `
 
