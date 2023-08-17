@@ -7,6 +7,8 @@ import { ReactComponent as VolumeMuteIcon } from '../../assets/svg/volumeMute.sv
 import { ReactComponent as FullScreenIcon } from '../../assets/svg/fullscreen.svg'
 import { ReactComponent as FullScreenExitIcon } from '../../assets/svg/fullscreenExit.svg'
 import { colors } from '../../UIHelper/constants'
+import { UploadingIcon } from '../../UIHelper'
+import { formatAudioVideoTime } from '../../helpers'
 
 interface IVideoPlayerProps {
   src: string
@@ -22,6 +24,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [videoTime, setVideoTime] = useState(0)
+  const [isLoaded, setIsLoaded] = useState(false)
   const [progress, setProgress] = useState(0)
   const [volume, setVolume] = useState(0)
   const [volumePrevValue, setVolumePrevValue] = useState(0)
@@ -85,7 +88,11 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
       }
     }
   }
-
+  const handleVideoProgress = (e: any) => {
+    if (e.currentTarget.readyState >= 2) {
+      setIsLoaded(true)
+    }
+  }
   /* const fastForward = () => {
     if (videoRef.current) {
       videoRef.current.currentTime += 5
@@ -110,8 +117,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
   }, [volume])
   useEffect(() => {
     if (playing) {
-      const vid: any = document.getElementById('video1')
-      const videoDuration = vid ? vid.duration : ''
+      const videoDuration = videoRef.current ? videoRef.current.duration : ''
       timerInterval = setInterval(() => {
         if (videoRef.current && videoDuration) {
           setCurrentTime(videoRef.current?.currentTime)
@@ -158,7 +164,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
     }
   }, [])
   return (
-    <Component ref={containerRef} fullScreen={isFullScreen} className='custom_video_player'>
+    <Component ref={containerRef} loaded={isLoaded} fullScreen={isFullScreen} className='custom_video_player'>
       <video
         onClick={() => videoHandler(playing ? 'pause' : 'play')}
         id='video1'
@@ -166,60 +172,65 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
         className='video'
         // src='https://res.cloudinary.com/dssvrf9oz/video/upload/v1635662987/pexels-pavel-danilyuk-5359634_1_gmixla.mp4'
         src={src}
+        onLoadedData={handleVideoProgress}
       ></video>
-
-      <ControlsContainer>
-        {/*  <span onClick={revert} className='controlsIcon'>
+      {isLoaded ? (
+        <ControlsContainer>
+          {/*  <span onClick={revert} className='controlsIcon'>
           Revert
         </span>
         <span className='controlsIcon' onClick={fastForward}>
           Forward
         </span>
 */}
-        <ProgressBlock>
-          <Progress
-            ref={progressRef}
-            onMouseDown={(e: any) => e.stopPropagation()}
-            onChange={handleProgressInputChange}
-            type='range'
-            value={progress}
-            min='0'
-            max='100'
-          />
-        </ProgressBlock>
-        {playing ? (
-          <PlayPauseWrapper onClick={() => videoHandler('pause')}>
-            <PauseIcon />
-          </PlayPauseWrapper>
-        ) : (
-          <PlayPauseWrapper onClick={() => videoHandler('play')}>
-            <PlayIcon />
-          </PlayPauseWrapper>
-        )}
+          <ProgressBlock>
+            <Progress
+              ref={progressRef}
+              onMouseDown={(e: any) => e.stopPropagation()}
+              onChange={handleProgressInputChange}
+              type='range'
+              value={progress}
+              min='0'
+              max='100'
+            />
+          </ProgressBlock>
+          {playing ? (
+            <PlayPauseWrapper onClick={() => videoHandler('pause')}>
+              <PauseIcon />
+            </PlayPauseWrapper>
+          ) : (
+            <PlayPauseWrapper onClick={() => videoHandler('play')}>
+              <PlayIcon />
+            </PlayPauseWrapper>
+          )}
 
-        <ControlTime>
-          {Math.floor(currentTime / 60) + ':' + ('0' + Math.floor(currentTime % 60)).slice(-2)} /{' '}
-          {Math.floor(videoTime / 60) + ':' + ('0' + Math.floor(videoTime % 60)).slice(-2)}
-        </ControlTime>
-        <VolumeController>
-          <VolumeIconWrapper onClick={handleMuteUnmute}>
-            {isMuted ? <VolumeMuteIcon /> : <VolumeIcon />}
-          </VolumeIconWrapper>
-          <VolumeSlide
-            ref={volumeRef}
-            onMouseDown={(e: any) => e.stopPropagation()}
-            onChange={handleVolumeInputChange}
-            type='range'
-            value={volume}
-            min='0'
-            max='1'
-            step='any'
-          />
-        </VolumeController>
-        <FullScreenWrapper onClick={handleOpenFullScreen}>
-          {isFullScreen ? <FullScreenExitIcon /> : <FullScreenIcon />}
-        </FullScreenWrapper>
-      </ControlsContainer>
+          <ControlTime>
+            {formatAudioVideoTime(currentTime)} / {formatAudioVideoTime(videoTime)}
+          </ControlTime>
+          <VolumeController>
+            <VolumeIconWrapper onClick={handleMuteUnmute}>
+              {isMuted ? <VolumeMuteIcon /> : <VolumeIcon />}
+            </VolumeIconWrapper>
+            <VolumeSlide
+              ref={volumeRef}
+              onMouseDown={(e: any) => e.stopPropagation()}
+              onChange={handleVolumeInputChange}
+              type='range'
+              value={volume}
+              min='0'
+              max='1'
+              step='any'
+            />
+          </VolumeController>
+          <FullScreenWrapper onClick={handleOpenFullScreen}>
+            {isFullScreen ? <FullScreenExitIcon /> : <FullScreenIcon />}
+          </FullScreenWrapper>
+        </ControlsContainer>
+      ) : (
+        <UploadCont>
+          <UploadingIcon />
+        </UploadCont>
+      )}
 
       {/*  <div className='timecontrols'>
            <p className='controlsTime'>
@@ -238,7 +249,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
 
 export default VideoPlayer
 
-const Component = styled.div<any>`
+const Component = styled.div<{ fullScreen?: boolean; loaded?: boolean; ref?: any }>`
   position: relative;
   display: inline-flex;
   & > video {
@@ -254,7 +265,7 @@ const Component = styled.div<any>`
   }
 
   &::after {
-    content: '';
+    content: ${(props) => props.loaded && ''};
     position: absolute;
     bottom: 0;
     height: 70px;
@@ -263,6 +274,18 @@ const Component = styled.div<any>`
   }
 `
 
+const UploadCont = styled.div`
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  min-height: 100px;
+  min-width: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+`
 const PlayPauseWrapper = styled.span`
   display: inline-block;
   width: 20px;
@@ -290,14 +313,14 @@ const PlayPauseWrapper = styled.span`
 `
 const ControlsContainer = styled.div`
   position: absolute;
-  bottom: 16px;
+  bottom: 0;
   left: 0;
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   width: calc(100% - 32px);
-  background-color: transparent;
-  padding: 0 16px;
+  background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0) 100%);
+  padding: 10px 16px 16px;
   z-index: 20;
 
   @media (max-width: 768px) {

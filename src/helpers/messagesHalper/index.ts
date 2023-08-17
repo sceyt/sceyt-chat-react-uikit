@@ -7,9 +7,14 @@ export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
 }
-export type IAttachmentMeta = { thumbnail?: string; imageWidth?: number; imageHeight?: number; duration?: number }
+export type IAttachmentMeta = {
+  thumbnail?: string
+  imageWidth?: number
+  imageHeight?: number
+  duration?: number
+}
 
-type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any } }
+type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
 
 type pendingMessagesMap = {
   [key: string]: IMessage[]
@@ -19,13 +24,15 @@ type messagesMap = {
   [key: string]: IMessage[]
 }
 
+// eslint-disable-next-line no-unused-vars
 export let sendMessageHandler: (message: IMessage, channelId: string) => Promise<IMessage>
 
+// eslint-disable-next-line no-unused-vars
 export const setSendMessageHandler = (handler: (message: IMessage, channelId: string) => Promise<IMessage>) => {
   sendMessageHandler = handler
 }
 
-const pendingAttachments: { [key: string]: File } = {}
+const pendingAttachments: { [key: string]: { file: File; checksum: string } } = {}
 let messagesMap: messagesMap = {}
 const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
@@ -103,7 +110,6 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
         setHasNextCached(true)
       } else {
         const toMessage = fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-
         messagesForAdd = activeChannelAllMessages.slice(fromMessageIndex + 1, toMessage)
         if (toMessage > activeChannelAllMessages.length - 1) {
           setHasNextCached(false)
@@ -170,16 +176,21 @@ export function addMessagesToMap(channelId: string, messages: IMessage[], direct
 }
 
 export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
-  if (
-    updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
-    updatedMessage.params.state !== MESSAGE_STATUS.FAILED &&
-    pendingMessagesMap[channelId]
-  ) {
-    const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
-    if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
-      pendingMessagesMap[channelId] = filteredMessages
+  if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
+    if (updatedMessage.params.state === MESSAGE_STATUS.FAILED) {
+      pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
+        if (msg.tid === updatedMessage.messageId) {
+          return { ...msg, ...updatedMessage.params }
+        }
+        return msg
+      })
     } else {
-      delete pendingMessagesMap[channelId]
+      const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
+      if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
+        pendingMessagesMap[channelId] = filteredMessages
+      } else {
+        delete pendingMessagesMap[channelId]
+      }
     }
   }
   if (messagesMap[channelId]) {
@@ -347,8 +358,8 @@ export const deleteVideoThumb = (attachmentId: string) => {
   delete pendingVideoAttachmentsThumbs[attachmentId]
 }
 
-export const setPendingAttachment = (attachmentId: string, file: File) => {
-  pendingAttachments[attachmentId] = file
+export const setPendingAttachment = (attachmentId: string, data: { file?: File; checksum?: string }) => {
+  pendingAttachments[attachmentId] = { ...pendingAttachments[attachmentId], ...data }
 }
 
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
@@ -368,6 +379,9 @@ export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
 }
 
-export const setDraftMessageToMap = (channelId: string, draftMessage: { text: string; mentionedMembers: any }) => {
+export const setDraftMessageToMap = (
+  channelId: string,
+  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage }
+) => {
   draftMessagesMap[channelId] = draftMessage
 }

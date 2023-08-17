@@ -2,6 +2,8 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
+import { CircularProgressbar } from 'react-circular-progressbar'
+// import 'react-circular-progressbar/dist/styles.css'
 // import { ReactComponent as DownloadFileIcon } from '../../assets/svg/download.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/fileIcon.svg'
 import { ReactComponent as RemoveAttachment } from '../../assets/svg/deleteUpload.svg'
@@ -9,8 +11,15 @@ import { ReactComponent as RemoveAttachment } from '../../assets/svg/deleteUploa
 // import { ReactComponent as PlayIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as UploadIcon } from '../../assets/svg/upload.svg'
 import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
-import { bytesToSize, calculateRenderedImageWidth, downloadFile, formatLargeText } from '../../helpers'
-import { attachmentCompilationStateSelector } from '../../store/message/selector'
+import {
+  bytesToSize,
+  calculateRenderedImageWidth,
+  cancelDownloadFile,
+  downloadFile,
+  formatLargeText,
+  setDownloadFilePromise
+} from '../../helpers'
+import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { IAttachment } from '../../types'
 import { attachmentTypes, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { colors } from '../../UIHelper/constants'
@@ -18,19 +27,23 @@ import VideoPreview from '../VideoPreview'
 import { getCustomDownloader } from '../../helpers/customUploader'
 import { pauseAttachmentUploadingAC, resumeAttachmentUploadingAC } from '../../store/message/actions'
 import AudioPlayer from '../AudioPlayer'
-import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from '../../UIHelper'
+import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { themeSelector } from '../../store/theme/selector'
+import { base64ToToDataURL } from '../../helpers/resizeImage'
 
 interface AttachmentPops {
   attachment: IAttachment
   isPreview?: boolean
   isRepliedMessage?: boolean
   isDetailsView?: boolean
+  // eslint-disable-next-line no-unused-vars
   removeSelected?: (attachmentUrl: string) => void
+  // eslint-disable-next-line no-unused-vars
   setVideoIsReadyToSend?: (attachmentId: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleMediaItemClick?: (attachment: IAttachment) => void
   borderRadius?: string
   backgroundColor: string
@@ -40,6 +53,7 @@ interface AttachmentPops {
   selectedFileAttachmentsIcon?: JSX.Element
   fileNameMaxLength?: number
   imageMinWidth?: string
+  // eslint-disable-next-line no-unused-vars
   closeMessageActions?: (state: boolean) => void
   fileAttachmentWidth?: number
   imageAttachmentMaxWidth?: number
@@ -73,30 +87,58 @@ const Attachment = ({
 }: AttachmentPops) => {
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
+  const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
   const connectionStatus = useSelector(connectionStatusSelector)
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  // const [imageLoading, setImageLoading] = useState(true)
+  const [imageLoading, setImageLoading] = useState(true)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [progress, setProgress] = useState(3)
+  const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number }>()
   const [isCached, setIsCached] = useState(true)
   // const [linkTitle, setLinkTitle] = useState('')
   // const [linkDescription, setLinkDescription] = useState('')
   // const [linkImage, setLinkImage] = useState('')
   const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
-  // const [progress, setProgress] = useState(0)
   const fileNameRef: any = useRef(null)
   const customDownloader = getCustomDownloader()
+  const previewFileType = isPreview && attachment.data.type.split('/')[0]
   const [renderWidth, renderHeight] =
     attachment.metadata && attachment.metadata.szw && attachment.metadata.szh
       ? calculateRenderedImageWidth(
           attachment.metadata.szw,
           attachment.metadata.szh,
-          imageAttachmentMaxWidth,
-          imageAttachmentMaxHeight
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
         )
       : []
+  const isInUploadingState =
+    attachmentCompilationState[attachment.attachmentId!] &&
+    (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
+      attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED)
+  // const attachmentThumb = attachment.metadata && attachment.metadata.tmb
+
+  let attachmentThumb
+  let withPrefix = true
+  if (
+    attachment.type !== attachmentTypes.voice &&
+    attachment.type !== attachmentTypes.link &&
+    attachment.metadata &&
+    attachment.metadata.tmb
+  ) {
+    try {
+      if (attachment.metadata.tmb.length < 70) {
+        attachmentThumb = base64ToToDataURL(attachment.metadata.tmb)
+        withPrefix = false
+      } else {
+        attachmentThumb = attachment.metadata && attachment.metadata.tmb
+      }
+    } catch (e) {
+      console.log('error on get attachmentThumb', e)
+    }
+  }
   // const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
   // TODO check after and remove in not nedded
   /* const [mediaFile, setMediaFile] = useState<IAttachment | null>(null)
@@ -134,7 +176,7 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(attachment.url).then((url: string) => {
+        customDownloader(attachment.url, false).then((url) => {
           downloadImage(url)
         })
       } else {
@@ -142,16 +184,22 @@ const Attachment = ({
       }
     } else {
       setAttachmentUrl('')
+      console.log('set downlod is cancelled true')
       setDownloadIsCancelled(true)
     }
   }
   const handlePauseResumeUpload = (e: Event) => {
     e.stopPropagation()
-    if (attachmentCompilationState[attachment.attachmentId!]) {
-      if (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING) {
-        dispatch(pauseAttachmentUploadingAC(attachment.attachmentId!))
-      } else {
-        dispatch(resumeAttachmentUploadingAC(attachment.attachmentId!))
+    console.log('handlePauseResumeUpload. . . . .', handlePauseResumeUpload)
+    if (downloadingFile) {
+      handleStopStartDownloadFile(attachment)
+    } else {
+      if (attachmentCompilationState[attachment.attachmentId!]) {
+        if (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING) {
+          dispatch(pauseAttachmentUploadingAC(attachment.attachmentId!))
+        } else {
+          dispatch(resumeAttachmentUploadingAC(attachment.attachmentId!))
+        }
       }
     }
   }
@@ -164,13 +212,81 @@ const Attachment = ({
 
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
   const handleCompleteDownload = (attachmentId: string) => {
+    console.log('handle complete download .... ', attachmentId)
+    console.log('attachment.id .... ', attachment.id)
     if (attachmentId === attachment.id) {
       setDownloadingFile(false)
     }
   }
-  const handleDownloadFile = (attachment: IAttachment) => {
+  const handleStopStartDownloadFile = (att?: IAttachment) => {
+    console.log('handleStopStartDownloadFile. . . . . downloadingFile . .', downloadingFile)
+    console.log('handleStopStartDownloadFile. . . . . downloadIsCancelled . .', downloadIsCancelled)
+    if (downloadingFile) {
+      if (downloadIsCancelled) {
+        setDownloadIsCancelled(false)
+        if (att) {
+          handleDownloadFileToDevice(att)
+        } else {
+          handleDownloadFile()
+        }
+      } else {
+        setDownloadIsCancelled(true)
+        const attachmentId = att ? att.id : attachment.id
+        console.log('cancel download ..... .. ', attachmentId)
+        cancelDownloadFile(attachmentId || '')
+      }
+    } else {
+      setDownloadingFile(true)
+      setDownloadIsCancelled(false)
+      if (att) {
+        handleDownloadFileToDevice(att)
+      } else {
+        handleDownloadFile()
+      }
+    }
+  }
+  const handleDownloadFileToDevice = (attachment: IAttachment) => {
     setDownloadingFile(true)
-    downloadFile(attachment, handleCompleteDownload)
+    setDownloadIsCancelled(false)
+    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
+      const loadedRes = progress.loaded && progress.loaded / progress.total
+      const uploadPercent = loadedRes && loadedRes * 100
+      setProgress(uploadPercent > 3 ? uploadPercent : 3)
+      setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+    })
+  }
+
+  const handleDownloadFile = async () => {
+    if (customDownloader) {
+      if (!attachment.attachmentUrl) {
+        setDownloadingFile(true)
+      }
+      const urlPromise = customDownloader(attachment.url, true, (progress) => {
+        const loadedRes = progress.loaded && progress.loaded / progress.total
+        const uploadPercent = loadedRes && loadedRes * 100
+        setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+        setProgress(uploadPercent)
+      })
+      setDownloadFilePromise(attachment.id!, urlPromise)
+      const result = await urlPromise
+      // customDownloader(attachment.url, true, (progress) => {}).then(async (data) => {
+      // if (attachment.type === attachmentTypes.video) {
+      const url = URL.createObjectURL(result.Body)
+      setSizeProgress(undefined)
+      const response = await fetch(url)
+      setAttachmentToCache(attachment.url, response)
+      setIsCached(true)
+      // }
+      setDownloadingFile(false)
+      setAttachmentUrl(url)
+      // })
+    } else {
+      setAttachmentUrl(attachment.url)
+      fetch(attachment.url).then(async (response) => {
+        setAttachmentToCache(attachment.url, response)
+        setIsCached(true)
+      })
+    }
   }
 
   useEffect(() => {
@@ -198,10 +314,11 @@ const Attachment = ({
     // setAttachmentUrl('')
     if (
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      attachment.id &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
-      getAttachmentUrlFromCache(attachment.id!)
-        .then((cachedUrl) => {
+      getAttachmentUrlFromCache(attachment.url)
+        .then(async (cachedUrl) => {
           if (attachment.type === 'image' && !isPreview) {
             if (cachedUrl) {
               // @ts-ignore
@@ -209,18 +326,24 @@ const Attachment = ({
               setAttachmentUrl(cachedUrl)
               setIsCached(true)
             } else {
+              setIsCached(false)
               if (customDownloader) {
                 // console.log('is not cached, download with custom downloader')
-                customDownloader(attachment.url).then(async (url: any) => {
+                customDownloader(attachment.url, false).then(async (url) => {
                   // console.log('image is downloaded. . . should load image', url)
                   downloadImage(url)
                   const response = await fetch(url)
-                  setAttachmentToCache(attachment.id!, response)
+                  setAttachmentToCache(attachment.url, response)
+                  setIsCached(true)
                 })
               } else {
                 // console.log('is not cached, load attachment.url', attachment.url)
                 // console.log('is not cached, load attachment.attachmentUrl', attachment.attachmentUrl)
                 downloadImage(attachment.url)
+                fetch(attachment.url).then(async (response) => {
+                  setAttachmentToCache(attachment.url, response)
+                  setIsCached(true)
+                })
               }
             }
           } else {
@@ -229,27 +352,23 @@ const Attachment = ({
               setAttachmentUrl(cachedUrl)
               setIsCached(true)
             } else {
-              if (customDownloader) {
-                customDownloader(attachment.url).then(async (url: any) => {
-                  // if (attachment.type === attachmentTypes.video) {
-                  const response = await fetch(url)
-                  setAttachmentToCache(attachment.id!, response)
-                  // }
-                  setAttachmentUrl(url)
-                })
-              } else {
-                setAttachmentUrl(attachment.url)
-              }
+              setIsCached(false)
+              /* if (attachment.attachmentUrl) {
+                setAttachmentUrl(attachment.attachmentUrl)
+              } else { */
+              console.log('should download the video .............................')
+              handleDownloadFile()
+              // }
             }
           }
         })
         .catch((e: any) => {
           console.log('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
-            customDownloader(attachment.url).then(async (url: any) => {
+            customDownloader(attachment.url, false).then(async (url) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
-              setAttachmentToCache(attachment.id!, response)
+              setAttachmentToCache(attachment.url, response)
               // }
               setAttachmentUrl(url)
             })
@@ -259,8 +378,48 @@ const Attachment = ({
         })
     }
   }, [attachment.id])
+  /* useEffect(() => {
+    console.log('START progress .. .. ', progress)
 
-  // @ts-ignore
+    const int = setInterval(() => {
+      setProgress((prev) => {
+        if (prev >= 100) {
+          clearInterval(int)
+          return prev
+        }
+        return prev + 2
+      })
+    }, 1200)
+  }, []) */
+  useEffect(() => {
+    const attachmentIndex = attachment.attachmentId || attachment.id
+    if (attachmentIndex && (attachmentsUploadProgress[attachmentIndex] || attachmentsUploadProgress[attachmentIndex])) {
+      const uploadProgress = attachmentsUploadProgress[attachmentIndex]
+      const uploadPercent =
+        uploadProgress.progress && uploadProgress.progress * 100 > 3 ? uploadProgress.progress * 100 : 3
+      setProgress(uploadPercent)
+      setSizeProgress({ loaded: uploadProgress.uploaded || 0, total: uploadProgress.total || 0 })
+    }
+  }, [attachmentsUploadProgress])
+
+  /* useEffect(() => {
+    console.log('isCached. . . . . . . ', attachment.name, isCached)
+  }, [isCached])
+  console.log(
+    'should show loading 1..... ',
+    attachment.name,
+    '- - -- ',
+    (attachmentCompilationState[attachment.attachmentId!] &&
+      (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
+        attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED)) ||
+      !isCached
+  )
+  console.log(
+    'should show loading 2..... ',
+    attachment.name,
+    '- - -- ',
+    attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING || !isCached
+  ) */
   return (
     <React.Fragment>
       {/* {ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'gif' ? ( */}
@@ -271,56 +430,32 @@ const Attachment = ({
           isPreview={isPreview}
           ref={imageContRef}
           borderRadius={borderRadius}
-          backgroundImage={attachment.metadata && attachment.metadata.tmb}
+          backgroundImage={attachmentThumb}
+          withPrefix={withPrefix}
           isRepliedMessage={isRepliedMessage}
           fitTheContainer={isDetailsView}
           width={!isPreview && !isRepliedMessage ? renderWidth : undefined}
           height={!isPreview && !isRepliedMessage ? renderHeight : undefined}
         >
-          {(attachment.attachmentUrl || attachmentUrl) && (
-            <AttachmentImg
-              draggable={false}
-              // hidden={imageLoading}
-              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
-              src={attachment.attachmentUrl || attachmentUrl}
-              borderRadius={borderRadius}
-              imageMinWidth={imageMinWidth}
-              isPreview={isPreview}
-              isRepliedMessage={isRepliedMessage}
-              withBorder={!isPreview && !isDetailsView}
-              fitTheContainer={isDetailsView}
-              imageMaxHeight={
-                attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
-              }
-              // onLoad={() => setImageLoading(false)}
-            />
-          )}
+          {/* {(attachment.attachmentUrl || attachmentUrl) && ( */}
+          <AttachmentImg
+            draggable={false}
+            // hidden={imageLoading}
+            backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
+            src={attachment.attachmentUrl || attachmentUrl}
+            borderRadius={borderRadius}
+            imageMinWidth={imageMinWidth}
+            isPreview={isPreview}
+            isRepliedMessage={isRepliedMessage}
+            withBorder={!isPreview && !isDetailsView}
+            fitTheContainer={isDetailsView}
+            imageMaxHeight={
+              attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
+            }
+            onLoad={() => setImageLoading(false)}
+          />
+          {/* )} */}
 
-          {!isPreview && !(attachment.attachmentUrl || attachmentUrl) && (
-            <UploadProgress
-              // positionStatic
-              backgroundImage={attachment.metadata && attachment.metadata.tmb}
-              isRepliedMessage={isRepliedMessage}
-              onClick={handlePauseResumeDownload}
-              width={renderWidth}
-              height={renderHeight}
-              withBorder={!isPreview && !isDetailsView}
-              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
-              isDetailsView={isDetailsView}
-              imageMinWidth={imageMinWidth}
-            >
-              {!isCached && (
-                <React.Fragment>
-                  <UploadPercent isRepliedMessage={isRepliedMessage}>
-                    {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
-                  </UploadPercent>
-                  {!downloadIsCancelled && (
-                    <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />
-                  )}
-                </React.Fragment>
-              )}
-            </UploadProgress>
-          )}
           {/* {!imgIsLoaded && ( */}
           {/*    {!isPreview && attachment.metadata && attachment.metadata.tmb && (
             <ImageThumbnail
@@ -333,13 +468,90 @@ const Attachment = ({
               isLoaded={!imgIsLoaded}
             />
           )} */}
-
           {/* )} */}
-          {!isPreview &&
-          attachmentCompilationState[attachment.attachmentId!] &&
-          (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
-            attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED) ? (
-            <UploadProgress onClick={handlePauseResumeUpload}>
+          {!isPreview && (isInUploadingState || imageLoading) ? (
+            <UploadProgress
+              backgroundImage={attachmentThumb}
+              isRepliedMessage={isRepliedMessage}
+              width={renderWidth}
+              height={renderHeight}
+              withBorder={!isPreview && !isDetailsView}
+              backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
+              isDetailsView={isDetailsView}
+              imageMinWidth={imageMinWidth}
+            >
+              <UploadPercent isRepliedMessage={isRepliedMessage}>
+                {isInUploadingState ? (
+                  <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                    {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ? (
+                      <CancelIcon />
+                    ) : (
+                      <UploadIcon />
+                    )}
+                  </CancelResumeWrapper>
+                ) : (
+                  !isCached && (
+                    <CancelResumeWrapper onClick={handlePauseResumeDownload}>
+                      {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+                    </CancelResumeWrapper>
+                  )
+                )}
+
+                {(!isCached || attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING) && (
+                  <React.Fragment>
+                    <ProgressWrapper>
+                      <CircularProgressbar
+                        minValue={0}
+                        maxValue={100}
+                        value={progress}
+                        backgroundPadding={3}
+                        background={true}
+                        text=''
+                        styles={{
+                          // Rotation of path and trail, in number of turns (0-1)
+                          // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+
+                          // Text size
+                          // textSize: '16px',
+                          background: {
+                            fill: 'rgba(23, 25, 28, 0.40)'
+                          },
+                          path: {
+                            // Path color
+                            stroke: colors.white,
+                            // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+                            strokeLinecap: 'butt',
+                            strokeWidth: '4px',
+                            // Customize transition animation
+                            transition: 'stroke-dashoffset 0.5s ease 0s',
+                            // Rotate the path
+                            transform: 'rotate(0turn)',
+                            transformOrigin: 'center center'
+                          }
+                          // How long animation takes to go from one percentage to another, in seconds
+                          // pathTransitionDuration: 0.5,
+
+                          // Can specify path transition in more detail, or remove it entirely
+                          // pathTransition: 'none',
+
+                          // Colors
+                          // pathColor: '#fff',
+                          // textColor: '#f88',
+                          // trailColor: 'transparent'
+                        }}
+                      />
+                    </ProgressWrapper>
+
+                    {sizeProgress && (
+                      <SizeProgress>
+                        {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                      </SizeProgress>
+                    )}
+                  </React.Fragment>
+                )}
+              </UploadPercent>
+            </UploadProgress>
+          ) : /*  <UploadProgress onClick={handlePauseResumeUpload}>
               <UploadPercent>
                 {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ? (
                   <CancelIcon />
@@ -350,8 +562,8 @@ const Attachment = ({
               {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING && (
                 <UploadingIcon className='rotate_cont' />
               )}
-            </UploadProgress>
-          ) : /* attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
+            </UploadProgress> */
+          /* attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
             <React.Fragment>
               <RemoveChosenFile onClick={() => removeSelected(attachment.attachmentId!)} />
               <UploadProgress isFailedAttachment>
@@ -372,6 +584,7 @@ const Attachment = ({
             <VideoCont
               onClick={() =>
                 handleMediaItemClick &&
+                !downloadingFile &&
                 (attachmentCompilationState[attachment.attachmentId!]
                   ? attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.FAIL ||
                     attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.UPLOADING
@@ -380,14 +593,68 @@ const Attachment = ({
               }
               isDetailsView={isDetailsView}
             >
-              {attachmentCompilationState[attachment.attachmentId!] &&
-              (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
-                attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED) ? (
+              {isInUploadingState || downloadingFile ? (
                 <UploadProgress
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
+                  withPrefix={withPrefix}
+                  backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
+                  zIndex={9}
+                >
+                  <UploadPercent isRepliedMessage={isRepliedMessage} backgroundColor={'rgba(23, 25, 28, 0.40)'}>
+                    {isInUploadingState ? (
+                      <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                        {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ? (
+                          <CancelIcon />
+                        ) : (
+                          <UploadIcon />
+                        )}
+                      </CancelResumeWrapper>
+                    ) : (
+                      <CancelResumeWrapper onClick={() => handleStopStartDownloadFile()}>
+                        {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+                      </CancelResumeWrapper>
+                    )}
+                    {(attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
+                      (downloadingFile && !downloadIsCancelled)) && (
+                      <React.Fragment>
+                        <ProgressWrapper>
+                          <CircularProgressbar
+                            minValue={0}
+                            maxValue={100}
+                            value={progress}
+                            backgroundPadding={3}
+                            background={true}
+                            text=''
+                            styles={{
+                              background: {
+                                fill: 'rgba(23, 25, 28, 0)'
+                              },
+                              path: {
+                                stroke: colors.white,
+                                strokeLinecap: 'butt',
+                                strokeWidth: '4px',
+                                transition: 'stroke-dashoffset 0.5s ease 0s',
+                                transform: 'rotate(0turn)',
+                                transformOrigin: 'center center'
+                              }
+                            }}
+                          />
+                        </ProgressWrapper>
+                        {sizeProgress && (
+                          <SizeProgress>
+                            {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                          </SizeProgress>
+                        )}
+                      </React.Fragment>
+                    )}
+                  </UploadPercent>
+                </UploadProgress>
+              ) : /* <UploadProgress
+                  isDetailsView={isDetailsView}
+                  isRepliedMessage={isRepliedMessage}
                   onClick={handlePauseResumeUpload}
-                  backgroundImage={attachment.metadata && attachment.metadata.tmb ? attachment.metadata.tmb : ''}
+                  backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
                 >
                   <React.Fragment>
                     <UploadPercent isRepliedMessage={isRepliedMessage}>
@@ -401,36 +668,22 @@ const Attachment = ({
                       <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />
                     )}
                   </React.Fragment>
-                </UploadProgress> /* : attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
+                </UploadProgress> */
+              /* : attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
                 <React.Fragment>
                   <UploadProgress isFailedAttachment>
                     <ErrorIcon />
                   </UploadProgress>
                 </React.Fragment>
               ) */
-              ) : null}
+              null}
               <VideoPreview
                 theme={theme}
-                maxWidth={
-                  isRepliedMessage
-                    ? '40px'
-                    : isDetailsView
-                    ? '100%'
-                    : videoAttachmentMaxWidth
-                    ? `${videoAttachmentMaxWidth}px`
-                    : '320px'
-                }
-                maxHeight={
-                  isRepliedMessage
-                    ? '40px'
-                    : isDetailsView
-                    ? '100%'
-                    : videoAttachmentMaxHeight
-                    ? `${videoAttachmentMaxHeight}px`
-                    : '240px'
-                }
+                maxWidth={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderWidth}px`}
+                maxHeight={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderHeight}px`}
                 file={attachment}
                 src={attachmentUrl}
+                isCachedFile={isCached}
                 uploading={
                   attachmentCompilationState[attachment.attachmentId!] &&
                   (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
@@ -493,29 +746,103 @@ const Attachment = ({
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}
         >
-          {attachment.metadata && attachment.metadata.tmb ? (
-            <FileThumbnail src={`data:image/jpeg;base64,${attachment.metadata.tmb}`} />
+          {attachmentThumb ? (
+            <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
           ) : (
-            <AttachmentIconCont className='icon-warpper'>
-              {selectedFileAttachmentsIcon || <FileIcon />}
+            // <FileThumbnail src={base64ToToDataURL(attachment.metadata.tmb)} />
+            <AttachmentIconCont backgroundColor={colors.primary} className='icon-warpper'>
+              {previewFileType && previewFileType === 'video' ? (
+                <VideoPreview
+                  file={attachment}
+                  backgroundColor={
+                    backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight
+                  }
+                  maxWidth='40px'
+                  maxHeight='40px'
+                  src={attachment.attachmentUrl}
+                  setVideoIsReadyToSend={setVideoIsReadyToSend}
+                  isPreview
+                />
+              ) : isPreview && attachment.attachmentUrl ? (
+                <FileThumbnail src={attachment.attachmentUrl} />
+              ) : (
+                attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.UPLOADING &&
+                attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.PAUSED &&
+                (selectedFileAttachmentsIcon || <FileIcon />)
+              )}
             </AttachmentIconCont>
           )}
+          {/* <AttachmentIconCont backgroundColor={colors.primary} className='icon-warpper'>
+            {attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.UPLOADING &&
+              attachmentCompilationState[attachment.attachmentId!] !== UPLOAD_STATE.PAUSED &&
+              (selectedFileAttachmentsIcon || <FileIcon />)}
+          </AttachmentIconCont> */}
           {!isRepliedMessage && !isPreview && (
             <DownloadFile
-              backgroundColor={colors.primary}
-              onClick={() => handleDownloadFile(attachment)}
+              // visible={downloadingFile}
+              // absolutePosition={downloadingFile}
+              widthThumb={!!attachmentThumb}
+              backgroundColor={attachmentThumb ? 'rgba(0,0,0,0.4)' : colors.primary}
+              onClick={() => handleStopStartDownloadFile(attachment)}
               onMouseEnter={() => handleMouseEvent(true)}
               onMouseLeave={() => handleMouseEvent(false)}
             >
-              {downloadingFile ? <UploadingIcon fileAttachment /> : <DownloadIcon />}
+              {!downloadingFile && <DownloadIcon />}
             </DownloadFile>
           )}
 
-          {!isPreview &&
-          attachmentCompilationState[attachment.attachmentId!] &&
-          (attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
-            attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.PAUSED) ? (
-            <UploadProgress fileAttachment onClick={handlePauseResumeUpload}>
+          {!isRepliedMessage && !isPreview && (isInUploadingState || downloadingFile) ? (
+            <UploadProgress fileAttachment>
+              <UploadPercent
+                fileAttachment
+                borderRadius={!(attachmentThumb || (attachment.attachmentUrl && isPreview)) ? '50%' : undefined}
+                backgroundColor={
+                  downloadingFile
+                    ? ''
+                    : attachment.attachmentUrl || attachmentThumb
+                    ? 'rgba(0,0,0,0.4)'
+                    : colors.primary
+                }
+              >
+                {(isInUploadingState || downloadingFile) && (
+                  <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                    {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
+                    downloadingFile ? (
+                      <CancelIcon />
+                    ) : (
+                      isInUploadingState && <UploadIcon />
+                    )}
+                  </CancelResumeWrapper>
+                )}
+                {(attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.UPLOADING ||
+                  downloadingFile) && (
+                  <ProgressWrapper>
+                    <CircularProgressbar
+                      minValue={0}
+                      maxValue={100}
+                      value={progress}
+                      backgroundPadding={6}
+                      background={true}
+                      text=''
+                      styles={{
+                        background: {
+                          fill: 'transparent'
+                        },
+                        path: {
+                          stroke: colors.white,
+                          strokeLinecap: 'butt',
+                          strokeWidth: '4px',
+                          transition: 'stroke-dashoffset 0.5s ease 0s',
+                          transform: 'rotate(0turn)',
+                          transformOrigin: 'center center'
+                        }
+                      }}
+                    />
+                  </ProgressWrapper>
+                )}
+              </UploadPercent>
+            </UploadProgress>
+          ) : /* <UploadProgress fileAttachment onClick={handlePauseResumeUpload}>
               <UploadPercent
                 fileAttachment
                 borderRadius={attachment.metadata && attachment.metadata.tmb ? undefined : '50%'}
@@ -527,14 +854,15 @@ const Attachment = ({
                 )}
               </UploadPercent>
               <UploadingIcon fileAttachment className='rotate_cont' />
-            </UploadProgress> /*: attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
+            </UploadProgress> */
+          /*: attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL ? (
             <React.Fragment>
               <UploadProgress isFailedAttachment>
                 <FailedFileIcon onClick={() => removeSelected && removeSelected(attachment.attachmentId!)} />
               </UploadProgress>
             </React.Fragment>
           ) */
-          ) : null}
+          null}
           {!isRepliedMessage && (
             <AttachmentFileInfo isPreview={isPreview}>
               {/* @ts-ignore */}
@@ -545,8 +873,10 @@ const Attachment = ({
                 )}
               </AttachmentName>
               <AttachmentSize color={selectedFileAttachmentsSizeColor}>
-                {((attachment.data && attachment.data.size) || attachment.size) &&
-                  bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
+                {(isInUploadingState || downloadingFile) && sizeProgress
+                  ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
+                  : ((attachment.data && attachment.data.size) || attachment.size) &&
+                    bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
                 {/* <span>
                   {attachmentCompilationState[attachment.attachmentId!] === UPLOAD_STATE.FAIL && 'Upload error'}
                 </span> */}
@@ -576,7 +906,10 @@ const Attachment = ({
   )
 }
 
-export default Attachment
+export default React.memo(Attachment, (prevProps, nextProps) => {
+  // Custom comparison function to check if only 'messages' prop has changed
+  return prevProps.attachment.url === nextProps.attachment.url && prevProps.attachment.id === nextProps.attachment.id
+})
 
 const DownloadImage = styled.div<any>`
   position: absolute;
@@ -606,6 +939,7 @@ const AttachmentImgCont = styled.div<{
   borderRadius?: string
   imgIsLoaded?: boolean
   isRepliedMessage?: boolean
+  withPrefix?: boolean
   fitTheContainer?: boolean
   width?: number
   height?: number
@@ -665,7 +999,7 @@ const FileThumbnail = styled.img<any>`
   border-radius: 8px;
 `
 
-const DownloadFile = styled.span<{ backgroundColor?: string }>`
+const DownloadFile = styled.span<{ backgroundColor?: string; widthThumb?: boolean }>`
   display: none;
   align-items: center;
   justify-content: center;
@@ -674,7 +1008,8 @@ const DownloadFile = styled.span<{ backgroundColor?: string }>`
   min-width: 40px;
   max-width: 40px;
   height: 40px;
-  border-radius: 50%;
+  position: ${(props) => props.widthThumb && 'absolute'};
+  border-radius: ${(props) => (props.widthThumb ? '8px' : '50%')};
 
   & > svg {
     width: 20px;
@@ -682,6 +1017,30 @@ const DownloadFile = styled.span<{ backgroundColor?: string }>`
   }
 `
 
+const ProgressWrapper = styled.span`
+  width: 100%;
+  height: 100%;
+  animation: preloader 1.5s linear infinite;
+
+  @keyframes preloader {
+    0% {
+      transform: rotate(0deg);
+    }
+    100% {
+      transform: rotate(360deg);
+    }
+  }
+`
+export const SizeProgress = styled.span`
+  position: absolute;
+  bottom: -26px;
+  background-color: rgba(0, 0, 0, 0.4);
+  color: ${colors.white};
+  font-size: 12px;
+  border-radius: 12px;
+  padding: 3px 6px;
+  white-space: nowrap;
+`
 export const AttachmentFile = styled.div<{
   isPreview?: boolean
   isRepliedMessage?: boolean
@@ -717,7 +1076,6 @@ export const AttachmentFile = styled.div<{
       }
 
       &:hover ${FileThumbnail} {
-        display: none;
       }
         &:hover ${AttachmentIconCont} {
     display: none;

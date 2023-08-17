@@ -192,13 +192,13 @@ export const MessageTextFormat = ({
         const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mention.id)
         let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, mention.loc) : ''}`
         nextPartIndex = mention.loc + mention.len
-        const firstPartMatch = linkify.match(firstPart)
+        const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
         if (!isLastMessage && !asSampleText && firstPartMatch) {
           firstPart = linkifyTextPart(firstPart, firstPartMatch)
         }
         let secondPart = `${textPart ? textPart?.substring(mention.loc + mention.len) : ''}`
-        const secondPartMatch = linkify.match(secondPart)
+        const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
         if (!isLastMessage && !asSampleText && secondPartMatch) {
           secondPart = linkifyTextPart(secondPart, secondPartMatch)
         }

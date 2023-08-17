@@ -9,7 +9,7 @@ import { IAttachment, IContact } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
-import { getCustomDownloader } from './customUploader'
+import { getCustomDownloader, getCustomUploader } from './customUploader'
 
 const StatusText = styled.span`
   color: ${colors.textColor2};
@@ -74,22 +74,62 @@ export const systemMessageUserName = (contact: IContact, userId: string) => {
   return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
 }
 
+const filesPromisesOnDownload: { [key: string]: any } = {}
+
+export const setDownloadFilePromise = (attachmentId: string, promise: any) => {
+  filesPromisesOnDownload[attachmentId] = promise
+}
 export const downloadFile = async (
   attachment: IAttachment,
-  done?: (attachmentId: string, failed?: boolean) => void
+  download: boolean,
+  // eslint-disable-next-line no-unused-vars
+  done?: (attachmentId: string, failed?: boolean) => void,
+  // eslint-disable-next-line no-unused-vars
+  progressCallback?: (progress: { loaded: number; total: number }) => void
 ) => {
   try {
     const customDownloader = getCustomDownloader()
     let response
     if (customDownloader) {
-      customDownloader(attachment.url).then(async (url: any) => {
+      const urlPromise = customDownloader(attachment.url, download, (progress) => {
+        if (progressCallback) {
+          progressCallback(progress)
+        }
+      })
+      filesPromisesOnDownload[attachment.id!] = urlPromise
+      const result = await urlPromise
+      /* response = await fetch(result)
+      const data = await response.blob()
+      if (done) {
+        delete filesPromisesOnDownload[attachment.id!]
+        done(attachment.id || '')
+      } */
+      FileSaver.saveAs(result.Body, attachment.name)
+      if (done) {
+        done(attachment.id || '')
+      }
+      delete filesPromisesOnDownload[attachment.id!]
+      /* urlPromise.then(async (url) => {
+        response = await fetch(url)
+        const data = await response.blob()
+        if (done) {
+          delete filesPromisesOnDownload[attachment.id!]
+          done(attachment.id || '')
+        }
+        FileSaver.saveAs(data, attachment.name)
+      }) */
+      /*  customDownloader(attachment.url, (progress) => {
+        if (progressCallback) {
+          progressCallback(progress)
+        }
+      }).then(async (url) => {
         response = await fetch(url)
         const data = await response.blob()
         if (done) {
           done(attachment.id || '')
         }
         FileSaver.saveAs(data, attachment.name)
-      })
+      }) */
     } else {
       response = await fetch(attachment.url)
       const data = await response.blob()
@@ -102,6 +142,18 @@ export const downloadFile = async (
     console.log('error on download... ', e)
     if (done) {
       done(attachment.id || '', true)
+    }
+  }
+}
+
+export const cancelDownloadFile = (attachmentId: string) => {
+  console.log('cancelDownloadFile... ', attachmentId)
+  const promise = filesPromisesOnDownload[attachmentId]
+  if (promise) {
+    console.log('cancelDownloadFile... promise exist - --')
+    const customUploader = getCustomUploader()
+    if (customUploader) {
+      customUploader.cancelRequest(promise)
     }
   }
 }
@@ -193,7 +245,7 @@ export const getMetadataFromUrl = (url: string): Promise<any> => {
         doc.querySelector("meta[property='og:description']") ||
         doc.querySelector("meta[name='description']")
       ).getAttribute('content')
-      let image = ''
+      let image
       // Extract the image
       // @ts-ignore
       const imageSrc = (
@@ -209,9 +261,9 @@ export const getMetadataFromUrl = (url: string): Promise<any> => {
     .catch((error) => console.log(error))
 }
 
-export const formatAudioVideoTime = (duration: number, currentTime: number) => {
-  const minutes = Math.floor((duration - currentTime) / 60)
-  const seconds = Math.floor((duration - currentTime) % 60)
+export const formatAudioVideoTime = (currentTime: number) => {
+  const minutes = Math.floor(currentTime / 60)
+  const seconds = Math.floor(currentTime % 60)
   return `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`
 }
 
@@ -445,7 +497,7 @@ export const detectOS = () => {
     os = 'Windows'
   } else if (/Android/.test(userAgent)) {
     os = 'Android'
-  } else if (!os && /Linux/.test(platform)) {
+  } else if (/Linux/.test(platform)) {
     os = 'Linux'
   }
 
@@ -472,7 +524,7 @@ export const detectBrowser = () => {
 }
 
 export const getEmojisCategoryTitle = (categoryKey: string) => {
-  let category = ''
+  let category
 
   switch (categoryKey) {
     case 'People':
@@ -501,4 +553,12 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
       break
   }
   return category
+}
+
+export const hashString = async (str: string) => {
+  const encoder = new TextEncoder()
+  const encodedData = encoder.encode(str)
+  const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  const hashArray = Array.from(new Uint8Array(hashBuffer))
+  return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }

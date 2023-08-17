@@ -57,7 +57,8 @@ import {
   setChannelInMap,
   addChannelsToAllChannels,
   getAllChannels,
-  getChannelFromAllChannels
+  getChannelFromAllChannels,
+  updateChannelOnAllChannels
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IMember, IMessage } from '../../types'
@@ -70,7 +71,12 @@ import {
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
-import { removeAllMessages, removeMessagesFromMap } from '../../helpers/messagesHalper'
+import {
+  removeAllMessages,
+  removeMessagesFromMap,
+  updateMessageOnAllMessages,
+  updateMessageOnMap
+} from '../../helpers/messagesHalper'
 import { updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { makeUsername } from '../../helpers/message'
@@ -137,6 +143,7 @@ function* getChannels(action: IAction): any {
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
+    // console.log('channelsData. . . . . .', channelsData)
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
@@ -145,7 +152,6 @@ function* getChannels(action: IAction): any {
       setChannelsInMap,
       channelsData.channels
     )
-
     if (channelsForUpdateLastReactionMessage.length) {
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
@@ -477,25 +483,25 @@ function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
   let channel = yield call(getChannelFromMap, channelId)
-  if (!channel) {
-    channel = getChannelFromAllChannels(channelId)
-    setChannelInMap(channel)
-  }
-  // const activeChannelId = yield call(getActiveChannelId)
-  if (channel) {
-    const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
-    // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
-    // yield put(setChannelUnreadCount(0, channel.id));
-    yield put(
-      updateChannelDataAC(channel.id, {
-        markedAsUnread: channel.unread,
-        lastReadMessageId: channel.lastDisplayedMsgId,
-        unreadMessageCount: channel.newMessageCount
-      })
-    )
-    for (const messageId of messageListMarker.messageIds) {
+  try {
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      setChannelInMap(channel)
+    }
+    // const activeChannelId = yield call(getActiveChannelId)
+    if (channel) {
+      const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
+      // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
+      // yield put(setChannelUnreadCount(0, channel.id));
       yield put(
-        updateMessageAC(messageId, {
+        updateChannelDataAC(channel.id, {
+          unread: channel.unread,
+          lastReadMessageId: channel.lastDisplayedMsgId,
+          unreadMessageCount: channel.newMessageCount
+        })
+      )
+      for (const messageId of messageListMarker.messageIds) {
+        const updateParams = {
           deliveryStatus: MESSAGE_DELIVERY_STATUS.READ,
           userMarkers: [
             {
@@ -505,40 +511,49 @@ function* markMessagesRead(action: IAction): any {
               name: MESSAGE_DELIVERY_STATUS.READ
             }
           ]
-        })
-      )
-    }
+        }
+        yield put(updateMessageAC(messageId, updateParams))
+        updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        updateMessageOnAllMessages(messageId, updateParams)
+      }
 
-    /* if (channelId === activeChannelId) {
-      yield put(
-        updateChannelDataAC(channel.id, {
-          markedAsUnread: channel.unread,
-          lastReadMessageId: channel.lastDisplayedMsgId,
-          unreadMessageCount: channel.newMessageCount
-        })
-      )
-    } else {
-      yield put(
-        updateChannelDataAC(channel.id, {
-          markedAsUnread: channel.unread,
-          lastReadMessageId: channel.lastDisplayedMsgId
-        })
-      )
-    } */
+      /* if (channelId === activeChannelId) {
+        yield put(
+          updateChannelDataAC(channel.id, {
+            markedAsUnread: channel.unread,
+            lastReadMessageId: channel.lastDisplayedMsgId,
+            unreadMessageCount: channel.newMessageCount
+          })
+        )
+      } else {
+        yield put(
+          updateChannelDataAC(channel.id, {
+            markedAsUnread: channel.unread,
+            lastReadMessageId: channel.lastDisplayedMsgId
+          })
+        )
+      } */
+    }
+  } catch (e) {
+    console.log(e, 'Error on mark messages read')
   }
 }
 
 function* markMessagesDelivered(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
-  let channel = yield call(getChannelFromMap, channelId)
-  if (!channel) {
-    channel = getChannelFromAllChannels(channelId)
-    setChannelInMap(channel)
-  }
+  try {
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      setChannelInMap(channel)
+    }
 
-  if (channel) {
-    yield call(channel.markMessagesAsReceived, messageIds)
+    if (channel) {
+      yield call(channel.markMessagesAsReceived, messageIds)
+    }
+  } catch (e) {
+    console.log(e, 'Error on mark messages delivered')
   }
 }
 
@@ -615,6 +630,7 @@ function* markChannelAsRead(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     const updatedChannel = yield call(channel.markAsRead)
+    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
     yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
@@ -631,8 +647,7 @@ function* markChannelAsUnRead(action: IAction): any {
     }
 
     const updatedChannel = yield call(channel.markAsUnRead)
-    console.log(' channel -- ', channel)
-    console.log('updated channel -- ', updatedChannel)
+    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
     yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
@@ -664,7 +679,7 @@ function* leaveChannel(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     if (channel) {
-      if (channel.type === CHANNEL_TYPE.GROUP) {
+      if (channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE) {
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder.setBody('LG').setType('system').setDisplayCount(0).setSilent(true)
         const messageToSend = messageBuilder.create()
@@ -777,10 +792,19 @@ function* checkUsersStatus(/* action: IAction */): any {
     // const { usersMap } = payload
     const SceytChatClient = getClient()
     const usersForUpdate = Object.keys(usersMap)
+    const activeChannelId = getActiveChannelId()
+    const activeChannel = getChannelFromMap(activeChannelId)
+    let activeChannelUser: any
+    if (activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT) {
+      activeChannelUser = activeChannel.members.find((member) => member.id !== SceytChatClient.user.id)
+    }
     const updatedUsers = yield call(SceytChatClient.getUsers as any, usersForUpdate)
     const usersToUpdateMap: { [key: string]: IMember } = {}
     let update: boolean = false
     updatedUsers.forEach((updatedUser: IMember) => {
+      if (activeChannelUser && activeChannelUser.id === updatedUser.id) {
+        console.log('active channel user is updated - ', updatedUser)
+      }
       if (
         updatedUser.presence &&
         (updatedUser.presence.state !== usersMap[updatedUser.id].state ||
@@ -812,12 +836,16 @@ function* sendTyping(action: IAction): any {
   const activeChannelId = yield call(getActiveChannelId)
   const channel = yield call(getChannelFromMap, activeChannelId)
 
-  if (channel) {
-    if (state) {
-      yield call(channel.startTyping)
-    } else {
-      yield call(channel.stopTyping)
+  try {
+    if (channel) {
+      if (state) {
+        yield call(channel.startTyping)
+      } else {
+        yield call(channel.stopTyping)
+      }
     }
+  } catch (e) {
+    console.log('ERROR in send typing')
   }
 }
 

@@ -25,6 +25,7 @@ interface IProps {
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
   playingVoiceId?: string
+  // eslint-disable-next-line no-unused-vars
   setVoiceIsPlaying?: (attachmentId: string) => void
 }
 
@@ -58,9 +59,9 @@ const VoiceItem = ({
           const audioCurrentTime = audioRef.current?.currentTime
           if (audioDuration) {
             if ((audioCurrentTime || audioCurrentTime === 0) && audioDuration - audioCurrentTime > 0) {
-              setCurrentTime(formatAudioVideoTime(audioDuration, audioCurrentTime))
+              setCurrentTime(formatAudioVideoTime(audioCurrentTime))
             } else {
-              setCurrentTime(formatAudioVideoTime(audioDuration, 0))
+              setCurrentTime(formatAudioVideoTime(audioCurrentTime || 0))
               setAudioIsPlaying(false)
               audioRef.current?.pause()
               audioRef.current && (audioRef.current.currentTime = 0)
@@ -92,7 +93,7 @@ const VoiceItem = ({
   }, [playingVoiceId])
   useEffect(() => {
     if (customDownloader) {
-      customDownloader(file.url).then((url) => {
+      customDownloader(file.url, false).then((url) => {
         setFileUrl(url)
       })
     } else {
@@ -131,7 +132,7 @@ const VoiceItem = ({
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
         <AudioSendTime>
-          {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur, 0) : '')}
+          {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur) : '')}
         </AudioSendTime>
       </AudioInfo>
 

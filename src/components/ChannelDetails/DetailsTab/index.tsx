@@ -82,8 +82,10 @@ const DetailsTab = ({
       ? 'subscribers'
       : 'members'
   const handleTabClick = (tabIndex: string) => {
-    dispatch(emptyChannelAttachmentsAC())
-    setActiveTab(tabIndex)
+    if (activeTab !== tabIndex) {
+      dispatch(emptyChannelAttachmentsAC())
+      setActiveTab(tabIndex)
+    }
   }
   useEffect(() => {
     if (!showMembers) {

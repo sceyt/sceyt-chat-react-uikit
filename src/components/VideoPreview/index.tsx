@@ -1,16 +1,19 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { memo, useEffect, useRef, useState } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { colors } from '../../UIHelper/constants'
 import { getFileExtension } from '../../helpers/message'
-import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
-import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
+// import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
+// import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { getFrame3 } from '../../helpers/getVideoFrame'
 import { setVideoThumb } from '../../helpers/messagesHalper'
-import { AttachmentIconCont, UploadProgress, UploadingIcon, UploadPercent } from '../../UIHelper'
+import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
+import { base64ToToDataURL } from '../../helpers/resizeImage'
+// import { CircularProgressbar } from 'react-circular-progressbar'
+// import { ProgressWrapper } from '../Attachment'
 
 interface IVideoPreviewProps {
   maxWidth?: string
@@ -19,15 +22,16 @@ interface IVideoPreviewProps {
   file: IAttachment
   borderRadius?: string
   isPreview?: boolean
+  isCachedFile?: boolean
   isRepliedMessage?: boolean
   backgroundColor: string
   src: string
   uploading?: boolean
   isDetailsView?: boolean
+  // eslint-disable-next-line no-unused-vars
   setVideoIsReadyToSend?: (attachmentId: string) => void
 }
-
-const VideoPreview = ({
+const VideoPreview = memo(function VideoPreview({
   maxWidth,
   maxHeight,
   src,
@@ -35,24 +39,43 @@ const VideoPreview = ({
   borderRadius,
   isPreview,
   uploading,
+  // isCachedFile = true,
   isRepliedMessage,
   backgroundColor,
   isDetailsView,
   setVideoIsReadyToSend
-}: IVideoPreviewProps) => {
-  const [videoPlaying, setVideoPlaying] = useState(false)
+}: IVideoPreviewProps) {
+  // const VideoPreview =
   const [videoDuration, setVideoDuration] = useState(0)
   const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [videoUrl, setVideoUrl] = useState(src)
-  const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
+  // const [progress, setProgress] = useState(3)
+  // const [showProgress, setShowProgress] = useState(false)
+  const [videoUrl, setVideoUrl] = useState('')
+  // const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  let attachmentThumb
+  let withPrefix = true
 
-  const handlePauseResumeDownload = (e: Event) => {
+  if (file.metadata && file.metadata.tmb) {
+    if (file.metadata.tmb.length < 70) {
+      attachmentThumb = base64ToToDataURL(file.metadata.tmb)
+      withPrefix = false
+    } else {
+      attachmentThumb = file.metadata && file.metadata.tmb
+    }
+  }
+  /*  const handleVideoProgress = (e: any) => {
+    const loadedPercentage = e.currentTarget.buffered.end(0) / e.currentTarget.duration
+    if (loadedPercentage > 0.03) {
+      setProgress(loadedPercentage * 100)
+    }
+  } */
+  /* const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
-      if (videoRef.current) {
+      if (videoRef.current && videoUrl) {
         videoRef.current.src = videoUrl
       }
     } else {
@@ -61,34 +84,7 @@ const VideoPreview = ({
         videoRef.current.src = ''
       }
     }
-  }
-  useEffect(() => {
-    let checkVideoInterval: any
-    if (videoRef.current) {
-      if (videoPlaying) {
-        checkVideoInterval = setInterval(() => {
-          if (videoRef.current && videoRef.current.readyState > 0) {
-            const minutes = Math.floor((videoDuration - videoRef.current.currentTime) / 60)
-            const seconds = Math.floor((videoDuration - videoRef.current.currentTime) % 60)
-            setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-            if (videoRef.current.currentTime >= videoDuration) {
-              setVideoPlaying(false)
-              const minutes = Math.floor(videoDuration / 60)
-              const seconds = Math.floor(videoDuration % 60)
-              setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-            }
-          }
-        }, 500)
-        videoRef.current.play()
-      } else {
-        clearInterval(checkVideoInterval)
-        videoRef.current.pause()
-      }
-    }
-
-    return () => clearInterval(checkVideoInterval)
-  }, [videoPlaying])
-
+  } */
   useEffect(() => {
     let checkVideoInterval: any
 
@@ -96,14 +92,14 @@ const VideoPreview = ({
       checkVideoInterval = setInterval(async () => {
         if (videoRef.current && videoRef.current.readyState > 3) {
           // drawCanvas()
-          videoRef.current.currentTime = 2
+          // videoRef.current.currentTime = 2
           setLoading(false)
           setVideoDuration(videoRef.current.duration)
           const minutes = Math.floor(videoRef.current.duration / 60)
           const seconds = Math.floor(videoRef.current.duration % 60)
           setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
           if (isPreview) {
-            const thumb = await getFrame3(videoRef.current, 1)
+            const thumb = await getFrame3(videoRef.current, 0)
             if (thumb) {
               setVideoThumb(file.attachmentId!, { ...thumb, duration: videoRef.current.duration })
               if (setVideoIsReadyToSend) {
@@ -115,21 +111,28 @@ const VideoPreview = ({
         }
       }, 1000)
     }
-    if (downloadIsCancelled) {
+    /* if (downloadIsCancelled) {
       clearInterval(checkVideoInterval)
-    }
+    } */
     return () => clearInterval(checkVideoInterval)
-  }, [downloadIsCancelled])
+  }, [])
 
   useEffect(() => {
-    getAttachmentUrlFromCache(file.id!).then((cachedUrl) => {
-      if (!cachedUrl) {
-        setVideoUrl(src)
-      } else if (!videoUrl) {
-        setVideoUrl(src)
+    getAttachmentUrlFromCache(file.url).then((cachedUrl: string) => {
+      if (!videoUrl) {
+        if (!cachedUrl && src) {
+          setVideoUrl(src)
+        } else if (cachedUrl) {
+          setVideoUrl(cachedUrl)
+        }
       }
     })
   }, [src])
+
+  /* useEffect(() => {
+    console.log('render video *********************************************')
+  }) */
+  // console.log('!isPreview && loading && !uploading &&. . . .  . . . . . .. ', !isPreview && loading && !uploading)
   return (
     <Component
       maxWidth={maxWidth}
@@ -143,19 +146,61 @@ const VideoPreview = ({
       {!isPreview && loading && !uploading && (
         <UploadProgress
           isDetailsView={isDetailsView}
-          onClick={handlePauseResumeDownload}
+          // onClick={handlePauseResumeDownload}
           isRepliedMessage={isRepliedMessage}
           borderRadius={borderRadius}
-          backgroundImage={file.metadata && file.metadata.tmb ? file.metadata.tmb : ''}
+          backgroundImage={attachmentThumb}
+          withPrefix={withPrefix}
         >
-          {/* {!isCached && ( */}
-          <React.Fragment>
-            <UploadPercent isRepliedMessage={isRepliedMessage}>
-              {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+          {/* {showProgress && (
+            <UploadPercent isRepliedMessage={isRepliedMessage} backgroundColor={'rgba(23, 25, 28, 0.40)'}>
+              <CancelResumeWrapper onClick={handlePauseResumeDownload}>
+                {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+              </CancelResumeWrapper>
+              <ProgressWrapper>
+                <CircularProgressbar
+                  minValue={0}
+                  maxValue={100}
+                  value={progress}
+                  backgroundPadding={3}
+                  background={true}
+                  text=''
+                  styles={{
+                    // Rotation of path and trail, in number of turns (0-1)
+                    // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+
+                    // Text size
+                    // textSize: '16px',
+                    background: {
+                      fill: 'rgba(23, 25, 28, 0)'
+                    },
+                    path: {
+                      // Path color
+                      stroke: `#fff`,
+                      // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+                      strokeLinecap: 'butt',
+                      strokeWidth: '4px',
+                      // Customize transition animation
+                      transition: 'stroke-dashoffset 0.5s ease 0s',
+                      // Rotate the path
+                      transform: 'rotate(0turn)',
+                      transformOrigin: 'center center'
+                    }
+                    // How long animation takes to go from one percentage to another, in seconds
+                    // pathTransitionDuration: 0.5,
+
+                    // Can specify path transition in more detail, or remove it entirely
+                    // pathTransition: 'none',
+
+                    // Colors
+                    // pathColor: '#fff',
+                    // textColor: '#f88',
+                    // trailColor: 'transparent'
+                  }}
+                />
+              </ProgressWrapper>
             </UploadPercent>
-            {!downloadIsCancelled && <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />}
-          </React.Fragment>
-          {/* )} */}
+          )} */}
         </UploadProgress>
       )}
       <video
@@ -164,12 +209,14 @@ const VideoPreview = ({
         preload='auto'
         id='video'
         // crossOrigin='anonymous'
-        src={videoUrl}
-        onPause={() => setVideoPlaying(false)}
-        onPlay={() => setVideoPlaying(true)}
+        src={file.attachmentUrl || videoUrl}
+        // onProgress={handleVideoProgress}
       >
-        <source src={videoUrl || file.url} type={`video/${getFileExtension(file.name || file.data.name)}`} />
-        <source src={videoUrl || file.url} type='video/ogg' />
+        <source
+          src={file.attachmentUrl || videoUrl || file.url}
+          type={`video/${!!(file.name || file.data) && getFileExtension(file.name || file.data.name)}`}
+        />
+        <source src={file.attachmentUrl || videoUrl || file.url} type='video/ogg' />
         {/* <track default kind='captions' srcLang='en' src='../../assets/img/defaultAvatar.png' /> */}
         Your browser does not support the video tag.
       </video>
@@ -186,7 +233,7 @@ const VideoPreview = ({
         <VideoControls>
           {!isPreview && !!videoDuration && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
-            <VideoPlayButton showOnHover={videoPlaying}>
+            <VideoPlayButton>
               <PlayIcon />
             </VideoPlayButton>
           )}
@@ -198,7 +245,7 @@ const VideoPreview = ({
       )}
     </Component>
   )
-}
+})
 
 export default VideoPreview
 

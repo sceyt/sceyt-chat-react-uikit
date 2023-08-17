@@ -4,7 +4,6 @@ import styled, { keyframes } from 'styled-components'
 // import { Editor } from 'react-draft-wysiwyg'
 // import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css'
 // import { convertToRaw, EditorState } from 'draft-js'
-
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
@@ -30,7 +29,14 @@ import {
   setMessageToEditAC,
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
-import { detectBrowser, detectOS, getCaretPosition, placeCaretAtEnd, setCursorPosition } from '../../helpers'
+import {
+  detectBrowser,
+  detectOS,
+  getCaretPosition,
+  hashString,
+  placeCaretAtEnd,
+  setCursorPosition
+} from '../../helpers'
 import { getDuplicateMentionsFromMeta, makeUsername, MessageTextFormat, typingTextFormat } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
@@ -52,17 +58,18 @@ import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import DropDown from '../../common/dropdown'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { getFrame } from '../../helpers/getVideoFrame'
 import {
   checkDraftMessagesIsEmpty,
   deleteVideoThumb,
+  draftMessagesMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
   setDraftMessageToMap,
+  setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import { attachmentTypes, CHANNEL_TYPE } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, DB_NAMES, DB_STORE_NAMES } from '../../helpers/constants'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
@@ -71,13 +78,16 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 import MentionMembersPopup from '../../common/popups/mentions'
 import LinkifyIt from 'linkify-it'
 import { themeSelector } from '../../store/theme/selector'
+import { getDataFromDB } from '../../helpers/indexedDB'
 // import { activeChannelMembersSelector } from '../../store/member/selector'
 
 let prevActiveChannelId: any
 
 interface SendMessageProps {
   draggedAttachments?: boolean
+  // eslint-disable-next-line no-unused-vars
   handleAttachmentSelected?: (state: boolean) => void
+  // eslint-disable-next-line no-unused-vars
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
   inputCustomClassname?: string
   inputAutofocus?: boolean
@@ -261,7 +271,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const mentions =
       editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
     if (mentions.length && mentions.length > 0) {
-      const currentTextCont = typingTextFormat({
+      messageInputRef.current.innerHTML = typingTextFormat({
         text: newText,
         mentionedMembers: [
           ...mentions.map((menMem: any) => ({
@@ -270,7 +280,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           }))
         ]
       })
-      messageInputRef.current.innerHTML = currentTextCont
     } else {
       messageInputRef.current.innerText = newText
     }
@@ -420,7 +429,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleMentionDetect = (e: any) => {
     const selPos = getCaretPosition(e.currentTarget)
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
-      console.log('selPos pos .. . ', selPos)
       setSelectionPos(selPos)
     }
     if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
@@ -486,11 +494,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
         // console.log('set mentioned members,,., ', updatedMentionedMembers)
         setMentionedMembers(updatedMentionedMembers)
-        const currentTextCont = typingTextFormat({
+        messageInputRef.current.innerHTML = typingTextFormat({
           text: currentText,
           mentionedMembers: [...mentionedMembersPositions]
         })
-        messageInputRef.current.innerHTML = currentTextCont
       }
       if (messageToEdit) {
         setEditMessageText(currentText)
@@ -500,6 +507,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       // console.log('set pos .. . ', selPos)
       // if (mentionedMembers && mentionedMembers.length && selPos > 0) {
       if (selPos > 0) {
+        setSelectionPos(selPos)
         setCursorPosition(messageInputRef.current, selPos)
       }
       // } else
@@ -523,12 +531,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (e.key === ' ') {
         // console.log('lastTwoChar. . . . . . ', lastTwoChar)
         // if (/  /.test(str)lastTwoChar === '  ') {
-        console.log('should close mentions ............................... ****** ')
+        setSelectionPos(selPos)
         handleCloseMentionsPopup(true)
       } else if (!currentMentions.end && !shouldClose) {
         const typedMessage = e.currentTarget.innerText
         const updateCurrentMentions = { ...currentMentions }
-        console.log('set current mention typed... .. .', typedMessage.slice(updateCurrentMentions.start + 1, selPos))
         updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1, selPos)
         setCurrentMentions(updateCurrentMentions)
       }
@@ -564,10 +571,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
     } else { */
+    console.log('handle send message . . . . connectionState ', connectionStatus)
     const { shiftKey, charCode, type } = event
-    const shouldSend = (charCode === 13 && shiftKey === false && !openMention) || type === 'click'
-    if (shouldSend) {
+    const isEnter: boolean = charCode === 13 && shiftKey === false && !openMention
+    const shouldSend =
+      (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
+    if (isEnter) {
       event.preventDefault()
+    }
+    if (shouldSend) {
       if (messageToEdit) {
         handleEditMessage()
       } else if (messageText || (attachments.length && attachments.length > 0)) {
@@ -647,7 +659,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               name: attachment.data.name,
               data: attachment.data,
               attachmentId: attachment.attachmentId,
-              upload: true,
+              cachedUrl: attachment.cachedUrl,
+              upload: attachment.upload,
               attachmentUrl: attachment.attachmentUrl,
               metadata: attachment.metadata,
               type: attachment.type,
@@ -952,141 +965,242 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const customUploader = getCustomUploader()
     const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
     const fileType = file.type.split('/')[0]
-    if (customUploader) {
-      if (fileType === 'image') {
-        resizeImage(file).then(async (resizedFile: any) => {
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              upload: false,
-              type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-              attachmentId: uuidv4(),
-              size: file.size
-            }
-          ])
-        })
-      } else if (fileType === 'video') {
-        setAttachments((prevState: any[]) => [
-          ...prevState,
-          {
-            data: file,
-            upload: false,
-            type: isMediaAttachment ? fileType : 'file',
-            attachmentUrl: URL.createObjectURL(file),
-            attachmentId: uuidv4(),
-            size: file.size
-          }
-        ])
+    const attachmentId = uuidv4()
+    let cachedUrl: any
+    const reader = new FileReader()
+    console.log('file is opened. .. ', file)
+    reader.onload = async () => {
+      // @ts-ignore
+      const length = reader.result && reader.result.length
+      let fileChecksum = ''
+      if (length > 500) {
+        const firstPart = reader.result && reader.result.slice(0, 100)
+        const middlePart = reader.result && reader.result.slice(length / 2 - 50, length / 2)
+        const lastPart = reader.result && reader.result.slice(length - 100, length)
+        fileChecksum = `${firstPart}${middlePart}${lastPart}`
       } else {
-        setAttachments((prevState: any[]) => [
-          ...prevState,
-          {
-            data: file,
-            upload: false,
-            type: 'file',
-            attachmentUrl: URL.createObjectURL(file),
-            attachmentId: uuidv4(),
-            size: file.size
-          }
-        ])
+        fileChecksum = `${reader.result}`
       }
-    } else {
-      if (fileType === 'image') {
-        if (isMediaAttachment) {
-          const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-          if (file.type === 'image/gif') {
-            console.log('imageWidth', imageWidth)
-            console.log('imageHeight', imageHeight)
+      const checksumHash = await hashString(fileChecksum)
+      let dataFromDb: any
+      try {
+        dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
+        console.log('data from db . . . . ', dataFromDb)
+      } catch (e) {
+        console.log('error in get data from db . . . . ', e)
+      }
+      if (dataFromDb) {
+        cachedUrl = dataFromDb.url
+        setPendingAttachment(attachmentId, { file: cachedUrl })
+      } else {
+        setPendingAttachment(attachmentId, { file, checksum: checksumHash })
+      }
+      if (customUploader) {
+        if (fileType === 'image') {
+          resizeImage(file).then(async (resizedFile: any) => {
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
                 data: file,
-                attachmentUrl: URL.createObjectURL(file),
-                attachmentId: uuidv4(),
-                type: fileType,
-                metadata: sendAsSeparateMessage
-                  ? ''
-                  : JSON.stringify({
-                      tmb: thumbnail,
-                      szw: imageWidth,
-                      szh: imageHeight
-                    })
+                cachedUrl,
+                upload: false,
+                type: isMediaAttachment ? fileType : 'file',
+                attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
+                attachmentId,
+                size: dataFromDb ? dataFromDb.size : file.size,
+                metadata: dataFromDb && dataFromDb.metadata
               }
             ])
-          } else {
-            resizeImage(file).then(async (resizedFile: any) => {
-              // resizedFiles.forEach((file: any, index: number) => {
+          })
+        } else if (fileType === 'video') {
+          console.log('handle set attachments ... .', {
+            data: file,
+            cachedUrl,
+            upload: false,
+            type: isMediaAttachment ? fileType : 'file',
+            attachmentUrl: URL.createObjectURL(file),
+            attachmentId,
+            size: dataFromDb ? dataFromDb.size : file.size,
+            metadata: dataFromDb && dataFromDb.metadata
+          })
+          setAttachments((prevState: any[]) => [
+            ...prevState,
+            {
+              data: file,
+              cachedUrl,
+              upload: false,
+              type: isMediaAttachment ? fileType : 'file',
+              attachmentUrl: URL.createObjectURL(file),
+              attachmentId,
+              size: dataFromDb ? dataFromDb.size : file.size,
+              metadata: dataFromDb && dataFromDb.metadata
+            }
+          ])
+        } else {
+          setAttachments((prevState: any[]) => [
+            ...prevState,
+            {
+              data: file,
+              cachedUrl,
+              upload: false,
+              type: 'file',
+              attachmentId,
+              size: dataFromDb ? dataFromDb.size : file.size,
+              metadata: dataFromDb && dataFromDb.metadata
+            }
+          ])
+        }
+      } else {
+        if (fileType === 'image') {
+          if (isMediaAttachment) {
+            let metas: any = {}
+            if (dataFromDb) {
+              metas = dataFromDb.metadata
+            } else {
+              const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+              metas.imageHeight = imageHeight
+              metas.imageWidth = imageWidth
+              metas.thumbnail = thumbnail
+            }
+            if (file.type === 'image/gif') {
               setAttachments((prevState: any[]) => [
                 ...prevState,
                 {
-                  data: new File([resizedFile.blob], resizedFile.file.name),
+                  data: file,
+                  cachedUrl,
+                  upload: !cachedUrl,
                   attachmentUrl: URL.createObjectURL(file),
-                  attachmentId: uuidv4(),
+                  attachmentId,
                   type: fileType,
-                  metadata: sendAsSeparateMessage
-                    ? ''
+                  size: dataFromDb ? dataFromDb.size : file.size,
+                  metadata: dataFromDb
+                    ? metas
                     : JSON.stringify({
-                        tmb: thumbnail,
-                        szw: resizedFile.newWidth,
-                        szh: resizedFile.newHeight
+                        tmb: metas.thumbnail,
+                        szw: metas.imageWidth,
+                        szh: metas.imageHeight
                       })
                 }
               ])
-              // })
-            })
+            } else {
+              if (dataFromDb) {
+                setAttachments((prevState: any[]) => [
+                  ...prevState,
+                  {
+                    data: file,
+                    cachedUrl,
+                    upload: !cachedUrl,
+                    attachmentUrl: URL.createObjectURL(file),
+                    attachmentId,
+                    type: fileType,
+                    size: dataFromDb ? dataFromDb.size : file.size,
+                    metadata: sendAsSeparateMessage
+                      ? ''
+                      : JSON.stringify({
+                          tmb: metas.thumbnail,
+                          szw: metas.imageWidth,
+                          szh: metas.imageHeight
+                        })
+                  }
+                ])
+              } else {
+                resizeImage(file).then(async (resizedFile: any) => {
+                  // resizedFiles.forEach((file: any, index: number) => {
+                  setAttachments((prevState: any[]) => [
+                    ...prevState,
+                    {
+                      data: new File([resizedFile.blob], resizedFile.file.name),
+                      cachedUrl,
+                      upload: !cachedUrl,
+                      attachmentUrl: URL.createObjectURL(file),
+                      attachmentId,
+                      type: fileType,
+                      size: dataFromDb ? dataFromDb.size : file.size,
+                      metadata: sendAsSeparateMessage
+                        ? ''
+                        : JSON.stringify({
+                            tmb: metas.thumbnail,
+                            szw: resizedFile.newWidth,
+                            szh: resizedFile.newHeight
+                          })
+                    }
+                  ])
+                  // })
+                })
+              }
+            }
+          } else {
+            let metas: any = {}
+            if (dataFromDb) {
+              metas = dataFromDb.metadata
+            } else {
+              const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
+              metas.thumbnail = thumbnail
+            }
+            setAttachments((prevState: any[]) => [
+              ...prevState,
+              {
+                data: file,
+                // type: file.type.split('/')[0],
+                type: 'file',
+                cachedUrl,
+                upload: !cachedUrl,
+                attachmentUrl: URL.createObjectURL(file as any),
+                attachmentId,
+                size: dataFromDb ? dataFromDb.size : file.size,
+                metadata: dataFromDb
+                  ? metas.thumbnail
+                  : JSON.stringify({
+                      tmb: metas.thumbnail
+                    })
+              }
+            ])
           }
-        } else {
-          const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
+        } else if (fileType === 'video') {
+          let metas: any = {}
+          if (dataFromDb) {
+            metas = dataFromDb.metadata
+          } /* else {
+            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
+            metas.thumb = thumb
+            metas.width = width
+            metas.height = height
+          } */
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
               data: file,
               // type: file.type.split('/')[0],
-              type: 'file',
+              type: 'video',
+              cachedUrl,
+              upload: !cachedUrl,
+              size: dataFromDb ? dataFromDb.size : file.size,
               attachmentUrl: URL.createObjectURL(file as any),
-              attachmentId: uuidv4(),
-              metadata: sendAsSeparateMessage
-                ? ''
-                : JSON.stringify({
-                    tmb: thumbnail
-                  })
+              attachmentId,
+              metadata: dataFromDb ? metas : ''
+            }
+          ])
+        } else {
+          setAttachments((prevState: any[]) => [
+            ...prevState,
+            {
+              data: file,
+              cachedUrl,
+              upload: !cachedUrl,
+              // type: file.type.split('/')[0],
+              type: 'file',
+              size: dataFromDb ? dataFromDb.size : file.size,
+              attachmentUrl: URL.createObjectURL(file as any),
+              attachmentId
             }
           ])
         }
-      } else if (fileType === 'video') {
-        const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
-        setAttachments((prevState: any[]) => [
-          ...prevState,
-          {
-            data: file,
-            // type: file.type.split('/')[0],
-            type: 'video',
-            attachmentUrl: URL.createObjectURL(file as any),
-            attachmentId: uuidv4(),
-            metadata: sendAsSeparateMessage
-              ? ''
-              : JSON.stringify({
-                  tmb: thumb,
-                  szw: width,
-                  szh: height
-                })
-          }
-        ])
-      } else {
-        setAttachments((prevState: any[]) => [
-          ...prevState,
-          {
-            data: file,
-            // type: file.type.split('/')[0],
-            type: 'file',
-            attachmentUrl: URL.createObjectURL(file as any),
-            attachmentId: uuidv4()
-          }
-        ])
       }
     }
+    reader.onerror = (e: any) => {
+      console.log(' error on read file onError', e)
+    }
+    reader.readAsBinaryString(file)
   }
 
   useEffect(() => {
@@ -1270,6 +1384,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } */
     const draftMessage = getDraftMessageFromMap(activeChannel.id)
     if (draftMessage) {
+      if (draftMessage.messageForReply) {
+        dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+      }
       setMessageText(draftMessage.text)
       setMentionedMembers(draftMessage.mentionedMembers)
       const mentionedMembersPositions: any = []
@@ -1308,6 +1425,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [activeChannel.id])
 
   useEffect(() => {
+    // console.log('attachments. . . . .  . .', attachments)
+    // console.log('readyVideoAttachments. . . . .  . .', readyVideoAttachments)
     if (
       messageText.trim() ||
       (editMessageText.trim() && editMessageText !== messageToEdit.body) ||
@@ -1316,7 +1435,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (attachments.length) {
         let videoAttachment = false
         attachments.forEach((att: any) => {
-          if (att.type === 'video') {
+          if (att.type === 'video' || att.data.type.split('/')[0] === 'video') {
             videoAttachment = true
             if (!readyVideoAttachments[att.attachmentId]) {
               setSendMessageIsActive(false)
@@ -1336,7 +1455,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
 
     if (messageText) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
       if (!listenerIsAdded) {
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
@@ -1353,7 +1472,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers })
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
     }
   }, [mentionedMembers])
 
@@ -1396,6 +1515,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   })
 
   useDidUpdate(() => {
+    if (draftMessagesMap[activeChannel.id]) {
+      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+    }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
     }
@@ -1442,11 +1564,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           // }
         })
         setMentionedMembers(editingMentionedMembers)
-        const currentTextCont = typingTextFormat({
+        messageInputRef.current.innerHTML = typingTextFormat({
           text: messageToEdit.body,
           mentionedMembers: [...mentionedMembersPositions]
         })
-        messageInputRef.current.innerHTML = currentTextCont
       } else {
         setEditMessageText(messageToEdit.body || '')
         messageInputRef.current.innerText = messageToEdit.body
@@ -1852,6 +1973,7 @@ const Container = styled.div<{
 
   & .rdw-suggestion-option {
   }
+
   & .rdw-suggestion-option-active {
     background-color: rgb(243, 245, 248);
   }

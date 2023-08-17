@@ -13,12 +13,13 @@ import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { useDidUpdate, useEventListener } from '../../../hooks'
+import { useDidUpdate } from '../../../hooks'
 import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
   channelId: string
   theme?: string
+  // eslint-disable-next-line no-unused-vars
   addMentionMember: (member: IMember) => void
   handleMentionsPopupClose: () => void
   searchMention: string
@@ -38,6 +39,7 @@ export default function MentionMembersPopup({
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
   const [hideMenu, setHideMenu] = useState(false)
+  const membersListRef = useRef<HTMLElement>()
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
   const dispatch = useDispatch()
@@ -70,11 +72,19 @@ export default function MentionMembersPopup({
   const handleKeyDown = (e: any) => {
     if (e.key === 'ArrowDown') {
       e.preventDefault()
-      setActiveIndex((prevState) => (prevState < filteredMembersLength.current - 1 ? prevState + 1 : prevState))
+      setActiveIndex((prevState) => {
+        const newIndex = prevState < filteredMembersLength.current - 1 ? prevState + 1 : prevState
+        handleScrollToActiveItem(newIndex, 'bottom')
+        return newIndex
+      })
     }
     if (e.key === 'ArrowUp') {
       e.preventDefault()
-      setActiveIndex((prevState) => (prevState > 0 ? prevState - 1 : prevState))
+      setActiveIndex((prevState) => {
+        const newIndex = prevState > 0 ? prevState - 1 : prevState
+        handleScrollToActiveItem(newIndex, 'top')
+        return newIndex
+      })
     }
     if (e.key === 'Enter') {
       e.preventDefault()
@@ -82,13 +92,13 @@ export default function MentionMembersPopup({
       handleMentionMember()
     }
   }
-  const handleClicks = (e: any) => {
+  /*  const handleClicks = (e: any) => {
     if (e.target.closest('.mention_member_popup')) {
     }
     // handleMentionsPopupClose()
-  }
+  } */
 
-  useEventListener('click', handleClicks)
+  // useEventListener('click', handleClicks)
   const handleSearchMembers = () => {
     const searchedMembers = [...members].filter((member: IMember) => {
       const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
@@ -96,6 +106,17 @@ export default function MentionMembersPopup({
     })
     filteredMembersLength.current = searchedMembers.length
     setFilteredMembers(sortMembers(searchedMembers))
+  }
+  const handleScrollToActiveItem = (newIndex: number, direction: 'top' | 'bottom') => {
+    const membersList = membersListRef.current
+    if (membersList) {
+      const activeMentionPosition = (newIndex + 1) * 48
+      if (direction === 'bottom' && activeMentionPosition > membersList.scrollTop + membersList.offsetHeight) {
+        membersList.scrollTop = activeMentionPosition - membersList.offsetHeight + 30
+      } else if (direction === 'top' && membersList.scrollTop + 48 > activeMentionPosition) {
+        membersList.scrollTop = activeMentionPosition - 68
+      }
+    }
   }
   useEffect(() => {
     dispatch(getMembersAC(channelId))
@@ -148,7 +169,7 @@ export default function MentionMembersPopup({
       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
       withBorder={theme !== THEME.DARK}
     >
-      <MembersList onScroll={handleMembersListScroll}>
+      <MembersList ref={membersListRef} onScroll={handleMembersListScroll}>
         {filteredMembers.map((member: IMember, index: number) => (
           <MemberItem
             key={member.id}
@@ -227,7 +248,7 @@ const EditMemberIcon = styled.span`
   transition: all 0.2s;
 `
 
-const MembersList = styled.ul`
+const MembersList = styled.ul<{ ref?: any }>`
   margin: 4px 0 0;
   padding: 0;
   overflow-x: hidden;

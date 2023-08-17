@@ -46,7 +46,9 @@ import {
   SET_REACTIONS_LOADING_STATE,
   DELETE_REACTION_FROM_LIST,
   ADD_REACTION_TO_LIST,
-  SET_MESSAGE_MENU_OPENED
+  SET_MESSAGE_MENU_OPENED,
+  UPDATE_UPLOAD_PROGRESS,
+  REMOVE_UPLOAD_PROGRESS
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -247,6 +249,26 @@ export function updateAttachmentUploadingStateAC(attachmentUploadingState: strin
     type: UPLOAD_ATTACHMENT_COMPILATION,
     payload: {
       attachmentUploadingState,
+      attachmentId
+    }
+  }
+}
+
+export function updateAttachmentUploadingProgressAC(uploaded: number, total: number, attachmentId: any) {
+  return {
+    type: UPDATE_UPLOAD_PROGRESS,
+    payload: {
+      uploaded,
+      total,
+      attachmentId
+    }
+  }
+}
+
+export function removeAttachmentProgressAC(attachmentId: any) {
+  return {
+    type: REMOVE_UPLOAD_PROGRESS,
+    payload: {
       attachmentId
     }
   }

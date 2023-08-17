@@ -390,23 +390,24 @@ export default function* watchForEvents(): any {
         console.log('channel LEAVE ... ', channel, member)
         const channelExists = checkChannelExists(channel.id)
         const activeChannelId = yield call(getActiveChannelId)
-        if (activeChannelId === channel.id) {
-          yield put(removeMemberFromListAC([member]))
-        }
-        if (channelExists) {
-          yield put(
-            updateChannelDataAC(channel.id, {
-              memberCount: channel.memberCount
-            })
-          )
-        }
 
         if (member.id === SceytChatClient.user.id) {
-          removeChannelAC(channel.id)
+          yield put(removeChannelAC(channel.id))
           removeChannelFromMap(channel.id)
           deleteChannelFromAllChannels(channel.id)
         } else {
           const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
+          if (channelExists) {
+            if (activeChannelId === channel.id) {
+              yield put(removeMemberFromListAC([member]))
+            }
+            yield put(
+              updateChannelDataAC(channel.id, {
+                memberCount: channel.memberCount
+              })
+            )
+          }
+
           yield put(updateSearchedChannelDataAC(channel.id, { memberCount: channel.memberCount }, groupName))
           updateChannelOnAllChannels(channel.id, {
             memberCount: channel.memberCount
@@ -523,7 +524,6 @@ export default function* watchForEvents(): any {
             yield call(setChannelInMap, channel)
           } else if (!message.repliedInThread) {
             yield put(updateChannelLastMessageAC(message, channelForAdd))
-            yield put(updateChannelDataAC(message, channelForAdd))
           }
           if (channel.id === activeChannelId) {
             // TODO message for thread reply
@@ -560,7 +560,23 @@ export default function* watchForEvents(): any {
           }
 
           yield put(
-            updateChannelDataAC(channel.id, { ...channelForAdd, userMessageReactions: [], lastReactedMessage: null })
+            updateChannelDataAC(channel.id, {
+              ...channelForAdd,
+              userMessageReactions: [],
+              lastReactedMessage: null
+            })
+          )
+          const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
+          yield put(
+            updateSearchedChannelDataAC(
+              channel.id,
+              {
+                ...channelForAdd,
+                userMessageReactions: [],
+                lastReactedMessage: null
+              },
+              groupName
+            )
           )
           const showNotifications = getShowNotifications()
           if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
@@ -587,25 +603,12 @@ export default function* watchForEvents(): any {
             }
           }
 
-          const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
-          yield put(updateSearchedChannelDataAC(channel.id, channelForAdd, groupName))
-          updateChannelOnAllChannels(channel.id, channelForAdd)
+          updateChannelOnAllChannels(channel.id, {
+            ...channelForAdd,
+            userMessageReactions: [],
+            lastReactedMessage: null
+          })
           updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
-          // TODO browser notification
-          /* const notificationStatus = yield call(Notification.requestPermission);
-          if (notificationStatus === 'granted' && document.visibilityState !== 'visible') {
-            const notification = new Notification(`New Message from ${message.user.firstName}`,
-            { body: message.body, icon: logo, silent: false });
-            // notification.onclick = (event) => {
-            //   event.preventDefault(); // prevent the browser from focusing the Notification's tab
-            //   window.open(window.sceytTabUrl, '_blank');
-            //   notification.close();
-            // };
-            if (window.sceytTabNotifications) {
-              window.sceytTabNotifications.close();
-            }
-            window.sceytTabNotifications = notification;
-          } */
         }
         break
       }
@@ -807,7 +810,8 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
         const { channel, user, message, reaction } = args
-        console.log('channel REACTION_DELETED ... ')
+        console.log('channel REACTION_DELETED ... ', channel)
+        const channelFromMap = getChannelFromMap(channel.id)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
@@ -815,14 +819,24 @@ export default function* watchForEvents(): any {
           yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
           removeReactionOnAllMessages(message, reaction, true)
         }
-        if (!(channel.newReactions && channel.newReactions.length)) {
+        const channelUpdateParams = JSON.parse(JSON.stringify(channel))
+        if (
+          channelFromMap &&
+          channelFromMap.lastReactedMessage &&
+          channelFromMap.lastReactedMessage.id === message.id
+        ) {
+          channelUpdateParams.lastReactedMessage = null
+        }
+        yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+        updateChannelOnAllChannels(channel.id, channelUpdateParams)
+        /* if (!(channel.newReactions && channel.newReactions.length)) {
           const channelUpdateParams = {
             userMessageReactions: [],
             lastReactedMessage: null
           }
           yield put(updateChannelDataAC(channel.id, channelUpdateParams))
           updateChannelOnAllChannels(channel.id, channelUpdateParams)
-        }
+        } */
         if (checkChannelExistsOnMessagesMap(channel.id)) {
           removeReactionToMessageOnMap(channel.id, message, reaction, true)
         }
@@ -907,20 +921,20 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
+        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
         const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
-        yield put(updateSearchedChannelDataAC(channel.id, { markedAsUnread: channel.unread }, groupName))
+        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
 
-        updateChannelOnAllChannels(channel.id, { markedAsUnread: channel.unread })
+        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
         break
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { markedAsUnread: channel.unread }))
+        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
         const groupName = channel.type === CHANNEL_TYPE.DIRECT ? 'directs' : 'groups'
-        yield put(updateSearchedChannelDataAC(channel.id, { markedAsUnread: channel.unread }, groupName))
-        updateChannelOnAllChannels(channel.id, { markedAsUnread: channel.unread })
+        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
+        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
         break
       }
       /*
@@ -993,8 +1007,11 @@ export default function* watchForEvents(): any {
       } */
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
-        console.log('connection status changed lst. . . . . ', status)
+        console.log('connection status changed . . . . . ', status)
         yield put(setConnectionStatusAC(status))
+        /* if (status === CONNECTION_STATUS.CONNECTED) {
+          yield put(getRolesAC())
+        } */
         break
       }
       default:

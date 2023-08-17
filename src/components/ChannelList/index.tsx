@@ -51,10 +51,12 @@ interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
     searchedChannels: { groups: []; directs: [] }
+    // eslint-disable-next-line no-unused-vars
     loadMoreChannels: (count?: number) => void
     searchValue: string
     children: React.ReactNode
     activeChannel?: IChannel
+    // eslint-disable-next-line no-unused-vars
     setActiveChannel?: (channel: IChannel) => void
   }>
   ListItem?: FC<any>
@@ -66,6 +68,7 @@ interface IChannelListProps {
   searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
+  // eslint-disable-next-line no-unused-vars
   getActiveChannel?: (channel: IChannel) => void
   filter?: { channelType?: string }
   limit?: number
@@ -91,28 +94,43 @@ interface IChannelListProps {
   channelsPaddings?: string
   channelsMargin?: string
   onChannelDeleted?: (
+    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
+    // eslint-disable-next-line no-unused-vars
     deletedChannel: IChannel,
+    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelCreated?: (
+    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
+    // eslint-disable-next-line no-unused-vars
     createdChannel: IChannel,
+    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelHidden?: (
+    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
+    // eslint-disable-next-line no-unused-vars
     hiddenChannel: IChannel,
+    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelVisible?: (
+    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
+    // eslint-disable-next-line no-unused-vars
     visibleChannel: IChannel,
+    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onAddedToChannel?: (
+    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
+    // eslint-disable-next-line no-unused-vars
     channel: IChannel,
+    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
 }
@@ -350,9 +368,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
 
-  useEffect(() => {
+  /* useEffect(() => {
     console.log('channels. ...........................', channels)
   }, [channels])
+  useEffect(() => {
+    console.log('searchedChannels. ...........................', searchedChannels)
+  }, [searchedChannels]) */
   /*  useEffect(() => {
      console.log('contactsMap. ...........................', contactsMap)
    }, [contactsMap]) */
@@ -449,7 +470,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             channelsLoading === LOADING_STATE.LOADED &&
             searchValue && (
               <React.Fragment>
-                {!!searchedChannels.directs.length && (
+                {!!(searchedChannels.directs && searchedChannels.directs.length) && (
                   <DirectChannels>
                     <SearchedChannelsHeader>DIRECT</SearchedChannelsHeader>
                     {searchedChannels.directs.map((channel: IChannel) =>
@@ -475,7 +496,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     )}
                   </DirectChannels>
                 )}
-                {!!searchedChannels.groups.length && (
+                {!!(searchedChannels.groups && searchedChannels.groups.length) && (
                   <GroupChannels>
                     <SearchedChannelsHeader>GROUP</SearchedChannelsHeader>
                     {searchedChannels.groups.map((channel: IChannel) =>
@@ -651,7 +672,7 @@ const SearchedChannelsHeader = styled.p`
   font-weight: 500;
   font-size: 15px;
   line-height: 14px;
-  color: #676a7c;
+  color: ${colors.textColor2};
 `
 const DirectChannels = styled.div``
 const GroupChannels = styled.div``

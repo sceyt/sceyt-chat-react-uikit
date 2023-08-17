@@ -43,8 +43,7 @@ export function setChannelsInMap(channels: IChannel[]) {
       channel.newReactions &&
       channel.newReactions.length &&
       channel.lastMessage &&
-      channel.lastMessage.id < channel.newReactions[0].id &&
-      channel.lastMessage.id !== channel.newReactions[0].messageId
+      channel.lastMessage.id < channel.newReactions[0].id
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
@@ -131,8 +130,10 @@ export function setDefaultRolesByChannelTypesMap(map: channelTypesMemberDisplayT
   defaultRolesByChannelTypesMap = map
 }
 
+// eslint-disable-next-line no-unused-vars
 export let handleNewMessages: (message: IMessage, channel: IChannel) => IMessage | null
 
+// eslint-disable-next-line no-unused-vars
 export function setHandleNewMessages(callback: (message: IMessage, channel: IChannel) => IMessage | null) {
   handleNewMessages = callback
 }
@@ -175,6 +176,7 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
     if (updateChannel) {
       const updateMessage = message
       if (
+        updateChannel.lastMessage &&
         updateChannel.lastMessage.id === message.id &&
         updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
       ) {
@@ -205,4 +207,5 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
     }
     return channel
   })
+  channelsMap[channelId] = { ...channelsMap[channelId], ...config }
 }

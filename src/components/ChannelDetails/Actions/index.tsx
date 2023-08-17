@@ -166,7 +166,7 @@ const Actions = ({
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
-  showDeleteAllMessages,
+  // showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor
@@ -594,38 +594,43 @@ const Actions = ({
             )}
           </React.Fragment>
         )}
-        {showClearHistory && checkActionPermission('deleteAllMessagesForMe') && (
-          <ActionItem
-            key={10}
-            color={clearHistoryTextColor || colors.red1}
-            iconColor={clearHistoryTextColor || colors.red1}
-            order={clearHistoryOrder}
-            hoverColor={clearHistoryTextColor || colors.red1}
-            onClick={() => {
-              setPopupButtonText('Clear')
-              setPopupTitle('Clear history')
-              handleToggleClearHistoryPopup()
-            }}
-          >
-            {clearHistoryIcon || <CleareIcon />} Clear history
-          </ActionItem>
-        )}
-        {showDeleteAllMessages && checkActionPermission('deleteAllMessagesForAll') && (
-          <ActionItem
-            key={11}
-            color={deleteAllMessagesTextColor || colors.red1}
-            iconColor={deleteAllMessagesTextColor || colors.red1}
-            order={deleteAllMessagesOrder}
-            hoverColor={deleteAllMessagesTextColor || colors.red1}
-            onClick={() => {
-              setPopupButtonText('Clear')
-              setPopupTitle(`Clear history`)
-              handleToggleDeleteAllMessagesPopup()
-            }}
-          >
-            {deleteAllMessagesIcon || <CleareIcon />} Clear history
-          </ActionItem>
-        )}
+        {showClearHistory &&
+          (channel.type === CHANNEL_TYPE.GROUP ||
+            channel.type === CHANNEL_TYPE.PRIVATE ||
+            channel.type === CHANNEL_TYPE.DIRECT) && (
+            <ActionItem
+              key={10}
+              color={clearHistoryTextColor || colors.red1}
+              iconColor={clearHistoryTextColor || colors.red1}
+              order={clearHistoryOrder}
+              hoverColor={clearHistoryTextColor || colors.red1}
+              onClick={() => {
+                setPopupButtonText('Clear')
+                setPopupTitle('Clear history')
+                handleToggleClearHistoryPopup()
+              }}
+            >
+              {clearHistoryIcon || <CleareIcon />} Clear history
+            </ActionItem>
+          )}
+        {showClearHistory &&
+          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
+          checkActionPermission('clearAllMessages') && (
+            <ActionItem
+              key={11}
+              color={deleteAllMessagesTextColor || colors.red1}
+              iconColor={deleteAllMessagesTextColor || colors.red1}
+              order={deleteAllMessagesOrder}
+              hoverColor={deleteAllMessagesTextColor || colors.red1}
+              onClick={() => {
+                setPopupButtonText('Clear')
+                setPopupTitle(`Clear history`)
+                handleToggleDeleteAllMessagesPopup()
+              }}
+            >
+              {deleteAllMessagesIcon || <CleareIcon />} Clear history
+            </ActionItem>
+          )}
 
         {showDeleteChannel && checkActionPermission('deleteChannel') && (
           <ActionItem
@@ -670,7 +675,7 @@ const Actions = ({
           togglePopup={handleToggleLeaveChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.GROUP
+            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you leave this group it will be removed for you along with its entire history.'
               : 'Once you leave this channel it will be removed for you along with its entire history.'
           }
@@ -734,9 +739,9 @@ const Actions = ({
           description={
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP
+              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST
+              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
               ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
               : 'Are you sure you want to clear history? This action cannot be undone.'
           }
@@ -751,9 +756,9 @@ const Actions = ({
           description={
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP
+              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
               ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST
+              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
               ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
               : 'Are you sure you want to delete all messages? This action cannot be undone.'
           }

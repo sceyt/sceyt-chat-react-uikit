@@ -12,9 +12,13 @@ export interface IProgress {
 }
 
 export interface IUploadTask {
+  // eslint-disable-next-line no-unused-vars
   updateLocalFileLocation?: (newPath: String) => void
+  // eslint-disable-next-line no-unused-vars
   progress: (progress: IProgress) => void
+  // eslint-disable-next-line no-unused-vars
   failure: (error: Error) => void
+  // eslint-disable-next-line no-unused-vars
   success: (uri: string) => void
   cancel: () => void
   stop: () => void
@@ -22,7 +26,11 @@ export interface IUploadTask {
 }
 
 export interface ICustomUploader {
+  // eslint-disable-next-line no-unused-vars
   upload: (attachment: IAttachment, uploadTask: IUploadTask) => void
+  // eslint-disable-next-line no-unused-vars
+  download: (uri: string, download: boolean, progressCallback?: (progress: any) => void) => Promise<any>
+  // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void
 }
 
@@ -30,7 +38,9 @@ export interface IChatClientProps {
   client: SceytChatClient
   theme?: 'dark' | 'light'
   avatarColors?: ICustomAvatarColors
+  // eslint-disable-next-line no-unused-vars
   hideUserPresence?: (user: IUser) => boolean
+  // eslint-disable-next-line no-unused-vars
   handleNewMessages?: (message: IMessage, channel: IChannel) => IMessage | null
   showOnlyContactUsers?: boolean
   sendAttachmentsAsSeparateMessages?: boolean

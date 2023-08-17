@@ -50,6 +50,7 @@ import {
   UPDATE_CHANNEL_DATA,
   UPDATE_CHANNEL_LAST_MESSAGE,
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
+  UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL,
   WATCH_FOR_EVENTS
 } from './constants'
@@ -249,19 +250,20 @@ export function updateChannelAC(channelId: string, config: any) {
   }
 }
 
-export function updateChannelDataAC(channelId: string, config: any) {
+export function updateChannelDataAC(channelId: string, config: any, moveUp?: boolean) {
   return {
     type: UPDATE_CHANNEL_DATA,
     payload: {
       channelId,
-      config
+      config,
+      moveUp
     }
   }
 }
 
 export function updateSearchedChannelDataAC(channelId: string, config: any, groupName: 'groups' | 'directs') {
   return {
-    type: UPDATE_CHANNEL_DATA,
+    type: UPDATE_SEARCHED_CHANNEL_DATA,
     payload: {
       channelId,
       updateData: config,

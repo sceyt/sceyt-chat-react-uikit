@@ -1,11 +1,12 @@
-import { put, call, takeLatest } from 'redux-saga/effects'
+import { put, call, takeLatest, takeEvery } from 'redux-saga/effects'
 import {
   setMembersLoadingStateAC,
   removeMemberFromListAC,
   updateMembersAC,
   addMembersToListAC,
   getRolesSuccess,
-  setMembersToListAC
+  setMembersToListAC,
+  getRolesFailAC
 } from './actions'
 import { getChannelFromMap, query } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
@@ -42,7 +43,7 @@ function* getMembers(action: IAction): any {
     yield put(setMembersToListAC(members))
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR in get member - ', e.message)
+    console.log('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -185,24 +186,30 @@ function* reportMember(action: IAction): any {
   }
 }
 
-function* getRoles(): any {
+function* getRoles(action: IAction): any {
+  const {
+    payload: { timeout, attempts }
+  } = action
   try {
     const SceytChatClient = getClient()
+    console.log('Get roles .. .. attempts', attempts || 0)
     const roles = yield call(SceytChatClient.getRoles)
     yield put(getRolesSuccess(roles))
+    yield put(getRolesFailAC())
   } catch (e) {
-    console.log('error in get roles')
+    console.log('ERROR get roles', e)
+    yield put(getRolesFailAC((timeout || 0) + 300, (attempts || 0) + 1))
     // yield put(setErrorNotification(e.message));
   }
 }
 
 export default function* MembersSaga() {
   yield takeLatest(GET_MEMBERS, getMembers)
-  yield takeLatest(LOAD_MORE_MEMBERS, loadMoreMembers)
-  yield takeLatest(ADD_MEMBERS, addMembers)
-  yield takeLatest(KICK_MEMBER, kickMemberFromChannel)
-  yield takeLatest(BLOCK_MEMBER, blockMember)
-  yield takeLatest(REPORT_MEMBER, reportMember)
-  yield takeLatest(CHANGE_MEMBER_ROLE, changeMemberRole)
+  yield takeEvery(LOAD_MORE_MEMBERS, loadMoreMembers)
+  yield takeEvery(ADD_MEMBERS, addMembers)
+  yield takeEvery(KICK_MEMBER, kickMemberFromChannel)
+  yield takeEvery(BLOCK_MEMBER, blockMember)
+  yield takeEvery(REPORT_MEMBER, reportMember)
+  yield takeEvery(CHANGE_MEMBER_ROLE, changeMemberRole)
   yield takeLatest(GET_ROLES, getRoles)
 }

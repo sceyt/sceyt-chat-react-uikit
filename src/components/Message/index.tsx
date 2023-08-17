@@ -61,10 +61,15 @@ interface IMessageProps {
   isPendingMessage?: boolean
   prevMessage?: IMessage
   nextMessage: IMessage
+  // eslint-disable-next-line no-unused-vars
   stopScrolling: (stop: boolean) => void
-  setLastVisibleMessageId: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
+  setLastVisibleMessageId?: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleScrollToRepliedMessage?: (msgId: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleMediaItemClick?: (attachment: IAttachment) => void
+  unreadMessageId: string
   isUnreadMessage: boolean
   isThreadMessage: boolean
   fontFamily?: string
@@ -170,6 +175,7 @@ const Message = ({
   nextMessage,
   setLastVisibleMessageId,
   isUnreadMessage,
+  unreadMessageId,
   isThreadMessage,
   fontFamily,
   ownMessageOnRightSide,
@@ -433,7 +439,7 @@ const Message = ({
     if (message.attachments && message.attachments.length) {
       messageToResend.attachments = (message.attachments as IAttachment[]).map((att) => {
         const pendingAttachment = getPendingAttachment(att.attachmentId!)
-        return { ...att, data: new File([pendingAttachment], att.data.name) }
+        return { ...att, data: new File([pendingAttachment.file], att.data.name) }
       })
     }
 
@@ -508,10 +514,7 @@ const Message = ({
           channel.id,
           message.id,
           selectedEmoji,
-          channel.newReactions &&
-            channel.newReactions[0] &&
-            channel.newReactions[0].messageId === message.id &&
-            channel.newReactions[0].key === selectedEmoji
+          channel.lastReactedMessage && channel.lastReactedMessage.id === message.id
         )
       )
     } else {
@@ -536,7 +539,7 @@ const Message = ({
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       )
     ) {
-      console.log('send marker for message ... ', message)
+      console.log('send received marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -669,9 +672,7 @@ const Message = ({
   }
 
   useEffect(() => {
-    // console.log('message body .. .', message.body)
-    // console.log('isVisible - -- - ', isVisible)
-    if (isVisible && tabIsActive) {
+    if (isVisible && setLastVisibleMessageId) {
       setLastVisibleMessageId(message.id)
       handleSendReadMarker()
     }
@@ -704,6 +705,11 @@ const Message = ({
       setMessageActionsShow(false)
     }
   }, [openedMessageMenuId])
+  /*
+  useDidUpdate(() => {
+    console.log('message  ............................................................... ', message)
+  }, [message])
+*/
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
@@ -711,6 +717,7 @@ const Message = ({
       document.removeEventListener('mousedown', handleClick)
     }
   }, [])
+
   return (
     <MessageItem
       key={message.id || message.tid}
@@ -726,6 +733,8 @@ const Message = ({
       topMargin={
         prevMessage?.type === 'system'
           ? '0'
+          : prevMessage && unreadMessageId === prevMessage.id
+          ? '16px'
           : prevMessageUserID !== messageUserID || firstMessageInInterval
           ? differentUserMessageSpacing || '16px'
           : sameUserMessageSpacing || '8px'
@@ -818,7 +827,7 @@ const Message = ({
                       imageAttachmentMaxHeight
                     )[0]
                   : mediaAttachment.type === attachmentTypes.video
-                  ? videoAttachmentMaxWidth || 320
+                  ? videoAttachmentMaxWidth || 420
                   : undefined
                 : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
@@ -850,7 +859,7 @@ const Message = ({
               handleReportMessage={handleToggleReportPopupOpen}
               handleAddEmoji={handleReactionAddDelete}
               selfMessage={message.user && messageUserID === user.id}
-              isThreadMessage={!!isThreadMessage}
+              isThreadMessage={isThreadMessage}
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               showMessageReaction={messageReaction}
               showEditMessage={
@@ -1315,7 +1324,17 @@ const Message = ({
   )
 }
 
-export default Message
+export default React.memo(Message, (prevProps, nextProps) => {
+  // Custom comparison function to check if only 'messages' prop has changed
+  return (
+    prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
+    prevProps.message.state === nextProps.message.state &&
+    prevProps.message.userReactions === nextProps.message.userReactions &&
+    prevProps.message.body === nextProps.message.body &&
+    prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
+    prevProps.message.attachments === nextProps.message.attachments
+  )
+})
 
 const MessageReactionKey = styled.span`
   display: inline-flex;
