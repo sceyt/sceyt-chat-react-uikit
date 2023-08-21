@@ -19,7 +19,7 @@ import {
 } from '../../../../../../store/channel/selector' */
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 // import { ReactComponent as CreateChannelIcon } from '../../../../../assets/svg/add.svg'
-import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS, THEME } from '../../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
 /* import {
   createChannel,
@@ -59,6 +59,7 @@ interface IProps {
   channel?: IChannel
   toggleCreatePopup: () => void
   actionType: 'addMembers' | 'createChat' | 'selectUsers'
+  // eslint-disable-next-line no-unused-vars
   getSelectedUsers?: (members: IAddMember[], action: 'create' | 'back') => void
   memberIds?: string[]
   selectIsRequired?: boolean
@@ -103,7 +104,7 @@ const UsersPopup = ({
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
       ? `Add ${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST
+      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
       ? 'Subscribers'
       : 'Members')
   /* const handleGetUsers = (option) => {
@@ -145,7 +146,7 @@ const UsersPopup = ({
       const role = channel
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST
+          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
           ? 'subscriber'
           : 'participant'
         : 'participant'
@@ -367,7 +368,7 @@ const UsersPopup = ({
                   <UserNamePresence>
                     <MemberName color={colors.textColor1}>{memberDisplayName}</MemberName>
                     <SubTitle>
-                      {user.presence && user.presence.state === PRESENCE_STATUS.ONLINE
+                      {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
                         : user.presence &&
                           user.presence.lastActiveAt &&

@@ -76,7 +76,21 @@ const CreateMessageDateDivider = ({
   theme,
   marginBottom,
   marginTop
-}: any) => {
+}: {
+  lastIndex: boolean
+  currentMessageDate: Date
+  nextMessageDate: Date
+  messagesHasNext: boolean
+  dateDividerFontSize?: string
+  dateDividerTextColor?: string
+  dateDividerBorder?: string
+  dateDividerBackgroundColor?: string
+  dateDividerBorderRadius?: string
+  noMargin?: boolean
+  theme?: any
+  marginBottom?: string
+  marginTop?: string
+}) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
   const differentDays = !(nextMessageDate && current.diff(moment(nextMessageDate).endOf('day'), 'days') === 0)
@@ -702,6 +716,12 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [browserTabIsActive])
 
   useDidUpdate(() => {
+    if (!mediaFile && isDragging) {
+      setIsDragging(false)
+    }
+  }, [mediaFile])
+
+  useDidUpdate(() => {
     if (!draggingSelector) {
       setIsDragging(false)
     }
@@ -928,7 +948,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   return (
     <React.Fragment>
-      {isDragging && (
+      {isDragging && !(attachmentsPreview && mediaFile) && (
         <DragAndDropContainer
           id='draggingContainer'
           draggable
@@ -1011,7 +1031,9 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
-                      marginBottom={prevMessage && prevMessage.type === 'system' && message.type !== 'system'}
+                      marginBottom={
+                        prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
+                      }
                       marginTop={differentUserMessageSpacing}
                     />
                     {message.type === 'system' ? (
@@ -1192,6 +1214,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorBackground={newMessagesSeparatorBackground}
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
+                        marginTop={message.type === 'system' ? '0px' : ''}
+                        marginBottom={message.type === 'system' ? '16px' : '0'}
                         unread
                       />
                     ) : null}
@@ -1282,6 +1306,8 @@ const SystemMessage = styled.div<any>`
 
 export const MessageTopDate = styled.div<any>`
   position: ${(props) => (props.systemMessage ? '' : 'absolute')};
+  display: ${(props) => props.systemMessage && 'inline-flex'};
+  justify-content: center;
   width: 100%;
   top: ${(props) => (props.topOffset ? `${props.topOffset + 22}px` : '22px')};
   left: 0;

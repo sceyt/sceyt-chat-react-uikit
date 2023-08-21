@@ -296,6 +296,15 @@ function* searchChannels(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const { search: searchBy } = params
     if (searchBy) {
+      /* const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+      if (params.filter && params.filter.channelType) {
+        channelQueryBuilder.type(params.filter.channelType)
+      }
+      channelQueryBuilder.subjectEquals(searchBy)
+      channelQueryBuilder.sortByLastMessage()
+      channelQueryBuilder.limit(params.limit || 50)
+      const channelQuery = yield call(channelQueryBuilder.build)
+      const channelsData = yield call(channelQuery.loadNextPage) */
       const allChannels = getAllChannels()
       const groupChannels: IChannel[] = []
       const directChannels: IChannel[] = []
@@ -321,6 +330,7 @@ function* searchChannels(action: IAction): any {
       })
       yield put(
         setSearchedChannelsAC({
+          // groups: JSON.parse(JSON.stringify([...channelsData.channels, ...groupChannels])),
           groups: JSON.parse(JSON.stringify(groupChannels)),
           directs: JSON.parse(JSON.stringify(directChannels))
         })
@@ -376,7 +386,7 @@ function* getChannelsForForward(action: IAction): any {
       const channelsData = yield call(channelQuery.loadNextPage)
       yield put(channelHasNextAC(channelsData.hasNext, true))
       const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-        channel.type === CHANNEL_TYPE.BROADCAST
+        channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
           ? channel.userRole === 'admin' || channel.userRole === 'owner'
           : channel.type === CHANNEL_TYPE.DIRECT
           ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
@@ -462,7 +472,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
     const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === CHANNEL_TYPE.BROADCAST
+      channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === CHANNEL_TYPE.DIRECT
         ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)

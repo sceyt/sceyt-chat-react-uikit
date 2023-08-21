@@ -40,7 +40,7 @@ import {
   updateMessageAC,
   updateMessagesStatusAC
 } from '../message/actions'
-import { CONNECTION_EVENT_TYPES } from '../user/constants'
+import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
   addAllMessages,
@@ -54,6 +54,7 @@ import {
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
+  removePendingMessageFromMap,
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
@@ -63,7 +64,7 @@ import {
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
-import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
+import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
 import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -620,6 +621,7 @@ export default function* watchForEvents(): any {
         let updateLastMessage = false
         const markersMap: any = {}
         markerList.messageIds.forEach((messageId: string) => {
+          removePendingMessageFromMap(channel.id, messageId)
           markersMap[messageId] = true
           if (channel) {
             if (
@@ -1009,9 +1011,9 @@ export default function* watchForEvents(): any {
         const { status } = args
         console.log('connection status changed . . . . . ', status)
         yield put(setConnectionStatusAC(status))
-        /* if (status === CONNECTION_STATUS.CONNECTED) {
+        if (status === CONNECTION_STATUS.CONNECTED) {
           yield put(getRolesAC())
-        } */
+        }
         break
       }
       default:

@@ -235,9 +235,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
       dispatch(switchChannelActionAC(chan))
     }
     console.log('handleChangeActiveChannel .... searchValue... ', searchValue)
-    if (searchValue) {
+    /* if (searchValue) {
       getMyChannels()
-    }
+    } */
   }
 
   const handleSearchValueChange = (e: any) => {
@@ -341,12 +341,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
     if (getActiveChannel) {
       getActiveChannel(activeChannel)
     }
-    if (searchValue) {
+    /*  if (searchValue) {
       if (channelsScrollRef.current) {
         channelsScrollRef.current.scrollTop = 0
       }
       getMyChannels()
-    }
+    } */
   }, [activeChannel.id])
 
   useDidUpdate(() => {
@@ -368,10 +368,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
     dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
   }, [])
 
-  /* useEffect(() => {
+  useEffect(() => {
     console.log('channels. ...........................', channels)
   }, [channels])
-  useEffect(() => {
+  /* useEffect(() => {
     console.log('searchedChannels. ...........................', searchedChannels)
   }, [searchedChannels]) */
   /*  useEffect(() => {

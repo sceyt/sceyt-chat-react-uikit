@@ -15,7 +15,7 @@ import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.sv
 import Avatar from '../Avatar'
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, PRESENCE_STATUS, THEME } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
@@ -144,7 +144,7 @@ const Channel: React.FC<IChannelProps> = ({
             hideUserPresence &&
             (hideUserPresence(directChannelUser)
               ? ''
-              : directChannelUser.presence && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE) && (
+              : directChannelUser.presence && directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
               <UserStatus backgroundColor={colors.primary} />
             )}
         </AvatarWrapper>
@@ -190,7 +190,8 @@ const Channel: React.FC<IChannelProps> = ({
                   <span ref={messageAuthorRef}>
                     {channel.newReactions[0].user.id === user.id
                       ? 'You'
-                      : contactsMap[channel.newReactions[0].user.id]
+                      : contactsMap[channel.newReactions[0].user.id] &&
+                        contactsMap[channel.newReactions[0].user.id].firstName
                       ? contactsMap[channel.newReactions[0].user.id].firstName
                       : channel.newReactions[0].user.id || 'Deleted'}
                   </span>
@@ -205,7 +206,7 @@ const Channel: React.FC<IChannelProps> = ({
                   <span ref={messageAuthorRef}>
                     {lastMessage.user.id === user.id
                       ? 'You'
-                      : contactsMap[lastMessage.user.id]
+                      : contactsMap[lastMessage.user.id] && contactsMap[lastMessage.user.id].firstName
                       ? contactsMap[lastMessage.user.id].firstName
                       : lastMessage.user.id || 'Deleted'}
                   </span>
@@ -449,6 +450,8 @@ export const LastMessage = styled.div<{ markedAsUnread?: boolean; unreadMentions
       ? // @ts-ignore
         `calc(100% - ${props.markedAsUnread && props.unreadMentions ? 48 : 24}px)`
       : '100%'};
+
+  height: 20px;
 `
 
 export const AvatarWrapper = styled.div`
@@ -505,9 +508,8 @@ export const LastMessageText = styled.span<{
   white-space: nowrap;
   color: ${colors.textColor2};
   font-style: ${(props) => props.deletedMessage && 'italic'};
-  //transform: ${(props) => props.withAttachments && 'translate(0px, -1.5px)'};
-  height: 17px;
-  display: flex;
+  transform: ${(props) => props.withAttachments && 'translate(0px, -1px)'};
+  //height: 20px;
 
   > svg {
     width: 16px;
@@ -515,7 +517,7 @@ export const LastMessageText = styled.span<{
     margin-right: 4px;
     color: ${colors.textColor2};
     //transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
-    transform: translate(0px, 1px);
+    transform: translate(0px, 3px);
   }
 `
 

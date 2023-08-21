@@ -323,6 +323,13 @@ export function removeMessageFromMap(channelId: string, messageId: string) {
     (msg) => !(msg.id === messageId || msg.tid === messageId)
   )
 }
+export function removePendingMessageFromMap(channelId: string, messageId: string) {
+  if (pendingMessagesMap[channelId]) {
+    pendingMessagesMap[channelId] = [...pendingMessagesMap[channelId]].filter(
+      (msg) => !(msg.id === messageId || msg.tid === messageId)
+    )
+  }
+}
 
 export function clearMessagesMap() {
   messagesMap = {}
@@ -367,6 +374,9 @@ export const getPendingAttachment = (attachmentId: string) => pendingAttachments
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
+export const setPendingMessages = (channelId: string, pendingMessages: any) => {
+  pendingMessagesMap[channelId] = pendingMessages
+}
 export const getPendingMessagesMap = () => pendingMessagesMap
 
 export const draftMessagesMap: draftMessagesMap = {}

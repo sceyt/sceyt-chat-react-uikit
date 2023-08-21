@@ -251,7 +251,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
     }
   }, [])
   return (
-    <Container>
+    <Container draggable={false}>
       <SliderHeader backgroundColor={colors.textColor1}>
         <FileInfo>
           <Avatar

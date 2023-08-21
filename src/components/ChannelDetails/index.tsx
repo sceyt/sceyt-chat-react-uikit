@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
-import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, PRESENCE_STATUS } from '../../helpers/constants'
+import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
@@ -145,7 +145,7 @@ const Details = ({
       ? channel.memberCount > 1
         ? `${memberDisplayText[channel.type]}s`
         : memberDisplayText[channel.type]
-      : channel.type === CHANNEL_TYPE.BROADCAST
+      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
       ? channel.memberCount > 1
         ? 'subscribers'
         : 'subscriber'
@@ -169,7 +169,7 @@ const Details = ({
           dispatch(loadMoreMembersAC(15))
         }
       } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {
-        dispatch(loadMoreAttachmentsAC(10))
+        dispatch(loadMoreAttachmentsAC(20))
       }
     }
   }
@@ -252,7 +252,7 @@ const Details = ({
                     ? ''
                     : directChannelUser &&
                       directChannelUser.presence &&
-                      (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                      (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
                         : directChannelUser.presence.lastActiveAt &&
                           userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}

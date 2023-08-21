@@ -16,7 +16,7 @@ import { ReactComponent as StarIcon } from '../../../assets/svg/star.svg'
 import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import ConfirmPopup from '../../../common/popups/delete'
-import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
 import { colors } from '../../../UIHelper/constants'
 // import ReportPopup from '../../../../common/Popups/report';
@@ -323,7 +323,7 @@ const Actions = ({
       )}
       <ActionsMenu isOpen={menuIsOpen}>
         {showMuteUnmuteNotifications &&
-          (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) &&
+          (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.muted ? (
             <ActionItem
               key={0}
@@ -420,7 +420,7 @@ const Actions = ({
           </ActionItem>
         )}
         {showPinChannel &&
-          (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) && (
+          (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
             <ActionItem
               key={2}
               onClick={() => console.log('pin channel')}
@@ -433,7 +433,7 @@ const Actions = ({
             </ActionItem>
           )}
         {showMarkAsReadUnread &&
-          (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) &&
+          (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.unread ? (
             <ActionItem
               key={3}
@@ -492,7 +492,7 @@ const Actions = ({
         {isDirectChannel && otherMembers.length === 1 ? (
           <React.Fragment>
             {showBlockUser &&
-              (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) &&
+              (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}

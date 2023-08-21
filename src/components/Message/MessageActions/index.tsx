@@ -13,7 +13,7 @@ import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 // import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import usePermissions from '../../../hooks/usePermissions'
-import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME } from '../../../helpers/constants'
+import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
 import { useSelector } from 'react-redux'
@@ -145,7 +145,7 @@ export default function MessageActions({
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
           (isDirectChannel && directChannelUser
-            ? !isIncoming && directChannelUser.activityState !== 'Deleted'
+            ? !isIncoming && directChannelUser.state !== USER_STATE.DELETED
             : true) && (
             <Action
               order={editIconOrder || 1}
@@ -173,7 +173,7 @@ export default function MessageActions({
           <React.Fragment>
             {showReplyMessage &&
               replyMessagePermitted &&
-              (isDirectChannel && directChannelUser ? directChannelUser.activityState !== 'Deleted' : true) && (
+              (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
                 <Action
                   order={replyIconOrder || 2}
                   iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
@@ -227,7 +227,9 @@ export default function MessageActions({
         )}
 
         {showDeleteMessage &&
-          (channel.type === CHANNEL_TYPE.BROADCAST ? myRole === 'owner' || myRole === 'admin' : true) && (
+          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+            ? myRole === 'owner' || myRole === 'admin'
+            : true) && (
             <Action
               order={deleteIconOrder || 6}
               iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}

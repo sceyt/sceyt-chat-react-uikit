@@ -39,9 +39,15 @@ export const CHANNEL_TYPE = {
   PRIVATE: 'private'
 }
 
-export const PRESENCE_STATUS = {
-  OFFLINE: 'Offline',
-  ONLINE: 'Online'
+export const USER_PRESENCE_STATUS = {
+  OFFLINE: 'offline',
+  ONLINE: 'online'
+}
+
+export const USER_STATE = {
+  ACTIVE: 'active',
+  INACTIVE: 'inactive',
+  DELETED: 'deleted'
 }
 
 export const userSearchMethods = {

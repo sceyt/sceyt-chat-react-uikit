@@ -30,7 +30,7 @@ const initialState: IUserStore = {
   usersLoadingState: null,
   contactsMap: {},
   updatedUserMap: {},
-  user: { id: '', firstName: '', lastName: '', activityState: '' },
+  user: { id: '', firstName: '', lastName: '', state: '' },
   browserTabIsActive: true
 }
 

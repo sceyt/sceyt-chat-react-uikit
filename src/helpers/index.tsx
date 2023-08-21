@@ -164,7 +164,7 @@ export const calculateRenderedImageWidth = (width: number, height: number, maxWi
   const minWidth = 130
   const aspectRatio = width / height
   if (aspectRatio >= maxWdt / maxHg) {
-    return [Math.max(minWidth, Math.min(maxWdt, width)), Math.min(maxHg, maxWdt / aspectRatio) + 2]
+    return [Math.max(minWidth, Math.min(maxWdt, width)), Math.min(maxHg, height, maxWdt / aspectRatio) + 2]
   } else {
     if (maxHg <= height) {
       return [Math.min(maxWdt, maxHg * aspectRatio), Math.min(maxHg, height)]
