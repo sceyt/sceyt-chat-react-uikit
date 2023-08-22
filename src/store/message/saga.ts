@@ -1035,11 +1035,11 @@ function* forwardMessage(action: IAction): any {
 }
 
 function* resendMessage(action: IAction): any {
+  const { payload } = action
+  const { message, connectionState, channelId } = payload
+  let channel = yield call(getChannelFromMap, channelId)
   try {
-    const { payload } = action
-    const { message, connectionState, channelId } = payload
     console.log('resend message .... ', message)
-    let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
       setChannelInMap(channel)
@@ -1048,6 +1048,14 @@ function* resendMessage(action: IAction): any {
     // const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
+
+    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.UNMODIFIED }))
+
+    updateMessageOnMap(channel.id, {
+      messageId: message.tid,
+      params: { state: MESSAGE_STATUS.UNMODIFIED }
+    })
+    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.UNMODIFIED })
 
     if (message.attachments && message.attachments.length && message.state === MESSAGE_STATUS.FAILED) {
       const attachmentCompilation = yield select(attachmentCompilationStateSelector)
@@ -1172,6 +1180,7 @@ function* resendMessage(action: IAction): any {
                 ],
                 mentionedUsers: messageResponse.mentionedUsers,
                 metadata: messageResponse.metadata,
+                state: messageResponse.state,
                 parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
@@ -1259,6 +1268,15 @@ function* resendMessage(action: IAction): any {
     yield put(updateMessageAC(message.id || message.tid, messageResponse)) */
   } catch (e) {
     console.log('ERROR in resend message', e.message)
+
+    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.FAILED }))
+
+    updateMessageOnMap(channel.id, {
+      messageId: message.tid,
+      params: { state: MESSAGE_STATUS.FAILED }
+    })
+    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.FAILED })
+
     // yield put(setErrorNotification(e.message))
   }
 }

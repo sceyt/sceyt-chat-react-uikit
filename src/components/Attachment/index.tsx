@@ -356,7 +356,6 @@ const Attachment = ({
               /* if (attachment.attachmentUrl) {
                 setAttachmentUrl(attachment.attachmentUrl)
               } else { */
-              console.log('should download the video .............................')
               handleDownloadFile()
               // }
             }

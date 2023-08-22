@@ -59,6 +59,7 @@ let loadDirection = ''
 // let nextTargetMessage = ''
 let nextDisable = false
 let prevDisable = false
+let scrollToLastVisible = false
 let prevMessageId = ''
 const messagesIndexMap = {}
 
@@ -411,6 +412,9 @@ const MessageList: React.FC<MessagesProps> = ({
     const { target } = event
     // console.log('target.scrollTop. ..  . ..  .. ', -target.scrollTop)
     // console.log('target.scrollHeight. ..  . ..  .. ', target.scrollHeight)
+    if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
+      scrollToLastVisible = true
+    }
     // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
     // const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
     if (
@@ -777,7 +781,6 @@ const MessageList: React.FC<MessagesProps> = ({
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
         } */
         if (prevMessageId) {
-          console.log('set scroll position to a last visibla message ,,,,,,,,,,,,,,,,,,,,,')
           /* let i: any = 0
           let messagesHeight = 0
           let prevMessagesHeight = 0
@@ -818,7 +821,7 @@ const MessageList: React.FC<MessagesProps> = ({
           // if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
           // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
           // console.log('last message pos........ ')
-          if (lastVisibleMessage) {
+          if (lastVisibleMessage && scrollToLastVisible) {
             // console.log('prevMessagesHeight  + messagesHeight ... ', prevMessagesHeight + messagesHeight)
             // console.log('lastVisibleMessage.offsetTop ... ', -lastVisibleMessage.offsetTop)
             // scrollRef.current.scrollTop = lastVisibleMessage.offsetTop

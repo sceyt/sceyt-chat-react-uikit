@@ -13,7 +13,7 @@ export const MESSAGE_DELIVERY_STATUS = {
 }
 
 export const MESSAGE_STATUS = {
-  NONE: 'none',
+  UNMODIFIED: 'unmodified',
   EDIT: 'edited',
   DELETE: 'deleted',
   FAILED: 'failed'

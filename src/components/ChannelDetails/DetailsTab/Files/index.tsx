@@ -80,7 +80,7 @@ const Files = ({
             </AttachmentPreviewTitle>
             <FileSizeAndDate color={filePreviewSizeColor}>{file.size ? bytesToSize(file.size) : ''}</FileSizeAndDate>
           </div>
-          <DownloadWrapper onClick={() => handleDownloadFile(file)}>
+          <DownloadWrapper visible={downloadingFilesMap[file.id!]} onClick={() => handleDownloadFile(file)}>
             {downloadingFilesMap[file.id!] ? (
               // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
               <ProgressWrapper>
@@ -129,9 +129,9 @@ const Container = styled.ul`
 `
 // eslint-disable-next-line max-len
 // ${(props) => (props.optionsMenuIsOpen ? 'height: calc(100vh - 495px)' : (props.noActions ? 'height: calc(100vh - 544px)' : 'height: calc(100vh - 445px)'))}
-const DownloadWrapper = styled.a`
+const DownloadWrapper = styled.a<{ visible?: boolean }>`
   text-decoration: none;
-  visibility: hidden;
+  visibility: ${(props) => (props.visible ? 'visible' : 'hidden')};
   padding: 5px 6px;
   position: absolute;
   top: 25%;

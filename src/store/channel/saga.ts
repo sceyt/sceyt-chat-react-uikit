@@ -602,6 +602,10 @@ function* notificationsTurnOff(action: IAction): any {
 
   try {
     const updatedChannel = yield call(channel.mute, expireTime)
+    updateChannelOnAllChannels(channel.id, {
+      muted: updatedChannel.muted,
+      mutedTill: updatedChannel.mutedTill
+    })
     yield put(
       updateChannelDataAC(updatedChannel.id, {
         muted: updatedChannel.muted,
@@ -620,6 +624,10 @@ function* notificationsTurnOn(): any {
 
   try {
     const updatedChannel = yield call(channel.unmute)
+    updateChannelOnAllChannels(channel.id, {
+      muted: updatedChannel.muted,
+      mutedTill: updatedChannel.mutedTill
+    })
     yield put(
       updateChannelDataAC(updatedChannel.id, {
         muted: updatedChannel.muted,
