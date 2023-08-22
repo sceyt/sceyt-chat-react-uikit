@@ -628,6 +628,7 @@ const Message = ({
       isReplied={!!message.parentMessage}
       isForwarded={!!message.forwardingDetails}
       messageBody={!!message.body}
+      withMediaAttachment={withMediaAttachment}
       withPadding={
         withAttachments &&
         notLinkAttachment &&
@@ -816,19 +817,23 @@ const Message = ({
           attachmentWidth={
             withAttachments
               ? mediaAttachment
-                ? mediaAttachment.type === attachmentTypes.image
-                  ? attachmentMetas &&
+                ? (attachmentMetas &&
                     getSendAttachmentsAsSeparateMessages() &&
                     attachmentMetas.szw &&
                     calculateRenderedImageWidth(
                       attachmentMetas.szw,
                       attachmentMetas.szh,
-                      imageAttachmentMaxWidth,
-                      imageAttachmentMaxHeight
-                    )[0]
-                  : mediaAttachment.type === attachmentTypes.video
-                  ? videoAttachmentMaxWidth || 420
-                  : undefined
+
+                      mediaAttachment.type === attachmentTypes.image
+                        ? imageAttachmentMaxWidth
+                        : videoAttachmentMaxWidth,
+                      mediaAttachment.type === attachmentTypes.image
+                        ? imageAttachmentMaxHeight
+                        : videoAttachmentMaxHeight
+                      // imageAttachmentMaxWidth,
+                      // imageAttachmentMaxHeight
+                    )[0]) ||
+                  420
                 : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
                 message.attachments[0].type === attachmentTypes.voice
@@ -1500,6 +1505,7 @@ const MessageHeaderCont = styled.div<{
   isForwarded?: boolean
   messageBody?: boolean
   isReplied?: boolean
+  withMediaAttachment?: boolean
 }>`
   display: flex;
   align-items: center;
@@ -1508,7 +1514,9 @@ const MessageHeaderCont = styled.div<{
     (props.isForwarded
       ? '8px 0 2px 12px'
       : !props.isReplied && !props.messageBody
-      ? '8px 0 8px 12px'
+      ? props.withMediaAttachment
+        ? '8px 0 8px 12px'
+        : '8px 0 0 12px'
       : '8px 0 0 12px')};
 `
 

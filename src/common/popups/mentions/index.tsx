@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
-import { LOADING_STATE, PRESENCE_STATUS, THEME } from '../../../Helpers/constants'
+import { LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../Helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
@@ -21,7 +21,8 @@ interface IMentionsPopupProps {
   theme?: string
   // eslint-disable-next-line no-unused-vars
   addMentionMember: (member: IMember) => void
-  handleMentionsPopupClose: () => void
+  // eslint-disable-next-line no-unused-vars
+  handleMentionsPopupClose: (setPending?: boolean) => void
   searchMention: string
 }
 
@@ -38,7 +39,7 @@ export default function MentionMembersPopup({
   const [filteredMembers, setFilteredMembers] = useState<IMember[]>([])
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
-  const [hideMenu, setHideMenu] = useState(false)
+  // const [hideMenu, setHideMenu] = useState(false)
   const membersListRef = useRef<HTMLElement>()
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
@@ -154,17 +155,17 @@ export default function MentionMembersPopup({
 
   useDidUpdate(() => {
     if (filteredMembersLength.current === 0) {
-      // handleMentionsPopupClose()
-      setHideMenu(true)
-    } else {
+      handleMentionsPopupClose(true)
+      // setHideMenu(true)
+    } /* else {
       setHideMenu(false)
-    }
+    } */
   }, [filteredMembersLength.current])
 
   return (
     <Container
       className='mention_member_popup'
-      hidden={hideMenu}
+      // hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
       withBorder={theme !== THEME.DARK}
@@ -194,7 +195,7 @@ export default function MentionMembersPopup({
                 {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
               <SubTitle>
-                {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE
+                {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : member.presence &&
                     member.presence.lastActiveAt &&

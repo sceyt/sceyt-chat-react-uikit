@@ -77,6 +77,7 @@ const EditChannelFooter = styled(ButtonBlock)`
 interface IProps {
   channel: IChannel
   theme?: string
+  // eslint-disable-next-line no-unused-vars
   handleToggleEditMode: (state: boolean) => void
   editChannelSaveButtonBackgroundColor?: string
   editChannelSaveButtonTextColor?: string
@@ -241,7 +242,7 @@ const EditChannel = ({
             size={120}
             image={newAvatar.url || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
             name={isDirectChannel && directChannelUser ? directChannelUser.id : channel.subject || channel.id}
-            textSize={70}
+            textSize={55}
           />
         </AvatarCont>
 

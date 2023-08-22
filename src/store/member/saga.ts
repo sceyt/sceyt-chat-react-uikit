@@ -8,7 +8,7 @@ import {
   setMembersToListAC,
   getRolesFailAC
 } from './actions'
-import { getChannelFromMap, query } from '../../helpers/channelHalper'
+import { getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 
 import {
@@ -102,7 +102,8 @@ function* addMembers(action: IAction): any {
         yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
       }
       yield put(addMembersToListAC(addedMembers))
-      yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount }))
+      updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount + addedMembers.length })
+      yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount + addedMembers.length }))
     }
   } catch (e) {
     console.log('error on add members... ', e)
@@ -133,7 +134,8 @@ function* kickMemberFromChannel(action: IAction): any {
       yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
     }
     yield put(removeMemberFromListAC(removedMembers))
-    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount }))
+    updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
+    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount - removedMembers.length }))
   } catch (e) {
     // yield put(setErrorNotification(e.message))
   }
@@ -147,7 +149,8 @@ function* blockMember(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
     const removedMembers = yield call(channel.blockMembers, [memberId])
     yield put(removeMemberFromListAC(removedMembers))
-    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount }))
+    updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
+    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount - removedMembers.length }))
   } catch (e) {
     // yield put(setErrorNotification(e.message))
   }

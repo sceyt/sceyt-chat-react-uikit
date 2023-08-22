@@ -16,7 +16,9 @@ interface IProps {
   channel: IChannel
   activeTab: string
   theme: string
+  // eslint-disable-next-line no-unused-vars
   setActiveTab: (activeTab: string) => void
+  // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
   linkPreviewIcon?: JSX.Element
   linkPreviewHoverIcon?: JSX.Element
@@ -78,7 +80,7 @@ const DetailsTab = ({
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST
+      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
       ? 'subscribers'
       : 'members'
   const handleTabClick = (tabIndex: string) => {

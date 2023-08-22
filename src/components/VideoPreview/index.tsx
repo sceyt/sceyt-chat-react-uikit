@@ -87,7 +87,6 @@ const VideoPreview = memo(function VideoPreview({
   } */
   useEffect(() => {
     let checkVideoInterval: any
-
     if (videoRef.current) {
       checkVideoInterval = setInterval(async () => {
         if (videoRef.current && videoRef.current.readyState > 3) {

@@ -59,6 +59,7 @@ let loadDirection = ''
 // let nextTargetMessage = ''
 let nextDisable = false
 let prevDisable = false
+let scrollToLastVisible = false
 let prevMessageId = ''
 const messagesIndexMap = {}
 
@@ -76,7 +77,21 @@ const CreateMessageDateDivider = ({
   theme,
   marginBottom,
   marginTop
-}: any) => {
+}: {
+  lastIndex: boolean
+  currentMessageDate: Date
+  nextMessageDate: Date
+  messagesHasNext: boolean
+  dateDividerFontSize?: string
+  dateDividerTextColor?: string
+  dateDividerBorder?: string
+  dateDividerBackgroundColor?: string
+  dateDividerBorderRadius?: string
+  noMargin?: boolean
+  theme?: any
+  marginBottom?: string
+  marginTop?: string
+}) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
   const differentDays = !(nextMessageDate && current.diff(moment(nextMessageDate).endOf('day'), 'days') === 0)
@@ -397,6 +412,9 @@ const MessageList: React.FC<MessagesProps> = ({
     const { target } = event
     // console.log('target.scrollTop. ..  . ..  .. ', -target.scrollTop)
     // console.log('target.scrollHeight. ..  . ..  .. ', target.scrollHeight)
+    if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
+      scrollToLastVisible = true
+    }
     // console.log('scrollToNewMessage.scrollToBottom. ..  . ..  .. ', scrollToNewMessage.scrollToBottom)
     // const lastVisibleMessagePos = lastVisibleMessage && lastVisibleMessage.offsetTop
     if (
@@ -702,6 +720,12 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [browserTabIsActive])
 
   useDidUpdate(() => {
+    if (!mediaFile && isDragging) {
+      setIsDragging(false)
+    }
+  }, [mediaFile])
+
+  useDidUpdate(() => {
     if (!draggingSelector) {
       setIsDragging(false)
     }
@@ -757,7 +781,6 @@ const MessageList: React.FC<MessagesProps> = ({
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
         } */
         if (prevMessageId) {
-          console.log('set scroll position to a last visibla message ,,,,,,,,,,,,,,,,,,,,,')
           /* let i: any = 0
           let messagesHeight = 0
           let prevMessagesHeight = 0
@@ -798,7 +821,7 @@ const MessageList: React.FC<MessagesProps> = ({
           // if (lastVisibleMessage && -lastVisibleMessage.offsetTop > messagesHeight) {
           // if (-lastVisibleMessage.offsetTop < scrollRef.current.scrollTop) {
           // console.log('last message pos........ ')
-          if (lastVisibleMessage) {
+          if (lastVisibleMessage && scrollToLastVisible) {
             // console.log('prevMessagesHeight  + messagesHeight ... ', prevMessagesHeight + messagesHeight)
             // console.log('lastVisibleMessage.offsetTop ... ', -lastVisibleMessage.offsetTop)
             // scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
@@ -928,7 +951,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   return (
     <React.Fragment>
-      {isDragging && (
+      {isDragging && !(attachmentsPreview && mediaFile) && (
         <DragAndDropContainer
           id='draggingContainer'
           draggable
@@ -1011,7 +1034,9 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
-                      marginBottom={prevMessage && prevMessage.type === 'system' && message.type !== 'system'}
+                      marginBottom={
+                        prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
+                      }
                       marginTop={differentUserMessageSpacing}
                     />
                     {message.type === 'system' ? (
@@ -1192,6 +1217,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorBackground={newMessagesSeparatorBackground}
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
+                        marginTop={message.type === 'system' ? '0px' : ''}
+                        marginBottom={message.type === 'system' ? '16px' : '0'}
                         unread
                       />
                     ) : null}
@@ -1282,6 +1309,8 @@ const SystemMessage = styled.div<any>`
 
 export const MessageTopDate = styled.div<any>`
   position: ${(props) => (props.systemMessage ? '' : 'absolute')};
+  display: ${(props) => props.systemMessage && 'inline-flex'};
+  justify-content: center;
   width: 100%;
   top: ${(props) => (props.topOffset ? `${props.topOffset + 22}px` : '22px')};
   left: 0;

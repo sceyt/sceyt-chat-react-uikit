@@ -356,7 +356,6 @@ const Attachment = ({
               /* if (attachment.attachmentUrl) {
                 setAttachmentUrl(attachment.attachmentUrl)
               } else { */
-              console.log('should download the video .............................')
               handleDownloadFile()
               // }
             }
@@ -479,6 +478,7 @@ const Attachment = ({
               backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
+              withPrefix={withPrefix}
             >
               <UploadPercent isRepliedMessage={isRepliedMessage}>
                 {isInUploadingState ? (
@@ -679,8 +679,8 @@ const Attachment = ({
               null}
               <VideoPreview
                 theme={theme}
-                maxWidth={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderWidth}px`}
-                maxHeight={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderHeight}px`}
+                maxWidth={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderWidth || 420}px`}
+                maxHeight={isRepliedMessage ? '40px' : isDetailsView ? '100%' : `${renderHeight || 240}px`}
                 file={attachment}
                 src={attachmentUrl}
                 isCachedFile={isCached}

@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
-import { CHANNEL_TYPE, PRESENCE_STATUS } from '../../helpers/constants'
+import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
@@ -100,7 +100,7 @@ export default function ChatHeader({
       ? activeChannel.memberCount > 1
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
-      : activeChannel.type === CHANNEL_TYPE.BROADCAST
+      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
       ? activeChannel.memberCount > 1
         ? 'subscribers'
         : 'subscriber'
@@ -155,7 +155,7 @@ export default function ChatHeader({
                 {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
                   : directChannelUser.presence &&
-                    (directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                    (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : directChannelUser.presence.lastActiveAt &&
                         userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}

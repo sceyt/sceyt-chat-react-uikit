@@ -13,7 +13,7 @@ import {
 } from '../../../../store/member/actions'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
 import Avatar from '../../../Avatar'
-import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
 import DropDown from '../../../../common/dropdown'
 import { colors } from '../../../../UIHelper/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
@@ -35,6 +35,7 @@ import {
 interface IProps {
   channel: IChannel
   theme: string
+  // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
   showChangeMemberRole?: boolean
   showMakeMemberAdmin?: boolean
@@ -70,7 +71,7 @@ const Members = ({
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST
+      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
       ? 'subscribers'
       : 'members'
   const noMemberEditPermissions =
@@ -152,7 +153,7 @@ const Members = ({
       const role =
         channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST
+          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
           ? 'subscriber'
           : 'participant'
       const updateMember: IMember = {
@@ -226,7 +227,7 @@ const Members = ({
                   </MemberNameWrapper>
 
                   <SubTitle margin='1px 0 0'>
-                    {member.presence && member.presence.state === PRESENCE_STATUS.ONLINE
+                    {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
                         member.presence.lastActiveAt &&
@@ -311,7 +312,11 @@ const Members = ({
           handleFunction={handleKickMember}
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
-          title={channel.type === CHANNEL_TYPE.GROUP ? 'Remove member' : 'Remove subscriber'}
+          title={
+            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+              ? 'Remove member'
+              : 'Remove subscriber'
+          }
           description={
             <span>
               Are you sure to remove

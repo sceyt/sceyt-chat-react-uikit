@@ -69,7 +69,7 @@ import {
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import { attachmentTypes, CHANNEL_TYPE, DB_NAMES, DB_STORE_NAMES } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, DB_NAMES, DB_STORE_NAMES, USER_STATE } from '../../helpers/constants'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
@@ -173,7 +173,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
-  const isDeletedUserChat = directChannelUser && directChannelUser.activityState === 'Deleted'
+  const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
   /* const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -407,7 +407,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setMessageText(e.currentTarget.innerText)
       }
       // e.currentTarget.html = e.currentTarget.innerText
-      if (allowMentionUser) {
+      if (
+        allowMentionUser &&
+        (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === CHANNEL_TYPE.PRIVATE)
+      ) {
         handleMentionDetect(e)
       }
 
@@ -436,11 +439,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
-    if (
-      lastTwoChar.trimStart() === '@' &&
-      !mentionTyping &&
-      (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === 'private')
-    ) {
+    if (lastTwoChar.trimStart() === '@' && !mentionTyping) {
       setCurrentMentions({
         start: selPos - 1,
         typed: ''
@@ -972,7 +971,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     reader.onload = async () => {
       // @ts-ignore
       const length = reader.result && reader.result.length
-      let fileChecksum = ''
+      let fileChecksum
       if (length > 500) {
         const firstPart = reader.result && reader.result.slice(0, 100)
         const middlePart = reader.result && reader.result.slice(length / 2 - 50, length / 2)
@@ -981,7 +980,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       } else {
         fileChecksum = `${reader.result}`
       }
-      const checksumHash = await hashString(fileChecksum)
+      const checksumHash = await hashString(fileChecksum || '')
       let dataFromDb: any
       try {
         dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
@@ -1664,7 +1663,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           Join
         </JoinChannelCont>
       ) : (
-          activeChannel.type === CHANNEL_TYPE.BROADCAST
+          activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
             ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
             : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
         ) ? (

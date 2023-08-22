@@ -6,7 +6,7 @@ import { THEME } from '../../helpers/constants'
 export const Container = styled.div<any>`
   text-align: center;
   margin: ${(props) => (props.noMargin ? '0 auto' : `${props.marginTop || '16px'} auto 0`)};
-  margin-bottom: ${(props) => (props.marginBottom ? '8px' : '0')};
+  margin-bottom: ${(props) => props.marginBottom || '0'};
   display: ${(props) => (props.dividerVisibility ? 'flex' : 'none')};
   align-items: center;
   width: ${(props) => props.width || '100%'};
@@ -84,7 +84,7 @@ interface IProps {
   newMessagesSeparatorBackground?: string
   newMessagesSeparatorLeftRightSpaceWidth?: string
   noMargin?: boolean
-  marginBottom?: boolean
+  marginBottom?: string
   marginTop?: string
 }
 

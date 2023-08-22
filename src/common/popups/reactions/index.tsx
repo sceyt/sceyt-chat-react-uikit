@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { LOADING_STATE, PRESENCE_STATUS } from '../../../Helpers/constants'
+import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../Helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import { IReaction } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
@@ -23,6 +23,7 @@ import {
 
 interface IReactionsPopupProps {
   messageId: string
+  // eslint-disable-next-line no-unused-vars
   handleAddDeleteEmoji: (selectedEmoji: string) => void
   handleReactionsPopupClose: () => void
   bottomPosition: number
@@ -198,7 +199,7 @@ export default function ReactionsPopup({
                 )}
               </MemberName>
               <SubTitle>
-                {reaction.user.presence && reaction.user.presence.state === PRESENCE_STATUS.ONLINE
+                {reaction.user.presence && reaction.user.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : reaction.user.presence &&
                     reaction.user.presence.lastActiveAt &&

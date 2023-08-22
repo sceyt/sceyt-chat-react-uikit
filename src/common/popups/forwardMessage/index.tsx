@@ -18,7 +18,7 @@ import {
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
-import { CHANNEL_TYPE, LOADING_STATE, PRESENCE_STATUS } from '../../../helpers/constants'
+import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
@@ -39,6 +39,7 @@ interface IProps {
   title: string
   buttonText: string
   togglePopup: () => void
+  // eslint-disable-next-line no-unused-vars
   handleForward: (channelIds: string[]) => void
   loading?: boolean
 }
@@ -196,7 +197,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     hideUserPresence && hideUserPresence(directChannelUser)
                                       ? ''
                                       : directChannelUser.presence &&
-                                        directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                                        directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                                   )
                                   ? 'Online'
                                   : directChannelUser &&
@@ -294,7 +295,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               hideUserPresence && hideUserPresence(directChannelUser)
                                 ? ''
                                 : directChannelUser.presence &&
-                                  directChannelUser.presence.state === PRESENCE_STATUS.ONLINE
+                                  directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
                             )
                             ? 'Online'
                             : directChannelUser &&

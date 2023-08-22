@@ -1,9 +1,9 @@
-import { IChannel, IContactsMap, IUser } from '../types'
+import { IAttachment, IChannel, IContactsMap, IUser } from '../types'
 import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
-import { CHANNEL_TYPE } from './constants'
+import { attachmentTypes, CHANNEL_TYPE } from './constants'
 
 let contactsMap = {}
 let logoSrc = ''
@@ -35,11 +35,27 @@ function openRequestedSingleTab(url: any) {
   /!* explanation: we store the current url in order to compare url
      in the event of another call of this function. *!/
 } */
-export const setNotification = (body: string, user: IUser, channel: IChannel, reaction?: string) => {
+export const setNotification = (
+  body: string,
+  user: IUser,
+  channel: IChannel,
+  reaction?: string,
+  attachment?: IAttachment
+) => {
   const getFromContacts = getShowOnlyContactUsers()
-
+  let attachmentType
+  if (attachment) {
+    const attType = attachment.type
+    attachmentType =
+      attType === attachmentTypes.voice
+        ? 'Voice'
+        : attType === attachmentTypes.image
+        ? 'Photo'
+        : attType === attachmentTypes.video
+        ? 'Video'
+        : 'File'
+  }
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
-
   let notification: any
   if (showNotifications) {
     if (reaction) {
@@ -48,7 +64,7 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
         {
           body: `${
             channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
-          } reacted ${reaction} to "${body}"`,
+          } reacted ${reaction} to "${attachmentType || ''}${attachmentType && body ? ': ' : ''}${body}"`,
           icon: logoSrc
           // silent: false
         }
@@ -57,7 +73,11 @@ export const setNotification = (body: string, user: IUser, channel: IChannel, re
       notification = new Notification(
         `${isDirectChannel ? makeUsername(contactsMap[user.id], user, getFromContacts) : channel.subject}`,
         {
-          body: isDirectChannel ? body : `${makeUsername(contactsMap[user.id], user, getFromContacts)}\n${body}`,
+          body: isDirectChannel
+            ? `${attachmentType || ''}${attachmentType && body ? ': ' : ''}${body}`
+            : `${makeUsername(contactsMap[user.id], user, getFromContacts)}\n${attachmentType || ''}${
+                attachmentType && body ? ': ' : ''
+              }${body}`,
           icon: logoSrc
           // silent: false
           // silent: false

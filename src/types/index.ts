@@ -8,7 +8,7 @@ export interface IUser {
   firstName: string
   lastName: string
   avatarUrl?: string
-  activityState: string
+  state: string
   blocked?: boolean
   presence?: {
     state: string
@@ -53,10 +53,14 @@ declare class AttachmentBuilder {
   metadata?: string
   upload?: boolean
 
+  // eslint-disable-next-line no-unused-vars
   constructor(url: string, type: string)
 
+  // eslint-disable-next-line no-unused-vars
   setName: (name: string) => this
+  // eslint-disable-next-line no-unused-vars
   setMetadata: (metadata: string) => this
+  // eslint-disable-next-line no-unused-vars
   setUpload: (upload: boolean) => this
   create: () => IAttachment
 }
@@ -76,8 +80,8 @@ export interface IMessage {
   tid?: string
   body: string
   user: IUser
-  createdAt: Date | number
-  updatedAt?: Date | number
+  createdAt: Date
+  updatedAt?: Date
   type: string
   deliveryStatus: string
   markerTotals: {
@@ -153,43 +157,56 @@ export interface IChannel {
   newReactions: IReaction[]
   lastReactedMessage?: IMessage
   delete: () => Promise<void>
+  // eslint-disable-next-line no-unused-vars
   deleteAllMessages: (forEveryone?: boolean) => Promise<void>
   hide: () => Promise<boolean>
   unhide: () => Promise<boolean>
   markAsUnRead: () => Promise<IChannel>
+  // eslint-disable-next-line no-unused-vars
   mute: (_muteExpireTime: number) => Promise<IChannel>
   unmute: () => Promise<IChannel>
+  // eslint-disable-next-line no-unused-vars
   markMessagesAsReceived: (_messageIds: string[]) => Promise<void>
+  // eslint-disable-next-line no-unused-vars
   markMessagesAsDisplayed: (_messageIds: string[]) => Promise<void>
   startTyping: () => void
   stopTyping: () => void
+  // eslint-disable-next-line no-unused-vars
   sendMessage: (message: any) => Promise<any>
+  // eslint-disable-next-line no-unused-vars
   editMessage: (message: any) => Promise<any>
+  // eslint-disable-next-line no-unused-vars
   reSendMessage: (failedMessage: any) => Promise<any>
+  // eslint-disable-next-line no-unused-vars
   deleteMessageById: (messageId: string) => Promise<any>
+  // eslint-disable-next-line no-unused-vars
   deleteMessage: (message: any) => Promise<any>
   addReaction: (
+    // eslint-disable-next-line no-unused-vars
     messageId: string,
+    // eslint-disable-next-line no-unused-vars
     key: string,
+    // eslint-disable-next-line no-unused-vars
     score: number,
+    // eslint-disable-next-line no-unused-vars
     reason: string,
+    // eslint-disable-next-line no-unused-vars
     enforceUnique: boolean
   ) => Promise<{ message: any; reaction: any }>
+  // eslint-disable-next-line no-unused-vars
   deleteReaction: (messageId: string, key: string) => Promise<{ message: any; reaction: any }>
   createMessageBuilder: () => any
+  // eslint-disable-next-line no-unused-vars
   createAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
+  // eslint-disable-next-line no-unused-vars
   createThread: (messageId: string) => IChannel
+  // eslint-disable-next-line no-unused-vars
   getMessagesById: (messageIds: string[]) => Promise<IMessage[]>
 }
 
 export interface IMedia extends IAttachment {
   user: IUser
   updatedAt: Date
-}
-
-export interface ICustomChannelItemProps {
-  channel: IChannel
-  setActiveChannel: (channel: IChannel) => void
 }
 
 export interface IMarker {

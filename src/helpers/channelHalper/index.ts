@@ -21,7 +21,7 @@ let activeChannelId = ''
 let UploadImageIcon: JSX.Element
 
 export function setChannelInMap(channel: IChannel) {
-  channelsMap[channel.id] = channel
+  channelsMap[channel.id] = { ...channel }
 }
 
 export function setActiveChannelId(id: string) {
@@ -48,7 +48,7 @@ export function setChannelsInMap(channels: IChannel[]) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
     channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
-    channelsMap[channel.id] = channel
+    channelsMap[channel.id] = { ...channel }
 
     return channel
   })

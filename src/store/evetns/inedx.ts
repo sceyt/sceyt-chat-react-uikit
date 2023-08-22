@@ -1,7 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
-import { IChannel, IMarker, IMessage, IReaction, IUser } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IReaction, IUser } from '../../types'
 import { CHANNEL_EVENT_TYPES } from '../channel/constants'
 import {
   addChannelToAllChannels,
@@ -40,7 +40,7 @@ import {
   updateMessageAC,
   updateMessagesStatusAC
 } from '../message/actions'
-import { CONNECTION_EVENT_TYPES } from '../user/constants'
+import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
   addAllMessages,
@@ -54,6 +54,7 @@ import {
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
+  removePendingMessageFromMap,
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
@@ -63,11 +64,11 @@ import {
   updateMessageStatusOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
-import { addMembersToListAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
+import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
 import { MessageTextFormat } from '../../helpers/message'
 import { contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -592,8 +593,15 @@ export default function* watchForEvents(): any {
                   isLastMessage: false,
                   asSampleText: true
                 })
-                console.log('messageBody. . . . ', messageBody)
-                setNotification(messageBody, message.user, channel)
+                setNotification(
+                  messageBody,
+                  message.user,
+                  channel,
+                  undefined,
+                  message.attachments && message.attachments.length
+                    ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
+                    : undefined
+                )
               }
             }
             if (message.repliedInThread && message.parentMessage.id) {
@@ -620,6 +628,7 @@ export default function* watchForEvents(): any {
         let updateLastMessage = false
         const markersMap: any = {}
         markerList.messageIds.forEach((messageId: string) => {
+          removePendingMessageFromMap(channel.id, messageId)
           markersMap[messageId] = true
           if (channel) {
             if (
@@ -784,7 +793,25 @@ export default function* watchForEvents(): any {
         if (message.user.id === SceytChatClient.user.id) {
           if (!isSelf && Notification.permission === 'granted') {
             if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
-              setNotification(message.body, reaction.user, channel, reaction.key)
+              const contactsMap = yield select(contactsMapSelector)
+              const getFromContacts = getShowOnlyContactUsers()
+              const messageBody = MessageTextFormat({
+                text: message.body,
+                message,
+                contactsMap,
+                getFromContacts,
+                isLastMessage: false,
+                asSampleText: true
+              })
+              setNotification(
+                messageBody,
+                reaction.user,
+                channel,
+                reaction.key,
+                message.attachments && message.attachments.length
+                  ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
+                  : undefined
+              )
             }
           }
 
@@ -1009,9 +1036,9 @@ export default function* watchForEvents(): any {
         const { status } = args
         console.log('connection status changed . . . . . ', status)
         yield put(setConnectionStatusAC(status))
-        /* if (status === CONNECTION_STATUS.CONNECTED) {
+        if (status === CONNECTION_STATUS.CONNECTED) {
           yield put(getRolesAC())
-        } */
+        }
         break
       }
       default:

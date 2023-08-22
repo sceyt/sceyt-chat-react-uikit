@@ -102,7 +102,9 @@ import {
   removeReactionToMessageOnMap,
   addReactionOnAllMessages,
   removeReactionOnAllMessages,
-  sendMessageHandler
+  sendMessageHandler,
+  removePendingMessageFromMap,
+  setPendingMessages
 } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../user/constants'
 import { customUpload, getCustomUploader, pauseUpload, resumeUpload } from '../../helpers/customUploader'
@@ -934,7 +936,12 @@ function* forwardMessage(action: IAction): any {
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
     const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     let attachments = message.attachments
-    if (!(channel.type === CHANNEL_TYPE.BROADCAST && !(channel.userRole === 'admin' || channel.userRole === 'owner'))) {
+    if (
+      !(
+        (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
+        !(channel.userRole === 'admin' || channel.userRole === 'owner')
+      )
+    ) {
       if (message.attachments && message.attachments.length) {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
@@ -1028,11 +1035,11 @@ function* forwardMessage(action: IAction): any {
 }
 
 function* resendMessage(action: IAction): any {
+  const { payload } = action
+  const { message, connectionState, channelId } = payload
+  let channel = yield call(getChannelFromMap, channelId)
   try {
-    const { payload } = action
-    const { message, connectionState, channelId } = payload
     console.log('resend message .... ', message)
-    let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
       setChannelInMap(channel)
@@ -1041,6 +1048,14 @@ function* resendMessage(action: IAction): any {
     // const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
+
+    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.UNMODIFIED }))
+
+    updateMessageOnMap(channel.id, {
+      messageId: message.tid,
+      params: { state: MESSAGE_STATUS.UNMODIFIED }
+    })
+    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.UNMODIFIED })
 
     if (message.attachments && message.attachments.length && message.state === MESSAGE_STATUS.FAILED) {
       const attachmentCompilation = yield select(attachmentCompilationStateSelector)
@@ -1165,6 +1180,7 @@ function* resendMessage(action: IAction): any {
                 ],
                 mentionedUsers: messageResponse.mentionedUsers,
                 metadata: messageResponse.metadata,
+                state: messageResponse.state,
                 parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
                 createdAt: messageResponse.createdAt
@@ -1208,6 +1224,7 @@ function* resendMessage(action: IAction): any {
 
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageCopy)
+        console.log('resend message response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           deliveryStatus: messageResponse.deliveryStatus,
@@ -1219,7 +1236,7 @@ function* resendMessage(action: IAction): any {
           repliedInThread: messageResponse.repliedInThread,
           createdAt: messageResponse.createdAt
         }
-        console.log('messageResponse ... ', messageResponse)
+        removePendingMessageFromMap(channel.id, messageCopy.tid)
         yield put(updateMessageAC(messageCopy.tid, messageUpdateData))
 
         updateMessageOnMap(channel.id, {
@@ -1251,6 +1268,15 @@ function* resendMessage(action: IAction): any {
     yield put(updateMessageAC(message.id || message.tid, messageResponse)) */
   } catch (e) {
     console.log('ERROR in resend message', e.message)
+
+    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.FAILED }))
+
+    updateMessageOnMap(channel.id, {
+      messageId: message.tid,
+      params: { state: MESSAGE_STATUS.FAILED }
+    })
+    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.FAILED })
+
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1370,7 +1396,13 @@ function* getMessagesQuery(action: IAction): any {
           // TO DO - pending messages are repeated in the list, fix after uncommenting.
           const pendingMessages = getPendingMessages(channel.id)
           if (pendingMessages && pendingMessages.length) {
-            result.messages = [...result.messages, ...pendingMessages]
+            const messagesMap = {}
+            result.messages.forEach((msg) => {
+              messagesMap[msg.tid || ''] = msg
+            })
+            const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
+            setPendingMessages(channel.id, filteredPendingMessages)
+            result.messages = [...result.messages, ...filteredPendingMessages]
           }
           yield put(setMessagesAC([...result.messages]))
           // setAllMessages([...result.messages])
@@ -1415,7 +1447,13 @@ function* getMessagesQuery(action: IAction): any {
         // TO DO - pending messages are repeated in the list, fix after uncommenting.
         const pendingMessages = getPendingMessages(channel.id)
         if (pendingMessages && pendingMessages.length) {
-          result.messages = [...result.messages, ...pendingMessages]
+          const messagesMap = {}
+          result.messages.forEach((msg) => {
+            messagesMap[msg.tid || ''] = msg
+          })
+          const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
+          setPendingMessages(channel.id, filteredPendingMessages)
+          result.messages = [...result.messages, ...filteredPendingMessages]
         }
         setAllMessages([...result.messages])
         yield put(setMessagesAC([...result.messages]))
@@ -1453,7 +1491,13 @@ function* getMessagesQuery(action: IAction): any {
           // TO DO - pending messages are repeated in the list, fix after uncommenting.
           const pendingMessages = getPendingMessages(channel.id)
           if (pendingMessages && pendingMessages.length) {
-            result.messages = [...result.messages, ...pendingMessages]
+            const messagesMap = {}
+            result.messages.forEach((msg) => {
+              messagesMap[msg.tid || ''] = msg
+            })
+            const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
+            setPendingMessages(channel.id, filteredPendingMessages)
+            result.messages = [...result.messages, ...filteredPendingMessages]
           }
         }
         yield put(setMessagesAC([...result.messages]))
