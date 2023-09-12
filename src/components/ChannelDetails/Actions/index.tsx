@@ -37,6 +37,7 @@ import {
 import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
 import usePermissions from '../../../hooks/usePermissions'
 import { getClient } from '../../../common/client'
+import { hideUserPresence } from '../../../helpers/userHelper'
 
 interface IProps {
   channel: IChannel
@@ -195,6 +196,7 @@ const Actions = ({
 
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+  const disableAction = directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
@@ -323,6 +325,7 @@ const Actions = ({
       )}
       <ActionsMenu isOpen={menuIsOpen}>
         {showMuteUnmuteNotifications &&
+          !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.muted ? (
             <ActionItem
@@ -407,7 +410,7 @@ const Actions = ({
               {/* ) : undefined} */}
             </DropDown>
           ))}
-        {showStarredMessages && (
+        {showStarredMessages && !channel.isMockChannel && (
           <ActionItem
             key={1}
             onClick={() => console.log('stared messages')}
@@ -420,6 +423,7 @@ const Actions = ({
           </ActionItem>
         )}
         {showPinChannel &&
+          !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
             <ActionItem
               key={2}
@@ -433,6 +437,7 @@ const Actions = ({
             </ActionItem>
           )}
         {showMarkAsReadUnread &&
+          !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.unread ? (
             <ActionItem
@@ -492,6 +497,7 @@ const Actions = ({
         {isDirectChannel && otherMembers.length === 1 ? (
           <React.Fragment>
             {showBlockUser &&
+              !disableAction &&
               (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
@@ -535,7 +541,7 @@ const Actions = ({
           </React.Fragment>
         ) : (
           <React.Fragment>
-            {showBlockAndLeaveChannel && (
+            {showBlockAndLeaveChannel && !channel.isMockChannel && (
               <ActionItem
                 key={8}
                 color={blockAndLeaveChannelTextColor || colors.red1}
@@ -570,7 +576,7 @@ const Actions = ({
                 `}
               </ActionItem>
             )}
-            {showReportChannel && (
+            {showReportChannel && !channel.isMockChannel && (
               <ActionItem
                 key={9}
                 order={reportChannelOrder}
@@ -595,6 +601,7 @@ const Actions = ({
           </React.Fragment>
         )}
         {showClearHistory &&
+          !channel.isMockChannel &&
           (channel.type === CHANNEL_TYPE.GROUP ||
             channel.type === CHANNEL_TYPE.PRIVATE ||
             channel.type === CHANNEL_TYPE.DIRECT) && (
@@ -614,6 +621,7 @@ const Actions = ({
             </ActionItem>
           )}
         {showClearHistory &&
+          !channel.isMockChannel &&
           (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
           checkActionPermission('clearAllMessages') && (
             <ActionItem
@@ -632,7 +640,7 @@ const Actions = ({
             </ActionItem>
           )}
 
-        {showDeleteChannel && checkActionPermission('deleteChannel') && (
+        {showDeleteChannel && !channel.isMockChannel && checkActionPermission('deleteChannel') && (
           <ActionItem
             key={12}
             order={deleteChannelOrder}

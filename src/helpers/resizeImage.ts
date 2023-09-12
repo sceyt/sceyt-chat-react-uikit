@@ -1,5 +1,5 @@
 import { IAttachmentMeta } from './messagesHalper'
-import * as ThumbHash from 'thumbhash'
+import { thumbHashToDataURL, rgbaToThumbHash } from './thumbhash'
 
 const MAX_WIDTH = 1280
 const MAX_HEIGHT = 1080
@@ -114,7 +114,7 @@ export const base64ToBinary = (base64: any) =>
       .split('')
       .map((x) => x.charCodeAt(0))
   )
-const binaryThumbHashToDataURL = (binaryThumbHash: Uint8Array) => ThumbHash.thumbHashToDataURL(binaryThumbHash)
+const binaryThumbHashToDataURL = (binaryThumbHash: Uint8Array) => thumbHashToDataURL(binaryThumbHash)
 export const base64ToToDataURL = (base64: any) => {
   const thumbHashFromBase64 = base64ToBinary(base64)
   return binaryThumbHashToDataURL(thumbHashFromBase64)
@@ -159,7 +159,7 @@ export function createImageThumbnail(
 
       // @ts-ignore
       const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
-      const binaryThumbHash = ThumbHash.rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
+      const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
 
       // ThumbHash to data URL
       // Simulate setting the placeholder first, then the full image loading later on

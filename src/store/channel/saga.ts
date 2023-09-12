@@ -1,10 +1,9 @@
 import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
+import { v4 as uuidv4 } from 'uuid'
 import {
-  // addChannelAC,
   addChannelsAC,
   addChannelsForForwardAC,
   channelHasNextAC,
-  getChannelsAC,
   removeChannelAC,
   removeChannelCachesAC,
   setActiveChannelAC,
@@ -12,10 +11,11 @@ import {
   setChannelsFroForwardAC,
   setChannelsLoadingStateAC,
   setChannelToAddAC,
+  setChannelToRemoveAC,
+  setCloseSearchChannelsAC,
   setSearchedChannelsAC,
   switchChannelActionAC,
   updateChannelDataAC,
-  updateChannelLastMessageAC,
   updateUserStatusOnChannelAC
 } from './actions'
 import {
@@ -58,10 +58,11 @@ import {
   addChannelsToAllChannels,
   getAllChannels,
   getChannelFromAllChannels,
-  updateChannelOnAllChannels
+  updateChannelOnAllChannels,
+  deleteChannelFromAllChannels
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
-import { IAction, IChannel, IMember, IMessage } from '../../types'
+import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
 import { getClient } from '../../common/client'
 import {
   clearMessagesAC,
@@ -79,14 +80,14 @@ import {
 } from '../../helpers/messagesHalper'
 import { updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
-import { makeUsername } from '../../helpers/message'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
 
 function* createChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channelData } = payload
+    const { channelData, dontCreateIfNotExists } = payload
     const SceytChatClient = getClient()
     const createChannelData = { ...channelData }
     if (createChannelData.avatarFile) {
@@ -99,7 +100,43 @@ function* createChannel(action: IAction): any {
       createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
     }
     delete createChannelData.avatarFile
-    const createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
+    let channelIsExistOnAllChannels = false
+    let createdChannel
+    if (channelData.type === CHANNEL_TYPE.DIRECT && dontCreateIfNotExists) {
+      const allChannels = getAllChannels()
+      const memberId = channelData.members[0].id
+      allChannels.forEach((channel: IChannel) => {
+        if (channel.type === CHANNEL_TYPE.DIRECT) {
+          const directChannelUser = channel.members.find((member) => member.id === memberId)
+          if (directChannelUser) {
+            channelIsExistOnAllChannels = true
+          }
+        }
+      })
+      if (channelIsExistOnAllChannels) {
+        createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
+      } else {
+        createdChannel = {
+          ...channelData,
+          isMockChannel: true,
+          avatarUrl: '',
+          createdAt: new Date(Date.now()),
+          hidden: false,
+          id: uuidv4(),
+          lastMessage: null,
+          memberCount: 2,
+          metadata: '',
+          newMentionCount: 0,
+          newMessageCount: 0,
+          newReactedMessageCount: 0,
+          muted: false,
+          subject: '',
+          userRole: 'owner'
+        }
+      }
+    } else {
+      createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
+    }
     let checkChannelExist = false
     if (createdChannel.type === CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
@@ -118,11 +155,17 @@ function* createChannel(action: IAction): any {
         yield put(sendTextMessageAC(messageToSend, createdChannel.id, CONNECTION_STATUS.CONNECTED))
       }
       // yield put(addChannelAC(JSON.parse(JSON.stringify(createdChannel))))
-      yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
+      if (!dontCreateIfNotExists || channelIsExistOnAllChannels) {
+        yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
+      }
     }
-    yield put(switchChannelActionAC(JSON.parse(JSON.stringify(createdChannel))))
-    addChannelsToAllChannels(createdChannel)
-    yield call(setActiveChannelId, createdChannel.id)
+    yield put(
+      switchChannelActionAC(JSON.parse(JSON.stringify({ ...createdChannel, isLinkedChannel: dontCreateIfNotExists })))
+    )
+    if (!dontCreateIfNotExists || channelIsExistOnAllChannels) {
+      addChannelsToAllChannels(createdChannel)
+      yield call(setActiveChannelId, createdChannel.id)
+    }
   } catch (e) {
     console.log(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
@@ -137,9 +180,9 @@ function* getChannels(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     if (params.filter && params.filter.channelType) {
-      channelQueryBuilder.type(params.filter.channelType)
+      channelQueryBuilder.types(params.filter.channelType)
     }
-    channelQueryBuilder.sortByLastMessage()
+    channelQueryBuilder.order('lastMessage')
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
@@ -264,7 +307,7 @@ function* getChannels(action: IAction): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
 
     const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-    allChannelsQueryBuilder.sortByLastMessage()
+    allChannelsQueryBuilder.order('lastMessage')
     allChannelsQueryBuilder.limit(50)
     const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
     let hasNext = true
@@ -291,27 +334,29 @@ function* searchChannels(action: IAction): any {
   try {
     const { payload } = action
     const { params, contactsMap } = payload
+    console.log('search channel payload: ', payload)
     const SceytChatClient = getClient()
     const getFromContacts = getShowOnlyContactUsers()
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const { search: searchBy } = params
     if (searchBy) {
-      /* const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+      const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       if (params.filter && params.filter.channelType) {
-        channelQueryBuilder.type(params.filter.channelType)
+        channelQueryBuilder.types(params.filter.channelType)
       }
-      channelQueryBuilder.subjectEquals(searchBy)
-      channelQueryBuilder.sortByLastMessage()
-      channelQueryBuilder.limit(params.limit || 50)
-      const channelQuery = yield call(channelQueryBuilder.build)
-      const channelsData = yield call(channelQuery.loadNextPage) */
+
       const allChannels = getAllChannels()
-      const groupChannels: IChannel[] = []
-      const directChannels: IChannel[] = []
+      const publicChannels: IChannel[] = []
+      const chatsGroups: IChannel[] = []
+      const contactsList: IContact[] = []
+      const contactsWithChannelsMap: { [key: string]: boolean } = {}
       const lowerCaseSearchBy = searchBy.toLowerCase()
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
           const directChannelUser = channel.members.find((member) => member.id !== SceytChatClient.user.id)
+          if (directChannelUser && contactsMap[directChannelUser.id]) {
+            contactsWithChannelsMap[directChannelUser.id] = true
+          }
           const userName = makeUsername(
             directChannelUser && contactsMap[directChannelUser.id],
             directChannelUser,
@@ -319,24 +364,74 @@ function* searchChannels(action: IAction): any {
           ).toLowerCase()
           if (userName.includes(lowerCaseSearchBy)) {
             // directChannels.push(JSON.parse(JSON.stringify(channel)))
-            directChannels.push(channel)
+            chatsGroups.push(channel)
           }
         } else {
           if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
+            if (channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST) {
+              publicChannels.push(channel)
+            } else {
+              chatsGroups.push(channel)
+            }
             // groupChannels.push(JSON.parse(JSON.stringify(channel)))
-            groupChannels.push(channel)
           }
         }
       })
+      if (getFromContacts) {
+        Object.values(contactsMap).forEach((contact: IContact) => {
+          if (!contactsWithChannelsMap[contact.id]) {
+            const userName = makeUsername(contact, undefined, true).toLowerCase()
+            if (userName.includes(lowerCaseSearchBy)) {
+              contactsList.push(contact)
+            }
+          }
+        })
+      }
       yield put(
         setSearchedChannelsAC({
-          // groups: JSON.parse(JSON.stringify([...channelsData.channels, ...groupChannels])),
-          groups: JSON.parse(JSON.stringify(groupChannels)),
-          directs: JSON.parse(JSON.stringify(directChannels))
+          chats_groups: JSON.parse(JSON.stringify(chatsGroups)),
+          channels: JSON.parse(JSON.stringify(publicChannels)),
+          contacts: JSON.parse(JSON.stringify(contactsList))
         })
       )
+      yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+      channelQueryBuilder.query(lowerCaseSearchBy)
+      channelQueryBuilder.limit(params.limit || 50)
+      channelQueryBuilder.order('lastMessage')
+      channelQueryBuilder.filterKey(['subject'])
+      channelQueryBuilder.searchOperator('contains')
+      const channelQuery = yield call(channelQueryBuilder.build)
+      console.log('searched channel query ..... ... ', channelQuery)
+      const channelsData = yield call(channelQuery.loadNextPage)
+      const channelsToAdd = channelsData.channels.filter(
+        (channel: IChannel) => channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST
+      )
+      console.log('searched channel data ..... ... ', channelsToAdd)
+      yield put(
+        setSearchedChannelsAC({
+          chats_groups: JSON.parse(JSON.stringify(chatsGroups)),
+          channels: JSON.parse(JSON.stringify(channelsToAdd)),
+          contacts: JSON.parse(JSON.stringify(contactsList))
+        })
+      )
+      /* yield put(
+        setSearchedChannelsAC({
+          groups: JSON.parse(
+            JSON.stringify(
+              [...channelsData.channels, ...groupChannels]
+                .sort(
+                  (a, b) =>
+                    (a.lastMessage ? a.lastMessage.createdAt : a.createdAt) -
+                    (b.lastMessage ? b.lastMessage.createdAt : b.createdAt)
+                )
+                .reverse()
+            )
+          ),
+          // groups: JSON.parse(JSON.stringify(groupChannels)),
+          directs: JSON.parse(JSON.stringify(directChannels))
+        })
+      ) */
     }
-    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
     console.log(e, 'Error on get channels')
     if (e.code !== 10008) {
@@ -345,57 +440,28 @@ function* searchChannels(action: IAction): any {
   }
 }
 
-function* getChannelsForForward(action: IAction): any {
+function* getChannelsForForward(): any {
   try {
-    const { payload } = action
-    const { searchValue } = payload
     const SceytChatClient = getClient()
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
 
-    if (searchValue) {
-      const directChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      directChannelQueryBuilder.type(CHANNEL_TYPE.DIRECT)
-      directChannelQueryBuilder.userContains(searchValue)
-      directChannelQueryBuilder.sortByLastMessage()
-      directChannelQueryBuilder.limit(10)
-      const directChannelQuery = yield call(directChannelQueryBuilder.build)
-      const directChannelsData = yield call(directChannelQuery.loadNextPage)
-      const directChannelsToAdd = directChannelsData.channels.filter((channel: IChannel) =>
-        channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
-      )
-      // getting other channels
-      const groupChannelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      groupChannelQueryBuilder.subjectContains(searchValue)
-      groupChannelQueryBuilder.sortByLastMessage()
-      groupChannelQueryBuilder.limit(20)
-      const groupChannelQuery = yield call(groupChannelQueryBuilder.build)
-      const groupChannelsData = yield call(groupChannelQuery.loadNextPage)
-      const groupChannelsToAdd = groupChannelsData.channels.filter((channel: IChannel) =>
-        channel.type === CHANNEL_TYPE.BROADCAST ? channel.userRole === 'admin' || channel.userRole === 'owner' : true
-      )
-      // set all channels
-      const allChannels: IChannel[] = directChannelsToAdd.concat(groupChannelsToAdd)
-      const { channels: mappedChannels } = yield call(setChannelsInMap, allChannels)
-      yield put(setChannelsFroForwardAC(mappedChannels))
-      yield put(channelHasNextAC(false, true))
-    } else {
-      const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      channelQueryBuilder.sortByLastMessage()
-      channelQueryBuilder.limit(20)
-      const channelQuery = yield call(channelQueryBuilder.build)
-      const channelsData = yield call(channelQuery.loadNextPage)
-      yield put(channelHasNextAC(channelsData.hasNext, true))
-      const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-        channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-          ? channel.userRole === 'admin' || channel.userRole === 'owner'
-          : channel.type === CHANNEL_TYPE.DIRECT
-          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
-          : true
-      )
-      const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
-      yield put(setChannelsFroForwardAC(mappedChannels))
-      query.channelQueryForward = channelQuery
-    }
+    const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+
+    channelQueryBuilder.order('lastMessage')
+    channelQueryBuilder.limit(20)
+    const channelQuery = yield call(channelQueryBuilder.build)
+    const channelsData = yield call(channelQuery.loadNextPage)
+    yield put(channelHasNextAC(channelsData.hasNext, true))
+    const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
+      channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+        ? channel.userRole === 'admin' || channel.userRole === 'owner'
+        : channel.type === CHANNEL_TYPE.DIRECT
+        ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+        : true
+    )
+    const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
+    yield put(setChannelsFroForwardAC(mappedChannels))
+    query.channelQueryForward = channelQuery
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
   } catch (e) {
     console.log(e, 'Error on get for forward channels')
@@ -496,7 +562,9 @@ function* markMessagesRead(action: IAction): any {
   try {
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
-      setChannelInMap(channel)
+      if (channel) {
+        setChannelInMap(channel)
+      }
     }
     // const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
@@ -507,7 +575,7 @@ function* markMessagesRead(action: IAction): any {
         updateChannelDataAC(channel.id, {
           unread: channel.unread,
           lastReadMessageId: channel.lastDisplayedMsgId,
-          unreadMessageCount: channel.newMessageCount
+          newMessageCount: channel.newMessageCount
         })
       )
       for (const messageId of messageListMarker.messageIds) {
@@ -556,7 +624,9 @@ function* markMessagesDelivered(action: IAction): any {
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
-      setChannelInMap(channel)
+      if (channel) {
+        setChannelInMap(channel)
+      }
     }
 
     if (channel) {
@@ -578,9 +648,14 @@ function* switchChannel(action: IAction) {
         setChannelInMap(addChannel)
       }
     }
+    const currentActiveChannel = getChannelFromMap(getActiveChannelId())
     yield call(setUnreadScrollTo, true)
     yield call(setActiveChannelId, channel && channel.id)
-    yield put(setActiveChannelAC({ ...channel }))
+    const channelToSwitch = channel
+    if (channel.isLinkedChannel) {
+      channelToSwitch.linkedFrom = currentActiveChannel
+    }
+    yield put(setActiveChannelAC({ ...channelToSwitch }))
     // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());
@@ -647,9 +722,10 @@ function* markChannelAsRead(action: IAction): any {
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
     }
-    const updatedChannel = yield call(channel.markAsRead)
-    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
-    yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
+    // const updatedChannel = yield call(channel.markAsRead)
+    yield call(channel.markAsRead)
+    updateChannelOnAllChannels(channel.id, { unread: false })
+    yield put(updateChannelDataAC(channel.id, { unread: false }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
@@ -664,9 +740,10 @@ function* markChannelAsUnRead(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
 
-    const updatedChannel = yield call(channel.markAsUnRead)
-    updateChannelOnAllChannels(channel.id, { ...updatedChannel })
-    yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
+    yield call(channel.markAsUnRead)
+    // const updatedChannel = yield call(channel.markAsUnRead)
+    updateChannelOnAllChannels(channel.id, { unread: true })
+    yield put(updateChannelDataAC(channel.id, { unread: true }))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
@@ -711,6 +788,7 @@ function* leaveChannel(action: IAction): any {
       console.log('leave')
       yield call(channel.leave)
       yield put(removeChannelAC(channelId))
+      deleteChannelFromAllChannels(channelId)
 
       yield put(removeChannelCachesAC(channelId))
     }
@@ -731,6 +809,7 @@ function* deleteChannel(action: IAction): any {
     }
     if (channel) {
       yield call(channel.delete)
+      yield put(setChannelToRemoveAC(channel))
 
       yield put(removeChannelAC(channelId))
 
@@ -797,7 +876,13 @@ function* updateChannel(action: IAction): any {
       paramsToUpdate.avatarUrl = ''
     }
     const { subject, avatarUrl, metadata } = yield call(channel.update, paramsToUpdate)
-    yield put(updateChannelDataAC(channelId, { subject, avatarUrl, metadata: JSON.parse(metadata) }))
+    yield put(
+      updateChannelDataAC(channelId, {
+        subject,
+        avatarUrl,
+        metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
+      })
+    )
   } catch (e) {
     console.log('ERROR in update channel', e.message)
     // yield put(setErrorNotification(e.message))
@@ -825,10 +910,14 @@ function* checkUsersStatus(/* action: IAction */): any {
       }
       if (
         updatedUser.presence &&
-        (updatedUser.presence.state !== usersMap[updatedUser.id].state ||
+        (updatedUser.presence.state !== usersMap[updatedUser.id].presence.state ||
+          updatedUser.presence.status !== usersMap[updatedUser.id].presence.status ||
           (updatedUser.presence.lastActiveAt &&
             new Date(updatedUser.presence.lastActiveAt).getTime() !==
-              new Date(usersMap[updatedUser.id].lastActiveAt).getTime()))
+              new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
+          updatedUser.avatarUrl !== usersMap[updatedUser.id].avatarUrl ||
+          updatedUser.firstName !== usersMap[updatedUser.id].firstName ||
+          updatedUser.lastName !== usersMap[updatedUser.id].lastName)
       ) {
         updateUserOnMap(updatedUser)
         usersToUpdateMap[updatedUser.id] = updatedUser
@@ -836,10 +925,11 @@ function* checkUsersStatus(/* action: IAction */): any {
       }
     })
     if (update) {
-      console.log('update users presence - - --', usersToUpdateMap)
-      yield put(updateMembersPresenceAC(Object.values(usersToUpdateMap)))
-      yield put(updateUserStatusOnMapAC(usersToUpdateMap))
-      yield put(updateUserStatusOnChannelAC(usersToUpdateMap))
+      const updateData = JSON.parse(JSON.stringify(usersToUpdateMap))
+      console.log('update users presence - - --', updateData)
+      yield put(updateMembersPresenceAC(updateData))
+      yield put(updateUserStatusOnMapAC(updateData))
+      yield put(updateUserStatusOnChannelAC(updateData))
     }
   } catch (e) {
     console.log('ERROR in check user status : ', e.message)
@@ -884,7 +974,7 @@ function* clearHistory(action: IAction): any {
       if (channelId === activeChannelId) {
         removeAllMessages()
       }
-      yield put(updateChannelDataAC(channel.id, { lastMessage: null, unreadMessageCount: 0 }))
+      yield put(updateChannelDataAC(channel.id, { lastMessage: null, newMessageCount: 0, newMentionCount: 0 }))
     }
   } catch (e) {
     console.log('ERROR in clear history')
@@ -909,7 +999,7 @@ function* deleteAllMessages(action: IAction): any {
         yield put(clearMessagesAC())
         removeAllMessages()
       }
-      yield put(updateChannelLastMessageAC({}, channel))
+      yield put(updateChannelDataAC(channel.id, { lastMessage: null, newMessageCount: 0, newMentionCount: 0 }))
     }
   } catch (e) {
     console.log('ERROR in clear history')
@@ -922,12 +1012,21 @@ function* joinChannel(action: IAction): any {
     const { payload } = action
     const { channelId } = payload
 
+    const SceytChatClient = getClient()
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
     }
-    yield call(channel.join)
-    yield put(getChannelsAC({ search: '' }))
+    if (!channel) {
+      channel = yield call(SceytChatClient.getChannel, channelId)
+    }
+    const joinedChannel = yield call(channel.join)
+    yield put(setCloseSearchChannelsAC(true))
+
+    yield put(setChannelToAddAC(JSON.parse(JSON.stringify(joinedChannel))))
+    yield put(switchChannelActionAC(JSON.parse(JSON.stringify(joinedChannel))))
+    addChannelsToAllChannels(joinedChannel)
+    yield call(setActiveChannelId, joinedChannel.id)
     // yield put(switchChannelAction({ ...JSON.parse(JSON.stringify(channel)), myRole: updatedChannel.myRole }));
   } catch (error) {
     console.log(error, 'Error in join to channel')

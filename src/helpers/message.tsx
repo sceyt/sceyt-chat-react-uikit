@@ -96,21 +96,22 @@ export const typingTextFormat = ({
   return messageText.length > 1 ? messageText : text
 }
 
-export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
+export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean, getFirstNameOnly?: boolean) => {
   if (hideUserPresence && user && user.id && hideUserPresence(user)) {
-    return user.id.charAt(0).toUpperCase() + user.id.slice(1)
+    return user.id.toUpperCase()
   }
-  return fromContact
-    ? contact
-      ? contact.firstName
-        ? `${contact.firstName.trim()} ${contact.lastName?.trim()}`
-        : contact.id
-      : user
-      ? user.id || 'Deleted user'
-      : 'Deleted user'
+
+  return fromContact && contact
+    ? contact.firstName
+      ? getFirstNameOnly
+        ? `${contact.firstName.split(' ')[0]}`
+        : `${contact.firstName.trim()} ${contact.lastName?.trim()}`
+      : contact.id
     : user
     ? user.firstName
-      ? `${user.firstName} ${user.lastName}`
+      ? getFirstNameOnly
+        ? `${fromContact ? '~' : ''}${user.firstName.split(' ')[0]}`
+        : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`
       : user.id || 'Deleted user'
     : 'Deleted user'
 }
@@ -133,24 +134,12 @@ const linkifyTextPart = (textPart: string, match: any) => {
     if (index === 0) {
       newMessageText = [
         textPart.substring(0, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={matchItem.url}
-          target='_blank'
-          rel='noreferrer'
-        >{`${matchItem.text} `}</a>
+        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
       ]
     } else {
       newMessageText.push(
         textPart.substring(prevMatchEnd, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={matchItem.url}
-          target='_blank'
-          rel='noreferrer'
-        >{`${matchItem.text} `}</a>
+        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
       )
     }
 
@@ -334,3 +323,9 @@ export const getDuplicateMentionsFromMeta = (mentionsMetas: any[], mentionedMemb
   })
   return mentionsList
 }
+
+let allowEditDeleteIncomingMessage = true
+export const setAllowEditDeleteIncomingMessage = (allow: boolean) => {
+  allowEditDeleteIncomingMessage = allow
+}
+export const getAllowEditDeleteIncomingMessage = () => allowEditDeleteIncomingMessage

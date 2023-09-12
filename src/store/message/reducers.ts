@@ -33,7 +33,11 @@ import {
   ADD_REACTION_TO_LIST,
   SET_MESSAGE_MENU_OPENED,
   REMOVE_UPLOAD_PROGRESS,
-  UPDATE_UPLOAD_PROGRESS
+  UPDATE_UPLOAD_PROGRESS,
+  SET_PLAYING_AUDIO_ID,
+  ADD_SELECTED_MESSAGE,
+  REMOVE_SELECTED_MESSAGE,
+  CLEAR_SELECTED_MESSAGES
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -78,6 +82,8 @@ export interface IMessageStore {
       progress?: number
     }
   }
+  playingAudioId: string | null
+  selectedMessagesMap: Map<string, IMessage> | null
 }
 const initialState: IMessageStore = {
   messagesLoadingState: null,
@@ -97,7 +103,8 @@ const initialState: IMessageStore = {
   activeChannelMessageUpdated: null,
   scrollToNewMessage: {
     scrollToBottom: false,
-    updateMessageList: false
+    updateMessageList: false,
+    isIncomingMessage: false
   },
   showScrollToNewMessageButton: false,
   sendMessageInputHeight: 0,
@@ -108,7 +115,9 @@ const initialState: IMessageStore = {
   reactionsHasNext: true,
   reactionsLoadingState: null,
   openedMessageMenu: '',
-  attachmentsUploadingProgress: {}
+  attachmentsUploadingProgress: {},
+  playingAudioId: null,
+  selectedMessagesMap: null
 }
 
 export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
@@ -156,7 +165,8 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_SCROLL_TO_NEW_MESSAGE: {
       newState.scrollToNewMessage = {
         scrollToBottom: payload.scrollToBottom,
-        updateMessageList: payload.updateMessageList
+        updateMessageList: payload.updateMessageList,
+        isIncomingMessage: payload.isIncomingMessage
       }
       return newState
     }
@@ -183,7 +193,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           setHasNextCached(true)
           // newState.messagesHasNext = true
           if (newMessagesLength > 0) {
-            messagesCopy.splice(-newMessagesLength)
+            if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+              messagesCopy.splice(-newMessagesLength)
+            } else {
+              messagesCopy.splice(-(newMessagesLength - (MESSAGES_MAX_LENGTH - currentMessagesLength)))
+            }
           }
           newState.activeChannelMessages = [...messages, ...messagesCopy]
         } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
@@ -244,12 +258,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case UPDATE_MESSAGE: {
-      const { messageId, params } = payload
+      const { messageId, params, addIfNotExists } = payload
       const messagesCopy = [...newState.activeChannelMessages]
-      // let messageFound = false
+      let messageFound = false
       newState.activeChannelMessages = messagesCopy.map((message) => {
         if (message.tid === messageId || message.id === messageId) {
-          // messageFound = true
+          messageFound = true
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
@@ -258,10 +272,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return message
       })
-      /*     if (!messageFound) {
+      if (!messageFound && addIfNotExists) {
         console.log('message not found on update message, add message to list .. ...', params)
         newState.activeChannelMessages = [...newState.activeChannelMessages, params]
-      } */
+      }
       return newState
     }
 
@@ -454,6 +468,37 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case SET_MESSAGE_MENU_OPENED: {
       newState.openedMessageMenu = payload.messageId
+      return newState
+    }
+    case SET_PLAYING_AUDIO_ID: {
+      newState.playingAudioId = payload.id
+      return newState
+    }
+
+    case ADD_SELECTED_MESSAGE: {
+      if (!newState.selectedMessagesMap) {
+        const messagesMap = new Map()
+        messagesMap.set(payload.message.id, payload.message)
+        newState.selectedMessagesMap = messagesMap
+      } else {
+        const messagesMap = new Map(newState.selectedMessagesMap)
+        messagesMap.set(payload.message.id, payload.message)
+        newState.selectedMessagesMap = messagesMap
+      }
+      return newState
+    }
+
+    case REMOVE_SELECTED_MESSAGE: {
+      if (newState.selectedMessagesMap) {
+        const messagesMap = new Map(newState.selectedMessagesMap)
+        messagesMap.delete(payload.messageId)
+        newState.selectedMessagesMap = messagesMap
+      }
+      return newState
+    }
+
+    case CLEAR_SELECTED_MESSAGES: {
+      newState.selectedMessagesMap = null
       return newState
     }
 

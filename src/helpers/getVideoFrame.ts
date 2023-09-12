@@ -1,6 +1,7 @@
 // import { calculateSize } from './resizeImage'
 
-import { createImageThumbnail } from './resizeImage'
+import { binaryToBase64, calculateSize, createImageThumbnail } from './resizeImage'
+import { rgbaToThumbHash } from './thumbhash'
 
 export async function getFrame(
   videoSrc: any,
@@ -16,17 +17,22 @@ export async function getFrame(
             video.currentTime = time
           }
           // const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 200, 100)
+          const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 50, 50)
           const canvas = document.createElement('canvas')
-          canvas.width = video.videoWidth
-          canvas.height = video.videoHeight
+          canvas.width = newWidth
+          canvas.height = newHeight
+
           // @ts-ignore
           const ctx = canvas.getContext('2d')
           video.currentTime = 10
           // @ts-ignore
-          ctx.drawImage(video, 0, 0)
+          ctx.drawImage(video, 0, 0, newWidth, newHeight)
           // @ts-ignore
-          console.log('canvas.toDataURL() resized ... ', canvas.toDataURL('', 0.7))
-          const thumb = canvas.toDataURL('', 0.7).replace('data:image/jpeg;base64,', '')
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
+          const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
+          const thumb = binaryToBase64(binaryThumbHash)
+          console.log('generated thumb hash ... ', thumb)
+
           clearInterval(b)
           resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
         }

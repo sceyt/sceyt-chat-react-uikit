@@ -22,7 +22,9 @@ export const getCustomDownloader = () => CustomUploader && CustomUploader.downlo
 
 export const customUpload = (
   attachment: IAttachment,
+  // eslint-disable-next-line no-unused-vars
   progress: ({ loaded, total }: IProgress) => void,
+  // eslint-disable-next-line no-unused-vars
   getUpdatedFilePath?: (newPath: String) => void
 ): Promise<string> => {
   return new Promise((resolve, reject) => {
@@ -50,7 +52,7 @@ export const customUpload = (
         } else if (error) {
         }
       } */
-      pendingUploaders[attachment.attachmentId!] = uploadTask
+      pendingUploaders[attachment.tid!] = uploadTask
       CustomUploader.upload(attachment, uploadTask)
     } else {
       reject(new Error('No Custom uploader'))

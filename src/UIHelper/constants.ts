@@ -20,6 +20,7 @@ export const colors = {
   gray0: '#F3F5F8',
   gray1: '#EDEDED',
   borderColor: '#dfe0eb',
+  borderColor2: '#818C99',
 
   primary: '#5159F6',
   primaryLight: '#E3E7FF',

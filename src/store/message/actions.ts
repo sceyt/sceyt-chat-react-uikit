@@ -48,7 +48,11 @@ import {
   ADD_REACTION_TO_LIST,
   SET_MESSAGE_MENU_OPENED,
   UPDATE_UPLOAD_PROGRESS,
-  REMOVE_UPLOAD_PROGRESS
+  REMOVE_UPLOAD_PROGRESS,
+  SET_PLAYING_AUDIO_ID,
+  ADD_SELECTED_MESSAGE,
+  REMOVE_SELECTED_MESSAGE,
+  CLEAR_SELECTED_MESSAGES
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -287,10 +291,14 @@ export function addMessageAC(message: IMessage) {
   }
 }
 
-export function scrollToNewMessageAC(scrollToBottom: boolean, updateMessageList?: boolean) {
+export function scrollToNewMessageAC(
+  scrollToBottom: boolean,
+  updateMessageList?: boolean,
+  isIncomingMessage?: boolean
+) {
   return {
     type: SET_SCROLL_TO_NEW_MESSAGE,
-    payload: { scrollToBottom, updateMessageList }
+    payload: { scrollToBottom, updateMessageList, isIncomingMessage }
   }
 }
 
@@ -328,10 +336,10 @@ export function setMessagesHasNextAC(hasNext: boolean) {
   }
 }
 
-export function updateMessageAC(messageId: string, params: any) {
+export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {
   return {
     type: UPDATE_MESSAGE,
-    payload: { messageId, params }
+    payload: { messageId, params, addIfNotExists }
   }
 }
 
@@ -446,5 +454,32 @@ export function setMessageForReplyAC(message: IMessage | null) {
   return {
     type: SET_MESSAGE_FOR_REPLY,
     payload: { message }
+  }
+}
+
+export function setPlayingAudioIdAC(id: string | null) {
+  return {
+    type: SET_PLAYING_AUDIO_ID,
+    payload: { id }
+  }
+}
+
+export function addSelectedMessageAC(message: IMessage) {
+  return {
+    type: ADD_SELECTED_MESSAGE,
+    payload: { message }
+  }
+}
+
+export function removeSelectedMessageAC(messageId: string) {
+  return {
+    type: REMOVE_SELECTED_MESSAGE,
+    payload: { messageId }
+  }
+}
+
+export function clearSelectedMessagesAC() {
+  return {
+    type: CLEAR_SELECTED_MESSAGES
   }
 }

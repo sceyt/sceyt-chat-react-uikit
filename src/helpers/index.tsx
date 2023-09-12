@@ -353,7 +353,6 @@ export const setCursorPosition = (
   attempt: number | undefined = 0
 ) => {
   try {
-    console.log('attamt ...... ', attempt)
     console.log('set pos ... ', position)
     const range = document.createRange()
     const sel = window.getSelection()
@@ -504,21 +503,23 @@ export const detectOS = () => {
   return os
 }
 export const detectBrowser = () => {
-  const userAgent = window.navigator.userAgent
-  let browser
+  let browser = ''
+  if (window && window.navigator) {
+    const userAgent = window.navigator.userAgent
 
-  if (userAgent.includes('Opera') || userAgent.includes('OPR')) {
-    browser = 'Opera'
-  } else if (userAgent.includes('Edge')) {
-    browser = 'Edge'
-  } else if (userAgent.includes('Chrome')) {
-    browser = 'Chrome'
-  } else if (userAgent.includes('Safari')) {
-    browser = 'Safari'
-  } else if (userAgent.includes('Firefox')) {
-    browser = 'Firefox'
-  } else if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) {
-    browser = 'Internet Explorer'
+    if (userAgent.includes('Opera') || userAgent.includes('OPR')) {
+      browser = 'Opera'
+    } else if (userAgent.includes('Edge')) {
+      browser = 'Edge'
+    } else if (userAgent.includes('Chrome')) {
+      browser = 'Chrome'
+    } else if (userAgent.includes('Safari')) {
+      browser = 'Safari'
+    } else if (userAgent.includes('Firefox')) {
+      browser = 'Firefox'
+    } else if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) {
+      browser = 'Internet Explorer'
+    }
   }
   return browser
 }
@@ -558,7 +559,14 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
 export const hashString = async (str: string) => {
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(str)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  let hashBuffer: any
+  try {
+    hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  } catch (e) {
+    // const crypto = await import('crypto')
+    // hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+    return ''
+  }
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }

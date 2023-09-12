@@ -1,6 +1,6 @@
 import { IChannel, IMessage } from '../../types'
 import { isJSON } from '../message'
-import { MESSAGE_DELIVERY_STATUS } from '../constants'
+import { CHANNEL_GROUP_TYPES, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../constants'
 
 type channelMap = {
   [key: string]: IChannel
@@ -64,10 +64,12 @@ export function getLastChannelFromMap() {
 }
 
 export function removeChannelFromMap(channelId: string) {
+  console.log('remove channel from map >> >> > > ', channelId)
   delete channelsMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
+  console.log('channelsMap. . . .  . ..  .', channelsMap)
   return !!channelsMap[channelId]
 }
 
@@ -207,5 +209,12 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
     }
     return channel
   })
-  channelsMap[channelId] = { ...channelsMap[channelId], ...config }
+  if (channelsMap[channelId]) {
+    channelsMap[channelId] = { ...channelsMap[channelId], ...config }
+  }
 }
+
+export const getChannelGroupName = (channel: IChannel) =>
+  channel.type === CHANNEL_TYPE.DIRECT || channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
+    ? CHANNEL_GROUP_TYPES.DIRECT_PRIVATE
+    : CHANNEL_GROUP_TYPES.PUBLIC

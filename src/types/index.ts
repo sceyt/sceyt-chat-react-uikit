@@ -41,7 +41,7 @@ export interface IAttachment {
   createdAt: Date
   upload: boolean
   user?: IUser
-  attachmentId?: string
+  tid?: string
   attachmentUrl: string
   data: any
 }
@@ -88,7 +88,7 @@ export interface IMessage {
     name: string
     count: number
   }[]
-  userMarkers?: {
+  userMarkers: {
     name: string
     messageId: string
     createdAt: Date
@@ -151,6 +151,10 @@ export interface IChannel {
   lastReceivedMsgId: string
   lastDisplayedMsgId: string
   messageRetentionPeriod?: number
+  isMockChannel?: boolean
+  isLinkedChannel?: boolean
+  backToLinkedChannel?: boolean
+  linkedFrom?: string
   lastMessage: IMessage
   messages: IMessage[]
   members: IMember[]

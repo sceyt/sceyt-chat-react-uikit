@@ -149,6 +149,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
     let checkVideoInterval: any
     if (videoRef.current) {
       checkVideoInterval = setInterval(() => {
+        console.log('videoRef.current.readyState . . . . ', videoRef && videoRef.current && videoRef.current.readyState)
         if (videoRef.current && videoRef.current.readyState > 0) {
           setVideoTime(videoRef.current.duration)
           setVolume(videoRef.current.volume)

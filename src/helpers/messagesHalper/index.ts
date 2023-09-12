@@ -15,6 +15,7 @@ export type IAttachmentMeta = {
 }
 
 type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
+type visibleMessagesMap = { [key: string]: { id: string } }
 
 type pendingMessagesMap = {
   [key: string]: IMessage[]
@@ -45,14 +46,23 @@ export const setAllMessages = (messages: IMessage[]) => {
 export const addAllMessages = (messages: IMessage[], direction: string) => {
   if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
     activeChannelAllMessages = [...messages, ...activeChannelAllMessages]
+    if (activeChannelAllMessages.length > MESSAGES_MAX_LENGTH) {
+      setHasNextCached(true)
+    }
   } else {
     activeChannelAllMessages = [...activeChannelAllMessages, ...messages]
+    if (activeChannelAllMessages.length > MESSAGES_MAX_LENGTH) {
+      setHasPrevCached(true)
+    }
   }
 }
 
 export const updateMessageOnAllMessages = (messageId: string, updatedParams: any) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (message.tid === messageId || message.id === messageId) {
+      if (updatedParams.state === MESSAGE_STATUS.DELETE) {
+        return { ...updatedParams }
+      }
       return { ...message, ...updatedParams }
     }
     return message
@@ -77,7 +87,7 @@ export const updateMarkersOnAllMessages = (markersMap: any, name: string) => {
   })
 }
 
-export const getAllMessages = () => [...activeChannelAllMessages]
+export const getAllMessages = () => activeChannelAllMessages
 
 export const removeAllMessages = () => {
   activeChannelAllMessages = []
@@ -374,6 +384,14 @@ export const getPendingAttachment = (attachmentId: string) => pendingAttachments
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
+export const addPendingMessageToMap = (channelId: string, pendingMessage: IMessage) => {
+  if (pendingMessagesMap[channelId]) {
+    pendingMessagesMap[channelId].push(pendingMessage)
+  } else {
+    pendingMessagesMap[channelId] = [pendingMessage]
+  }
+}
+
 export const setPendingMessages = (channelId: string, pendingMessages: any) => {
   pendingMessagesMap[channelId] = pendingMessages
 }
@@ -394,4 +412,20 @@ export const setDraftMessageToMap = (
   draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage }
 ) => {
   draftMessagesMap[channelId] = draftMessage
+}
+
+let visibleMessagesMap: visibleMessagesMap = {}
+
+export const getVisibleMessagesMap = () => visibleMessagesMap
+
+export const clearVisibleMessagesMap = () => {
+  visibleMessagesMap = {}
+}
+
+export const setMessageToVisibleMessagesMap = (message: IMessage) => {
+  visibleMessagesMap[message.id] = { id: message.id }
+}
+
+export const removeMessageFromVisibleMessagesMap = (message: IMessage) => {
+  delete visibleMessagesMap[message.id]
 }

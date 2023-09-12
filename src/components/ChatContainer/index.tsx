@@ -1,6 +1,4 @@
 import React from 'react'
-// @ts-ignore
-import SceytChatClient from 'sceyt-chat'
 import { Provider } from 'react-redux'
 import store from '../../store'
 import { ICustomAvatarColors } from '../Channel/types'
@@ -35,7 +33,7 @@ export interface ICustomUploader {
 }
 
 export interface IChatClientProps {
-  client: SceytChatClient
+  client: any
   theme?: 'dark' | 'light'
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars

@@ -29,7 +29,7 @@ import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 
 interface IChannelProps {
   channel: IChannel
-  avatar?: boolean
+  showAvatar?: boolean
   theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
@@ -45,7 +45,7 @@ interface IChannelProps {
 const Channel: React.FC<IChannelProps> = ({
   channel,
   theme,
-  avatar,
+  showAvatar = true,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
   selectedChannelLeftBorder,
@@ -64,7 +64,6 @@ const Channel: React.FC<IChannelProps> = ({
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
-  const withAvatar = avatar === undefined ? true : avatar
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
@@ -126,7 +125,7 @@ const Channel: React.FC<IChannelProps> = ({
       channelsMargin={channelsMargin}
       onClick={() => handleChangeActiveChannel(channel)}
     >
-      {withAvatar && (
+      {showAvatar && (
         <AvatarWrapper>
           <Avatar
             // customAvatarColors={userAvatarColors}
@@ -149,7 +148,13 @@ const Channel: React.FC<IChannelProps> = ({
             )}
         </AvatarWrapper>
       )}
-      <ChannelInfo theme={theme} avatar={withAvatar} isMuted={channel.muted} statusWidth={statusWidth}>
+      <ChannelInfo
+        theme={theme}
+        avatar={showAvatar}
+        isMuted={channel.muted}
+        statusWidth={statusWidth}
+        uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+      >
         <h3>
           {channel.subject ||
             (isDirectChannel && directChannelUser
@@ -161,7 +166,7 @@ const Channel: React.FC<IChannelProps> = ({
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {(lastMessage || !!typingIndicator) && (
+        {(lastMessage || !!typingIndicator || draftMessageText) && (
           <LastMessage
             markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
             unreadMentions={!!(channel.newMentionCount && channel.newMentionCount > 0)}
@@ -170,13 +175,7 @@ const Channel: React.FC<IChannelProps> = ({
               !isDirectChannel ? (
                 <LastMessageAuthor theme={theme} typing={typingIndicator}>
                   <span ref={messageAuthorRef}>
-                    {typingIndicator
-                      ? getFromContacts
-                        ? contactsMap[typingIndicator.from.id] && contactsMap[typingIndicator.from.id].firstName
-                          ? contactsMap[typingIndicator.from.id]!.firstName!.split(' ')[0]
-                          : typingIndicator.from.id
-                        : (typingIndicator.from && typingIndicator.from.firstName) || typingIndicator.from.id
-                      : ''}
+                    {makeUsername(contactsMap[typingIndicator.from.id], typingIndicator.from, getFromContacts, true)}
                   </span>
                 </LastMessageAuthor>
               ) : null
@@ -190,10 +189,12 @@ const Channel: React.FC<IChannelProps> = ({
                   <span ref={messageAuthorRef}>
                     {channel.newReactions[0].user.id === user.id
                       ? 'You'
-                      : contactsMap[channel.newReactions[0].user.id] &&
-                        contactsMap[channel.newReactions[0].user.id].firstName
-                      ? contactsMap[channel.newReactions[0].user.id].firstName
-                      : channel.newReactions[0].user.id || 'Deleted'}
+                      : makeUsername(
+                          contactsMap[channel.newReactions[0].user.id],
+                          channel.newReactions[0].user,
+                          getFromContacts,
+                          true
+                        )}
                   </span>
                 </LastMessageAuthor>
               )
@@ -206,9 +207,7 @@ const Channel: React.FC<IChannelProps> = ({
                   <span ref={messageAuthorRef}>
                     {lastMessage.user.id === user.id
                       ? 'You'
-                      : contactsMap[lastMessage.user.id] && contactsMap[lastMessage.user.id].firstName
-                      ? contactsMap[lastMessage.user.id].firstName
-                      : lastMessage.user.id || 'Deleted'}
+                      : makeUsername(contactsMap[lastMessage.user.id], lastMessage.user, getFromContacts, true)}
                   </span>
                 </LastMessageAuthor>
               )
@@ -222,6 +221,7 @@ const Channel: React.FC<IChannelProps> = ({
                       ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
                       : lastMessage.user.id === user.id)))
               : typingIndicator ||
+                draftMessageText ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
               <Points color={draftMessageText && colors.red1}>: </Points>
             )}
@@ -354,7 +354,7 @@ const Channel: React.FC<IChannelProps> = ({
             moment(lastMessage.createdAt).format('HH:mm')} */}
         </LastMessageDate>
       </ChannelStatus>
-      <UnreadInfo>
+      <UnreadInfo bottom={!(lastMessage || !!typingIndicator || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
           <UnreadMentionIconWrapper
             iconColor={colors.primary}
@@ -410,7 +410,13 @@ const Container = styled.div<{
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
 `
 
-export const ChannelInfo = styled.div<{ statusWidth: number; avatar?: boolean; isMuted?: boolean; theme?: string }>`
+export const ChannelInfo = styled.div<{
+  statusWidth: number
+  avatar?: boolean
+  isMuted?: boolean
+  theme?: string
+  uppercase?: boolean
+}>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
@@ -424,19 +430,21 @@ export const ChannelInfo = styled.div<{ statusWidth: number; avatar?: boolean; i
     text-overflow: ellipsis;
     line-height: 18px;
     letter-spacing: -0.2px;%;
-    max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 20 : 0) + 2}px)`};
+    max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 28 : 4) + 2}px)`};
     overflow: hidden;
     white-space: nowrap;
     color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+    text-transform: ${(props) => props.uppercase && 'uppercase'};
   }
 `
 
 export const MutedIcon = styled.span`
+  display: inline-flex;
   & > svg {
     height: 16px;
     width: 16px;
     margin-left: 5px;
-    color: ${(props) => props.color || '#818C99'};
+    color: ${(props) => props.color || colors.borderColor2};
   }
 `
 
@@ -561,9 +569,9 @@ export const ReactionItem = styled.span`
   padding: 0 3px;
 `
 
-export const UnreadInfo = styled.span`
+export const UnreadInfo = styled.span<{ bottom?: string }>`
   position: absolute;
-  bottom: 11px;
+  bottom: ${(props) => props.bottom || '11px'};
   right: 16px;
   display: flex;
   margin-top: 7px;

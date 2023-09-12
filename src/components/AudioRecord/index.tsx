@@ -54,11 +54,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = () => {
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
-        const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
-            setCurrentTime(formatAudioVideoTime(audioDuration, currentTime))
+            setCurrentTime(formatAudioVideoTime(currentTime))
           }
           /*   setCurrentTime(() => {
             if (time <= 9) {

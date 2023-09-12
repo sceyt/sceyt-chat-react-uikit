@@ -22,7 +22,7 @@ interface IMentionsPopupProps {
   // eslint-disable-next-line no-unused-vars
   addMentionMember: (member: IMember) => void
   // eslint-disable-next-line no-unused-vars
-  handleMentionsPopupClose: (setPending?: boolean) => void
+  handleMentionsPopupClose: (setPending?: boolean, withoutLastChar?: boolean) => void
   searchMention: string
 }
 
@@ -39,7 +39,7 @@ export default function MentionMembersPopup({
   const [filteredMembers, setFilteredMembers] = useState<IMember[]>([])
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
-  // const [hideMenu, setHideMenu] = useState(false)
+  const [hideMenu, setHideMenu] = useState(true)
   const membersListRef = useRef<HTMLElement>()
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
@@ -143,7 +143,7 @@ export default function MentionMembersPopup({
     }
   }, [members])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (searchMention) {
       handleSearchMembers()
     } else {
@@ -155,17 +155,17 @@ export default function MentionMembersPopup({
 
   useDidUpdate(() => {
     if (filteredMembersLength.current === 0) {
-      handleMentionsPopupClose(true)
+      handleMentionsPopupClose(true, true)
       // setHideMenu(true)
-    } /* else {
+    } else {
       setHideMenu(false)
-    } */
+    }
   }, [filteredMembersLength.current])
 
   return (
     <Container
       className='mention_member_popup'
-      // hidden={hideMenu}
+      hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
       withBorder={theme !== THEME.DARK}

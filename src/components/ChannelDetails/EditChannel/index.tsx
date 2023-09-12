@@ -219,7 +219,7 @@ const EditChannel = ({
                     iconWidth='20px'
                   >
                     <PictureIcon />
-                    <UploadFileLabel>Upload Avatar</UploadFileLabel>
+                    <UploadFileLabel>Upload image</UploadFileLabel>
                     <UploadFile ref={fileUploader} accept='.png,.jpeg,.jpg' onChange={handleFileUpload} type='file' />
                   </DropdownOptionLi>
                   {newAvatar.url && (
@@ -231,7 +231,7 @@ const EditChannel = ({
                       iconWidth='20px'
                     >
                       <DeleteIcon />
-                      Remove Avatar
+                      Delete
                     </DropdownOptionLi>
                   )}
                 </DropdownOptionsUl>

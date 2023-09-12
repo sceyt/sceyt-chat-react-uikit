@@ -4,6 +4,7 @@ import { colors } from '../../UIHelper/constants'
 import { ReactComponent as TickIcon } from '../../assets/svg/tick.svg'
 
 interface IProps {
+  // eslint-disable-next-line no-unused-vars
   onChange: (e: any) => void
   state: boolean
   index: any
@@ -72,7 +73,7 @@ const CustomLabel = styled.label<{
   min-width: ${(props) => props.size || '12px'};
   height: ${(props) => props.size || '12px'};
   cursor: ${(props) => !props.disabled && 'pointer'};
-  border: ${(props) => (props.isChecked ? 'none' : '1px solid #818C99')};
+  border: ${(props) => (props.isChecked ? 'none' : `1px solid ${colors.borderColor2}`)};
   border-radius: ${(props) => props.borderRadius || '4px'};
   background-color: ${(props) =>
     props.isChecked ? props.checkedBackgroundColor || colors.primary : props.backgroundColor || '#fff'};

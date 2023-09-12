@@ -566,12 +566,13 @@ export const PopupFooter = styled(ButtonBlock)`
   z-index: 2;
 `
 
-export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string }>`
+export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string; uppercase?: boolean }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 20px;
   color: ${(props) => props.color || colors.textColor1};
   margin: ${(props) => props.margin || 0};
+  text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
 export const ItemNote = styled.div<{ direction: string }>`
@@ -702,7 +703,12 @@ export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boole
   font-weight: ${(props) => props.isLastMessage && '500'};
 `
 
-export const MessageOwner = styled.h3<any>`
+export const MessageOwner = styled.h3<{
+  color?: string
+  rtlDirection?: boolean
+  fontSize?: string
+  clickable?: boolean
+}>`
   margin: 0 12px 4px 0;
   white-space: nowrap;
   color: ${(props) => props.color || colors.primary};
@@ -710,6 +716,7 @@ export const MessageOwner = styled.h3<any>`
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
   line-height: ${(props) => props.fontSize || '15px'};
+  cursor: ${(props) => props.clickable && 'pointer'};
 `
 
 export const MessageText = styled.pre<{
@@ -795,6 +802,10 @@ export const ReplyMessageText = styled.span<{
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  & a {
+    color: ${colors.blue};
+  }
 `
 
 export const CloseIcon = styled(CloseSvg)`
@@ -937,7 +948,7 @@ export const UploadProgress = styled.div<{
   height: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
   min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '130px' : null)};
-  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isFailedAttachment && '90px'};
+  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && '130px'};
   display: flex;
   //display: none;
   align-items: center;

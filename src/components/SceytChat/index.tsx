@@ -1,7 +1,5 @@
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-// @ts-ignore
-import SceytChatClient from 'sceyt-chat'
 import styled from 'styled-components'
 import { setClient } from '../../common/client'
 import {
@@ -53,7 +51,7 @@ const SceytChat = ({
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
   // const channels = useSelector(channelsSelector)
   const [darkTheme, setDarkTheme] = useState(false)
-  const [SceytChatClient, setSceytChatClient] = useState<null | SceytChatClient>(null)
+  const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
 
   let hidden: any = null

@@ -31,6 +31,7 @@ import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap
 } from '../../../../helpers/channelHalper'
+import { createChannelAC } from '../../../../store/channel/actions'
 
 interface IProps {
   channel: IChannel
@@ -168,6 +169,25 @@ const Members = ({
   const handleAddMemberPopup = () => {
     setAddMemberPopupOpen(!addMemberPopupOpen)
   }
+  const handleCreateChat = (user?: any) => {
+    if (user) {
+      dispatch(
+        createChannelAC(
+          {
+            metadata: '',
+            type: CHANNEL_TYPE.DIRECT,
+            members: [
+              {
+                ...user,
+                role: 'owner'
+              }
+            ]
+          },
+          true
+        )
+      )
+    }
+  }
 
   useEffect(() => {
     if (getFromContacts) {
@@ -198,6 +218,7 @@ const Members = ({
                 key={member.id + index}
                 color={colors.textColor1}
                 hoverBackground={colors.hoverBackgroundColor}
+                onClick={() => handleCreateChat(member)}
               >
                 <Avatar
                   name={member.firstName || member.id}
@@ -462,6 +483,7 @@ const MemberItem = styled.li<{
   padding: 6px 16px;
   transition: all 0.2s;
   color: ${(props) => props.color || colors.textColor1};
+  cursor: pointer;
 
   &:first-child {
     cursor: pointer;

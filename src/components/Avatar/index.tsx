@@ -17,6 +17,7 @@ interface IProps {
   setDefaultAvatar?: boolean
   DeletedIcon?: JSX.Element
   border?: string
+  handleAvatarClick?: () => void
 }
 
 const Avatar: React.FC<IProps> = ({
@@ -27,7 +28,8 @@ const Avatar: React.FC<IProps> = ({
   DeletedIcon,
   marginAuto,
   setDefaultAvatar,
-  border
+  border,
+  handleAvatarClick
   // customAvatarColors
 }) => {
   // const isMounted = useIsMounted()
@@ -78,6 +80,8 @@ const Avatar: React.FC<IProps> = ({
       isImage={!!(image || setDefaultAvatar)}
       avatarName={name}
       textSize={textSize}
+      onClick={handleAvatarClick}
+      cursorPointer={!!handleAvatarClick}
     >
       {isDeletedUserAvatar ? (
         // DeletedIcon || <DeletedAvatarIcon />
@@ -118,6 +122,7 @@ interface ContainerProps {
   isImage?: boolean
   marginAuto?: boolean
   border?: string
+  cursorPointer?: boolean
 }
 
 interface AvatarImageProps {
@@ -139,6 +144,7 @@ export const Container = styled.div<ContainerProps>`
   overflow: hidden;
   margin: ${(props) => (props.marginAuto ? 'auto' : '')};
   ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+  cursor: ${(props) => props.cursorPointer && 'pointer'};
 
   span {
     text-transform: uppercase;

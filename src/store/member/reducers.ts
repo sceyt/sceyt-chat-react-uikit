@@ -65,17 +65,14 @@ export default (state = initialState, { type, payload }: IAction) => {
       return newState
     }
     case UPDATE_MEMBERS_PRESENCE: {
-      const { members } = payload
+      const { usersMap } = payload
+      console.log('UPDATE_MEMBERS_PRESENCE . ... .. ', usersMap)
       let updateMembers: any = []
-      if (members.length && newState.activeChannelMembers.length) {
+      if (newState.activeChannelMembers.length) {
         const membersCopy = [...newState.activeChannelMembers]
-        const updatedMembersMap: any = {}
-        for (let i = 0; i < members.length; i++) {
-          updatedMembersMap[members[i].id] = members[i]
-        }
         updateMembers = membersCopy.map((member: IMember) => {
-          if (updatedMembersMap[member.id]) {
-            return { ...member, presence: updatedMembersMap[member.id].presence }
+          if (usersMap[member.id]) {
+            return { ...member, ...usersMap[member.id] }
           }
           return member
         })
