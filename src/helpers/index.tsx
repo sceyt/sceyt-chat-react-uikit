@@ -147,10 +147,8 @@ export const downloadFile = async (
 }
 
 export const cancelDownloadFile = (attachmentId: string) => {
-  console.log('cancelDownloadFile... ', attachmentId)
   const promise = filesPromisesOnDownload[attachmentId]
   if (promise) {
-    console.log('cancelDownloadFile... promise exist - --')
     const customUploader = getCustomUploader()
     if (customUploader) {
       customUploader.cancelRequest(promise)
@@ -161,7 +159,7 @@ export const cancelDownloadFile = (attachmentId: string) => {
 export const calculateRenderedImageWidth = (width: number, height: number, maxWidth?: number, maxHeight?: number) => {
   const maxWdt = maxWidth || 420
   const maxHg = maxHeight || 400
-  const minWidth = 130
+  const minWidth = 165
   const aspectRatio = width / height
   if (aspectRatio >= maxWdt / maxHg) {
     return [Math.max(minWidth, Math.min(maxWdt, width)), Math.min(maxHg, height, maxWdt / aspectRatio) + 2]
@@ -307,7 +305,6 @@ export const getCaretPosition = (element: any) => {
   // const text = element.innerText
   // console.log('focusOffset. . . . .', focusOffset)
   // console.log('focusNode. . . . .', focusNode)
-  // console.log('element innerText.. . . . .', text)
   // const separateLines = text.split(/\r?\n|\r|\n/g)
   // console.log('setperate lines .... ', separateLines)
   // let textNodesAdded = false
@@ -333,6 +330,10 @@ export const getCaretPosition = (element: any) => {
         caretOffset += node.innerText.length
       }
     } else {
+      const browser = detectBrowser()
+      if (browser === 'Safari' && node.innerText && node.innerText.length) {
+        caretOffset += node.innerText.length + 1
+      }
       // textNodes += 1
     }
     if (element.childNodes[i + 1] && element.childNodes[i + 1].nodeName === 'BR') {

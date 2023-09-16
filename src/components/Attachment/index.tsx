@@ -166,6 +166,7 @@ const Attachment = ({
     image.src = url
     image.onload = () => {
       setAttachmentUrl(url)
+      setDownloadingFile(false)
     }
     image.onerror = () => {
       console.error('Error on download image', url)
@@ -212,15 +213,11 @@ const Attachment = ({
 
   // const ext = getFileExtension(attachment.name || (attachment.data ? attachment.data.name : ''))
   const handleCompleteDownload = (attachmentId: string) => {
-    console.log('handle complete download .... ', attachmentId)
-    console.log('attachment.id .... ', attachment.id)
     if (attachmentId === attachment.id) {
       setDownloadingFile(false)
     }
   }
   const handleStopStartDownloadFile = (att?: IAttachment) => {
-    console.log('handleStopStartDownloadFile. . . . . downloadingFile . .', downloadingFile)
-    console.log('handleStopStartDownloadFile. . . . . downloadIsCancelled . .', downloadIsCancelled)
     if (downloadingFile) {
       if (downloadIsCancelled) {
         setDownloadIsCancelled(false)
@@ -232,7 +229,6 @@ const Attachment = ({
       } else {
         setDownloadIsCancelled(true)
         const attachmentId = att ? att.id : attachment.id
-        console.log('cancel download ..... .. ', attachmentId)
         cancelDownloadFile(attachmentId || '')
       }
     } else {
@@ -324,10 +320,10 @@ const Attachment = ({
               // @ts-ignore
               // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
-              console.log('cachedUrl.  ...  . . . ', cachedUrl)
               setIsCached(true)
             } else {
               setIsCached(false)
+              setDownloadingFile(true)
               if (customDownloader) {
                 // console.log('is not cached, download with custom downloader')
                 customDownloader(attachment.url, false).then(async (url) => {
@@ -365,12 +361,14 @@ const Attachment = ({
         .catch((e: any) => {
           console.log('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
+            setDownloadingFile(true)
             customDownloader(attachment.url, false).then(async (url) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.url, response)
               // }
               setAttachmentUrl(url)
+              setDownloadingFile(false)
             })
           } else {
             setAttachmentUrl(attachment.url)
@@ -431,7 +429,9 @@ const Attachment = ({
       {attachment.type === 'image' ? (
         <AttachmentImgCont
           draggable={false}
-          onClick={() => handleMediaItemClick && handleMediaItemClick(attachment)}
+          onClick={() =>
+            handleMediaItemClick && !isInUploadingState && !downloadingFile && handleMediaItemClick(attachment)
+          }
           isPreview={isPreview}
           ref={imageContRef}
           borderRadius={borderRadius}
@@ -486,7 +486,7 @@ const Attachment = ({
               imageMinWidth={imageMinWidth}
               withPrefix={withPrefix}
             >
-              <UploadPercent isRepliedMessage={isRepliedMessage}>
+              <UploadPercent isRepliedMessage={isRepliedMessage} isDetailsView={isDetailsView}>
                 {isInUploadingState ? (
                   <CancelResumeWrapper onClick={handlePauseResumeUpload}>
                     {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
@@ -608,7 +608,11 @@ const Attachment = ({
                   backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
                   zIndex={9}
                 >
-                  <UploadPercent isRepliedMessage={isRepliedMessage} backgroundColor={'rgba(23, 25, 28, 0.40)'}>
+                  <UploadPercent
+                    isRepliedMessage={isRepliedMessage}
+                    isDetailsView={isDetailsView}
+                    backgroundColor={'rgba(23, 25, 28, 0.40)'}
+                  >
                     {isInUploadingState ? (
                       <CancelResumeWrapper onClick={handlePauseResumeUpload}>
                         {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
@@ -811,10 +815,11 @@ const Attachment = ({
           )}
 
           {!isRepliedMessage && !isPreview && (isInUploadingState || downloadingFile) ? (
-            <UploadProgress fileAttachment>
+            <UploadProgress fileAttachment isDetailsView={isDetailsView}>
               <UploadPercent
                 fileAttachment
                 borderRadius={!(attachmentThumb || (attachment.attachmentUrl && isPreview)) ? '50%' : undefined}
+                isDetailsView={isDetailsView}
                 backgroundColor={
                   downloadingFile
                     ? ''
@@ -928,6 +933,7 @@ export default React.memo(Attachment, (prevProps, nextProps) => {
   return (
     prevProps.attachment.url === nextProps.attachment.url &&
     prevProps.attachment.id === nextProps.attachment.id &&
+    prevProps.handleMediaItemClick === nextProps.handleMediaItemClick &&
     prevProps.attachment.attachmentUrl === nextProps.attachment.attachmentUrl
   )
 })
@@ -973,7 +979,7 @@ const AttachmentImgCont = styled.div<{
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
   //max-width: 420px;
   //max-height: 400px;
-  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '130px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '165px'};
   height: ${(props) => props.fitTheContainer && '100%'};
 
   width: ${(props) =>
@@ -982,7 +988,7 @@ const AttachmentImgCont = styled.div<{
   height: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
   max-height: 400px;
-  min-height: ${(props) => props.height && '130px'};
+  min-height: ${(props) => props.height && '165px'};
   cursor: pointer;
 
   ${(props) =>
@@ -1186,13 +1192,13 @@ export const AttachmentImg = styled.img<{
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   min-height: ${(props) =>
     !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
-      ? '130px'
+      ? '165px'
       : props.isRepliedMessage
       ? '40px'
       : ''};
   min-width: ${(props) =>
     !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
-      ? props.imageMinWidth || '130px'
+      ? props.imageMinWidth || '165px'
       : props.isRepliedMessage
       ? '40px'
       : ''};

@@ -11,17 +11,23 @@ import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
-import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
+import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
+import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
+import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { colors } from '../../UIHelper/constants'
 import EmojisPopup from '../Emojis'
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
 // import { useDidUpdate } from '../../hooks'
 import {
+  clearSelectedMessagesAC,
+  deleteMessageAC,
+  deleteMessageFromListAC,
   editMessageAC,
+  forwardMessageAC,
   resendMessageAC,
   sendMessageAC,
   sendTextMessageAC,
@@ -37,16 +43,26 @@ import {
   placeCaretAtEnd,
   setCursorPosition
 } from '../../helpers'
-import { getDuplicateMentionsFromMeta, makeUsername, MessageTextFormat, typingTextFormat } from '../../helpers/message'
+import {
+  getAllowEditDeleteIncomingMessage,
+  getDuplicateMentionsFromMeta,
+  makeUsername,
+  MessageTextFormat,
+  typingTextFormat
+} from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
+import {
+  messageForReplySelector,
+  messageToEditSelector,
+  selectedMessagesMapSelector
+} from '../../store/message/selector'
 import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
   draggedAttachmentsSelector,
   typingIndicatorSelector
 } from '../../store/channel/selector'
-import { IMember, IMessage, IUser } from '../../types'
+import { IAttachment, IMember, IMessage, IUser } from '../../types'
 import {
   joinChannelAC,
   sendTypingAC,
@@ -57,19 +73,29 @@ import {
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import DropDown from '../../common/dropdown'
-import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
+  deletePendingAttachment,
   deleteVideoThumb,
   draftMessagesMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
+  removeMessageFromAllMessages,
+  removeMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import { attachmentTypes, CHANNEL_TYPE, DB_NAMES, DB_STORE_NAMES, USER_STATE } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  CHANNEL_TYPE,
+  DB_NAMES,
+  DB_STORE_NAMES,
+  MESSAGE_DELIVERY_STATUS,
+  USER_STATE
+} from '../../helpers/constants'
 import usePermissions from '../../hooks/usePermissions'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { useDidUpdate } from '../../hooks'
@@ -81,6 +107,9 @@ import { themeSelector } from '../../store/theme/selector'
 import { getDataFromDB } from '../../helpers/indexedDB'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getFrame } from '../../helpers/getVideoFrame'
+import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import ConfirmPopup from '../../common/popups/delete'
+
 // import { activeChannelMembersSelector } from '../../store/member/selector'
 
 let prevActiveChannelId: any
@@ -170,6 +199,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageToEdit = useSelector(messageToEditSelector)
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
+  const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   // const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
@@ -219,6 +249,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
   const [openMention, setOpenMention] = useState(false)
   const [attachments, setAttachments]: any = useState([])
+
+  const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
+  const [deletePopupOpen, setDeletePopupOpen] = useState(false)
+  const [isIncomingMessage, setIsIncomingMessage] = useState(false)
+
   const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
@@ -387,11 +422,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setOpenMention(false)
     setMentionTyping(false)
     if (setPending) {
+      let typed = currentMentions.typed.trim()
+      if (withoutLastChar) {
+        typed = typed.slice(0, -1)
+      }
       setPendingMentions([
         ...pendingMentions,
         {
           start: currentMentions.start,
-          typed: currentMentions.typed.trim(),
+          typed,
           end: currentMentions.start + 1 + currentMentions.typed.trim().length - (withoutLastChar ? 1 : 0)
         }
       ])
@@ -399,7 +438,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         ...pendingMentions,
         {
           start: currentMentions.start,
-          typed: currentMentions.typed.trim(),
+          typed,
           end: currentMentions.start + 1 + currentMentions.typed.trim().length - (withoutLastChar ? 1 : 0)
         }
       ])
@@ -450,6 +489,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setOpenMention(true)
     }
     const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
+    // console.log('selPos. . . . .', selPos)
+    // console.log('lastTwoChar. . . . .', lastTwoChar)
     if (lastTwoChar.trimStart() === '@' && !mentionTyping) {
       setCurrentMentions({
         start: selPos - 1,
@@ -497,7 +538,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       if (selPos > 0) {
         setSelectionPos(selPos)
+        // if (mentionedMembers && mentionedMembers.length > 0) {
         setCursorPosition(messageInputRef.current, selPos)
+        // }
       }
       if (currentMentions) {
         if (currentMentions.start >= selPos) {
@@ -915,30 +958,64 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setIsEmojisOpened(false)
     }
   }
-  useEffect(() => {
-    if (mentionTyping) {
-      if (
-        selectionPos <= currentMentions.start ||
-        selectionPos > currentMentions.start + 1 + currentMentions.typed.length
-      ) {
-        handleCloseMentionsPopup(true)
-      }
-    } else if (pendingMentions && pendingMentions.length) {
-      const currentPendingMention = pendingMentions.find(
-        (mention: any) => selectionPos <= mention.end && selectionPos > mention.start
-      )
-      if (currentPendingMention) {
-        delete currentPendingMention.end
-        setCurrentMentions({
-          ...currentPendingMention,
-          typed: currentPendingMention.typed.slice(currentPendingMention.start, selectionPos - 1)
+  const handleToggleForwardMessagePopup = () => {
+    setForwardPopupOpen(!forwardPopupOpen)
+  }
+
+  const handleForwardMessage = (channelIds: string[]) => {
+    const messagesArray = Array.from(selectedMessagesMap.values())
+    // @ts-ignore
+    messagesArray.sort((a: any, b: any) => new Date(a.createdAt) - new Date(b.createdAt))
+    if (channelIds && channelIds.length) {
+      channelIds.forEach((channelId) => {
+        messagesArray.forEach((message) => {
+          dispatch(forwardMessageAC(message, channelId, connectionStatus))
         })
-        setMentionTyping(true)
-        setOpenMention(true)
-        setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== currentPendingMention.start))
+      })
+    }
+    dispatch(clearSelectedMessagesAC())
+  }
+  const handleDeletePendingMessage = (message: IMessage) => {
+    if (message.attachments && message.attachments.length) {
+      const customUploader = getCustomUploader()
+      message.attachments.forEach((att: IAttachment) => {
+        if (customUploader) {
+          cancelUpload(att.tid!)
+          deletePendingAttachment(att.tid!)
+        }
+      })
+    }
+    removeMessageFromMap(activeChannel.id, message.id || message.tid!)
+    removeMessageFromAllMessages(message.id || message.tid!)
+    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+  }
+
+  const handleToggleDeleteMessagePopup = () => {
+    if (!deletePopupOpen) {
+      for (const message of selectedMessagesMap.values()) {
+        if (message.incoming) {
+          setIsIncomingMessage(true)
+          break
+        } else {
+          setIsIncomingMessage(false)
+        }
       }
     }
-  }, [selectionPos])
+    setDeletePopupOpen(!deletePopupOpen)
+  }
+  const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
+    for (const message of selectedMessagesMap.values()) {
+      if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+        handleDeletePendingMessage(message)
+      } else {
+        dispatch(deleteMessageAC(activeChannel.id, message.id, deleteOption))
+      }
+    }
+    dispatch(clearSelectedMessagesAC())
+  }
+  const handleCloseSelectMessages = () => {
+    dispatch(clearSelectedMessagesAC())
+  }
 
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
@@ -1176,6 +1253,33 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   useEffect(() => {
+    if (mentionTyping) {
+      if (
+        selectionPos <= currentMentions.start ||
+        selectionPos > currentMentions.start + 1 + currentMentions.typed.length
+      ) {
+        handleCloseMentionsPopup(true)
+      }
+    } else if (pendingMentions && pendingMentions.length) {
+      const currentPendingMention = pendingMentions.find(
+        (mention: any) => selectionPos <= mention.end && selectionPos > mention.start
+      )
+      console.log('current pendiong mention .>>>>>>>>>>>>', currentPendingMention)
+      if (currentPendingMention) {
+        delete currentPendingMention.end
+        setCurrentMentions({
+          start: currentPendingMention.start,
+          typed: currentPendingMention.typed
+          // typed: currentPendingMention.typed.slice(currentPendingMention.start, selectionPos - 1)
+        })
+        setMentionTyping(true)
+        setOpenMention(true)
+        setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== currentPendingMention.start))
+      }
+    }
+  }, [selectionPos])
+
+  useEffect(() => {
     if (typingTimout === 0) {
       handleSendTypingState(false)
     }
@@ -1351,6 +1455,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     setOpenMention(false)
     setCurrentMentions(undefined)
     setMentionTyping(false)
+    setPendingMentions([])
     /* if (allowMentionUser) {
       dispatch(getMembersAC(activeChannel.id))
     } */
@@ -1621,132 +1726,182 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         onEditorStateChange={onEditorStateChange}
         toolbar={{ options: [] }}
       /> */}
-      {!activeChannel.id ? (
-        <Loading />
-      ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
-        <BlockedUserInfo>
-          <BlockInfoIcon />{' '}
-          {isDeletedUserChat
-            ? 'This user has been deleted.'
-            : disableInput
-            ? "Sender doesn't support replies"
-            : 'You blocked this user.'}
-        </BlockedUserInfo>
-      ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-        <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
-          Join
-        </JoinChannelCont>
-      ) : (
-          activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
-            ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
-            : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
-        ) ? (
-        <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
-          <EyeIcon /> Read only
-        </ReadOnlyCont>
-      ) : (
-        <React.Fragment>
-          <TypingIndicator>
-            {typingIndicator &&
-              typingIndicator.typingState &&
-              (CustomTypingIndicator ? (
-                <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
-              ) : (
-                <TypingIndicatorCont>
-                  <TypingFrom>
-                    {makeUsername(
-                      getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
-                      typingIndicator.from,
-                      getFromContacts
-                    )}{' '}
-                    is typing
-                  </TypingFrom>
-                  <TypingAnimation>
-                    <DotOne />
-                    <DotTwo />
-                    <DotThree />
-                  </TypingAnimation>
-                </TypingIndicatorCont>
-              ))}
-          </TypingIndicator>
-          {/* <EmojiContainer rigthSide={emojisInRightSide} ref={emojisRef} isEmojisOpened={isEmojisOpened}> */}
-          {isEmojisOpened && (
-            <EmojisPopup
-              handleAddEmoji={handleAddEmoji}
-              // messageText={messageText}
-              // ccc={handleTyping}
-              handleEmojiPopupToggle={handleEmojiPopupToggle}
-              rightSide={emojisInRightSide}
-              bottomPosition={'100%'}
+      {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
+        <SelectedMessagesWrapper>
+          {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
+          <CustomButton
+            onClick={handleToggleForwardMessagePopup}
+            backgroundColor={colors.primaryLight}
+            marginLeft='32px'
+          >
+            <ForwardIcon />
+            Forward
+          </CustomButton>
+          <CustomButton
+            onClick={handleToggleDeleteMessagePopup}
+            color={colors.red1}
+            backgroundColor={colors.primaryLight}
+            marginLeft='16px'
+          >
+            <DeleteIcon />
+            Delete
+          </CustomButton>
+          <CloseIconWrapper onClick={handleCloseSelectMessages}>
+            <CloseIcon />
+          </CloseIconWrapper>
+          {forwardPopupOpen && (
+            <ForwardMessagePopup
+              handleForward={handleForwardMessage}
+              togglePopup={handleToggleForwardMessagePopup}
+              buttonText='Forward'
+              title='Forward message'
             />
           )}
-          {/* </EmojiContainer> */}
-          {messageToEdit && (
-            <EditReplyMessageCont>
-              <CloseEditMode onClick={handleCloseEditMode}>
-                <CloseIcon />
-              </CloseEditMode>
-              <EditReplyMessageHeader color={colors.primary}>
-                {editMessageIcon || <EditIcon />}
-                Edit Message
-              </EditReplyMessageHeader>
-              <EditMessageText>{messageToEdit.body}</EditMessageText>
-            </EditReplyMessageCont>
+          {deletePopupOpen && (
+            <ConfirmPopup
+              handleFunction={handleDeleteMessage}
+              togglePopup={handleToggleDeleteMessagePopup}
+              buttonText='Delete'
+              description={`Who do you want to remove ${
+                selectedMessagesMap.size > 1 ? 'these messages' : 'this message'
+              } for?`}
+              isDeleteMessage
+              isIncomingMessage={isIncomingMessage}
+              myRole={activeChannel.userRole}
+              allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
+              isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
+              title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
+            />
           )}
-          {messageForReply && (
-            <EditReplyMessageCont>
-              <CloseEditMode onClick={handleCloseReply}>
-                <CloseIcon />
-              </CloseEditMode>
-              <ReplyMessageCont>
-                {!!(messageForReply.attachments && messageForReply.attachments.length) &&
-                  (messageForReply.attachments[0].type === attachmentTypes.image ||
-                  messageForReply.attachments[0].type === attachmentTypes.video ? (
-                    <Attachment
-                      attachment={messageForReply.attachments[0]}
-                      backgroundColor={selectedFileAttachmentsBoxBackground || ''}
-                      isRepliedMessage
-                    />
+        </SelectedMessagesWrapper>
+      ) : (
+        <React.Fragment>
+          {!activeChannel.id ? (
+            <Loading />
+          ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
+            <BlockedUserInfo>
+              <BlockInfoIcon />{' '}
+              {isDeletedUserChat
+                ? 'This user has been deleted.'
+                : disableInput
+                ? "Sender doesn't support replies"
+                : 'You blocked this user.'}
+            </BlockedUserInfo>
+          ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
+            <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+              Join
+            </JoinChannelCont>
+          ) : (
+              activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+                ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
+                : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
+            ) ? (
+            <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
+              <EyeIcon /> Read only
+            </ReadOnlyCont>
+          ) : (
+            <React.Fragment>
+              <TypingIndicator>
+                {typingIndicator &&
+                  typingIndicator.typingState &&
+                  (CustomTypingIndicator ? (
+                    <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
                   ) : (
-                    messageForReply.attachments[0].type === attachmentTypes.file && (
-                      <ReplyIconWrapper backgroundColor={colors.primary}>
-                        <ChoseFileIcon />
-                      </ReplyIconWrapper>
-                    )
+                    <TypingIndicatorCont>
+                      <TypingFrom>
+                        {makeUsername(
+                          getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
+                          typingIndicator.from,
+                          getFromContacts
+                        )}{' '}
+                        is typing
+                      </TypingFrom>
+                      <TypingAnimation>
+                        <DotOne />
+                        <DotTwo />
+                        <DotThree />
+                      </TypingAnimation>
+                    </TypingIndicatorCont>
                   ))}
-                <div>
+              </TypingIndicator>
+              {/* <EmojiContainer rigthSide={emojisInRightSide} ref={emojisRef} isEmojisOpened={isEmojisOpened}> */}
+              {isEmojisOpened && (
+                <EmojisPopup
+                  handleAddEmoji={handleAddEmoji}
+                  // messageText={messageText}
+                  // ccc={handleTyping}
+                  handleEmojiPopupToggle={handleEmojiPopupToggle}
+                  rightSide={emojisInRightSide}
+                  bottomPosition={'100%'}
+                />
+              )}
+              {/* </EmojiContainer> */}
+              {messageToEdit && (
+                <EditReplyMessageCont>
+                  <CloseEditMode onClick={handleCloseEditMode}>
+                    <CloseIcon />
+                  </CloseEditMode>
                   <EditReplyMessageHeader color={colors.primary}>
-                    {replyMessageIcon || <ReplyIcon />} Reply to
-                    <UserName>
-                      {user.id === messageForReply.user.id
-                        ? user.firstName
-                          ? `${user.firstName} ${user.lastName}`
-                          : user.id
-                        : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
-                    </UserName>
+                    {editMessageIcon || <EditIcon />}
+                    Edit Message
                   </EditReplyMessageHeader>
-                  {messageForReply.attachments && messageForReply.attachments.length ? (
-                    messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                      'Voice'
-                    ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                      <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
-                    ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                      <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
-                    ) : (
-                      <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
-                    )
-                  ) : (
-                    MessageTextFormat({
-                      text: messageForReply.body,
-                      message: messageForReply,
-                      contactsMap,
-                      getFromContacts
-                    })
-                  )}
-                </div>
-              </ReplyMessageCont>
-            </EditReplyMessageCont>
-          )}
+                  <EditMessageText>{messageToEdit.body}</EditMessageText>
+                </EditReplyMessageCont>
+              )}
+              {messageForReply && (
+                <EditReplyMessageCont>
+                  <CloseEditMode onClick={handleCloseReply}>
+                    <CloseIcon />
+                  </CloseEditMode>
+                  <ReplyMessageCont>
+                    {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                      (messageForReply.attachments[0].type === attachmentTypes.image ||
+                      messageForReply.attachments[0].type === attachmentTypes.video ? (
+                        <Attachment
+                          attachment={messageForReply.attachments[0]}
+                          backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                          isRepliedMessage
+                        />
+                      ) : (
+                        messageForReply.attachments[0].type === attachmentTypes.file && (
+                          <ReplyIconWrapper backgroundColor={colors.primary}>
+                            <ChoseFileIcon />
+                          </ReplyIconWrapper>
+                        )
+                      ))}
+                    <div>
+                      <EditReplyMessageHeader color={colors.primary}>
+                        {replyMessageIcon || <ReplyIcon />} Reply to
+                        <UserName>
+                          {user.id === messageForReply.user.id
+                            ? user.firstName
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.id
+                            : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
+                        </UserName>
+                      </EditReplyMessageHeader>
+                      {messageForReply.attachments && messageForReply.attachments.length ? (
+                        messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                          'Voice'
+                        ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                          <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                        ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                          <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                        ) : (
+                          <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                        )
+                      ) : (
+                        MessageTextFormat({
+                          text: messageForReply.body,
+                          message: messageForReply,
+                          contactsMap,
+                          getFromContacts
+                        })
+                      )}
+                    </div>
+                  </ReplyMessageCont>
+                </EditReplyMessageCont>
+              )}
 
           {!!attachments.length && !sendAttachmentSeparately && (
             <ChosenAttachments>
@@ -1910,7 +2065,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <RecordIcon />
             </SendMessageIcon>
           )} */}
-          </SendMessageInputContainer>
+              </SendMessageInputContainer>
+            </React.Fragment>
+          )}
         </React.Fragment>
       )}
     </Container>
@@ -2403,5 +2560,39 @@ const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
   mediaRecorder: null | MediaRecorder
   audio?: string
 } */
+
+const SelectedMessagesWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+`
+
+const CustomButton = styled.span<{ color?: string; backgroundColor?: string; marginLeft?: string }>`
+  color: ${(props) => props.color || colors.textColor1};
+  padding: 8px 16px;
+  background-color: ${(props) => props.backgroundColor || colors.primaryLight};
+  margin-left: ${(props) => props.marginLeft || '8px'};
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Inter, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+
+  > svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+`
+
+const CloseIconWrapper = styled.span`
+  display: inline-flex;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 10px;
+`
 
 export default SendMessageInput

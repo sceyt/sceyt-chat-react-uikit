@@ -348,10 +348,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (visibleChannel) {
       if (onChannelVisible) {
-        console.log('onChannelVisible .... ', visibleChannel)
         onChannelVisible(channels, visibleChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
-        console.log('dispatch addChannelAC 3 .... ', visibleChannel)
         dispatch(addChannelAC(hiddenChannel))
       }
       dispatch(setChannelToUnHideAC(null))
@@ -380,7 +378,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [activeChannel.id])
 
   useDidUpdate(() => {
-    console.log('close search channels. ... ', closeSearchChannels)
     if (closeSearchChannels) {
       getMyChannels()
       dispatch(setCloseSearchChannelsAC(false))
@@ -410,15 +407,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     console.log('channels. ...........................', channels)
   }, [channels])
-  useDidUpdate(() => {
-    /* if (searchedChannels && searchedChannels.chats_groups && searchedChannels.chats_groups.length && !listWidthIsSet) {
+  /* useDidUpdate(() => {
+    /!* if (searchedChannels && searchedChannels.chats_groups && searchedChannels.chats_groups.length && !listWidthIsSet) {
       dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
       setListWidthIsSet(true)
     } else {
       setListWidthIsSet(false)
-    } */
+    } *!/
     console.log('searchedChannels. ...........................', searchedChannels)
-  }, [searchedChannels])
+  }, [searchedChannels]) */
   /*  useEffect(() => {
      console.log('contactsMap. ...........................', contactsMap)
    }, [contactsMap]) */

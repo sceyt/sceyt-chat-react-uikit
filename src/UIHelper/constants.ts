@@ -29,6 +29,9 @@ export const colors = {
   darkModePrimaryLight: '#1c1f47',
   lightModePrimaryLight: '#E3E7FF',
 
+  incomingRepliedMessageBackground: '#fbfbfc',
+  ownRepliedMessageBackground: '#f9fbfd',
+
   red1: '#FA4C56',
   red2: '#d7596c',
 

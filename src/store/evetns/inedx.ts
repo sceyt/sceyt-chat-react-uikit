@@ -407,13 +407,23 @@ export default function* watchForEvents(): any {
             }
             yield put(
               updateChannelDataAC(channel.id, {
-                memberCount: channel.memberCount
+                memberCount: channel.memberCount,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
               })
             )
           }
-          yield put(updateSearchedChannelDataAC(channel.id, { memberCount: channel.memberCount }, groupName))
+          yield put(
+            updateSearchedChannelDataAC(
+              channel.id,
+              { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
+              groupName
+            )
+          )
           updateChannelOnAllChannels(channel.id, {
-            memberCount: channel.memberCount
+            memberCount: channel.memberCount,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
           })
         }
         // TODO notification
@@ -458,17 +468,27 @@ export default function* watchForEvents(): any {
             }
 
             const groupName = getChannelGroupName(channel)
-            yield put(updateSearchedChannelDataAC(channel.id, { memberCount: channel.memberCount }, groupName))
+            yield put(
+              updateSearchedChannelDataAC(
+                channel.id,
+                { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
+                groupName
+              )
+            )
             yield put(
               updateChannelDataAC(channel.id, {
-                memberCount: channel.memberCount
+                memberCount: channel.memberCount,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
               })
             )
           }
         }
 
         updateChannelOnAllChannels(channel.id, {
-          memberCount: channel.memberCount
+          memberCount: channel.memberCount,
+          muted: channel.muted,
+          mutedTill: channel.mutedTill
         })
         break
       }
@@ -484,7 +504,9 @@ export default function* watchForEvents(): any {
           }
           yield put(
             updateChannelDataAC(channel.id, {
-              memberCount: channel.memberCount
+              memberCount: channel.memberCount,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
             })
           )
         } else {
@@ -493,23 +515,38 @@ export default function* watchForEvents(): any {
         }
 
         const groupName = getChannelGroupName(channel)
-        yield put(updateSearchedChannelDataAC(channel.id, { memberCount: channel.memberCount }, groupName))
+        yield put(
+          updateSearchedChannelDataAC(
+            channel.id,
+            { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
+            groupName
+          )
+        )
         updateChannelOnAllChannels(channel.id, {
-          memberCount: channel.memberCount
+          memberCount: channel.memberCount,
+          muted: channel.muted,
+          mutedTill: channel.mutedTill
         })
         break
       }
       case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
         const { updatedChannel } = args
         const channelExists = checkChannelExists(updatedChannel.id)
-        const { subject, avatarUrl } = updatedChannel
+        const { subject, avatarUrl, muted, mutedTill } = updatedChannel
         if (channelExists) {
-          yield put(updateChannelDataAC(updatedChannel.id, { subject, avatarUrl }))
+          yield put(
+            updateChannelDataAC(updatedChannel.id, {
+              subject,
+              avatarUrl,
+              muted,
+              mutedTill
+            })
+          )
         }
 
         const groupName = getChannelGroupName(updatedChannel)
-        yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl }, groupName))
-        updateChannelOnAllChannels(updatedChannel.id, { subject, avatarUrl })
+        yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl, muted, mutedTill }, groupName))
+        updateChannelOnAllChannels(updatedChannel.id, { subject, avatarUrl, muted, mutedTill })
         break
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {
@@ -744,7 +781,9 @@ export default function* watchForEvents(): any {
         if (channelExists) {
           yield put(
             updateChannelDataAC(channel.id, {
-              newMessageCount: channel.newMessageCount
+              newMessageCount: channel.newMessageCount,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
             })
           )
           if (channel.lastMessage.id === deletedMessage.id) {
@@ -754,7 +793,9 @@ export default function* watchForEvents(): any {
         updateChannelOnAllChannels(
           channel.id,
           {
-            newMessageCount: channel.newMessageCount
+            newMessageCount: channel.newMessageCount,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
           },
           deletedMessage
         )
@@ -762,7 +803,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
         const { channel, /* user, */ message } = args
-        console.log('channel EDIT_MESSAGE ... ')
+        console.log('channel EDIT_MESSAGE ... ', message)
         const activeChannelId = getActiveChannelId()
         const channelExists = checkChannelExists(channel.id)
         if (channel.id === activeChannelId) {
@@ -770,9 +811,16 @@ export default function* watchForEvents(): any {
             updateMessageAC(message.id, {
               body: message.body,
               state: message.state,
-              attachments: message.attachments
+              attachments: message.attachments,
+              updatedAt: message.updatedAt
             })
           )
+          updateMessageOnAllMessages(message.id, {
+            body: message.body,
+            state: message.state,
+            attachments: message.attachments,
+            updatedAt: message.updatedAt
+          })
         }
         if (channelExists) {
           if (channel.lastMessage.id === message.id) {
@@ -827,14 +875,18 @@ export default function* watchForEvents(): any {
             const channelUpdateParams = {
               userMessageReactions: channel.newReactions,
               lastReactedMessage: message,
-              newReactions: channel.newReactions
+              newReactions: channel.newReactions,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
             }
             yield put(updateChannelDataAC(channel.id, channelUpdateParams))
           }
           updateChannelOnAllChannels(channel.id, {
             userMessageReactions: channel.newReactions,
             lastReactedMessage: message,
-            newReactions: channel.newReactions
+            newReactions: channel.newReactions,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
           })
         }
 
@@ -883,7 +935,7 @@ export default function* watchForEvents(): any {
         const { channel, channelUnreadCount } = args
         // console.log('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
         // console.log('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
-        console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount)
+        console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
 
         // yield put(setChannelUnreadCount(0, channel.id));
         const updatedChannel = JSON.parse(JSON.stringify(channel))
@@ -903,9 +955,23 @@ export default function* watchForEvents(): any {
         }
         removeMessagesFromMap(channel.id)
         if (channelExist) {
-          yield put(updateChannelDataAC(channel.id, { lastMessage: null, newMessageCount: 0, newMentionCount: 0 }))
+          yield put(
+            updateChannelDataAC(channel.id, {
+              lastMessage: null,
+              newMessageCount: 0,
+              newMentionCount: 0,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
+          )
         }
-        updateChannelOnAllChannels(channel.id, { lastMessage: null, newMessageCount: 0, newMentionCount: 0 })
+        updateChannelOnAllChannels(channel.id, {
+          lastMessage: null,
+          newMessageCount: 0,
+          newMentionCount: 0,
+          muted: channel.muted,
+          mutedTill: channel.mutedTill
+        })
         break
       }
       case CHANNEL_EVENT_TYPES.MUTE: {
@@ -956,7 +1022,13 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
+        yield put(
+          updateChannelDataAC(channel.id, {
+            unread: channel.unread,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
+        )
         const groupName = getChannelGroupName(channel)
         yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
 
@@ -966,7 +1038,13 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
         // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
-        yield put(updateChannelDataAC(channel.id, { unread: channel.unread }))
+        yield put(
+          updateChannelDataAC(channel.id, {
+            unread: channel.unread,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
+        )
         const groupName = getChannelGroupName(channel)
         yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
         updateChannelOnAllChannels(channel.id, { unread: channel.unread })
@@ -999,8 +1077,18 @@ export default function* watchForEvents(): any {
         }
         for (let i = 0; i < members.length; i++) {
           if (members[i].id === SceytChatClient.user.id) {
-            yield put(updateChannelDataAC(channel.id, { userRole: members[i].role }))
-            updateChannelOnAllChannels(channel.id, { userRole: members[i].role })
+            yield put(
+              updateChannelDataAC(channel.id, {
+                userRole: members[i].role,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
+              })
+            )
+            updateChannelOnAllChannels(channel.id, {
+              userRole: members[i].role,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
           }
         }
         break

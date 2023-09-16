@@ -204,12 +204,8 @@ const UsersPopup = ({
         label: '',
         type: CHANNEL_TYPE.DIRECT,
         members: [
-          /* {
-            ...selectedUser,
-            role: 'owner'
-          } */
           {
-            id: 'waafiott',
+            ...selectedUser,
             role: 'owner'
           }
         ]

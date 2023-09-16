@@ -103,10 +103,21 @@ export default function MentionMembersPopup({
   const handleSearchMembers = () => {
     const searchedMembers = [...members].filter((member: IMember) => {
       const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-      return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
+      return (
+        displayName &&
+        member.id !== user.id &&
+        displayName
+          .split(' ')
+          .find((namePart) =>
+            namePart[0] === '~'
+              ? namePart.slice(1).toLowerCase().startsWith(searchMention.toLowerCase())
+              : namePart.toLowerCase().startsWith(searchMention.toLowerCase())
+          )
+      )
     })
     filteredMembersLength.current = searchedMembers.length
-    setFilteredMembers(sortMembers(searchedMembers))
+    // setFilteredMembers(sortMembers(searchedMembers))
+    setFilteredMembers(searchedMembers)
   }
   const handleScrollToActiveItem = (newIndex: number, direction: 'top' | 'bottom') => {
     const membersList = membersListRef.current

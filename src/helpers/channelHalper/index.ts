@@ -64,12 +64,10 @@ export function getLastChannelFromMap() {
 }
 
 export function removeChannelFromMap(channelId: string) {
-  console.log('remove channel from map >> >> > > ', channelId)
   delete channelsMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
-  console.log('channelsMap. . . .  . ..  .', channelsMap)
   return !!channelsMap[channelId]
 }
 

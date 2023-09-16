@@ -12,6 +12,8 @@ interface MessagesProps {
   messageStatusDisplayingType?: 'ticks' | 'text'
   ownMessageBackground?: string
   incomingMessageBackground?: string
+  ownRepliedMessageBackground?: string
+  incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
   showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
@@ -144,6 +146,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
   incomingMessageBackground = colors.backgroundColor,
+  ownRepliedMessageBackground,
+  incomingRepliedMessageBackground,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -259,6 +263,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         showMessageTimeForEachMessage={showMessageTimeForEachMessage}
         ownMessageBackground={ownMessageBackground}
         incomingMessageBackground={incomingMessageBackground}
+        ownRepliedMessageBackground={ownRepliedMessageBackground}
+        incomingRepliedMessageBackground={incomingRepliedMessageBackground}
         hoverBackground={hoverBackground}
         showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
         showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}

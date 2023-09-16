@@ -6,7 +6,12 @@ import {
   channelMessageDraftIsRemovedSelector,
   typingIndicatorSelector
 } from '../../store/channel/selector'
-import { sendTypingAC, setChannelDraftMessageIsRemovedAC, switchChannelActionAC } from '../../store/channel/actions'
+import {
+  sendTypingAC,
+  setChannelDraftMessageIsRemovedAC,
+  switchChannelActionAC,
+  updateChannelDataAC
+} from '../../store/channel/actions'
 import { ReactComponent as ImageIcon } from '../../assets/svg/picture.svg'
 import { ReactComponent as CameraIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
@@ -26,6 +31,8 @@ import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNo
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import moment from 'moment'
+import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 
 interface IChannelProps {
   channel: IChannel
@@ -86,9 +93,9 @@ const Channel: React.FC<IChannelProps> = ({
   // const channelItemRef = useRef()
   // const isVisible = useOnScreen(channelItemRef)
   // if (isDirectChannel) {
-  useUpdatePresence(channel, true)
   // }
 
+  useUpdatePresence(channel, true)
   useEffect(() => {
     if (messageTimeAndStatusRef.current) {
       setStatusWidth(messageTimeAndStatusRef.current.offsetWidth)
@@ -104,12 +111,28 @@ const Channel: React.FC<IChannelProps> = ({
       }
     }
   }, [activeChannel.id])
+
   useEffect(() => {
     if (channelDraftIsRemoved && channelDraftIsRemoved === channel.id) {
       setDraftMessageText(undefined)
       dispatch(setChannelDraftMessageIsRemovedAC())
     }
   }, [channelDraftIsRemoved])
+
+  useEffect(() => {
+    if (channel.muted) {
+      const dateDiff = moment(channel.mutedTill).diff(moment())
+      console.log(
+        'channel is muted. .. ',
+        channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id)),
+        dateDiff
+      )
+      if (dateDiff <= 0) {
+        dispatch(updateChannelDataAC(channel.id, { muted: false, mutedTill: null }))
+        updateChannelOnAllChannels(channel.id, { muted: false, mutedTill: null })
+      }
+    }
+  })
   return (
     <Container
       // ref={channelItemRef}

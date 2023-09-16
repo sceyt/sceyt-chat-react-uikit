@@ -56,6 +56,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { useDidUpdate } from '../../hooks'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
@@ -71,7 +72,8 @@ interface IMessageProps {
     handleCopyMessage?: () => void
     handleReportMessage?: () => void
     handleOpenEmojis?: () => void
-    handleSelectMessage?: () => void
+    // eslint-disable-next-line no-unused-vars
+    handleSelectMessage?: (event?: any) => void
     handleReplyMessage?: () => void
 
     isThreadMessage?: boolean
@@ -101,6 +103,8 @@ interface IMessageProps {
   messageStatusDisplayingType?: 'ticks' | 'text'
   ownMessageBackground?: string
   incomingMessageBackground?: string
+  ownRepliedMessageBackground?: string
+  incomingRepliedMessageBackground?: string
   showOwnAvatar?: boolean
   showMessageStatus?: boolean
   showMessageTimeAndStatusOnlyOnHover?: boolean
@@ -214,8 +218,10 @@ const Message = ({
   showSenderNameOnOwnMessages = true,
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
-  ownMessageBackground = '',
-  incomingMessageBackground = '',
+  ownMessageBackground = colors.primaryLight,
+  incomingMessageBackground = colors.backgroundColor,
+  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
+  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   showOwnAvatar = true,
   showMessageStatus = true,
   showMessageTimeAndStatusOnlyOnHover,
@@ -459,7 +465,11 @@ const Message = ({
 
     setMessageActionsShow(false)
   }
-  const handleSelectMessage = () => {
+  const handleSelectMessage = (e: any) => {
+    if (e) {
+      e.preventDefault()
+      e.stopPropagation()
+    }
     if (isSelectedMessage) {
       if (selectedMessagesMap && selectedMessagesMap.size === 1) {
         dispatch(clearSelectedMessagesAC())
@@ -531,7 +541,7 @@ const Message = ({
   }
 
   const handleMouseEnter = () => {
-    if (message.state !== MESSAGE_STATUS.DELETE) {
+    if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive) {
       messageActionsTimeout.current = setTimeout(() => {
         setMessageActionsShow(true)
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
@@ -596,7 +606,8 @@ const Message = ({
         message.userMarkers &&
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
-      )
+      ) &&
+      connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
       console.log('send displayed marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
@@ -662,7 +673,7 @@ const Message = ({
   }
 
   const handleCreateChat = (user?: any) => {
-    if (user) {
+    if (user && !selectionIsActive) {
       dispatch(
         createChannelAC(
           {
@@ -697,11 +708,17 @@ const Message = ({
     }
   }, [isVisible])
 
-  useEffect(() => {
+  useDidUpdate(() => {
     if (tabIsActive) {
       handleSendReadMarker()
     }
   }, [tabIsActive])
+
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      handleSendReadMarker()
+    }
+  }, [connectionStatus])
 
   useEffect(() => {
     if (emojisPopupOpen) {
@@ -757,6 +774,7 @@ const Message = ({
       bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}
       selectMessagesIsActive={selectionIsActive}
+      onClick={(e) => selectionIsActive && handleSelectMessage(e)}
       // id={message.id}
       className='MessageItem'
     >
@@ -781,6 +799,7 @@ const Message = ({
       )}
       {/* <MessageBoby /> */}
       <MessageContent
+        selectionIsActive={selectionIsActive}
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
@@ -972,7 +991,12 @@ const Message = ({
               withBody={!!message.body}
               withAttachments={withAttachments && notLinkAttachment}
               leftBorderColor={colors.primary}
-              onClick={() => handleScrollToRepliedMessage && handleScrollToRepliedMessage(message!.parentMessage!.id)}
+              backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
+              onClick={() =>
+                handleScrollToRepliedMessage &&
+                !selectionIsActive &&
+                handleScrollToRepliedMessage(message!.parentMessage!.id)
+              }
             >
               {
                 message.parentMessage.attachments &&
@@ -1039,7 +1063,8 @@ const Message = ({
                       text: message.parentMessage.body,
                       message: message.parentMessage,
                       contactsMap,
-                      getFromContacts
+                      getFromContacts,
+                      asSampleText: true
                     })
                   ) : (
                     parentNotLinkAttachment &&
@@ -1189,7 +1214,7 @@ const Message = ({
               (message.attachments as any[]).map((attachment: any) => (
                 <Attachment
                   key={attachment.tid || attachment.url}
-                  handleMediaItemClick={handleMediaItemClick}
+                  handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
                   attachment={{
                     ...attachment,
                     metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
@@ -1624,10 +1649,11 @@ const ReplyMessageContainer = styled.div<{
   withAttachments?: boolean
   withSenderName?: boolean
   withBody?: boolean
+  backgroundColor?: string
 }>`
   display: flex;
   border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
-  padding: 0 6px;
+  padding: 4px 6px;
   position: relative;
   //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
   margin: ${(props) =>
@@ -1638,6 +1664,8 @@ const ReplyMessageContainer = styled.div<{
       : props.withSenderName
       ? '6px 0 8px'
       : '0 0 8px'};
+  background-color: ${(props) => props.backgroundColor || colors.primaryLight};
+  border-radius: 0 4px 4px 0;
   margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;
 `
@@ -1819,10 +1847,10 @@ const MessageBody = styled.div<{
   max-width: ${(props) =>
     props.withAttachments
       ? props.attachmentWidth && props.attachmentWidth < 420
-        ? props.attachmentWidth < 130
+        ? props.attachmentWidth < 165
           ? props.isReplyMessage
             ? '210px'
-            : '130px'
+            : '165px'
           : `${props.attachmentWidth}px`
         : '420px'
       : '100%'};
@@ -1844,7 +1872,12 @@ const MessageBody = styled.div<{
   transform-origin: right;
 `
 
-const MessageContent = styled.div<{ messageWidthPercent?: string | number; withAvatar?: boolean; rtl?: boolean }>`
+const MessageContent = styled.div<{
+  messageWidthPercent?: string | number
+  withAvatar?: boolean
+  rtl?: boolean
+  selectionIsActive?: boolean
+}>`
   position: relative;
   margin-left: ${(props) => props.withAvatar && '13px'};
   margin-right: ${(props) => props.withAvatar && '13px'};
@@ -1853,6 +1886,7 @@ const MessageContent = styled.div<{ messageWidthPercent?: string | number; withA
 
   display: flex;
   flex-direction: column;
+  pointer-events: ${(props) => props.selectionIsActive && 'none'};
 `
 
 /* const AudioMessageTime = styled.div`
@@ -1887,10 +1921,8 @@ const MessageItem = styled.div<{
   width: 100%;
   box-sizing: border-box;
   transition: padding-left 0.2s;
-  ${(props) => props.rtl && 'direction: rtl;'}
-  /* &:last-child {
-    margin-bottom: 0;
-  }*/
+  cursor: ${(props) => props.selectMessagesIsActive && 'pointer'};
+  ${(props) => props.rtl && 'direction: rtl;'};
 
   &:hover {
     background-color: ${(props) => props.hoverBackground || ''};

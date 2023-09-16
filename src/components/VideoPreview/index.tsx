@@ -291,7 +291,7 @@ const Component = styled.div<{
   max-height: 100%;
   width: ${(props) => props.width};
   height: ${(props) => props.height};
-  min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '130px'};
+  min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
 
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
@@ -305,7 +305,7 @@ const Component = styled.div<{
     max-height: 100%;
     width: ${(props) => props.width};
     height: ${(props) => props.height};
-    min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && '130px'};
+    min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && '165px'};
     border: ${(props) =>
       !props.isPreview && props.isRepliedMessage
         ? '0.5px solid rgba(0, 0, 0, 0.1)'

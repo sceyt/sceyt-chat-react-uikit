@@ -135,6 +135,8 @@ interface MessagesProps {
   messageStatusDisplayingType?: 'ticks' | 'text'
   ownMessageBackground?: string
   incomingMessageBackground?: string
+  ownRepliedMessageBackground?: string
+  incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
   showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
@@ -267,6 +269,8 @@ const MessageList: React.FC<MessagesProps> = ({
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
   incomingMessageBackground = colors.backgroundColor,
+  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
+  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -917,7 +921,6 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     if (scrollToNewMessage.scrollToBottom && messages.length) {
       setTimeout(() => {
-        console.log('should scroll to bottom .... update messages list .............. ')
         dispatch(scrollToNewMessageAC(false, false, false))
       }, 500)
     }
@@ -1159,7 +1162,9 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageStatusAndTimePosition={messageStatusAndTimePosition}
                           messageStatusDisplayingType={messageStatusDisplayingType}
                           ownMessageBackground={ownMessageBackground}
+                          ownRepliedMessageBackground={ownRepliedMessageBackground}
                           incomingMessageBackground={incomingMessageBackground}
+                          incomingRepliedMessageBackground={incomingRepliedMessageBackground}
                           showMessageStatus={showMessageStatus}
                           showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                           showMessageTime={showMessageTime}

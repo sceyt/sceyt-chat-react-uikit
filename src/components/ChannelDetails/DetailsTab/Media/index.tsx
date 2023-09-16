@@ -30,10 +30,11 @@ const Media = ({ channelId }: IProps) => {
   return (
     <Container>
       {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.id} onClick={() => handleMediaItemClick(file)}>
+        <MediaItem key={file.id}>
           {file.type === 'image' ? (
             <Attachment
               attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+              handleMediaItemClick={handleMediaItemClick}
               backgroundColor={colors.white}
               borderRadius='8px'
               isDetailsView
@@ -43,6 +44,7 @@ const Media = ({ channelId }: IProps) => {
 
             <Attachment
               attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+              handleMediaItemClick={handleMediaItemClick}
               backgroundColor={colors.white}
               borderRadius='8px'
               isDetailsView

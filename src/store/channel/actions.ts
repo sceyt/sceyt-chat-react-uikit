@@ -24,6 +24,7 @@ import {
   REMOVE_CHANNEL,
   REMOVE_CHANNEL_CACHES,
   SEARCH_CHANNELS,
+  SEARCH_CHANNELS_FOR_FORWARD,
   SEND_TYPING,
   SET_ACTIVE_CHANNEL,
   SET_ADDED_TO_CHANNEL,
@@ -40,6 +41,7 @@ import {
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
   SET_SEARCHED_CHANNELS,
+  SET_SEARCHED_CHANNELS_FOR_FORWARD,
   SET_TAB_IS_ACTIVE,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
@@ -109,10 +111,55 @@ export function getChannelsForForwardAC(searchValue?: string) {
   }
 }
 
+export function addChannelsForForwardAC(channels: IChannel[]) {
+  return {
+    type: ADD_CHANNELS_FOR_FORWARD,
+    payload: { channels }
+  }
+}
+
+export function setChannelsForForwardAC(channels: IChannel[]) {
+  return {
+    type: SET_CHANNELS_FOR_FORWARD,
+    payload: { channels }
+  }
+}
+
+export function setChannelsLoadingStateAC(state: number, forForward?: boolean) {
+  return {
+    type: SET_CHANNELS_LOADING_STATE,
+    payload: { state, forForward }
+  }
+}
+
+export function channelHasNextAC(hasNext: boolean, forForward?: boolean) {
+  return {
+    type: CHANNELS_HAS_NEXT,
+    payload: { hasNext, forForward }
+  }
+}
 export function loadMoreChannelsForForward(limit?: number) {
   return {
     type: LOAD_MORE_CHANNELS_FOR_FORWARD,
     payload: { limit }
+  }
+}
+
+export function searchChannelsForForwardAC(params: ChannelQueryParams, contactsMap: IContactsMap) {
+  return {
+    type: SEARCH_CHANNELS_FOR_FORWARD,
+    payload: { params, contactsMap }
+  }
+}
+
+export function setSearchedChannelsForForwardAC(searchedChannels: {
+  chats_groups: IChannel[]
+  channels: IChannel[]
+  contacts: IContact[]
+}) {
+  return {
+    type: SET_SEARCHED_CHANNELS_FOR_FORWARD,
+    payload: { searchedChannels }
   }
 }
 
@@ -126,13 +173,6 @@ export function addChannelAC(channel: IChannel) {
 export function addChannelsAC(channels: IChannel[]) {
   return {
     type: ADD_CHANNELS,
-    payload: { channels }
-  }
-}
-
-export function addChannelsForForwardAC(channels: IChannel[]) {
-  return {
-    type: ADD_CHANNELS_FOR_FORWARD,
     payload: { channels }
   }
 }
@@ -206,27 +246,6 @@ export function setChannelsAC(channels: IChannel[]) {
   return {
     type: SET_CHANNELS,
     payload: { channels }
-  }
-}
-
-export function setChannelsFroForwardAC(channels: IChannel[]) {
-  return {
-    type: SET_CHANNELS_FOR_FORWARD,
-    payload: { channels }
-  }
-}
-
-export function setChannelsLoadingStateAC(state: number, forForward?: boolean) {
-  return {
-    type: SET_CHANNELS_LOADING_STATE,
-    payload: { state, forForward }
-  }
-}
-
-export function channelHasNextAC(hasNext: boolean, forForward?: boolean) {
-  return {
-    type: CHANNELS_HAS_NEXT,
-    payload: { hasNext, forForward }
   }
 }
 

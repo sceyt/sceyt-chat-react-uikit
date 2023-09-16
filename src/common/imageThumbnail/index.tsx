@@ -65,7 +65,7 @@ const Canvas = styled.canvas<{
   max-height: 400px;
   width: ${(props) => props.isRepliedMessage && '40px'};
   height: ${(props) => props.isRepliedMessage && '40px'};
-  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '130px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '165px'};
   height: ${(props) => props.fitTheContainer && '100%'};
   border: 2px solid #dff6eb;
   border-radius: ${(props) => props.borderRadius || '4px'};

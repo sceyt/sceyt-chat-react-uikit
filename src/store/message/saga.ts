@@ -1122,7 +1122,7 @@ function* forwardMessage(action: IAction): any {
         .setMentionUserIds(mentionedUserIds)
         .setType(message.type)
         .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
-        .setForwardingMessageId(message.id)
+        .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
 
       const messageToSend = messageBuilder.create()
       const pendingMessage = JSON.parse(
@@ -1131,8 +1131,13 @@ function* forwardMessage(action: IAction): any {
           createdAt: new Date(Date.now())
         })
       )
-      pendingMessage.forwardingDetails.user = message.user
-      pendingMessage.forwardingDetails.channelId = channelId
+      if (message.forwardingDetails) {
+        pendingMessage.forwardingDetails.user = message.forwardingDetails.user
+        pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
+      } else {
+        pendingMessage.forwardingDetails.user = message.user
+        pendingMessage.forwardingDetails.channelId = channelId
+      }
       pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
       const activeChannelId = getActiveChannelId()
       const isCachedChannel = checkChannelExistsOnMessagesMap(channelId)
@@ -1832,6 +1837,7 @@ function* deleteReaction(action: IAction): any {
         lastReactedMessage: null
       }
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
+      updateChannelOnAllChannels(channel.id, channelUpdateParam)
     }
     console.log('message received. ... ', message)
     yield put(deleteReactionFromListAC(reaction))

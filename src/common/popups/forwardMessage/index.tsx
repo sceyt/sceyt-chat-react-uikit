@@ -5,15 +5,15 @@ import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
   loadMoreChannelsForForward,
-  searchChannelsAC,
-  setSearchedChannelsAC
+  searchChannelsForForwardAC,
+  setSearchedChannelsForForwardAC
 } from '../../../store/channel/actions'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
-  channelsLoadingState,
-  searchedChannelsSelector
+  channelsLoadingStateForForwardSelector,
+  searchedChannelsForForwardSelector
 } from '../../../store/channel/selector'
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
@@ -49,10 +49,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const { user } = ChatClient
   const dispatch = useDispatch()
   const channels = useSelector(channelsForForwardSelector) || []
-  const searchedChannels = useSelector(searchedChannelsSelector) || []
+  const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
-  const channelsLoading = useSelector(channelsLoadingState)
+  const channelsLoading = useSelector(channelsLoadingStateForForwardSelector)
   const channelsHasNext = useSelector(channelsForForwardHasNextSelector)
   const [searchValue, setSearchValue] = useState('')
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
@@ -132,16 +132,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   useEffect(() => {
     dispatch(getChannelsForForwardAC())
     return () => {
-      dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
+      dispatch(setSearchedChannelsForForwardAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [])
 
   useEffect(() => {
     // dispatch(getChannelsForForwardAC(searchValue))
     if (searchValue) {
-      dispatch(searchChannelsAC({ search: searchValue }, contactsMap))
+      dispatch(searchChannelsForForwardAC({ search: searchValue }, contactsMap))
     } else {
-      dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
+      dispatch(setSearchedChannelsForForwardAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [searchValue])
   return (

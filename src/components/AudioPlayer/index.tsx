@@ -240,7 +240,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
 
   return (
     <Container>
-      <PlayPause onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
+      <PlayPause onClick={handlePlayPause} iconColor={colors.primary}>
+        {playAudio ? <PauseIcon /> : <PlayIcon />}
+      </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
         <AudioRate onClick={handleSetAudioRate}>
@@ -263,10 +265,11 @@ const Container = styled.div`
   padding: 8px 12px;
 `
 
-const PlayPause = styled.div`
+const PlayPause = styled.div<{ iconColor?: string }>`
   cursor: pointer;
 
   & > svg {
+    color: ${(props) => props.iconColor || colors.primary};
     display: flex;
     width: 40px;
     height: 40px;

@@ -44,6 +44,7 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
 
   useDidUpdate(() => {
     if (hideChannelList && (!activeChannel || !activeChannel.id) && addedChannel && addedChannel.id) {
+      console.log('call set active channel. ... ', addedChannel)
       dispatch(setActiveChannelAC(addedChannel))
     }
   }, [addedChannel])
