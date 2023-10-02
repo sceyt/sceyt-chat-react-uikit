@@ -51,8 +51,7 @@
     "react-dom": "18.2.0"
   },
   "devDependencies": {
-    "@babel/plugin-proposal-class-properties": "^7.18.6",
-    "@babel/plugin-transform-class-properties": "^7.22.5",
+    "@babel/plugin-transform-classes": "^7.22.15",
     "@babel/preset-react": "^7.22.5",
     "@reduxjs/toolkit": "^1.8.5",
     "@testing-library/jest-dom": "^4.2.4",
@@ -98,10 +97,6 @@
     "assets"
   ],
   "dependencies": {
-    "@babel/plugin-transform-arrow-functions": "^7.22.5",
-    "@babel/plugin-transform-classes": "^7.22.15",
-    "@babel/plugin-transform-for-of": "^7.22.15",
-    "@babel/plugin-transform-spread": "^7.22.5",
     "@lexical/offset": "^0.12.2",
     "@lexical/react": "^0.12.2",
     "file-saver": "^2.0.5",
