@@ -198,6 +198,7 @@ function* sendMessage(action: IAction): any {
         messageBuilder
           .setBody(message.body)
           .setAttachments([])
+          .setBodyAttributes(message.bodyAttributes)
           .setMentionUserIds(mentionedUserIds)
           .setType(message.type)
           .setDisplayCount(message.type === 'system' ? 0 : 1)
@@ -218,6 +219,7 @@ function* sendMessage(action: IAction): any {
           JSON.stringify({
             ...messageCopy,
             createdAt: new Date(Date.now()),
+            mentionedUsers: message.mentionedMembers,
             parentMessage: message.parentMessage
           })
         )
@@ -388,6 +390,7 @@ function* sendMessage(action: IAction): any {
                 deliveryStatus: messageResponse.deliveryStatus,
                 attachments: messageResponse.attachments,
                 mentionedUsers: messageResponse.mentionedUsers,
+                bodyAttributes: messageResponse.bodyAttributes,
                 metadata: messageResponse.metadata,
                 parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
@@ -480,6 +483,7 @@ function* sendMessage(action: IAction): any {
             mentionedUsers: messageResponse.mentionedUsers,
             metadata: messageResponse.metadata,
             parentMessage: messageResponse.parentMessage,
+            bodyAttributes: messageResponse.bodyAttributes,
             repliedInThread: messageResponse.repliedInThread,
             createdAt: messageResponse.createdAt
           }
@@ -592,6 +596,7 @@ function* sendMessage(action: IAction): any {
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder
           .setBody(message.body)
+          .setBodyAttributes(message.bodyAttributes)
           .setAttachments(message.attachments)
           .setMentionUserIds(mentionedUserIds)
           .setType(message.type)
@@ -757,6 +762,7 @@ function* sendMessage(action: IAction): any {
             deliveryStatus: messageResponse.deliveryStatus,
             attachments: attachmentsToUpdate,
             mentionedUsers: messageResponse.mentionedUsers,
+            bodyAttributes: messageResponse.bodyAttributes,
             metadata: messageResponse.metadata,
             parentMessage: messageResponse.parentMessage,
             repliedInThread: messageResponse.repliedInThread,
@@ -971,6 +977,7 @@ function* sendTextMessage(action: IAction): any {
     const messageBuilder = channel.createMessageBuilder()
     messageBuilder
       .setBody(message.body)
+      .setBodyAttributes(message.bodyAttributes)
       .setAttachments(attachments)
       .setMentionUserIds(mentionedUserIds)
       .setType(message.type)
@@ -988,6 +995,7 @@ function* sendTextMessage(action: IAction): any {
       JSON.stringify({
         ...messageToSend,
         createdAt: new Date(Date.now()),
+        mentionedUsers: message.mentionedMembers,
         parentMessage: message.parentMessage
       })
     )
@@ -1010,6 +1018,7 @@ function* sendTextMessage(action: IAction): any {
     yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
+      console.log('send message messageToSend ... ', messageToSend)
       if (sendMessageHandler) {
         messageResponse = yield call(sendMessageHandler, messageToSend, channel.id)
       } else {
@@ -1031,6 +1040,7 @@ function* sendTextMessage(action: IAction): any {
         body: messageResponse.body,
         type: messageResponse.type,
         state: messageResponse.state,
+        bodyAttributes: messageResponse.bodyAttributes,
         displayCount: messageResponse.displayCount,
         deliveryStatus: messageResponse.deliveryStatus,
         attachments: messageResponse.attachments,
@@ -1118,6 +1128,7 @@ function* forwardMessage(action: IAction): any {
       const messageBuilder = channel.createMessageBuilder()
       messageBuilder
         .setBody(message.body)
+        .setBodyAttributes(message.bodyAttributes)
         .setAttachments(attachments)
         .setMentionUserIds(mentionedUserIds)
         .setType(message.type)
@@ -1364,6 +1375,7 @@ function* resendMessage(action: IAction): any {
                 metadata: messageResponse.metadata,
                 parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
+                bodyAttributes: messageResponse.bodyAttributes,
                 createdAt: messageResponse.createdAt
               }
               yield put(updateMessageAC(messageCopy.tid, JSON.parse(JSON.stringify(messageUpdateData))))
@@ -1418,6 +1430,7 @@ function* resendMessage(action: IAction): any {
           metadata: messageResponse.metadata,
           parentMessage: messageResponse.parentMessage,
           repliedInThread: messageResponse.repliedInThread,
+          bodyAttributes: messageResponse.bodyAttributes,
           createdAt: messageResponse.createdAt
         }
         removePendingMessageFromMap(channel.id, messageCopy.tid)

@@ -29,6 +29,7 @@
     "react/no-unused-prop-types": 0,
     "react-hooks/exhaustive-deps": 0,
     "import/export": 0,
+    "no-use-before-define": ["error", { "functions": false, "classes": false,"variables": false }],
     "max-len": ["error", { "code": 140 }],
     "no-unused-vars": [
       "warn",

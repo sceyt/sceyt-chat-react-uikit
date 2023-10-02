@@ -95,28 +95,44 @@ const Members = ({
     }
   }
 
-  const toggleKickMemberPopup = () => {
+  const toggleKickMemberPopup = (e?: Event) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
     if (kickMemberPopupOpen) {
       setSelectedMember(null)
     }
     setKickMemberPopupOpen(!kickMemberPopupOpen)
   }
 
-  const toggleBlockMemberPopup = () => {
+  const toggleBlockMemberPopup = (e?: Event) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
     if (blockMemberPopupOpen) {
       setSelectedMember(null)
     }
     setBlockMemberPopupOpen(!blockMemberPopupOpen)
   }
 
-  const toggleChangeRolePopup = () => {
+  const toggleChangeRolePopup = (e?: Event) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
     if (changeMemberRolePopup) {
       setSelectedMember(null)
     }
     setChangeMemberRolePopup(!changeMemberRolePopup)
   }
 
-  const toggleMakeAdminPopup = (revoke: boolean) => {
+  const toggleMakeAdminPopup = (e?: Event, revoke?: boolean) => {
+    if (e) {
+      e.stopPropagation()
+      e.preventDefault()
+    }
     if (revoke) {
       if (revokeAdminPopup) {
         setSelectedMember(null)
@@ -270,9 +286,9 @@ const Members = ({
                     <DropdownOptionsUl>
                       {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
                         <DropdownOptionLi
-                          onClick={() => {
+                          onClick={(e: any) => {
                             setSelectedMember(member)
-                            toggleChangeRolePopup()
+                            toggleChangeRolePopup(e)
                           }}
                           key={1}
                           hoverBackground={colors.hoverBackgroundColor}
@@ -282,9 +298,9 @@ const Members = ({
                       )}
                       {showMakeMemberAdmin && checkActionPermission('changeMemberRole') && member.role !== 'owner' && (
                         <DropdownOptionLi
-                          onClick={() => {
+                          onClick={(e: any) => {
                             setSelectedMember(member)
-                            toggleMakeAdminPopup(member.role === 'admin')
+                            toggleMakeAdminPopup(e, member.role === 'admin')
                           }}
                           textColor={member.role === 'admin' ? colors.red1 : ''}
                           key={2}
@@ -295,9 +311,9 @@ const Members = ({
                       )}
                       {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
                         <DropdownOptionLi
-                          onClick={() => {
+                          onClick={(e: any) => {
                             setSelectedMember(member)
-                            toggleKickMemberPopup()
+                            toggleKickMemberPopup(e)
                           }}
                           textColor={colors.red1}
                           key={3}
@@ -311,9 +327,9 @@ const Members = ({
                           textColor={colors.red1}
                           key={4}
                           hoverBackground={colors.hoverBackgroundColor}
-                          onClick={() => {
+                          onClick={(e: any) => {
                             setSelectedMember(member)
-                            toggleBlockMemberPopup()
+                            toggleBlockMemberPopup(e)
                           }}
                         >
                           Remove and Block member
@@ -366,7 +382,7 @@ const Members = ({
         <ConfirmPopup
           theme={theme}
           handleFunction={handleMakeAdmin}
-          togglePopup={() => toggleMakeAdminPopup(false)}
+          togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
           buttonBackground={colors.primary}
           title='Promote admin'
@@ -384,7 +400,7 @@ const Members = ({
       {revokeAdminPopup && (
         <ConfirmPopup
           handleFunction={handleRevokeAdmin}
-          togglePopup={() => toggleMakeAdminPopup(true)}
+          togglePopup={() => toggleMakeAdminPopup(undefined, true)}
           buttonText='Revoke'
           title='Revoke admin'
           theme={theme}
@@ -458,7 +474,7 @@ const MemberName = styled.h4`
 const EditMemberIcon = styled.span`
   margin-left: auto;
   cursor: pointer;
-  padding: 2px;
+  padding: 15px;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s;

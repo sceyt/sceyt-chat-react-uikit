@@ -295,13 +295,26 @@ export const formatLargeText = (text: string, maxLength: number): any => {
   return text */
 }
 
+export const getLastTwoChars = (element: any) => {
+  const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  const selection = win.getSelection()
+  const focusOffset = selection.focusOffset
+  const focusNode = selection.focusNode
+  if (focusNode.nodeName !== 'SPAN') {
+    return focusNode.textContent?.slice(focusOffset - 2, focusOffset)
+  }
+  return ''
+}
 export const getCaretPosition = (element: any) => {
   let caretOffset = 0
   // const textNodes = 0
   const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
-  const focusOffset = win.getSelection().focusOffset
-  const focusNode = win.getSelection().focusNode
+  const selection = win.getSelection()
+  // console.log('get pos .>>> >> >selection', selection)
+  const focusOffset = selection.focusOffset
+  const focusNode = selection.focusNode
   // const text = element.innerText
   // console.log('focusOffset. . . . .', focusOffset)
   // console.log('focusNode. . . . .', focusNode)
@@ -457,6 +470,111 @@ export const setCursorPosition = (
     // console.log('position not exist attempt', attempt, 'e.', e)
     if (attempt <= 5) {
       setCursorPosition(element, position - 1, isAddMention, ++attempt)
+    }
+  }
+}
+
+export const setSelectionRange = (element: any, start: number, end: number, attempt: number | undefined = 0) => {
+  try {
+    const range = document.createRange()
+    const sel = window.getSelection()
+    let currentNodeStart = element.childNodes[0]
+    let currentNodeEnd = element.childNodes[0]
+    let caretOffsetStart = 0
+    let caretOffsetEnd = 0
+    let currentNodeStartIsFind = false
+    let currentNodeEndIsFind = false
+    element.childNodes.forEach((node: any, index: number) => {
+      if (!currentNodeStartIsFind && node.nodeType === Node.TEXT_NODE) {
+        currentNodeStart = node
+        const textLength = node.nodeValue.length
+        caretOffsetStart = caretOffsetStart + textLength
+
+        if (caretOffsetStart >= start) {
+          currentNodeStartIsFind = true
+          currentNodeStart = node
+
+          caretOffsetStart = start - (caretOffsetStart - textLength)
+        } else if (caretOffsetEnd >= end) {
+          currentNodeEnd = node
+        }
+        // caretOffset += 1
+      } else if (!currentNodeStartIsFind) {
+        if (node.nodeName === 'SPAN') {
+          caretOffsetStart += node.innerText.length
+
+          if (caretOffsetStart >= start) {
+            currentNodeStartIsFind = true
+            currentNodeStart = node
+            caretOffsetStart = start - caretOffsetStart
+          }
+        } else {
+          // textNodes += 1
+        }
+      }
+      if (!currentNodeEndIsFind && node.nodeType === Node.TEXT_NODE) {
+        currentNodeEnd = node
+        const textLength = node.nodeValue.length
+        caretOffsetEnd = caretOffsetEnd + textLength
+
+        if (caretOffsetEnd >= end) {
+          currentNodeEndIsFind = true
+          currentNodeEnd = node
+          caretOffsetEnd = end - (caretOffsetEnd - textLength)
+          return
+        }
+        // caretOffset += 1
+      } else if (!currentNodeEndIsFind) {
+        if (node.nodeName === 'SPAN') {
+          caretOffsetEnd += node.innerText.length
+
+          if (caretOffsetEnd >= end) {
+            currentNodeEndIsFind = true
+            currentNodeEnd = node
+            caretOffsetEnd = 1
+            return
+          }
+        } else {
+          // textNodes += 1
+        }
+      }
+      if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
+        if (!currentNodeStartIsFind) {
+          console.log('start +=1')
+          caretOffsetStart += 1
+        }
+        if (!currentNodeEndIsFind) {
+          console.log('+=1')
+          caretOffsetEnd += 1
+        }
+      }
+      if (element.childNodes.length === index + 1) {
+        if (!currentNodeStartIsFind) {
+          currentNodeStartIsFind = true
+          if (start > caretOffsetStart) {
+            caretOffsetStart++
+          }
+          currentNodeStart = node
+          caretOffsetStart = caretOffsetStart - start
+        }
+        if (!currentNodeEndIsFind) {
+          currentNodeEndIsFind = true
+          currentNodeEnd = node
+          caretOffsetEnd = caretOffsetEnd - end
+        }
+      }
+    })
+    range.setStart(currentNodeStart, caretOffsetStart)
+    range.setEnd(currentNodeEnd, caretOffsetEnd)
+    // range.collapse(true)
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  } catch (e) {
+    console.log('position not exist attempt', attempt, 'e.', e)
+    if (attempt <= 5) {
+      setSelectionRange(element, start - 1, end - 1, ++attempt)
     }
   }
 }

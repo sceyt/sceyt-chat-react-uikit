@@ -409,7 +409,7 @@ export const removeDraftMessageFromMap = (channelId: string) => {
 
 export const setDraftMessageToMap = (
   channelId: string,
-  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage }
+  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage; editorState?: any }
 ) => {
   draftMessagesMap[channelId] = draftMessage
 }

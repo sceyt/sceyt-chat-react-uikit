@@ -16,6 +16,7 @@ export const colors = {
   lightModeTextColor1: '#111539',
   textColor2: '#707388',
   textColor3: '#A0A1B0',
+  placeholderTextColor: '#acacad',
 
   gray0: '#F3F5F8',
   gray1: '#EDEDED',

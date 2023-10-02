@@ -702,6 +702,39 @@ export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boole
   color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
   font-weight: ${(props) => props.isLastMessage && '500'};
 `
+export const StyledText = styled.span<{
+  color?: string
+  fontWeight?: string
+  fontFamily?: string
+  fontStyle?: string
+  isLastMessage?: boolean
+  textDecoration?: string
+  letterSpacing?: string
+}>`
+  font-weight: ${(props) => props.fontWeight || (props.isLastMessage && '500')};
+  font-family: ${(props) => props.fontFamily};
+  font-style: ${(props) => props.fontStyle};
+  text-decoration: ${(props) => props.textDecoration};
+  letter-spacing: ${(props) => props.letterSpacing};
+  &.bold {
+    font-weight: bold;
+  }
+  &.italic {
+    font-style: italic;
+  }
+  &.underline {
+    text-decoration: underline;
+  }
+  &.strikethrough {
+    text-decoration: line-through;
+  }
+  &.underline.strikethrough {
+    text-decoration: underline line-through;
+  }
+  &.monospace {
+    letter-spacing: 4px;
+  }
+`
 
 export const MessageOwner = styled.h3<{
   color?: string

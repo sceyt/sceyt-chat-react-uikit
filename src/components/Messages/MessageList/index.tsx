@@ -861,10 +861,6 @@ const MessageList: React.FC<MessagesProps> = ({
       // setTimeout(() => {
       if (loadDirection !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
-        /* if (lastVisibleMessageId === prevMessageId) {
-          console.log('should scroll to last visible message >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>> ....... ')
-          scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
-        } */
         if (lastVisibleMessage) {
           scrollRef.current.style.scrollBehavior = 'inherit'
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop

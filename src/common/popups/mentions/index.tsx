@@ -88,9 +88,9 @@ export default function MentionMembersPopup({
       })
     }
     if (e.key === 'Enter') {
+      handleMentionMember()
       e.preventDefault()
       // setActiveIndex((prevState) => (prevState > 0 ? prevState - 1 : prevState))
-      handleMentionMember()
     }
   }
   /*  const handleClicks = (e: any) => {
@@ -260,7 +260,7 @@ const EditMemberIcon = styled.span`
   transition: all 0.2s;
 `
 
-const MembersList = styled.ul<{ ref?: any }>`
+export const MembersList = styled.ul<{ ref?: any }>`
   margin: 4px 0 0;
   padding: 0;
   overflow-x: hidden;
@@ -268,7 +268,7 @@ const MembersList = styled.ul<{ ref?: any }>`
   transition: all 0.2s;
   height: calc(100% - 10px); ;
 `
-const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
+export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
