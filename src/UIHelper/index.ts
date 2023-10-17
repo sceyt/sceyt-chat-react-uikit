@@ -698,10 +698,6 @@ export const UploadAvatarHandler = styled.div`
   color: ${colors.textColor1};
 `
 
-export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boolean }>`
-  color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
-  font-weight: ${(props) => props.isLastMessage && '500'};
-`
 export const StyledText = styled.span<{
   color?: string
   fontWeight?: string
@@ -716,8 +712,13 @@ export const StyledText = styled.span<{
   font-style: ${(props) => props.fontStyle};
   text-decoration: ${(props) => props.textDecoration};
   letter-spacing: ${(props) => props.letterSpacing};
+
+  &.mention {
+    color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
+    font-weight: ${(props) => props.isLastMessage && '500'};
+  }
   &.bold {
-    font-weight: bold;
+    font-weight: 600;
   }
   &.italic {
     font-style: italic;
@@ -765,6 +766,7 @@ export const MessageText = styled.pre<{
   withMediaAttachment?: boolean
   isForwarded?: boolean
   withPaddings?: boolean
+  theme: string
 }>`
   display: flow-root;
   position: relative;
@@ -793,6 +795,7 @@ export const MessageText = styled.pre<{
   letter-spacing: 0.3px;
   color: ${(props) => props.color || colors.textColor1};
   user-select: text;
+  overflow: hidden;
 
   ${(props) =>
     props.isRepliedMessage &&

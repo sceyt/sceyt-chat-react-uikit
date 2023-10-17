@@ -122,11 +122,6 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (channel.muted) {
       const dateDiff = moment(channel.mutedTill).diff(moment())
-      console.log(
-        'channel is muted. .. ',
-        channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id)),
-        dateDiff
-      )
       if (dateDiff <= 0) {
         dispatch(updateChannelDataAC(channel.id, { muted: false, mutedTill: null }))
         updateChannelOnAllChannels(channel.id, { muted: false, mutedTill: null })

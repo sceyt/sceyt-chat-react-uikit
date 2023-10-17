@@ -2,9 +2,10 @@ import React, { FC, useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
+import LinkifyIt from 'linkify-it'
 
 // Rich text editor
-import { $createParagraphNode, $createTextNode, $getRoot } from 'lexical'
+import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, FORMAT_TEXT_COMMAND } from 'lexical'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { LexicalComposer } from '@lexical/react/LexicalComposer'
 import { ContentEditable } from '@lexical/react/LexicalContentEditable'
@@ -16,19 +17,9 @@ import FloatingTextFormatToolbarPlugin from './FloatingTextFormatToolbarPlugin'
 import { MentionNode } from './MentionNode'
 import EditMessagePlugin from './EditMessagePlugin'
 import FormatMessagePlugin from './FormatMessagePlugin'
+import EmojisPopup from './EmojisPlugin'
 
-import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
-import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
-import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
-import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
-import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
-import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
-import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
-import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
-import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
-import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
-import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+// Action creators
 import {
   clearSelectedMessagesAC,
   deleteMessageAC,
@@ -42,12 +33,16 @@ import {
   setMessageToEditAC,
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
-import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
-import { detectBrowser, detectOS, hashString } from '../../helpers'
-import { EditorTheme, getAllowEditDeleteIncomingMessage, makeUsername, MessageTextFormat } from '../../helpers/message'
-import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
-import EmojisPopup from './EmojisPlugin'
+import {
+  joinChannelAC,
+  sendTypingAC,
+  setChannelDraftMessageIsRemovedAC,
+  setCloseSearchChannelsAC,
+  setDraggedAttachmentsAC
+} from '../../store/channel/actions'
+import { getMembersAC } from '../../store/member/actions'
+
+// Selectors
 import {
   messageForReplySelector,
   messageToEditSelector,
@@ -59,17 +54,23 @@ import {
   draggedAttachmentsSelector,
   typingIndicatorSelector
 } from '../../store/channel/selector'
-import { IAttachment, IMember, IMessage, IUser } from '../../types'
-import {
-  joinChannelAC,
-  sendTypingAC,
-  setChannelDraftMessageIsRemovedAC,
-  setCloseSearchChannelsAC,
-  setDraggedAttachments
-} from '../../store/channel/actions'
-import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
-import DropDown from '../../common/dropdown'
+import { activeChannelMembersSelector } from '../../store/member/selector'
+import { themeSelector } from '../../store/theme/selector'
+
+// Helpers
+import {
+  compareMessageBodyAttributes,
+  EditorTheme,
+  getAllowEditDeleteIncomingMessage,
+  makeUsername,
+  MessageTextFormat
+} from '../../helpers/message'
+import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
+import { colors } from '../../UIHelper/constants'
+import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
+import { detectBrowser, detectOS, hashString } from '../../helpers'
+import { IAttachment, IMember, IMessage, IUser } from '../../types'
 import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
@@ -93,32 +94,50 @@ import {
   MESSAGE_DELIVERY_STATUS,
   USER_STATE
 } from '../../helpers/constants'
-import usePermissions from '../../hooks/usePermissions'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { useDidUpdate } from '../../hooks'
-import { getClient } from '../../common/client'
-import { CONNECTION_STATUS } from '../../store/user/constants'
-import LinkifyIt from 'linkify-it'
-import { themeSelector } from '../../store/theme/selector'
-import { getDataFromDB } from '../../helpers/indexedDB'
 import { hideUserPresence } from '../../helpers/userHelper'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame } from '../../helpers/getVideoFrame'
-import ForwardMessagePopup from '../../common/popups/forwardMessage'
-import ConfirmPopup from '../../common/popups/delete'
-import { getMembersAC } from '../../store/member/actions'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
-import { activeChannelMembersSelector } from '../../store/member/selector'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 
-function AutoFocusPlugin() {
+// Hooks
+import usePermissions from '../../hooks/usePermissions'
+import { useDidUpdate } from '../../hooks'
+
+// Icons
+import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
+import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
+import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
+import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
+import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
+import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
+import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
+import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
+import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
+import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
+import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+
+// Components
+import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
+import DropDown from '../../common/dropdown'
+import ConfirmPopup from '../../common/popups/delete'
+import ForwardMessagePopup from '../../common/popups/forwardMessage'
+
+import { getClient } from '../../common/client'
+import { getDataFromDB } from '../../services/indexedDB'
+
+function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => {
     // Focus the editor when the effect fires!
     editor.focus()
-  }, [editor])
+  }, [editor, messageForReply])
 
   return null
 }
+
 function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
   const [editor] = useLexicalComposerContext()
 
@@ -131,6 +150,32 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
           const paragraphNode = $createParagraphNode()
           paragraphNode.append($createTextNode(shouldClearEditor.draftMessage.text))
           editor.setEditorState(shouldClearEditor.draftMessage.editorState)
+        } else {
+          const paragraphNode = $createParagraphNode()
+          rootNode.append(paragraphNode)
+          rootNode.selectEnd()
+        }
+        const selection: any = $getSelection()
+        if (selection.hasFormat('bold')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
+        }
+        if (selection.hasFormat('italic')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')
+        }
+        if (selection.hasFormat('underline')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')
+        }
+        if (selection.hasFormat('strikethrough')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')
+        }
+        if (selection.hasFormat('subscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'subscript')
+        }
+        if (selection.hasFormat('superscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'superscript')
+        }
+        if (selection.hasFormat('code')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')
         }
         setEditorCleared()
       })
@@ -155,7 +200,6 @@ interface SendMessageProps {
   // eslint-disable-next-line no-unused-vars
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
   inputCustomClassname?: string
-  inputAutofocus?: boolean
   disabled?: boolean
   showAddEmojis?: boolean
   AddEmojisIcon?: JSX.Element
@@ -185,6 +229,7 @@ interface SendMessageProps {
   voiceMessage?: boolean
   sendAttachmentSeparately?: boolean
   allowMentionUser?: boolean
+  allowTextEdit?: boolean
   textSelectionBackgroundColor?: string
 }
 
@@ -210,7 +255,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   backgroundColor,
   inputBackgroundColor,
   inputCustomClassname,
-  inputAutofocus = true,
   inputPaddings,
   selectedAttachmentsBorderRadius,
   selectedFileAttachmentsIcon,
@@ -222,6 +266,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   editMessageIcon,
   sendAttachmentSeparately,
   allowMentionUser = true,
+  allowTextEdit = true,
   textSelectionBackgroundColor
   // voiceMessage = true
 }) => {
@@ -272,8 +317,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [shouldClearEditor, setShouldClearEditor] = useState<{ clear: boolean; draftMessage?: any }>({ clear: false })
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedMembers, setMentionedMembers] = useState<any>([])
-
   const [browser, setBrowser] = useState<any>('')
+  const [mentionsIsOpen, setMentionsIsOpen] = useState<any>(false)
 
   const [inputContainerHeight, setInputContainerHeight] = useState<any>()
 
@@ -303,27 +348,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
   function onChange(editorState: any) {
     setRealEditorState(editorState)
-    editorState.read(() => {
-      const rootNode = $getRoot()
-      const plainText = rootNode.getTextContent()
-      if (!messageToEdit) {
-        setMessageText(plainText)
-      }
-    })
-
-    if (typingTimout) {
-      if (!inTypingStateTimout) {
-        handleSendTypingState(true)
-      }
-      clearTimeout(typingTimout)
-    } else {
-      handleSendTypingState(true)
-    }
-    setTypingTimout(
-      setTimeout(() => {
-        setTypingTimout(0)
-      }, 2000)
-    )
   }
 
   const onRef = (_floatingAnchorElem: HTMLDivElement) => {
@@ -359,7 +383,32 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleCloseReply = () => {
     dispatch(setMessageForReplyAC(null))
   }
+
+  const handleDoubleClick = (e: any) => {
+    if (e.target.matches('.mention') || e.target.closest('.mention')) {
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(e.target)
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+    }
+  }
   const handleSendEditMessage = (event?: any) => {
+    if (typingTimout) {
+      if (!inTypingStateTimout) {
+        handleSendTypingState(true)
+      }
+      clearTimeout(typingTimout)
+    } else {
+      handleSendTypingState(true)
+    }
+    setTypingTimout(
+      setTimeout(() => {
+        setTypingTimout(0)
+      }, 2000)
+    )
     /* if (recordedFile) {
       /!* const file = new File([recordedFile.data], recordedFile.data.name, {
         type: 'audio/mp3'
@@ -385,20 +434,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
     } else { */
     const { shiftKey, type, code } = event
-    const isEnter: boolean = code === 'Enter' && shiftKey === false
+    const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const shouldSend =
       (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
     if (isEnter) {
       event.preventDefault()
     }
-    if (shouldSend) {
+    if (shouldSend && !mentionsIsOpen) {
       event.preventDefault()
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
       } else if (messageText || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-
+        console.log('messageTexToSend . . . . .', messageTexToSend)
         const messageToSend: any = {
           // metadata: mentionedMembersPositions,
           body: messageTexToSend,
@@ -542,7 +591,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
-    if (messageTexToSend && messageTexToSend !== messageToEdit.body) {
+    if (messageTexToSend) {
       const mentionedMembersPositions: any = []
       const mentionMembersToSend: any = []
       if (mentionedMembers && mentionedMembers.length) {
@@ -818,7 +867,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               ])
             } else {
               if (dataFromDb) {
-                console.log('data from db . . . . set metas. ... .. ', metas)
                 setAttachments((prevState: any[]) => [
                   ...prevState,
                   {
@@ -951,7 +999,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       attachmentsFiles.forEach(async (file: any) => {
         handleAddAttachment(file, draggedAttachments[0].attachmentType === 'media')
       })
-      dispatch(setDraggedAttachments([], ''))
+      dispatch(setDraggedAttachmentsAC([], ''))
     }
   }, [draggedAttachments])
 
@@ -1112,9 +1160,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (activeChannel.id) {
       prevActiveChannelId = activeChannel.id
     }
-    if (messageInputRef.current && inputAutofocus) {
-      messageInputRef.current.focus()
-    }
 
     dispatch(getMembersAC(activeChannel.id))
     setMentionedMembers([])
@@ -1145,7 +1190,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setSendMessageIsActive(true)
       }
     } else {
-      setSendMessageIsActive(false)
+      if (editMessageText) {
+        if (
+          editMessageText.trim() !== messageToEdit.body ||
+          !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
+        ) {
+          setSendMessageIsActive(true)
+        } else {
+          setSendMessageIsActive(false)
+        }
+      } else {
+        setSendMessageIsActive(false)
+      }
     }
 
     if (messageText.trim()) {
@@ -1178,20 +1234,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments])
-
+  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
       setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
     }
   }, [mentionedMembers])
-
-  useEffect(() => {
-    if (emojiBtnRef && emojiBtnRef.current) {
-      const { left, width } = emojiBtnRef.current.getBoundingClientRect()
-      setEmojisPopupLeftPosition(left - width / 2)
-    }
-  }, [emojiBtnRef.current])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -1220,12 +1268,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [attachments])
 
   useEffect(() => {
-    if (
-      emojiBtnRef.current &&
-      messageInputRef.current &&
-      emojiBtnRef.current.offsetLeft > messageInputRef.current.offsetWidth
-    ) {
-      setEmojisInRightSide(true)
+    if (emojiBtnRef.current && messageInputRef.current) {
+      const windowHeight = window.innerHeight
+      const { left, width, top } = emojiBtnRef.current.getBoundingClientRect()
+      setEmojisPopupBottomPosition(windowHeight - top)
+      setEmojisPopupLeftPosition(left - width / 2)
+      if (emojiBtnRef.current.getBoundingClientRect().left > messageInputRef.current.getBoundingClientRect().left) {
+        setEmojisInRightSide(true)
+      }
     }
     if (attachmentIcoOrder > inputOrder) {
       setAddAttachmentsInRightSide(true)
@@ -1253,6 +1303,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (messageForReply) {
         handleCloseReply()
       }
+    } else {
+      setShouldClearEditor({ clear: true })
     }
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
@@ -1285,7 +1337,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageContRef && messageContRef.current) {
       inputHeightTimeout = setTimeout(() => {
         const inputContHeight = messageContRef.current.getBoundingClientRect().height
-        setEmojisPopupBottomPosition(inputContHeight)
         dispatch(setSendMessageInputHeightAC(inputContHeight))
       }, 800)
     }
@@ -1588,7 +1639,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderRadius={inputBorderRadius}
                   >
                     <LexicalComposer initialConfig={initialConfig}>
-                      <AutoFocusPlugin />
+                      <AutoFocusPlugin messageForReply={messageForReply} />
                       <ClearEditorPlugin
                         shouldClearEditor={shouldClearEditor}
                         setEditorCleared={() => setShouldClearEditor({ clear: false })}
@@ -1627,18 +1678,24 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             userId={user.id}
                             getFromContacts={getFromContacts}
                             members={activeChannelMembers}
+                            setMentionsIsOpen={setMentionsIsOpen}
                           />
                         )}
                         <RichTextPlugin
                           contentEditable={
-                            <div onKeyDown={handleSendEditMessage} className='rich_text_editor' ref={onRef}>
+                            <div
+                              onKeyDown={handleSendEditMessage}
+                              onDoubleClick={handleDoubleClick}
+                              className='rich_text_editor'
+                              ref={onRef}
+                            >
                               <ContentEditable className='content_editable_input' />
                             </div>
                           }
                           placeholder={<Placeholder paddings={inputPaddings}>Type message here ...</Placeholder>}
                           ErrorBoundary={LexicalErrorBoundary}
                         />
-                        {floatingAnchorElem && !isSmallWidthViewport && (
+                        {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
                           <React.Fragment>
                             {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
                             {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
@@ -1766,6 +1823,7 @@ const EditReplyMessageCont = styled.div<any>`
   background-color: ${colors.backgroundColor};
   z-index: 19;
   border-bottom: 1px solid ${colors.gray1};
+  box-sizing: content-box;
 `
 
 const EditMessageText = styled.p<any>`
@@ -1891,18 +1949,23 @@ const LexicalWrapper = styled.div<{
     min-height: 20px;
     display: block;
     border: none;
-    color: ${(props) => props.color};
     box-sizing: border-box;
     outline: none !important;
-    font-size: 15px;
-    line-height: 20px;
     overflow: auto;
     border-radius: ${(props) => props.borderRadius};
     background-color: ${(props) => props.backgroundColor};
     padding: ${(props) => props.paddings};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+    & p {
+      font-size: 15px;
+      line-height: 20px;
+      color: ${(props) => props.color};
+    }
 
     &::selection {
+      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+    }
+    & *::selection {
       background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
     }
     & span::selection {
@@ -1920,7 +1983,7 @@ const LexicalWrapper = styled.div<{
     & .mention {
       color: ${(props) => props.mentionColor || colors.primary};
       background-color: inherit !important;
-      //user-modify: read-only;
+      user-modify: read-only;
     }
 
     & span.bold {
@@ -1930,7 +1993,7 @@ const LexicalWrapper = styled.div<{
       margin: 0;
     }
     & .text_bold {
-      font-weight: bold;
+      font-weight: 600;
     }
     & .text_italic {
       font-style: italic;
@@ -1953,13 +2016,11 @@ const LexicalWrapper = styled.div<{
 
 const Placeholder = styled.span<{ paddings?: string }>`
   position: absolute;
-  top: 0;
+  top: calc(50% - 10px);
   left: 0;
   pointer-events: none;
   color: ${colors.placeholderTextColor};
-  margin: 8px 6px;
-
-  padding: ${(props) => props.paddings};
+  margin-left: 6px;
 `
 
 const EmojiButton = styled.span<any>`
@@ -2092,7 +2153,7 @@ const TypingAnimation = styled.div`
       width: 3.5px;
       height: 3.5px;
       border-radius: 50%;
-      background-color: ${colors.borderColor2}
+      background-color: ${colors.borderColor2};
       animation-name: ${sizeAnimation};
       animation-duration: 0.6s;
       animation-iteration-count: infinite;

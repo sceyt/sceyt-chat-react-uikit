@@ -289,6 +289,7 @@ const Members = ({
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleChangeRolePopup(e)
+                            setCloseMenu('1')
                           }}
                           key={1}
                           hoverBackground={colors.hoverBackgroundColor}
@@ -301,6 +302,7 @@ const Members = ({
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleMakeAdminPopup(e, member.role === 'admin')
+                            setCloseMenu('1')
                           }}
                           textColor={member.role === 'admin' ? colors.red1 : ''}
                           key={2}
@@ -314,6 +316,7 @@ const Members = ({
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleKickMemberPopup(e)
+                            setCloseMenu('1')
                           }}
                           textColor={colors.red1}
                           key={3}
@@ -330,6 +333,7 @@ const Members = ({
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup(e)
+                            setCloseMenu('1')
                           }}
                         >
                           Remove and Block member
@@ -451,7 +455,7 @@ const ActionsMenu = styled.div`
 
 const MemberNamePresence = styled.div`
   margin-left: 12px;
-  max-width: calc(100% - 54px);
+  max-width: calc(100% - 84px);
 
   & > ${SubTitle} {
     display: block;

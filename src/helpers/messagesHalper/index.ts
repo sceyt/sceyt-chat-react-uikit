@@ -33,7 +33,8 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
   sendMessageHandler = handler
 }
 
-const pendingAttachments: { [key: string]: { file: File; checksum: string } } = {}
+const pendingAttachments: { [key: string]: { file: File; checksum: string; messageTid?: string; channelId: string } } =
+  {}
 let messagesMap: messagesMap = {}
 const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
@@ -187,7 +188,10 @@ export function addMessagesToMap(channelId: string, messages: IMessage[], direct
 
 export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
-    if (updatedMessage.params.state === MESSAGE_STATUS.FAILED) {
+    if (
+      updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
+      updatedMessage.params.state === MESSAGE_STATUS.UNMODIFIED
+    ) {
       pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
         if (msg.tid === updatedMessage.messageId) {
           return { ...msg, ...updatedMessage.params }

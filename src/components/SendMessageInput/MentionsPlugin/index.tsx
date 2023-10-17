@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as ReactDOM from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
@@ -75,14 +75,13 @@ function useMentionLookupService(
 ) {
   // const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const [results, setResults] = useState<Array<{ name: string; avatar?: string; id: string; presence: any }>>([])
-  const membersMapMemo = useMemo(() => {
+  membersMap = useMemo(() => {
     mentionsCache.clear()
     return members.reduce((acc: any, member: any) => {
       acc[member.id] = member
       return acc
     }, {})
   }, [members])
-  membersMap = membersMapMemo
   useEffect(() => {
     const cachedResults = mentionsCache.get(mentionString)
     if (mentionString == null) {
@@ -188,7 +187,7 @@ function MentionsTypeaheadMenuItem({
   }
   return (
     <MemberItem
-      key={option.key}
+      key={option.id}
       tabIndex={-1}
       className={className}
       ref={option.setRefElement}
@@ -219,18 +218,121 @@ function MentionsTypeaheadMenuItem({
     </MemberItem>
   )
 }
+const optionObj: any = {}
+function MentionsContainer({
+  queryString,
+  options,
+  selectedIndex,
+  selectOptionAndCleanUp,
+  setHighlightedIndex,
+  setMentionsIsOpen
+}: any) {
+  const contRef: any = useRef()
+  // const [editor] = useLexicalComposerContext()
+  optionObj.selectedIndex = selectedIndex
+
+  const handleKeyDown = (event: any) => {
+    const { code } = event
+    const isEnter: boolean = code === 'Enter'
+    if (isEnter) {
+      const selectedOption = options[selectedIndex]
+      selectOptionAndCleanUp(selectedOption)
+    }
+  }
+  useEffect(() => {
+    setHighlightedIndex(selectedIndex + 1)
+    setTimeout(() => {
+      setHighlightedIndex(selectedIndex || 0)
+    }, 50)
+  }, [queryString])
+  useEffect(() => {
+    document.removeEventListener('keydown', handleKeyDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [selectedIndex])
+  useEffect(() => {
+    setMentionsIsOpen(true)
+    // document.addEventListener('keydown', handleKeyDown)
+    /* console.log('register command ...  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+    console.log('selectedIndex. .> > >> > . . ', selectedIndex)
+    editor.registerCommand(
+      KEY_ENTER_COMMAND,
+      (event: KeyboardEvent | null) => {
+        console.log('options.. . .. ', options)
+        console.log('selectedIndex.. . .. ', selectedIndex)
+        if (!rendered || options === null || selectedIndex === null || options[selectedIndex] == null) {
+          console.log('...>>>> return false ...>>>>>')
+          return false
+        }
+        if (event !== null) {
+          console.log('...>>>> preventDefault ...>>>>>')
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        }
+        console.log('rendered>>>>>>>>>>>>>>>>>>>>', rendered)
+        console.log('...>>>> selectOptionAndCleanUp ...>>>>>', options[selectedIndex])
+        selectOptionAndCleanUp(options[selectedIndex])
+        return true
+      },
+      COMMAND_PRIORITY_NORMAL
+    ) */
+
+    const menuTimeOut = setTimeout(() => {
+      const menuElement = document.getElementById('typeahead-menu')
+      if (menuElement) {
+        menuElement.style.zIndex = 'inherit'
+      }
+    }, 200)
+    return () => {
+      clearTimeout(menuTimeOut)
+      const menuElement = document.getElementById('typeahead-menu')
+      if (menuElement) {
+        menuElement.style.zIndex = '-1'
+      }
+      selectOptionAndCleanUp(null)
+      setMentionsIsOpen(false)
+    }
+  }, [])
+  return (
+    <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
+      <MentionsList>
+        {options.map((option: any, i: number) => (
+          <MentionsTypeaheadMenuItem
+            index={i}
+            isSelected={selectedIndex === i}
+            onClick={() => {
+              setHighlightedIndex(i)
+              selectOptionAndCleanUp(option)
+            }}
+            onMouseEnter={() => {
+              setHighlightedIndex(i)
+            }}
+            key={option.id}
+            option={option}
+          />
+        ))}
+      </MentionsList>
+    </MentionsContainerWrapper>
+  )
+}
 
 export default function MentionsPlugin({
   contactsMap,
   userId,
   getFromContacts,
   setMentionMember,
+  setMentionsIsOpen,
   members
 }: {
   contactsMap: IContactsMap
   userId: string
   getFromContacts?: boolean
+  // eslint-disable-next-line no-unused-vars
   setMentionMember: (member: any) => void
+  // eslint-disable-next-line no-unused-vars
+  setMentionsIsOpen: (state: boolean) => void
   members: IMember[]
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
@@ -248,18 +350,29 @@ export default function MentionsPlugin({
     [results]
   )
 
+  const handleOnOpen = () => {
+    const menuElement = document.getElementById('typeahead-menu')
+    if (menuElement) {
+      menuElement.style.zIndex = 'inherit'
+    }
+  }
+
   const onSelectOption = useCallback(
     (selectedOption: MentionTypeaheadOption, nodeToReplace: TextNode | null, closeMenu: () => void) => {
-      setMentionMember(membersMap[selectedOption.id])
-      editor.update(() => {
-        const mentionNode = $createMentionNode({ ...selectedOption, name: `@${selectedOption.name}` })
-        if (nodeToReplace) {
-          const replacedNode = nodeToReplace.replace(mentionNode)
-          const appendedNode = replacedNode.insertAfter($createTextNode(' '))
-          appendedNode.select()
-        }
+      if (selectedOption) {
+        setMentionMember(membersMap[selectedOption.id])
+        editor.update(() => {
+          const mentionNode = $createMentionNode({ ...selectedOption, name: `@${selectedOption.name}` })
+          if (nodeToReplace) {
+            const replacedNode = nodeToReplace.replace(mentionNode)
+            const appendedNode = replacedNode.insertAfter($createTextNode(' '))
+            appendedNode.select()
+          }
+          closeMenu()
+        })
+      } else {
         closeMenu()
-      })
+      }
     },
     [editor]
   )
@@ -281,28 +394,18 @@ export default function MentionsPlugin({
       onSelectOption={onSelectOption}
       triggerFn={checkForMentionMatch}
       options={options}
+      onOpen={handleOnOpen}
       menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) =>
         anchorElementRef.current && results.length
           ? ReactDOM.createPortal(
-              <MentionsContainer className='typeahead-popover mentions-menu'>
-                <MentionsList>
-                  {options.map((option, i: number) => (
-                    <MentionsTypeaheadMenuItem
-                      index={i}
-                      isSelected={selectedIndex === i}
-                      onClick={() => {
-                        setHighlightedIndex(i)
-                        selectOptionAndCleanUp(option)
-                      }}
-                      onMouseEnter={() => {
-                        setHighlightedIndex(i)
-                      }}
-                      key={option.key}
-                      option={option}
-                    />
-                  ))}
-                </MentionsList>
-              </MentionsContainer>,
+              <MentionsContainer
+                queryString={queryString}
+                options={options}
+                setMentionsIsOpen={setMentionsIsOpen}
+                selectOptionAndCleanUp={selectOptionAndCleanUp}
+                selectedIndex={selectedIndex}
+                setHighlightedIndex={setHighlightedIndex}
+              />,
               anchorElementRef.current
             )
           : null
@@ -311,7 +414,7 @@ export default function MentionsPlugin({
   )
 }
 
-export const MentionsContainer = styled.div<{ mentionsIsOpen?: boolean }>`
+export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; ref?: any }>`
   position: relative;
   animation: fadeIn 0.2s ease-in-out;
   @keyframes fadeIn {
@@ -323,7 +426,13 @@ export const MentionsContainer = styled.div<{ mentionsIsOpen?: boolean }>`
     }
   }
 `
-const MentionsList = styled.ul<{ height?: number; hidden?: boolean; backgroundColor?: string; withBorder?: boolean }>`
+
+const MentionsList = styled.ul<{
+  height?: number
+  hidden?: boolean
+  backgroundColor?: string
+  withBorder?: boolean
+}>`
   position: absolute;
   bottom: 100%;
   width: 300px;
@@ -356,7 +465,7 @@ export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundCo
 `
 
 const UserNamePresence = styled.div`
-  width: 100%;
+  width: calc(100% - 44px);
   margin-left: 12px;
 `
 const MemberName = styled.h3<{ color?: string }>`

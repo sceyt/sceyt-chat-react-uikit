@@ -123,7 +123,7 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { attachmentCompilationStateSelector, messagesHasNextSelector } from './selector'
 import { isJSON } from '../../helpers/message'
-import { setDataToDB } from '../../helpers/indexedDB'
+import { setDataToDB } from '../../services/indexedDB'
 
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
@@ -193,7 +193,7 @@ function* sendMessage(action: IAction): any {
         }
 
         // messageAttachment.size = message.attachments[0].data.size
-        setPendingAttachment(messageAttachment.tid, messageAttachment.data)
+
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder
           .setBody(message.body)
@@ -211,6 +211,11 @@ function* sendMessage(action: IAction): any {
           messageBuilder.setReplyInThread()
         }
         const messageToSend = messageBuilder.create()
+        setPendingAttachment(messageAttachment.tid, {
+          ...messageAttachment.data,
+          messageTid: messageToSend.tid,
+          channelId: channel.id
+        })
         const messageCopy = {
           ...messageToSend,
           attachments: [...messageAttachment]
@@ -1378,6 +1383,7 @@ function* resendMessage(action: IAction): any {
                 bodyAttributes: messageResponse.bodyAttributes,
                 createdAt: messageResponse.createdAt
               }
+              removePendingMessageFromMap(channel.id, messageCopy.tid)
               yield put(updateMessageAC(messageCopy.tid, JSON.parse(JSON.stringify(messageUpdateData))))
 
               const fileType =

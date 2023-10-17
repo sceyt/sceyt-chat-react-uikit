@@ -225,7 +225,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
       }
       channelsForAction.forEach((channelToDelete: any) => removeChannelFromMap(channelToDelete.id))
     }
-    console.log('dispatch setChannel s.... ', updatedChannels)
     dispatch(setChannelsAC(updatedChannels))
   }
 

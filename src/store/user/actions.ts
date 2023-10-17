@@ -116,12 +116,10 @@ export function browserTabIsActiveAC(state: boolean) {
   }
 }
 
-export function checkUserStatusAC(usersMap: { [key: string]: string }) {
+export function checkUserStatusAC() {
   return {
     type: CHECK_USER_STATUS,
-    payload: {
-      usersMap
-    }
+    payload: {}
   }
 }
 export function updateUserStatusOnMapAC(usersMap: { [key: string]: IUser }) {

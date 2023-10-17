@@ -35,6 +35,7 @@ export default function MessageActions({
   handleCopyMessage,
   handleReportMessage,
   messageStatus,
+  handleSelectMessage,
   handleReplyMessage,
   isThreadMessage,
   rtlDirection,
@@ -95,9 +96,7 @@ export default function MessageActions({
     ? checkActionPermission('editAnyMessage')
     : checkActionPermission('editOwnMessage')
 
-  const replyMessagePermitted = isIncoming
-    ? checkActionPermission('replyAnyMessage')
-    : checkActionPermission('replyOwnMessage')
+  const replyMessagePermitted = checkActionPermission('replyMessage')
 
   const forwardMessagePermitted = checkActionPermission('forwardMessage')
 
@@ -235,7 +234,7 @@ export default function MessageActions({
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
-            onClick={() => handleOpenDeleteMessage()}
+            onClick={() => handleSelectMessage()}
           >
             <ItemNote direction='top'>{selectIconTooltipText || 'Select'}</ItemNote>
             {selectIcon || <SelectIcon />}

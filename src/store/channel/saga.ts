@@ -757,6 +757,7 @@ function* markMessagesDelivered(action: IAction): any {
     }
 
     if (channel) {
+      console.log('send delivered marker ', messageIds)
       yield call(channel.markMessagesAsReceived, messageIds)
     }
   } catch (e) {
@@ -852,8 +853,13 @@ function* markChannelAsRead(action: IAction): any {
     }
     // const updatedChannel = yield call(channel.markAsRead)
     yield call(channel.markAsRead)
-    updateChannelOnAllChannels(channel.id, { unread: false })
-    yield put(updateChannelDataAC(channel.id, { unread: false }))
+    const updateData = {
+      unread: false,
+      newMessageCount: 0,
+      newMentionCount: 0
+    }
+    updateChannelOnAllChannels(channel.id, updateData)
+    yield put(updateChannelDataAC(channel.id, updateData))
   } catch (error) {
     console.log(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
@@ -1076,7 +1082,7 @@ function* sendTyping(action: IAction): any {
       }
     }
   } catch (e) {
-    console.log('ERROR in send typing')
+    console.log('ERROR in send typing', e)
   }
 }
 

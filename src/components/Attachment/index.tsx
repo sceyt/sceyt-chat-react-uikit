@@ -21,11 +21,16 @@ import {
 } from '../../helpers'
 import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { IAttachment } from '../../types'
-import { attachmentTypes, THEME, UPLOAD_STATE } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { colors } from '../../UIHelper/constants'
 import VideoPreview from '../VideoPreview'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
-import { pauseAttachmentUploadingAC, resumeAttachmentUploadingAC } from '../../store/message/actions'
+import {
+  pauseAttachmentUploadingAC,
+  resumeAttachmentUploadingAC,
+  updateAttachmentUploadingStateAC,
+  updateMessageAC
+} from '../../store/message/actions'
 import AudioPlayer from '../AudioPlayer'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
@@ -33,6 +38,8 @@ import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { themeSelector } from '../../store/theme/selector'
 import { base64ToToDataURL } from '../../helpers/resizeImage'
+import { useDidUpdate } from '../../hooks'
+import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -95,6 +102,7 @@ const Attachment = ({
   const [imageLoading, setImageLoading] = useState(true)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [failTimeout, setFailTimeout]: any = useState()
   const [progress, setProgress] = useState(3)
   const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number }>()
   const [isCached, setIsCached] = useState(true)
@@ -111,7 +119,7 @@ const Attachment = ({
           attachment.metadata.szw,
           attachment.metadata.szh,
           attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
         )
       : []
   const isInUploadingState =
@@ -252,6 +260,12 @@ const Attachment = ({
     })
   }
 
+  const handleDeleteSelectedAttachment = (attachmentTid: string) => {
+    if (removeSelected) {
+      removeSelected(attachmentTid)
+    }
+  }
+
   const handleDownloadFile = async () => {
     if (customDownloader) {
       if (!attachment.attachmentUrl) {
@@ -376,22 +390,34 @@ const Attachment = ({
         })
     }
   }, [attachment.id])
-  /* useEffect(() => {
-    console.log('START progress .. .. ', progress)
+  useDidUpdate(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && isInUploadingState) {
+      setFailTimeout(
+        setTimeout(() => {
+          const pendingAttachment = getPendingAttachment(attachment.tid!)
+          dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
 
-    const int = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(int)
-          return prev
-        }
-        return prev + 2
-      })
-    }, 1200)
-  }, []) */
+          if (pendingAttachment && pendingAttachment.messageTid && pendingAttachment.channelId) {
+            updateMessageOnMap(pendingAttachment.channelId, {
+              messageId: pendingAttachment.messageTid,
+              params: { state: MESSAGE_STATUS.FAILED }
+            })
+            updateMessageOnAllMessages(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED })
+            dispatch(updateMessageAC(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED }))
+          }
+          // }
+        }, 20000)
+      )
+    }
+    return () => clearTimeout(failTimeout)
+  }, [connectionStatus])
   useEffect(() => {
     const attachmentIndex = attachment.tid || attachment.id
     if (attachmentIndex && attachmentsUploadProgress[attachmentIndex]) {
+      if (failTimeout) {
+        clearTimeout(failTimeout)
+        setFailTimeout()
+      }
       const uploadProgress = attachmentsUploadProgress[attachmentIndex]
       if (getCustomUploader()) {
         const uploadPercent =
@@ -455,7 +481,8 @@ const Attachment = ({
             withBorder={!isPreview && !isDetailsView}
             fitTheContainer={isDetailsView}
             imageMaxHeight={
-              attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
+              `${renderHeight}px`
+              // attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
             }
             onLoad={() => setImageLoading(false)}
           />
@@ -580,7 +607,7 @@ const Attachment = ({
           {isPreview && (
             <RemoveChosenFile
               color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
-              onClick={() => removeSelected && removeSelected(attachment.tid!)}
+              onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
           )}
         </AttachmentImgCont>
@@ -737,7 +764,7 @@ const Attachment = ({
               />
               <RemoveChosenFile
                 color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
-                onClick={() => removeSelected && removeSelected(attachment.tid!)}
+                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
             </AttachmentImgCont>
           )}
@@ -909,7 +936,7 @@ const Attachment = ({
             isPreview && (
               <RemoveChosenFile
                 color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
-                onClick={() => removeSelected && removeSelected(attachment.tid!)}
+                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
             ) /*: attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL &&
             attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING ? (

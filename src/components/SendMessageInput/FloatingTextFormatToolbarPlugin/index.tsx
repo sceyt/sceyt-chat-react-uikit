@@ -6,6 +6,7 @@ import { ReactComponent as StrikethroughIcon } from '../../../assets/svg/striket
 import { ReactComponent as MonoIcon } from '../../../assets/svg/mono.svg'
 import { ReactComponent as UnderlineIcon } from '../../../assets/svg/underline.svg'
 import {
+  $createTextNode,
   $getSelection,
   $isRangeSelection,
   $isTextNode,
@@ -23,6 +24,7 @@ import styled from 'styled-components'
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { useEventListener } from '../../../hooks'
+import { $isMentionNode } from '../MentionNode'
 type Func = () => void
 export function mergeRegister(...func: Array<Func>): () => void {
   return () => {
@@ -98,7 +100,9 @@ function TextFormatFloatingToolbar({
   isItalic,
   isUnderline,
   isCode,
-  isStrikethrough
+  isStrikethrough,
+  setShowMenu,
+  showMenu
 }: {
   editor: LexicalEditor
   anchorElem: HTMLElement
@@ -109,6 +113,9 @@ function TextFormatFloatingToolbar({
   isSubscript: boolean
   isSuperscript: boolean
   isUnderline: boolean
+  // eslint-disable-next-line no-unused-vars
+  setShowMenu: (showMenu: boolean) => void
+  showMenu: boolean
 }): JSX.Element {
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
@@ -125,8 +132,8 @@ function TextFormatFloatingToolbar({
       }
     }
   }
-  // @ts-ignore
-  function mouseUpListener(e: MouseEvent) {
+
+  function mouseUpListener() {
     if (popupCharStylesEditorRef?.current) {
       if (popupCharStylesEditorRef.current.style.pointerEvents !== 'auto') {
         popupCharStylesEditorRef.current.style.pointerEvents = 'auto'
@@ -163,7 +170,9 @@ function TextFormatFloatingToolbar({
       rootElement !== null &&
       rootElement.contains(nativeSelection.anchorNode)
     ) {
+      setShowMenu(true)
       const rangeRect = getDOMRangeRect(nativeSelection, rootElement)
+
       setFloatingElemPosition(rangeRect, popupCharStylesEditorElem, anchorElem)
     }
   }, [editor, anchorElem])
@@ -183,6 +192,7 @@ function TextFormatFloatingToolbar({
 
     return () => {
       window.removeEventListener('resize', update)
+      setShowMenu(false)
       if (scrollerElem) {
         scrollerElem.removeEventListener('scroll', update)
       }
@@ -212,7 +222,7 @@ function TextFormatFloatingToolbar({
   }, [editor, updateTextFormatFloatingToolbar])
 
   return (
-    <FloatingTextFormatPopup ref={popupCharStylesEditorRef} className='floating-text-format-popup'>
+    <FloatingTextFormatPopup showMenu={showMenu} ref={popupCharStylesEditorRef} className='floating-text-format-popup'>
       {editor.isEditable() && (
         <React.Fragment>
           <Action
@@ -301,11 +311,13 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
   const [isSubscript, setIsSubscript] = useState(false)
   const [isSuperscript, setIsSuperscript] = useState(false)
   const [isCode, setIsCode] = useState(false)
+  const [showMenu, setShowMenu] = useState(false)
   const handleClick = (e: any) => {
     if (!e.target.closest('.rich_text_editor')) {
       setIsText(false)
     }
   }
+
   const updatePopup = useCallback(() => {
     editor.getEditorState().read(() => {
       // Should not to pop up the floating toolbar when using IME input
@@ -329,7 +341,17 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
       }
 
       const node = getSelectedNode(selection)
-
+      if ($isMentionNode(node)) {
+        const nextSibling = node.getNextSibling()
+        if (!nextSibling) {
+          editor.update(() => {
+            const appendedNode = node.insertAfter($createTextNode(' '))
+            appendedNode.select(0, 0)
+          })
+        }
+      }
+      // const textContent = node.getTextContent()
+      // const lastChar = textContent.slice(-1)
       // Update text format
       setIsBold(selection.hasFormat('bold'))
       setIsItalic(selection.hasFormat('italic'))
@@ -350,7 +372,7 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
         setIsText(false)
       }
     })
-  }, [editor])
+  }, [editor, showMenu])
 
   useEventListener('click', handleClick)
   useEffect(() => {
@@ -360,6 +382,38 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
     }
   }, [updatePopup])
 
+  useEffect(() => {
+    editor.getEditorState().read(() => {
+      const selection = $getSelection()
+
+      if (!$isRangeSelection(selection)) {
+        return
+      }
+      if (!showMenu && !selection.getTextContent()) {
+        if (selection.hasFormat('bold')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
+        }
+        if (selection.hasFormat('italic')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')
+        }
+        if (selection.hasFormat('underline')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')
+        }
+        if (selection.hasFormat('strikethrough')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')
+        }
+        if (selection.hasFormat('subscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'subscript')
+        }
+        if (selection.hasFormat('superscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'superscript')
+        }
+        if (selection.hasFormat('code')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')
+        }
+      }
+    })
+  }, [showMenu])
   useEffect(() => {
     return mergeRegister(
       editor.registerUpdateListener(() => {
@@ -388,6 +442,8 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
       isSuperscript={isSuperscript}
       isUnderline={isUnderline}
       isCode={isCode}
+      setShowMenu={setShowMenu}
+      showMenu={showMenu}
     />,
     anchorElem
   )
@@ -402,7 +458,7 @@ export default function FloatingTextFormatToolbarPlugin({
   return useFloatingTextFormatToolbar(editor, anchorElem)
 }
 
-const FloatingTextFormatPopup = styled.div`
+const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
   display: flex;
   background: #fff;
   vertical-align: middle;
@@ -410,7 +466,7 @@ const FloatingTextFormatPopup = styled.div`
   top: 0;
   left: 0;
   opacity: 0;
-  box-shadow: 0px 5px 10px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 5px 10px rgba(0, 0, 0, 0.3);
   border-radius: 8px;
   transition: opacity 0.5s;
   padding: 12px;

@@ -1,6 +1,6 @@
 import React from 'react'
 import { attachmentTypes } from './constants'
-import { MentionedUser, StyledText } from '../UIHelper'
+import { StyledText } from '../UIHelper'
 import { IBodyAttribute, IContact, IContactsMap, IUser } from '../types'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
@@ -108,13 +108,13 @@ export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boo
     ? contact.firstName
       ? getFirstNameOnly
         ? `${contact.firstName.split(' ')[0]}`
-        : `${contact.firstName.trim()} ${contact.lastName?.trim()}`
+        : `${contact.firstName.trim()} ${contact.lastName?.trim()}`.trim()
       : contact.id
     : user
     ? user.firstName
       ? getFirstNameOnly
         ? `${fromContact ? '~' : ''}${user.firstName.split(' ')[0]}`
-        : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`
+        : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`.trim()
       : user.id || 'Deleted user'
     : 'Deleted user'
 }
@@ -155,15 +155,17 @@ const linkifyTextPart = (textPart: string, match: any) => {
 }
 
 export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAttribute[] => {
-  const attributesPositions: any = attributes.sort((a: any, b: any) => a.offset - b.offset)
+  const sortedAttributes: any = attributes.sort((a: any, b: any) => a.offset - b.offset)
   const combinedAttributes = {}
-  attributesPositions.forEach((attribute: any) => {
+  sortedAttributes.forEach((attribute: any) => {
     const offset = attribute.offset
     const typeValue = attribute.type
 
     // If offset exists in the combinedAttributes object, update the type value by adding a comma-separated string
     if (offset in combinedAttributes) {
       combinedAttributes[offset].type += ` ${typeValue}`
+      const metadata = (combinedAttributes[offset].metadata += ` ${attribute.metadata}`)
+      combinedAttributes[offset].metadata = metadata.trim()
     } else {
       // If offset does not exist, create a new entry in the combinedAttributes object
       combinedAttributes[offset] = {
@@ -199,6 +201,7 @@ export const MessageTextFormat = ({
     const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
     const textPart = text
     let nextPartIndex: any
+
     combinedAttributesList.forEach((attribute: any, index: number) => {
       const attributeOffset = attribute.offset
 
@@ -216,32 +219,77 @@ export const MessageTextFormat = ({
           secondPart = linkifyTextPart(secondPart, secondPartMatch)
         }
 
-        if (attribute.type === 'mention') {
+        if (attribute.type.includes('mention')) {
           const mentionDisplay =
             message.mentionedUsers && message.mentionedUsers.find((men: any) => men.id === attribute.metadata)
           // const idLength = attribute.metadata.length
 
           const user = getClient().user
-          const mentionDisplayName = `@${makeUsername(
-            user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-            mentionDisplay,
-            getFromContacts
-          ).trim()}`
-
-          nextPartIndex = attribute.offset + attribute.length
-
-          messageText.push(
-            firstPart,
-            // @ts-ignore
-            asSampleText ? (
-              mentionDisplayName
-            ) : (
-              <MentionedUser isLastMessage={isLastMessage} color={colors.primary} key={attributeOffset}>
-                {mentionDisplayName}
-              </MentionedUser>
-            ),
-            index === combinedAttributesList.length - 1 ? secondPart : ''
-          )
+          let mentionDisplayName = text.slice(attributeOffset, attributeOffset + attribute.length)
+          if (mentionDisplay) {
+            mentionDisplayName = `@${makeUsername(
+              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
+              mentionDisplay,
+              getFromContacts
+            ).trim()}`
+          }
+          if (nextPartIndex > attributeOffset) {
+            messageText = messageText.slice(0, -2)
+            const prevAtt = combinedAttributesList[index - 1]
+            const start = nextPartIndex - prevAtt.length
+            const currentTextPart = `${textPart ? textPart?.substring(start || 0, start + prevAtt.length) : ''}`
+            const currentMentionIndex = currentTextPart.indexOf(`@${attribute.metadata}`)
+            const firsTextPart = `${currentTextPart.substring(0, currentMentionIndex)}`
+            const secondTextPart = `${currentTextPart.substring(
+              currentMentionIndex + attribute.length,
+              prevAtt.length
+            )}`
+            secondPart = `${textPart ? textPart?.substring(prevAtt.offset + prevAtt.length) : ''}`
+            nextPartIndex = prevAtt.offset + prevAtt.length
+            messageText.push(
+              // @ts-ignore
+              asSampleText ? (
+                currentTextPart
+              ) : (
+                <StyledText
+                  className={`${combinedAttributesList[index - 1].type}`}
+                  isLastMessage={isLastMessage}
+                  key={attributeOffset + index}
+                >
+                  {firsTextPart}
+                  <StyledText
+                    className='mention'
+                    isLastMessage={isLastMessage}
+                    color={colors.primary}
+                    key={attributeOffset + index}
+                  >
+                    {mentionDisplayName}
+                  </StyledText>
+                  {secondTextPart}
+                </StyledText>
+              ),
+              index === combinedAttributesList.length - 1 ? secondPart : ''
+            )
+          } else {
+            nextPartIndex = attribute.offset + attribute.length
+            messageText.push(
+              firstPart,
+              // @ts-ignore
+              asSampleText ? (
+                mentionDisplayName
+              ) : (
+                <StyledText
+                  className={attribute.type}
+                  isLastMessage={isLastMessage}
+                  color={colors.primary}
+                  key={attributeOffset}
+                >
+                  {mentionDisplayName}
+                </StyledText>
+              ),
+              index === combinedAttributesList.length - 1 ? secondPart : ''
+            )
+          }
         } else {
           nextPartIndex = attributeOffset + attribute.length
 
@@ -249,14 +297,14 @@ export const MessageTextFormat = ({
             firstPart,
             // @ts-ignore
             asSampleText ? (
-              `${text.slice(attributeOffset, attributeOffset + attribute.length).trim()}`
+              `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
             ) : (
               <StyledText
                 isLastMessage={isLastMessage}
                 className={attribute.type}
                 key={`${attributeOffset}-${attribute.type}`}
               >
-                {`${text.slice(attributeOffset, attributeOffset + attribute.length).trim()}`}
+                {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
               </StyledText>
             ),
             index === combinedAttributesList.length - 1 ? secondPart : ''
@@ -376,6 +424,10 @@ export const setAllowEditDeleteIncomingMessage = (allow: boolean) => {
   allowEditDeleteIncomingMessage = allow
 }
 export const getAllowEditDeleteIncomingMessage = () => allowEditDeleteIncomingMessage
+
+export const compareMessageBodyAttributes = (attributes1: IBodyAttribute[], attributes2: IBodyAttribute[]) => {
+  return JSON.stringify(attributes1) === JSON.stringify(attributes2)
+}
 
 export const bodyAttributesMapByType = {
   1: ['bold'],

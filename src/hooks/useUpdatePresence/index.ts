@@ -22,18 +22,27 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   if (userId && usersMap[userId] && !isVisible) {
     deleteUserFromMap(userId)
   }
-  if (userId && !usersMap[userId] && isVisible && directChannelUser) {
-    setUserToMap(directChannelUser as IUser)
-  }
+
   if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
     clearInterval(updateInterval)
     updateInterval = setInterval(() => {
-      dispatch(checkUserStatusAC(usersMap))
+      dispatch(checkUserStatusAC())
     }, 4000)
   } else if (!Object.keys(usersMap).length && updateInterval) {
     clearInterval(updateInterval)
     updateInterval = undefined
   }
+
+  useEffect(() => {
+    if (userId && isVisible && directChannelUser) {
+      if (!usersMap[userId]) {
+        setUserToMap(directChannelUser as IUser)
+      } else if (usersMap[userId].presence.state !== directChannelUser.presence!.state) {
+        updateUserOnMap(directChannelUser as IUser)
+        dispatch(updateUserStatusOnChannelAC({ [directChannelUser.id]: directChannelUser }))
+      }
+    }
+  })
 
   useEffect(() => {
     clearInterval(updateInterval)

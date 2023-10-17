@@ -342,6 +342,15 @@ export default function* watchForEvents(): any {
           unblockedMembers
         }
       })
+    channelListener.onReceivedChannelEvent = (channelId: string, user: IUser, eventName: string) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.CHANNEL_EVENT,
+        args: {
+          channelId,
+          user,
+          eventName
+        }
+      })
     SceytChatClient.addChannelListener('CHANNEL_EVENTS', channelListener)
     SceytChatClient.addConnectionListener('CONNECTION_EVENTS', connectionListener)
 
@@ -600,7 +609,6 @@ export default function* watchForEvents(): any {
           if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
             addMessageToMap(channel.id, message)
           }
-
           yield put(
             updateChannelDataAC(channel.id, {
               ...channelForAdd,
@@ -648,6 +656,7 @@ export default function* watchForEvents(): any {
                 )
               }
             }
+            console.log('send delivered for message . .. . ', message)
             if (message.repliedInThread && message.parentMessage.id) {
               yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
             } else {
@@ -812,6 +821,8 @@ export default function* watchForEvents(): any {
               body: message.body,
               state: message.state,
               attachments: message.attachments,
+              bodyAttributes: message.bodyAttributes,
+              mentionedUsers: message.mentionedUsers,
               updatedAt: message.updatedAt
             })
           )
@@ -819,6 +830,8 @@ export default function* watchForEvents(): any {
             body: message.body,
             state: message.state,
             attachments: message.attachments,
+            bodyAttributes: message.bodyAttributes,
+            mentionedUsers: message.mentionedUsers,
             updatedAt: message.updatedAt
           })
         }
@@ -1128,6 +1141,12 @@ export default function* watchForEvents(): any {
         console.log('user TOKEN_WILL_EXPIRE ... ', expireTime)
         break
       } */
+
+      case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
+        // const { user, channelId, name } = args
+        console.log('channel event received >>>... . . . . . ', args)
+        break
+      }
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
         console.log('connection status changed . . . . . ', status)

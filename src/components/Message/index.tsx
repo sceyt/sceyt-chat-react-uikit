@@ -193,6 +193,7 @@ interface IMessageProps {
   openedMessageMenuId?: string
   tabIsActive?: boolean
   connectionStatus: string
+  theme: string
 }
 
 const Message = ({
@@ -310,7 +311,8 @@ const Message = ({
   contactsMap,
   openedMessageMenuId,
   tabIsActive,
-  connectionStatus
+  connectionStatus,
+  theme
 }: IMessageProps) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -927,6 +929,7 @@ const Message = ({
                 handleResendMessage={handleResendMessage}
                 handleReplyMessage={handleReplyMessage}
                 handleReportMessage={handleToggleReportPopupOpen}
+                handleSelectMessage={handleSelectMessage}
                 handleOpenEmojis={handleOpenEmojis}
                 selfMessage={message.user && messageUserID === user.id}
                 isThreadMessage={isThreadMessage}
@@ -1116,6 +1119,7 @@ const Message = ({
             </React.Fragment>
           ) : ( */}
           <MessageText
+            theme={theme}
             draggable={false}
             color={colors.textColor1}
             showMessageSenderName={showMessageSenderName}
@@ -1429,7 +1433,8 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
     prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.tabIsActive === nextProps.tabIsActive
+    prevProps.tabIsActive === nextProps.tabIsActive &&
+    prevProps.theme === nextProps.theme
   )
 })
 

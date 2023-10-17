@@ -87,7 +87,9 @@ const VideoPreview = memo(function VideoPreview({
   useEffect(() => {
     let checkVideoInterval: any
     if (videoRef.current) {
+      let intervalCount = 0
       checkVideoInterval = setInterval(async () => {
+        intervalCount++
         if (videoRef.current && videoRef.current.readyState > 3) {
           // drawCanvas()
           // videoRef.current.currentTime = 2
@@ -104,6 +106,12 @@ const VideoPreview = memo(function VideoPreview({
                 setVideoIsReadyToSend(file.tid!)
               }
             }
+          }
+          clearInterval(checkVideoInterval)
+        }
+        if (intervalCount >= 8) {
+          if (setVideoIsReadyToSend) {
+            setVideoIsReadyToSend(file.tid!)
           }
           clearInterval(checkVideoInterval)
         }

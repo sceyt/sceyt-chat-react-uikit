@@ -46,7 +46,7 @@ import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
-import { setDraggedAttachments } from '../../../store/channel/actions'
+import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { useDidUpdate } from '../../../hooks'
 import { LOADING_STATE } from '../../../helpers/constants'
 import { getClient } from '../../../common/client'
@@ -693,7 +693,7 @@ const MessageList: React.FC<MessagesProps> = ({
           fileReader.readAsDataURL(attachment)
         })
       }).then(() => {
-        dispatch(setDraggedAttachments(attachmentsFiles, 'file'))
+        dispatch(setDraggedAttachmentsAC(attachmentsFiles, 'file'))
       })
       e.dataTransfer.clearData()
     }
@@ -703,29 +703,25 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    const fileList = Array.from(e.dataTransfer.items)
-    fileList.forEach((file: any) => {
-      const fileType = file.type.split('/')[0]
-      console.log('file. .. . ', file.getAsFile())
-      console.log('fileType. .. . ', fileType)
-    })
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const fileList: File[] = Object.values(e.dataTransfer.files)
       const attachmentsFiles: any = []
       new Promise<void>((resolve) => {
-        fileList.forEach((attachment, index) => {
+        let readFiles = 0
+        fileList.forEach((attachment) => {
           const fileReader = new FileReader()
           fileReader.onload = (event: any) => {
             const file = event.target.result
             attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
-            if (fileList.length - 1 === index) {
+            readFiles++
+            if (fileList.length === readFiles) {
               resolve()
             }
           }
           fileReader.readAsDataURL(attachment)
         })
       }).then(() => {
-        dispatch(setDraggedAttachments(attachmentsFiles, 'media'))
+        dispatch(setDraggedAttachmentsAC(attachmentsFiles, 'media'))
       })
       e.dataTransfer.clearData()
     }
@@ -842,6 +838,7 @@ const MessageList: React.FC<MessagesProps> = ({
     // messageTopDateRef.current.innerText = ''
     // setActiveChannel(channel)
   }, [channel.id])
+
   useDidUpdate(() => {
     if (!isDragging) {
       renderTopDate()
@@ -1142,6 +1139,7 @@ const MessageList: React.FC<MessagesProps> = ({
                             ...message,
                             metadata: messageMetas
                           }}
+                          theme={theme}
                           channel={channel}
                           stopScrolling={setStopScrolling}
                           handleMediaItemClick={(attachment) => setMediaFile(attachment)}

@@ -71,7 +71,7 @@ const DropDownTriggerContainer = styled.div<{
 
 const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor?: string }>`
   position: absolute;
-  z-index: 300;
+  z-index: 30;
   min-width: 200px;
   right: ${(props) => props.position !== 'left' && '0'};
   left: ${(props) => props.position === 'left' && '0'};
@@ -122,6 +122,7 @@ interface IProps {
   dropDownState?: boolean
   order?: number
   margin?: string
+  // eslint-disable-next-line no-unused-vars
   watchToggleState?: (state: boolean) => void
   height?: string
   children?: JSX.Element | JSX.Element[]
@@ -147,7 +148,6 @@ const DropDown = ({
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)
-
   const toggleDropdown = () => {
     setIsOpen(!isOpen)
     if (watchToggleState) {

@@ -9,7 +9,9 @@ import { IMessage } from '../../../types'
 function useFormatMessage(
   editor: LexicalEditor,
   editorState: any,
+  // eslint-disable-next-line no-unused-vars
   setMessageBodyAttributes: (data: any) => void,
+  // eslint-disable-next-line no-unused-vars
   setMessageText: (newMessageText: string) => void,
   messageToEdit?: IMessage
 ): void {
@@ -28,8 +30,25 @@ function useFormatMessage(
           parsedEditorState.root.children.length &&
           (parsedEditorState.root.children[0].children.length > 1 ||
             (parsedEditorState.root.children[0].children[0] &&
-              parsedEditorState.root.children[0].children[0].type === 'mention'))
+              (parsedEditorState.root.children[0].children[0].type === 'mention' ||
+                parsedEditorState.root.children[0].children[0].format > 0)))
         ) {
+          /* if (
+          parsedEditorState.root &&
+          parsedEditorState.root.children &&
+          parsedEditorState.root.children.length &&
+          (parsedEditorState.root.children[0].children.length > 1 ||
+            (parsedEditorState.root.children[0].children[0] &&
+              parsedEditorState.root.children[0].children[0].type === 'mention'))
+        ) { */
+          /*   if (
+            parsedEditorState.root.children[0].children.length === 1 &&
+            parsedEditorState.root.children[0].children[0].format > 0
+          ) {
+            return
+          } */
+          // console.log('parsedEditorState.root.children[0].children >>> ', parsedEditorState.root.children[0].children)
+          // console.log('offsetList >>> ', offsetList)
           let currentOffsetDiff = 0
           let newMessageText = messageText
           parsedEditorState.root.children[0].children.forEach((child: any, index: number) => {
@@ -44,13 +63,33 @@ function useFormatMessage(
               )}${mentionId}${newMessageText.slice(offset + currentOffsetDiff + length)}`
               const menIndex = offset + currentOffsetDiff
               currentOffsetDiff += idLength - length
-
               messageBodyAttributes.push({
                 type: 'mention',
                 metadata: child.mentionName,
                 offset: menIndex,
                 length: idLength
               })
+              if (child.format) {
+                const attributeTypes = bodyAttributesMapByType[child.format]
+
+                if (attributeTypes.length > 1) {
+                  attributeTypes.forEach((attributeType: string) => {
+                    messageBodyAttributes.push({
+                      type: attributeType,
+                      metadata: child.metadata || '',
+                      offset: menIndex,
+                      length
+                    })
+                  })
+                } else {
+                  messageBodyAttributes.push({
+                    type: attributeTypes[0],
+                    metadata: child.metadata || '',
+                    offset: menIndex,
+                    length
+                  })
+                }
+              }
             } else {
               const attributeTypes = bodyAttributesMapByType[child.format]
               if (attributeTypes) {
@@ -63,6 +102,7 @@ function useFormatMessage(
                   attributeTypes.forEach((attributeType: string) => {
                     messageBodyAttributes.push({
                       type: attributeType,
+                      metadata: child.metadata || '',
                       offset: attIndex,
                       length
                     })
@@ -70,6 +110,7 @@ function useFormatMessage(
                 } else {
                   messageBodyAttributes.push({
                     type: attributeTypes[0],
+                    metadata: child.metadata || '',
                     offset: attIndex,
                     length
                   })
@@ -83,6 +124,9 @@ function useFormatMessage(
           } else {
             setMessageText(messageToEdit ? messageToEdit.body : '')
           }
+        } else {
+          setMessageText(messageText)
+          setMessageBodyAttributes([])
         }
       })
     }

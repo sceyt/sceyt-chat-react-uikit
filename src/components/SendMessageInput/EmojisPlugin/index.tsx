@@ -68,7 +68,6 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
-  console.log('EmojisPopup leftPosition', leftPosition)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
@@ -246,7 +245,10 @@ const Container = styled.div<{
   noBorder?: boolean
 }>`
   position: ${(props) => (props.leftPosition ? 'fixed' : props.relativePosition ? 'relative' : 'absolute')};
-  left: ${(props) => props.leftPosition || (props.rtlDirection ? '' : props.rightSide ? '' : '5px')};
+  left: ${(props) =>
+    props.rightSide
+      ? `calc(${props.leftPosition} - 250px)`
+      : props.leftPosition || (props.rtlDirection ? '' : props.rightSide ? '' : '5px')};
   right: ${(props) => (props.rtlDirection ? '0' : props.rightSide ? '65px' : '')};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   bottom: ${(props) => props.bottomPosition};

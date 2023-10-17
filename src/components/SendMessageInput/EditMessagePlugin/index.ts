@@ -15,6 +15,7 @@ export default function EditMessagePlugin({
   editMessage: IMessage
   contactsMap: any
   getFromContacts: boolean
+  // eslint-disable-next-line no-unused-vars
   setMentionedMember: (mentionedMember: any) => void
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
@@ -30,14 +31,44 @@ export default function EditMessagePlugin({
         const textPart = editMessage.body
         let nextPartIndex: any
         if (editMessage.bodyAttributes && editMessage.bodyAttributes.length) {
-          const combinedAttributes = combineMessageAttributes(editMessage.bodyAttributes)
+          const bodyAttributes = JSON.parse(JSON.stringify(editMessage.bodyAttributes))
+          const modifiedAttributes: IBodyAttribute[] = []
+          bodyAttributes
+            .sort((a: any, b: any) => a.offset - b.offset)
+            .forEach((attribute: IBodyAttribute, index: number) => {
+              if (attribute.type === 'mention') {
+                const prevAttribute = bodyAttributes[index - 1]
+                if (prevAttribute && attribute.offset < prevAttribute.offset + prevAttribute.length) {
+                  modifiedAttributes.pop()
+                  const modifiedAttribute = {
+                    ...prevAttribute,
+                    offset: prevAttribute.offset,
+                    length: attribute.offset - prevAttribute.offset
+                  }
+                  modifiedAttributes.push(modifiedAttribute)
+                  modifiedAttributes.push(attribute)
+                  modifiedAttributes.push({ ...attribute, type: modifiedAttribute.type, metadata: '' })
+                  const modifiedNextAttribute = {
+                    ...prevAttribute,
+                    offset: attribute.offset + attribute.length,
+                    length: prevAttribute.offset + prevAttribute.length - (attribute.offset + attribute.length)
+                  }
+                  modifiedAttributes.push(modifiedNextAttribute)
+                } else {
+                  modifiedAttributes.push(attribute)
+                }
+              } else {
+                modifiedAttributes.push(attribute)
+              }
+            })
+          const combinedAttributes = combineMessageAttributes(modifiedAttributes)
           combinedAttributes.forEach((attribute: IBodyAttribute, index) => {
             const attributeOffset = attribute.offset
             const firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
             const secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
 
             nextPartIndex = attribute.offset + attribute.length
-            if (attribute.type === 'mention') {
+            if (attribute.type.includes('mention')) {
               const mentionUser = editMessage.mentionedUsers.find((mention) => mention.id === attribute.metadata)
               if (mentionUser) {
                 const userDisplayName = makeUsername(contactsMap[mentionUser.id], mentionUser, getFromContacts)
@@ -52,13 +83,44 @@ export default function EditMessagePlugin({
                 if (firstPart) {
                   paragraphNode.append($createTextNode(firstPart))
                 }
+                if (attribute.type.length > 7) {
+                  const typeArray = attribute.type.split(' ').filter((type) => type !== 'mention')
+                  // const styleNumber = 0
+                  typeArray.forEach((type: any) => {
+                    /* mentionNode.setStyle(
+                      type === 'monospace'
+                        ? 'letter-spacing: 4px'
+                        : type === 'strikethrough'
+                        ? 'text-decoration: line-through'
+                        : ''
+                    ) */
+                    const format = type === 'monospace' ? 'code' : type
+                    mentionNode.toggleFormat(format)
+                  })
+                  /*  const attTypes = attribute.type.replace('mention', '').trim()
+                  for (const style in bodyAttributesMapByType) {
+                    const stylesStr = bodyAttributesMapByType[style].join(' ')
+                    if (stylesStr === attTypes) {
+                      styleNumber = Number(style)
+                    }
+                  } */
+                  // console.log('styleNumber >>>>>>>>>>>>> ', styleNumber)
+                  // mentionNode.setFormat(styleNumber)
+                }
+                // const typeArray = attribute.type.split(' ').reverse()
                 paragraphNode.append(mentionNode)
               }
             } else {
+              if (
+                combinedAttributes[index + 1] &&
+                combinedAttributes[index + 1].type.includes('mention') &&
+                combinedAttributes[index + 1].offset < attributeOffset + attribute.length
+              ) {
+                return
+              }
               if (firstPart) {
                 paragraphNode.append($createTextNode(firstPart))
               }
-              console.log('attribute. . . ..  ', attribute)
               const textNode = $createTextNode(textPart.slice(attributeOffset, attributeOffset + attribute.length))
               switch (attribute.type) {
                 case 'bold': {
@@ -101,9 +163,9 @@ export default function EditMessagePlugin({
                 paragraphNode.append($createTextNode(' '))
               }
             }
-            rootNode.append(paragraphNode)
-            rootNode.selectEnd()
           })
+          rootNode.append(paragraphNode)
+          rootNode.selectEnd()
         } else {
           paragraphNode.append($createTextNode(editMessage.body))
           rootNode.append(paragraphNode)

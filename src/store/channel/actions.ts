@@ -449,7 +449,7 @@ export function setIsDraggingAC(isDragging: boolean) {
   }
 }
 
-export function setDraggedAttachments(attachments: File[], type: string) {
+export function setDraggedAttachmentsAC(attachments: File[], type: string) {
   return {
     type: SET_DRAGGED_ATTACHMENTS,
     payload: {

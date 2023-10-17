@@ -50,6 +50,7 @@ export default function ReactionsPopup({
   rtlDirection
 }: IReactionsPopupProps) {
   const popupRef = useRef<HTMLDivElement>(null)
+  const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
   const messageInputHeight = useSelector(sendMessageInputHeightSelector, shallowEqual)
   // const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
@@ -62,10 +63,10 @@ export default function ReactionsPopup({
   const [popupVerticalPosition, setPopupVerticalPosition] = useState('')
   // const [popupHorizontalPosition, setPopupHorizontalPosition] = useState('')
   const [popupHeight, setPopupHeight] = useState(0)
+  const [scoresHeight, setScoresHeight] = useState(0)
   const [calculateSizes, setCalculateSizes] = useState(false)
   const [closeIsApproved, setCloseIsApproved] = useState(false)
   let totalReactions = 0
-  console.log('reactionTotals. . . . ', reactionTotals)
   if (reactionTotals) {
     reactionTotals.forEach((summery) => {
       totalReactions += summery.count
@@ -105,6 +106,12 @@ export default function ReactionsPopup({
       dispatch(setReactionsListAC([], true))
     }
   }, [messageId])
+  useEffect(() => {
+    const scoresElem = scoresRef.current
+    if (scoresElem) {
+      setScoresHeight(scoresElem.offsetHeight)
+    }
+  })
 
   useEffect(() => {
     if (!reactionTotals || !reactionTotals.length) {
@@ -152,7 +159,7 @@ export default function ReactionsPopup({
       rtlDirection={rtlDirection}
       borderRadius={reactionsDetailsPopupBorderRadius}
     >
-      <ReactionScoresCont>
+      <ReactionScoresCont ref={scoresRef}>
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
@@ -178,7 +185,7 @@ export default function ReactionsPopup({
           ))}
         </ReactionScoresList>
       </ReactionScoresCont>
-      <ReactionsList onScroll={handleReactionsListScroll} popupHeight={popupHeight}>
+      <ReactionsList scoresHeight={scoresHeight} onScroll={handleReactionsListScroll} popupHeight={popupHeight}>
         {reactions.map((reaction: IReaction) => (
           <ReactionItem key={reaction.id}>
             <AvatarWrapper>
@@ -290,14 +297,15 @@ const MemberName = styled.h3`
   }
 `
 
-const ReactionsList = styled.ul<{ popupHeight?: any }>`
+const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
   margin: 0;
   padding: 0;
   overflow: ${(props) => !props.popupHeight && 'hidden'};
   overflow-x: hidden;
   list-style: none;
   transition: all 0.2s;
-  height: calc(100% - 45px); ;
+  height: ${(props) => `calc(100% - ${props.scoresHeight || 57}px)`};
+    calc(100% - 57px);
 `
 
 const ReactionScoresCont = styled.div`
