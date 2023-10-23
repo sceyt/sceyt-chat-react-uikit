@@ -112,8 +112,8 @@ const VideoPreview = memo(function VideoPreview({
         if (intervalCount >= 8) {
           if (setVideoIsReadyToSend) {
             setVideoIsReadyToSend(file.tid!)
+            clearInterval(checkVideoInterval)
           }
-          clearInterval(checkVideoInterval)
         }
       }, 1000)
     }

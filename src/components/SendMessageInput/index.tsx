@@ -123,6 +123,7 @@ import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
 import DropDown from '../../common/dropdown'
 import ConfirmPopup from '../../common/popups/delete'
 import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
@@ -290,15 +291,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const allowSetMention =
     allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
-  /* const recordingInitialState = {
-    recordingSeconds: 0,
-    recordingMilliseconds: 0,
-    initRecording: false,
-    mediaStream: null,
-    mediaRecorder: null,
-    audio: undefined
-  } */
-  const messageContRef = useRef<any>(null)
+
+  // Voice recording
+  const [showRecording, setShowRecording] = useState<boolean>(false)
+  const [recordedFile, setRecordedFile] = useState<any>(null)
+
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
@@ -310,9 +307,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [emojisPopupLeftPosition, setEmojisPopupLeftPosition] = useState(0)
   const [emojisPopupBottomPosition, setEmojisPopupBottomPosition] = useState(0)
   const [addAttachmentsInRightSide, setAddAttachmentsInRightSide] = useState(false)
-
-  // const [recording, setRecording] = useState<Recording>(recordingInitialState)
-  // const [recordedFile, setRecordedFile] = useState<any>(null)
 
   const [shouldClearEditor, setShouldClearEditor] = useState<{ clear: boolean; draftMessage?: any }>({ clear: false })
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
@@ -337,6 +331,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+
+  const messageContRef = useRef<any>(null)
   const fileUploader = useRef<any>(null)
   const inputWrapperRef = useRef<any>(null)
   const messageInputRef = useRef<any>(null)
@@ -1003,125 +999,52 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [draggedAttachments])
 
-  /* const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      setRecording((prevState: any) => ({
-        ...prevState,
-        initRecording: true,
-        mediaStream: stream
-      }))
-    } catch (e) {
-    }
-  }
-
-  const saveRecord = () => {
-    const recorder = recording.mediaRecorder
-    if (recorder && recorder.state !== 'inactive') {
-      recorder.stop()
-    }
-  }
-
-  const deleteRecord = () => {
-    const recorder = recording.mediaRecorder
-    if (recorder)
-      recorder.stream.getAudioTracks().forEach((track: any) => track.stop())
-    setRecording(recordingInitialState)
-  }
-
-  useDidUpdate(() => {
-    if (recording.mediaStream) {
-      setRecording({
-        ...recording,
-        mediaRecorder: new MediaRecorder(recording.mediaStream, {
-          mimeType: 'audio/webm'
-        })
-      })
-    }
-  }, [recording.mediaStream])
-
-  useEffect(() => {
-    const MAX_RECORDER_TIME = 15
-    let recordingInterval: any = null
-
-    if (recording.initRecording) {
-      recordingInterval = setInterval(() => {
-        setRecording((prevState) => {
-          if (
-            prevState.recordingSeconds === MAX_RECORDER_TIME &&
-            prevState.recordingMilliseconds === 0
-          ) {
-            clearInterval(recordingInterval)
-            return prevState
-          }
-
-          if (
-            prevState.recordingMilliseconds >= 0 &&
-            prevState.recordingMilliseconds < 99
-          ) {
-            return {
-              ...prevState,
-              recordingMilliseconds: prevState.recordingMilliseconds + 1
-            }
-          }
-
-          if (prevState.recordingMilliseconds === 99) {
-            return {
-              ...prevState,
-              recordingSeconds: prevState.recordingSeconds + 1,
-              recordingMilliseconds: 0
-            }
-          }
-
-          return prevState
-        })
-      }, 10)
-    } else clearInterval(recordingInterval)
-
-    return () => clearInterval(recordingInterval)
-  }, [recording.initRecording])
-
-  useEffect(() => {
-    const recorder = recording.mediaRecorder
-    let chunks: Blob[] = []
-    if (recorder && recorder.state === 'inactive') {
-      recorder.start()
-      recorder.ondataavailable = (e) => {
-        chunks.push(e.data)
-      }
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        chunks = []
-        setRecording((prevState) => {
-          if (prevState.mediaRecorder) {
-            setRecordedFile({
-              data: blob,
-              attachmentURL: URL.createObjectURL(blob)
-            })
-            return {
-              ...recordingInitialState,
-              initRecording: false,
-              audio: URL.createObjectURL(blob)
-            }
-          }
-          return recordingInitialState
-        })
-      }
-    }
-
-    return () => {
-      if (recorder)
-        recorder.stream.getAudioTracks().forEach((track) => track.stop())
-    }
-  }, [recording.mediaRecorder])
-
   useEffect(() => {
     if (recordedFile) {
-      handleSendEditMessage()
+      const tid = uuidv4()
+      const reader = new FileReader()
+      reader.onload = async () => {
+        // @ts-ignore
+        const length = reader.result && reader.result.length
+        let fileChecksum
+        if (length > 3000) {
+          const firstPart = reader.result && reader.result.slice(0, 1000)
+          const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
+          const lastPart = reader.result && reader.result.slice(length - 1000, length)
+          fileChecksum = `${firstPart}${middlePart}${lastPart}`
+        } else {
+          fileChecksum = `${reader.result}`
+        }
+        const checksumHash = await hashString(fileChecksum || '')
+
+        setPendingAttachment(tid, { file: recordedFile, checksum: checksumHash })
+        const messageToSend = {
+          metadata: '',
+          body: '',
+          mentionedMembers: [],
+          attachments: [
+            {
+              name: `${uuidv4()}.mp3`,
+              data: recordedFile.file,
+              tid,
+              upload: true,
+              size: recordedFile.file.size,
+              attachmentUrl: recordedFile.objectUrl,
+              metadata: { tmb: recordedFile.thumb, dur: recordedFile.dur },
+              type: attachmentTypes.voice
+            }
+          ],
+          type: 'text'
+        }
+        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
+      }
+
+      reader.onerror = (e: any) => {
+        console.log(' error on read file onError', e)
+      }
+      reader.readAsBinaryString(recordedFile.file)
     }
   }, [recordedFile])
-*/
 
   useEffect(() => {
     const updateViewPortWidth = () => {
@@ -1312,23 +1235,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [messageToEdit])
 
   useEffect(() => {
-    /* wavesurfer.current = WaveSurfer.create({
-      container: '#waveform',
-      waveColor: '#757D8B',
-      progressColor: '#0DBD8B',
-      // cursorColor: 'transparent',
-      barWidth: 2,
-      barRadius: 3,
-      cursorWidth: 0,
-      barGap: 2,
-      barMinHeight: 1,
-      height: 200,
-    });
-
-    wavesurfer.current.on('ready', () => {
-      wavesurfer.current.play();
-    }); */
-
     setBrowser(detectBrowser())
     if (handleSendMessage) {
       setSendMessageHandler(handleSendMessage)
@@ -1562,194 +1468,178 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               )}
               <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
                 <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                <MessageInputWrapper
-                  className='message_input_wrapper'
-                  borderRadius={borderRadius}
-                  ref={inputWrapperRef}
-                  backgroundColor={backgroundColor || colors.backgroundColor}
-                  channelDetailsIsOpen={channelDetailsIsOpen}
-                  messageInputOrder={inputOrder}
-                  messageInputPaddings={inputPaddings}
-                >
-                  {showAddEmojis && (
-                    <EmojiButton
-                      order={emojiIcoOrder}
-                      isEmojisOpened={isEmojisOpened}
-                      ref={emojiBtnRef}
-                      hoverColor={colors.primary}
-                      height={inputContainerHeight || minHeight}
-                      onClick={() => {
-                        setIsEmojisOpened(!isEmojisOpened)
-                      }}
-                    >
-                      {AddEmojisIcon || <EmojiSmileIcon />}
-                    </EmojiButton>
-                  )}
-                  {showAddAttachments && (
-                    <DropDown
-                      theme={theme}
-                      forceClose={showChooseAttachmentType}
-                      position={addAttachmentsInRightSide ? 'top' : 'topRight'}
-                      margin='auto 0 0'
-                      order={attachmentIcoOrder}
-                      trigger={
-                        <AddAttachmentIcon
-                          ref={addAttachmentsBtnRef}
-                          color={colors.primary}
-                          height={inputContainerHeight || minHeight}
-                        >
-                          {AddAttachmentsIcon || <AttachmentIcon />}
-                        </AddAttachmentIcon>
-                      }
-                    >
-                      <DropdownOptionsUl>
-                        <DropdownOptionLi
-                          key={1}
-                          textColor={colors.textColor1}
-                          hoverBackground={colors.hoverBackgroundColor}
-                          onClick={() => onOpenFileUploader(mediaExtensions)}
-                          iconWidth='20px'
-                          iconColor={colors.textColor2}
-                        >
-                          <ChoseMediaIcon />
-                          Photo or video
-                        </DropdownOptionLi>
-                        <DropdownOptionLi
-                          key={2}
-                          textColor={colors.textColor1}
-                          hoverBackground={colors.hoverBackgroundColor}
-                          onClick={() => onOpenFileUploader('')}
-                          iconWidth='20px'
-                          iconColor={colors.textColor2}
-                        >
-                          <ChoseFileIcon />
-                          File
-                        </DropdownOptionLi>
-                      </DropdownOptionsUl>
-                    </DropDown>
-                  )}
-                  <LexicalWrapper
-                    ref={messageInputRef}
-                    order={inputOrder}
-                    backgroundColor={inputBackgroundColor}
-                    paddings={inputPaddings}
-                    mentionColor={colors.primary}
-                    className={inputCustomClassname}
-                    selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
-                    borderRadius={inputBorderRadius}
+                {showRecording ? (
+                  <AudioCont />
+                ) : (
+                  <MessageInputWrapper
+                    className='message_input_wrapper'
+                    borderRadius={borderRadius}
+                    ref={inputWrapperRef}
+                    backgroundColor={backgroundColor || colors.backgroundColor}
+                    channelDetailsIsOpen={channelDetailsIsOpen}
+                    messageInputOrder={inputOrder}
+                    messageInputPaddings={inputPaddings}
                   >
-                    <LexicalComposer initialConfig={initialConfig}>
-                      <AutoFocusPlugin messageForReply={messageForReply} />
-                      <ClearEditorPlugin
-                        shouldClearEditor={shouldClearEditor}
-                        setEditorCleared={() => setShouldClearEditor({ clear: false })}
-                      />
-                      {/* eslint-disable-next-line react/jsx-no-bind */}
-                      <OnChangePlugin onChange={onChange} />
-                      <EditMessagePlugin
-                        editMessage={messageToEdit}
-                        contactsMap={contactsMap}
-                        getFromContacts={getFromContacts}
-                        setMentionedMember={setMentionedMembers}
-                      />
-                      <FormatMessagePlugin
-                        editorState={realEditorState}
-                        setMessageBodyAttributes={setMessageBodyAttributes}
-                        messageText={messageToEdit ? editMessageText : messageText}
-                        setMessageText={messageToEdit ? setEditMessageText : setMessageText}
-                        messageToEdit={messageToEdit}
-                      />
-                      <React.Fragment>
-                        {isEmojisOpened && (
-                          <EmojisPopup
-                            // handleAddEmoji={handleAddEmoji}
-                            // messageText={messageText}
-                            // ccc={handleTyping}
-                            handleEmojiPopupToggle={handleEmojiPopupToggle}
-                            rightSide={emojisInRightSide}
-                            bottomPosition={`${emojisPopupBottomPosition}px`}
-                            leftPosition={`${emojisPopupLeftPosition}px`}
-                          />
-                        )}
-                        {allowSetMention && (
-                          <MentionsPlugin
-                            setMentionMember={handleSetMentionMember}
-                            contactsMap={contactsMap}
-                            userId={user.id}
-                            getFromContacts={getFromContacts}
-                            members={activeChannelMembers}
-                            setMentionsIsOpen={setMentionsIsOpen}
-                          />
-                        )}
-                        <RichTextPlugin
-                          contentEditable={
-                            <div
-                              onKeyDown={handleSendEditMessage}
-                              onDoubleClick={handleDoubleClick}
-                              className='rich_text_editor'
-                              ref={onRef}
-                            >
-                              <ContentEditable className='content_editable_input' />
-                            </div>
-                          }
-                          placeholder={<Placeholder paddings={inputPaddings}>Type message here ...</Placeholder>}
-                          ErrorBoundary={LexicalErrorBoundary}
+                    {showAddEmojis && (
+                      <EmojiButton
+                        order={emojiIcoOrder}
+                        isEmojisOpened={isEmojisOpened}
+                        ref={emojiBtnRef}
+                        hoverColor={colors.primary}
+                        height={inputContainerHeight || minHeight}
+                        onClick={() => {
+                          setIsEmojisOpened(!isEmojisOpened)
+                        }}
+                      >
+                        {AddEmojisIcon || <EmojiSmileIcon />}
+                      </EmojiButton>
+                    )}
+                    {showAddAttachments && (
+                      <DropDown
+                        theme={theme}
+                        forceClose={showChooseAttachmentType}
+                        position={addAttachmentsInRightSide ? 'top' : 'topRight'}
+                        margin='auto 0 0'
+                        order={attachmentIcoOrder}
+                        trigger={
+                          <AddAttachmentIcon
+                            ref={addAttachmentsBtnRef}
+                            color={colors.primary}
+                            height={inputContainerHeight || minHeight}
+                          >
+                            {AddAttachmentsIcon || <AttachmentIcon />}
+                          </AddAttachmentIcon>
+                        }
+                      >
+                        <DropdownOptionsUl>
+                          <DropdownOptionLi
+                            key={1}
+                            textColor={colors.textColor1}
+                            hoverBackground={colors.hoverBackgroundColor}
+                            onClick={() => onOpenFileUploader(mediaExtensions)}
+                            iconWidth='20px'
+                            iconColor={colors.textColor2}
+                          >
+                            <ChoseMediaIcon />
+                            Photo or video
+                          </DropdownOptionLi>
+                          <DropdownOptionLi
+                            key={2}
+                            textColor={colors.textColor1}
+                            hoverBackground={colors.hoverBackgroundColor}
+                            onClick={() => onOpenFileUploader('')}
+                            iconWidth='20px'
+                            iconColor={colors.textColor2}
+                          >
+                            <ChoseFileIcon />
+                            File
+                          </DropdownOptionLi>
+                        </DropdownOptionsUl>
+                      </DropDown>
+                    )}
+                    <LexicalWrapper
+                      ref={messageInputRef}
+                      order={inputOrder}
+                      backgroundColor={inputBackgroundColor}
+                      paddings={inputPaddings}
+                      mentionColor={colors.primary}
+                      className={inputCustomClassname}
+                      selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+                      borderRadius={inputBorderRadius}
+                    >
+                      <LexicalComposer initialConfig={initialConfig}>
+                        <AutoFocusPlugin messageForReply={messageForReply} />
+                        <ClearEditorPlugin
+                          shouldClearEditor={shouldClearEditor}
+                          setEditorCleared={() => setShouldClearEditor({ clear: false })}
                         />
-                        {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
-                          <React.Fragment>
-                            {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
-                            {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
-                            <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
-                          </React.Fragment>
-                        )}
-                      </React.Fragment>
-                    </LexicalComposer>
-                  </LexicalWrapper>
-                </MessageInputWrapper>
-                <SendMessageIcon
-                  isActive={sendMessageIsActive}
-                  order={sendIconOrder}
-                  color={colors.backgroundColor}
-                  height={inputContainerHeight || minHeight}
-                  onClick={sendMessageIsActive ? handleSendEditMessage : null}
-                >
-                  <SendIcon />
-                </SendMessageIcon>
-                {/*  {recording.initRecording ? (
-            <AudioCont />
-          ) : (
-            <MessageInput
-              order={inputOrder}
-              onChange={handleTyping}
-              onKeyPress={handleSendEditMessage}
-              // onKeyDown={handleKeyDown}
-              value={messageText}
-              ref={messageInputRef}
-              placeholder='Type message here...'
-            />
-          )}
+                        {/* eslint-disable-next-line react/jsx-no-bind */}
+                        <OnChangePlugin onChange={onChange} />
+                        <EditMessagePlugin
+                          editMessage={messageToEdit}
+                          contactsMap={contactsMap}
+                          getFromContacts={getFromContacts}
+                          setMentionedMember={setMentionedMembers}
+                        />
+                        <FormatMessagePlugin
+                          editorState={realEditorState}
+                          setMessageBodyAttributes={setMessageBodyAttributes}
+                          messageText={messageToEdit ? editMessageText : messageText}
+                          setMessageText={messageToEdit ? setEditMessageText : setMessageText}
+                          messageToEdit={messageToEdit}
+                        />
+                        <React.Fragment>
+                          {isEmojisOpened && (
+                            <EmojisPopup
+                              // handleAddEmoji={handleAddEmoji}
+                              // messageText={messageText}
+                              // ccc={handleTyping}
+                              handleEmojiPopupToggle={handleEmojiPopupToggle}
+                              rightSide={emojisInRightSide}
+                              bottomPosition={`${emojisPopupBottomPosition}px`}
+                              leftPosition={`${emojisPopupLeftPosition}px`}
+                            />
+                          )}
+                          {allowSetMention && (
+                            <MentionsPlugin
+                              setMentionMember={handleSetMentionMember}
+                              contactsMap={contactsMap}
+                              userId={user.id}
+                              getFromContacts={getFromContacts}
+                              members={activeChannelMembers}
+                              setMentionsIsOpen={setMentionsIsOpen}
+                            />
+                          )}
+                          <RichTextPlugin
+                            contentEditable={
+                              <div
+                                onKeyDown={handleSendEditMessage}
+                                onDoubleClick={handleDoubleClick}
+                                className='rich_text_editor'
+                                ref={onRef}
+                              >
+                                <ContentEditable className='content_editable_input' />
+                              </div>
+                            }
+                            placeholder={<Placeholder paddings={inputPaddings}>Type message here ...</Placeholder>}
+                            ErrorBoundary={LexicalErrorBoundary}
+                          />
+                          {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
+                            <React.Fragment>
+                              {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
+                              {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
+                              <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
+                            </React.Fragment>
+                          )}
+                        </React.Fragment>
+                      </LexicalComposer>
+                    </LexicalWrapper>
+                  </MessageInputWrapper>
+                )}
 
-          {sendMessageIsActive ? (
-            <SendMessageIcon order={sendIcoOrder} onClick={handleSendEditMessage}>
-              <SendIcon />
-            </SendMessageIcon>
-          ) : recording.initRecording ? (
-            <React.Fragment>
-              <RecordingTimer>
-                {recording.recordingSeconds}:{recording.recordingMilliseconds}
-              </RecordingTimer>
-              <SendMessageIcon order={sendIcoOrder} onClick={deleteRecord}>
-                <DelteIcon />
-              </SendMessageIcon>
-              <SendMessageIcon order={sendIcoOrder} onClick={saveRecord}>
-                <SendIcon />
-              </SendMessageIcon>
-            </React.Fragment>
-          ) : (
-            <SendMessageIcon order={sendIcoOrder} onClick={startRecording}>
-              <RecordIcon />
-            </SendMessageIcon>
-          )} */}
+                {sendMessageIsActive ? (
+                  <SendMessageIcon
+                    isActive={sendMessageIsActive}
+                    order={sendIconOrder}
+                    color={colors.backgroundColor}
+                    height={inputContainerHeight || minHeight}
+                    onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                  >
+                    <SendIcon />
+                  </SendMessageIcon>
+                ) : (
+                  <SendMessageIcon
+                    order={sendIconOrder}
+                    height={inputContainerHeight || minHeight}
+                    color={colors.primary}
+                  >
+                    <AudioRecord
+                      sendRecordedFile={setRecordedFile}
+                      setShowRecording={setShowRecording}
+                      showRecording={showRecording}
+                    />
+                  </SendMessageIcon>
+                )}
               </SendMessageInputContainer>
             </React.Fragment>
           )}
@@ -2050,7 +1940,7 @@ const SendMessageIcon = styled.span<any>`
   display: flex;
   height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
-  margin: 0 8px;
+  margin: 0 8px 0 auto;
   cursor: pointer;
   line-height: 13px;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
@@ -2059,18 +1949,11 @@ const SendMessageIcon = styled.span<any>`
   color: ${(props) => (props.isActive ? colors.primary : props.color)};
 `
 
-/* const AudioCont = styled.div<any>`
+const AudioCont = styled.div<any>`
   display: flex;
   width: 100%;
   justify-content: flex-end;
 `
-
-const RecordingTimer = styled.span<any>`
-  display: inline-block;
-  width: 50px;
-  font-size: 16px;
-  color: ${colors.gray6};
-` */
 
 const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
   display: flex;
@@ -2244,14 +2127,6 @@ const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
     color: ${colors.white};
   }
 `
-/* interface Recording {
-  recordingSeconds: number
-  recordingMilliseconds: number
-  initRecording: boolean
-  mediaStream: null | MediaStream
-  mediaRecorder: null | MediaRecorder
-  audio?: string
-} */
 
 const SelectedMessagesWrapper = styled.div`
   display: flex;

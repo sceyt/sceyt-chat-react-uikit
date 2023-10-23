@@ -252,6 +252,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_CHANNEL_DATA: {
       const { config, channelId, moveUp } = payload
+      console.log('UPDATE_CHANNEL_DATA reducer .>>.... .', channelId, '.. config ...', config)
       if (moveUp) {
         let updateChannel: any
         const updatedChannels = newState.channels.filter((chan) => {

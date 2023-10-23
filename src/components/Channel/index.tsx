@@ -191,7 +191,7 @@ const Channel: React.FC<IChannelProps> = ({
           >
             {typingIndicator ? (
               !isDirectChannel ? (
-                <LastMessageAuthor theme={theme} typing={typingIndicator}>
+                <LastMessageAuthor theme={theme}>
                   <span ref={messageAuthorRef}>
                     {makeUsername(contactsMap[typingIndicator.from.id], typingIndicator.from, getFromContacts, true)}
                   </span>
@@ -507,7 +507,6 @@ export const DraftMessageText = styled.span<any>`
 export const LastMessageAuthor = styled.div<{ theme?: string; typing?: boolean }>`
   max-width: 120px;
   font-weight: 500;
-  font-style: ${(props) => props.typing && 'italic'};
   color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
 
   & > span {

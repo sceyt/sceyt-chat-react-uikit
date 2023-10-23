@@ -160,13 +160,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           // barHeight: 3,
 
           barWidth: 1,
-          barHeight: 3,
+          barHeight: 1,
 
           hideScrollbar: true,
           barRadius: 1.5,
           cursorWidth: 0,
           barGap: 2,
-          barMinHeight: 1,
+          barMinHeight: 2,
           height: 20
         })
         /* .then((blob) => {
@@ -182,7 +182,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           console.log('object url ........ ', objectURL);
         }); */
         // wavesurfer.current.load(url);
-        wavesurfer.current.load(url)
+        let peaks
+        if (file.metadata && file.metadata.tmb) {
+          const maxVal = Math.max(...file.metadata.tmb)
+          const dec = maxVal / 100
+          peaks = file.metadata.tmb.map((peak: number) => {
+            return peak / dec / 100
+          })
+        }
+
+        wavesurfer.current.load(url, peaks)
 
         wavesurfer.current.on('ready', () => {
           // wavesurfer.current.play();
