@@ -8,7 +8,7 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 import { checkUserStatusAC } from '../../store/user/actions'
 import { CHANNEL_TYPE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
-import { deleteUserFromMap, setUserToMap, usersMap } from '../../helpers/userHelper'
+import { deleteUserFromMap, setUserToMap, updateUserOnMap, usersMap } from '../../helpers/userHelper'
 // import { checkUserStatusAC } from '../../store/user/actions'
 let updateInterval: any
 export default function useUpdatePresence(channel: IChannel, isVisible: boolean) {
@@ -18,23 +18,31 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   const { user } = ChatClient
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-
   const userId = directChannelUser && directChannelUser.id
   if (userId && usersMap[userId] && !isVisible) {
     deleteUserFromMap(userId)
   }
-  if (userId && !usersMap[userId] && isVisible && directChannelUser) {
-    setUserToMap(directChannelUser as IUser)
-  }
+
   if (Object.keys(usersMap).length && connectionStatus === CONNECTION_STATUS.CONNECTED) {
     clearInterval(updateInterval)
     updateInterval = setInterval(() => {
-      dispatch(checkUserStatusAC(usersMap))
+      dispatch(checkUserStatusAC())
     }, 4000)
   } else if (!Object.keys(usersMap).length && updateInterval) {
     clearInterval(updateInterval)
     updateInterval = undefined
   }
+
+  useEffect(() => {
+    if (userId && isVisible && directChannelUser) {
+      if (!usersMap[userId]) {
+        setUserToMap(directChannelUser as IUser)
+      } else if (usersMap[userId].presence.state !== directChannelUser.presence!.state) {
+        updateUserOnMap(directChannelUser as IUser)
+        dispatch(updateUserStatusOnChannelAC({ [directChannelUser.id]: directChannelUser }))
+      }
+    }
+  })
 
   useEffect(() => {
     clearInterval(updateInterval)
@@ -57,7 +65,7 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
             new Date(usersMap[directChannelUser.id].lastActiveAt).getTime()))
     ) {
       dispatch(updateUserStatusOnChannelAC({ [directChannelUser.id]: directChannelUser }))
-      usersMap[directChannelUser.id] = directChannelUser.presence
+      updateUserOnMap(directChannelUser)
     }
   }, [])
   // }

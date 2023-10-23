@@ -30,3 +30,5 @@ export const reactionsListSelector = (store: any) => store.MessageReducer.reacti
 export const reactionsHasNextSelector = (store: any) => store.MessageReducer.reactionsHasNext
 export const reactionsLoadingStateSelector = (store: any) => store.MessageReducer.reactionsLoadingState
 export const openedMessageMenuSelector = (store: any) => store.MessageReducer.openedMessageMenu
+export const playingAudioIdSelector = (store: any) => store.MessageReducer.playingAudioId
+export const selectedMessagesMapSelector = (store: any) => store.MessageReducer.selectedMessagesMap

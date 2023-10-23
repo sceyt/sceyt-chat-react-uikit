@@ -1,8 +1,9 @@
-import React from 'react'
+import React, { FC } from 'react'
 import { useSelector } from 'react-redux'
 import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { colors } from '../../UIHelper/constants'
+import { IChannel, IMessage } from '../../types'
 interface MessagesProps {
   fontFamily?: string
   ownMessageOnRightSide?: boolean
@@ -11,6 +12,8 @@ interface MessagesProps {
   messageStatusDisplayingType?: 'ticks' | 'text'
   ownMessageBackground?: string
   incomingMessageBackground?: string
+  ownRepliedMessageBackground?: string
+  incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
   showMessageTimeAndStatusOnlyOnHover?: boolean
   showMessageTime?: boolean
@@ -20,6 +23,22 @@ interface MessagesProps {
   showSenderNameOnDirectChannel?: boolean
   showSenderNameOnOwnMessages?: boolean
   showSenderNameOnGroupChannel?: boolean
+  MessageActionsMenu?: FC<{
+    message: IMessage
+    channel: IChannel
+    handleSetMessageForEdit?: () => void
+    handleResendMessage?: () => void
+    handleOpenDeleteMessage?: () => void
+    handleOpenForwardMessage?: () => void
+    handleCopyMessage?: () => void
+    handleReportMessage?: () => void
+    handleOpenEmojis?: () => void
+    handleSelectMessage?: () => void
+    handleReplyMessage?: () => void
+
+    isThreadMessage?: boolean
+    rtlDirection?: boolean
+  }>
   showOwnAvatar?: boolean
   messageReaction?: boolean
   editMessage?: boolean
@@ -28,6 +47,7 @@ interface MessagesProps {
   replyMessageInThread?: boolean
   forwardMessage?: boolean
   deleteMessage?: boolean
+  selectMessage?: boolean
   reportMessage?: boolean
   reactionIcon?: JSX.Element
   editIcon?: JSX.Element
@@ -36,6 +56,7 @@ interface MessagesProps {
   replyInThreadIcon?: JSX.Element
   forwardIcon?: JSX.Element
   deleteIcon?: JSX.Element
+  selectIcon?: JSX.Element
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
@@ -50,6 +71,7 @@ interface MessagesProps {
   replyInThreadIconOrder?: number
   forwardIconOrder?: number
   deleteIconOrder?: number
+  selectIconOrder?: number
   allowEditDeleteIncomingMessage?: boolean
   starIconOrder?: number
   reportIconOrder?: number
@@ -60,6 +82,7 @@ interface MessagesProps {
   replyInThreadIconTooltipText?: string
   forwardIconTooltipText?: string
   deleteIconTooltipText?: string
+  selectIconTooltipText?: string
   starIconTooltipText?: string
   reportIconTooltipText?: string
   messageActionIconsColor?: string
@@ -123,19 +146,23 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
   incomingMessageBackground = colors.backgroundColor,
+  ownRepliedMessageBackground,
+  incomingRepliedMessageBackground,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
   showSenderNameOnGroupChannel = true,
   showOwnAvatar = false,
-  messageReaction = false,
-  editMessage = false,
-  copyMessage = false,
-  replyMessage = false,
-  replyMessageInThread = false,
-  forwardMessage = false,
-  deleteMessage = false,
-  reportMessage = false,
+  MessageActionsMenu,
+  messageReaction,
+  editMessage,
+  copyMessage,
+  replyMessage,
+  replyMessageInThread,
+  forwardMessage,
+  deleteMessage,
+  selectMessage,
+  reportMessage,
   reactionIcon,
   editIcon,
   copyIcon,
@@ -143,6 +170,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   replyInThreadIcon,
   forwardIcon,
   deleteIcon,
+  selectIcon,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -175,6 +203,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   replyInThreadIconOrder,
   forwardIconOrder,
   deleteIconOrder,
+  selectIconOrder,
   starIconOrder,
   reportIconOrder,
   reactionIconTooltipText,
@@ -184,6 +213,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   replyInThreadIconTooltipText,
   forwardIconTooltipText,
   deleteIconTooltipText,
+  selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
   messageActionIconsColor,
@@ -233,11 +263,14 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         showMessageTimeForEachMessage={showMessageTimeForEachMessage}
         ownMessageBackground={ownMessageBackground}
         incomingMessageBackground={incomingMessageBackground}
+        ownRepliedMessageBackground={ownRepliedMessageBackground}
+        incomingRepliedMessageBackground={incomingRepliedMessageBackground}
         hoverBackground={hoverBackground}
         showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
         showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
         showSenderNameOnGroupChannel={showSenderNameOnGroupChannel}
         showOwnAvatar={showOwnAvatar}
+        MessageActionsMenu={MessageActionsMenu}
         messageReaction={messageReaction}
         editMessage={editMessage}
         copyMessage={copyMessage}
@@ -245,6 +278,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         replyMessageInThread={replyMessageInThread}
         forwardMessage={forwardMessage}
         deleteMessage={deleteMessage}
+        selectMessage={selectMessage}
         reportMessage={reportMessage}
         reactionIcon={reactionIcon}
         editIcon={editIcon}
@@ -253,6 +287,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         replyInThreadIcon={replyInThreadIcon}
         forwardIcon={forwardIcon}
         deleteIcon={deleteIcon}
+        selectIcon={selectIcon}
         allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
         starIcon={starIcon}
         staredIcon={staredIcon}
@@ -285,6 +320,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         replyInThreadIconOrder={replyInThreadIconOrder}
         forwardIconOrder={forwardIconOrder}
         deleteIconOrder={deleteIconOrder}
+        selectIconOrder={selectIconOrder}
         starIconOrder={starIconOrder}
         reportIconOrder={reportIconOrder}
         reactionIconTooltipText={reactionIconTooltipText}
@@ -294,6 +330,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         replyInThreadIconTooltipText={replyInThreadIconTooltipText}
         forwardIconTooltipText={forwardIconTooltipText}
         deleteIconTooltipText={deleteIconTooltipText}
+        selectIconTooltipText={selectIconTooltipText}
         starIconTooltipText={starIconTooltipText}
         reportIconTooltipText={reportIconTooltipText}
         messageActionIconsColor={messageActionIconsColor}

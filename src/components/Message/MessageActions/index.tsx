@@ -1,6 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteIcon.svg'
+import { ReactComponent as SelectIcon } from '../../../assets/svg/checkCircle.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report_icon.svg'
 import { ReactComponent as EditIcon } from '../../../assets/svg/editIcon.svg'
 import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
@@ -30,11 +31,11 @@ export default function MessageActions({
   channel,
   handleResendMessage,
   handleOpenDeleteMessage,
-  handleDeletePendingMessage,
   handleOpenForwardMessage,
   handleCopyMessage,
   handleReportMessage,
   messageStatus,
+  handleSelectMessage,
   handleReplyMessage,
   isThreadMessage,
   rtlDirection,
@@ -45,6 +46,7 @@ export default function MessageActions({
   showReplyMessageInThread,
   showForwardMessage,
   showDeleteMessage,
+  showSelectMessage,
   showReportMessage,
   reactionIcon,
   editIcon,
@@ -52,6 +54,7 @@ export default function MessageActions({
   replyIcon,
   replyInThreadIcon,
   deleteIcon,
+  selectIcon,
   allowEditDeleteIncomingMessage,
   // starIcon,
   // staredIcon,
@@ -64,6 +67,7 @@ export default function MessageActions({
   forwardIcon,
   forwardIconOrder,
   deleteIconOrder,
+  selectIconOrder,
   // starIconOrder,
   reportIconOrder,
   reactionIconTooltipText,
@@ -73,6 +77,7 @@ export default function MessageActions({
   replyInThreadIconTooltipText,
   forwardIconTooltipText,
   deleteIconTooltipText,
+  selectIconTooltipText,
   // starIconTooltipText,
   reportIconTooltipText,
   myRole,
@@ -91,9 +96,7 @@ export default function MessageActions({
     ? checkActionPermission('editAnyMessage')
     : checkActionPermission('editOwnMessage')
 
-  const replyMessagePermitted = isIncoming
-    ? checkActionPermission('replyAnyMessage')
-    : checkActionPermission('replyOwnMessage')
+  const replyMessagePermitted = checkActionPermission('replyMessage')
 
   const forwardMessagePermitted = checkActionPermission('forwardMessage')
 
@@ -225,21 +228,28 @@ export default function MessageActions({
             {forwardIcon || <ForwardIcon />}
           </Action>
         )}
-
+        {showSelectMessage && (
+          <Action
+            order={selectIconOrder || 6}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverIconColor={colors.primary}
+            onClick={() => handleSelectMessage()}
+          >
+            <ItemNote direction='top'>{selectIconTooltipText || 'Select'}</ItemNote>
+            {selectIcon || <SelectIcon />}
+          </Action>
+        )}
         {showDeleteMessage &&
           (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
             ? myRole === 'owner' || myRole === 'admin'
             : true) && (
             <Action
-              order={deleteIconOrder || 6}
+              order={deleteIconOrder || 7}
               iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
-              onClick={() =>
-                messageStatus === MESSAGE_DELIVERY_STATUS.PENDING
-                  ? handleDeletePendingMessage()
-                  : handleOpenDeleteMessage()
-              }
+              onClick={() => handleOpenDeleteMessage()}
             >
               <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
               {deleteIcon || <DeleteIcon />}
@@ -247,7 +257,7 @@ export default function MessageActions({
           )}
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
-            order={reportIconOrder || 7}
+            order={reportIconOrder || 8}
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
@@ -277,7 +287,6 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
   align-items: center;
   direction: ${(props) => props.rtlDirection && 'initial'};
   background-color: ${(props) => props.backgroundColor};
-  padding: 8px 2px;
   box-sizing: border-box;
   border-radius: 12px;
   box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
@@ -297,12 +306,20 @@ const Action = styled.div<{
   position: relative;
   display: flex;
   padding: 4px;
-  margin: 0 6px;
+  margin: 8px 6px;
   cursor: pointer;
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
   color: ${(props) => props.iconColor || colors.textColor2};
   border-radius: 50%;
+
+  &:first-child {
+    margin-left: 8px;
+  }
+
+  &:last-child {
+    margin-right: 8px;
+  }
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};

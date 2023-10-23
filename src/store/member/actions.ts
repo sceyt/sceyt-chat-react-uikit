@@ -17,7 +17,7 @@ import {
   UPDATE_MEMBERS_PRESENCE,
   GET_ROLES_FAIL
 } from './constants'
-import { IAddMember, IMember, IRole } from '../../types'
+import { IAddMember, IMember, IRole, IUser } from '../../types'
 
 export function getMembersAC(channelId: string) {
   return {
@@ -47,10 +47,10 @@ export function updateMembersAC(members: IMember[]) {
   }
 }
 
-export function updateMembersPresenceAC(members: IMember[]) {
+export function updateMembersPresenceAC(usersMap: { [key: string]: IUser }) {
   return {
     type: UPDATE_MEMBERS_PRESENCE,
-    payload: { members }
+    payload: { usersMap }
   }
 }
 

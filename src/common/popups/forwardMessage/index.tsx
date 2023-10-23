@@ -5,15 +5,15 @@ import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
   loadMoreChannelsForForward,
-  searchChannelsAC,
-  setSearchedChannelsAC
+  searchChannelsForForwardAC,
+  setSearchedChannelsForForwardAC
 } from '../../../store/channel/actions'
 import { useDispatch, useSelector } from 'react-redux'
 import {
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
-  channelsLoadingState,
-  searchedChannelsSelector
+  channelsLoadingStateForForwardSelector,
+  searchedChannelsForForwardSelector
 } from '../../../store/channel/selector'
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
@@ -49,10 +49,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const { user } = ChatClient
   const dispatch = useDispatch()
   const channels = useSelector(channelsForForwardSelector) || []
-  const searchedChannels = useSelector(searchedChannelsSelector) || []
+  const searchedChannels = useSelector(searchedChannelsForForwardSelector) || []
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
-  const channelsLoading = useSelector(channelsLoadingState)
+  const channelsLoading = useSelector(channelsLoadingStateForForwardSelector)
   const channelsHasNext = useSelector(channelsForForwardHasNextSelector)
   const [searchValue, setSearchValue] = useState('')
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
@@ -132,16 +132,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   useEffect(() => {
     dispatch(getChannelsForForwardAC())
     return () => {
-      dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
+      dispatch(setSearchedChannelsForForwardAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [])
 
   useEffect(() => {
     // dispatch(getChannelsForForwardAC(searchValue))
     if (searchValue) {
-      dispatch(searchChannelsAC({ search: searchValue }, contactsMap))
+      dispatch(searchChannelsForForwardAC({ search: searchValue }, contactsMap))
     } else {
-      dispatch(setSearchedChannelsAC({ groups: [], directs: [] }))
+      dispatch(setSearchedChannelsForForwardAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [searchValue])
   return (
@@ -170,26 +170,34 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
             {searchValue ? (
               <React.Fragment>
-                {!!(searchedChannels.directs && searchedChannels.directs.length) && (
+                {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                   <React.Fragment>
-                    <ChannelsGroupTitle>DIRECT</ChannelsGroupTitle>
-                    {searchedChannels.directs.map((channel: IChannel) => {
+                    <ChannelsGroupTitle margin='0 0 12px'>Chats & Groups</ChannelsGroupTitle>
+                    {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
-                      const directChannelUser = channel.members.find((member: IMember) => member.id !== user.id)
+                      const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                      const directChannelUser =
+                        isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
                       return (
                         <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
                           <Avatar
-                            name={directChannelUser ? directChannelUser.firstName || directChannelUser.id : ''}
-                            image={directChannelUser && directChannelUser.avatarUrl}
+                            name={
+                              directChannelUser
+                                ? directChannelUser.firstName || directChannelUser.id
+                                : channel.subject || ''
+                            }
+                            image={directChannelUser ? directChannelUser.avatarUrl : channel.avatarUrl}
                             size={40}
                             textSize={12}
                             setDefaultAvatar={true}
                           />
                           <ChannelInfo>
                             <ChannelTitle>
-                              {directChannelUser
-                                ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                                : 'Deleted User'}
+                              {isDirectChannel
+                                ? directChannelUser
+                                  ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                                  : 'Deleted User'
+                                : channel.subject}
                             </ChannelTitle>
                             <ChannelMembers>
                               {directChannelUser
@@ -219,10 +227,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     })}
                   </React.Fragment>
                 )}
-                {!!(searchedChannels.groups && searchedChannels.groups.length) && (
+                {!!(searchedChannels.channels && searchedChannels.channels.length) && (
                   <React.Fragment>
-                    <ChannelsGroupTitle>GROUPS</ChannelsGroupTitle>
-                    {searchedChannels.groups.map((channel: IChannel) => {
+                    <ChannelsGroupTitle>Channels</ChannelsGroupTitle>
+                    {searchedChannels.channels.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       return (
                         <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
@@ -360,11 +368,11 @@ const ChannelInfo = styled.div<any>`
   max-width: calc(100% - 74px);
 `
 
-const ChannelsGroupTitle = styled.h4`
+const ChannelsGroupTitle = styled.h4<{ margin?: string }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 14px;
-  margin: 20px 0 12px;
+  margin: ${(props) => props.margin || '20px 0 12px'};
   color: ${colors.textColor2};
 `
 const ChannelTitle = styled.h3<any>`

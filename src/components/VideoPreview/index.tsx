@@ -4,7 +4,6 @@ import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { colors } from '../../UIHelper/constants'
-import { getFileExtension } from '../../helpers/message'
 // import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 // import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { getFrame3 } from '../../helpers/getVideoFrame'
@@ -16,8 +15,8 @@ import { base64ToToDataURL } from '../../helpers/resizeImage'
 // import { ProgressWrapper } from '../Attachment'
 
 interface IVideoPreviewProps {
-  maxWidth?: string
-  maxHeight?: string
+  width?: string
+  height?: string
   theme?: string
   file: IAttachment
   borderRadius?: string
@@ -32,8 +31,8 @@ interface IVideoPreviewProps {
   setVideoIsReadyToSend?: (attachmentId: string) => void
 }
 const VideoPreview = memo(function VideoPreview({
-  maxWidth,
-  maxHeight,
+  width,
+  height,
   src,
   file,
   borderRadius,
@@ -88,7 +87,9 @@ const VideoPreview = memo(function VideoPreview({
   useEffect(() => {
     let checkVideoInterval: any
     if (videoRef.current) {
+      let intervalCount = 0
       checkVideoInterval = setInterval(async () => {
+        intervalCount++
         if (videoRef.current && videoRef.current.readyState > 3) {
           // drawCanvas()
           // videoRef.current.currentTime = 2
@@ -100,13 +101,19 @@ const VideoPreview = memo(function VideoPreview({
           if (isPreview) {
             const thumb = await getFrame3(videoRef.current, 0)
             if (thumb) {
-              setVideoThumb(file.attachmentId!, { ...thumb, duration: videoRef.current.duration })
+              setVideoThumb(file.tid!, { ...thumb, duration: videoRef.current.duration })
               if (setVideoIsReadyToSend) {
-                setVideoIsReadyToSend(file.attachmentId!)
+                setVideoIsReadyToSend(file.tid!)
               }
             }
           }
           clearInterval(checkVideoInterval)
+        }
+        if (intervalCount >= 8) {
+          if (setVideoIsReadyToSend) {
+            setVideoIsReadyToSend(file.tid!)
+            clearInterval(checkVideoInterval)
+          }
         }
       }, 1000)
     }
@@ -134,8 +141,8 @@ const VideoPreview = memo(function VideoPreview({
   // console.log('!isPreview && loading && !uploading &&. . . .  . . . . . .. ', !isPreview && loading && !uploading)
   return (
     <Component
-      maxWidth={maxWidth}
-      maxHeight={maxHeight}
+      width={width}
+      height={height}
       borderRadius={borderRadius}
       isRepliedMessage={isRepliedMessage}
       isPreview={isPreview}
@@ -210,15 +217,7 @@ const VideoPreview = memo(function VideoPreview({
         // crossOrigin='anonymous'
         src={file.attachmentUrl || videoUrl}
         // onProgress={handleVideoProgress}
-      >
-        <source
-          src={file.attachmentUrl || videoUrl || file.url}
-          type={`video/${!!(file.name || file.data) && getFileExtension(file.name || file.data.name)}`}
-        />
-        <source src={file.attachmentUrl || videoUrl || file.url} type='video/ogg' />
-        {/* <track default kind='captions' srcLang='en' src='../../assets/img/defaultAvatar.png' /> */}
-        Your browser does not support the video tag.
-      </video>
+      />
       {/* {file.metadata && file.metadata.thumbnail && (
         <ImageThumbnail
           src={file.metadata.thumbnail}
@@ -287,8 +286,8 @@ const Component = styled.div<{
   isPreview?: boolean
   isRepliedMessage?: boolean
   isDetailsView?: boolean
-  maxWidth?: string
-  maxHeight?: string
+  width?: string
+  height?: string
   borderRadius?: string
   backgroundColor: string
 }>`
@@ -296,10 +295,11 @@ const Component = styled.div<{
   display: flex;
   flex-direction: column;
   align-items: center;
-  max-width: ${(props) => props.maxWidth || '100%'};
-  max-height: ${(props) => props.maxHeight || '100%'};
-  width: ${(props) => props.maxWidth};
-  height: ${(props) => props.maxHeight};
+  max-width: 100%;
+  max-height: 100%;
+  width: ${(props) => props.width};
+  height: ${(props) => props.height};
+  min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
 
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
@@ -309,10 +309,11 @@ const Component = styled.div<{
   z-index: 20;*/
 
   & > video {
-    max-width: ${(props) => props.maxWidth || '100%'};
-    max-height: ${(props) => props.maxHeight || '100%'};
-    width: ${(props) => props.maxWidth};
-    height: ${(props) => props.maxHeight};
+    max-width: 100%;
+    max-height: 100%;
+    width: ${(props) => props.width};
+    height: ${(props) => props.height};
+    min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && '165px'};
     border: ${(props) =>
       !props.isPreview && props.isRepliedMessage
         ? '0.5px solid rgba(0, 0, 0, 0.1)'

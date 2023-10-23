@@ -1,27 +1,31 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
+import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
-// import { Editor } from 'react-draft-wysiwyg'
-// import 'react-draft-wysiwyg/dist/react-draft-wysiwyg.css'
-// import { convertToRaw, EditorState } from 'draft-js'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
-import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
-// import { ReactComponent as RecordIcon } from '../../assets/lib/svg/recordButton.svg'
-import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
-import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
-import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
-import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
-import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
-import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
-import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
-import { colors } from '../../UIHelper/constants'
-import EmojisPopup from '../Emojis'
-import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
-// import { useDidUpdate } from '../../hooks'
+import LinkifyIt from 'linkify-it'
+
+// Rich text editor
+import { $createParagraphNode, $createTextNode, $getRoot, $getSelection, FORMAT_TEXT_COMMAND } from 'lexical'
+import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
+import { LexicalComposer } from '@lexical/react/LexicalComposer'
+import { ContentEditable } from '@lexical/react/LexicalContentEditable'
+import { RichTextPlugin } from '@lexical/react/LexicalRichTextPlugin'
+import LexicalErrorBoundary from '@lexical/react/LexicalErrorBoundary'
+import { OnChangePlugin } from '@lexical/react/LexicalOnChangePlugin'
+import MentionsPlugin from './MentionsPlugin'
+import FloatingTextFormatToolbarPlugin from './FloatingTextFormatToolbarPlugin'
+import { MentionNode } from './MentionNode'
+import EditMessagePlugin from './EditMessagePlugin'
+import FormatMessagePlugin from './FormatMessagePlugin'
+import EmojisPopup from './EmojisPlugin'
+
+// Action creators
 import {
+  clearSelectedMessagesAC,
+  deleteMessageAC,
+  deleteMessageFromListAC,
   editMessageAC,
+  forwardMessageAC,
   resendMessageAC,
   sendMessageAC,
   sendTextMessageAC,
@@ -30,56 +34,163 @@ import {
   setSendMessageInputHeightAC
 } from '../../store/message/actions'
 import {
-  detectBrowser,
-  detectOS,
-  getCaretPosition,
-  hashString,
-  placeCaretAtEnd,
-  setCursorPosition
-} from '../../helpers'
-import { getDuplicateMentionsFromMeta, makeUsername, MessageTextFormat, typingTextFormat } from '../../helpers/message'
-import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { messageForReplySelector, messageToEditSelector } from '../../store/message/selector'
+  joinChannelAC,
+  sendTypingAC,
+  setChannelDraftMessageIsRemovedAC,
+  setCloseSearchChannelsAC,
+  setDraggedAttachmentsAC
+} from '../../store/channel/actions'
+import { getMembersAC } from '../../store/member/actions'
+
+// Selectors
+import {
+  messageForReplySelector,
+  messageToEditSelector,
+  selectedMessagesMapSelector
+} from '../../store/message/selector'
 import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
   draggedAttachmentsSelector,
   typingIndicatorSelector
 } from '../../store/channel/selector'
-import { IMember, IMessage, IUser } from '../../types'
-import {
-  joinChannelAC,
-  sendTypingAC,
-  setChannelDraftMessageIsRemovedAC,
-  setCloseSearchChannelsAC,
-  setDraggedAttachments
-} from '../../store/channel/actions'
-import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
-import DropDown from '../../common/dropdown'
-import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { activeChannelMembersSelector } from '../../store/member/selector'
+import { themeSelector } from '../../store/theme/selector'
+
+// Helpers
+import {
+  compareMessageBodyAttributes,
+  EditorTheme,
+  getAllowEditDeleteIncomingMessage,
+  makeUsername,
+  MessageTextFormat
+} from '../../helpers/message'
+import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
+import { colors } from '../../UIHelper/constants'
+import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
+import { detectBrowser, detectOS, hashString } from '../../helpers'
+import { IAttachment, IMember, IMessage, IUser } from '../../types'
+import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
+  deletePendingAttachment,
   deleteVideoThumb,
   draftMessagesMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
+  removeMessageFromAllMessages,
+  removeMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import { attachmentTypes, CHANNEL_TYPE, DB_NAMES, DB_STORE_NAMES, USER_STATE } from '../../helpers/constants'
-import usePermissions from '../../hooks/usePermissions'
+import {
+  attachmentTypes,
+  CHANNEL_TYPE,
+  DB_NAMES,
+  DB_STORE_NAMES,
+  MESSAGE_DELIVERY_STATUS,
+  USER_STATE
+} from '../../helpers/constants'
+import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { useDidUpdate } from '../../hooks'
-import { getClient } from '../../common/client'
+import { getFrame } from '../../helpers/getVideoFrame'
+import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 import { CONNECTION_STATUS } from '../../store/user/constants'
-import MentionMembersPopup from '../../common/popups/mentions'
-import LinkifyIt from 'linkify-it'
-import { themeSelector } from '../../store/theme/selector'
-import { getDataFromDB } from '../../helpers/indexedDB'
-// import { activeChannelMembersSelector } from '../../store/member/selector'
+
+// Hooks
+import usePermissions from '../../hooks/usePermissions'
+import { useDidUpdate } from '../../hooks'
+
+// Icons
+import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
+import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
+import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
+import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
+import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
+import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
+import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
+import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
+import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
+import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
+import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+
+// Components
+import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
+import DropDown from '../../common/dropdown'
+import ConfirmPopup from '../../common/popups/delete'
+import ForwardMessagePopup from '../../common/popups/forwardMessage'
+import AudioRecord from '../AudioRecord'
+
+import { getClient } from '../../common/client'
+import { getDataFromDB } from '../../services/indexedDB'
+
+function AutoFocusPlugin({ messageForReply }: any) {
+  const [editor] = useLexicalComposerContext()
+
+  useEffect(() => {
+    // Focus the editor when the effect fires!
+    editor.focus()
+  }, [editor, messageForReply])
+
+  return null
+}
+
+function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
+  const [editor] = useLexicalComposerContext()
+
+  useDidUpdate(() => {
+    if (shouldClearEditor.clear) {
+      editor.update(() => {
+        const rootNode = $getRoot()
+        rootNode.clear()
+        if (shouldClearEditor.draftMessage) {
+          const paragraphNode = $createParagraphNode()
+          paragraphNode.append($createTextNode(shouldClearEditor.draftMessage.text))
+          editor.setEditorState(shouldClearEditor.draftMessage.editorState)
+        } else {
+          const paragraphNode = $createParagraphNode()
+          rootNode.append(paragraphNode)
+          rootNode.selectEnd()
+        }
+        const selection: any = $getSelection()
+        if (selection.hasFormat('bold')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
+        }
+        if (selection.hasFormat('italic')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'italic')
+        }
+        if (selection.hasFormat('underline')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')
+        }
+        if (selection.hasFormat('strikethrough')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'strikethrough')
+        }
+        if (selection.hasFormat('subscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'subscript')
+        }
+        if (selection.hasFormat('superscript')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'superscript')
+        }
+        if (selection.hasFormat('code')) {
+          editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')
+        }
+        setEditorCleared()
+      })
+    }
+  }, [shouldClearEditor])
+
+  return null
+}
+// Catch any errors that occur during Lexical updates and log them
+// or throw them as needed. If you don't throw them, Lexical will
+// try to recover gracefully without losing user data.
+function onError(error: any) {
+  console.error(error)
+}
 
 let prevActiveChannelId: any
 
@@ -90,7 +201,6 @@ interface SendMessageProps {
   // eslint-disable-next-line no-unused-vars
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
   inputCustomClassname?: string
-  inputAutofocus?: boolean
   disabled?: boolean
   showAddEmojis?: boolean
   AddEmojisIcon?: JSX.Element
@@ -120,6 +230,8 @@ interface SendMessageProps {
   voiceMessage?: boolean
   sendAttachmentSeparately?: boolean
   allowMentionUser?: boolean
+  allowTextEdit?: boolean
+  textSelectionBackgroundColor?: string
 }
 
 const SendMessageInput: React.FC<SendMessageProps> = ({
@@ -144,7 +256,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   backgroundColor,
   inputBackgroundColor,
   inputCustomClassname,
-  inputAutofocus = true,
   inputPaddings,
   selectedAttachmentsBorderRadius,
   selectedFileAttachmentsIcon,
@@ -155,91 +266,100 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   replyMessageIcon,
   editMessageIcon,
   sendAttachmentSeparately,
-  allowMentionUser = true
+  allowMentionUser = true,
+  allowTextEdit = true,
+  textSelectionBackgroundColor
   // voiceMessage = true
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
-
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const messageToEdit = useSelector(messageToEditSelector)
+  const activeChannelMembers = useSelector(activeChannelMembersSelector, shallowEqual)
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
-  // const members = useSelector(activeChannelMembersSelector, shallowEqual)
+  const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
   const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
-  /* const recordingInitialState = {
-    recordingSeconds: 0,
-    recordingMilliseconds: 0,
-    initRecording: false,
-    mediaStream: null,
-    mediaRecorder: null,
-    audio: undefined
-  } */
-  const messageContRef = useRef<any>(null)
+
+  const allowSetMention =
+    allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
+
+  // Voice recording
+  const [showRecording, setShowRecording] = useState<boolean>(false)
+  const [recordedFile, setRecordedFile] = useState<any>(null)
+
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
-  // const [messageTextWs, setMessageTextWs] = useState(EditorState.createEmpty())
   const [editMessageText, setEditMessageText] = useState('')
   const [readyVideoAttachments, setReadyVideoAttachments] = useState({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
   const [emojisInRightSide, setEmojisInRightSide] = useState(false)
+  const [emojisPopupLeftPosition, setEmojisPopupLeftPosition] = useState(0)
+  const [emojisPopupBottomPosition, setEmojisPopupBottomPosition] = useState(0)
   const [addAttachmentsInRightSide, setAddAttachmentsInRightSide] = useState(false)
 
-  // const [recording, setRecording] = useState<Recording>(recordingInitialState)
-  // const [recordedFile, setRecordedFile] = useState<any>(null)
-
+  const [shouldClearEditor, setShouldClearEditor] = useState<{ clear: boolean; draftMessage?: any }>({ clear: false })
+  const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedMembers, setMentionedMembers] = useState<any>([])
-
-  const [mentionedMembersDisplayName, setMentionedMembersDisplayName] = useState<any>({})
-
-  const [currentMentions, setCurrentMentions] = useState<any>(undefined)
-  const [pendingMentions, setPendingMentions] = useState<any>([])
-
-  const [mentionTyping, setMentionTyping] = useState(false)
-
-  const [selectionPos, setSelectionPos] = useState<any>()
+  const [browser, setBrowser] = useState<any>('')
+  const [mentionsIsOpen, setMentionsIsOpen] = useState<any>(false)
 
   const [inputContainerHeight, setInputContainerHeight] = useState<any>()
+
+  const selectedText = useRef<any>(null)
 
   const [typingTimout, setTypingTimout] = useState<any>()
   const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
   const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
-  const [openMention, setOpenMention] = useState(false)
   const [attachments, setAttachments]: any = useState([])
+
+  const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
+  const [deletePopupOpen, setDeletePopupOpen] = useState(false)
+  const [isIncomingMessage, setIsIncomingMessage] = useState(false)
+
   const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+
+  const messageContRef = useRef<any>(null)
   const fileUploader = useRef<any>(null)
   const inputWrapperRef = useRef<any>(null)
   const messageInputRef = useRef<any>(null)
   const emojiBtnRef = useRef<any>(null)
   const addAttachmentsBtnRef = useRef<any>(null)
 
+  const [realEditorState, setRealEditorState] = useState()
+  const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
+  const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
+  function onChange(editorState: any) {
+    setRealEditorState(editorState)
+  }
+
+  const onRef = (_floatingAnchorElem: HTMLDivElement) => {
+    if (_floatingAnchorElem !== null) {
+      setFloatingAnchorElem(_floatingAnchorElem)
+    }
+  }
+
+  const initialConfig = {
+    namespace: 'MyEditor',
+    theme: EditorTheme,
+    nodes: [MentionNode],
+    onError
+  }
   const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
 
-  /* const onEditorStateChange = (editorState: any) => {
-    const entityMap = convertToRaw(messageTextWs.getCurrentContent()).entityMap
-    const mentions: any = []
-
-    Object.values(entityMap).forEach((entity) => {
-      if (entity.type === 'MENTION') {
-        mentions.push(entity.data)
-      }
-    })
-    console.log('mentions . .. . . ', mentions)
-    setMessageTextWs(editorState)
-  }
-*/
   const handleSendTypingState = (typingState: boolean) => {
     if (typingState) {
       setInTypingStateTimout(
@@ -251,293 +371,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       clearTimeout(inTypingStateTimout)
     }
     setInTypingState(typingState)
-    dispatch(sendTypingAC(typingState))
-  }
-
-  const handleAddEmoji = (emoji: string) => {
-    const selPos = getCaretPosition(messageInputRef.current)
-    const messageTextToFormat = editMessageText || messageText
-    const newText = messageTextToFormat.slice(0, selPos) + emoji + messageTextToFormat.slice(selPos)
-    if (editMessageText) {
-      setEditMessageText(newText)
-    } else {
-      setMessageText(newText)
-    }
-    let editingMentions: any = []
-    if (messageToEdit && messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length > 0) {
-      // Get duplicate mentions from metadata
-      editingMentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
-    }
-    const mentions =
-      editingMentions && editingMentions.length ? [...editingMentions, ...mentionedMembers] : mentionedMembers
-    if (mentions.length && mentions.length > 0) {
-      messageInputRef.current.innerHTML = typingTextFormat({
-        text: newText,
-        mentionedMembers: [
-          ...mentions.map((menMem: any) => ({
-            ...menMem,
-            displayName: `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
-          }))
-        ]
-      })
-    } else {
-      messageInputRef.current.innerText = newText
-    }
-    setCursorPosition(messageInputRef.current, selPos + emoji.length)
-  }
-
-  const handleSetMention = (member: IMember) => {
-    const mentionDisplayName = makeUsername(
-      user.id === member.id ? member : contactsMap[member.id],
-      member,
-      getFromContacts
-    ).trim()
-    const mentionToChange = mentionedMembers.find((men: any) => men.start === currentMentions.start)
-    if (mentionToChange) {
-      setMentionedMembers(
-        mentionedMembers.map((menMem: any) => {
-          if (menMem.start === currentMentions.start) {
-            return {
-              ...member,
-              start: currentMentions.start,
-              end: currentMentions.start + 1 + mentionDisplayName.length
-            }
-          } else {
-            return menMem
-          }
-        })
-      )
-      const mentionDisplayNameToChange = { ...mentionedMembersDisplayName }
-      delete mentionDisplayNameToChange[mentionToChange.id]
-      setMentionedMembersDisplayName(mentionDisplayNameToChange)
-    } else {
-      setMentionedMembers((members: any) => [
-        ...members,
-        { ...member, start: currentMentions.start, end: currentMentions.start + 1 + mentionDisplayName.length }
-      ])
-    }
-    if (!mentionedMembersDisplayName[member.id]) {
-      setMentionedMembersDisplayName((prevState: any) => ({
-        ...prevState,
-        [member.id]: { id: member.id, displayName: `@${mentionDisplayName}` }
-      }))
-    }
-    setMentionTyping(false)
-    const messageTextToFormat = editMessageText || messageText
-    const currentText = `${messageTextToFormat.slice(
-      0,
-      mentionToChange ? mentionToChange.start + 1 : currentMentions.start + 1
-    )}${mentionDisplayName}${messageTextToFormat.slice(
-      mentionToChange ? mentionToChange.end : currentMentions.start + 1 + currentMentions.typed.length
-    )}`
-    const mentionedMembersPositions: any = []
-    if (mentionedMembers && mentionedMembers.length > 0) {
-      let lastFoundIndex = 0
-      const starts: any = {}
-      mentionedMembers.forEach((menMem: any) => {
-        const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
-        const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
-        lastFoundIndex = menIndex + mentionDisplayName.length
-
-        if (!starts[menIndex]) {
-          mentionedMembersPositions.push({
-            displayName: mentionDisplayName,
-            start: menIndex,
-            end: menIndex + mentionDisplayName.length
-          })
-        }
-        starts[menIndex] = true
-        // }
-      })
-    }
-    const currentTextCont = typingTextFormat({
-      text: currentText,
-      mentionedMembers: [
-        ...mentionedMembersPositions,
-        {
-          displayName: `@${mentionDisplayName}`,
-          start: mentionToChange ? mentionToChange.start : currentMentions.start,
-          end: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
-        }
-      ],
-      currentMentionEnd: mentionToChange ? mentionToChange.end : currentMentions.start + 1 + mentionDisplayName.length
-    })
-    if (editMessageText) {
-      setEditMessageText(currentText)
-    } else {
-      setMessageText(currentText)
-    }
-    messageInputRef.current.innerHTML = currentTextCont
-    setCursorPosition(messageInputRef.current, currentMentions.start + 2 + mentionDisplayName.length, true)
-    const updateCurrentMentions = { ...currentMentions }
-    updateCurrentMentions.typed = mentionDisplayName
-    updateCurrentMentions.id = member.id
-    updateCurrentMentions.end = updateCurrentMentions.start + mentionDisplayName.length
-
-    setCurrentMentions(updateCurrentMentions)
-    setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== updateCurrentMentions.start))
-    messageInputRef.current.focus()
-  }
-  const handleCloseMentionsPopup = (setPending?: boolean) => {
-    setOpenMention(false)
-    setMentionTyping(false)
-    if (setPending) {
-      setPendingMentions([
-        ...pendingMentions,
-        { ...currentMentions, end: currentMentions.start + 1 + currentMentions.typed.length }
-      ])
-
-      console.log('set pending mentions... .', [
-        ...pendingMentions,
-        { ...currentMentions, end: currentMentions.start + 1 + currentMentions.typed.length }
-      ])
-    }
-    setCurrentMentions(undefined)
-  }
-  const handleTyping = (e: any) => {
-    if (!e.currentTarget.innerText.trim()) {
-      setSendMessageIsActive(false)
-    } else {
-      setSendMessageIsActive(true)
-    }
-    if (!(openMention && (e.key === 'ArrowDown' || e.key === 'ArrowUp'))) {
-      if (messageToEdit) {
-        setEditMessageText(e.currentTarget.innerText)
-      } else {
-        setMessageText(e.currentTarget.innerText)
-      }
-      // e.currentTarget.html = e.currentTarget.innerText
-      if (
-        allowMentionUser &&
-        (activeChannel.type === CHANNEL_TYPE.GROUP || activeChannel.type === CHANNEL_TYPE.PRIVATE)
-      ) {
-        handleMentionDetect(e)
-      }
-
-      if (typingTimout) {
-        if (!inTypingStateTimout) {
-          handleSendTypingState(true)
-        }
-        clearTimeout(typingTimout)
-      } else {
-        handleSendTypingState(true)
-      }
-      setTypingTimout(
-        setTimeout(() => {
-          setTypingTimout(0)
-        }, 2000)
-      )
-    }
-  }
-  const handleMentionDetect = (e: any) => {
-    const selPos = getCaretPosition(e.currentTarget)
-    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowTop' || e.key === 'ArrowDown') {
-      setSelectionPos(selPos)
-    }
-    if (currentMentions && currentMentions.start === selPos - 1 && !mentionTyping) {
-      setMentionTyping(true)
-      setOpenMention(true)
-    }
-    const lastTwoChar = messageInputRef.current.innerText.slice(0, selPos).slice(-2)
-    if (lastTwoChar.trimStart() === '@' && !mentionTyping) {
-      setCurrentMentions({
-        start: selPos - 1,
-        typed: ''
-      })
-
-      setMentionTyping(true)
-      setOpenMention(true)
-    }
-    let shouldClose = false
-    if (e.key === 'Backspace' || e.key === 'Delete') {
-      // const selPos2 = getCaretPosition(e.currentTarget)
-      // console.log('selPos 2 pos .. . ', selPos2)
-      // const mentionToEdit = mentionedMembers.find((menMem: any) => menMem.start <= selPos && menMem.end >= selPos + 1)
-      // if (mentionToEdit) {
-      //   const editingMentionPosition = 0
-      const mentionedMembersPositions: any = []
-      /* const sortedMentionedMembersDspNames = mentionedMembersDisplayName.sort((a: any, b: any) =>
-            a.displayName < b.displayName ? 1 : b.displayName < a.displayName ? -1 : 0
-          ) */
-      // const findIndexes: any = []
-      const currentText = messageInputRef.current.innerText
-      if (mentionedMembers && mentionedMembers.length > 0) {
-        let lastFoundIndex = 0
-        const starts: any = {}
-        const updatedMentionedMembers: any = []
-        // console.log('mentionedMembers . . . . .  92133', mentionedMembers)
-        mentionedMembers.forEach((menMem: any) => {
-          const mentionDisplayName = menMem.displayName || mentionedMembersDisplayName[menMem.id].displayName
-          // console.log('find index of mentionDisplayName. .. .  .', mentionDisplayName)
-          // console.log('find index on text . .. .  .', currentText)
-          // console.log('find index from . .. .  .', lastFoundIndex)
-          const menIndex = currentText.indexOf(mentionDisplayName, lastFoundIndex)
-          // console.log('found in index .. ', menIndex)
-          lastFoundIndex = menIndex + mentionDisplayName.length
-          /* if (menMem.start === mentionToEdit.start) {
-              editingMentionPosition = menIndex
-            } */
-          // if (!starts[menMem.start] && menMem.start !== mentionToEdit.start) {
-          if (menIndex >= 0 && !starts[menMem.start]) {
-            updatedMentionedMembers.push({ ...menMem, start: menIndex, end: menIndex + mentionDisplayName.length })
-            mentionedMembersPositions.push({
-              displayName: mentionDisplayName,
-              start: menIndex,
-              // loc: menMem.start - trimLength,
-              end: menIndex + mentionDisplayName.length
-              // len: menMem.end - menMem.start
-            })
-          }
-          starts[menMem.start] = true
-          // }
-        })
-        // console.log('set mentioned members,,., ', updatedMentionedMembers)
-        setMentionedMembers(updatedMentionedMembers)
-        messageInputRef.current.innerHTML = typingTextFormat({
-          text: currentText,
-          mentionedMembers: [...mentionedMembersPositions]
-        })
-      }
-      if (messageToEdit) {
-        setEditMessageText(currentText)
-      } else {
-        setMessageText(currentText)
-      }
-      // console.log('set pos .. . ', selPos)
-      // if (mentionedMembers && mentionedMembers.length && selPos > 0) {
-      if (selPos > 0) {
-        setSelectionPos(selPos)
-        setCursorPosition(messageInputRef.current, selPos)
-      }
-      // } else
-      if (currentMentions) {
-        // console.log('currentMentions.start . ..  . .. ', currentMentions.start)
-        // console.log('selPos . ..  . .. ', selPos)
-        if (currentMentions.start >= selPos) {
-          shouldClose = true
-          setCurrentMentions(undefined)
-          setOpenMention(false)
-          setMentionTyping(false)
-        } else {
-          setCurrentMentions({
-            start: currentMentions.start,
-            typed: messageText.slice(currentMentions.start + 1, selPos)
-          })
-        }
-      }
-    }
-    if (mentionTyping) {
-      if (e.key === ' ') {
-        // console.log('lastTwoChar. . . . . . ', lastTwoChar)
-        // if (/  /.test(str)lastTwoChar === '  ') {
-        setSelectionPos(selPos)
-        handleCloseMentionsPopup(true)
-      } else if (!currentMentions.end && !shouldClose) {
-        const typedMessage = e.currentTarget.innerText
-        const updateCurrentMentions = { ...currentMentions }
-        updateCurrentMentions.typed = typedMessage.slice(updateCurrentMentions.start + 1, selPos)
-        setCurrentMentions(updateCurrentMentions)
-      }
+    if (!activeChannel.isMockChannel) {
+      dispatch(sendTypingAC(typingState))
     }
   }
 
@@ -545,7 +380,31 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     dispatch(setMessageForReplyAC(null))
   }
 
+  const handleDoubleClick = (e: any) => {
+    if (e.target.matches('.mention') || e.target.closest('.mention')) {
+      const selection = window.getSelection()
+      const range = document.createRange()
+      range.selectNodeContents(e.target)
+      if (selection) {
+        selection.removeAllRanges()
+        selection.addRange(range)
+      }
+    }
+  }
   const handleSendEditMessage = (event?: any) => {
+    if (typingTimout) {
+      if (!inTypingStateTimout) {
+        handleSendTypingState(true)
+      }
+      clearTimeout(typingTimout)
+    } else {
+      handleSendTypingState(true)
+    }
+    setTypingTimout(
+      setTimeout(() => {
+        setTypingTimout(0)
+      }, 2000)
+    )
     /* if (recordedFile) {
       /!* const file = new File([recordedFile.data], recordedFile.data.name, {
         type: 'audio/mp3'
@@ -570,94 +429,76 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
     } else { */
-    console.log('handle send message . . . . connectionState ', connectionStatus)
-    const { shiftKey, charCode, type } = event
-    const isEnter: boolean = charCode === 13 && shiftKey === false && !openMention
+    const { shiftKey, type, code } = event
+    const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const shouldSend =
       (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
     if (isEnter) {
       event.preventDefault()
     }
-    if (shouldSend) {
+    if (shouldSend && !mentionsIsOpen) {
+      event.preventDefault()
+      event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
       } else if (messageText || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-        const mentionedMembersPositions: any = []
-        if (mentionedMembers && mentionedMembers.length > 0) {
-          let lastFoundIndex = 0
-          const starts: any = {}
-          mentionedMembers.forEach((menMem: any) => {
-            const mentionDisplayName = mentionedMembersDisplayName[menMem.id].displayName
-            const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
-            lastFoundIndex = menIndex + mentionDisplayName.length
-            if (!starts[menIndex]) {
-              mentionedMembersPositions.push({
-                id: menMem.id,
-                loc: menIndex,
-                len: mentionDisplayName.length
-              })
-            }
-            starts[menIndex] = true
-            // }
-          })
-        }
+        console.log('messageTexToSend . . . . .', messageTexToSend)
         const messageToSend: any = {
-          metadata: mentionedMembersPositions,
+          // metadata: mentionedMembersPositions,
           body: messageTexToSend,
+          // body: 'test message',
+          bodyAttributes: messageBodyAttributes,
           mentionedMembers: [],
           attachments: [],
           type: 'text'
         }
-
-        messageToSend.mentionedMembers = mentionedMembers.filter(
-          (v: any, i: any, a: any) => a.findIndex((t: any) => t.id === v.id) === i
-        )
-        // messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
+        const mentionMembersToSend: any = []
+        if (messageBodyAttributes && messageBodyAttributes.length) {
+          messageBodyAttributes.forEach((att: any) => {
+            if (att.type === 'mention') {
+              let mentionsToFind = [...mentionedMembers]
+              const draftMessage = getDraftMessageFromMap(activeChannel.id)
+              if (draftMessage) {
+                mentionsToFind = [...draftMessage.mentionedMembers, ...mentionedMembers]
+              }
+              const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
+              mentionMembersToSend.push(mentionToAdd)
+            }
+          })
+        }
+        messageToSend.mentionedMembers = mentionMembersToSend
+        console.log('message to send ..........................................', messageToSend)
 
         if (messageForReply) {
           messageToSend.parentMessage = messageForReply
         }
-
-        if (messageTexToSend && !attachments.length) {
+        let linkAttachment: any
+        if (messageTexToSend) {
           const linkify = new LinkifyIt()
           const match = linkify.match(messageTexToSend)
           // const messageTextArr = [messageTexToSend]
-          let firstUrl: any
           if (match) {
-            firstUrl = match[0].url
+            linkAttachment = {
+              type: attachmentTypes.link,
+              data: match[0].url,
+              upload: false
+            }
           }
-          /* messageTextArr.forEach((textPart) => {
-              if (urlRegex.test(textPart)) {
-                const textArray = textPart.split(urlRegex)
-                textArray.forEach(async (part) => {
-                  if (urlRegex.test(part)) {
-                    if (!firstUrl) {
-                      firstUrl = part
-                    }
-                  }
-                })
-              }
-            }) */
-          if (firstUrl) {
-            messageToSend.attachments = [
-              {
-                type: attachmentTypes.link,
-                data: firstUrl,
-                upload: false
-              }
-            ]
+        }
+        if (messageTexToSend && !attachments.length) {
+          if (linkAttachment) {
+            messageToSend.attachments = [linkAttachment]
           }
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-          console.log('send as separate message ... ', sendAsSeparateMessage)
           messageToSend.attachments = attachments.map((attachment: any, index: any) => {
             const attachmentToSend = {
               name: attachment.data.name,
               data: attachment.data,
-              attachmentId: attachment.attachmentId,
+              tid: attachment.tid,
               cachedUrl: attachment.cachedUrl,
               upload: attachment.upload,
               attachmentUrl: attachment.attachmentUrl,
@@ -671,11 +512,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 messageToSend.metadata = ''
                 delete messageToSend.mentionedMembers
               }
+              const attachmentsToSent = [attachmentToSend]
+              if (linkAttachment) {
+                attachmentsToSent.push(linkAttachment)
+              }
               dispatch(
                 sendMessageAC(
                   {
                     ...messageToSend,
-                    attachments: [attachmentToSend]
+                    attachments: attachmentsToSent
                   },
                   activeChannel.id,
                   connectionStatus,
@@ -686,12 +531,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             return attachmentToSend
           })
           if (!sendAsSeparateMessage) {
-            dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, false))
+            const attachmentsToSent = [...messageToSend.attachments]
+            if (linkAttachment) {
+              attachmentsToSent.push(linkAttachment)
+            }
+            dispatch(
+              sendMessageAC(
+                { ...messageToSend, attachments: attachmentsToSent },
+                activeChannel.id,
+                connectionStatus,
+                false
+              )
+            )
           }
         }
         setMessageText('')
 
-        messageInputRef.current.innerText = ''
         fileUploader.current.value = ''
         if (inTypingState) {
           handleSendTypingState(false)
@@ -724,11 +579,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       setAttachments([])
       handleCloseReply()
+      setShouldClearEditor({ clear: true })
       setMentionedMembers([])
-      setMentionedMembersDisplayName([])
-      setOpenMention(false)
-      setMentionTyping(false)
-      setCurrentMentions(undefined)
+      setMessageBodyAttributes([])
       dispatch(setCloseSearchChannelsAC(true))
     }
   }
@@ -736,121 +589,56 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const messageTexToSend = editMessageText.trim()
     if (messageTexToSend) {
       const mentionedMembersPositions: any = []
-      const mentionedUserForSend: any = []
+      const mentionMembersToSend: any = []
       if (mentionedMembers && mentionedMembers.length) {
-        let lastFoundIndex = 0
-        const starts: any = {}
-        mentionedMembers.forEach((menMem: any) => {
-          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
-          const menIndex = messageTexToSend.indexOf(mentionDisplayName, lastFoundIndex)
-          if (menIndex >= 0) {
-            lastFoundIndex = menIndex + mentionDisplayName.length
-            if (!starts[menIndex]) {
-              mentionedMembersPositions.push({
-                id: menMem.id,
-                loc: menIndex,
-                len: mentionDisplayName.length
-              })
-            }
-            starts[menIndex] = true
-
-            mentionedUserForSend.push(menMem)
-          }
-
-          // }
-        })
-
-        /* const findIndexes: any[] = []
-        mentionedUserForSend.forEach((menMem: any) => {
-          // eslint-disable-next-line max-len
-          const mentionedMembersDisplayName = `@${menMem.firstName}${menMem.lastName !== '' ? ` ${menMem.lastName}` : ''}`
-          let menIndex = messageTexToSend.indexOf(mentionedMembersDisplayName)
-          let existingIndex = findIndexes.includes(menIndex)
-          let i = 0
-          if (menIndex < 0) {
-            mentionedUserForSend = messageToEdit.mentionedUsers.filter((menUs: any) => menUs.id !== menMem.id)
-          } else {
-            while (existingIndex) {
-              menIndex = messageTexToSend.indexOf(menMem.displayName, menIndex + 1)
-              existingIndex = findIndexes.includes(menIndex)
-              // eslint-disable-next-line no-plusplus
-              i++
-              if (i > mentionedUserForSend.length) {
-                break
+        if (messageBodyAttributes && messageBodyAttributes.length) {
+          messageBodyAttributes.forEach((att: any) => {
+            if (att.type === 'mention') {
+              let mentionsToFind = [...mentionedMembers]
+              const draftMessage = getDraftMessageFromMap(activeChannel.id)
+              if (draftMessage) {
+                mentionsToFind = [...draftMessage.mentionedMembers, ...mentionedMembers]
               }
+              const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
+              mentionMembersToSend.push(mentionToAdd)
             }
-
-            const mentionDisplayLength = mentionedMembersDisplayName.length
-            if (!mentionedMembersPositions[menMem.id] && menIndex >= 0) {
-              findIndexes.push(menIndex)
-              mentionedMembersPositions = {
-                ...mentionedMembersPositions,
-                [menMem.id]: {
-                  loc: menIndex,
-                  len: mentionDisplayLength
-                }
-              }
-            }
-          }
-        }) */
+          })
+        }
       }
       const messageToSend = {
         ...messageToEdit,
         metadata: mentionedMembersPositions,
-        mentionedUsers: mentionedUserForSend,
+        bodyAttributes: messageBodyAttributes,
+        mentionedUsers: mentionMembersToSend,
         body: messageTexToSend
       }
-
       messageToSend.type = /(https?:\/\/[^\s]+)/.test(messageToSend.body) ? 'link' : messageToSend.type
       dispatch(editMessageAC(activeChannel.id, messageToSend))
-      handleCloseEditMode()
     }
+    handleCloseEditMode()
   }
   const handleCloseEditMode = () => {
     setEditMessageText('')
-    if (messageInputRef.current) {
-      messageInputRef.current.innerText = ''
-    }
-
     setMentionedMembers([])
-    setMentionedMembersDisplayName([])
-    setOpenMention(false)
-    setMentionTyping(false)
-    setCurrentMentions(undefined)
     dispatch(setMessageToEditAC(null))
   }
   const removeUpload = (attachmentId: string) => {
     if (attachmentId) {
       deleteVideoThumb(attachmentId)
-      setAttachments(attachments.filter((item: any) => item.attachmentId !== attachmentId))
+      setAttachments(attachments.filter((item: any) => item.tid !== attachmentId))
     } else {
       setAttachments([])
     }
   }
 
   const handleFileUpload = (e: any) => {
-    // const { files } = fileUploader.current
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
-    // if (fileList.length > 10) {
-    //   alert('You are chosen more than 10 attachment')
-    // } else {
+
     fileList.forEach(async (file: any) => {
       handleAddAttachment(file, isMediaAttachment)
     })
-    // }
-    /* const { files } = fileUploader.current
-    const fileList = Object.values(files)
-    fileList.forEach((file, index) => {
-      setAttachments((prevState: any[]) => [
-        ...prevState,
-        {
-          data: file,
-          attachmentUrl: URL.createObjectURL(file as any),
-          attachmentId: Date.now() + index
-        }
-      ])
-    }) */
+
     fileUploader.current.value = ''
   }
 
@@ -862,12 +650,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const handlePastAttachments = (e: any) => {
     const os = detectOS()
-    const browser = detectBrowser()
-    if (os === 'Windows' && browser === 'Firefox') {
-      e.preventDefault()
-      setMessageText(e.clipboardData.getData('text/plain').trim())
-      document.execCommand('inserttext', false, e.clipboardData.getData('text/plain').trim())
-    } else {
+    if (!(os === 'Windows' && browser === 'Firefox')) {
       if (e.clipboardData.files && e.clipboardData.files.length > 0) {
         e.preventDefault()
         const fileList: File[] = Object.values(e.clipboardData.files)
@@ -876,26 +659,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         })
       } else {
         e.preventDefault()
-        setMessageText(e.clipboardData.getData('text/plain').trim())
-        document.execCommand('inserttext', false, e.clipboardData.getData('text/plain').trim())
-        //
-        // e.currentTarget.innerText = e.clipboardData.getData('Text')
-        // placeCaretAtEnd(messageInputRef.current)
       }
     }
   }
 
   const handleCut = () => {
-    setMentionTyping(false)
     setMessageText('')
-    setCurrentMentions(undefined)
-    setOpenMention(false)
     setMentionedMembers([])
   }
 
   const handleEmojiPopupToggle = (bool: boolean) => {
     setIsEmojisOpened(bool)
-    messageInputRef.current.focus()
   }
 
   const setVideoIsReadyToSend = (attachmentId: string) => {
@@ -917,65 +691,82 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setIsEmojisOpened(false)
     }
   }
-  useEffect(() => {
-    if (mentionTyping) {
-      if (
-        selectionPos <= currentMentions.start ||
-        selectionPos > currentMentions.start + 1 + currentMentions.typed.length
-      ) {
-        handleCloseMentionsPopup(true)
-      }
-    } else if (pendingMentions && pendingMentions.length) {
-      const currentPendingMention = pendingMentions.find(
-        (mention: any) => selectionPos <= mention.end && selectionPos > mention.start
-      )
-      if (currentPendingMention) {
-        delete currentPendingMention.end
-        setCurrentMentions(currentPendingMention)
-        setMentionTyping(true)
-        setOpenMention(true)
-        setPendingMentions(pendingMentions.filter((mention: any) => mention.start !== currentPendingMention.start))
+  const handleToggleForwardMessagePopup = () => {
+    setForwardPopupOpen(!forwardPopupOpen)
+  }
+
+  const handleForwardMessage = (channelIds: string[]) => {
+    const messagesArray = Array.from(selectedMessagesMap.values())
+    // @ts-ignore
+    messagesArray.sort((a: any, b: any) => new Date(a.createdAt) - new Date(b.createdAt))
+    if (channelIds && channelIds.length) {
+      channelIds.forEach((channelId) => {
+        messagesArray.forEach((message) => {
+          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+        })
+      })
+    }
+    dispatch(clearSelectedMessagesAC())
+  }
+  const handleDeletePendingMessage = (message: IMessage) => {
+    if (message.attachments && message.attachments.length) {
+      const customUploader = getCustomUploader()
+      message.attachments.forEach((att: IAttachment) => {
+        if (customUploader) {
+          cancelUpload(att.tid!)
+          deletePendingAttachment(att.tid!)
+        }
+      })
+    }
+    removeMessageFromMap(activeChannel.id, message.id || message.tid!)
+    removeMessageFromAllMessages(message.id || message.tid!)
+    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+  }
+
+  const handleToggleDeleteMessagePopup = () => {
+    if (!deletePopupOpen) {
+      for (const message of selectedMessagesMap.values()) {
+        if (message.incoming) {
+          setIsIncomingMessage(true)
+          break
+        } else {
+          setIsIncomingMessage(false)
+        }
       }
     }
-    /* if (mentionedMembers.length) {
-      // const currentPos = getCaretPosition(messageInputRef.current)
-      const mentionToEdit = mentionedMembers.find(
-        (menMem: any) => menMem.start < selectionPos && menMem.end >= selectionPos
-      )
-      if (mentionToEdit) {
-        setMentionEdit(mentionToEdit)
-        // if (!currentMentions) {
-        setCurrentMentions({
-          start: mentionToEdit.start,
-          typed: ''
-        })
-        // }
-        setOpenMention(true)
-        setMentionTyping(true)
-      } else if (openMention || mentionTyping) {
-        handleCloseMentionsPopup()
-        setMentionTyping(false)
-        setOpenMention(false)
+    setDeletePopupOpen(!deletePopupOpen)
+  }
+  const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
+    for (const message of selectedMessagesMap.values()) {
+      if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+        handleDeletePendingMessage(message)
+      } else {
+        dispatch(deleteMessageAC(activeChannel.id, message.id, deleteOption))
       }
-    } */
-  }, [selectionPos])
+    }
+    dispatch(clearSelectedMessagesAC())
+  }
+  const handleCloseSelectMessages = () => {
+    dispatch(clearSelectedMessagesAC())
+  }
 
+  const handleSetMentionMember = (mentionMember: any) => {
+    setMentionedMembers((prevState: any[]) => [...prevState, mentionMember])
+  }
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
-    const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
     const fileType = file.type.split('/')[0]
-    const attachmentId = uuidv4()
+    const tid = uuidv4()
     let cachedUrl: any
     const reader = new FileReader()
-    console.log('file is opened. .. ', file)
     reader.onload = async () => {
       // @ts-ignore
       const length = reader.result && reader.result.length
       let fileChecksum
-      if (length > 500) {
-        const firstPart = reader.result && reader.result.slice(0, 100)
-        const middlePart = reader.result && reader.result.slice(length / 2 - 50, length / 2)
-        const lastPart = reader.result && reader.result.slice(length - 100, length)
+      if (length > 3000) {
+        const firstPart = reader.result && reader.result.slice(0, 1000)
+        const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
+        const lastPart = reader.result && reader.result.slice(length - 1000, length)
         fileChecksum = `${firstPart}${middlePart}${lastPart}`
       } else {
         fileChecksum = `${reader.result}`
@@ -984,15 +775,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       let dataFromDb: any
       try {
         dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
-        console.log('data from db . . . . ', dataFromDb)
       } catch (e) {
         console.log('error in get data from db . . . . ', e)
       }
       if (dataFromDb) {
         cachedUrl = dataFromDb.url
-        setPendingAttachment(attachmentId, { file: cachedUrl })
+        setPendingAttachment(tid, { file: cachedUrl })
       } else {
-        setPendingAttachment(attachmentId, { file, checksum: checksumHash })
+        setPendingAttachment(tid, { file, checksum: checksumHash })
       }
       if (customUploader) {
         if (fileType === 'image') {
@@ -1005,23 +795,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 upload: false,
                 type: isMediaAttachment ? fileType : 'file',
                 attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-                attachmentId,
+                tid,
                 size: dataFromDb ? dataFromDb.size : file.size,
                 metadata: dataFromDb && dataFromDb.metadata
               }
             ])
           })
         } else if (fileType === 'video') {
-          console.log('handle set attachments ... .', {
-            data: file,
-            cachedUrl,
-            upload: false,
-            type: isMediaAttachment ? fileType : 'file',
-            attachmentUrl: URL.createObjectURL(file),
-            attachmentId,
-            size: dataFromDb ? dataFromDb.size : file.size,
-            metadata: dataFromDb && dataFromDb.metadata
-          })
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -1030,7 +810,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               upload: false,
               type: isMediaAttachment ? fileType : 'file',
               attachmentUrl: URL.createObjectURL(file),
-              attachmentId,
+              tid,
               size: dataFromDb ? dataFromDb.size : file.size,
               metadata: dataFromDb && dataFromDb.metadata
             }
@@ -1043,7 +823,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               cachedUrl,
               upload: false,
               type: 'file',
-              attachmentId,
+              tid,
               size: dataFromDb ? dataFromDb.size : file.size,
               metadata: dataFromDb && dataFromDb.metadata
             }
@@ -1069,7 +849,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   cachedUrl,
                   upload: !cachedUrl,
                   attachmentUrl: URL.createObjectURL(file),
-                  attachmentId,
+                  tid,
                   type: fileType,
                   size: dataFromDb ? dataFromDb.size : file.size,
                   metadata: dataFromDb
@@ -1088,40 +868,32 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   {
                     data: file,
                     cachedUrl,
-                    upload: !cachedUrl,
+                    upload: false,
                     attachmentUrl: URL.createObjectURL(file),
-                    attachmentId,
+                    tid,
                     type: fileType,
-                    size: dataFromDb ? dataFromDb.size : file.size,
-                    metadata: sendAsSeparateMessage
-                      ? ''
-                      : JSON.stringify({
-                          tmb: metas.thumbnail,
-                          szw: metas.imageWidth,
-                          szh: metas.imageHeight
-                        })
+                    size: dataFromDb.size,
+                    metadata: metas
                   }
                 ])
               } else {
-                resizeImage(file).then(async (resizedFile: any) => {
+                resizeImage(file).then(async (resizedFileData: any) => {
                   // resizedFiles.forEach((file: any, index: number) => {
+                  const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
                   setAttachments((prevState: any[]) => [
                     ...prevState,
                     {
-                      data: new File([resizedFile.blob], resizedFile.file.name),
-                      cachedUrl,
-                      upload: !cachedUrl,
-                      attachmentUrl: URL.createObjectURL(file),
-                      attachmentId,
+                      data: resizedFile,
+                      upload: true,
+                      attachmentUrl: URL.createObjectURL(resizedFile),
+                      tid,
                       type: fileType,
-                      size: dataFromDb ? dataFromDb.size : file.size,
-                      metadata: sendAsSeparateMessage
-                        ? ''
-                        : JSON.stringify({
-                            tmb: metas.thumbnail,
-                            szw: resizedFile.newWidth,
-                            szh: resizedFile.newHeight
-                          })
+                      size: resizedFile.size,
+                      metadata: JSON.stringify({
+                        tmb: metas.thumbnail,
+                        szw: resizedFileData.newWidth,
+                        szh: resizedFileData.newHeight
+                      })
                     }
                   ])
                   // })
@@ -1145,10 +917,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 cachedUrl,
                 upload: !cachedUrl,
                 attachmentUrl: URL.createObjectURL(file as any),
-                attachmentId,
+                tid,
                 size: dataFromDb ? dataFromDb.size : file.size,
                 metadata: dataFromDb
-                  ? metas.thumbnail
+                  ? metas
                   : JSON.stringify({
                       tmb: metas.thumbnail
                     })
@@ -1159,12 +931,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           let metas: any = {}
           if (dataFromDb) {
             metas = dataFromDb.metadata
-          } /* else {
-            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 1)
+          } else {
+            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
             metas.thumb = thumb
             metas.width = width
             metas.height = height
-          } */
+            metas = JSON.stringify(metas)
+          }
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -1175,8 +948,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               upload: !cachedUrl,
               size: dataFromDb ? dataFromDb.size : file.size,
               attachmentUrl: URL.createObjectURL(file as any),
-              attachmentId,
-              metadata: dataFromDb ? metas : ''
+              tid,
+              metadata: metas
             }
           ])
         } else {
@@ -1186,11 +959,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               data: file,
               cachedUrl,
               upload: !cachedUrl,
-              // type: file.type.split('/')[0],
               type: 'file',
               size: dataFromDb ? dataFromDb.size : file.size,
-              attachmentUrl: URL.createObjectURL(file as any),
-              attachmentId
+              metadata: dataFromDb && dataFromDb.metadata,
+              tid
             }
           ])
         }
@@ -1210,225 +982,116 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (draggedAttachments.length > 0) {
-      const attachmentsFiles = draggedAttachments.map(
-        (draggedData: any) => {
-          const arr = draggedData.data.split(',')
-          const bstr = atob(arr[1])
-          let n = bstr.length
-          const u8arr = new Uint8Array(n)
-          while (n--) {
-            u8arr[n] = bstr.charCodeAt(n)
-          }
-          return new File([u8arr], draggedData.name, { type: draggedData.type })
+      const attachmentsFiles = draggedAttachments.map((draggedData: any) => {
+        const arr = draggedData.data.split(',')
+        const bstr = atob(arr[1])
+        let n = bstr.length
+        const u8arr = new Uint8Array(n)
+        while (n--) {
+          u8arr[n] = bstr.charCodeAt(n)
         }
-        /* new File([draggedData.data], draggedData.name, {
-            type: draggedData.type
-          }) */
-      )
+        return new File([u8arr], draggedData.name, { type: draggedData.type })
+      })
       attachmentsFiles.forEach(async (file: any) => {
         handleAddAttachment(file, draggedAttachments[0].attachmentType === 'media')
       })
-      dispatch(setDraggedAttachments([], ''))
+      dispatch(setDraggedAttachmentsAC([], ''))
     }
   }, [draggedAttachments])
 
-  /* const startRecording = async () => {
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      setRecording((prevState: any) => ({
-        ...prevState,
-        initRecording: true,
-        mediaStream: stream
-      }))
-    } catch (e) {
-    }
-  }
-
-  const saveRecord = () => {
-    const recorder = recording.mediaRecorder
-    if (recorder && recorder.state !== 'inactive') {
-      recorder.stop()
-    }
-  }
-
-  const deleteRecord = () => {
-    const recorder = recording.mediaRecorder
-    if (recorder)
-      recorder.stream.getAudioTracks().forEach((track: any) => track.stop())
-    setRecording(recordingInitialState)
-  }
-
-  useDidUpdate(() => {
-    if (recording.mediaStream) {
-      setRecording({
-        ...recording,
-        mediaRecorder: new MediaRecorder(recording.mediaStream, {
-          mimeType: 'audio/webm'
-        })
-      })
-    }
-  }, [recording.mediaStream])
-
-  useEffect(() => {
-    const MAX_RECORDER_TIME = 15
-    let recordingInterval: any = null
-
-    if (recording.initRecording) {
-      recordingInterval = setInterval(() => {
-        setRecording((prevState) => {
-          if (
-            prevState.recordingSeconds === MAX_RECORDER_TIME &&
-            prevState.recordingMilliseconds === 0
-          ) {
-            clearInterval(recordingInterval)
-            return prevState
-          }
-
-          if (
-            prevState.recordingMilliseconds >= 0 &&
-            prevState.recordingMilliseconds < 99
-          ) {
-            return {
-              ...prevState,
-              recordingMilliseconds: prevState.recordingMilliseconds + 1
-            }
-          }
-
-          if (prevState.recordingMilliseconds === 99) {
-            return {
-              ...prevState,
-              recordingSeconds: prevState.recordingSeconds + 1,
-              recordingMilliseconds: 0
-            }
-          }
-
-          return prevState
-        })
-      }, 10)
-    } else clearInterval(recordingInterval)
-
-    return () => clearInterval(recordingInterval)
-  }, [recording.initRecording])
-
-  useEffect(() => {
-    const recorder = recording.mediaRecorder
-    let chunks: Blob[] = []
-    if (recorder && recorder.state === 'inactive') {
-      recorder.start()
-      recorder.ondataavailable = (e) => {
-        chunks.push(e.data)
-      }
-
-      recorder.onstop = () => {
-        const blob = new Blob(chunks, { type: 'audio/webm' })
-        chunks = []
-        setRecording((prevState) => {
-          if (prevState.mediaRecorder) {
-            setRecordedFile({
-              data: blob,
-              attachmentURL: URL.createObjectURL(blob)
-            })
-            return {
-              ...recordingInitialState,
-              initRecording: false,
-              audio: URL.createObjectURL(blob)
-            }
-          }
-          return recordingInitialState
-        })
-      }
-    }
-
-    return () => {
-      if (recorder)
-        recorder.stream.getAudioTracks().forEach((track) => track.stop())
-    }
-  }, [recording.mediaRecorder])
-
   useEffect(() => {
     if (recordedFile) {
-      handleSendEditMessage()
+      const tid = uuidv4()
+      const reader = new FileReader()
+      reader.onload = async () => {
+        // @ts-ignore
+        const length = reader.result && reader.result.length
+        let fileChecksum
+        if (length > 3000) {
+          const firstPart = reader.result && reader.result.slice(0, 1000)
+          const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
+          const lastPart = reader.result && reader.result.slice(length - 1000, length)
+          fileChecksum = `${firstPart}${middlePart}${lastPart}`
+        } else {
+          fileChecksum = `${reader.result}`
+        }
+        const checksumHash = await hashString(fileChecksum || '')
+
+        setPendingAttachment(tid, { file: recordedFile, checksum: checksumHash })
+        const messageToSend = {
+          metadata: '',
+          body: '',
+          mentionedMembers: [],
+          attachments: [
+            {
+              name: `${uuidv4()}.mp3`,
+              data: recordedFile.file,
+              tid,
+              upload: true,
+              size: recordedFile.file.size,
+              attachmentUrl: recordedFile.objectUrl,
+              metadata: { tmb: recordedFile.thumb, dur: recordedFile.dur },
+              type: attachmentTypes.voice
+            }
+          ],
+          type: 'text'
+        }
+        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
+      }
+
+      reader.onerror = (e: any) => {
+        console.log(' error on read file onError', e)
+      }
+      reader.readAsBinaryString(recordedFile.file)
     }
   }, [recordedFile])
-*/
+
+  useEffect(() => {
+    const updateViewPortWidth = () => {
+      const isNextSmallWidthViewport = CAN_USE_DOM && window.matchMedia('(max-width: 1025px)').matches
+
+      if (isNextSmallWidthViewport !== isSmallWidthViewport) {
+        setIsSmallWidthViewport(isNextSmallWidthViewport)
+      }
+    }
+    updateViewPortWidth()
+    window.addEventListener('resize', updateViewPortWidth)
+
+    return () => {
+      window.removeEventListener('resize', updateViewPortWidth)
+    }
+  }, [isSmallWidthViewport])
 
   useEffect(() => {
     if (prevActiveChannelId && activeChannel.id && prevActiveChannelId !== activeChannel.id) {
       setMessageText('')
-      // messageInputRef.current.innerText = ''
       handleCloseReply()
-      setMentionedMembersDisplayName([])
       setAttachments([])
       handleCloseEditMode()
       clearTimeout(typingTimout)
-      if (messageInputRef && messageInputRef.current) {
-        messageInputRef.current.focus()
+
+      const draftMessage = getDraftMessageFromMap(activeChannel.id)
+      if (draftMessage) {
+        if (draftMessage.messageForReply) {
+          dispatch(setMessageForReplyAC(draftMessage.messageForReply))
+        }
+        setMessageText(draftMessage.text)
+        setMentionedMembers(draftMessage.mentionedMembers)
       }
-    } /* else if (activeChannel.id) {
-      prevActiveChannelId = activeChannel.id
-    } */
+      setShouldClearEditor({ clear: true, draftMessage })
+    }
     if (activeChannel.id) {
       prevActiveChannelId = activeChannel.id
     }
-    if (messageInputRef.current && inputAutofocus) {
-      messageInputRef.current.focus()
-    }
 
+    dispatch(getMembersAC(activeChannel.id))
     setMentionedMembers([])
-    setOpenMention(false)
-    setCurrentMentions(undefined)
-    setMentionTyping(false)
-    /* if (allowMentionUser) {
-      dispatch(getMembersAC(activeChannel.id))
-    } */
-    const draftMessage = getDraftMessageFromMap(activeChannel.id)
-    if (draftMessage) {
-      if (draftMessage.messageForReply) {
-        dispatch(setMessageForReplyAC(draftMessage.messageForReply))
-      }
-      setMessageText(draftMessage.text)
-      setMentionedMembers(draftMessage.mentionedMembers)
-      const mentionedMembersPositions: any = []
-      if (draftMessage.mentionedMembers && draftMessage.mentionedMembers.length > 0) {
-        let lastFoundIndex = 0
-        const starts: any = {}
-        draftMessage.mentionedMembers.forEach((menMem: any) => {
-          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts).trim()}`
-          const menIndex = draftMessage.text.indexOf(mentionDisplayName, lastFoundIndex)
-          lastFoundIndex = menIndex + mentionDisplayName.length
-          setMentionedMembersDisplayName((prevState: any) => ({
-            ...prevState,
-            [menMem.id]: { id: menMem.id, displayName: mentionDisplayName }
-          }))
-          if (!starts[menIndex]) {
-            mentionedMembersPositions.push({
-              displayName: mentionDisplayName,
-              start: menIndex,
-              end: menIndex + mentionDisplayName.length
-            })
-          }
-          starts[menIndex] = true
-          // }
-        })
-      }
-
-      messageInputRef.current.innerHTML = typingTextFormat({
-        text: draftMessage.text,
-        mentionedMembers: [...mentionedMembersPositions]
-      })
-      setCursorPosition(messageInputRef.current, draftMessage.text.length)
-      if (inputAutofocus) {
-        messageInputRef.current.focus()
-      }
-    }
   }, [activeChannel.id])
 
   useEffect(() => {
-    // console.log('attachments. . . . .  . .', attachments)
-    // console.log('readyVideoAttachments. . . . .  . .', readyVideoAttachments)
     if (
       messageText.trim() ||
-      (editMessageText.trim() && editMessageText !== messageToEdit.body) ||
+      (editMessageText.trim() && editMessageText && editMessageText.trim() !== messageToEdit.body) ||
       attachments.length
     ) {
       if (attachments.length) {
@@ -1436,7 +1099,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         attachments.forEach((att: any) => {
           if (att.type === 'video' || att.data.type.split('/')[0] === 'video') {
             videoAttachment = true
-            if (!readyVideoAttachments[att.attachmentId]) {
+            if (!readyVideoAttachments[att.tid]) {
               setSendMessageIsActive(false)
             } else {
               setSendMessageIsActive(true)
@@ -1450,25 +1113,51 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setSendMessageIsActive(true)
       }
     } else {
-      setSendMessageIsActive(false)
+      if (editMessageText) {
+        if (
+          editMessageText.trim() !== messageToEdit.body ||
+          !compareMessageBodyAttributes(messageBodyAttributes, messageToEdit.bodyAttributes)
+        ) {
+          setSendMessageIsActive(true)
+        } else {
+          setSendMessageIsActive(false)
+        }
+      } else {
+        setSendMessageIsActive(false)
+      }
     }
 
-    if (messageText) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+    if (messageText.trim()) {
+      const draftMessage = getDraftMessageFromMap(activeChannel.id)
+      if (draftMessage && draftMessage.mentionedMembers && draftMessage.mentionedMembers.length) {
+        setDraftMessageToMap(activeChannel.id, {
+          text: messageText,
+          mentionedMembers: draftMessage.mentionedMembers,
+          messageForReply,
+          editorState: realEditorState
+        })
+      } else {
+        setDraftMessageToMap(activeChannel.id, {
+          text: messageText,
+          mentionedMembers,
+          messageForReply,
+          editorState: realEditorState
+        })
+      }
+
       if (!listenerIsAdded) {
         setListenerIsAdded(true)
         document.body.setAttribute('onbeforeunload', "return () => 'reload?'")
       }
     } else if (getDraftMessageFromMap(activeChannel.id)) {
       removeDraftMessageFromMap(activeChannel.id)
+      dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
       if (checkDraftMessagesIsEmpty() && listenerIsAdded) {
-        dispatch(setChannelDraftMessageIsRemovedAC(activeChannel.id))
         setListenerIsAdded(false)
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments])
-
+  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
       setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
@@ -1502,8 +1191,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [attachments])
 
   useEffect(() => {
-    if (emojiBtnRef.current && emojiBtnRef.current.offsetLeft > messageInputRef.current.offsetWidth) {
-      setEmojisInRightSide(true)
+    if (emojiBtnRef.current && messageInputRef.current) {
+      const windowHeight = window.innerHeight
+      const { left, width, top } = emojiBtnRef.current.getBoundingClientRect()
+      setEmojisPopupBottomPosition(windowHeight - top)
+      setEmojisPopupLeftPosition(left - width / 2)
+      if (emojiBtnRef.current.getBoundingClientRect().left > messageInputRef.current.getBoundingClientRect().left) {
+        setEmojisInRightSide(true)
+      }
     }
     if (attachmentIcoOrder > inputOrder) {
       setAddAttachmentsInRightSide(true)
@@ -1524,98 +1219,35 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
-    if (messageInputRef.current) {
-      messageInputRef.current.focus()
-    }
   }, [messageForReply])
 
   useDidUpdate(() => {
-    if (messageToEdit && messageInputRef.current) {
-      if (messageToEdit.mentionedUsers && messageToEdit.mentionedUsers.length) {
-        const formattedText = MessageTextFormat({
-          text: messageToEdit.body,
-          message: messageToEdit,
-          contactsMap,
-          getFromContacts,
-          asSampleText: true
-        })
-        setEditMessageText(formattedText)
-        // Get duplicate mentions from metadata
-        const mentions = getDuplicateMentionsFromMeta(messageToEdit.metadata, messageToEdit.mentionedUsers)
-        const mentionedMembersPositions: any = []
-        const editingMentionedMembers: any = []
-        let lastFoundIndex = 0
-        const starts: any = {}
-        mentions.forEach((menMem: any) => {
-          const mentionDisplayName = `@${makeUsername(contactsMap[menMem.id], menMem, getFromContacts)}`.trim()
-          const menIndex = formattedText.indexOf(mentionDisplayName, lastFoundIndex)
-          lastFoundIndex = menIndex + mentionDisplayName.length
-          if (!starts[menIndex]) {
-            const mentionInfo = {
-              displayName: mentionDisplayName,
-              start: menIndex,
-              end: menIndex + mentionDisplayName.length
-            }
-            editingMentionedMembers.push({ ...menMem, ...mentionInfo })
-            mentionedMembersPositions.push(mentionInfo)
-          }
-          starts[menIndex] = true
-          // }
-        })
-        setMentionedMembers(editingMentionedMembers)
-        messageInputRef.current.innerHTML = typingTextFormat({
-          text: messageToEdit.body,
-          mentionedMembers: [...mentionedMembersPositions]
-        })
-      } else {
-        setEditMessageText(messageToEdit.body || '')
-        messageInputRef.current.innerText = messageToEdit.body
-      }
-      // Creates range object
-      placeCaretAtEnd(messageInputRef.current)
-
-      // Set cursor on focus
-      messageInputRef.current.focus()
+    if (messageToEdit) {
       if (messageForReply) {
         handleCloseReply()
       }
+    } else {
+      setShouldClearEditor({ clear: true })
     }
     if (messageContRef && messageContRef.current) {
       dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
     }
-
-    if (messageInputRef.current) {
-      messageInputRef.current.focus()
-    }
   }, [messageToEdit])
 
   useEffect(() => {
-    /* wavesurfer.current = WaveSurfer.create({
-      container: '#waveform',
-      waveColor: '#757D8B',
-      progressColor: '#0DBD8B',
-      // cursorColor: 'transparent',
-      barWidth: 2,
-      barRadius: 3,
-      cursorWidth: 0,
-      barGap: 2,
-      barMinHeight: 1,
-      height: 200,
-    });
-
-    wavesurfer.current.on('ready', () => {
-      wavesurfer.current.play();
-    }); */
-
+    setBrowser(detectBrowser())
     if (handleSendMessage) {
       setSendMessageHandler(handleSendMessage)
     }
     let inputHeightTimeout: any = null
     if (messageContRef && messageContRef.current) {
       inputHeightTimeout = setTimeout(() => {
-        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+        const inputContHeight = messageContRef.current.getBoundingClientRect().height
+        dispatch(setSendMessageInputHeightAC(inputContHeight))
       }, 800)
     }
+    messageContRef.current.addEventListener('paste', handlePastAttachments)
+    messageContRef.current.addEventListener('cut', handleCut)
     document.addEventListener('mousedown', handleClick)
     return () => {
       if (inputHeightTimeout) {
@@ -1623,319 +1255,394 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       prevActiveChannelId = undefined
       document.removeEventListener('mousedown', handleClick)
+
+      if (messageContRef && messageContRef.current) {
+        messageContRef.current.removeEventListener('paste', handlePastAttachments)
+        messageContRef.current.removeEventListener('cut', handleCut)
+      }
     }
   }, [])
 
   return (
-    <Container margin={margin} border={border} ref={messageContRef} theme={theme}>
-      {/* <Editor
-        wrapperClassName='demo-wrapper'
-        editorClassName='demo-editor'
-        editorState={messageTextWs}
-        mention={{
-          separator: ' ',
-          trigger: '@',
-          suggestions: members.map((member: IMember) => {
-            const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-            return {
-              text: displayName,
-              value: displayName,
-              url: member.id
-            }
-          })
-        }}
-        onEditorStateChange={onEditorStateChange}
-        toolbar={{ options: [] }}
-      /> */}
-      {!activeChannel.id ? (
-        <Loading />
-      ) : isBlockedUserChat || isDeletedUserChat || disabled ? (
-        <BlockedUserInfo>
-          <BlockInfoIcon />{' '}
-          {isDeletedUserChat
-            ? 'This user has been deleted.'
-            : disabled
-            ? "Sender doesn't support replies"
-            : 'You blocked this user.'}
-        </BlockedUserInfo>
-      ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-        <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
-          Join
-        </JoinChannelCont>
-      ) : (
-          activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
-            ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
-            : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
-        ) ? (
-        <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
-          <EyeIcon /> Read only
-        </ReadOnlyCont>
+    <Container
+      margin={margin}
+      border={border}
+      ref={messageContRef}
+      theme={theme}
+      mentionColor={colors.primary}
+      toolBarTop={selectedText && selectedText.current ? selectedText.current.top : ''}
+      toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
+      selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+    >
+      {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
+        <SelectedMessagesWrapper>
+          {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
+          <CustomButton
+            onClick={handleToggleForwardMessagePopup}
+            backgroundColor={colors.primaryLight}
+            marginLeft='32px'
+          >
+            <ForwardIcon />
+            Forward
+          </CustomButton>
+          <CustomButton
+            onClick={handleToggleDeleteMessagePopup}
+            color={colors.red1}
+            backgroundColor={colors.primaryLight}
+            marginLeft='16px'
+          >
+            <DeleteIcon />
+            Delete
+          </CustomButton>
+          <CloseIconWrapper onClick={handleCloseSelectMessages}>
+            <CloseIcon />
+          </CloseIconWrapper>
+          {forwardPopupOpen && (
+            <ForwardMessagePopup
+              handleForward={handleForwardMessage}
+              togglePopup={handleToggleForwardMessagePopup}
+              buttonText='Forward'
+              title='Forward message'
+            />
+          )}
+          {deletePopupOpen && (
+            <ConfirmPopup
+              handleFunction={handleDeleteMessage}
+              togglePopup={handleToggleDeleteMessagePopup}
+              buttonText='Delete'
+              description={`Who do you want to remove ${
+                selectedMessagesMap.size > 1 ? 'these messages' : 'this message'
+              } for?`}
+              isDeleteMessage
+              isIncomingMessage={isIncomingMessage}
+              myRole={activeChannel.userRole}
+              allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
+              isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
+              title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
+            />
+          )}
+        </SelectedMessagesWrapper>
       ) : (
         <React.Fragment>
-          <TypingIndicator>
-            {typingIndicator &&
-              typingIndicator.typingState &&
-              (CustomTypingIndicator ? (
-                <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
-              ) : (
-                <TypingIndicatorCont>
-                  <TypingFrom>
-                    {makeUsername(
-                      getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
-                      typingIndicator.from,
-                      getFromContacts
-                    )}{' '}
-                    is typing
-                  </TypingFrom>
-                  <TypingAnimation>
-                    <DotOne />
-                    <DotTwo />
-                    <DotThree />
-                  </TypingAnimation>
-                </TypingIndicatorCont>
-              ))}
-          </TypingIndicator>
-          {/* <EmojiContainer rigthSide={emojisInRightSide} ref={emojisRef} isEmojisOpened={isEmojisOpened}> */}
-          {isEmojisOpened && (
-            <EmojisPopup
-              handleAddEmoji={handleAddEmoji}
-              // messageText={messageText}
-              // ccc={handleTyping}
-              handleEmojiPopupToggle={handleEmojiPopupToggle}
-              rightSide={emojisInRightSide}
-              bottomPosition={'100%'}
-            />
-          )}
-          {/* </EmojiContainer> */}
-          {messageToEdit && (
-            <EditReplyMessageCont>
-              <CloseEditMode onClick={handleCloseEditMode}>
-                <CloseIcon />
-              </CloseEditMode>
-              <EditReplyMessageHeader color={colors.primary}>
-                {editMessageIcon || <EditIcon />}
-                Edit Message
-              </EditReplyMessageHeader>
-              <EditMessageText>{messageToEdit.body}</EditMessageText>
-            </EditReplyMessageCont>
-          )}
-          {messageForReply && (
-            <EditReplyMessageCont>
-              <CloseEditMode onClick={handleCloseReply}>
-                <CloseIcon />
-              </CloseEditMode>
-              <ReplyMessageCont>
-                {!!(messageForReply.attachments && messageForReply.attachments.length) &&
-                  (messageForReply.attachments[0].type === attachmentTypes.image ||
-                  messageForReply.attachments[0].type === attachmentTypes.video ? (
-                    <Attachment
-                      attachment={messageForReply.attachments[0]}
-                      backgroundColor={selectedFileAttachmentsBoxBackground || ''}
-                      isRepliedMessage
-                    />
-                  ) : (
-                    messageForReply.attachments[0].type === attachmentTypes.file && (
-                      <ReplyIconWrapper backgroundColor={colors.primary}>
-                        <ChoseFileIcon />
-                      </ReplyIconWrapper>
-                    )
-                  ))}
-                <div>
-                  <EditReplyMessageHeader color={colors.primary}>
-                    {replyMessageIcon || <ReplyIcon />} Reply to
-                    <UserName>
-                      {user.id === messageForReply.user.id
-                        ? user.firstName
-                          ? `${user.firstName} ${user.lastName}`
-                          : user.id
-                        : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
-                    </UserName>
-                  </EditReplyMessageHeader>
-                  {messageForReply.attachments && messageForReply.attachments.length ? (
-                    messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                      'Voice'
-                    ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                      <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
-                    ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                      <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
-                    ) : (
-                      <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
-                    )
-                  ) : (
-                    MessageTextFormat({
-                      text: messageForReply.body,
-                      message: messageForReply,
-                      contactsMap,
-                      getFromContacts
-                    })
-                  )}
-                </div>
-              </ReplyMessageCont>
-            </EditReplyMessageCont>
-          )}
-
-          {!!attachments.length && !sendAttachmentSeparately && (
-            <ChosenAttachments>
-              {attachments.map((attachment: any) => (
-                <Attachment
-                  attachment={attachment}
-                  isPreview
-                  removeSelected={removeUpload}
-                  key={attachment.attachmentId}
-                  setVideoIsReadyToSend={setVideoIsReadyToSend}
-                  borderRadius={selectedAttachmentsBorderRadius}
-                  selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                  backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
-                  selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
-                  selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
-                  selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
-                />
-              ))}
-            </ChosenAttachments>
-          )}
-          <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
-            <MentionsContainer mentionsIsOpen={openMention}>
-              {openMention && (
-                <MentionMembersPopup
-                  theme={theme}
-                  channelId={activeChannel.id}
-                  addMentionMember={handleSetMention}
-                  searchMention={currentMentions.typed}
-                  handleMentionsPopupClose={handleCloseMentionsPopup}
-                />
-              )}
-            </MentionsContainer>
-            <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-            <MessageInputWrapper
-              borderRadius={borderRadius}
-              ref={inputWrapperRef}
-              backgroundColor={backgroundColor || colors.backgroundColor}
-              channelDetailsIsOpen={channelDetailsIsOpen}
-            >
-              {showAddEmojis && (
-                <EmojiButton
-                  order={emojiIcoOrder}
-                  isEmojisOpened={isEmojisOpened}
-                  ref={emojiBtnRef}
-                  hoverColor={colors.primary}
-                  height={inputContainerHeight || minHeight}
-                  onClick={() => {
-                    setIsEmojisOpened(!isEmojisOpened)
-                  }}
-                >
-                  {AddEmojisIcon || <EmojiSmileIcon />}
-                </EmojiButton>
-              )}
-              {showAddAttachments && (
-                <DropDown
-                  theme={theme}
-                  forceClose={showChooseAttachmentType}
-                  position={addAttachmentsInRightSide ? 'top' : 'topRight'}
-                  margin='auto 0 0'
-                  order={attachmentIcoOrder}
-                  trigger={
-                    <AddAttachmentIcon
-                      ref={addAttachmentsBtnRef}
-                      color={colors.primary}
-                      height={inputContainerHeight || minHeight}
-                    >
-                      {AddAttachmentsIcon || <AttachmentIcon />}
-                    </AddAttachmentIcon>
-                  }
-                >
-                  <DropdownOptionsUl>
-                    <DropdownOptionLi
-                      key={1}
-                      textColor={colors.textColor1}
-                      hoverBackground={colors.hoverBackgroundColor}
-                      onClick={() => onOpenFileUploader(mediaExtensions)}
-                      iconWidth='20px'
-                      iconColor={colors.textColor2}
-                    >
-                      <ChoseMediaIcon />
-                      Photo or video
-                    </DropdownOptionLi>
-                    <DropdownOptionLi
-                      key={2}
-                      textColor={colors.textColor1}
-                      hoverBackground={colors.hoverBackgroundColor}
-                      onClick={() => onOpenFileUploader('')}
-                      iconWidth='20px'
-                      iconColor={colors.textColor2}
-                    >
-                      <ChoseFileIcon />
-                      File
-                    </DropdownOptionLi>
-                  </DropdownOptionsUl>
-                </DropDown>
-              )}
-              <MessageInput
-                contentEditable
-                suppressContentEditableWarning
-                onKeyUp={handleTyping}
-                onChange={handleTyping}
-                onPaste={handlePastAttachments}
-                color={colors.textColor1}
-                onCut={handleCut}
-                onKeyPress={handleSendEditMessage}
-                data-placeholder='Type message here ...'
-                // onKeyDown={handleKeyDown}
-                // value={editMessageText || messageText}
-                borderRadius={inputBorderRadius}
-                order={inputOrder}
-                backgroundColor={inputBackgroundColor}
-                paddings={inputPaddings}
-                ref={messageInputRef}
-                mentionColor={colors.primary}
-                className={inputCustomClassname}
-                // placeholder='Type message here...'
-              />
-            </MessageInputWrapper>
-            <SendMessageIcon
-              isActive={sendMessageIsActive}
-              order={sendIconOrder}
-              color={colors.backgroundColor}
-              height={inputContainerHeight || minHeight}
-              onClick={sendMessageIsActive ? handleSendEditMessage : null}
-            >
-              <SendIcon />
-            </SendMessageIcon>
-            {/*  {recording.initRecording ? (
-            <AudioCont />
+          {!activeChannel.id ? (
+            <Loading />
+          ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
+            <BlockedUserInfo>
+              <BlockInfoIcon />{' '}
+              {isDeletedUserChat
+                ? 'This user has been deleted.'
+                : disableInput
+                ? "Sender doesn't support replies"
+                : 'You blocked this user.'}
+            </BlockedUserInfo>
+          ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
+            <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+              Join
+            </JoinChannelCont>
           ) : (
-            <MessageInput
-              order={inputOrder}
-              onChange={handleTyping}
-              onKeyPress={handleSendEditMessage}
-              // onKeyDown={handleKeyDown}
-              value={messageText}
-              ref={messageInputRef}
-              placeholder='Type message here...'
-            />
-          )}
-
-          {sendMessageIsActive ? (
-            <SendMessageIcon order={sendIcoOrder} onClick={handleSendEditMessage}>
-              <SendIcon />
-            </SendMessageIcon>
-          ) : recording.initRecording ? (
+              activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+                ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
+                : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
+            ) ? (
+            <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
+              <EyeIcon /> Read only
+            </ReadOnlyCont>
+          ) : (
             <React.Fragment>
-              <RecordingTimer>
-                {recording.recordingSeconds}:{recording.recordingMilliseconds}
-              </RecordingTimer>
-              <SendMessageIcon order={sendIcoOrder} onClick={deleteRecord}>
-                <DelteIcon />
-              </SendMessageIcon>
-              <SendMessageIcon order={sendIcoOrder} onClick={saveRecord}>
-                <SendIcon />
-              </SendMessageIcon>
+              <TypingIndicator>
+                {typingIndicator &&
+                  typingIndicator.typingState &&
+                  (CustomTypingIndicator ? (
+                    <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
+                  ) : (
+                    <TypingIndicatorCont>
+                      <TypingFrom>
+                        {makeUsername(
+                          getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
+                          typingIndicator.from,
+                          getFromContacts
+                        )}{' '}
+                        is typing
+                      </TypingFrom>
+                      <TypingAnimation>
+                        <DotOne />
+                        <DotTwo />
+                        <DotThree />
+                      </TypingAnimation>
+                    </TypingIndicatorCont>
+                  ))}
+              </TypingIndicator>
+              {messageToEdit && (
+                <EditReplyMessageCont>
+                  <CloseEditMode onClick={handleCloseEditMode}>
+                    <CloseIcon />
+                  </CloseEditMode>
+                  <EditReplyMessageHeader color={colors.primary}>
+                    {editMessageIcon || <EditIcon />}
+                    Edit Message
+                  </EditReplyMessageHeader>
+                  <EditMessageText>
+                    {MessageTextFormat({
+                      text: messageToEdit.body,
+                      message: messageToEdit,
+                      contactsMap,
+                      getFromContacts,
+                      asSampleText: true
+                    })}
+                  </EditMessageText>
+                </EditReplyMessageCont>
+              )}
+              {messageForReply && (
+                <EditReplyMessageCont>
+                  <CloseEditMode onClick={handleCloseReply}>
+                    <CloseIcon />
+                  </CloseEditMode>
+                  <ReplyMessageCont>
+                    {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                      (messageForReply.attachments[0].type === attachmentTypes.image ||
+                      messageForReply.attachments[0].type === attachmentTypes.video ? (
+                        <Attachment
+                          attachment={messageForReply.attachments[0]}
+                          backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                          isRepliedMessage
+                        />
+                      ) : (
+                        messageForReply.attachments[0].type === attachmentTypes.file && (
+                          <ReplyIconWrapper backgroundColor={colors.primary}>
+                            <ChoseFileIcon />
+                          </ReplyIconWrapper>
+                        )
+                      ))}
+                    <div>
+                      <EditReplyMessageHeader color={colors.primary}>
+                        {replyMessageIcon || <ReplyIcon />} Reply to
+                        <UserName>
+                          {user.id === messageForReply.user.id
+                            ? user.firstName
+                              ? `${user.firstName} ${user.lastName}`
+                              : user.id
+                            : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
+                        </UserName>
+                      </EditReplyMessageHeader>
+                      {messageForReply.attachments && messageForReply.attachments.length ? (
+                        messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                          'Voice'
+                        ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                          <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                        ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                          <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                        ) : (
+                          <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                        )
+                      ) : (
+                        MessageTextFormat({
+                          text: messageForReply.body,
+                          message: messageForReply,
+                          contactsMap,
+                          getFromContacts
+                        })
+                      )}
+                    </div>
+                  </ReplyMessageCont>
+                </EditReplyMessageCont>
+              )}
+
+              {!!attachments.length && !sendAttachmentSeparately && (
+                <ChosenAttachments>
+                  {attachments.map((attachment: any) => (
+                    <Attachment
+                      attachment={attachment}
+                      isPreview
+                      removeSelected={removeUpload}
+                      key={attachment.tid}
+                      setVideoIsReadyToSend={setVideoIsReadyToSend}
+                      borderRadius={selectedAttachmentsBorderRadius}
+                      selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
+                      backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
+                      selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
+                      selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
+                      selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
+                    />
+                  ))}
+                </ChosenAttachments>
+              )}
+              <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
+                <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
+                {showRecording ? (
+                  <AudioCont />
+                ) : (
+                  <MessageInputWrapper
+                    className='message_input_wrapper'
+                    borderRadius={borderRadius}
+                    ref={inputWrapperRef}
+                    backgroundColor={backgroundColor || colors.backgroundColor}
+                    channelDetailsIsOpen={channelDetailsIsOpen}
+                    messageInputOrder={inputOrder}
+                    messageInputPaddings={inputPaddings}
+                  >
+                    {showAddEmojis && (
+                      <EmojiButton
+                        order={emojiIcoOrder}
+                        isEmojisOpened={isEmojisOpened}
+                        ref={emojiBtnRef}
+                        hoverColor={colors.primary}
+                        height={inputContainerHeight || minHeight}
+                        onClick={() => {
+                          setIsEmojisOpened(!isEmojisOpened)
+                        }}
+                      >
+                        {AddEmojisIcon || <EmojiSmileIcon />}
+                      </EmojiButton>
+                    )}
+                    {showAddAttachments && (
+                      <DropDown
+                        theme={theme}
+                        forceClose={showChooseAttachmentType}
+                        position={addAttachmentsInRightSide ? 'top' : 'topRight'}
+                        margin='auto 0 0'
+                        order={attachmentIcoOrder}
+                        trigger={
+                          <AddAttachmentIcon
+                            ref={addAttachmentsBtnRef}
+                            color={colors.primary}
+                            height={inputContainerHeight || minHeight}
+                          >
+                            {AddAttachmentsIcon || <AttachmentIcon />}
+                          </AddAttachmentIcon>
+                        }
+                      >
+                        <DropdownOptionsUl>
+                          <DropdownOptionLi
+                            key={1}
+                            textColor={colors.textColor1}
+                            hoverBackground={colors.hoverBackgroundColor}
+                            onClick={() => onOpenFileUploader(mediaExtensions)}
+                            iconWidth='20px'
+                            iconColor={colors.textColor2}
+                          >
+                            <ChoseMediaIcon />
+                            Photo or video
+                          </DropdownOptionLi>
+                          <DropdownOptionLi
+                            key={2}
+                            textColor={colors.textColor1}
+                            hoverBackground={colors.hoverBackgroundColor}
+                            onClick={() => onOpenFileUploader('')}
+                            iconWidth='20px'
+                            iconColor={colors.textColor2}
+                          >
+                            <ChoseFileIcon />
+                            File
+                          </DropdownOptionLi>
+                        </DropdownOptionsUl>
+                      </DropDown>
+                    )}
+                    <LexicalWrapper
+                      ref={messageInputRef}
+                      order={inputOrder}
+                      backgroundColor={inputBackgroundColor}
+                      paddings={inputPaddings}
+                      mentionColor={colors.primary}
+                      className={inputCustomClassname}
+                      selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+                      borderRadius={inputBorderRadius}
+                    >
+                      <LexicalComposer initialConfig={initialConfig}>
+                        <AutoFocusPlugin messageForReply={messageForReply} />
+                        <ClearEditorPlugin
+                          shouldClearEditor={shouldClearEditor}
+                          setEditorCleared={() => setShouldClearEditor({ clear: false })}
+                        />
+                        {/* eslint-disable-next-line react/jsx-no-bind */}
+                        <OnChangePlugin onChange={onChange} />
+                        <EditMessagePlugin
+                          editMessage={messageToEdit}
+                          contactsMap={contactsMap}
+                          getFromContacts={getFromContacts}
+                          setMentionedMember={setMentionedMembers}
+                        />
+                        <FormatMessagePlugin
+                          editorState={realEditorState}
+                          setMessageBodyAttributes={setMessageBodyAttributes}
+                          messageText={messageToEdit ? editMessageText : messageText}
+                          setMessageText={messageToEdit ? setEditMessageText : setMessageText}
+                          messageToEdit={messageToEdit}
+                        />
+                        <React.Fragment>
+                          {isEmojisOpened && (
+                            <EmojisPopup
+                              // handleAddEmoji={handleAddEmoji}
+                              // messageText={messageText}
+                              // ccc={handleTyping}
+                              handleEmojiPopupToggle={handleEmojiPopupToggle}
+                              rightSide={emojisInRightSide}
+                              bottomPosition={`${emojisPopupBottomPosition}px`}
+                              leftPosition={`${emojisPopupLeftPosition}px`}
+                            />
+                          )}
+                          {allowSetMention && (
+                            <MentionsPlugin
+                              setMentionMember={handleSetMentionMember}
+                              contactsMap={contactsMap}
+                              userId={user.id}
+                              getFromContacts={getFromContacts}
+                              members={activeChannelMembers}
+                              setMentionsIsOpen={setMentionsIsOpen}
+                            />
+                          )}
+                          <RichTextPlugin
+                            contentEditable={
+                              <div
+                                onKeyDown={handleSendEditMessage}
+                                onDoubleClick={handleDoubleClick}
+                                className='rich_text_editor'
+                                ref={onRef}
+                              >
+                                <ContentEditable className='content_editable_input' />
+                              </div>
+                            }
+                            placeholder={<Placeholder paddings={inputPaddings}>Type message here ...</Placeholder>}
+                            ErrorBoundary={LexicalErrorBoundary}
+                          />
+                          {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
+                            <React.Fragment>
+                              {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
+                              {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
+                              <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
+                            </React.Fragment>
+                          )}
+                        </React.Fragment>
+                      </LexicalComposer>
+                    </LexicalWrapper>
+                  </MessageInputWrapper>
+                )}
+
+                {sendMessageIsActive ? (
+                  <SendMessageIcon
+                    isActive={sendMessageIsActive}
+                    order={sendIconOrder}
+                    color={colors.backgroundColor}
+                    height={inputContainerHeight || minHeight}
+                    onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                  >
+                    <SendIcon />
+                  </SendMessageIcon>
+                ) : (
+                  <SendMessageIcon
+                    order={sendIconOrder}
+                    height={inputContainerHeight || minHeight}
+                    color={colors.primary}
+                  >
+                    <AudioRecord
+                      sendRecordedFile={setRecordedFile}
+                      setShowRecording={setShowRecording}
+                      showRecording={showRecording}
+                    />
+                  </SendMessageIcon>
+                )}
+              </SendMessageInputContainer>
             </React.Fragment>
-          ) : (
-            <SendMessageIcon order={sendIcoOrder} onClick={startRecording}>
-              <RecordIcon />
-            </SendMessageIcon>
-          )} */}
-          </SendMessageInputContainer>
+          )}
         </React.Fragment>
       )}
     </Container>
@@ -1949,6 +1656,10 @@ const Container = styled.div<{
   ref?: any
   height?: number
   theme?: string
+  mentionColor?: string
+  toolBarTop: string
+  toolBarLeft: string
+  selectionBackgroundColor: string
 }>`
   margin: ${(props) => props.margin || '30px 0 16px'};
   border: ${(props) => props.border || ''};
@@ -1970,11 +1681,22 @@ const Container = styled.div<{
     z-index: 99;
   }
 
-  & .rdw-suggestion-option {
+  & .text_formatting_toolbar {
+    display: ${(props) => (props.toolBarTop || props.toolBarLeft ? 'block' : 'none')};
+    position: fixed;
+    top: ${(props) => props.toolBarTop};
+    left: ${(props) => props.toolBarLeft};
   }
 
   & .rdw-suggestion-option-active {
     background-color: rgb(243, 245, 248);
+  }
+  & .custom_editor {
+    cursor: text;
+
+    & .rdw-mention-link {
+      color: ${(props) => props.mentionColor || colors.primary};
+    }
   }
 `
 
@@ -1991,6 +1713,7 @@ const EditReplyMessageCont = styled.div<any>`
   background-color: ${colors.backgroundColor};
   z-index: 19;
   border-bottom: 1px solid ${colors.gray1};
+  box-sizing: content-box;
 `
 
 const EditMessageText = styled.p<any>`
@@ -2078,19 +1801,12 @@ const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: s
 }
 `
 
-/*
-const CloseReply = styled.span`
-  position: absolute;
-  right: 14px;
-  top: 8px;
-  cursor: pointer;
-`
-*/
-
 const MessageInputWrapper = styled.div<{
   channelDetailsIsOpen?: boolean
   backgroundColor?: string
   borderRadius?: string
+  messageInputOrder?: number
+  messageInputPaddings?: string
 }>`
   display: flex;
   width: 100%;
@@ -2102,62 +1818,99 @@ const MessageInputWrapper = styled.div<{
   border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
 `
-const MessageInput = styled.div<{
+
+const LexicalWrapper = styled.div<{
   order?: number
   color?: string
   borderRadius?: string
   backgroundColor?: string
   paddings?: string
   mentionColor?: string
+  isChrome?: boolean
+  selectionBackgroundColor?: string
 }>`
-  margin: 8px 6px;
+  position: relative;
   width: 100%;
-  max-height: 80px;
-  min-height: 20px;
-  display: block;
-  border: none;
-  font: inherit;
-  color: ${(props) => props.color};
-  box-sizing: border-box;
-  outline: none !important;
-  font-size: 15px;
-  line-height: 20px;
-  overflow: auto;
-  border-radius: ${(props) => props.borderRadius};
-  background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => props.paddings};
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
-  &:empty:before {
-    content: attr(data-placeholder);
+  & .rich_text_editor {
+    margin: 8px 6px;
+    width: 100%;
+    max-height: 80px;
+    min-height: 20px;
+    display: block;
+    border: none;
+    box-sizing: border-box;
+    outline: none !important;
+    overflow: auto;
+    border-radius: ${(props) => props.borderRadius};
+    background-color: ${(props) => props.backgroundColor};
+    padding: ${(props) => props.paddings};
+    order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+    & p {
+      font-size: 15px;
+      line-height: 20px;
+      color: ${(props) => props.color};
+    }
+
+    &::selection {
+      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+    }
+    & *::selection {
+      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+    }
+    & span::selection {
+      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+    }
+
+    &:empty:before {
+      content: attr(data-placeholder);
+    }
+
+    & .content_editable_input {
+      border: none !important;
+      outline: none !important;
+    }
+    & .mention {
+      color: ${(props) => props.mentionColor || colors.primary};
+      background-color: inherit !important;
+      user-modify: read-only;
+    }
+
+    & span.bold {
+      font-weight: bold;
+    }
+    & .editor_paragraph {
+      margin: 0;
+    }
+    & .text_bold {
+      font-weight: 600;
+    }
+    & .text_italic {
+      font-style: italic;
+    }
+    & .text_underline {
+      text-decoration: underline;
+    }
+    & .text_strikethrough {
+      text-decoration: line-through;
+    }
+    & .text_underlineStrikethrough {
+      text-decoration: underline line-through;
+    }
+    & code {
+      font-family: inherit;
+      letter-spacing: 4px;
+    }
   }
+`
 
-  &:before {
-    position: relative;
-    top: calc(50% - 10px);
-    left: 0;
-    font-size: 15px;
-    color: ${colors.textColor3};
-    pointer-events: none;
-    unicode-bidi: plaintext;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 100%;
-  }
-
-  &::placeholder {
-    font-size: 15px;
-    color: ${colors.textColor3};
-    opacity: 1;
-  }
-
-  & span.mention_user {
-    color: ${(props) => props.mentionColor || colors.primary};
-    user-modify: read-only;
-  }
-
-  //caret-color: #000;
+const Placeholder = styled.span<{ paddings?: string }>`
+  position: absolute;
+  top: calc(50% - 10px);
+  left: 0;
+  pointer-events: none;
+  color: ${colors.placeholderTextColor};
+  margin-left: 6px;
 `
 
 const EmojiButton = styled.span<any>`
@@ -2183,49 +1936,11 @@ const EmojiButton = styled.span<any>`
   }
 `
 
-// TODO Mentions
-/* const MentionButton = styled.span<any>`
-  margin: 0 5px;
-  cursor: pointer;
-  line-height: 13px;
-  z-index: 2;
-  > svg {
-    ${(props) =>
-      props.isEmojisOpened ? `color: ${colors.cobalt1};` : 'color: #898B99;'}
-  }
-
-  &:hover > svg {
-    color: ${colors.cobalt1};
-  }
-` */
-
-/* const EmojiContainer = styled.div<any>`
-  position: absolute;
-  left: ${(props) => (props.rigthSide ? '-276px' : '-8px')};
-  bottom: 46px;
-  z-index: 9998;
-` */
-
-export const MentionsContainer = styled.div<{ mentionsIsOpen?: boolean }>`
-  position: absolute;
-  left: 0;
-  bottom: 100%;
-  z-index: 9998;
-`
-
-/* const TypingMessage = styled.div`
-  position: absolute;
-  top: -21px;
-  font-style: italic;
-  color: #7c7e8e;
-  font-size: 14px;
-` */
-
 const SendMessageIcon = styled.span<any>`
   display: flex;
   height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
-  margin: 0 8px;
+  margin: 0 8px 0 auto;
   cursor: pointer;
   line-height: 13px;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
@@ -2234,18 +1949,11 @@ const SendMessageIcon = styled.span<any>`
   color: ${(props) => (props.isActive ? colors.primary : props.color)};
 `
 
-/* const AudioCont = styled.div<any>`
+const AudioCont = styled.div<any>`
   display: flex;
   width: 100%;
   justify-content: flex-end;
 `
-
-const RecordingTimer = styled.span<any>`
-  display: inline-block;
-  width: 50px;
-  font-size: 16px;
-  color: ${colors.gray6};
-` */
 
 const ChosenAttachments = styled.div<{ fileBoxWidth?: string }>`
   display: flex;
@@ -2328,7 +2036,7 @@ const TypingAnimation = styled.div`
       width: 3.5px;
       height: 3.5px;
       border-radius: 50%;
-      background-color: #818c99;
+      background-color: ${colors.borderColor2};
       animation-name: ${sizeAnimation};
       animation-duration: 0.6s;
       animation-iteration-count: infinite;
@@ -2419,13 +2127,39 @@ const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
     color: ${colors.white};
   }
 `
-/* interface Recording {
-  recordingSeconds: number
-  recordingMilliseconds: number
-  initRecording: boolean
-  mediaStream: null | MediaStream
-  mediaRecorder: null | MediaRecorder
-  audio?: string
-} */
+
+const SelectedMessagesWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+`
+
+const CustomButton = styled.span<{ color?: string; backgroundColor?: string; marginLeft?: string }>`
+  color: ${(props) => props.color || colors.textColor1};
+  padding: 8px 16px;
+  background-color: ${(props) => props.backgroundColor || colors.primaryLight};
+  margin-left: ${(props) => props.marginLeft || '8px'};
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-family: Inter, sans-serif;
+  font-size: 15px;
+  font-weight: 500;
+  cursor: pointer;
+
+  > svg {
+    width: 20px;
+    height: 20px;
+    margin-right: 8px;
+  }
+`
+
+const CloseIconWrapper = styled.span`
+  display: inline-flex;
+  cursor: pointer;
+  margin-left: auto;
+  padding: 10px;
+`
 
 export default SendMessageInput

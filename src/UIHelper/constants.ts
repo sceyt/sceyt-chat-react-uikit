@@ -16,10 +16,12 @@ export const colors = {
   lightModeTextColor1: '#111539',
   textColor2: '#707388',
   textColor3: '#A0A1B0',
+  placeholderTextColor: '#acacad',
 
   gray0: '#F3F5F8',
   gray1: '#EDEDED',
   borderColor: '#dfe0eb',
+  borderColor2: '#818C99',
 
   primary: '#5159F6',
   primaryLight: '#E3E7FF',
@@ -27,6 +29,9 @@ export const colors = {
   lightModePrimary: '#5159F6',
   darkModePrimaryLight: '#1c1f47',
   lightModePrimaryLight: '#E3E7FF',
+
+  incomingRepliedMessageBackground: '#fbfbfc',
+  ownRepliedMessageBackground: '#f9fbfd',
 
   red1: '#FA4C56',
   red2: '#d7596c',

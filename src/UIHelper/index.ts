@@ -566,12 +566,13 @@ export const PopupFooter = styled(ButtonBlock)`
   z-index: 2;
 `
 
-export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string }>`
+export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string; uppercase?: boolean }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 20px;
   color: ${(props) => props.color || colors.textColor1};
   margin: ${(props) => props.margin || 0};
+  text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
 export const ItemNote = styled.div<{ direction: string }>`
@@ -697,12 +698,51 @@ export const UploadAvatarHandler = styled.div`
   color: ${colors.textColor1};
 `
 
-export const MentionedUser = styled.span<{ color?: string; isLastMessage?: boolean }>`
-  color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
-  font-weight: ${(props) => props.isLastMessage && '500'};
+export const StyledText = styled.span<{
+  color?: string
+  fontWeight?: string
+  fontFamily?: string
+  fontStyle?: string
+  isLastMessage?: boolean
+  textDecoration?: string
+  letterSpacing?: string
+}>`
+  font-weight: ${(props) => props.fontWeight || (props.isLastMessage && '500')};
+  font-family: ${(props) => props.fontFamily};
+  font-style: ${(props) => props.fontStyle};
+  text-decoration: ${(props) => props.textDecoration};
+  letter-spacing: ${(props) => props.letterSpacing};
+
+  &.mention {
+    color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
+    font-weight: ${(props) => props.isLastMessage && '500'};
+  }
+  &.bold {
+    font-weight: 600;
+  }
+  &.italic {
+    font-style: italic;
+  }
+  &.underline {
+    text-decoration: underline;
+  }
+  &.strikethrough {
+    text-decoration: line-through;
+  }
+  &.underline.strikethrough {
+    text-decoration: underline line-through;
+  }
+  &.monospace {
+    letter-spacing: 4px;
+  }
 `
 
-export const MessageOwner = styled.h3<any>`
+export const MessageOwner = styled.h3<{
+  color?: string
+  rtlDirection?: boolean
+  fontSize?: string
+  clickable?: boolean
+}>`
   margin: 0 12px 4px 0;
   white-space: nowrap;
   color: ${(props) => props.color || colors.primary};
@@ -710,6 +750,9 @@ export const MessageOwner = styled.h3<any>`
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
   line-height: ${(props) => props.fontSize || '15px'};
+  cursor: ${(props) => props.clickable && 'pointer'};
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 export const MessageText = styled.pre<{
@@ -723,6 +766,7 @@ export const MessageText = styled.pre<{
   withMediaAttachment?: boolean
   isForwarded?: boolean
   withPaddings?: boolean
+  theme: string
 }>`
   display: flow-root;
   position: relative;
@@ -751,6 +795,7 @@ export const MessageText = styled.pre<{
   letter-spacing: 0.3px;
   color: ${(props) => props.color || colors.textColor1};
   user-select: text;
+  overflow: hidden;
 
   ${(props) =>
     props.isRepliedMessage &&
@@ -795,6 +840,10 @@ export const ReplyMessageText = styled.span<{
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+
+  & a {
+    color: ${colors.blue};
+  }
 `
 
 export const CloseIcon = styled(CloseSvg)`
@@ -887,6 +936,7 @@ export const CancelResumeWrapper = styled.span<{ isRepliedMessage?: boolean; onC
 `
 export const UploadPercent = styled.span<{
   fileAttachment?: boolean
+  isDetailsView?: boolean
   isRepliedMessage?: boolean
   borderRadius?: string
   backgroundColor?: string
@@ -896,8 +946,8 @@ export const UploadPercent = styled.span<{
   justify-content: center;
   position: absolute;
   color: #fff;
-  width: ${(props) => (props.fileAttachment || props.isRepliedMessage ? '40px' : '56px')};
-  height: ${(props) => (props.fileAttachment || props.isRepliedMessage ? '40px' : '56px')};
+  width: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
+  height: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   //background-color: rgba(0,0,0,0.4);
   background-color: ${(props) => props.backgroundColor};
   border-radius: ${(props) =>
@@ -936,8 +986,8 @@ export const UploadProgress = styled.div<{
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
   height: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
-  min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '130px' : null)};
-  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isFailedAttachment && '90px'};
+  min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '165px' : null)};
+  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && '165px'};
   display: flex;
   //display: none;
   align-items: center;

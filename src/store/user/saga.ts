@@ -11,7 +11,7 @@ import {
   updateUserProfileAC
 } from './actions'
 import { IAction, IMember } from '../../types'
-import { getActiveChannelId, getChannelFromMap, query } from '../../helpers/channelHalper'
+import { getActiveChannelId, getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { updateChannelDataAC } from '../channel/actions'
 
 function* getContacts(): any {
@@ -52,6 +52,15 @@ function* blockUser(action: IAction): any {
           })
         })
       )
+      updateChannelOnAllChannels(activeChannelId, {
+        members: activeChannel.members.map((member: IMember) => {
+          if (member.id === blockedUsers[0].id) {
+            return blockedUsers[0]
+          } else {
+            return member
+          }
+        })
+      })
     }
   } catch (error) {
     console.log('error in block users', error.message)
@@ -82,6 +91,15 @@ function* unblockUser(action: IAction): any {
           })
         })
       )
+      updateChannelOnAllChannels(activeChannelId, {
+        members: activeChannel.members.map((member: IMember) => {
+          if (member.id === unblockedUsers[0].id) {
+            return unblockedUsers[0]
+          } else {
+            return member
+          }
+        })
+      })
     }
   } catch (error) {
     console.log('error in unblock users', error.message)

@@ -14,6 +14,7 @@ import { useDidUpdate } from '../../hooks'
 interface IProps {
   hideChannelList?: boolean
   children?: JSX.Element | JSX.Element[]
+  // eslint-disable-next-line no-unused-vars
   onActiveChannelUpdated?: (activeChannel: IChannel) => void
 }
 
@@ -28,6 +29,7 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
 
   useEffect(() => {
+    // console.log('channelListWidth.  ... . . . ', channelListWidth)
     if (hideChannelList && !channelListWidth) {
       dispatch(setHideChannelListAC(true))
       dispatch(getChannelsAC({ filter: {}, limit: 1, sort: 'byLastMessage', search: '' }, false))
@@ -42,6 +44,7 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
 
   useDidUpdate(() => {
     if (hideChannelList && (!activeChannel || !activeChannel.id) && addedChannel && addedChannel.id) {
+      console.log('call set active channel. ... ', addedChannel)
       dispatch(setActiveChannelAC(addedChannel))
     }
   }, [addedChannel])

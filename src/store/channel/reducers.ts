@@ -23,6 +23,7 @@ import {
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
   SET_SEARCHED_CHANNELS,
+  SET_SEARCHED_CHANNELS_FOR_FORWARD,
   SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
@@ -32,9 +33,10 @@ import {
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel, IMember } from '../../types'
+import { IAction, IChannel, IContact, IMember } from '../../types'
 import { CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
+import { setUserToMap } from '../../helpers/userHelper'
 
 const initialState: {
   channelsLoadingState: string | null
@@ -44,8 +46,14 @@ const initialState: {
   channelsForForwardHasNext: boolean
   channels: IChannel[]
   searchedChannels: {
-    groups: IChannel[]
-    directs: IChannel[]
+    chats_groups: IChannel[]
+    channels: IChannel[]
+    contacts: IContact[]
+  }
+  searchedChannelsForForward: {
+    chats_groups: IChannel[]
+    channels: IChannel[]
+    contacts: IContact[]
   }
   closeSearchChannel: boolean
   channelsForForward: IChannel[]
@@ -81,7 +89,8 @@ const initialState: {
   channelsHasNext: true,
   channelsForForwardHasNext: true,
   channels: [],
-  searchedChannels: { groups: [], directs: [] },
+  searchedChannels: { chats_groups: [], channels: [], contacts: [] },
+  searchedChannelsForForward: { chats_groups: [], channels: [], contacts: [] },
   closeSearchChannel: false,
   channelsForForward: [],
   activeChannel: {},
@@ -129,6 +138,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       return newState
     }
 
+    case SET_SEARCHED_CHANNELS_FOR_FORWARD: {
+      newState.searchedChannelsForForward = payload.searchedChannels
+      return newState
+    }
+
     case SET_CLOSE_SEARCH_CHANNELS: {
       newState.closeSearchChannel = payload.close
       return newState
@@ -163,10 +177,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case REMOVE_CHANNEL: {
       const { channelId } = payload
       const channelsCpy = newState.channels
-      console.log(
-        'updated channels. . ..',
-        channelsCpy.filter((chan) => chan.id !== channelId)
-      )
       newState.channels = channelsCpy.filter((chan) => chan.id !== channelId)
 
       return newState
@@ -229,11 +239,20 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case SET_ACTIVE_CHANNEL: {
       newState.activeChannel = payload.channel || {}
+      if (payload.channel.type === CHANNEL_TYPE.DIRECT) {
+        const ChatClient = getClient()
+        const { user } = ChatClient
+        const directChannelUser = payload.channel.members.find((member: IMember) => member.id !== user.id)
+        if (directChannelUser) {
+          setUserToMap(directChannelUser)
+        }
+      }
       return newState
     }
 
     case UPDATE_CHANNEL_DATA: {
       const { config, channelId, moveUp } = payload
+      console.log('UPDATE_CHANNEL_DATA reducer .>>.... .', channelId, '.. config ...', config)
       if (moveUp) {
         let updateChannel: any
         const updatedChannels = newState.channels.filter((chan) => {
@@ -289,10 +308,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       const updatedChannels = newState.channels.map((channel) => {
         const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
         const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-        if (channel.type === CHANNEL_TYPE.DIRECT && directChannelUser && usersMap[directChannelUser.id]) {
+        if (isDirectChannel && directChannelUser && usersMap[directChannelUser.id]) {
           const membersToUpdate = channel.members.map((member) => {
             if (member.id === usersMap[directChannelUser.id].id) {
-              return { ...member, presence: usersMap[directChannelUser.id].presence }
+              return { ...member, ...usersMap[directChannelUser.id] }
             } else {
               return member
             }
@@ -309,7 +328,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           ...newState.activeChannel,
           members: (newState.activeChannel as IChannel).members.map((member) => {
             if (member.id !== user.id) {
-              return { ...member, presence: usersMap[activeChannelUser.id].presence }
+              return { ...member, ...usersMap[activeChannelUser.id] }
             } else {
               return member
             }
@@ -432,7 +451,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case DESTROY_SESSION: {
-      newState = initialState
+      newState = { ...initialState, channelListWidth: newState.channelListWidth }
       return newState
     }
     default:

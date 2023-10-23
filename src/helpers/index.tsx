@@ -147,10 +147,8 @@ export const downloadFile = async (
 }
 
 export const cancelDownloadFile = (attachmentId: string) => {
-  console.log('cancelDownloadFile... ', attachmentId)
   const promise = filesPromisesOnDownload[attachmentId]
   if (promise) {
-    console.log('cancelDownloadFile... promise exist - --')
     const customUploader = getCustomUploader()
     if (customUploader) {
       customUploader.cancelRequest(promise)
@@ -161,7 +159,7 @@ export const cancelDownloadFile = (attachmentId: string) => {
 export const calculateRenderedImageWidth = (width: number, height: number, maxWidth?: number, maxHeight?: number) => {
   const maxWdt = maxWidth || 420
   const maxHg = maxHeight || 400
-  const minWidth = 130
+  const minWidth = 165
   const aspectRatio = width / height
   if (aspectRatio >= maxWdt / maxHg) {
     return [Math.max(minWidth, Math.min(maxWdt, width)), Math.min(maxHg, height, maxWdt / aspectRatio) + 2]
@@ -297,17 +295,29 @@ export const formatLargeText = (text: string, maxLength: number): any => {
   return text */
 }
 
+export const getLastTwoChars = (element: any) => {
+  const doc = element.ownerDocument || element.document
+  const win = doc.defaultView || doc.parentWindow
+  const selection = win.getSelection()
+  const focusOffset = selection.focusOffset
+  const focusNode = selection.focusNode
+  if (focusNode.nodeName !== 'SPAN') {
+    return focusNode.textContent?.slice(focusOffset - 2, focusOffset)
+  }
+  return ''
+}
 export const getCaretPosition = (element: any) => {
   let caretOffset = 0
   // const textNodes = 0
   const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
-  const focusOffset = win.getSelection().focusOffset
-  const focusNode = win.getSelection().focusNode
+  const selection = win.getSelection()
+  // console.log('get pos .>>> >> >selection', selection)
+  const focusOffset = selection.focusOffset
+  const focusNode = selection.focusNode
   // const text = element.innerText
   // console.log('focusOffset. . . . .', focusOffset)
   // console.log('focusNode. . . . .', focusNode)
-  // console.log('element innerText.. . . . .', text)
   // const separateLines = text.split(/\r?\n|\r|\n/g)
   // console.log('setperate lines .... ', separateLines)
   // let textNodesAdded = false
@@ -333,6 +343,10 @@ export const getCaretPosition = (element: any) => {
         caretOffset += node.innerText.length
       }
     } else {
+      const browser = detectBrowser()
+      if (browser === 'Safari' && node.innerText && node.innerText.length) {
+        caretOffset += node.innerText.length + 1
+      }
       // textNodes += 1
     }
     if (element.childNodes[i + 1] && element.childNodes[i + 1].nodeName === 'BR') {
@@ -353,7 +367,6 @@ export const setCursorPosition = (
   attempt: number | undefined = 0
 ) => {
   try {
-    console.log('attamt ...... ', attempt)
     console.log('set pos ... ', position)
     const range = document.createRange()
     const sel = window.getSelection()
@@ -461,6 +474,111 @@ export const setCursorPosition = (
   }
 }
 
+export const setSelectionRange = (element: any, start: number, end: number, attempt: number | undefined = 0) => {
+  try {
+    const range = document.createRange()
+    const sel = window.getSelection()
+    let currentNodeStart = element.childNodes[0]
+    let currentNodeEnd = element.childNodes[0]
+    let caretOffsetStart = 0
+    let caretOffsetEnd = 0
+    let currentNodeStartIsFind = false
+    let currentNodeEndIsFind = false
+    element.childNodes.forEach((node: any, index: number) => {
+      if (!currentNodeStartIsFind && node.nodeType === Node.TEXT_NODE) {
+        currentNodeStart = node
+        const textLength = node.nodeValue.length
+        caretOffsetStart = caretOffsetStart + textLength
+
+        if (caretOffsetStart >= start) {
+          currentNodeStartIsFind = true
+          currentNodeStart = node
+
+          caretOffsetStart = start - (caretOffsetStart - textLength)
+        } else if (caretOffsetEnd >= end) {
+          currentNodeEnd = node
+        }
+        // caretOffset += 1
+      } else if (!currentNodeStartIsFind) {
+        if (node.nodeName === 'SPAN') {
+          caretOffsetStart += node.innerText.length
+
+          if (caretOffsetStart >= start) {
+            currentNodeStartIsFind = true
+            currentNodeStart = node
+            caretOffsetStart = start - caretOffsetStart
+          }
+        } else {
+          // textNodes += 1
+        }
+      }
+      if (!currentNodeEndIsFind && node.nodeType === Node.TEXT_NODE) {
+        currentNodeEnd = node
+        const textLength = node.nodeValue.length
+        caretOffsetEnd = caretOffsetEnd + textLength
+
+        if (caretOffsetEnd >= end) {
+          currentNodeEndIsFind = true
+          currentNodeEnd = node
+          caretOffsetEnd = end - (caretOffsetEnd - textLength)
+          return
+        }
+        // caretOffset += 1
+      } else if (!currentNodeEndIsFind) {
+        if (node.nodeName === 'SPAN') {
+          caretOffsetEnd += node.innerText.length
+
+          if (caretOffsetEnd >= end) {
+            currentNodeEndIsFind = true
+            currentNodeEnd = node
+            caretOffsetEnd = 1
+            return
+          }
+        } else {
+          // textNodes += 1
+        }
+      }
+      if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
+        if (!currentNodeStartIsFind) {
+          console.log('start +=1')
+          caretOffsetStart += 1
+        }
+        if (!currentNodeEndIsFind) {
+          console.log('+=1')
+          caretOffsetEnd += 1
+        }
+      }
+      if (element.childNodes.length === index + 1) {
+        if (!currentNodeStartIsFind) {
+          currentNodeStartIsFind = true
+          if (start > caretOffsetStart) {
+            caretOffsetStart++
+          }
+          currentNodeStart = node
+          caretOffsetStart = caretOffsetStart - start
+        }
+        if (!currentNodeEndIsFind) {
+          currentNodeEndIsFind = true
+          currentNodeEnd = node
+          caretOffsetEnd = caretOffsetEnd - end
+        }
+      }
+    })
+    range.setStart(currentNodeStart, caretOffsetStart)
+    range.setEnd(currentNodeEnd, caretOffsetEnd)
+    // range.collapse(true)
+    if (sel) {
+      sel.removeAllRanges()
+      sel.addRange(range)
+    }
+  } catch (e) {
+    console.log('position not exist attempt', attempt, 'e.', e)
+    if (attempt <= 5) {
+      setSelectionRange(element, start - 1, end - 1, ++attempt)
+    }
+  }
+}
+
 export const placeCaretAtEnd = (el: any) => {
   el.focus()
   if (typeof window.getSelection !== 'undefined' && typeof document.createRange !== 'undefined') {
@@ -504,21 +622,23 @@ export const detectOS = () => {
   return os
 }
 export const detectBrowser = () => {
-  const userAgent = window.navigator.userAgent
-  let browser
+  let browser = ''
+  if (window && window.navigator) {
+    const userAgent = window.navigator.userAgent
 
-  if (userAgent.includes('Opera') || userAgent.includes('OPR')) {
-    browser = 'Opera'
-  } else if (userAgent.includes('Edge')) {
-    browser = 'Edge'
-  } else if (userAgent.includes('Chrome')) {
-    browser = 'Chrome'
-  } else if (userAgent.includes('Safari')) {
-    browser = 'Safari'
-  } else if (userAgent.includes('Firefox')) {
-    browser = 'Firefox'
-  } else if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) {
-    browser = 'Internet Explorer'
+    if (userAgent.includes('Opera') || userAgent.includes('OPR')) {
+      browser = 'Opera'
+    } else if (userAgent.includes('Edge')) {
+      browser = 'Edge'
+    } else if (userAgent.includes('Chrome')) {
+      browser = 'Chrome'
+    } else if (userAgent.includes('Safari')) {
+      browser = 'Safari'
+    } else if (userAgent.includes('Firefox')) {
+      browser = 'Firefox'
+    } else if (userAgent.includes('MSIE') || userAgent.includes('Trident/')) {
+      browser = 'Internet Explorer'
+    }
   }
   return browser
 }
@@ -558,7 +678,14 @@ export const getEmojisCategoryTitle = (categoryKey: string) => {
 export const hashString = async (str: string) => {
   const encoder = new TextEncoder()
   const encodedData = encoder.encode(str)
-  const hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  let hashBuffer: any
+  try {
+    hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+  } catch (e) {
+    // const crypto = await import('crypto')
+    // hashBuffer = await crypto.subtle.digest('SHA-256', encodedData)
+    return ''
+  }
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }

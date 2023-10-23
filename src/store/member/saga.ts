@@ -195,7 +195,6 @@ function* getRoles(action: IAction): any {
   } = action
   try {
     const SceytChatClient = getClient()
-    console.log('Get roles .. .. attempts', attempts || 0)
     const roles = yield call(SceytChatClient.getRoles)
     yield put(getRolesSuccess(roles))
     yield put(getRolesFailAC())

@@ -22,7 +22,7 @@ interface IMentionsPopupProps {
   // eslint-disable-next-line no-unused-vars
   addMentionMember: (member: IMember) => void
   // eslint-disable-next-line no-unused-vars
-  handleMentionsPopupClose: (setPending?: boolean) => void
+  handleMentionsPopupClose: (setPending?: boolean, withoutLastChar?: boolean) => void
   searchMention: string
 }
 
@@ -39,7 +39,7 @@ export default function MentionMembersPopup({
   const [filteredMembers, setFilteredMembers] = useState<IMember[]>([])
   const filteredMembersLength = useRef(0)
   const [activeIndex, setActiveIndex] = useState(0)
-  // const [hideMenu, setHideMenu] = useState(false)
+  const [hideMenu, setHideMenu] = useState(true)
   const membersListRef = useRef<HTMLElement>()
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
@@ -88,9 +88,9 @@ export default function MentionMembersPopup({
       })
     }
     if (e.key === 'Enter') {
+      handleMentionMember()
       e.preventDefault()
       // setActiveIndex((prevState) => (prevState > 0 ? prevState - 1 : prevState))
-      handleMentionMember()
     }
   }
   /*  const handleClicks = (e: any) => {
@@ -103,10 +103,21 @@ export default function MentionMembersPopup({
   const handleSearchMembers = () => {
     const searchedMembers = [...members].filter((member: IMember) => {
       const displayName = makeUsername(contactsMap[member.id], member, getFromContacts)
-      return displayName && member.id !== user.id && displayName.toLowerCase().includes(searchMention.toLowerCase())
+      return (
+        displayName &&
+        member.id !== user.id &&
+        displayName
+          .split(' ')
+          .find((namePart) =>
+            namePart[0] === '~'
+              ? namePart.slice(1).toLowerCase().startsWith(searchMention.toLowerCase())
+              : namePart.toLowerCase().startsWith(searchMention.toLowerCase())
+          )
+      )
     })
     filteredMembersLength.current = searchedMembers.length
-    setFilteredMembers(sortMembers(searchedMembers))
+    // setFilteredMembers(sortMembers(searchedMembers))
+    setFilteredMembers(searchedMembers)
   }
   const handleScrollToActiveItem = (newIndex: number, direction: 'top' | 'bottom') => {
     const membersList = membersListRef.current
@@ -143,7 +154,7 @@ export default function MentionMembersPopup({
     }
   }, [members])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (searchMention) {
       handleSearchMembers()
     } else {
@@ -155,17 +166,17 @@ export default function MentionMembersPopup({
 
   useDidUpdate(() => {
     if (filteredMembersLength.current === 0) {
-      handleMentionsPopupClose(true)
+      handleMentionsPopupClose(true, true)
       // setHideMenu(true)
-    } /* else {
+    } else {
       setHideMenu(false)
-    } */
+    }
   }, [filteredMembersLength.current])
 
   return (
     <Container
       className='mention_member_popup'
-      // hidden={hideMenu}
+      hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
       withBorder={theme !== THEME.DARK}
@@ -249,7 +260,7 @@ const EditMemberIcon = styled.span`
   transition: all 0.2s;
 `
 
-const MembersList = styled.ul<{ ref?: any }>`
+export const MembersList = styled.ul<{ ref?: any }>`
   margin: 4px 0 0;
   padding: 0;
   overflow-x: hidden;
@@ -257,7 +268,7 @@ const MembersList = styled.ul<{ ref?: any }>`
   transition: all 0.2s;
   height: calc(100% - 10px); ;
 `
-const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
+export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;

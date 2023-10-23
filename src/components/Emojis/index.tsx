@@ -52,7 +52,9 @@ function EmojisPopup({
   emojisPopupPosition,
   relativePosition
 }: {
+  // eslint-disable-next-line no-unused-vars
   handleAddEmoji: (selectedEmoji: string) => void
+  // eslint-disable-next-line no-unused-vars
   handleEmojiPopupToggle?: (state: boolean) => void
   rtlDirection?: boolean
   rightSide?: boolean
@@ -235,13 +237,15 @@ const Container = styled.div<{
   border-radius: ${(props) => props.borderRadius || '12px'};
   background: ${(props) => props.backgroundColor};
   z-index: 35;
-  transform: scaleY(0);
+  //transform: scaleY(0);
+  height: 0;
+  overflow: hidden;
   transform-origin: ${(props) => (props.emojisPopupPosition === 'bottom' ? '0 0' : '0 100%')};
   transition: all 0.2s ease-in-out;
   ${(props) =>
     props.rendered &&
     `
-    transform: scaleY(1);
+    height: 225px;
   `};
 `
 const EmojiHeader = styled.div<{ padding?: string }>`
@@ -258,6 +262,11 @@ const EmojiHeader = styled.div<{ padding?: string }>`
 const EmojiSection = styled.div`
   height: 180px;
   overflow-x: hidden;
+
+  & ::selection {
+    color: inherit;
+    background: inherit;
+  }
 `
 const EmojiCollection = styled.span<EmojiCollectionProps>`
   cursor: pointer;

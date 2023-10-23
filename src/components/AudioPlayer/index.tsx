@@ -9,7 +9,9 @@ import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 import { colors } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
-import { getPlayingAudioId, setPlayingAudioId } from '../../helpers/playingAudio'
+import { useDispatch, useSelector } from 'react-redux'
+import { playingAudioIdSelector } from '../../store/message/selector'
+import { setPlayingAudioIdAC } from '../../store/message/actions'
 
 interface Recording {
   recordingSeconds: number
@@ -35,10 +37,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
+  const dispatch = useDispatch()
+  const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
   const [isRendered, setIsRendered] = useState<any>(false)
   const [playAudio, setPlayAudio] = useState<any>(false)
-  const [payingAudioId, setPayingAudioId] = useState<any>(false)
+  // const [payingAudioId, setPayingAudioId] = useState<any>(false)
 
   const [currentTime, setCurrentTime] = useState<any>('')
   const [audioRate, setAudioRate] = useState<any>(1)
@@ -69,10 +73,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
-        setPlayingAudioId(file.id!)
+        dispatch(setPlayingAudioIdAC(`player_${file.id}`))
         // const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
-          setPayingAudioId(getPlayingAudioId())
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(formatAudioVideoTime(currentTime))
@@ -88,8 +91,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           }) */
         }, 10)
       } else {
-        if (payingAudioId === file.id) {
-          setPayingAudioId('')
+        if (playingAudioId === file.id) {
+          dispatch(setPlayingAudioIdAC(null))
         }
       }
       wavesurfer.current.playPause()
@@ -157,13 +160,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           // barHeight: 3,
 
           barWidth: 1,
-          barHeight: 3,
+          barHeight: 1,
 
           hideScrollbar: true,
           barRadius: 1.5,
           cursorWidth: 0,
           barGap: 2,
-          barMinHeight: 1,
+          barMinHeight: 2,
           height: 20
         })
         /* .then((blob) => {
@@ -179,7 +182,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           console.log('object url ........ ', objectURL);
         }); */
         // wavesurfer.current.load(url);
-        wavesurfer.current.load(url)
+        let peaks
+        if (file.metadata && file.metadata.tmb) {
+          const maxVal = Math.max(...file.metadata.tmb)
+          const dec = maxVal / 100
+          peaks = file.metadata.tmb.map((peak: number) => {
+            return peak / dec / 100
+          })
+        }
+
+        wavesurfer.current.load(url, peaks)
 
         wavesurfer.current.on('ready', () => {
           // wavesurfer.current.play();
@@ -201,16 +213,16 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           const audioDuration = wavesurfer.current.getDuration()
           // const currentTime = wavesurfer.current.getCurrentTime()
           setCurrentTime(formatAudioVideoTime(audioDuration))
-          if (payingAudioId === file.id) {
-            setPayingAudioId('')
+          if (playingAudioId === file.id) {
+            dispatch(setPlayingAudioIdAC(null))
           }
           clearInterval(intervalRef.current)
         })
 
         wavesurfer.current.on('pause', () => {
           setPlayAudio(false)
-          if (payingAudioId === file.id) {
-            setPayingAudioId('')
+          if (playingAudioId === file.id) {
+            dispatch(setPlayingAudioIdAC(null))
           }
           clearInterval(intervalRef.current)
         })
@@ -229,15 +241,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     }
   }, [url])
   useEffect(() => {
-    if (payingAudioId && wavesurfer.current && payingAudioId !== file.id) {
+    if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
       setPlayAudio(false)
       wavesurfer.current.pause()
     }
-  }, [payingAudioId])
-  // console.log('currentTime . .. . ', currentTime)
+  }, [playingAudioId])
+
   return (
     <Container>
-      <PlayPause onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
+      <PlayPause onClick={handlePlayPause} iconColor={colors.primary}>
+        {playAudio ? <PauseIcon /> : <PlayIcon />}
+      </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
         <AudioRate onClick={handleSetAudioRate}>
@@ -260,10 +274,11 @@ const Container = styled.div`
   padding: 8px 12px;
 `
 
-const PlayPause = styled.div`
+const PlayPause = styled.div<{ iconColor?: string }>`
   cursor: pointer;
 
   & > svg {
+    color: ${(props) => props.iconColor || colors.primary};
     display: flex;
     width: 40px;
     height: 40px;

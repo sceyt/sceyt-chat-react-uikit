@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // import { getAttachments, loadMoreAttachments } from '../../../../../store/message/actions';
@@ -31,7 +31,6 @@ const Voices = ({
   voicePreviewHoverBackgroundColor
 }: IProps) => {
   const dispatch = useDispatch()
-  const [payingVoiceId, setPlayingVoiceId] = useState('')
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
@@ -51,8 +50,6 @@ const Voices = ({
           voicePreviewPauseIcon={voicePreviewPauseIcon}
           voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
           voicePreviewTitleColor={voicePreviewTitleColor}
-          setVoiceIsPlaying={(voiceId) => setPlayingVoiceId(voiceId)}
-          playingVoiceId={payingVoiceId}
         />
       ))}
     </Container>

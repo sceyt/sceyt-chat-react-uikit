@@ -1,28 +1,28 @@
 import React from 'react'
 import { attachmentTypes } from './constants'
-import { MentionedUser } from '../UIHelper'
-import { IContact, IContactsMap, IUser } from '../types'
+import { StyledText } from '../UIHelper'
+import { IBodyAttribute, IContact, IContactsMap, IUser } from '../types'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
 import { getClient } from '../common/client'
 import LinkifyIt from 'linkify-it'
 import { hideUserPresence } from './userHelper'
+import { EditorThemeClasses } from 'lexical'
 
 export const typingTextFormat = ({
   text,
-  mentionedMembers,
-  currentMentionEnd
+  formatAttributes,
+  currentAttributeEnd
 }: {
   text: string
-  mentionedMembers: any
-  currentMentionEnd?: number
-  setEmoji?: any
+  formatAttributes: any[]
+  currentAttributeEnd?: number
 }) => {
   // const messageText: any = [text]
   let messageText: any = ''
   // if (mentionedMembers.length > 0) {
-  const mentionsPositions: any = Array.isArray(mentionedMembers)
-    ? [...mentionedMembers].sort((a: any, b: any) => a.start - b.start)
+  const attributesPositions: any = Array.isArray(formatAttributes)
+    ? [...formatAttributes].sort((a: any, b: any) => a.start - b.start)
     : []
 
   let prevEnd = 0
@@ -38,9 +38,9 @@ export const typingTextFormat = ({
     const currentLine = separateLines[i]
     let lastFoundIndexOnTheLine = 0
     textLengthInCurrentIteration += currentLine.length + 1
-    if (mentionsPositions.length > addedMembers) {
-      for (let j = addedMembers; j < mentionsPositions.length; j++) {
-        const mention = mentionsPositions[j]
+    if (attributesPositions.length > addedMembers) {
+      for (let j = addedMembers; j < attributesPositions.length; j++) {
+        const mention = attributesPositions[j]
 
         if (mention.start >= textLengthInCurrentIteration) {
           const addPart = (nextTextPart || currentLine.substring(prevEnd)).trimStart()
@@ -54,15 +54,17 @@ export const typingTextFormat = ({
 
           nextTextPart = currentLine.substring(mentionStartInCurrentLine + mention.displayName.length)
           const setSpaceToEnd =
-            (currentMentionEnd && currentMentionEnd === mention.end) || (!nextTextPart.trim() && !separateLines[i + 1])
+            mention.type === 'mention' &&
+            ((currentAttributeEnd && currentAttributeEnd === mention.end) ||
+              (!nextTextPart.trim() && !separateLines[i + 1]))
 
           messageText += `${currentLine.substring(
             0,
             mentionStartInCurrentLine
             // mention.start - (textLengthInCurrentIteration - 1 - currentLine.length) - prevEnd
-          )}<span class='mention_user'>${mention.displayName}</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+          )}<span class=${mention.type}>${mention.displayName}</span>${setSpaceToEnd ? '&nbsp;' : ''}`
 
-          prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+          prevEnd = currentAttributeEnd === mention.end ? mention.end + 1 : mention.end
         } else {
           const mentionStartInCurrentLine = nextTextPart.indexOf(mention.displayName)
 
@@ -71,17 +73,19 @@ export const typingTextFormat = ({
 
           const nextPart = nextTextPart.substring(mentionStartInCurrentLine + mention.displayName.length)
           const setSpaceToEnd =
-            (currentMentionEnd && currentMentionEnd === mention.end) || (!nextPart.trim() && !separateLines[i + 1])
+            mention.type === 'mention' &&
+            ((currentAttributeEnd && currentAttributeEnd === mention.end) ||
+              (!nextPart.trim() && !separateLines[i + 1]))
 
-          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class="mention_user">${
+          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class=${mention.type}>${
             mention.displayName
           }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
 
           nextTextPart = nextPart
-          prevEnd = currentMentionEnd === mention.end ? mention.end + 1 : mention.end
+          prevEnd = currentAttributeEnd === mention.end ? mention.end + 1 : mention.end
         }
         addedMembers++
-        if (addedMembers === mentionsPositions.length && nextTextPart.trim()) {
+        if (addedMembers === attributesPositions.length && nextTextPart.trim()) {
           messageText += nextTextPart
         }
       }
@@ -96,21 +100,21 @@ export const typingTextFormat = ({
   return messageText.length > 1 ? messageText : text
 }
 
-export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean) => {
+export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boolean, getFirstNameOnly?: boolean) => {
   if (hideUserPresence && user && user.id && hideUserPresence(user)) {
-    return user.id.charAt(0).toUpperCase() + user.id.slice(1)
+    return user.id.toUpperCase()
   }
-  return fromContact
-    ? contact
-      ? contact.firstName
-        ? `${contact.firstName.trim()} ${contact.lastName?.trim()}`
-        : contact.id
-      : user
-      ? user.id || 'Deleted user'
-      : 'Deleted user'
+  return fromContact && contact
+    ? contact.firstName
+      ? getFirstNameOnly
+        ? `${contact.firstName.split(' ')[0]}`
+        : `${contact.firstName.trim()} ${contact.lastName?.trim()}`.trim()
+      : contact.id
     : user
     ? user.firstName
-      ? `${user.firstName} ${user.lastName}`
+      ? getFirstNameOnly
+        ? `${fromContact ? '~' : ''}${user.firstName.split(' ')[0]}`
+        : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`.trim()
       : user.id || 'Deleted user'
     : 'Deleted user'
 }
@@ -133,24 +137,12 @@ const linkifyTextPart = (textPart: string, match: any) => {
     if (index === 0) {
       newMessageText = [
         textPart.substring(0, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={matchItem.url}
-          target='_blank'
-          rel='noreferrer'
-        >{`${matchItem.text} `}</a>
+        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
       ]
     } else {
       newMessageText.push(
         textPart.substring(prevMatchEnd, matchIndex),
-        <a
-          draggable={false}
-          key={index}
-          href={matchItem.url}
-          target='_blank'
-          rel='noreferrer'
-        >{`${matchItem.text} `}</a>
+        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
       )
     }
 
@@ -160,6 +152,31 @@ const linkifyTextPart = (textPart: string, match: any) => {
     }
   })
   return newMessageText || textPart
+}
+
+export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAttribute[] => {
+  const sortedAttributes: any = attributes.sort((a: any, b: any) => a.offset - b.offset)
+  const combinedAttributes = {}
+  sortedAttributes.forEach((attribute: any) => {
+    const offset = attribute.offset
+    const typeValue = attribute.type
+
+    // If offset exists in the combinedAttributes object, update the type value by adding a comma-separated string
+    if (offset in combinedAttributes) {
+      combinedAttributes[offset].type += ` ${typeValue}`
+      const metadata = (combinedAttributes[offset].metadata += ` ${attribute.metadata}`)
+      combinedAttributes[offset].metadata = metadata.trim()
+    } else {
+      // If offset does not exist, create a new entry in the combinedAttributes object
+      combinedAttributes[offset] = {
+        type: typeValue,
+        metadata: attribute.metadata,
+        offset,
+        length: attribute.length
+      }
+    }
+  })
+  return Object.values(combinedAttributes)
 }
 
 export const MessageTextFormat = ({
@@ -179,51 +196,118 @@ export const MessageTextFormat = ({
 }) => {
   let messageText: any = []
   const linkify = new LinkifyIt()
-  if (message.body && message.mentionedUsers && message.mentionedUsers.length > 0) {
-    const messageMetadata = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
-    const mentionsPositions: any = Array.isArray(messageMetadata)
-      ? [...messageMetadata].sort((a: any, b: any) => a.loc - b.loc)
-      : []
-
+  const messageBodyAttributes = JSON.parse(JSON.stringify(message.bodyAttributes))
+  if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
+    const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
     const textPart = text
     let nextPartIndex: any
-    mentionsPositions.forEach((mention: any, index: number) => {
+
+    combinedAttributesList.forEach((attribute: any, index: number) => {
+      const attributeOffset = attribute.offset
+
       try {
-        const mentionDisplay = message.mentionedUsers.find((men: any) => men.id === mention.id)
-        let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, mention.loc) : ''}`
-        nextPartIndex = mention.loc + mention.len
+        let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
+
         const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
         if (!isLastMessage && !asSampleText && firstPartMatch) {
           firstPart = linkifyTextPart(firstPart, firstPartMatch)
         }
-        let secondPart = `${textPart ? textPart?.substring(mention.loc + mention.len) : ''}`
+        let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
         const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
         if (!isLastMessage && !asSampleText && secondPartMatch) {
           secondPart = linkifyTextPart(secondPart, secondPartMatch)
         }
 
-        if (mentionDisplay) {
+        if (attribute.type.includes('mention')) {
+          const mentionDisplay =
+            message.mentionedUsers && message.mentionedUsers.find((men: any) => men.id === attribute.metadata)
+          // const idLength = attribute.metadata.length
+
           const user = getClient().user
+          let mentionDisplayName = text.slice(attributeOffset, attributeOffset + attribute.length)
+          if (mentionDisplay) {
+            mentionDisplayName = `@${makeUsername(
+              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
+              mentionDisplay,
+              getFromContacts
+            ).trim()}`
+          }
+          if (nextPartIndex > attributeOffset) {
+            messageText = messageText.slice(0, -2)
+            const prevAtt = combinedAttributesList[index - 1]
+            const start = nextPartIndex - prevAtt.length
+            const currentTextPart = `${textPart ? textPart?.substring(start || 0, start + prevAtt.length) : ''}`
+            const currentMentionIndex = currentTextPart.indexOf(`@${attribute.metadata}`)
+            const firsTextPart = `${currentTextPart.substring(0, currentMentionIndex)}`
+            const secondTextPart = `${currentTextPart.substring(
+              currentMentionIndex + attribute.length,
+              prevAtt.length
+            )}`
+            secondPart = `${textPart ? textPart?.substring(prevAtt.offset + prevAtt.length) : ''}`
+            nextPartIndex = prevAtt.offset + prevAtt.length
+            messageText.push(
+              // @ts-ignore
+              asSampleText ? (
+                currentTextPart
+              ) : (
+                <StyledText
+                  className={`${combinedAttributesList[index - 1].type}`}
+                  isLastMessage={isLastMessage}
+                  key={attributeOffset + index}
+                >
+                  {firsTextPart}
+                  <StyledText
+                    className='mention'
+                    isLastMessage={isLastMessage}
+                    color={colors.primary}
+                    key={attributeOffset + index}
+                  >
+                    {mentionDisplayName}
+                  </StyledText>
+                  {secondTextPart}
+                </StyledText>
+              ),
+              index === combinedAttributesList.length - 1 ? secondPart : ''
+            )
+          } else {
+            nextPartIndex = attribute.offset + attribute.length
+            messageText.push(
+              firstPart,
+              // @ts-ignore
+              asSampleText ? (
+                mentionDisplayName
+              ) : (
+                <StyledText
+                  className={attribute.type}
+                  isLastMessage={isLastMessage}
+                  color={colors.primary}
+                  key={attributeOffset}
+                >
+                  {mentionDisplayName}
+                </StyledText>
+              ),
+              index === combinedAttributesList.length - 1 ? secondPart : ''
+            )
+          }
+        } else {
+          nextPartIndex = attributeOffset + attribute.length
+
           messageText.push(
             firstPart,
             // @ts-ignore
             asSampleText ? (
-              `@${makeUsername(
-                user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-                mentionDisplay,
-                getFromContacts
-              ).trim()}`
+              `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
             ) : (
-              <MentionedUser isLastMessage={isLastMessage} color={colors.primary} key={`${mention.loc}`}>
-                {`@${makeUsername(
-                  user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-                  mentionDisplay,
-                  getFromContacts
-                ).trim()}`}
-              </MentionedUser>
+              <StyledText
+                isLastMessage={isLastMessage}
+                className={attribute.type}
+                key={`${attributeOffset}-${attribute.type}`}
+              >
+                {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
+              </StyledText>
             ),
-            index === mentionsPositions.length - 1 ? secondPart : ''
+            index === combinedAttributesList.length - 1 ? secondPart : ''
           )
         }
       } catch (e) {
@@ -333,4 +417,62 @@ export const getDuplicateMentionsFromMeta = (mentionsMetas: any[], mentionedMemb
     }
   })
   return mentionsList
+}
+
+let allowEditDeleteIncomingMessage = true
+export const setAllowEditDeleteIncomingMessage = (allow: boolean) => {
+  allowEditDeleteIncomingMessage = allow
+}
+export const getAllowEditDeleteIncomingMessage = () => allowEditDeleteIncomingMessage
+
+export const compareMessageBodyAttributes = (attributes1: IBodyAttribute[], attributes2: IBodyAttribute[]) => {
+  return JSON.stringify(attributes1) === JSON.stringify(attributes2)
+}
+
+export const bodyAttributesMapByType = {
+  1: ['bold'],
+  2: ['italic'],
+  3: ['bold', 'italic'],
+  4: ['strikethrough'],
+  5: ['bold', 'strikethrough'],
+  6: ['italic', 'strikethrough'],
+  7: ['bold', 'italic', 'strikethrough'],
+  8: ['underline'],
+  9: ['bold', 'underline'],
+  10: ['italic', 'underline'],
+  11: ['bold', 'italic', 'underline'],
+  12: ['strikethrough', 'underline'],
+  13: ['bold', 'strikethrough', 'underline'],
+  14: ['italic', 'strikethrough', 'underline'],
+  15: ['bold', 'italic', 'strikethrough', 'underline'],
+  16: ['monospace'],
+  17: ['bold', 'monospace'],
+  18: ['italic', 'monospace'],
+  19: ['bold', 'italic', 'monospace'],
+  20: ['strikethrough', 'monospace'],
+  21: ['bold', 'strikethrough', 'monospace'],
+  22: ['italic', 'strikethrough', 'monospace'],
+  23: ['bold', 'italic', 'strikethrough', 'monospace'],
+  24: ['underline', 'monospace'],
+  25: ['bold', 'underline', 'monospace'],
+  26: ['italic', 'underline', 'monospace'],
+  27: ['bold', 'italic', 'underline', 'monospace'],
+  28: ['strikethrough', 'underline', 'monospace'],
+  29: ['bold', 'strikethrough', 'underline', 'monospace'],
+  30: ['italic', 'strikethrough', 'underline', 'monospace'],
+  31: ['bold', 'italic', 'strikethrough', 'underline', 'monospace']
+}
+
+export const EditorTheme: EditorThemeClasses = {
+  paragraph: 'editor_paragraph',
+  text: {
+    bold: 'text_bold',
+    code: 'text_monospace',
+    italic: 'text_italic',
+    strikethrough: 'text_strikethrough',
+    subscript: 'text_subscript',
+    superscript: 'text_superscript',
+    underline: 'text_underline',
+    underlineStrikethrough: 'text_underlineStrikethrough'
+  }
 }

@@ -240,7 +240,10 @@ const Details = ({
               setDefaultAvatar={isDirectChannel}
             />
             <ChannelInfo direction={avatarAndNameDirection}>
-              <ChannelName isDirect={isDirectChannel}>
+              <ChannelName
+                isDirect={isDirectChannel}
+                uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+              >
                 {channel.subject ||
                   (isDirectChannel && directChannelUser
                     ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
@@ -341,35 +344,37 @@ const Details = ({
           />
         )}
         {/* <div ref={tabsRef}> */}
-        <DetailsTab
-          theme={theme}
-          channel={channel}
-          activeTab={activeTab}
-          setActiveTab={setActiveTab}
-          linkPreviewIcon={linkPreviewIcon}
-          linkPreviewHoverIcon={linkPreviewHoverIcon}
-          linkPreviewTitleColor={linkPreviewTitleColor}
-          linkPreviewColor={linkPreviewColor}
-          linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
-          voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
-          voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
-          voicePreviewPauseIcon={voicePreviewPauseIcon}
-          voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
-          voicePreviewTitleColor={voicePreviewTitleColor}
-          voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
-          voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
-          filePreviewIcon={filePreviewIcon}
-          filePreviewHoverIcon={filePreviewHoverIcon}
-          filePreviewTitleColor={filePreviewTitleColor}
-          filePreviewSizeColor={filePreviewSizeColor}
-          filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
-          filePreviewDownloadIcon={filePreviewDownloadIcon}
-          checkActionPermission={checkActionPermission}
-          showChangeMemberRole={showChangeMemberRole}
-          showKickMember={showKickMember}
-          showKickAndBlockMember={showKickAndBlockMember}
-          showMakeMemberAdmin={showMakeMemberAdmin}
-        />
+        {!channel.isMockChannel && (
+          <DetailsTab
+            theme={theme}
+            channel={channel}
+            activeTab={activeTab}
+            setActiveTab={setActiveTab}
+            linkPreviewIcon={linkPreviewIcon}
+            linkPreviewHoverIcon={linkPreviewHoverIcon}
+            linkPreviewTitleColor={linkPreviewTitleColor}
+            linkPreviewColor={linkPreviewColor}
+            linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
+            voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+            voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+            voicePreviewPauseIcon={voicePreviewPauseIcon}
+            voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
+            voicePreviewTitleColor={voicePreviewTitleColor}
+            voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
+            voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
+            filePreviewIcon={filePreviewIcon}
+            filePreviewHoverIcon={filePreviewHoverIcon}
+            filePreviewTitleColor={filePreviewTitleColor}
+            filePreviewSizeColor={filePreviewSizeColor}
+            filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
+            filePreviewDownloadIcon={filePreviewDownloadIcon}
+            checkActionPermission={checkActionPermission}
+            showChangeMemberRole={showChangeMemberRole}
+            showKickMember={showKickMember}
+            showKickAndBlockMember={showKickAndBlockMember}
+            showMakeMemberAdmin={showMakeMemberAdmin}
+          />
+        )}
         {/* </div> */}
       </ChatDetails>
     </Container>
@@ -466,11 +471,12 @@ const ChannelAvatarAndName = styled.div<{ direction?: string }>`
   flex-direction: ${(props) => props.direction};
 `
 
-const ChannelName = styled(SectionHeader)<any>`
+const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: boolean }>`
   white-space: nowrap;
   max-width: ${(props) => (props.isDirect ? '200px' : '168px')};
   text-overflow: ellipsis;
   overflow: hidden;
+  text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
 const EditButton = styled.span`

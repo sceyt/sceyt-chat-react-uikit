@@ -24,6 +24,7 @@ import {
   REMOVE_CHANNEL,
   REMOVE_CHANNEL_CACHES,
   SEARCH_CHANNELS,
+  SEARCH_CHANNELS_FOR_FORWARD,
   SEND_TYPING,
   SET_ACTIVE_CHANNEL,
   SET_ADDED_TO_CHANNEL,
@@ -40,6 +41,7 @@ import {
   SET_HIDE_CHANNEL_LIST,
   SET_IS_DRAGGING,
   SET_SEARCHED_CHANNELS,
+  SET_SEARCHED_CHANNELS_FOR_FORWARD,
   SET_TAB_IS_ACTIVE,
   SWITCH_CHANNEL,
   SWITCH_TYPING_INDICATOR,
@@ -55,12 +57,12 @@ import {
   WATCH_FOR_EVENTS
 } from './constants'
 import { ChannelQueryParams } from '../../components/Channel/types'
-import { IChannel, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
+import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
-export function createChannelAC(channelData: ICreateChannel) {
+export function createChannelAC(channelData: ICreateChannel, dontCreateIfNotExists?: boolean) {
   return {
     type: CREATE_CHANNEL,
-    payload: { channelData }
+    payload: { channelData, dontCreateIfNotExists }
   }
 }
 
@@ -85,7 +87,11 @@ export function searchChannelsAC(params: ChannelQueryParams, contactsMap: IConta
   }
 }
 
-export function setSearchedChannelsAC(searchedChannels: { groups: IChannel[]; directs: IChannel[] }) {
+export function setSearchedChannelsAC(searchedChannels: {
+  chats_groups: IChannel[]
+  channels: IChannel[]
+  contacts: IContact[]
+}) {
   return {
     type: SET_SEARCHED_CHANNELS,
     payload: { searchedChannels }
@@ -105,10 +111,55 @@ export function getChannelsForForwardAC(searchValue?: string) {
   }
 }
 
+export function addChannelsForForwardAC(channels: IChannel[]) {
+  return {
+    type: ADD_CHANNELS_FOR_FORWARD,
+    payload: { channels }
+  }
+}
+
+export function setChannelsForForwardAC(channels: IChannel[]) {
+  return {
+    type: SET_CHANNELS_FOR_FORWARD,
+    payload: { channels }
+  }
+}
+
+export function setChannelsLoadingStateAC(state: number, forForward?: boolean) {
+  return {
+    type: SET_CHANNELS_LOADING_STATE,
+    payload: { state, forForward }
+  }
+}
+
+export function channelHasNextAC(hasNext: boolean, forForward?: boolean) {
+  return {
+    type: CHANNELS_HAS_NEXT,
+    payload: { hasNext, forForward }
+  }
+}
 export function loadMoreChannelsForForward(limit?: number) {
   return {
     type: LOAD_MORE_CHANNELS_FOR_FORWARD,
     payload: { limit }
+  }
+}
+
+export function searchChannelsForForwardAC(params: ChannelQueryParams, contactsMap: IContactsMap) {
+  return {
+    type: SEARCH_CHANNELS_FOR_FORWARD,
+    payload: { params, contactsMap }
+  }
+}
+
+export function setSearchedChannelsForForwardAC(searchedChannels: {
+  chats_groups: IChannel[]
+  channels: IChannel[]
+  contacts: IContact[]
+}) {
+  return {
+    type: SET_SEARCHED_CHANNELS_FOR_FORWARD,
+    payload: { searchedChannels }
   }
 }
 
@@ -122,13 +173,6 @@ export function addChannelAC(channel: IChannel) {
 export function addChannelsAC(channels: IChannel[]) {
   return {
     type: ADD_CHANNELS,
-    payload: { channels }
-  }
-}
-
-export function addChannelsForForwardAC(channels: IChannel[]) {
-  return {
-    type: ADD_CHANNELS_FOR_FORWARD,
     payload: { channels }
   }
 }
@@ -205,27 +249,6 @@ export function setChannelsAC(channels: IChannel[]) {
   }
 }
 
-export function setChannelsFroForwardAC(channels: IChannel[]) {
-  return {
-    type: SET_CHANNELS_FOR_FORWARD,
-    payload: { channels }
-  }
-}
-
-export function setChannelsLoadingStateAC(state: number, forForward?: boolean) {
-  return {
-    type: SET_CHANNELS_LOADING_STATE,
-    payload: { state, forForward }
-  }
-}
-
-export function channelHasNextAC(hasNext: boolean, forForward?: boolean) {
-  return {
-    type: CHANNELS_HAS_NEXT,
-    payload: { hasNext, forForward }
-  }
-}
-
 export function setActiveChannelAC(channel: IChannel) {
   return {
     type: SET_ACTIVE_CHANNEL,
@@ -261,7 +284,7 @@ export function updateChannelDataAC(channelId: string, config: any, moveUp?: boo
   }
 }
 
-export function updateSearchedChannelDataAC(channelId: string, config: any, groupName: 'groups' | 'directs') {
+export function updateSearchedChannelDataAC(channelId: string, config: any, groupName: string) {
   return {
     type: UPDATE_SEARCHED_CHANNEL_DATA,
     payload: {
@@ -426,7 +449,7 @@ export function setIsDraggingAC(isDragging: boolean) {
   }
 }
 
-export function setDraggedAttachments(attachments: File[], type: string) {
+export function setDraggedAttachmentsAC(attachments: File[], type: string) {
   return {
     type: SET_DRAGGED_ATTACHMENTS,
     payload: {

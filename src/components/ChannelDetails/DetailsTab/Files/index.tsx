@@ -11,6 +11,8 @@ import { getAttachmentsAC } from '../../../../store/message/actions'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { CircularProgressbar } from 'react-circular-progressbar'
+import { isJSON } from '../../../../helpers/message'
+import { base64ToToDataURL } from '../../../../helpers/resizeImage'
 
 interface IProps {
   channelId: string
@@ -55,64 +57,83 @@ const Files = ({
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
   }, [channelId])
-
+  console.log('attachments. .. . ', attachments)
   return (
     <Container theme={theme}>
-      {attachments.map((file: IAttachment) => (
+      {attachments.map(
+        (file: IAttachment) => {
+          const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+          let withPrefix = true
+          let attachmentThumb = ''
+
+          if (metas && metas.tmb) {
+            if (metas.tmb.length < 70) {
+              attachmentThumb = base64ToToDataURL(metas.tmb)
+              withPrefix = false
+            } else {
+              attachmentThumb = metas.tmb
+            }
+          }
+          return (
+            <FileItem
+              key={file.id}
+              // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
+              // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
+              hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}
+            >
+              {metas && metas.tmb ? (
+                <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
+              ) : (
+                <React.Fragment>
+                  <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
+                  <FileHoverIconCont>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
+                </React.Fragment>
+              )}
+              <div>
+                <AttachmentPreviewTitle color={filePreviewTitleColor}>
+                  {formatLargeText(file.name, 32)}
+                </AttachmentPreviewTitle>
+                <FileSizeAndDate color={filePreviewSizeColor}>
+                  {file.size ? bytesToSize(file.size) : ''}
+                </FileSizeAndDate>
+              </div>
+              <DownloadWrapper visible={downloadingFilesMap[file.id!]} onClick={() => handleDownloadFile(file)}>
+                {downloadingFilesMap[file.id!] ? (
+                  // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
+                  <ProgressWrapper>
+                    <CircularProgressbar
+                      minValue={0}
+                      maxValue={100}
+                      value={downloadingFilesMap[file.id!].uploadPercent || 0}
+                      backgroundPadding={6}
+                      background={true}
+                      text=''
+                      styles={{
+                        background: {
+                          fill: 'transparent'
+                        },
+                        path: {
+                          stroke: colors.textColor2,
+                          strokeLinecap: 'butt',
+                          strokeWidth: '6px',
+                          transition: 'stroke-dashoffset 0.5s ease 0s',
+                          transform: 'rotate(0turn)',
+                          transformOrigin: 'center center'
+                        }
+                      }}
+                    />
+                  </ProgressWrapper>
+                ) : (
+                  filePreviewDownloadIcon || <Download />
+                )}
+              </DownloadWrapper>
+            </FileItem>
+          )
+        }
         // <FileItemWrapper >
-        <FileItem
-          key={file.id}
-          // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-          // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-          hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}
-        >
-          {file.metadata && file.metadata.tmb ? (
-            <FileThumb draggable={false} src={`data:image/jpeg;base64,${file.metadata.tmb}`} />
-          ) : (
-            <React.Fragment>
-              <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
-              <FileHoverIconCont>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
-            </React.Fragment>
-          )}
-          <div>
-            <AttachmentPreviewTitle color={filePreviewTitleColor}>
-              {formatLargeText(file.name, 32)}
-            </AttachmentPreviewTitle>
-            <FileSizeAndDate color={filePreviewSizeColor}>{file.size ? bytesToSize(file.size) : ''}</FileSizeAndDate>
-          </div>
-          <DownloadWrapper visible={downloadingFilesMap[file.id!]} onClick={() => handleDownloadFile(file)}>
-            {downloadingFilesMap[file.id!] ? (
-              // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
-              <ProgressWrapper>
-                <CircularProgressbar
-                  minValue={0}
-                  maxValue={100}
-                  value={downloadingFilesMap[file.id!].uploadPercent || 0}
-                  backgroundPadding={6}
-                  background={true}
-                  text=''
-                  styles={{
-                    background: {
-                      fill: 'transparent'
-                    },
-                    path: {
-                      stroke: colors.textColor2,
-                      strokeLinecap: 'butt',
-                      strokeWidth: '6px',
-                      transition: 'stroke-dashoffset 0.5s ease 0s',
-                      transform: 'rotate(0turn)',
-                      transformOrigin: 'center center'
-                    }
-                  }}
-                />
-              </ProgressWrapper>
-            ) : (
-              filePreviewDownloadIcon || <Download />
-            )}
-          </DownloadWrapper>
-        </FileItem>
+
         // </FileItemWrapper>
-      ))}
+      )}
     </Container>
   )
 }

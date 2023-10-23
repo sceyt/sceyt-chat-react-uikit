@@ -1,5 +1,5 @@
 interface IAttachment {
-  attachmentId: string
+  tid: string
   url: any
   attachmentUrl: string
   type: string

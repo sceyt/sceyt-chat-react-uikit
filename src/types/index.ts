@@ -41,7 +41,7 @@ export interface IAttachment {
   createdAt: Date
   upload: boolean
   user?: IUser
-  attachmentId?: string
+  tid?: string
   attachmentUrl: string
   data: any
 }
@@ -75,6 +75,13 @@ export interface IReaction {
   user: IUser
 }
 
+export interface IBodyAttribute {
+  type: string
+  metadata: string
+  offset: number
+  length: number
+}
+
 export interface IMessage {
   id: string
   tid?: string
@@ -88,7 +95,7 @@ export interface IMessage {
     name: string
     count: number
   }[]
-  userMarkers?: {
+  userMarkers: {
     name: string
     messageId: string
     createdAt: Date
@@ -107,6 +114,7 @@ export interface IMessage {
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
   parentMessage?: IMessage | null
+  bodyAttributes: IBodyAttribute[] | []
   parentId?: string
   repliedInThread?: boolean
   replyCount?: number
@@ -151,6 +159,10 @@ export interface IChannel {
   lastReceivedMsgId: string
   lastDisplayedMsgId: string
   messageRetentionPeriod?: number
+  isMockChannel?: boolean
+  isLinkedChannel?: boolean
+  backToLinkedChannel?: boolean
+  linkedFrom?: string
   lastMessage: IMessage
   messages: IMessage[]
   members: IMember[]

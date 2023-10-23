@@ -105,3 +105,8 @@ export const THEME = {
   DARK: 'dark',
   LIGHT: 'light'
 }
+
+export const CHANNEL_GROUP_TYPES = {
+  DIRECT_PRIVATE: 'chats_groups',
+  PUBLIC: 'channels'
+}

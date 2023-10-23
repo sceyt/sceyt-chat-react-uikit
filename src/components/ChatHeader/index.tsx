@@ -1,7 +1,8 @@
 import styled from 'styled-components'
-import React, { useEffect, useState } from 'react'
+import React from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
+import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import {
   activeChannelSelector,
@@ -10,7 +11,7 @@ import {
 } from '../../store/channel/selector'
 import Avatar from '../Avatar'
 import { SectionHeader, SubTitle } from '../../UIHelper'
-import { switchChannelInfoAC } from '../../store/channel/actions'
+import { switchChannelActionAC, switchChannelInfoAC } from '../../store/channel/actions'
 import { AvatarWrapper, UserStatus } from '../Channel'
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
@@ -22,50 +23,6 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 import { themeSelector } from '../../store/theme/selector'
-
-const Container = styled.div<{ background?: string; borderColor?: string }>`
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 16px;
-  height: 64px;
-  box-sizing: border-box;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
-  background-color: ${(props) => props.background};
-`
-
-const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any }>`
-  display: flex;
-  align-items: center;
-  width: 650px;
-  max-width: calc(100% - 70px);
-  cursor: ${(props) => props.clickable && 'pointer'};
-
-  & ${UserStatus} {
-    width: 10px;
-    height: 10px;
-  }
-`
-
-const ChannelName = styled.div`
-  margin-left: 7px;
-  width: 100%;
-
-  & > ${SectionHeader} {
-    max-width: calc(100% - 8px);
-    white-space: nowrap;
-    text-overflow: ellipsis;
-    overflow: hidden;
-  }
-`
-
-const ChanelInfo = styled.span<{ infoIconColor?: string }>`
-  cursor: pointer;
-
-  > svg {
-    color: ${(props) => props.infoIconColor};
-  }
-`
 
 interface IProps {
   backgroundColor?: string
@@ -86,7 +43,7 @@ export default function ChatHeader({
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  const [infoButtonVisible, setInfoButtonVisible] = useState(false)
+  // const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
   const theme = useSelector(themeSelector)
   const channelListHidden = useSelector(channelListHiddenSelector)
@@ -110,20 +67,31 @@ export default function ChatHeader({
   const channelDetailsOnOpen = () => {
     dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
   }
-  const channelDetailsOpen = false
-
-  useEffect(() => {
-    if (!channelDetailsOpen) {
-      setTimeout(() => {
-        setInfoButtonVisible(!channelDetailsOpen)
-      }, 90)
-    } else {
-      setInfoButtonVisible(!channelDetailsOpen)
+  const handleSwitchChannel = () => {
+    if (activeChannel.linkedFrom) {
+      dispatch(switchChannelActionAC({ ...activeChannel.linkedFrom, backToLinkedChannel: true }))
     }
-  }, [channelDetailsOpen])
+  }
+
+  /* const channelDetailsOpen = false
+
+   useEffect(() => {
+     if (!channelDetailsOpen) {
+       setTimeout(() => {
+         setInfoButtonVisible(!channelDetailsOpen)
+       }, 90)
+     } else {
+       setInfoButtonVisible(!channelDetailsOpen)
+     }
+   }, [channelDetailsOpen]) */
 
   return (
     <Container background={backgroundColor} borderColor={colors.backgroundColor}>
+      {activeChannel.isLinkedChannel && (
+        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight}>
+          <ArrowLeftIcon />
+        </BackButtonWrapper>
+      )}
       <ChannelInfo onClick={!channelListHidden && channelDetailsOnOpen} clickable={!channelListHidden}>
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
@@ -143,7 +111,11 @@ export default function ChatHeader({
           {/* {isDirectChannel && directChannelUser.presence.state === PRESENCE_STATUS.ONLINE && <UserStatus />} */}
         </AvatarWrapper>
         <ChannelName>
-          <SectionHeader color={titleColor || colors.textColor1} theme={theme}>
+          <SectionHeader
+            color={titleColor || colors.textColor1}
+            theme={theme}
+            uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+          >
             {activeChannel.subject ||
               (isDirectChannel && directChannelUser
                 ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
@@ -172,9 +144,64 @@ export default function ChatHeader({
           onClick={() => channelDetailsOnOpen()}
           infoIconColor={channelDetailsIsOpen ? colors.primary : colors.textColor2}
         >
-          {infoButtonVisible && (infoIcon || <InfoIcon />)}
+          {infoIcon || <InfoIcon />}
         </ChanelInfo>
       )}
     </Container>
   )
 }
+
+const Container = styled.div<{ background?: string; borderColor?: string }>`
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px;
+  height: 64px;
+  box-sizing: border-box;
+  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  background-color: ${(props) => props.background};
+`
+
+const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any }>`
+  display: flex;
+  align-items: center;
+  width: 650px;
+  max-width: calc(100% - 70px);
+  cursor: ${(props) => props.clickable && 'pointer'};
+  margin-right: auto;
+
+  & ${UserStatus} {
+    width: 10px;
+    height: 10px;
+  }
+`
+
+const ChannelName = styled.div`
+  margin-left: 7px;
+  width: 100%;
+
+  & > ${SectionHeader} {
+    max-width: calc(100% - 8px);
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+  }
+`
+
+const ChanelInfo = styled.span<{ infoIconColor?: string }>`
+  cursor: pointer;
+
+  > svg {
+    color: ${(props) => props.infoIconColor};
+  }
+`
+const BackButtonWrapper = styled.span<{ hoverBackground?: string }>`
+  display: inline-flex;
+  cursor: pointer;
+  margin-right: 16px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  &:hover {
+    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
+  }
+`
