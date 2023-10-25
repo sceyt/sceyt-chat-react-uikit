@@ -367,6 +367,9 @@ const Attachment = ({
               /* if (attachment.attachmentUrl) {
                 setAttachmentUrl(attachment.attachmentUrl)
               } else { */
+              if (attachment.type === attachmentTypes.voice) {
+                setAttachmentUrl('_')
+              }
               handleDownloadFile()
               // }
             }

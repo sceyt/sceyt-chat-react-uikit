@@ -127,6 +127,7 @@ import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
+import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -268,8 +269,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   sendAttachmentSeparately,
   allowMentionUser = true,
   allowTextEdit = true,
-  textSelectionBackgroundColor
-  // voiceMessage = true
+  textSelectionBackgroundColor,
+  voiceMessage = true
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -1590,6 +1591,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               setMentionsIsOpen={setMentionsIsOpen}
                             />
                           )}
+                          <HistoryPlugin />
                           <RichTextPlugin
                             contentEditable={
                               <div
@@ -1617,7 +1619,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </MessageInputWrapper>
                 )}
 
-                {sendMessageIsActive ? (
+                {sendMessageIsActive || !voiceMessage ? (
                   <SendMessageIcon
                     isActive={sendMessageIsActive}
                     order={sendIconOrder}
@@ -1629,6 +1631,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </SendMessageIcon>
                 ) : (
                   <SendMessageIcon
+                    isActive={true}
                     order={sendIconOrder}
                     height={inputContainerHeight || minHeight}
                     color={colors.primary}
@@ -1941,7 +1944,7 @@ const SendMessageIcon = styled.span<any>`
   height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
   margin: 0 8px 0 auto;
-  cursor: pointer;
+  cursor: ${(props) => props.isActive && 'pointer'};
   line-height: 13px;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
   -webkit-tap-highlight-color: transparent;
