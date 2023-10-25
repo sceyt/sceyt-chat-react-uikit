@@ -813,7 +813,9 @@ const MessageList: React.FC<MessagesProps> = ({
       if (!channel.isLinkedChannel) {
         clearVisibleMessagesMap()
       }
-      dispatch(getMessagesAC(channel))
+      if (channel) {
+        dispatch(getMessagesAC(channel))
+      }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
           setUnreadMessageId(channel.lastDisplayedMsgId)

@@ -144,7 +144,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     return () => clearInterval(recordingInterval)
   }, [recording.initRecording])
   useEffect(() => {
-    if (url && !isRendered) {
+    if (url) {
+      if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
+        wavesurfer.current.destroy()
+      }
       const initWaveSurfer = async () => {
         const WaveSurfer = await import('wavesurfer.js')
         wavesurfer.current = WaveSurfer.default.create({
@@ -183,23 +186,25 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         }); */
         // wavesurfer.current.load(url);
         let peaks
-        if (file.metadata && file.metadata.tmb) {
-          const maxVal = Math.max(...file.metadata.tmb)
-          const dec = maxVal / 100
-          peaks = file.metadata.tmb.map((peak: number) => {
-            return peak / dec / 100
-          })
+        if (file.metadata) {
+          if (file.metadata.dur) {
+            setCurrentTime(formatAudioVideoTime(file.metadata.dur))
+          }
+          if (file.metadata.tmb) {
+            const maxVal = Math.max(...file.metadata.tmb)
+            const dec = maxVal / 100
+            peaks = file.metadata.tmb.map((peak: number) => {
+              return peak / dec / 100
+            })
+          }
         }
 
         wavesurfer.current.load(url, peaks)
 
         wavesurfer.current.on('ready', () => {
-          // wavesurfer.current.play();
           const audioDuration = wavesurfer.current.getDuration()
-          // const currentTime = wavesurfer.current.getCurrentTime()
           setCurrentTime(formatAudioVideoTime(audioDuration))
 
-          // const filters = wavesurfer.current.getFilters()
           wavesurfer.current.drawBuffer = (d: any) => {
             console.log('filters --- ', d)
           }
@@ -232,7 +237,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           const currentTime = wavesurfer.current.getCurrentTime()
           setCurrentTime(formatAudioVideoTime(currentTime))
         })
-        setIsRendered(true)
+        if (url !== '_') {
+          setIsRendered(true)
+        }
       }
       initWaveSurfer()
     }

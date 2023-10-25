@@ -207,7 +207,6 @@ function* getChannels(action: IAction): any {
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
-    // console.log('channelsData. . . . . .', channelsData)
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
@@ -323,6 +322,7 @@ function* getChannels(action: IAction): any {
     }
     query.channelQuery = channelQuery
     if (activeChannel) {
+      console.log('switch channel .. . ', activeChannel)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))

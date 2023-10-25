@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import {
   activeChannelSelector,
+  addedChannelSelector,
   addedToChannelSelector,
   channelInfoIsOpenSelector,
   channelListWidthSelector
@@ -10,6 +11,7 @@ import {
 import { getChannelsAC, setActiveChannelAC, setHideChannelListAC } from '../../store/channel/actions'
 import { IChannel } from '../../types'
 import { useDidUpdate } from '../../hooks'
+import { setActiveChannelId } from '../../helpers/channelHalper'
 
 interface IProps {
   hideChannelList?: boolean
@@ -25,6 +27,7 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
+  const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
 
@@ -43,8 +46,15 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   }, [activeChannel])
 
   useDidUpdate(() => {
+    if (hideChannelList && (!activeChannel || !activeChannel.id) && channelCreated && channelCreated.id) {
+      setActiveChannelId(channelCreated.id)
+      dispatch(setActiveChannelAC(channelCreated))
+    }
+  }, [channelCreated])
+
+  useDidUpdate(() => {
     if (hideChannelList && (!activeChannel || !activeChannel.id) && addedChannel && addedChannel.id) {
-      console.log('call set active channel. ... ', addedChannel)
+      setActiveChannelId(addedChannel.id)
       dispatch(setActiveChannelAC(addedChannel))
     }
   }, [addedChannel])
