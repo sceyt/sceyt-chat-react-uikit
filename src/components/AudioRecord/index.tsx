@@ -35,9 +35,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const wavesurfer = useRef<any>(null)
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
+  const recordButtonRef = useRef<any>(null)
 
-  function startRecording() {
-    setShowRecording(true)
+  async function startRecording() {
+    const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
+    if (permissionStatus.state === 'granted') {
+      setShowRecording(true)
+    } else {
+      recordButtonRef.current.style.pointerEvents = 'none'
+    }
     if (recording) {
       stopRecording(true)
     } else if (recordedFile) {
@@ -53,6 +59,8 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       recorder
         .start()
         .then(() => {
+          recordButtonRef.current.style.pointerEvents = 'initial'
+          setShowRecording(true)
           setStartRecording(true)
           shouldDraw = true
           const stream = recorder.activeStream
@@ -451,7 +459,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
         {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
-      <RecordIconWrapper onClick={() => startRecording()}>
+      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
     </Container>

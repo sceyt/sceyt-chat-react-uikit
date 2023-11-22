@@ -24,7 +24,6 @@ import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, TH
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
-// import useOnScreen from '../../hooks/useOnScrean'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
 import { colors } from '../../UIHelper/constants'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
@@ -89,11 +88,6 @@ const Channel: React.FC<IChannelProps> = ({
   }
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
-
-  // const channelItemRef = useRef()
-  // const isVisible = useOnScreen(channelItemRef)
-  // if (isDirectChannel) {
-  // }
 
   useUpdatePresence(channel, true)
   useEffect(() => {
@@ -266,9 +260,11 @@ const Channel: React.FC<IChannelProps> = ({
                   lastMessage.user &&
                   (lastMessage.user.id === user.id
                     ? 'You '
-                    : contactsMap[lastMessage.user.id]
-                    ? contactsMap[lastMessage.user.id].firstName
-                    : lastMessage.user.id)
+                    : makeUsername(
+                        lastMessage.user && contactsMap[lastMessage.user.id],
+                        lastMessage.user,
+                        getFromContacts
+                      ))
                 } ${
                   lastMessage.body === 'CC'
                     ? 'created this channel'
@@ -281,7 +277,9 @@ const Channel: React.FC<IChannelProps> = ({
                         lastMessageMetas.m
                           .slice(0, 5)
                           .map((mem: string) =>
-                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
+                            mem === user.id
+                              ? ' You'
+                              : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
                           )
                       } ${
                         lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
@@ -295,7 +293,9 @@ const Channel: React.FC<IChannelProps> = ({
                         lastMessageMetas.m
                           .slice(0, 5)
                           .map((mem: string) =>
-                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
+                            mem === user.id
+                              ? ' You'
+                              : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
                           )
                       } ${
                         lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5

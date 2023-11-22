@@ -99,7 +99,7 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  const [imageLoading, setImageLoading] = useState(true)
+  const [imageLoading, setImageLoading] = useState(!attachment.attachmentUrl)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
   const [failTimeout, setFailTimeout]: any = useState()
@@ -793,7 +793,7 @@ const Attachment = ({
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED
           }
-          borderRadius={borderRadius}
+          borderRadius={isRepliedMessage ? '50%' : borderRadius}
           background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
@@ -1112,7 +1112,9 @@ export const AttachmentFile = styled.div<{
   position: relative;
   align-items: center;
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
-  width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
+  //width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
+  min-width: ${(props) => !props.isRepliedMessage && (props.isUploading ? '260px' : '205px')};
+  transition: all 0.1s;
   //height: 70px;
   background: ${(props) => props.background};
   border: ${(props) => props.border || `1px solid  ${colors.gray1}`};

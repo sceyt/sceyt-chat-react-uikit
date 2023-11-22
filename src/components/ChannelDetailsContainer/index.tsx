@@ -7,6 +7,7 @@ import styled from 'styled-components'
 export interface IDetailsProps {
   size?: 'small' | 'medium' | 'large'
   showAboutChannel?: boolean
+  showAboutChannelTitle?: boolean
   avatarAndNameDirection?: 'row' | 'column'
   channelEditIcon?: JSX.Element
   editChannelSaveButtonBackgroundColor?: string
@@ -111,8 +112,9 @@ export interface IDetailsProps {
 const ChannelDetailsContainer = ({
   size = 'large',
   channelEditIcon,
-  showAboutChannel,
-  avatarAndNameDirection = 'row',
+  showAboutChannel = true,
+  showAboutChannelTitle = true,
+  avatarAndNameDirection = 'column',
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
   editChannelCancelButtonBackgroundColor,
@@ -195,6 +197,7 @@ const ChannelDetailsContainer = ({
         <Details
           size={size}
           showAboutChannel={showAboutChannel}
+          showAboutChannelTitle={showAboutChannelTitle}
           avatarAndNameDirection={avatarAndNameDirection}
           channelEditIcon={channelEditIcon}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}

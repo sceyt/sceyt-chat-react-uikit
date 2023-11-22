@@ -310,7 +310,11 @@ export const InputErrorMessage = styled.p`
   margin: 4px 0 0;
 `
 
-export const CustomInput = styled.input<{ error?: boolean; theme?: string; color?: string }>`
+export const CustomInput = styled.input<{
+  error?: boolean
+  theme?: string
+  color?: string
+}>`
   height: 40px;
   width: 100%;
   background: ${(props) => (props.theme === THEME.DARK ? colors.backgroundColor : colors.white)};
@@ -749,7 +753,7 @@ export const MessageOwner = styled.h3<{
   margin-left: ${(props) => props.rtlDirection && 'auto'};
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
-  line-height: ${(props) => props.fontSize || '15px'};
+  line-height: ${(props) => props.fontSize || '18px'};
   cursor: ${(props) => props.clickable && 'pointer'};
   overflow: hidden;
   text-overflow: ellipsis;
@@ -795,7 +799,7 @@ export const MessageText = styled.pre<{
   letter-spacing: 0.3px;
   color: ${(props) => props.color || colors.textColor1};
   user-select: text;
-  overflow: hidden;
+  //overflow: hidden;
 
   ${(props) =>
     props.isRepliedMessage &&

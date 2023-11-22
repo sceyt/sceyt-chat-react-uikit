@@ -5,7 +5,7 @@ import { ReactComponent as DeliveredIcon } from '../assets/svg/ticks_delivered.s
 import { ReactComponent as SentIcon } from '../assets/svg/ticks_sent.svg'
 import { ReactComponent as PendingIcon } from '../assets/svg/pending_icon.svg'
 import { MESSAGE_DELIVERY_STATUS } from './constants'
-import { IAttachment, IContact } from '../types'
+import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
@@ -70,8 +70,20 @@ export const bytesToSize = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
-export const systemMessageUserName = (contact: IContact, userId: string) => {
-  return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
+export const systemMessageUserName = (contact: IContact, userId: string, mentionedUsers?: IUser[]) => {
+  let user
+  if (!contact && mentionedUsers && mentionedUsers.length) {
+    user = mentionedUsers.find((menUser) => menUser.id === userId)
+  }
+  return contact
+    ? contact.firstName
+      ? contact.firstName.split(' ')[0]
+      : contact.id
+    : userId
+    ? user
+      ? `~${user.firstName.split(' ')[0]}`
+      : userId
+    : 'Deleted user'
 }
 
 const filesPromisesOnDownload: { [key: string]: any } = {}

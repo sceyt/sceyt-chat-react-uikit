@@ -322,7 +322,6 @@ function* getChannels(action: IAction): any {
     }
     query.channelQuery = channelQuery
     if (activeChannel) {
-      console.log('switch channel .. . ', activeChannel)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))

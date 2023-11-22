@@ -70,18 +70,16 @@ import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '
 import { colors } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
-import { IAttachment, IMember, IMessage, IUser } from '../../types'
-import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { IMember, IMessage, IUser } from '../../types'
+import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
-  deletePendingAttachment,
+  deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
-  removeMessageFromAllMessages,
-  removeMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
   setSendMessageHandler
@@ -194,6 +192,7 @@ function onError(error: any) {
 }
 
 let prevActiveChannelId: any
+let attachmentsUpdate: any = []
 
 interface SendMessageProps {
   draggedAttachments?: boolean
@@ -406,43 +405,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setTypingTimout(0)
       }, 2000)
     )
-    /* if (recordedFile) {
-      /!* const file = new File([recordedFile.data], recordedFile.data.name, {
-        type: 'audio/mp3'
-      }) *!/
-      const messageToSend = {
-        metadata: '',
-        body: '',
-        mentionedMembers: [],
-        attachments: [
-          {
-            name: `${uuidv4()}.mp3`,
-            data: recordedFile.data,
-            attachmentId: uuidv4(),
-            upload: true,
-            size: recordedFile.data.size,
-            attachmentUrl: recordedFile.attachmentURL,
-            metadata: { tmb: recordedFile.thumbs },
-            type: attachmentTypes.voice
-          }
-        ],
-        type: 'text'
-      }
-      dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
-    } else { */
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const shouldSend =
       (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
     if (isEnter) {
       event.preventDefault()
+      if (!messageText.trim() && !attachments.length && !messageToEdit) {
+        setShouldClearEditor({ clear: true })
+      }
     }
     if (shouldSend && !mentionsIsOpen) {
       event.preventDefault()
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
-      } else if (messageText || (attachments.length && attachments.length > 0)) {
+      } else if (messageText.trim() || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
         console.log('messageTexToSend . . . . .', messageTexToSend)
         const messageToSend: any = {
@@ -458,13 +436,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              let mentionsToFind = [...mentionedMembers]
-              const draftMessage = getDraftMessageFromMap(activeChannel.id)
-              if (draftMessage) {
-                mentionsToFind = [...draftMessage.mentionedMembers, ...mentionedMembers]
-              }
-              const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
-              mentionMembersToSend.push(mentionToAdd)
+              // let mentionsToFind = [...mentionedMembers]
+              // const draftMessage = getDraftMessageFromMap(activeChannel.id)
+              // if (draftMessage) {
+              //   mentionsToFind = [...draftMessage.mentionedMembers, ...mentionedMembers]
+              // }
+              // const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
+              // mentionMembersToSend.push(mentionToAdd)
+              mentionMembersToSend.push({ id: att.metadata })
             }
           })
         }
@@ -495,7 +474,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-          messageToSend.attachments = attachments.map((attachment: any, index: any) => {
+          messageToSend.attachments = attachments.map((attachment: any) => {
             const attachmentToSend = {
               name: attachment.data.name,
               data: attachment.data,
@@ -507,7 +486,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               type: attachment.type,
               size: attachment.size
             }
-            if (sendAsSeparateMessage) {
+            /* if (sendAsSeparateMessage) {
               if (index !== 0) {
                 messageToSend.body = ''
                 messageToSend.metadata = ''
@@ -528,23 +507,23 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   true
                 )
               )
-            }
+            } */
             return attachmentToSend
           })
-          if (!sendAsSeparateMessage) {
-            const attachmentsToSent = [...messageToSend.attachments]
-            if (linkAttachment) {
-              attachmentsToSent.push(linkAttachment)
-            }
-            dispatch(
-              sendMessageAC(
-                { ...messageToSend, attachments: attachmentsToSent },
-                activeChannel.id,
-                connectionStatus,
-                false
-              )
-            )
+          // if (!sendAsSeparateMessage) {
+          const attachmentsToSent = [...messageToSend.attachments]
+          if (linkAttachment) {
+            attachmentsToSent.push(linkAttachment)
           }
+          dispatch(
+            sendMessageAC(
+              { ...messageToSend, attachments: attachmentsToSent },
+              activeChannel.id,
+              connectionStatus,
+              sendAsSeparateMessage
+            )
+          )
+          // }
         }
         setMessageText('')
 
@@ -554,31 +533,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         clearTimeout(typingTimout)
         setTypingTimout(undefined)
-        /* else if (recordedFile) {
-           /!* const file = new File([recordedFile.data], 'voice_message.webm', {
-             type: 'audio/ogg',
-           });
-           const messageToSend = {
-             metadata: '',
-             body: '',
-             mentionedMembers: [],
-             attachments: [
-               {
-                 name: recordedFile.data.name,
-                 data: recordedFile.data,
-                 attachmentId: Date.now(),
-                 upload: true,
-                 attachmentUrl: recordedFile.attachmentURL,
-                 metadata: 'metadata for voice message',
-                 type: recordedFile.data.type.split('/')[1]
-               }
-             ],
-             type: 'voice'
-           }
-           dispatch(sendMessageAC(messageToSend))
-         } */
       }
       setAttachments([])
+      attachmentsUpdate = []
       handleCloseReply()
       setShouldClearEditor({ clear: true })
       setMentionedMembers([])
@@ -625,10 +582,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
   const removeUpload = (attachmentId: string) => {
     if (attachmentId) {
+      const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
       deleteVideoThumb(attachmentId)
-      setAttachments(attachments.filter((item: any) => item.tid !== attachmentId))
+      setAttachments(updatedAttachments)
+      attachmentsUpdate = updatedAttachments
     } else {
       setAttachments([])
+      attachmentsUpdate = []
     }
   }
 
@@ -710,17 +670,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     dispatch(clearSelectedMessagesAC())
   }
   const handleDeletePendingMessage = (message: IMessage) => {
-    if (message.attachments && message.attachments.length) {
-      const customUploader = getCustomUploader()
-      message.attachments.forEach((att: IAttachment) => {
-        if (customUploader) {
-          cancelUpload(att.tid!)
-          deletePendingAttachment(att.tid!)
-        }
-      })
-    }
-    removeMessageFromMap(activeChannel.id, message.id || message.tid!)
-    removeMessageFromAllMessages(message.id || message.tid!)
+    deletePendingMessage(activeChannel.id, message)
     dispatch(deleteMessageFromListAC(message.id || message.tid!))
   }
 
@@ -1068,6 +1018,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setMessageText('')
       handleCloseReply()
       setAttachments([])
+      attachmentsUpdate = []
       handleCloseEditMode()
       clearTimeout(typingTimout)
 
@@ -1189,6 +1140,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
       }
     }
+    attachmentsUpdate = attachments
   }, [attachments])
 
   useEffect(() => {
@@ -1450,20 +1402,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
               {!!attachments.length && !sendAttachmentSeparately && (
                 <ChosenAttachments>
-                  {attachments.map((attachment: any) => (
-                    <Attachment
-                      attachment={attachment}
-                      isPreview
-                      removeSelected={removeUpload}
-                      key={attachment.tid}
-                      setVideoIsReadyToSend={setVideoIsReadyToSend}
-                      borderRadius={selectedAttachmentsBorderRadius}
-                      selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                      backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
-                      selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
-                      selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
-                      selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
-                    />
+                  {[...attachments].map((attachment: any) => (
+                    <div key={attachment.tid}>
+                      <Attachment
+                        attachment={attachment}
+                        isPreview
+                        removeSelected={removeUpload}
+                        key={attachment.tid}
+                        setVideoIsReadyToSend={setVideoIsReadyToSend}
+                        borderRadius={selectedAttachmentsBorderRadius}
+                        selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
+                        backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
+                        selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
+                        selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
+                        selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
+                      />
+                    </div>
                   ))}
                 </ChosenAttachments>
               )}
@@ -1565,7 +1519,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         <FormatMessagePlugin
                           editorState={realEditorState}
                           setMessageBodyAttributes={setMessageBodyAttributes}
-                          messageText={messageToEdit ? editMessageText : messageText}
                           setMessageText={messageToEdit ? setEditMessageText : setMessageText}
                           messageToEdit={messageToEdit}
                         />
@@ -1619,7 +1572,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </MessageInputWrapper>
                 )}
 
-                {sendMessageIsActive || !voiceMessage ? (
+                {sendMessageIsActive || !voiceMessage || messageToEdit ? (
                   <SendMessageIcon
                     isActive={sendMessageIsActive}
                     order={sendIconOrder}

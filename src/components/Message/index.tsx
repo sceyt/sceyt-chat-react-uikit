@@ -39,15 +39,12 @@ import {
 } from '../../store/message/actions'
 import ConfirmPopup from '../../common/popups/delete'
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
-import useOnScreen from '../../hooks/useOnScrean'
 import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
-  deletePendingAttachment,
+  deletePendingMessage,
   getPendingAttachment,
-  removeMessageFromAllMessages,
-  removeMessageFromMap,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from '../../helpers/messagesHalper'
@@ -55,7 +52,7 @@ import {
 import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useOnScreen } from '../../hooks'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
@@ -344,7 +341,8 @@ const Message = ({
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system'
+    prevMessage?.type === 'system' ||
+    unreadMessageId === prevMessage.id
   const lastMessageInInterval =
     !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
     nextMessage.type === 'system'
@@ -564,17 +562,7 @@ const Message = ({
   }
 
   const handleDeletePendingMessage = () => {
-    if (message.attachments && message.attachments.length) {
-      const customUploader = getCustomUploader()
-      message.attachments.forEach((att: IAttachment) => {
-        if (customUploader) {
-          cancelUpload(att.tid!)
-          deletePendingAttachment(att.tid!)
-        }
-      })
-    }
-    removeMessageFromMap(channel.id, message.id || message.tid!)
-    removeMessageFromAllMessages(message.id || message.tid!)
+    deletePendingMessage(channel.id, message)
     dispatch(deleteMessageFromListAC(message.id || message.tid!))
   }
 
@@ -755,6 +743,7 @@ const Message = ({
   return (
     <MessageItem
       key={message.id || message.tid}
+      className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
       hoverBackground={
@@ -778,7 +767,6 @@ const Message = ({
       selectMessagesIsActive={selectionIsActive}
       onClick={(e) => selectionIsActive && handleSelectMessage(e)}
       // id={message.id}
-      className='MessageItem'
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
         <SelectMessageWrapper
@@ -1083,7 +1071,8 @@ const Message = ({
               </ReplyMessageBody>
             </ReplyMessageContainer>
           )}
-          {message.forwardingDetails &&
+          {message.state !== MESSAGE_STATUS.DELETE &&
+            message.forwardingDetails &&
             message.forwardingDetails.user &&
             message.user &&
             message.forwardingDetails.user.id !== message.user.id && (
@@ -1772,7 +1761,7 @@ const HiddenMessageTime = styled.span<{ hide?: boolean }>`
   color: ${colors.textColor2};
 `
 
-export const MessageStatusAndTime = styled.div<{
+export const MessageStatusAndTime = styled.span<{
   withAttachment?: boolean
   fileAttachment?: boolean
   hide?: boolean

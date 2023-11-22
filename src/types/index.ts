@@ -44,6 +44,7 @@ export interface IAttachment {
   tid?: string
   attachmentUrl: string
   data: any
+  cachedUrl?: string
 }
 
 declare class AttachmentBuilder {

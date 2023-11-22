@@ -87,6 +87,15 @@ const SceytChat = ({
       dispatch(browserTabIsActiveAC(true))
     }
   }
+  const handleFocusChange = (focus: boolean) => {
+    if (focus) {
+      setTabIsActive(true)
+      dispatch(browserTabIsActiveAC(true))
+    } else {
+      setTabIsActive(false)
+      dispatch(browserTabIsActiveAC(false))
+    }
+  }
   useEffect(() => {
     console.log('client is changed.... ', client)
     if (client) {
@@ -197,10 +206,15 @@ const SceytChat = ({
       }
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href
+
+      window.addEventListener('focus', () => handleFocusChange(true))
+      window.addEventListener('blur', () => handleFocusChange(false))
     }
 
     document.addEventListener(visibilityChange, handleVisibilityChange, false)
     return () => {
+      window.removeEventListener('focus', () => handleFocusChange(true))
+      window.removeEventListener('blur', () => handleFocusChange(false))
       document.removeEventListener(visibilityChange, handleVisibilityChange)
     }
   }, [customColors])

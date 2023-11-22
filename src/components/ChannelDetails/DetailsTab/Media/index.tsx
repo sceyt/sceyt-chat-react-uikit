@@ -1,22 +1,20 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-// import { getFileExtension } from '../../../../helpers'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
-import { IAttachment } from '../../../../types'
+import { IAttachment, IChannel } from '../../../../types'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import Attachment from '../../../Attachment'
 import { colors } from '../../../../UIHelper/constants'
 import { isJSON } from '../../../../helpers/message'
-// import SliderPopup from '../../../../../common/Popups/SliderPopup'
 
 interface IProps {
-  channelId: string
+  channel: IChannel
 }
 
-const Media = ({ channelId }: IProps) => {
+const Media = ({ channel }: IProps) => {
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -25,8 +23,8 @@ const Media = ({ channelId }: IProps) => {
   }
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.media))
-  }, [channelId])
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media))
+  }, [channel.id])
   return (
     <Container>
       {attachments.map((file: IAttachment) => (
@@ -60,7 +58,7 @@ const Media = ({ channelId }: IProps) => {
       ))}
       {mediaFile && (
         <SliderPopup
-          channelId={channelId}
+          channel={channel}
           setIsSliderOpen={setMediaFile}
           mediaFiles={attachments}
           currentMediaFile={mediaFile}

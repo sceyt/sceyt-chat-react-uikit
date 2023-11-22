@@ -1,8 +1,9 @@
-import { IMessage, IReaction } from '../../types'
+import { IAttachment, IMessage, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
-export const MESSAGES_MAX_LENGTH = 60
-export const LOAD_MAX_MESSAGE_COUNT = 20
+import { cancelUpload, getCustomUploader } from '../customUploader'
+export const MESSAGES_MAX_LENGTH = 80
+export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
@@ -386,6 +387,20 @@ export const setPendingAttachment = (attachmentId: string, data: { file?: File; 
 export const getPendingAttachment = (attachmentId: string) => pendingAttachments[attachmentId]
 
 export const deletePendingAttachment = (attachmentId: string) => delete pendingAttachments[attachmentId]
+
+export const deletePendingMessage = (channelId: string, message: IMessage) => {
+  if (message.attachments && message.attachments.length) {
+    const customUploader = getCustomUploader()
+    message.attachments.forEach((att: IAttachment) => {
+      if (customUploader) {
+        cancelUpload(att.tid!)
+        deletePendingAttachment(att.tid!)
+      }
+    })
+  }
+  removeMessageFromMap(channelId, message.id || message.tid!)
+  removeMessageFromAllMessages(message.id || message.tid!)
+}
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
 export const addPendingMessageToMap = (channelId: string, pendingMessage: IMessage) => {

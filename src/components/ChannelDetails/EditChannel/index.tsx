@@ -10,6 +10,7 @@ import {
   CustomInput,
   DropdownOptionLi,
   DropdownOptionsUl,
+  InputErrorMessage,
   Label,
   UploadFile,
   UploadFileLabel
@@ -102,7 +103,9 @@ const EditChannel = ({
   const [deleteAvatarPopupOpen, setDeleteAvatarPopupOpen] = useState(false)
   const [selectedImageUrl, setSelectedImageUrl] = useState('')
   const [newSubject, setNewSubject] = useState(channel.subject)
+  const [subjectIsWrong, setSubjectIsWrong] = useState(false)
   const [newDescription, setNewDescription] = useState(channel.metadata && channel.metadata.d)
+  const [descriptionIsWrong, setDescriptionIsWrong] = useState(false)
   const [offsetTop, setOffsetTop] = useState(null)
   const [newAvatar, setNewAvatar] = useStateComplex({
     src: {},
@@ -172,11 +175,17 @@ const EditChannel = ({
       newDescription !== (channel.metadata.d || channel.metadata) ||
       newAvatar.url !== channel.avatarUrl
     ) {
-      handleUpdateChannel({
-        ...(newSubject !== channel.subject && { subject: newSubject }),
-        ...(newDescription !== (channel.metadata.d || channel.metadata) && { metadata: { d: newDescription } }),
-        ...(newAvatar.url !== channel.avatarUrl && { avatar: newAvatar.src.file })
-      })
+      if (!newSubject || newSubject.length < 1 || newSubject.length > 250) {
+        setSubjectIsWrong(true)
+      } else if (newDescription && newDescription?.length > 2000) {
+        setDescriptionIsWrong(true)
+      } else {
+        handleUpdateChannel({
+          ...(newSubject !== channel.subject && { subject: newSubject }),
+          ...(newDescription !== (channel.metadata.d || channel.metadata) && { metadata: { d: newDescription } }),
+          ...(newAvatar.url !== channel.avatarUrl && { avatar: newAvatar.src.file })
+        })
+      }
     }
   }
 
@@ -191,6 +200,20 @@ const EditChannel = ({
     })
   }, [channel])
 
+  useEffect(() => {
+    if (!newSubject || newSubject.length < 1 || newSubject.length > 250) {
+      setSubjectIsWrong(true)
+    } else {
+      setSubjectIsWrong(false)
+    }
+  }, [newSubject])
+  useEffect(() => {
+    if (newDescription && newDescription.length > 2000) {
+      setDescriptionIsWrong(true)
+    } else {
+      setDescriptionIsWrong(false)
+    }
+  }, [newDescription])
   useEffect(() => {
     setOffsetTop(editContainer && editContainer.current && editContainer.current.offsetTop)
   }, [])
@@ -248,21 +271,29 @@ const EditChannel = ({
 
         <Label> Name </Label>
         <CustomInput
+          error={subjectIsWrong}
           theme={theme}
           color={colors.textColor1}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e) => setNewSubject(e.target.value)}
         />
+        {subjectIsWrong && (
+          <InputErrorMessage>Channel name must be a minimum of 1 and a maximum of 250 symbols.</InputErrorMessage>
+        )}
 
         <Label> Description </Label>
         <CustomInput
+          error={descriptionIsWrong}
           theme={theme}
           color={colors.textColor1}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e) => setNewDescription(e.target.value)}
         />
+        {descriptionIsWrong && (
+          <InputErrorMessage>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
+        )}
 
         <EditChannelFooter>
           <Button
@@ -275,6 +306,7 @@ const EditChannel = ({
             Cancel
           </Button>
           <Button
+            disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
             color={editChannelSaveButtonTextColor}
             backgroundColor={editChannelSaveButtonBackgroundColor || colors.primary}

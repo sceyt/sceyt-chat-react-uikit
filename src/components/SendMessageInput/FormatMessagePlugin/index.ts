@@ -1,10 +1,25 @@
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $createOffsetView } from '@lexical/offset'
-import { $getRoot, LexicalEditor } from 'lexical'
+import {
+  $getRoot,
+  $getSelection,
+  $isRangeSelection,
+  COMMAND_PRIORITY_LOW,
+  COMMAND_PRIORITY_NORMAL,
+  GridSelection,
+  KEY_BACKSPACE_COMMAND,
+  KEY_DELETE_COMMAND,
+  LexicalEditor,
+  PASTE_COMMAND,
+  RangeSelection
+} from 'lexical'
 
 import { useDidUpdate } from '../../../hooks'
 import { bodyAttributesMapByType } from '../../../helpers/message'
 import { IMessage } from '../../../types'
+import { useCallback, useEffect } from 'react'
+import { $isMentionNode } from '../MentionNode'
+import { getSelectedNode, mergeRegister } from '../FloatingTextFormatToolbarPlugin'
 
 function useFormatMessage(
   editor: LexicalEditor,
@@ -15,6 +30,70 @@ function useFormatMessage(
   setMessageText: (newMessageText: string) => void,
   messageToEdit?: IMessage
 ): void {
+  function $insertDataTransferForPlainText(
+    dataTransfer: DataTransfer,
+    selection: RangeSelection | GridSelection
+  ): void {
+    const text = dataTransfer.getData('text/plain') || dataTransfer.getData('text/uri-list')
+
+    if (text != null) {
+      selection.insertRawText(text)
+    }
+  }
+  const handlePast = useCallback(
+    (e: any) => {
+      const pastedTex = e.clipboardData.getData('text/plain')
+      if (pastedTex) {
+        editor.update(() => {
+          const selection = $getSelection()
+          const { clipboardData } = event as ClipboardEvent
+          if (clipboardData != null && $isRangeSelection(selection)) {
+            $insertDataTransferForPlainText(clipboardData, selection)
+          }
+        })
+      }
+    },
+    [editor]
+  )
+  const onDelete = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault()
+      const selection = $getSelection()
+      const node = getSelectedNode(selection as any)
+      if ($isMentionNode(node)) {
+        node.remove()
+      }
+      return false
+    },
+    [editor]
+  )
+  useEffect(() => {
+    return mergeRegister(
+      editor.registerCommand(
+        PASTE_COMMAND,
+        (e) => {
+          handlePast(e)
+          return true
+        },
+        COMMAND_PRIORITY_NORMAL
+      ),
+      editor.registerCommand(KEY_DELETE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
+      editor.registerCommand(KEY_BACKSPACE_COMMAND, onDelete, COMMAND_PRIORITY_LOW)
+    )
+    // console.log('selectedIndex. .> > >> > . . ', selectedIndex)
+    /* editor.registerCommand(
+      KEY_ENTER_COMMAND,
+      (event: KeyboardEvent | null) => {
+        if (event !== null) {
+          console.log('...>>>> preventDefault ...>>>>>')
+          event.preventDefault()
+          event.stopImmediatePropagation()
+        }
+        return true
+      },
+      COMMAND_PRIORITY_NORMAL
+    ) */
+  }, [])
   useDidUpdate(() => {
     if (editorState) {
       editorState.read(() => {

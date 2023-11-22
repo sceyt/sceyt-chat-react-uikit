@@ -143,7 +143,7 @@ const DetailsTab = ({
           showMakeMemberAdmin={showMakeMemberAdmin}
         />
       )}
-      {activeTab === channelDetailsTabs.media && <Media channelId={channel.id} />}
+      {activeTab === channelDetailsTabs.media && <Media channel={channel} />}
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}

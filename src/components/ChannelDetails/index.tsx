@@ -33,6 +33,7 @@ import { themeSelector } from '../../store/theme/selector'
 const Details = ({
   size,
   showAboutChannel,
+  showAboutChannelTitle,
   avatarAndNameDirection,
   channelEditIcon,
   editChannelSaveButtonBackgroundColor,
@@ -273,7 +274,7 @@ const Details = ({
 
           {showAboutChannel && channel.metadata && channel.metadata.d && (
             <AboutChannel>
-              <AboutChannelTitle>About</AboutChannelTitle>
+              {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
               <AboutChannelText color={colors.textColor1}>
                 {channel.metadata && channel.metadata.d ? channel.metadata.d : ''}
               </AboutChannelText>
@@ -429,11 +430,11 @@ const AboutChannelTitle = styled.h4`
   color: ${colors.textColor3};
 `
 
-const AboutChannelText = styled.h3`
-  font-size: 16px;
+const AboutChannelText = styled.h3<{ color: string }>`
+  font-size: 15px;
   margin: 0;
   font-weight: 400;
-  line-height: 22px;
+  line-height: 20px;
   color: ${(props) => props.color};
 `
 

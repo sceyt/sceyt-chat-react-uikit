@@ -279,7 +279,7 @@ const MessageActionsWrapper = styled.div<EditMessageContainerProps>`
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   top: -46px;
   padding: 0 0 8px;
-  z-index: 200;
+  z-index: 90;
 `
 const EditMessageContainer = styled.div<EditMessageContainerProps>`
   position: relative;
