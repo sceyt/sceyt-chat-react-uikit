@@ -997,7 +997,7 @@ export const UploadProgress = styled.div<{
   align-items: center;
   justify-content: center;
   //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
-  background-image: url(${(props) => `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
+  background-image: url(${(props) => props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
   background-size: cover;
   background-position: center;
   border-radius: ${(props) =>

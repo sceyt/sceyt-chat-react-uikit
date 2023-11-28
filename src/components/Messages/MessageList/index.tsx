@@ -49,6 +49,7 @@ import { useDidUpdate } from '../../../hooks'
 import { LOADING_STATE } from '../../../helpers/constants'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { themeSelector } from '../../../store/theme/selector'
+import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 // const Message = lazy(() => import('../../Message'))
 
@@ -492,7 +493,7 @@ const MessageList: React.FC<MessagesProps> = ({
           }
         }
       }
-      if (messagesIndexMap[lastVisibleMessageId] > messages.length - 15) {
+      if (messagesIndexMap[lastVisibleMessageId] >= messages.length - 15 || target.scrollTop === 0) {
         if (
           connectionStatus === CONNECTION_STATUS.CONNECTED &&
           !scrollToNewMessage.scrollToBottom &&

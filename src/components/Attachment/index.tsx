@@ -452,6 +452,7 @@ const Attachment = ({
     '- - -- ',
     attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || !isCached
   ) */
+
   return (
     <React.Fragment>
       {/* {ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'gif' ? ( */}
@@ -484,7 +485,7 @@ const Attachment = ({
             withBorder={!isPreview && !isDetailsView}
             fitTheContainer={isDetailsView}
             imageMaxHeight={
-              `${renderHeight}px`
+              `${renderHeight || 400}px`
               // attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
             }
             onLoad={() => setImageLoading(false)}
@@ -635,7 +636,7 @@ const Attachment = ({
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
                   withPrefix={withPrefix}
-                  backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
+                  backgroundImage={attachmentThumb || ''}
                   zIndex={9}
                 >
                   <UploadPercent
@@ -1113,7 +1114,7 @@ export const AttachmentFile = styled.div<{
   align-items: center;
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
   //width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
-  min-width: ${(props) => !props.isRepliedMessage && (props.isUploading ? '260px' : '205px')};
+  min-width: ${(props) => !props.isRepliedMessage && props.width || (props.isUploading ? '260px' : '205px')};
   transition: all 0.1s;
   //height: 70px;
   background: ${(props) => props.background};

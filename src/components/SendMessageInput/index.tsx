@@ -202,6 +202,7 @@ interface SendMessageProps {
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
   inputCustomClassname?: string
   disabled?: boolean
+  CustomDisabledInput?: FC<{}>
   showAddEmojis?: boolean
   AddEmojisIcon?: JSX.Element
   emojiIcoOrder?: number
@@ -239,6 +240,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   // draggedAttachments,
   handleSendMessage,
   disabled = false,
+  CustomDisabledInput,
   sendIconOrder,
   inputOrder = 1,
   showAddEmojis = true,
@@ -884,7 +886,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             metas = dataFromDb.metadata
           } else {
             const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
-            metas.thumb = thumb
+            metas.tmb = thumb
             metas.width = width
             metas.height = height
             metas = JSON.stringify(metas)
@@ -1280,14 +1282,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           {!activeChannel.id ? (
             <Loading />
           ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
-            <BlockedUserInfo>
-              <BlockInfoIcon />{' '}
-              {isDeletedUserChat
-                ? 'This user has been deleted.'
-                : disableInput
-                ? "Sender doesn't support replies"
-                : 'You blocked this user.'}
-            </BlockedUserInfo>
+            <React.Fragment>
+              {disableInput && CustomDisabledInput ? <CustomDisabledInput /> : (
+                <BlockedUserInfo color={colors.textColor1}>
+                  <BlockInfoIcon />{' '}
+                  {isDeletedUserChat
+                    ? 'This user has been deleted.'
+                    : disableInput
+                      ? "Sender doesn't support replies"
+                      : 'You blocked this user.'}
+                </BlockedUserInfo>
+              ) }
+            </React.Fragment>
+
           ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
             <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
               Join
@@ -1326,7 +1333,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   ))}
               </TypingIndicator>
               {messageToEdit && (
-                <EditReplyMessageCont>
+                <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
                   <CloseEditMode onClick={handleCloseEditMode}>
                     <CloseIcon />
                   </CloseEditMode>
@@ -1346,7 +1353,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 </EditReplyMessageCont>
               )}
               {messageForReply && (
-                <EditReplyMessageCont>
+                <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
                   <CloseEditMode onClick={handleCloseReply}>
                     <CloseIcon />
                   </CloseEditMode>
@@ -1501,6 +1508,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       className={inputCustomClassname}
                       selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
                       borderRadius={inputBorderRadius}
+                      color={colors.textColor1}
                     >
                       <LexicalComposer initialConfig={initialConfig}>
                         <AutoFocusPlugin messageForReply={messageForReply} />
@@ -1656,7 +1664,7 @@ const Container = styled.div<{
   }
 `
 
-const EditReplyMessageCont = styled.div<any>`
+const EditReplyMessageCont = styled.div<{backgroundColor?: string; color?: string}>`
   position: relative;
   left: -12px;
   width: calc(100% - 8px);
@@ -1665,10 +1673,9 @@ const EditReplyMessageCont = styled.div<any>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
-  background-color: ${colors.backgroundColor};
+  color: ${props => props.color || colors.textColor1};
+  background-color: ${props => props.backgroundColor || colors.backgroundColor};
   z-index: 19;
-  border-bottom: 1px solid ${colors.gray1};
   box-sizing: content-box;
 `
 
@@ -1801,6 +1808,7 @@ const LexicalWrapper = styled.div<{
     border-radius: ${(props) => props.borderRadius};
     background-color: ${(props) => props.backgroundColor};
     padding: ${(props) => props.paddings};
+    color: ${(props) => props.color};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
     & p {
       font-size: 15px;
@@ -2028,7 +2036,7 @@ const BlockedUserInfo = styled.div`
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color || colors.textColor1};
 
   & > svg {
     margin-right: 12px;

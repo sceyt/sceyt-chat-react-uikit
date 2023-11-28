@@ -219,15 +219,7 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  useEffect(() => {
-    dispatch(setTabIsActiveAC(tabIsActive))
-    if (tabIsActive && showNotifications) {
-      if (window.sceytTabNotifications) {
-        window.sceytTabNotifications.close()
-      }
-    }
-  }, [tabIsActive])
-  useDidUpdate(() => {
+  const handleChangedTheme = (theme: string) => {
     if (theme === THEME.DARK) {
       dispatch(setThemeAC(THEME.DARK))
       colors.primary = colors.darkModePrimary
@@ -244,6 +236,20 @@ const SceytChat = ({
       colors.backgroundColor = colors.lightModeBackgroundColor
       colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
       setDarkTheme(false)
+    }
+  }
+  useEffect(() => {
+    dispatch(setTabIsActiveAC(tabIsActive))
+    if (tabIsActive && showNotifications) {
+      if (window.sceytTabNotifications) {
+        window.sceytTabNotifications.close()
+      }
+    }
+  }, [tabIsActive])
+
+  useEffect(() => {
+    if(theme) {
+      handleChangedTheme(theme)
     }
   }, [theme])
   useDidUpdate(() => {
