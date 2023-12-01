@@ -103,6 +103,17 @@ interface IChannelListProps {
   selectedChannelPaddings?: string
   channelsPaddings?: string
   channelsMargin?: string
+  channelHoverBackground?: string
+  channelSubjectFontSize?: string
+  channelSubjectLineHeight?: string
+  channelSubjectColor?: string
+  channelLastMessageFontSize?: string
+  channelLastMessageHeight?: string
+  channelLastMessageTimeFontSize?: string
+  channelAvatarSize?: number
+  channelAvatarTextSize?: number
+  searchChannelInputFontSize?: string
+  searchedChannelsTitleFontSize?: string
   onChannelDeleted?: (
     // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
@@ -182,7 +193,18 @@ const ChannelList: React.FC<IChannelListProps> = ({
   newChannelIcon,
   newGroupIcon,
   newChatIcon,
-  uploadPhotoIcon
+  uploadPhotoIcon,
+  channelHoverBackground,
+  channelSubjectFontSize,
+  channelSubjectLineHeight,
+  channelSubjectColor,
+  channelLastMessageFontSize,
+  channelLastMessageHeight,
+  channelLastMessageTimeFontSize,
+  channelAvatarSize,
+  channelAvatarTextSize,
+  searchChannelInputFontSize,
+  searchedChannelsTitleFontSize
 }) => {
   const dispatch = useDispatch()
   // const [searchValue, setSearchValue] = useState('');
@@ -244,7 +266,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     if (activeChannel.id !== chan.id) {
       dispatch(switchChannelActionAC(chan))
     }
-    console.log('handleChangeActiveChannel .... searchValue... ', searchValue)
     /* if (searchValue) {
       getMyChannels()
     } */
@@ -265,7 +286,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
       dispatch(createChannelAC(channelData))
     }
     getMyChannels()
-    console.log('handle crate channel with contact ... ', contact)
   }
 
   const handleSearchValueChange = (e: any) => {
@@ -283,7 +303,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (deletedChannel) {
       if (onChannelDeleted) {
-        console.log('onChannelDeleted .... ', deletedChannel)
         onChannelDeleted(channels, deletedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         removeChannelFromMap(deletedChannel.id)
@@ -309,10 +328,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (addedChannel) {
       if (onChannelCreated) {
-        console.log('onChannelCreated .... ', addedChannel)
         onChannelCreated(channels, addedChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
-        console.log('dispatch addChannelAC 1 .... ', addedChannel)
         dispatch(addChannelAC(addedChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -322,10 +339,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (addedToChannel) {
       if (onAddedToChannel) {
-        console.log('onAddedToChannel .... ', addedToChannel)
         onAddedToChannel(channels, addedToChannel, (updatedChannels) => handleSetChannelList(updatedChannels, false))
       } else {
-        console.log('dispatch addChannelAC 2 .... ', addedToChannel)
         dispatch(addChannelAC(addedToChannel))
       }
       dispatch(setChannelToAddAC(null))
@@ -335,7 +350,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useEffect(() => {
     if (hiddenChannel) {
       if (onChannelHidden) {
-        console.log('onChannelHidden .... ', hiddenChannel)
         onChannelHidden(channels, hiddenChannel, (updatedChannels) => handleSetChannelList(updatedChannels, true))
       } else {
         dispatch(removeChannelAC(hiddenChannel.id))
@@ -404,7 +418,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       // console.log('set channels width is set ..... ', false)
       setListWidthIsSet(false)
     }
-    console.log('channels. ...........................', channels)
+    // console.log('channels. ...........................', channels)
   }, [channels])
   /* useDidUpdate(() => {
     /!* if (searchedChannels && searchedChannels.chats_groups && searchedChannels.chats_groups.length && !listWidthIsSet) {
@@ -443,6 +457,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             getMyChannels={getMyChannels}
             searchInputBackgroundColor={searchInputBackgroundColor}
             searchInputTextColor={searchInputTextColor}
+            fontSize={searchChannelInputFontSize}
           />
         ) : (
           ChannelsTitle || <ChatsTitle theme={theme}>Chats</ChatsTitle>
@@ -471,6 +486,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
           getMyChannels={getMyChannels}
           searchInputBackgroundColor={searchInputBackgroundColor}
           searchInputTextColor={searchInputTextColor}
+          fontSize={searchChannelInputFontSize}
         />
       )}
       {/* <ChannelTabs /> */}
@@ -495,6 +511,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
                     selectedChannelPaddings={selectedChannelPaddings}
+                    channelHoverBackground={channelHoverBackground}
+                    channelSubjectFontSize={channelSubjectFontSize}
+                    channelSubjectLineHeight={channelSubjectLineHeight}
+                    channelSubjectColor={channelSubjectColor}
+                    channelLastMessageFontSize={channelLastMessageFontSize}
+                    channelLastMessageHeight={channelLastMessageHeight}
+                    channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                    channelAvatarSize={channelAvatarSize}
+                    channelAvatarTextSize={channelAvatarTextSize}
                     channelsPaddings={channelsPaddings}
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -512,12 +537,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
               {!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) &&
               !(searchedChannels.channels && searchedChannels.channels.length) &&
               !(searchedChannels.contacts && searchedChannels.contacts.length) ? (
-                <NoData>No channels found</NoData>
+                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
               ) : (
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
-                      <SearchedChannelsHeader>Chats & Groups</SearchedChannelsHeader>
+                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                        Chats & Groups
+                      </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
@@ -528,6 +555,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
                             selectedChannelPaddings={selectedChannelPaddings}
+                            channelHoverBackground={channelHoverBackground}
+                            channelSubjectFontSize={channelSubjectFontSize}
+                            channelSubjectLineHeight={channelSubjectLineHeight}
+                            channelSubjectColor={channelSubjectColor}
+                            channelLastMessageFontSize={channelLastMessageFontSize}
+                            channelLastMessageHeight={channelLastMessageHeight}
+                            channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                            channelAvatarSize={channelAvatarSize}
+                            channelAvatarTextSize={channelAvatarTextSize}
                             channelsPaddings={channelsPaddings}
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -543,7 +579,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!(searchedChannels.contacts && searchedChannels.contacts.length) && (
                     <GroupChannels>
-                      <SearchedChannelsHeader>Contacts</SearchedChannelsHeader>
+                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Contacts</SearchedChannelsHeader>
                       {searchedChannels.contacts.map((contact: IContact) =>
                         ListItem ? (
                           <ListItem
@@ -559,6 +595,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
                             selectedChannelPaddings={selectedChannelPaddings}
+                            channelHoverBackground={channelHoverBackground}
+                            channelSubjectFontSize={channelSubjectFontSize}
+                            channelSubjectLineHeight={channelSubjectLineHeight}
+                            channelSubjectColor={channelSubjectColor}
+                            channelAvatarSize={channelAvatarSize}
+                            channelAvatarTextSize={channelAvatarTextSize}
                             channelsPaddings={channelsPaddings}
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -575,7 +617,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!(searchedChannels.channels && searchedChannels.channels.length) && (
                     <GroupChannels>
-                      <SearchedChannelsHeader>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
@@ -586,6 +628,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
                             selectedChannelPaddings={selectedChannelPaddings}
+                            channelHoverBackground={channelHoverBackground}
+                            channelSubjectFontSize={channelSubjectFontSize}
+                            channelSubjectLineHeight={channelSubjectLineHeight}
+                            channelSubjectColor={channelSubjectColor}
+                            channelLastMessageFontSize={channelLastMessageFontSize}
+                            channelLastMessageHeight={channelLastMessageHeight}
+                            channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                            channelAvatarSize={channelAvatarSize}
+                            channelAvatarTextSize={channelAvatarTextSize}
                             channelsPaddings={channelsPaddings}
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -622,6 +673,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
                     selectedChannelPaddings={selectedChannelPaddings}
+                    channelHoverBackground={channelHoverBackground}
+                    channelSubjectFontSize={channelSubjectFontSize}
+                    channelSubjectLineHeight={channelSubjectLineHeight}
+                    channelSubjectColor={channelSubjectColor}
+                    channelLastMessageFontSize={channelLastMessageFontSize}
+                    channelLastMessageHeight={channelLastMessageHeight}
+                    channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                    channelAvatarSize={channelAvatarSize}
+                    channelAvatarTextSize={channelAvatarTextSize}
                     channelsPaddings={channelsPaddings}
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -638,14 +698,16 @@ const ChannelList: React.FC<IChannelListProps> = ({
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
               !searchedChannels.chats_groups.length && !searchedChannels.chats_groups.length ? (
-                <NoData>
+                <NoData fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
               ) : (
                 <SearchedChannels>
                   {!!searchedChannels.chats_groups.length && (
                     <DirectChannels>
-                      <SearchedChannelsHeader>Chats & Groups</SearchedChannelsHeader>
+                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                        Chats & Groups
+                      </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
@@ -656,6 +718,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
                             selectedChannelPaddings={selectedChannelPaddings}
+                            channelHoverBackground={channelHoverBackground}
+                            channelSubjectFontSize={channelSubjectFontSize}
+                            channelSubjectLineHeight={channelSubjectLineHeight}
+                            channelSubjectColor={channelSubjectColor}
+                            channelLastMessageFontSize={channelLastMessageFontSize}
+                            channelLastMessageHeight={channelLastMessageHeight}
+                            channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                            channelAvatarSize={channelAvatarSize}
+                            channelAvatarTextSize={channelAvatarTextSize}
                             channelsPaddings={channelsPaddings}
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -671,7 +742,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
@@ -682,6 +753,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
                             selectedChannelPaddings={selectedChannelPaddings}
+                            channelHoverBackground={channelHoverBackground}
+                            channelSubjectFontSize={channelSubjectFontSize}
+                            channelSubjectLineHeight={channelSubjectLineHeight}
+                            channelSubjectColor={channelSubjectColor}
+                            channelLastMessageFontSize={channelLastMessageFontSize}
+                            channelLastMessageHeight={channelLastMessageHeight}
+                            channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                            channelAvatarSize={channelAvatarSize}
+                            channelAvatarTextSize={channelAvatarTextSize}
                             channelsPaddings={channelsPaddings}
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
@@ -750,10 +830,10 @@ const SearchedChannels = styled.div`
   height: calc(100vh - 123px);
   overflow-x: hidden;
 `
-const SearchedChannelsHeader = styled.p`
+const SearchedChannelsHeader = styled.p<{ fontSize?: string }>`
   padding-left: 16px;
   font-weight: 500;
-  font-size: 15px;
+  font-size: ${(props) => props.fontSize || '15px'};
   line-height: 14px;
   color: ${colors.textColor2};
 `
@@ -770,9 +850,10 @@ const ChatsTitle = styled.h3<{ theme?: string }>`
   color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
 `
 
-const NoData = styled.div`
+const NoData = styled.div<{ fontSize?: string }>`
   text-align: center;
   padding: 10px;
+  font-size: ${(props) => props.fontSize};
   color: ${colors.textColor2};
 `
 const LoadingWrapper = styled.div`

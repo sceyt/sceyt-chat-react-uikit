@@ -5,54 +5,75 @@ import { ReactComponent as DeliveredIcon } from '../assets/svg/ticks_delivered.s
 import { ReactComponent as SentIcon } from '../assets/svg/ticks_sent.svg'
 import { ReactComponent as PendingIcon } from '../assets/svg/pending_icon.svg'
 import { MESSAGE_DELIVERY_STATUS } from './constants'
-import { IAttachment, IContact } from '../types'
+import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { colors } from '../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 
-const StatusText = styled.span`
-  color: ${colors.textColor2};
+const StatusText = styled.span<{ color?: string; fontSize?: string }>`
+  color: ${(props) => props.color || colors.textColor2};
   font-weight: 400;
-  font-size: 12px;
+  font-size: ${(props) => props.fontSize || '12px'};
 `
 const ReadIconWrapper = styled(ReadIcon)`
+  width: ${(props) => props.width}!important;
+  height: ${(props) => props.height}!important;
   color: ${(props) => props.color || colors.primary};
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
+  width: ${(props) => props.width}!important;
+  height: ${(props) => props.height}!important;
   color: ${(props) => props.color || colors.textColor2};
 `
 const SentIconWrapper = styled(SentIcon)`
+  width: ${(props) => props.width}!important;
+  height: ${(props) => props.height}!important;
   color: ${(props) => props.color || colors.textColor2};
 `
 const PendingIconWrapper = styled(PendingIcon)`
+  width: ${(props) => props.width}!important;
+  height: ${(props) => props.height}!important;
   color: ${(props) => props.color || colors.textColor2};
 `
 
-export const messageStatusIcon = (
-  messageStatus: string,
-  messageStatusDisplayingType: string,
-  iconColor?: string,
+export const messageStatusIcon = ({
+  messageStatus,
+  messageStatusDisplayingType,
+  iconColor,
+  size,
+  readIconColor
+}: {
+  messageStatus: string
+  messageStatusDisplayingType: string
+  size?: string
+  iconColor?: string
   readIconColor?: string
-) => {
+}) => {
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper color={readIconColor} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor || colors.primary} />
       ) : (
-        <StatusText>• Seen</StatusText>
+        <StatusText fontSize={size} color={iconColor}>
+          • Seen
+        </StatusText>
       )
     case MESSAGE_DELIVERY_STATUS.DELIVERED:
       return messageStatusDisplayingType === 'ticks' ? (
-        <DeliveredIconWrapper color={iconColor} />
+        <DeliveredIconWrapper width={size} height={size} color={iconColor} />
       ) : (
-        <StatusText>• Not seen yet</StatusText>
+        <StatusText fontSize={size} color={iconColor}>
+          • Not seen yet
+        </StatusText>
       )
     case MESSAGE_DELIVERY_STATUS.SENT:
       return messageStatusDisplayingType === 'ticks' ? (
-        <SentIconWrapper color={iconColor} />
+        <SentIconWrapper color={iconColor} width={size} height={size} />
       ) : (
-        <StatusText>• Not seen yet</StatusText>
+        <StatusText fontSize={size} color={iconColor}>
+          • Not seen yet
+        </StatusText>
       )
     default:
       return <PendingIconWrapper color={iconColor} />
@@ -70,8 +91,20 @@ export const bytesToSize = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
-export const systemMessageUserName = (contact: IContact, userId: string) => {
-  return contact ? (contact.firstName ? contact.firstName.split(' ')[0] : contact.id) : userId || 'Deleted user'
+export const systemMessageUserName = (contact: IContact, userId: string, mentionedUsers?: IUser[]) => {
+  let user
+  if (!contact && mentionedUsers && mentionedUsers.length) {
+    user = mentionedUsers.find((menUser) => menUser.id === userId)
+  }
+  return contact
+    ? contact.firstName
+      ? contact.firstName.split(' ')[0]
+      : contact.id
+    : userId
+      ? user
+        ? `~${user.firstName.split(' ')[0]}`
+        : userId
+      : 'Deleted user'
 }
 
 const filesPromisesOnDownload: { [key: string]: any } = {}

@@ -39,15 +39,12 @@ import {
 } from '../../store/message/actions'
 import ConfirmPopup from '../../common/popups/delete'
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
-import useOnScreen from '../../hooks/useOnScrean'
 import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { cancelUpload, getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
-  deletePendingAttachment,
+  deletePendingMessage,
   getPendingAttachment,
-  removeMessageFromAllMessages,
-  removeMessageFromMap,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from '../../helpers/messagesHalper'
@@ -55,7 +52,7 @@ import {
 import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useOnScreen } from '../../hooks'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
@@ -176,6 +173,14 @@ interface IMessageProps {
   reactionsDetailsPopupBorderRadius?: string
   reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
   reactionsContainerPadding?: string
+  messageStatusSize?: string
+  messageStatusColor?: string
+  messageReadStatusColor?: string
+  messageStateFontSize?: string
+  messageStateColor?: string
+  messageTimeFontSize?: string
+  messageTimeColor?: string
+  messageStatusAndTimeLineHeight?: string
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
   fileAttachmentsBoxBorder?: string
@@ -194,6 +199,8 @@ interface IMessageProps {
   tabIsActive?: boolean
   connectionStatus: string
   theme: string
+  messageTextFontSize?: string
+  messageTextLineHeight?: string
 }
 
 const Message = ({
@@ -273,6 +280,14 @@ const Message = ({
   starIconTooltipText,
   reportIconTooltipText,
   messageActionIconsColor,
+  messageStatusSize,
+  messageStatusColor,
+  messageReadStatusColor,
+  messageStateFontSize,
+  messageStateColor,
+  messageTimeFontSize,
+  messageTimeColor,
+  messageStatusAndTimeLineHeight,
   // inlineReactionIcon,
   fileAttachmentsIcon,
   reactionsDisplayCount = 5,
@@ -312,7 +327,9 @@ const Message = ({
   openedMessageMenuId,
   tabIsActive,
   connectionStatus,
-  theme
+  theme,
+  messageTextFontSize,
+  messageTextLineHeight
 }: IMessageProps) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -344,7 +361,8 @@ const Message = ({
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system'
+    prevMessage?.type === 'system' ||
+    unreadMessageId === prevMessage.id
   const lastMessageInInterval =
     !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
     nextMessage.type === 'system'
@@ -391,18 +409,18 @@ const Message = ({
     message.incoming && incomingMessageBackground === 'inherit'
       ? '0px'
       : !message.incoming && ownMessageBackground === 'inherit'
-      ? '0px'
-      : !message.incoming && ownMessageOnRightSide
-      ? prevMessageUserID !== messageUserID || firstMessageInInterval
-        ? '16px 16px 4px 16px'
-        : nextMessageUserID !== messageUserID || lastMessageInInterval
-        ? '16px 4px 16px 16px'
-        : '16px 4px 4px 16px'
-      : prevMessageUserID !== messageUserID || firstMessageInInterval
-      ? '16px 16px 16px 4px'
-      : nextMessageUserID !== messageUserID || lastMessageInInterval
-      ? '4px 16px 16px 16px'
-      : '4px 16px 16px 4px'
+        ? '0px'
+        : !message.incoming && ownMessageOnRightSide
+          ? prevMessageUserID !== messageUserID || firstMessageInInterval
+            ? '16px 16px 4px 16px'
+            : nextMessageUserID !== messageUserID || lastMessageInInterval
+              ? '16px 4px 16px 16px'
+              : '16px 4px 4px 16px'
+          : prevMessageUserID !== messageUserID || firstMessageInInterval
+            ? '16px 16px 16px 4px'
+            : nextMessageUserID !== messageUserID || lastMessageInInterval
+              ? '4px 16px 16px 16px'
+              : '4px 16px 16px 4px'
 
   const showMessageSenderName =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
@@ -564,17 +582,7 @@ const Message = ({
   }
 
   const handleDeletePendingMessage = () => {
-    if (message.attachments && message.attachments.length) {
-      const customUploader = getCustomUploader()
-      message.attachments.forEach((att: IAttachment) => {
-        if (customUploader) {
-          cancelUpload(att.tid!)
-          deletePendingAttachment(att.tid!)
-        }
-      })
-    }
-    removeMessageFromMap(channel.id, message.id || message.tid!)
-    removeMessageFromAllMessages(message.id || message.tid!)
+    deletePendingMessage(channel.id, message)
     dispatch(deleteMessageFromListAC(message.id || message.tid!))
   }
 
@@ -755,6 +763,7 @@ const Message = ({
   return (
     <MessageItem
       key={message.id || message.tid}
+      className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
       hoverBackground={
@@ -768,17 +777,16 @@ const Message = ({
         prevMessage?.type === 'system'
           ? '0'
           : prevMessage && unreadMessageId === prevMessage.id
-          ? '16px'
-          : prevMessageUserID !== messageUserID || firstMessageInInterval
-          ? differentUserMessageSpacing || '16px'
-          : sameUserMessageSpacing || '8px'
+            ? '16px'
+            : prevMessageUserID !== messageUserID || firstMessageInInterval
+              ? differentUserMessageSpacing || '16px'
+              : sameUserMessageSpacing || '8px'
       }
       bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}
       selectMessagesIsActive={selectionIsActive}
       onClick={(e) => selectionIsActive && handleSelectMessage(e)}
       // id={message.id}
-      className='MessageItem'
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
         <SelectMessageWrapper
@@ -882,11 +890,11 @@ const Message = ({
                   420
                 : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
-                message.attachments[0].type === attachmentTypes.voice
-                ? 254
-                : message.attachments[0].type === attachmentTypes.file
-                ? fileAttachmentsBoxWidth
-                : undefined
+                  message.attachments[0].type === attachmentTypes.voice
+                  ? 254
+                  : message.attachments[0].type === attachmentTypes.file
+                    ? fileAttachmentsBoxWidth
+                    : undefined
               : undefined
           }
           noBody={!message.body && !withAttachments}
@@ -1074,16 +1082,17 @@ const Message = ({
                     (message.parentMessage.attachments[0].type === attachmentTypes.image
                       ? 'Photo'
                       : message.parentMessage.attachments[0].type === attachmentTypes.video
-                      ? 'Video'
-                      : message.parentMessage.attachments[0].type === attachmentTypes.voice
-                      ? ' Voice'
-                      : 'File')
+                        ? 'Video'
+                        : message.parentMessage.attachments[0].type === attachmentTypes.voice
+                          ? ' Voice'
+                          : 'File')
                   )}
                 </ReplyMessageText>
               </ReplyMessageBody>
             </ReplyMessageContainer>
           )}
-          {message.forwardingDetails &&
+          {message.state !== MESSAGE_STATUS.DELETE &&
+            message.forwardingDetails &&
             message.forwardingDetails.user &&
             message.user &&
             message.forwardingDetails.user.id !== message.user.id && (
@@ -1122,6 +1131,8 @@ const Message = ({
             theme={theme}
             draggable={false}
             color={colors.textColor1}
+            fontSize={messageTextFontSize}
+            lineHeight={messageTextLineHeight}
             showMessageSenderName={showMessageSenderName}
             withPaddings={
               message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
@@ -1146,20 +1157,35 @@ const Message = ({
               ''
             )}
             {messageStatusAndTimePosition === 'onMessage' &&
-            (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) &&
+            !notLinkAttachment &&
             (messageStatusVisible || messageTimeVisible) ? (
               <MessageStatusAndTime
+                lineHeight={messageStatusAndTimeLineHeight}
                 showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                 leftMargin
                 isSelfMessage={!message.incoming}
               >
-                {message.state === MESSAGE_STATUS.EDIT ? <MessageStatusUpdated>edited</MessageStatusUpdated> : ''}
+                {message.state === MESSAGE_STATUS.EDIT ? (
+                  <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+                    edited
+                  </MessageStatusUpdated>
+                ) : (
+                  ''
+                )}
                 {messageTimeVisible && (
-                  <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
+                  <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+                    message.createdAt
+                  ).format('HH:mm')}`}</HiddenMessageTime>
                 )}
                 {messageStatusVisible && (
-                  <MessageStatus iconColor={colors.primary}>
-                    {messageStatusIcon(message.deliveryStatus, messageStatusDisplayingType)}
+                  <MessageStatus height={messageStatusAndTimeLineHeight}>
+                    {messageStatusIcon({
+                      messageStatus: message.deliveryStatus,
+                      messageStatusDisplayingType,
+                      size: messageStatusSize,
+                      iconColor: messageStatusColor,
+                      readIconColor: messageReadStatusColor
+                    })}
                   </MessageStatus>
                 )}
               </MessageStatusAndTime>
@@ -1170,6 +1196,7 @@ const Message = ({
             messageStatusAndTimePosition === 'onMessage' &&
             (messageStatusVisible || messageTimeVisible) && (
               <MessageStatusAndTime
+                lineHeight={messageStatusAndTimeLineHeight}
                 showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
                 withAttachment
                 leftMargin
@@ -1178,10 +1205,11 @@ const Message = ({
               >
                 {message.state === MESSAGE_STATUS.EDIT ? (
                   <MessageStatusUpdated
+                    fontSize={messageStateFontSize}
                     color={
                       message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                         ? colors.white
-                        : ''
+                        : messageStateColor
                     }
                   >
                     edited
@@ -1190,16 +1218,21 @@ const Message = ({
                   ''
                 )}
                 {messageTimeVisible && (
-                  <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
+                  <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+                    message.createdAt
+                  ).format('HH:mm')}`}</HiddenMessageTime>
                 )}
                 {messageStatusVisible &&
-                  messageStatusIcon(
-                    message.deliveryStatus,
+                  messageStatusIcon({
+                    messageStatus: message.deliveryStatus,
                     messageStatusDisplayingType,
-                    message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                      ? colors.white
-                      : ''
-                  )}
+                    size: messageStatusSize,
+                    iconColor:
+                      message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
+                        ? colors.white
+                        : '',
+                    readIconColor: messageReadStatusColor
+                  })}
               </MessageStatusAndTime>
             )}
           {
@@ -1285,19 +1318,34 @@ const Message = ({
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
           // (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) ? (
           <MessageStatusAndTime
+            lineHeight={messageStatusAndTimeLineHeight}
             showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
             isSelfMessage={!message.incoming}
             marginBottom={sameUserMessageSpacing}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             bottomOfMessage
           >
-            {message.state === MESSAGE_STATUS.EDIT ? <MessageStatusUpdated>edited</MessageStatusUpdated> : ''}
+            {message.state === MESSAGE_STATUS.EDIT ? (
+              <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+                edited
+              </MessageStatusUpdated>
+            ) : (
+              ''
+            )}
             {messageTimeVisible && (
-              <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
+              <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+                message.createdAt
+              ).format('HH:mm')}`}</HiddenMessageTime>
             )}
             {messageStatusVisible && (
-              <MessageStatus iconColor={colors.primary}>
-                {messageStatusIcon(message.deliveryStatus, messageStatusDisplayingType)}
+              <MessageStatus height={messageStatusAndTimeLineHeight}>
+                {messageStatusIcon({
+                  messageStatus: message.deliveryStatus,
+                  messageStatusDisplayingType,
+                  size: messageStatusSize,
+                  iconColor: messageStatusColor,
+                  readIconColor: messageReadStatusColor
+                })}
               </MessageStatus>
             )}
           </MessageStatusAndTime>
@@ -1441,8 +1489,15 @@ export default React.memo(Message, (prevProps, nextProps) => {
 const MessageReactionKey = styled.span`
   display: inline-flex;
   align-items: center;
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
 `
 
 const ReactionItemCount = styled.span<{ color?: string }>`
@@ -1635,10 +1690,10 @@ const MessageHeaderCont = styled.div<{
     (props.isForwarded
       ? '8px 0 2px 12px'
       : !props.isReplied && !props.messageBody
-      ? props.withMediaAttachment
-        ? '8px 0 8px 12px'
-        : '8px 0 0 12px'
-      : '8px 0 0 12px')};
+        ? props.withMediaAttachment
+          ? '8px 0 8px 12px'
+          : '8px 0 0 12px'
+        : '8px 0 0 12px')};
 `
 
 /* const MessageTime = styled.span`
@@ -1667,8 +1722,8 @@ const ReplyMessageContainer = styled.div<{
         ? '6px 12px 0'
         : '6px 12px 8px'
       : props.withSenderName
-      ? '6px 0 8px'
-      : '0 0 8px'};
+        ? '6px 0 8px'
+        : '0 0 8px'};
   background-color: ${(props) => props.backgroundColor || colors.primaryLight};
   border-radius: 0 4px 4px 0;
   margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
@@ -1704,13 +1759,13 @@ const ForwardedTitle = styled.h3<{
       ? !props.withAttachments || props.showSenderName
         ? '4px'
         : props.withAttachments && !props.withPadding
-        ? '4px'
-        : '0'
+          ? '4px'
+          : '0'
       : props.withAttachments
-      ? props.withMediaAttachment
-        ? '8px'
-        : '2px'
-      : '4px'};
+        ? props.withMediaAttachment
+          ? '8px'
+          : '2px'
+        : '4px'};
   & > svg {
     margin-right: 4px;
     width: 16px;
@@ -1756,23 +1811,26 @@ const MessageAttachments = styled.div<{ directionLeft?: boolean; prefixBackgroun
   }
 ` */
 
-const MessageStatus = styled.span<any>`
-  display: inline-block;
+const MessageStatus = styled.span<{ height?: string }>`
+  display: inline-flex;
+  align-items: center;
   margin-left: 4px;
   text-align: right;
-  transform: translate(0px, -1px);
-  height: 14px;
-  //visibility: ${({ lastMessage }) => (lastMessage ? 'visible' : 'hidden')};
+  height: ${(props) => props.height || '14px'};
+  & > svg {
+    height: 16px;
+    width: 16px;
+  }
 `
 
-const HiddenMessageTime = styled.span<{ hide?: boolean }>`
+const HiddenMessageTime = styled.span<{ hide?: boolean; color?: string; fontSize?: string }>`
   display: ${(props) => props.hide && 'none'};
   font-weight: 400;
-  font-size: 12px;
-  color: ${colors.textColor2};
+  font-size: ${(props) => props.fontSize || '12px'};
+  color: ${(props) => props.color || colors.textColor2};
 `
 
-export const MessageStatusAndTime = styled.div<{
+export const MessageStatusAndTime = styled.span<{
   withAttachment?: boolean
   fileAttachment?: boolean
   hide?: boolean
@@ -1782,6 +1840,7 @@ export const MessageStatusAndTime = styled.div<{
   rtlDirection?: boolean
   bottomOfMessage?: boolean
   showOnlyOnHover?: boolean
+  lineHeight?: string
 }>`
   visibility: ${(props) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
@@ -1790,7 +1849,7 @@ export const MessageStatusAndTime = styled.div<{
   padding: ${(props) => props.withAttachment && '4px 6px'};
   background-color: ${(props) => props.withAttachment && !props.fileAttachment && 'rgba(1, 1, 1, 0.3)'};
   float: right;
-  line-height: 14px;
+  line-height: ${(props) => props.lineHeight || '14px'};
   margin-right: ${(props) => props.rtlDirection && 'auto'};
   margin-left: ${(props) => props.leftMargin && '12px'};
   margin-bottom: ${(props) => props.marginBottom && '8px'};
@@ -1801,8 +1860,8 @@ export const MessageStatusAndTime = styled.div<{
   justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
   & > svg {
     margin-left: 4px;
-    transform: translate(0px, -1px);
     height: 14px;
+    width: 16px;
   }
 
   & > ${HiddenMessageTime} {
@@ -1819,16 +1878,17 @@ export const MessageStatusAndTime = styled.div<{
   `}
 `
 
-const MessageStatusUpdated = styled.span<{ color?: string }>`
+const MessageStatusUpdated = styled.span<{ color?: string; fontSize?: string }>`
   margin-right: 4px;
   font-style: italic;
   font-weight: 400;
-  font-size: 12px;
+  font-size: ${(props) => props.fontSize || '12px'};
   color: ${(props) => props.color || colors.textColor2};
 `
 
-const MessageStatusDeleted = styled.span<{ withAttachment?: boolean }>`
-  color: ${colors.textColor2};
+const MessageStatusDeleted = styled.span<{ color?: string; fontSize?: string; withAttachment?: boolean }>`
+  color: ${(props) => props.color || colors.textColor2};
+  font-size: ${(props) => props.fontSize};
   font-style: italic;
 `
 
@@ -1865,12 +1925,12 @@ const MessageBody = styled.div<{
         ? '1px 0 0 '
         : '0'
       : props.isSelfMessage
-      ? props.ownMessageBackground === 'inherit'
-        ? '0'
-        : '8px 12px'
-      : props.incomingMessageBackground === 'inherit'
-      ? ' 0'
-      : '8px 12px'};
+        ? props.ownMessageBackground === 'inherit'
+          ? '0'
+          : '8px 12px'
+        : props.incomingMessageBackground === 'inherit'
+          ? ' 0'
+          : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
   //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;

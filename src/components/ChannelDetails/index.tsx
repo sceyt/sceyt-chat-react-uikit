@@ -31,10 +31,22 @@ import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper
 import { themeSelector } from '../../store/theme/selector'
 
 const Details = ({
+  detailsTitleText,
+  editDetailsTitleText,
+  detailsTitleFontSize,
   size,
+  channelNameFontSize,
+  channelNameLineHeight,
+  channelAvatarSize,
+  channelAvatarTextSize,
+  channelMembersFontSize,
+  channelMembersLineHeight,
   showAboutChannel,
+  showAboutChannelTitle,
   avatarAndNameDirection,
   channelEditIcon,
+  channelEditIconTopPosition,
+  channelEditIconRightPosition,
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
   editChannelCancelButtonBackgroundColor,
@@ -104,6 +116,10 @@ const Details = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
+  fileNameFontSize,
+  fileNameLineHeight,
+  fileSizeFontSize,
+  fileSizeLineHeight,
   showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
@@ -115,7 +131,19 @@ const Details = ({
   showChangeMemberRole,
   showKickMember,
   showKickAndBlockMember,
-  showMakeMemberAdmin
+  showMakeMemberAdmin,
+  memberHoverBackgroundColor,
+  addMemberFontSize,
+  memberNameFontSize,
+  memberAvatarSize,
+  memberPresenceFontSize,
+  actionItemsFontSize,
+  addMemberIcon,
+  tabItemsFontSize,
+  tabItemsLineHeight,
+  tabItemsMinWidth,
+  backgroundColor,
+  bordersColor
 }: IDetailsProps) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -146,12 +174,12 @@ const Details = ({
         ? `${memberDisplayText[channel.type]}s`
         : memberDisplayText[channel.type]
       : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-      ? channel.memberCount > 1
-        ? 'subscribers'
-        : 'subscriber'
-      : channel.memberCount > 1
-      ? 'members'
-      : 'member'
+        ? channel.memberCount > 1
+          ? 'subscribers'
+          : 'subscriber'
+        : channel.memberCount > 1
+          ? 'members'
+          : 'member'
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
@@ -194,18 +222,26 @@ const Details = ({
     }
   }, [])
   return (
-    <Container mounted={mounted} size={size} theme={theme} borderColor={colors.backgroundColor}>
-      <ChannelDetailsHeader borderColor={colors.backgroundColor}>
+    <Container
+      backgroundColor={backgroundColor}
+      mounted={mounted}
+      size={size}
+      theme={theme}
+      borderColor={bordersColor || colors.backgroundColor}
+    >
+      <ChannelDetailsHeader borderColor={bordersColor || colors.backgroundColor}>
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader margin='0 0 0 12px' color={colors.textColor1}>
-              Edit details
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={colors.textColor1}>
+              {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader color={colors.textColor1}>Details</SectionHeader>{' '}
+            <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
+              {detailsTitleText || 'Details'}
+            </SectionHeader>{' '}
             <CloseIcon color={colors.textColor1} onClick={handleDetailsClose} />
           </React.Fragment>
         )}
@@ -230,19 +266,21 @@ const Details = ({
         height={channelDetailsHeight}
         ref={detailsRef}
       >
-        <DetailsHeader borderColor={colors.backgroundColor}>
+        <DetailsHeader borderColor={bordersColor || colors.backgroundColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
               image={channel.avatarUrl || (directChannelUser && directChannelUser.avatarUrl)}
               name={channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id))}
-              size={72}
-              textSize={26}
+              size={channelAvatarSize || 72}
+              textSize={channelAvatarTextSize || 26}
               setDefaultAvatar={isDirectChannel}
             />
             <ChannelInfo direction={avatarAndNameDirection}>
               <ChannelName
                 isDirect={isDirectChannel}
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+                fontSize={channelNameFontSize}
+                lineHeight={channelNameLineHeight}
               >
                 {channel.subject ||
                   (isDirectChannel && directChannelUser
@@ -250,7 +288,7 @@ const Details = ({
                     : '')}
               </ChannelName>
               {isDirectChannel ? (
-                <SubTitle>
+                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                     ? ''
                     : directChannelUser &&
@@ -261,19 +299,25 @@ const Details = ({
                           userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
                 </SubTitle>
               ) : (
-                <SubTitle>
+                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {channel.memberCount} {displayMemberText}
                 </SubTitle>
               )}
               {!isDirectChannel && checkActionPermission('editChannel') && (
-                <EditButton onClick={() => setEditMode(true)}>{channelEditIcon || <EditIcon />}</EditButton>
+                <EditButton
+                  topPosition={channelEditIconTopPosition}
+                  rightPosition={channelEditIconRightPosition}
+                  onClick={() => setEditMode(true)}
+                >
+                  {channelEditIcon || <EditIcon />}
+                </EditButton>
               )}
             </ChannelInfo>
           </ChannelAvatarAndName>
 
           {showAboutChannel && channel.metadata && channel.metadata.d && (
             <AboutChannel>
-              <AboutChannelTitle>About</AboutChannelTitle>
+              {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
               <AboutChannelText color={colors.textColor1}>
                 {channel.metadata && channel.metadata.d ? channel.metadata.d : ''}
               </AboutChannelText>
@@ -341,6 +385,8 @@ const Details = ({
             channel={channel}
             toggleable={false}
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
+            actionItemsFontSize={actionItemsFontSize}
+            borderColor={bordersColor}
           />
         )}
         {/* <div ref={tabsRef}> */}
@@ -368,11 +414,26 @@ const Details = ({
             filePreviewSizeColor={filePreviewSizeColor}
             filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
             filePreviewDownloadIcon={filePreviewDownloadIcon}
+            fileNameFontSize={fileNameFontSize}
+            fileNameLineHeight={fileNameLineHeight}
+            fileSizeFontSize={fileSizeFontSize}
+            fileSizeLineHeight={fileSizeLineHeight}
             checkActionPermission={checkActionPermission}
             showChangeMemberRole={showChangeMemberRole}
             showKickMember={showKickMember}
             showKickAndBlockMember={showKickAndBlockMember}
             showMakeMemberAdmin={showMakeMemberAdmin}
+            memberHoverBackgroundColor={memberHoverBackgroundColor}
+            addMemberFontSize={addMemberFontSize}
+            addMemberIcon={addMemberIcon}
+            memberNameFontSize={memberNameFontSize}
+            memberAvatarSize={memberAvatarSize}
+            memberPresenceFontSize={memberPresenceFontSize}
+            backgroundColor={backgroundColor}
+            borderColor={bordersColor}
+            tabItemsFontSize={tabItemsFontSize}
+            tabItemsLineHeight={tabItemsLineHeight}
+            tabItemsMinWidth={tabItemsMinWidth}
           />
         )}
         {/* </div> */}
@@ -388,6 +449,7 @@ const Container = styled.div<{
   theme?: string
   borderColor?: string
   size?: 'small' | 'medium' | 'large'
+  backgroundColor?: string
 }>`
   flex: 0 0 auto;
   width: 0;
@@ -395,6 +457,7 @@ const Container = styled.div<{
   //transition: all 0.1s;
   ${(props) =>
     props.mounted && ` width: ${props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px'};`}
+  background-color: ${(props) => props.backgroundColor};
 }
 `
 
@@ -429,11 +492,11 @@ const AboutChannelTitle = styled.h4`
   color: ${colors.textColor3};
 `
 
-const AboutChannelText = styled.h3`
-  font-size: 16px;
+const AboutChannelText = styled.h3<{ color: string }>`
+  font-size: 15px;
   margin: 0;
   font-weight: 400;
-  line-height: 22px;
+  line-height: 20px;
   color: ${(props) => props.color};
 `
 
@@ -479,10 +542,10 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
-const EditButton = styled.span`
+const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>`
   position: absolute;
-  right: -28px;
-  top: 8px;
+  right: ${(props) => props.rightPosition || '-28px'};
+  top: ${(props) => props.topPosition || '8px'};
   margin-left: 8px;
   cursor: pointer;
   color: #b2b6be;

@@ -52,7 +52,8 @@ import {
   SET_PLAYING_AUDIO_ID,
   ADD_SELECTED_MESSAGE,
   REMOVE_SELECTED_MESSAGE,
-  CLEAR_SELECTED_MESSAGES
+  CLEAR_SELECTED_MESSAGES,
+  REMOVE_ATTACHMENT
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -377,6 +378,13 @@ export function setAttachmentsAC(attachments: IAttachment[]) {
   return {
     type: SET_ATTACHMENTS,
     payload: { attachments }
+  }
+}
+
+export function removeAttachmentAC(attachmentId: string) {
+  return {
+    type: REMOVE_ATTACHMENT,
+    payload: { attachmentId }
   }
 }
 

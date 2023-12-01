@@ -37,7 +37,8 @@ import {
   SET_PLAYING_AUDIO_ID,
   ADD_SELECTED_MESSAGE,
   REMOVE_SELECTED_MESSAGE,
-  CLEAR_SELECTED_MESSAGES
+  CLEAR_SELECTED_MESSAGES,
+  REMOVE_ATTACHMENT
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -347,6 +348,12 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     case SET_ATTACHMENTS: {
       const { attachments } = payload
       newState.activeTabAttachments = attachments
+      return newState
+    }
+    case REMOVE_ATTACHMENT: {
+      const { attachmentId } = payload
+      newState.activeTabAttachments = [...newState.activeTabAttachments].filter((item) => item.id !== attachmentId)
+      newState.attachmentsForPopup = [...newState.attachmentsForPopup].filter((item) => item.id !== attachmentId)
       return newState
     }
 

@@ -57,25 +57,18 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [searchValue, setSearchValue] = useState('')
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
-  const [channelIds, setChannelIds] = useState<string[]>([])
   const selectedChannelsContRef = useRef<any>()
 
   const handleForwardMessage = () => {
-    handleForward(channelIds)
+    handleForward(selectedChannels.map((channel) => channel.id))
     togglePopup()
   }
 
   const handleChannelListScroll = (event: any) => {
-    // setCloseMenu(true)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext) {
         dispatch(loadMoreChannelsForForward(15))
       }
-    }
-  }
-  const handleChoseChannel = (e: any, channelId: string) => {
-    if (e.target.checked) {
-      setChannelIds((prevState) => [...prevState, channelId])
     }
   }
 
@@ -179,7 +172,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       const directChannelUser =
                         isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
                       return (
-                        <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                        <ChannelItem key={channel.id}>
                           <Avatar
                             name={
                               directChannelUser
@@ -233,7 +226,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     {searchedChannels.channels.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       return (
-                        <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                        <ChannelItem key={channel.id}>
                           <Avatar
                             name={channel.subject || ''}
                             image={channel.avatarUrl}
@@ -275,7 +268,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
                 const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                 return (
-                  <ChannelItem key={channel.id} onClick={(e: any) => handleChoseChannel(e, channel.id)}>
+                  <ChannelItem key={channel.id}>
                     <Avatar
                       name={
                         channel.subject ||

@@ -1,19 +1,34 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { colors } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
 
-export const Container = styled.div<any>`
+export const Container = styled.div<{
+  chatBackgroundColor?: string
+  noMargin?: boolean
+  marginTop?: string
+  marginBottom?: string
+  dividerVisibility?: boolean
+  width?: string
+  dateDividerBorder?: string
+  dateDividerFontSize?: string
+  dateDividerTextColor?: string
+  dateDividerBackgroundColor?: string
+  dateDividerBorderRadius?: string
+  newMessagesSeparatorLeftRightSpaceWidth?: string
+  height?: number
+}>`
   text-align: center;
   margin: ${(props) => (props.noMargin ? '0 auto' : `${props.marginTop || '16px'} auto 0`)};
   margin-bottom: ${(props) => props.marginBottom || '0'};
   display: ${(props) => (props.dividerVisibility ? 'flex' : 'none')};
   align-items: center;
   width: ${(props) => props.width || '100%'};
-  height: 25px;
+  height: ${(props) => (props.height ? `${props.height}px` : '25px')};
   z-index: 5;
   top: 0;
   background: transparent;
+
   div {
     position: relative;
     border-bottom: ${(props) => props.dateDividerBorder};
@@ -23,7 +38,7 @@ export const Container = styled.div<any>`
     background: transparent;
     span {
       position: absolute;
-      top: -12px;
+      top: -18px;
       font-style: normal;
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};
@@ -45,7 +60,8 @@ export const Container = styled.div<any>`
         height: 100%;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
-        background-color: ${(props) => (props.theme === THEME.DARK ? colors.dark : colors.white)};
+        background-color: ${(props) =>
+          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
 
       &::after {
@@ -59,7 +75,8 @@ export const Container = styled.div<any>`
         height: 100%;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
-        background-color: ${(props) => (props.theme === THEME.DARK ? colors.dark : colors.white)};
+        background-color: ${(props) =>
+          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
     }
   }
@@ -75,7 +92,6 @@ interface IProps {
   dateDividerBorder?: string
   dateDividerBackgroundColor?: string
   dateDividerBorderRadius?: string
-  systemMessage?: boolean
   newMessagesSeparatorTextColor?: string
   newMessagesSeparatorFontSize?: string
   newMessagesSeparatorWidth?: string
@@ -86,6 +102,7 @@ interface IProps {
   noMargin?: boolean
   marginBottom?: string
   marginTop?: string
+  chatBackgroundColor?: string
 }
 
 export default function MessageDivider({
@@ -97,7 +114,6 @@ export default function MessageDivider({
   dateDividerBorder,
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
-  systemMessage,
   newMessagesSeparatorTextColor,
   newMessagesSeparatorFontSize,
   newMessagesSeparatorWidth,
@@ -108,13 +124,21 @@ export default function MessageDivider({
   noMargin,
   marginTop,
   theme,
-  marginBottom
+  marginBottom,
+  chatBackgroundColor
 }: IProps) {
+  const textRef = React.useRef<HTMLSpanElement>(null)
+  const [textHeight, setTextHeight] = React.useState<number>(0)
+
+  useEffect(() => {
+    if (textRef.current) {
+      setTextHeight(textRef.current.offsetHeight)
+    }
+  }, [textRef])
   return (
     <Container
       className={unread ? 'unread' : 'divider'}
       theme={theme}
-      systemMessage={systemMessage}
       marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}
@@ -123,14 +147,16 @@ export default function MessageDivider({
       dateDividerBackgroundColor={
         dateDividerBackgroundColor || newMessagesSeparatorBackground || colors.backgroundColor
       }
+      chatBackgroundColor={chatBackgroundColor}
       dateDividerBorderRadius={dateDividerBorderRadius || newMessagesSeparatorBorderRadius}
       width={newMessagesSeparatorWidth}
       newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorLeftRightSpaceWidth}
       noMargin={noMargin}
       marginBottom={marginBottom}
+      height={textHeight}
     >
       <div>
-        <span>{dividerText}</span>
+        <span ref={textRef}>{dividerText}</span>
       </div>
     </Container>
   )

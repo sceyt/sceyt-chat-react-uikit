@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { USER_PRESENCE_STATUS } from '../../../../Helpers/constants'
+import { USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { colors } from '../../../../UIHelper/constants'
 import { AvatarWrapper, UserStatus } from '../../../../components/Channel'
 import { Avatar } from '../../../../components'

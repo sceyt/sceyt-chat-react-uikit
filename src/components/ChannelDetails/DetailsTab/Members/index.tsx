@@ -42,6 +42,12 @@ interface IProps {
   showMakeMemberAdmin?: boolean
   showKickMember?: boolean
   showKickAndBlockMember?: boolean
+  hoverBackgroundColor?: string
+  addMemberFontSize?: string
+  addMemberIcon?: JSX.Element
+  memberNameFontSize?: string
+  memberAvatarSize?: number
+  memberPresenceFontSize?: string
 }
 
 const Members = ({
@@ -51,7 +57,13 @@ const Members = ({
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
   showKickMember = true,
-  showKickAndBlockMember = true
+  showKickAndBlockMember = true,
+  hoverBackgroundColor,
+  addMemberFontSize,
+  addMemberIcon,
+  memberNameFontSize,
+  memberAvatarSize,
+  memberPresenceFontSize
 }: IProps) => {
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -73,8 +85,8 @@ const Members = ({
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
       : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-      ? 'subscribers'
-      : 'members'
+        ? 'subscribers'
+        : 'members'
   const noMemberEditPermissions =
     !checkActionPermission('changeMemberRole') &&
     !checkActionPermission('kickAndBlockMember') &&
@@ -171,8 +183,8 @@ const Members = ({
         channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
           : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-          ? 'subscriber'
-          : 'participant'
+            ? 'subscriber'
+            : 'participant'
       const updateMember: IMember = {
         ...selectedMember,
         role
@@ -220,10 +232,13 @@ const Members = ({
               key={1}
               onClick={handleAddMemberPopup}
               color={colors.textColor1}
-              hoverBackground={theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight}
+              hoverBackground={
+                hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
+              }
               addMemberIconColor={colors.primary}
+              fontSize={addMemberFontSize}
             >
-              <AddMemberIcon />
+              {addMemberIcon || <AddMemberIcon />}
               {`Add ${displayMemberText}`}
             </MemberItem>
           )}
@@ -233,13 +248,14 @@ const Members = ({
               <MemberItem
                 key={member.id + index}
                 color={colors.textColor1}
-                hoverBackground={colors.hoverBackgroundColor}
+                hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
                 onClick={() => handleCreateChat(member)}
+                fontSize={memberNameFontSize}
               >
                 <Avatar
                   name={member.firstName || member.id}
                   image={member.avatarUrl}
-                  size={40}
+                  size={memberAvatarSize || 40}
                   textSize={14}
                   setDefaultAvatar
                 />
@@ -263,7 +279,7 @@ const Members = ({
                     )}
                   </MemberNameWrapper>
 
-                  <SubTitle margin='1px 0 0'>
+                  <SubTitle margin='1px 0 0' fontSize={memberPresenceFontSize}>
                     {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
@@ -495,10 +511,11 @@ const MemberItem = styled.li<{
   hoverBackground?: string
   addMemberIconColor?: string
   addMemberBackground?: string
+  fontSize?: string
 }>`
   display: flex;
   align-items: center;
-  font-size: 15px;
+  font-size: ${(props) => props.fontSize || '15px'};
   font-weight: 500;
   padding: 6px 16px;
   transition: all 0.2s;

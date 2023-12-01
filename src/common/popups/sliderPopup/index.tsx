@@ -5,39 +5,53 @@ import moment from 'moment'
 import Carousel from 'react-elastic-carousel'
 import { colors } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
-import { ReactComponent as CloseIcon } from '../../../assets/svg/close.svg'
+import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
 import { ReactComponent as LeftArrow } from '../../../assets/svg/sliderButtonLeft.svg'
+import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
+import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteChannel.svg'
 import { bytesToSize, downloadFile } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
-import { IAttachment, IMedia } from '../../../types'
+import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { attachmentsForPopupSelector } from '../../../store/message/selector'
-import { getAttachmentsAC } from '../../../store/message/actions'
-import { channelDetailsTabs } from '../../../helpers/constants'
+import { deleteMessageAC, forwardMessageAC, getAttachmentsAC, removeAttachmentAC } from '../../../store/message/actions'
+import { CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { queryDirection } from '../../../store/message/constants'
 import { useDidUpdate } from '../../../hooks'
 import { Avatar } from '../../../components'
-import { contactsMapSelector } from '../../../store/user/selector'
+import { connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { UploadingIcon } from '../../../UIHelper'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../../helpers/attachmentsCache'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
+import ForwardMessagePopup from '../forwardMessage'
+import { deletePendingMessage, getAllMessages } from '../../../helpers/messagesHalper'
+import { getChannelFromMap } from '../../../helpers/channelHalper'
+import ConfirmPopup from '../delete'
 
 interface IProps {
-  channelId: string
+  channel: IChannel
   // eslint-disable-next-line no-unused-vars
   setIsSliderOpen: (state: any) => void
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
+  allowEditDeleteIncomingMessage?: boolean
 }
 
-const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile }: IProps) => {
+const SliderPopup = ({
+  channel,
+  setIsSliderOpen,
+  mediaFiles,
+  currentMediaFile,
+  allowEditDeleteIncomingMessage
+}: IProps) => {
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
+  const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [currentFile, setCurrentFile] = useState<any>({ ...currentMediaFile })
@@ -49,6 +63,9 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
   const [visibleSlide, setVisibleSlide] = useState(false)
+  const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
+  const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
+
   // const customUploader = getCustomUploader()
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
@@ -108,6 +125,56 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
     }
   }
 
+  const handleForwardMessage = async (channelIds: string[]) => {
+    let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+    if (!message) {
+      let channelInstance = getChannelFromMap(channel.id)
+      if (!channelInstance) {
+        channelInstance = await ChatClient.getChannelById(channel.id)
+      }
+      const messages = await channelInstance.getMessagesById([currentFile.messageId])
+      message = messages[0]
+    }
+    if (channelIds && channelIds.length) {
+      channelIds.forEach((channelId) => {
+        dispatch(forwardMessageAC(message, channelId, connectionStatus))
+      })
+    }
+    setIsSliderOpen(false)
+  }
+
+  const handleToggleForwardMessagePopup = () => {
+    setForwardPopupOpen(!forwardPopupOpen)
+  }
+
+  const handleToggleDeleteMessagePopup = async () => {
+    if (!messageToDelete) {
+      let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+      if (!message) {
+        let channelInstance = getChannelFromMap(channel.id)
+        if (!channelInstance) {
+          channelInstance = await ChatClient.getChannelById(channel.id)
+        }
+        const messages = await channelInstance.getMessagesById([currentFile.messageId])
+        message = messages[0]
+      }
+      if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+        deletePendingMessage(channel.id, message)
+      } else {
+        setMessageToDelete(message)
+      }
+    } else {
+      setMessageToDelete(undefined)
+    }
+  }
+
+  const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
+    dispatch(deleteMessageAC(channel.id, currentFile.messageId, deleteOption))
+    dispatch(removeAttachmentAC(currentFile.id))
+
+    setMessageToDelete(undefined)
+    setIsSliderOpen(false)
+  }
   useDidUpdate(() => {
     if (playedVideo) {
       const videoElem: any = document.getElementById(playedVideo)
@@ -241,7 +308,7 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
         setAttachmentsList(mediaFiles)
       } else {
         dispatch(
-          getAttachmentsAC(channelId, channelDetailsTabs.media, 35, queryDirection.NEAR, currentMediaFile.id, true)
+          getAttachmentsAC(channel.id, channelDetailsTabs.media, 35, queryDirection.NEAR, currentMediaFile.id, true)
         )
       }
     }
@@ -272,41 +339,49 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
             </FileDateAndSize>
           </Info>
         </FileInfo>
-        <ActionDownload onClick={() => handleDownloadFile(currentFile)}>
-          {downloadingFilesMap[currentFile.id] ? (
-            // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
-            <ProgressWrapper>
-              <CircularProgressbar
-                minValue={0}
-                maxValue={100}
-                value={downloadingFilesMap[currentFile.id].uploadPercent || 0}
-                backgroundPadding={6}
-                background={true}
-                text=''
-                styles={{
-                  background: {
-                    fill: 'transparent'
-                  },
-                  path: {
-                    stroke: colors.white,
-                    strokeLinecap: 'butt',
-                    strokeWidth: '6px',
-                    transition: 'stroke-dashoffset 0.5s ease 0s',
-                    transform: 'rotate(0turn)',
-                    transformOrigin: 'center center'
-                  }
-                }}
-              />
-            </ProgressWrapper>
-          ) : (
-            <DownloadIcon />
-          )}
-        </ActionDownload>
-        <Actions>
-          <ActionItem onClick={handleClosePopup}>
+        <ActionsWrapper>
+          <IconWrapper onClick={() => handleDownloadFile(currentFile)}>
+            {downloadingFilesMap[currentFile.id] ? (
+              // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
+              <ProgressWrapper>
+                <CircularProgressbar
+                  minValue={0}
+                  maxValue={100}
+                  value={downloadingFilesMap[currentFile.id].uploadPercent || 0}
+                  backgroundPadding={6}
+                  background={true}
+                  text=''
+                  styles={{
+                    background: {
+                      fill: 'transparent'
+                    },
+                    path: {
+                      stroke: colors.white,
+                      strokeLinecap: 'butt',
+                      strokeWidth: '6px',
+                      transition: 'stroke-dashoffset 0.5s ease 0s',
+                      transform: 'rotate(0turn)',
+                      transformOrigin: 'center center'
+                    }
+                  }}
+                />
+              </ProgressWrapper>
+            ) : (
+              <DownloadIcon />
+            )}
+          </IconWrapper>
+          <IconWrapper hideInMobile margin='0 32px' onClick={handleToggleForwardMessagePopup}>
+            <ForwardIcon />
+          </IconWrapper>
+          <IconWrapper hideInMobile onClick={handleToggleDeleteMessagePopup}>
+            <DeleteIcon />
+          </IconWrapper>
+        </ActionsWrapper>
+        <ClosePopupWrapper>
+          <IconWrapper onClick={handleClosePopup}>
             <CloseIcon />
-          </ActionItem>
-        </Actions>
+          </IconWrapper>
+        </ClosePopupWrapper>
       </SliderHeader>
       <SliderBody onClick={handleClicks}>
         {attachmentsList && attachmentsList.length ? (
@@ -398,6 +473,28 @@ const SliderPopup = ({ channelId, setIsSliderOpen, mediaFiles, currentMediaFile 
           <UploadingIcon />
         )}
       </SliderBody>
+      {forwardPopupOpen && (
+        <ForwardMessagePopup
+          handleForward={handleForwardMessage}
+          togglePopup={handleToggleForwardMessagePopup}
+          buttonText='Forward'
+          title='Forward message'
+        />
+      )}
+      {messageToDelete && (
+        <ConfirmPopup
+          handleFunction={handleDeleteMessage}
+          togglePopup={handleToggleDeleteMessagePopup}
+          buttonText='Delete'
+          description='Who do you want to remove this message for?'
+          isDeleteMessage
+          isIncomingMessage={messageToDelete.incoming}
+          myRole={channel.userRole}
+          allowDeleteIncoming={allowEditDeleteIncomingMessage}
+          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          title='Delete message'
+        />
+      )}
     </Container>
   )
 }
@@ -465,12 +562,13 @@ const FileInfo = styled.div`
   font-weight: normal;
   font-size: 14px;
   line-height: 14px;
+  min-width: 230px;
   color: ${colors.white};
 `
 const Info = styled.div`
   margin-left: 12px;
 `
-const Actions = styled.div`
+const ClosePopupWrapper = styled.div`
   width: 40%;
   display: flex;
   justify-content: flex-end;
@@ -518,17 +616,27 @@ const UserName = styled.h4`
   line-height: 18px;
   letter-spacing: -0.2px;
 `
-const ActionItem = styled.span`
-  cursor: pointer;
+const ActionsWrapper = styled.div`
+  display: flex;
 `
-const ActionDownload = styled.div`
+const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean }>`
+  display: flex;
   cursor: pointer;
   color: ${colors.white};
+  margin: ${(props) => props.margin};
 
   & > svg {
     width: 28px;
     height: 28px;
   }
+
+  ${(props) =>
+    props.hideInMobile &&
+    `
+    @media (max-width: 550px) {
+      display: none;
+    }
+  `}
 `
 const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   position: relative;

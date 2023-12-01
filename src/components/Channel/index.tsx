@@ -24,7 +24,6 @@ import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, TH
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { clearMessagesAC } from '../../store/message/actions'
-// import useOnScreen from '../../hooks/useOnScrean'
 import useUpdatePresence from '../../hooks/useUpdatePresence'
 import { colors } from '../../UIHelper/constants'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
@@ -47,6 +46,15 @@ interface IChannelProps {
   selectedChannelPaddings?: string
   channelsPaddings?: string
   channelsMargin?: string
+  channelHoverBackground?: string
+  channelSubjectFontSize?: string
+  channelSubjectLineHeight?: string
+  channelSubjectColor?: string
+  channelLastMessageFontSize?: string
+  channelLastMessageHeight?: string
+  channelLastMessageTimeFontSize?: string
+  channelAvatarSize?: number
+  channelAvatarTextSize?: number
 }
 
 const Channel: React.FC<IChannelProps> = ({
@@ -61,7 +69,16 @@ const Channel: React.FC<IChannelProps> = ({
   selectedChannelBorderRadius,
   selectedChannelPaddings,
   channelsPaddings,
-  channelsMargin
+  channelsMargin,
+  channelHoverBackground,
+  channelSubjectFontSize,
+  channelSubjectLineHeight,
+  channelSubjectColor,
+  channelLastMessageFontSize,
+  channelLastMessageTimeFontSize,
+  channelLastMessageHeight,
+  channelAvatarSize,
+  channelAvatarTextSize
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -89,11 +106,6 @@ const Channel: React.FC<IChannelProps> = ({
   }
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
-
-  // const channelItemRef = useRef()
-  // const isVisible = useOnScreen(channelItemRef)
-  // if (isDirectChannel) {
-  // }
 
   useUpdatePresence(channel, true)
   useEffect(() => {
@@ -142,6 +154,7 @@ const Channel: React.FC<IChannelProps> = ({
       selectedChannelBorderRadius={selectedChannelBorderRadius}
       channelsMargin={channelsMargin}
       onClick={() => handleChangeActiveChannel(channel)}
+      hoverBackground={channelHoverBackground}
     >
       {showAvatar && (
         <AvatarWrapper>
@@ -152,8 +165,8 @@ const Channel: React.FC<IChannelProps> = ({
               (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
             }
             image={channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
-            size={50}
-            textSize={16}
+            size={channelAvatarSize || 50}
+            textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
           {isDirectChannel &&
@@ -172,6 +185,10 @@ const Channel: React.FC<IChannelProps> = ({
         isMuted={channel.muted}
         statusWidth={statusWidth}
         uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+        subjectFontSize={channelSubjectFontSize}
+        subjectLineHeight={channelSubjectLineHeight}
+        subjectColor={channelSubjectColor}
+        avatarSize={channelAvatarSize}
       >
         <h3>
           {channel.subject ||
@@ -188,6 +205,8 @@ const Channel: React.FC<IChannelProps> = ({
           <LastMessage
             markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
             unreadMentions={!!(channel.newMentionCount && channel.newMentionCount > 0)}
+            fontSize={channelLastMessageFontSize}
+            height={channelLastMessageHeight}
           >
             {typingIndicator ? (
               !isDirectChannel ? (
@@ -266,45 +285,51 @@ const Channel: React.FC<IChannelProps> = ({
                   lastMessage.user &&
                   (lastMessage.user.id === user.id
                     ? 'You '
-                    : contactsMap[lastMessage.user.id]
-                    ? contactsMap[lastMessage.user.id].firstName
-                    : lastMessage.user.id)
+                    : makeUsername(
+                        lastMessage.user && contactsMap[lastMessage.user.id],
+                        lastMessage.user,
+                        getFromContacts
+                      ))
                 } ${
                   lastMessage.body === 'CC'
                     ? 'created this channel'
                     : lastMessage.body === 'CG'
-                    ? 'created this group'
-                    : lastMessage.body === 'AM'
-                    ? ` added ${
-                        lastMessageMetas &&
-                        lastMessageMetas.m &&
-                        lastMessageMetas.m
-                          .slice(0, 5)
-                          .map((mem: string) =>
-                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
-                          )
-                      } ${
-                        lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
-                          ? `and ${lastMessageMetas.m.length - 5} more`
-                          : ''
-                      }`
-                    : lastMessage.body === 'RM'
-                    ? ` removed ${
-                        lastMessageMetas &&
-                        lastMessageMetas.m &&
-                        lastMessageMetas.m
-                          .slice(0, 5)
-                          .map((mem: string) =>
-                            mem === user.id ? ' You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
-                          )
-                      } ${
-                        lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
-                          ? `and ${lastMessageMetas.m.length - 5} more`
-                          : ''
-                      }`
-                    : lastMessage.body === 'LG'
-                    ? 'Left this group'
-                    : ''
+                      ? 'created this group'
+                      : lastMessage.body === 'AM'
+                        ? ` added ${
+                            lastMessageMetas &&
+                            lastMessageMetas.m &&
+                            lastMessageMetas.m
+                              .slice(0, 5)
+                              .map((mem: string) =>
+                                mem === user.id
+                                  ? ' You'
+                                  : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
+                              )
+                          } ${
+                            lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                              ? `and ${lastMessageMetas.m.length - 5} more`
+                              : ''
+                          }`
+                        : lastMessage.body === 'RM'
+                          ? ` removed ${
+                              lastMessageMetas &&
+                              lastMessageMetas.m &&
+                              lastMessageMetas.m
+                                .slice(0, 5)
+                                .map((mem: string) =>
+                                  mem === user.id
+                                    ? ' You'
+                                    : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
+                                )
+                            } ${
+                              lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
+                                ? `and ${lastMessageMetas.m.length - 5} more`
+                                : ''
+                            }`
+                          : lastMessage.body === 'LG'
+                            ? 'Left this group'
+                            : ''
                 }`
               ) : (
                 <React.Fragment>
@@ -362,10 +387,14 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.user &&
               lastMessage.user.id === user.id &&
               lastMessage.type !== 'system' &&
-              messageStatusIcon(lastMessage.deliveryStatus, 'ticks', undefined, colors.primary)}
+              messageStatusIcon({
+                messageStatus: lastMessage.deliveryStatus,
+                messageStatusDisplayingType: 'ticks',
+                iconColor: colors.primary
+              })}
           </DeliveryIconCont>
         )}
-        <LastMessageDate>
+        <LastMessageDate fontSize={channelLastMessageTimeFontSize}>
           {lastMessage && lastMessage.createdAt && lastMessageDateFormat(lastMessage.createdAt)}
           {/* {lastMessage &&
             lastMessage.createdAt &&
@@ -411,6 +440,7 @@ const Container = styled.div<{
   channelsMargin?: string
   selectedChannelBorderRadius?: string
   theme?: string
+  hoverBackground?: string
 }>`
   position: relative;
   display: flex;
@@ -426,6 +456,11 @@ const Container = styled.div<{
       : props.channelsPaddings || '8px'};
   margin: ${(props) => props.channelsMargin || '0 8px'};
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
+
+  transition: all 0.2s;
+  &:hover {
+    background-color: ${(props) => props.hoverBackground};
+  }
 `
 
 export const ChannelInfo = styled.div<{
@@ -434,24 +469,29 @@ export const ChannelInfo = styled.div<{
   isMuted?: boolean
   theme?: string
   uppercase?: boolean
+  subjectFontSize?: string
+  subjectLineHeight?: string
+  subjectColor?: string
+  avatarSize?: number
 }>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
-  max-width: calc(100% - 62px);
+  max-width: ${(props) => (props.avatarSize ? `calc(100% - ${props.avatarSize + 12}px)` : 'calc(100% - 62px)')};
 
   h3 {
     display: inline-block;
     margin: 0;
-    font-size: 15px;
+    font-size: ${(props) => props.subjectFontSize || '15px'};
     font-weight: 500;
     text-overflow: ellipsis;
-    line-height: 18px;
+    line-height: ${(props) => props.subjectLineHeight || '18px'};
     letter-spacing: -0.2px;%;
     max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 28 : 4) + 2}px)`};
     overflow: hidden;
     white-space: nowrap;
-    color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+    color: ${(props) =>
+      props.subjectColor || (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
     text-transform: ${(props) => props.uppercase && 'uppercase'};
   }
 `
@@ -466,10 +506,15 @@ export const MutedIcon = styled.span`
   }
 `
 
-export const LastMessage = styled.div<{ markedAsUnread?: boolean; unreadMentions?: boolean }>`
+export const LastMessage = styled.div<{
+  markedAsUnread?: boolean
+  unreadMentions?: boolean
+  fontSize?: string
+  height?: string
+}>`
   display: flex;
   align-items: center;
-  font-size: 14px;
+  font-size: ${(props) => props.fontSize || '14px'};
   color: ${colors.textColor1};
   max-width: ${(props) =>
     props.markedAsUnread || props.unreadMentions
@@ -477,7 +522,7 @@ export const LastMessage = styled.div<{ markedAsUnread?: boolean; unreadMentions
         `calc(100% - ${props.markedAsUnread && props.unreadMentions ? 48 : 24}px)`
       : '100%'};
 
-  height: 20px;
+  height: ${(props) => props.height || '20px'};
 `
 
 export const AvatarWrapper = styled.div`
@@ -556,9 +601,9 @@ export const ChannelStatus = styled.div`
   margin-left: auto;
 `
 
-export const LastMessageDate = styled.span`
+export const LastMessageDate = styled.span<{ fontSize?: string }>`
   color: ${colors.textColor2};
-  font-size: 12px;
+  font-size: ${(props) => props.fontSize || '12px'};
   line-height: 16px;
 `
 
@@ -581,8 +626,15 @@ export const TypingIndicator = styled.span`
 `
 
 export const ReactionItem = styled.span`
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   padding: 0 3px;
 `
 

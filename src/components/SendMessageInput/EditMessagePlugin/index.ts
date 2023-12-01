@@ -86,12 +86,40 @@ export default function EditMessagePlugin({
                 if (attribute.type.length > 7) {
                   const typeArray = attribute.type.split(' ').filter((type) => type !== 'mention')
                   // const styleNumber = 0
-                  typeArray.forEach((type: any) => {
+                  let styleStr = ''
+                  let textDecorationIsSet = false
+                  typeArray.forEach((type: any, index) => {
+                    if (type === 'monospace') {
+                      styleStr += 'letter-spacing: 4px;'
+                    } else if (type === 'strikethrough') {
+                      if (textDecorationIsSet) {
+                        styleStr = 'text-decoration: line-through, underline;'
+                      } else {
+                        styleStr += 'text-decoration: line-through;'
+                      }
+                      textDecorationIsSet = true
+                    } else if (type === 'underline') {
+                      if (textDecorationIsSet) {
+                        styleStr = 'text-decoration: line-through, underline;'
+                      } else {
+                        styleStr += 'text-decoration: underline;'
+                      }
+                      textDecorationIsSet = true
+                    } else if (type === 'italic') {
+                      styleStr += 'font-style: italic;'
+                    }
+                    if (index === typeArray.length - 1) {
+                      mentionNode.setStyle(styleStr)
+                    }
                     /* mentionNode.setStyle(
                       type === 'monospace'
                         ? 'letter-spacing: 4px'
                         : type === 'strikethrough'
                         ? 'text-decoration: line-through'
+                        : type === 'underline'
+                        ? 'text-decoration: underline'
+                        : type === 'italic'
+                        ? 'font-style: italic'
                         : ''
                     ) */
                     const format = type === 'monospace' ? 'code' : type
@@ -169,6 +197,7 @@ export default function EditMessagePlugin({
         } else {
           paragraphNode.append($createTextNode(editMessage.body))
           rootNode.append(paragraphNode)
+          rootNode.selectEnd()
         }
       })
     }

@@ -239,6 +239,7 @@ function MentionsContainer({
       selectOptionAndCleanUp(selectedOption)
     }
   }
+
   useEffect(() => {
     setHighlightedIndex(selectedIndex + 1)
     setTimeout(() => {
@@ -254,31 +255,6 @@ function MentionsContainer({
   }, [selectedIndex])
   useEffect(() => {
     setMentionsIsOpen(true)
-    // document.addEventListener('keydown', handleKeyDown)
-    /* console.log('register command ...  >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-    console.log('selectedIndex. .> > >> > . . ', selectedIndex)
-    editor.registerCommand(
-      KEY_ENTER_COMMAND,
-      (event: KeyboardEvent | null) => {
-        console.log('options.. . .. ', options)
-        console.log('selectedIndex.. . .. ', selectedIndex)
-        if (!rendered || options === null || selectedIndex === null || options[selectedIndex] == null) {
-          console.log('...>>>> return false ...>>>>>')
-          return false
-        }
-        if (event !== null) {
-          console.log('...>>>> preventDefault ...>>>>>')
-          event.preventDefault()
-          event.stopImmediatePropagation()
-        }
-        console.log('rendered>>>>>>>>>>>>>>>>>>>>', rendered)
-        console.log('...>>>> selectOptionAndCleanUp ...>>>>>', options[selectedIndex])
-        selectOptionAndCleanUp(options[selectedIndex])
-        return true
-      },
-      COMMAND_PRIORITY_NORMAL
-    ) */
-
     const menuTimeOut = setTimeout(() => {
       const menuElement = document.getElementById('typeahead-menu')
       if (menuElement) {
@@ -439,7 +415,7 @@ const MentionsList = styled.ul<{
   transition: all 0.2s;
   overflow: auto;
   max-height: 240px;
-  z-index: 99;
+  z-index: 200;
   padding: 2px 0 0;
   background: ${(props) => props.backgroundColor || colors.white};
   border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};

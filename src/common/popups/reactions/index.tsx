@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../Helpers/constants'
+import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import { IReaction } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'

@@ -6,9 +6,24 @@ import { MuteTime } from '../../types'
 import styled from 'styled-components'
 export interface IDetailsProps {
   size?: 'small' | 'medium' | 'large'
+
+  detailsTitleText?: string
+  editDetailsTitleText?: string
+  detailsTitleFontSize?: string
+
+  channelNameFontSize?: string
+  channelNameLineHeight?: string
+  channelAvatarSize?: number
+  channelAvatarTextSize?: number
+  channelMembersFontSize?: string
+  channelMembersLineHeight?: string
+
   showAboutChannel?: boolean
+  showAboutChannelTitle?: boolean
   avatarAndNameDirection?: 'row' | 'column'
   channelEditIcon?: JSX.Element
+  channelEditIconTopPosition?: string
+  channelEditIconRightPosition?: string
   editChannelSaveButtonBackgroundColor?: string
   editChannelSaveButtonTextColor?: string
   editChannelCancelButtonBackgroundColor?: string
@@ -101,18 +116,48 @@ export interface IDetailsProps {
   filePreviewSizeColor?: string
   filePreviewHoverBackgroundColor?: string
   filePreviewDownloadIcon?: JSX.Element
+  fileNameFontSize?: string
+  fileNameLineHeight?: string
+  fileSizeFontSize?: string
+  fileSizeLineHeight?: string
 
   showChangeMemberRole?: boolean
   showKickMember?: boolean
   showKickAndBlockMember?: boolean
   showMakeMemberAdmin?: boolean
+  memberHoverBackgroundColor?: string
+  addMemberFontSize?: string
+  memberNameFontSize?: string
+  memberAvatarSize?: number
+  memberPresenceFontSize?: string
+
+  actionItemsFontSize?: string
+  addMemberIcon?: JSX.Element
+  tabItemsFontSize?: string
+  tabItemsLineHeight?: string
+  tabItemsMinWidth?: string
+
+  backgroundColor?: string
+  bordersColor?: string
 }
 
 const ChannelDetailsContainer = ({
   size = 'large',
+  detailsTitleText,
+  editDetailsTitleText,
+  detailsTitleFontSize,
+  channelNameFontSize,
+  channelNameLineHeight,
+  channelAvatarSize,
+  channelAvatarTextSize,
+  channelMembersFontSize,
+  channelMembersLineHeight,
   channelEditIcon,
-  showAboutChannel,
-  avatarAndNameDirection = 'row',
+  channelEditIconTopPosition,
+  channelEditIconRightPosition,
+  showAboutChannel = true,
+  showAboutChannelTitle = true,
+  avatarAndNameDirection = 'column',
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
   editChannelCancelButtonBackgroundColor,
@@ -175,6 +220,10 @@ const ChannelDetailsContainer = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
+  fileNameFontSize,
+  fileNameLineHeight,
+  fileSizeFontSize,
+  fileSizeLineHeight,
   showClearHistory,
   clearHistoryOrder,
   clearHistoryIcon,
@@ -184,8 +233,20 @@ const ChannelDetailsContainer = ({
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
   showChangeMemberRole,
+  memberHoverBackgroundColor,
+  addMemberFontSize,
+  addMemberIcon,
+  memberNameFontSize,
+  memberAvatarSize,
+  memberPresenceFontSize,
   showKickMember,
-  showKickAndBlockMember
+  showKickAndBlockMember,
+  backgroundColor,
+  actionItemsFontSize,
+  tabItemsFontSize,
+  tabItemsLineHeight,
+  tabItemsMinWidth,
+  bordersColor
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -195,8 +256,11 @@ const ChannelDetailsContainer = ({
         <Details
           size={size}
           showAboutChannel={showAboutChannel}
+          showAboutChannelTitle={showAboutChannelTitle}
           avatarAndNameDirection={avatarAndNameDirection}
           channelEditIcon={channelEditIcon}
+          channelEditIconTopPosition={channelEditIconTopPosition}
+          channelEditIconRightPosition={channelEditIconRightPosition}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
           editChannelSaveButtonTextColor={editChannelSaveButtonTextColor}
           editChannelCancelButtonBackgroundColor={editChannelCancelButtonBackgroundColor}
@@ -259,6 +323,10 @@ const ChannelDetailsContainer = ({
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
+          fileNameFontSize={fileNameFontSize}
+          fileNameLineHeight={fileNameLineHeight}
+          fileSizeFontSize={fileSizeFontSize}
+          fileSizeLineHeight={fileSizeLineHeight}
           showClearHistory={showClearHistory}
           clearHistoryOrder={clearHistoryOrder}
           clearHistoryIcon={clearHistoryIcon}
@@ -269,7 +337,28 @@ const ChannelDetailsContainer = ({
           deleteAllMessagesTextColor={deleteAllMessagesTextColor}
           showChangeMemberRole={showChangeMemberRole}
           showKickMember={showKickMember}
+          memberHoverBackgroundColor={memberHoverBackgroundColor}
+          addMemberFontSize={addMemberFontSize}
+          memberNameFontSize={memberNameFontSize}
+          memberAvatarSize={memberAvatarSize}
+          memberPresenceFontSize={memberPresenceFontSize}
           showKickAndBlockMember={showKickAndBlockMember}
+          backgroundColor={backgroundColor}
+          bordersColor={bordersColor}
+          detailsTitleText={detailsTitleText}
+          editDetailsTitleText={editDetailsTitleText}
+          detailsTitleFontSize={detailsTitleFontSize}
+          channelNameFontSize={channelNameFontSize}
+          channelNameLineHeight={channelNameLineHeight}
+          channelAvatarSize={channelAvatarSize}
+          channelAvatarTextSize={channelAvatarTextSize}
+          channelMembersFontSize={channelMembersFontSize}
+          channelMembersLineHeight={channelMembersLineHeight}
+          actionItemsFontSize={actionItemsFontSize}
+          addMemberIcon={addMemberIcon}
+          tabItemsFontSize={tabItemsFontSize}
+          tabItemsLineHeight={tabItemsLineHeight}
+          tabItemsMinWidth={tabItemsMinWidth}
         />
       )}
     </DetailsWrapper>

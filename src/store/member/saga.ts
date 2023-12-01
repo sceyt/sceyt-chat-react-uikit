@@ -95,7 +95,7 @@ function* addMembers(action: IAction): any {
         const messageToSend: any = {
           metadata: { m: membersIds },
           body: 'AM',
-          mentionedMembers: [],
+          mentionedMembers: addedMembers,
           attachments: [],
           type: 'system'
         }
@@ -127,7 +127,7 @@ function* kickMemberFromChannel(action: IAction): any {
       const messageToSend: any = {
         metadata: { m: membersIds },
         body: 'RM',
-        mentionedMembers: [],
+        mentionedMembers: removedMembers,
         attachments: [],
         type: 'system'
       }

@@ -38,10 +38,25 @@ interface IProps {
   filePreviewSizeColor?: string
   filePreviewHoverBackgroundColor?: string
   filePreviewDownloadIcon?: JSX.Element
+  fileNameFontSize?: string
+  fileNameLineHeight?: string
+  fileSizeFontSize?: string
+  fileSizeLineHeight?: string
   showChangeMemberRole?: boolean
   showKickMember?: boolean
   showKickAndBlockMember?: boolean
   showMakeMemberAdmin?: boolean
+  memberHoverBackgroundColor?: string
+  addMemberFontSize?: string
+  addMemberIcon?: JSX.Element
+  memberNameFontSize?: string
+  memberAvatarSize?: number
+  memberPresenceFontSize?: string
+  backgroundColor?: string
+  borderColor?: string
+  tabItemsFontSize?: string
+  tabItemsLineHeight?: string
+  tabItemsMinWidth?: string
 }
 
 const DetailsTab = ({
@@ -68,10 +83,25 @@ const DetailsTab = ({
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
   filePreviewDownloadIcon,
+  fileNameFontSize,
+  fileNameLineHeight,
+  fileSizeFontSize,
+  fileSizeLineHeight,
   showChangeMemberRole,
   showKickMember,
   showKickAndBlockMember,
-  showMakeMemberAdmin
+  showMakeMemberAdmin,
+  memberHoverBackgroundColor,
+  addMemberFontSize,
+  addMemberIcon,
+  memberNameFontSize,
+  memberAvatarSize,
+  memberPresenceFontSize,
+  backgroundColor,
+  borderColor,
+  tabItemsFontSize,
+  tabItemsLineHeight,
+  tabItemsMinWidth
 }: IProps) => {
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
@@ -81,8 +111,8 @@ const DetailsTab = ({
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
       : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-      ? 'subscribers'
-      : 'members'
+        ? 'subscribers'
+        : 'members'
   const handleTabClick = (tabIndex: string) => {
     if (activeTab !== tabIndex) {
       dispatch(emptyChannelAttachmentsAC())
@@ -101,7 +131,11 @@ const DetailsTab = ({
     <Container theme={theme}>
       <DetailsTabHeader
         activeTabColor={colors.primary}
-        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
+        backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
+        borderColor={borderColor}
+        fontSize={tabItemsFontSize}
+        lineHeight={tabItemsLineHeight}
+        minWidth={tabItemsMinWidth}
       >
         {Object.keys(channelDetailsTabs).map((key) => {
           if (key === 'member') {
@@ -141,9 +175,15 @@ const DetailsTab = ({
           showKickMember={showKickMember}
           showKickAndBlockMember={showKickAndBlockMember}
           showMakeMemberAdmin={showMakeMemberAdmin}
+          hoverBackgroundColor={memberHoverBackgroundColor}
+          addMemberFontSize={addMemberFontSize}
+          addMemberIcon={addMemberIcon}
+          memberNameFontSize={memberNameFontSize}
+          memberAvatarSize={memberAvatarSize}
+          memberPresenceFontSize={memberPresenceFontSize}
         />
       )}
-      {activeTab === channelDetailsTabs.media && <Media channelId={channel.id} />}
+      {activeTab === channelDetailsTabs.media && <Media channel={channel} />}
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}
@@ -154,6 +194,10 @@ const DetailsTab = ({
           filePreviewSizeColor={filePreviewSizeColor}
           filePreviewHoverBackgroundColor={filePreviewHoverBackgroundColor}
           filePreviewDownloadIcon={filePreviewDownloadIcon}
+          fileNameFontSize={fileNameFontSize}
+          fileNameLineHeight={fileNameLineHeight}
+          fileSizeFontSize={fileSizeFontSize}
+          fileSizeLineHeight={fileSizeLineHeight}
         />
       )}
       {activeTab === channelDetailsTabs.link && (
@@ -188,7 +232,14 @@ const Container = styled.div<{ theme?: string }>`
   //border-top: 1px solid ${colors.gray1};
 `
 
-const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: string; backgroundColor?: string }>`
+const DetailsTabHeader = styled.div<{
+  activeTabColor?: string
+  borderColor?: string
+  backgroundColor?: string
+  fontSize?: string
+  minWidth?: string
+  lineHeight?: string
+}>`
   overflow: auto;
   padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
@@ -227,10 +278,10 @@ const DetailsTabHeader = styled.div<{ activeTabColor?: string; borderColor?: str
     text-transform: capitalize;
     font-style: normal;
     font-weight: 500;
-    font-size: 15px;
-    line-height: 20px;
+    font-size: ${(props) => props.fontSize || '15px'};
+    line-height: ${(props) => props.lineHeight || '20px'};
     color: ${colors.textColor2};
-    min-width: 70px;
+    min-width: ${(props) => props.minWidth || '70px'};
     cursor: pointer;
   }
   & .active {

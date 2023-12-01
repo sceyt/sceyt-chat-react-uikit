@@ -99,7 +99,7 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  const [imageLoading, setImageLoading] = useState(true)
+  const [imageLoading, setImageLoading] = useState(!attachment.attachmentUrl)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState('')
   const [failTimeout, setFailTimeout]: any = useState()
@@ -452,6 +452,7 @@ const Attachment = ({
     '- - -- ',
     attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || !isCached
   ) */
+
   return (
     <React.Fragment>
       {/* {ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'gif' ? ( */}
@@ -484,7 +485,7 @@ const Attachment = ({
             withBorder={!isPreview && !isDetailsView}
             fitTheContainer={isDetailsView}
             imageMaxHeight={
-              `${renderHeight}px`
+              `${renderHeight || 400}px`
               // attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
             }
             onLoad={() => setImageLoading(false)}
@@ -635,7 +636,7 @@ const Attachment = ({
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
                   withPrefix={withPrefix}
-                  backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
+                  backgroundImage={attachmentThumb || ''}
                   zIndex={9}
                 >
                   <UploadPercent
@@ -724,15 +725,15 @@ const Attachment = ({
                   isRepliedMessage
                     ? '40px'
                     : isDetailsView
-                    ? '100%'
-                    : `${renderWidth || videoAttachmentMaxWidth || 420}px`
+                      ? '100%'
+                      : `${renderWidth || videoAttachmentMaxWidth || 420}px`
                 }
                 height={
                   isRepliedMessage
                     ? '40px'
                     : isDetailsView
-                    ? '100%'
-                    : `${renderHeight || videoAttachmentMaxHeight || 240}px`
+                      ? '100%'
+                      : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
                 file={attachment}
                 src={attachmentUrl}
@@ -793,7 +794,7 @@ const Attachment = ({
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED
           }
-          borderRadius={borderRadius}
+          borderRadius={isRepliedMessage ? '50%' : borderRadius}
           background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : colors.primaryLight}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
@@ -854,8 +855,8 @@ const Attachment = ({
                   downloadingFile
                     ? ''
                     : attachment.attachmentUrl || attachmentThumb
-                    ? 'rgba(0,0,0,0.4)'
-                    : colors.primary
+                      ? 'rgba(0,0,0,0.4)'
+                      : colors.primary
                 }
               >
                 {(isInUploadingState || downloadingFile) && (
@@ -1112,7 +1113,9 @@ export const AttachmentFile = styled.div<{
   position: relative;
   align-items: center;
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
-  width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
+  //width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
+  min-width: ${(props) => !props.isRepliedMessage && (props.width || (props.isUploading ? '260px' : '205px'))};
+  transition: all 0.1s;
   //height: 70px;
   background: ${(props) => props.background};
   border: ${(props) => props.border || `1px solid  ${colors.gray1}`};
@@ -1224,14 +1227,14 @@ export const AttachmentImg = styled.img<{
     !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
       ? '165px'
       : props.isRepliedMessage
-      ? '40px'
-      : ''};
+        ? '40px'
+        : ''};
   min-width: ${(props) =>
     !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
       ? props.imageMinWidth || '165px'
       : props.isRepliedMessage
-      ? '40px'
-      : ''};
+        ? '40px'
+        : ''};
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;

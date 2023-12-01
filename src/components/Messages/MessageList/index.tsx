@@ -40,18 +40,16 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import SliderPopup from '../../../common/popups/sliderPopup'
-import { systemMessageUserName } from '../../../helpers'
-import { isJSON, makeUsername, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { getShowOnlyContactUsers } from '../../../helpers/contacts'
+import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { useDidUpdate } from '../../../hooks'
 import { LOADING_STATE } from '../../../helpers/constants'
-import { getClient } from '../../../common/client'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { themeSelector } from '../../../store/theme/selector'
+import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 // const Message = lazy(() => import('../../Message'))
 
@@ -63,6 +61,7 @@ let loadFromServer = false
 // let hasPrevMessages = true
 let loadDirection = ''
 // let nextTargetMessage = ''
+// @ts-ignore
 let nextDisable = false
 let prevDisable = false
 let scrollToBottom = false
@@ -82,7 +81,8 @@ const CreateMessageDateDivider = ({
   noMargin,
   theme,
   marginBottom,
-  marginTop
+  marginTop,
+  chatBackgroundColor
 }: {
   lastIndex: boolean
   currentMessageDate: Date
@@ -97,6 +97,7 @@ const CreateMessageDateDivider = ({
   theme?: any
   marginBottom?: string
   marginTop?: string
+  chatBackgroundColor?: string
 }) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
@@ -122,6 +123,7 @@ const CreateMessageDateDivider = ({
       noMargin={noMargin}
       marginBottom={marginBottom}
       marginTop={marginTop}
+      chatBackgroundColor={chatBackgroundColor}
     />
   )
 }
@@ -182,6 +184,14 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  messageStatusSize?: string
+  messageStatusColor?: string
+  messageReadStatusColor?: string
+  messageStateFontSize?: string
+  messageStateColor?: string
+  messageTimeFontSize?: string
+  messageTimeColor?: string
+  messageStatusAndTimeLineHeight?: string
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -253,6 +263,9 @@ interface MessagesProps {
   attachmentsPreview?: boolean
   sameUserMessageSpacing?: string
   differentUserMessageSpacing?: string
+  backgroundColor?: string
+  messageTextFontSize?: string
+  messageTextLineHeight?: string
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -367,19 +380,26 @@ const MessageList: React.FC<MessagesProps> = ({
   videoAttachmentMaxHeight,
   attachmentsPreview = true,
   sameUserMessageSpacing,
-  differentUserMessageSpacing
+  differentUserMessageSpacing,
+  backgroundColor,
+  messageTextFontSize,
+  messageTextLineHeight,
+  messageStatusSize,
+  messageStatusColor,
+  messageReadStatusColor,
+  messageStateFontSize,
+  messageStateColor,
+  messageTimeFontSize,
+  messageTimeColor,
+  messageStatusAndTimeLineHeight
 }) => {
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
-  const getFromContacts = getShowOnlyContactUsers()
   const channel: IChannel = useSelector(activeChannelSelector)
-  const ChatClient = getClient()
-  const { user } = ChatClient
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
   const tabIsActive = useSelector(tabIsActiveSelector, shallowEqual)
-
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
@@ -448,7 +468,6 @@ const MessageList: React.FC<MessagesProps> = ({
     renderTopDate()
     const { target } = event
     let forceLoadPrevMessages = false
-    // console.log('target.scrollTop . . . .   ', target.scrollTop)
     if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
       forceLoadPrevMessages = true
     }
@@ -498,7 +517,7 @@ const MessageList: React.FC<MessagesProps> = ({
           }
         }
       }
-      if (messagesIndexMap[lastVisibleMessageId] > messages.length - 15) {
+      if (messagesIndexMap[lastVisibleMessageId] >= messages.length - 15 || target.scrollTop === 0) {
         if (
           connectionStatus === CONNECTION_STATUS.CONNECTED &&
           !scrollToNewMessage.scrollToBottom &&
@@ -824,6 +843,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
       }
     }
+    setMediaFile(null)
     if (selectedMessagesMap && selectedMessagesMap.size) {
       dispatch(clearSelectedMessagesAC())
     }
@@ -1038,6 +1058,7 @@ const MessageList: React.FC<MessagesProps> = ({
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
           onDragEnter={handleDragIn}
+          backgroundColor={backgroundColor}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1070,6 +1091,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerTextColor={dateDividerTextColor}
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
+                      chatBackgroundColor={backgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
                         prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
@@ -1077,63 +1099,20 @@ const MessageList: React.FC<MessagesProps> = ({
                       marginTop={differentUserMessageSpacing}
                     />
                     {message.type === 'system' ? (
-                      <MessageTopDate
-                        systemMessage
-                        marginTop={message.type === 'system' && (differentUserMessageSpacing || '16px')}
-                        marginBottom={
-                          message.type === 'system' &&
-                          nextMessage &&
-                          nextMessage.type !== 'system' &&
-                          (differentUserMessageSpacing || '16px')
-                        }
-                        visible={showTopFixedDate}
-                        dividerText={message.body}
-                        dateDividerFontSize={dateDividerFontSize}
-                        dateDividerTextColor={dateDividerTextColor || colors.textColor1}
-                        dateDividerBorder={dateDividerBorder}
-                        dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
-                        dateDividerBorderRadius={dateDividerBorderRadius}
-                      >
-                        <span>
-                          {message.incoming
-                            ? makeUsername(message.user && contactsMap[message.user.id], message.user, getFromContacts)
-                            : 'You'}
-                          {message.body === 'CC'
-                            ? ' created this channel '
-                            : message.body === 'CG'
-                            ? ' created this group'
-                            : message.body === 'AM'
-                            ? ` added ${
-                                !!(messageMetas && messageMetas.m) &&
-                                messageMetas.m
-                                  .slice(0, 5)
-                                  .map((mem: string) =>
-                                    mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
-                                  )
-                              } ${
-                                messageMetas && messageMetas.m && messageMetas.m.length > 5
-                                  ? `and ${messageMetas.m.length - 5} more`
-                                  : ''
-                              }`
-                            : message.body === 'RM'
-                            ? ` removed ${
-                                messageMetas &&
-                                messageMetas.m &&
-                                messageMetas.m
-                                  .slice(0, 5)
-                                  .map((mem: string) =>
-                                    mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem)}`
-                                  )
-                              } ${
-                                messageMetas && messageMetas.m && messageMetas.m.length > 5
-                                  ? `and ${messageMetas.m.length - 5} more`
-                                  : ''
-                              }`
-                            : message.body === 'LG'
-                            ? ' left the group'
-                            : ''}
-                        </span>
-                      </MessageTopDate>
+                      <SystemMessage
+                        channel={channel}
+                        message={message}
+                        nextMessage={nextMessage}
+                        connectionStatus={connectionStatus}
+                        differentUserMessageSpacing={differentUserMessageSpacing}
+                        tabIsActive={browserTabIsActive}
+                        contactsMap={contactsMap}
+                        fontSize={dateDividerFontSize}
+                        textColor={dateDividerTextColor}
+                        border={dateDividerBorder}
+                        backgroundColor={dateDividerBackgroundColor}
+                        borderRadius={dateDividerBorderRadius}
+                      />
                     ) : (
                       <MessageWrapper id={message.id}>
                         <Message
@@ -1253,6 +1232,16 @@ const MessageList: React.FC<MessagesProps> = ({
                           connectionStatus={connectionStatus}
                           openedMessageMenuId={openedMessageMenuId}
                           tabIsActive={tabIsActive}
+                          messageTextFontSize={messageTextFontSize}
+                          messageTextLineHeight={messageTextLineHeight}
+                          messageStatusSize={messageStatusSize}
+                          messageStatusColor={messageStatusColor}
+                          messageReadStatusColor={messageReadStatusColor}
+                          messageStateFontSize={messageStateFontSize}
+                          messageStateColor={messageStateColor}
+                          messageTimeFontSize={messageTimeFontSize}
+                          messageTimeColor={messageTimeColor}
+                          messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                         />
                       </MessageWrapper>
                     )}
@@ -1269,6 +1258,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
                         marginTop={message.type === 'system' ? '0px' : ''}
                         marginBottom={message.type === 'system' ? '16px' : '0'}
+                        chatBackgroundColor={backgroundColor}
                         unread
                       />
                     ) : null}
@@ -1291,7 +1281,7 @@ const MessageList: React.FC<MessagesProps> = ({
             )
           )}
           {attachmentsPreview && mediaFile && (
-            <SliderPopup channelId={channel.id} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />
+            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />
           )}
         </Container>
       </React.Fragment>
@@ -1310,7 +1300,7 @@ interface MessageBoxProps {
   readonly attachmentsSelected: boolean
 }
 
-export const Container = styled.div<{ stopScrolling?: boolean }>`
+export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string }>`
   display: flex;
   flex-direction: column-reverse;
   //flex-direction: column;
@@ -1320,6 +1310,7 @@ export const Container = styled.div<{ stopScrolling?: boolean }>`
   overflow: auto;
   scroll-behavior: smooth;
   will-change: left, top;
+  background-color: ${(props) => props.backgroundColor};
 `
 export const EmptyDiv = styled.div`
   height: 300px;
@@ -1334,34 +1325,19 @@ const MessagesBox = styled.div<MessageBoxProps>`
   //overflow: auto;
   //scroll-behavior: unset;
 `
-/*
-const SystemMessage = styled.div<any>`
-  position: absolute;
-  width: 100%;
-  top: 30px;
-  left: 0;
-  text-align: center;
-  z-index: 10;
-  background: transparent;
-  span {
-    display: ${(props) => (props.visible ? 'inline-block' : 'none')};
-    font-style: normal;
-    font-weight: normal;
-    font-size: ${(props) => props.dateDividerFontSize || '14px'};
-    color: ${(props) => props.dateDividerTextColor || colors.blue6};
-    background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
-    border: ${(props) => props.dateDividerBorder || '1px solid #dfe0eb'};
-    box-sizing: border-box;
-    border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
-    padding: 5px 16px;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
-  }
-`
-*/
 
-export const MessageTopDate = styled.div<any>`
-  position: ${(props) => (props.systemMessage ? '' : 'absolute')};
-  display: ${(props) => props.systemMessage && 'inline-flex'};
+export const MessageTopDate = styled.div<{
+  topOffset?: number
+  marginTop?: string
+  marginBottom?: string
+  visible?: boolean
+  dateDividerFontSize?: string
+  dateDividerTextColor?: string
+  dateDividerBackgroundColor?: string
+  dateDividerBorder?: string
+  dateDividerBorderRadius?: string
+}>`
+  position: absolute;
   justify-content: center;
   width: 100%;
   top: ${(props) => (props.topOffset ? `${props.topOffset + 22}px` : '22px')};
@@ -1373,8 +1349,8 @@ export const MessageTopDate = styled.div<any>`
   background: transparent;
   opacity: ${(props) => (props.visible ? '1' : '0')};
   transition: all 0.2s ease-in-out;
+
   span {
-    //display: ${(props) => !props.systemMessage && 'none'};
     display: inline-block;
     max-width: 380px;
     font-style: normal;
@@ -1386,7 +1362,9 @@ export const MessageTopDate = styled.div<any>`
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 0 2px rgba(0, 0, 0, 0.08),
+      0 2px 24px rgba(0, 0, 0, 0.08);
     text-overflow: ellipsis;
     overflow: hidden;
   }
@@ -1420,6 +1398,7 @@ export const IconWrapper = styled.span<{ iconColor?: string }>`
   margin-bottom: 16px;
   transition: all 0.3s;
   pointer-events: none;
+
   & > svg {
     color: ${(props) => props.iconColor || colors.primary};
     width: 32px;
@@ -1489,7 +1468,9 @@ export const NoMessagesTitle = styled.h4<{ color?: string }>`
 export const NoMessagesText = styled.p<{ color?: string }>`
   margin: 0;
   text-align: center;
-  font-feature-settings: 'clig' off, 'liga' off;
+  font-feature-settings:
+    'clig' off,
+    'liga' off;
   font-family: Inter, sans-serif;
   font-size: 15px;
   font-style: normal;
