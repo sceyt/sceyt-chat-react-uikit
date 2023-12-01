@@ -233,6 +233,8 @@ interface SendMessageProps {
   allowMentionUser?: boolean
   allowTextEdit?: boolean
   textSelectionBackgroundColor?: string
+  placeholderText?: string
+  placeholderTextColor?: string
 }
 
 const SendMessageInput: React.FC<SendMessageProps> = ({
@@ -271,7 +273,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   allowMentionUser = true,
   allowTextEdit = true,
   textSelectionBackgroundColor,
-  voiceMessage = true
+  voiceMessage = true,
+  placeholderText,
+  placeholderTextColor
 }) => {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -477,17 +481,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = attachments.map((attachment: any) => {
-            const attachmentToSend = {
-              name: attachment.data.name,
-              data: attachment.data,
-              tid: attachment.tid,
-              cachedUrl: attachment.cachedUrl,
-              upload: attachment.upload,
-              attachmentUrl: attachment.attachmentUrl,
-              metadata: attachment.metadata,
-              type: attachment.type,
-              size: attachment.size
-            }
             /* if (sendAsSeparateMessage) {
               if (index !== 0) {
                 messageToSend.body = ''
@@ -510,7 +503,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )
               )
             } */
-            return attachmentToSend
+            return {
+              name: attachment.data.name,
+              data: attachment.data,
+              tid: attachment.tid,
+              cachedUrl: attachment.cachedUrl,
+              upload: attachment.upload,
+              attachmentUrl: attachment.attachmentUrl,
+              metadata: attachment.metadata,
+              type: attachment.type,
+              size: attachment.size
+            }
           })
           // if (!sendAsSeparateMessage) {
           const attachmentsToSent = [...messageToSend.attachments]
@@ -1219,400 +1222,413 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [])
 
   return (
-    <Container
-      margin={margin}
-      border={border}
-      ref={messageContRef}
-      theme={theme}
-      mentionColor={colors.primary}
-      toolBarTop={selectedText && selectedText.current ? selectedText.current.top : ''}
-      toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
-      selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
-    >
-      {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
-        <SelectedMessagesWrapper>
-          {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
-          <CustomButton
-            onClick={handleToggleForwardMessagePopup}
-            backgroundColor={colors.primaryLight}
-            marginLeft='32px'
-          >
-            <ForwardIcon />
-            Forward
-          </CustomButton>
-          <CustomButton
-            onClick={handleToggleDeleteMessagePopup}
-            color={colors.red1}
-            backgroundColor={colors.primaryLight}
-            marginLeft='16px'
-          >
-            <DeleteIcon />
-            Delete
-          </CustomButton>
-          <CloseIconWrapper onClick={handleCloseSelectMessages}>
-            <CloseIcon />
-          </CloseIconWrapper>
-          {forwardPopupOpen && (
-            <ForwardMessagePopup
-              handleForward={handleForwardMessage}
-              togglePopup={handleToggleForwardMessagePopup}
-              buttonText='Forward'
-              title='Forward message'
-            />
-          )}
-          {deletePopupOpen && (
-            <ConfirmPopup
-              handleFunction={handleDeleteMessage}
-              togglePopup={handleToggleDeleteMessagePopup}
-              buttonText='Delete'
-              description={`Who do you want to remove ${
-                selectedMessagesMap.size > 1 ? 'these messages' : 'this message'
-              } for?`}
-              isDeleteMessage
-              isIncomingMessage={isIncomingMessage}
-              myRole={activeChannel.userRole}
-              allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
-              isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
-              title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
-            />
-          )}
-        </SelectedMessagesWrapper>
-      ) : (
-        <React.Fragment>
-          {!activeChannel.id ? (
-            <Loading />
-          ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
-            <React.Fragment>
-              {disableInput && CustomDisabledInput ? <CustomDisabledInput /> : (
-                <BlockedUserInfo color={colors.textColor1}>
-                  <BlockInfoIcon />{' '}
-                  {isDeletedUserChat
-                    ? 'This user has been deleted.'
-                    : disableInput
-                      ? "Sender doesn't support replies"
-                      : 'You blocked this user.'}
-                </BlockedUserInfo>
-              ) }
-            </React.Fragment>
-
-          ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-            <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
-              Join
-            </JoinChannelCont>
-          ) : (
-              activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
-                ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
-                : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
-            ) ? (
-            <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
-              <EyeIcon /> Read only
-            </ReadOnlyCont>
-          ) : (
-            <React.Fragment>
-              <TypingIndicator>
-                {typingIndicator &&
-                  typingIndicator.typingState &&
-                  (CustomTypingIndicator ? (
-                    <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
-                  ) : (
-                    <TypingIndicatorCont>
-                      <TypingFrom>
-                        {makeUsername(
-                          getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
-                          typingIndicator.from,
-                          getFromContacts
-                        )}{' '}
-                        is typing
-                      </TypingFrom>
-                      <TypingAnimation>
-                        <DotOne />
-                        <DotTwo />
-                        <DotThree />
-                      </TypingAnimation>
-                    </TypingIndicatorCont>
-                  ))}
-              </TypingIndicator>
-              {messageToEdit && (
-                <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
-                  <CloseEditMode onClick={handleCloseEditMode}>
-                    <CloseIcon />
-                  </CloseEditMode>
-                  <EditReplyMessageHeader color={colors.primary}>
-                    {editMessageIcon || <EditIcon />}
-                    Edit Message
-                  </EditReplyMessageHeader>
-                  <EditMessageText>
-                    {MessageTextFormat({
-                      text: messageToEdit.body,
-                      message: messageToEdit,
-                      contactsMap,
-                      getFromContacts,
-                      asSampleText: true
-                    })}
-                  </EditMessageText>
-                </EditReplyMessageCont>
-              )}
-              {messageForReply && (
-                <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
-                  <CloseEditMode onClick={handleCloseReply}>
-                    <CloseIcon />
-                  </CloseEditMode>
-                  <ReplyMessageCont>
-                    {!!(messageForReply.attachments && messageForReply.attachments.length) &&
-                      (messageForReply.attachments[0].type === attachmentTypes.image ||
-                      messageForReply.attachments[0].type === attachmentTypes.video ? (
-                        <Attachment
-                          attachment={messageForReply.attachments[0]}
-                          backgroundColor={selectedFileAttachmentsBoxBackground || ''}
-                          isRepliedMessage
-                        />
-                      ) : (
-                        messageForReply.attachments[0].type === attachmentTypes.file && (
-                          <ReplyIconWrapper backgroundColor={colors.primary}>
-                            <ChoseFileIcon />
-                          </ReplyIconWrapper>
-                        )
-                      ))}
-                    <div>
-                      <EditReplyMessageHeader color={colors.primary}>
-                        {replyMessageIcon || <ReplyIcon />} Reply to
-                        <UserName>
-                          {user.id === messageForReply.user.id
-                            ? user.firstName
-                              ? `${user.firstName} ${user.lastName}`
-                              : user.id
-                            : makeUsername(contactsMap[messageForReply.user.id], messageForReply.user, getFromContacts)}
-                        </UserName>
-                      </EditReplyMessageHeader>
-                      {messageForReply.attachments && messageForReply.attachments.length ? (
-                        messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                          'Voice'
-                        ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                          <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
-                        ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                          <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
-                        ) : (
-                          <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
-                        )
-                      ) : (
-                        MessageTextFormat({
-                          text: messageForReply.body,
-                          message: messageForReply,
-                          contactsMap,
-                          getFromContacts
-                        })
-                      )}
-                    </div>
-                  </ReplyMessageCont>
-                </EditReplyMessageCont>
-              )}
-
-              {!!attachments.length && !sendAttachmentSeparately && (
-                <ChosenAttachments>
-                  {[...attachments].map((attachment: any) => (
-                    <div key={attachment.tid}>
-                      <Attachment
-                        attachment={attachment}
-                        isPreview
-                        removeSelected={removeUpload}
-                        key={attachment.tid}
-                        setVideoIsReadyToSend={setVideoIsReadyToSend}
-                        borderRadius={selectedAttachmentsBorderRadius}
-                        selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                        backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
-                        selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
-                        selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
-                        selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
-                      />
-                    </div>
-                  ))}
-                </ChosenAttachments>
-              )}
-              <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
-                <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                {showRecording ? (
-                  <AudioCont />
+    <SendMessageWrapper backgroundColor={backgroundColor}>
+      <Container
+        margin={margin}
+        border={border}
+        ref={messageContRef}
+        theme={theme}
+        mentionColor={colors.primary}
+        toolBarTop={selectedText && selectedText.current ? selectedText.current.top : ''}
+        toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
+        selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+      >
+        {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
+          <SelectedMessagesWrapper>
+            {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
+            <CustomButton
+              onClick={handleToggleForwardMessagePopup}
+              backgroundColor={colors.primaryLight}
+              marginLeft='32px'
+            >
+              <ForwardIcon />
+              Forward
+            </CustomButton>
+            <CustomButton
+              onClick={handleToggleDeleteMessagePopup}
+              color={colors.red1}
+              backgroundColor={colors.primaryLight}
+              marginLeft='16px'
+            >
+              <DeleteIcon />
+              Delete
+            </CustomButton>
+            <CloseIconWrapper onClick={handleCloseSelectMessages}>
+              <CloseIcon />
+            </CloseIconWrapper>
+            {forwardPopupOpen && (
+              <ForwardMessagePopup
+                handleForward={handleForwardMessage}
+                togglePopup={handleToggleForwardMessagePopup}
+                buttonText='Forward'
+                title='Forward message'
+              />
+            )}
+            {deletePopupOpen && (
+              <ConfirmPopup
+                handleFunction={handleDeleteMessage}
+                togglePopup={handleToggleDeleteMessagePopup}
+                buttonText='Delete'
+                description={`Who do you want to remove ${
+                  selectedMessagesMap.size > 1 ? 'these messages' : 'this message'
+                } for?`}
+                isDeleteMessage
+                isIncomingMessage={isIncomingMessage}
+                myRole={activeChannel.userRole}
+                allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
+                isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
+                title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
+              />
+            )}
+          </SelectedMessagesWrapper>
+        ) : (
+          <React.Fragment>
+            {!activeChannel.id ? (
+              <Loading />
+            ) : isBlockedUserChat || isDeletedUserChat || disableInput ? (
+              <React.Fragment>
+                {disableInput && CustomDisabledInput ? (
+                  <CustomDisabledInput />
                 ) : (
-                  <MessageInputWrapper
-                    className='message_input_wrapper'
-                    borderRadius={borderRadius}
-                    ref={inputWrapperRef}
-                    backgroundColor={backgroundColor || colors.backgroundColor}
-                    channelDetailsIsOpen={channelDetailsIsOpen}
-                    messageInputOrder={inputOrder}
-                    messageInputPaddings={inputPaddings}
-                  >
-                    {showAddEmojis && (
-                      <EmojiButton
-                        order={emojiIcoOrder}
-                        isEmojisOpened={isEmojisOpened}
-                        ref={emojiBtnRef}
-                        hoverColor={colors.primary}
-                        height={inputContainerHeight || minHeight}
-                        onClick={() => {
-                          setIsEmojisOpened(!isEmojisOpened)
-                        }}
-                      >
-                        {AddEmojisIcon || <EmojiSmileIcon />}
-                      </EmojiButton>
-                    )}
-                    {showAddAttachments && (
-                      <DropDown
-                        theme={theme}
-                        forceClose={showChooseAttachmentType}
-                        position={addAttachmentsInRightSide ? 'top' : 'topRight'}
-                        margin='auto 0 0'
-                        order={attachmentIcoOrder}
-                        trigger={
-                          <AddAttachmentIcon
-                            ref={addAttachmentsBtnRef}
-                            color={colors.primary}
-                            height={inputContainerHeight || minHeight}
-                          >
-                            {AddAttachmentsIcon || <AttachmentIcon />}
-                          </AddAttachmentIcon>
-                        }
-                      >
-                        <DropdownOptionsUl>
-                          <DropdownOptionLi
-                            key={1}
-                            textColor={colors.textColor1}
-                            hoverBackground={colors.hoverBackgroundColor}
-                            onClick={() => onOpenFileUploader(mediaExtensions)}
-                            iconWidth='20px'
-                            iconColor={colors.textColor2}
-                          >
-                            <ChoseMediaIcon />
-                            Photo or video
-                          </DropdownOptionLi>
-                          <DropdownOptionLi
-                            key={2}
-                            textColor={colors.textColor1}
-                            hoverBackground={colors.hoverBackgroundColor}
-                            onClick={() => onOpenFileUploader('')}
-                            iconWidth='20px'
-                            iconColor={colors.textColor2}
-                          >
-                            <ChoseFileIcon />
-                            File
-                          </DropdownOptionLi>
-                        </DropdownOptionsUl>
-                      </DropDown>
-                    )}
-                    <LexicalWrapper
-                      ref={messageInputRef}
-                      order={inputOrder}
-                      backgroundColor={inputBackgroundColor}
-                      paddings={inputPaddings}
-                      mentionColor={colors.primary}
-                      className={inputCustomClassname}
-                      selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
-                      borderRadius={inputBorderRadius}
-                      color={colors.textColor1}
-                    >
-                      <LexicalComposer initialConfig={initialConfig}>
-                        <AutoFocusPlugin messageForReply={messageForReply} />
-                        <ClearEditorPlugin
-                          shouldClearEditor={shouldClearEditor}
-                          setEditorCleared={() => setShouldClearEditor({ clear: false })}
-                        />
-                        {/* eslint-disable-next-line react/jsx-no-bind */}
-                        <OnChangePlugin onChange={onChange} />
-                        <EditMessagePlugin
-                          editMessage={messageToEdit}
-                          contactsMap={contactsMap}
-                          getFromContacts={getFromContacts}
-                          setMentionedMember={setMentionedMembers}
-                        />
-                        <FormatMessagePlugin
-                          editorState={realEditorState}
-                          setMessageBodyAttributes={setMessageBodyAttributes}
-                          setMessageText={messageToEdit ? setEditMessageText : setMessageText}
-                          messageToEdit={messageToEdit}
-                        />
-                        <React.Fragment>
-                          {isEmojisOpened && (
-                            <EmojisPopup
-                              // handleAddEmoji={handleAddEmoji}
-                              // messageText={messageText}
-                              // ccc={handleTyping}
-                              handleEmojiPopupToggle={handleEmojiPopupToggle}
-                              rightSide={emojisInRightSide}
-                              bottomPosition={`${emojisPopupBottomPosition}px`}
-                              leftPosition={`${emojisPopupLeftPosition}px`}
-                            />
-                          )}
-                          {allowSetMention && (
-                            <MentionsPlugin
-                              setMentionMember={handleSetMentionMember}
-                              contactsMap={contactsMap}
-                              userId={user.id}
-                              getFromContacts={getFromContacts}
-                              members={activeChannelMembers}
-                              setMentionsIsOpen={setMentionsIsOpen}
-                            />
-                          )}
-                          <HistoryPlugin />
-                          <RichTextPlugin
-                            contentEditable={
-                              <div
-                                onKeyDown={handleSendEditMessage}
-                                onDoubleClick={handleDoubleClick}
-                                className='rich_text_editor'
-                                ref={onRef}
-                              >
-                                <ContentEditable className='content_editable_input' />
-                              </div>
-                            }
-                            placeholder={<Placeholder paddings={inputPaddings}>Type message here ...</Placeholder>}
-                            ErrorBoundary={LexicalErrorBoundary}
+                  <BlockedUserInfo color={colors.textColor1}>
+                    <BlockInfoIcon />{' '}
+                    {isDeletedUserChat
+                      ? 'This user has been deleted.'
+                      : disableInput
+                        ? "Sender doesn't support replies"
+                        : 'You blocked this user.'}
+                  </BlockedUserInfo>
+                )}
+              </React.Fragment>
+            ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
+              <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+                Join
+              </JoinChannelCont>
+            ) : (
+                activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+                  ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
+                  : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
+              ) ? (
+              <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
+                <EyeIcon /> Read only
+              </ReadOnlyCont>
+            ) : (
+              <React.Fragment>
+                <TypingIndicator>
+                  {typingIndicator &&
+                    typingIndicator.typingState &&
+                    (CustomTypingIndicator ? (
+                      <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
+                    ) : (
+                      <TypingIndicatorCont>
+                        <TypingFrom>
+                          {makeUsername(
+                            getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
+                            typingIndicator.from,
+                            getFromContacts
+                          )}{' '}
+                          is typing
+                        </TypingFrom>
+                        <TypingAnimation>
+                          <DotOne />
+                          <DotTwo />
+                          <DotThree />
+                        </TypingAnimation>
+                      </TypingIndicatorCont>
+                    ))}
+                </TypingIndicator>
+                {messageToEdit && (
+                  <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
+                    <CloseEditMode onClick={handleCloseEditMode}>
+                      <CloseIcon />
+                    </CloseEditMode>
+                    <EditReplyMessageHeader color={colors.primary}>
+                      {editMessageIcon || <EditIcon />}
+                      Edit Message
+                    </EditReplyMessageHeader>
+                    <EditMessageText>
+                      {MessageTextFormat({
+                        text: messageToEdit.body,
+                        message: messageToEdit,
+                        contactsMap,
+                        getFromContacts,
+                        asSampleText: true
+                      })}
+                    </EditMessageText>
+                  </EditReplyMessageCont>
+                )}
+                {messageForReply && (
+                  <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
+                    <CloseEditMode onClick={handleCloseReply}>
+                      <CloseIcon />
+                    </CloseEditMode>
+                    <ReplyMessageCont>
+                      {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                        (messageForReply.attachments[0].type === attachmentTypes.image ||
+                        messageForReply.attachments[0].type === attachmentTypes.video ? (
+                          <Attachment
+                            attachment={messageForReply.attachments[0]}
+                            backgroundColor={selectedFileAttachmentsBoxBackground || ''}
+                            isRepliedMessage
                           />
-                          {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
-                            <React.Fragment>
-                              {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
-                              {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
-                              <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
-                            </React.Fragment>
-                          )}
-                        </React.Fragment>
-                      </LexicalComposer>
-                    </LexicalWrapper>
-                  </MessageInputWrapper>
+                        ) : (
+                          messageForReply.attachments[0].type === attachmentTypes.file && (
+                            <ReplyIconWrapper backgroundColor={colors.primary}>
+                              <ChoseFileIcon />
+                            </ReplyIconWrapper>
+                          )
+                        ))}
+                      <div>
+                        <EditReplyMessageHeader color={colors.primary}>
+                          {replyMessageIcon || <ReplyIcon />} Reply to
+                          <UserName>
+                            {user.id === messageForReply.user.id
+                              ? user.firstName
+                                ? `${user.firstName} ${user.lastName}`
+                                : user.id
+                              : makeUsername(
+                                  contactsMap[messageForReply.user.id],
+                                  messageForReply.user,
+                                  getFromContacts
+                                )}
+                          </UserName>
+                        </EditReplyMessageHeader>
+                        {messageForReply.attachments && messageForReply.attachments.length ? (
+                          messageForReply.attachments[0].type === attachmentTypes.voice ? (
+                            'Voice'
+                          ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
+                            <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                          ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
+                            <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                          ) : (
+                            <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                          )
+                        ) : (
+                          MessageTextFormat({
+                            text: messageForReply.body,
+                            message: messageForReply,
+                            contactsMap,
+                            getFromContacts
+                          })
+                        )}
+                      </div>
+                    </ReplyMessageCont>
+                  </EditReplyMessageCont>
                 )}
 
-                {sendMessageIsActive || !voiceMessage || messageToEdit ? (
-                  <SendMessageIcon
-                    isActive={sendMessageIsActive}
-                    order={sendIconOrder}
-                    color={colors.backgroundColor}
-                    height={inputContainerHeight || minHeight}
-                    onClick={sendMessageIsActive ? handleSendEditMessage : null}
-                  >
-                    <SendIcon />
-                  </SendMessageIcon>
-                ) : (
-                  <SendMessageIcon
-                    isActive={true}
-                    order={sendIconOrder}
-                    height={inputContainerHeight || minHeight}
-                    color={colors.primary}
-                  >
-                    <AudioRecord
-                      sendRecordedFile={setRecordedFile}
-                      setShowRecording={setShowRecording}
-                      showRecording={showRecording}
-                    />
-                  </SendMessageIcon>
+                {!!attachments.length && !sendAttachmentSeparately && (
+                  <ChosenAttachments>
+                    {[...attachments].map((attachment: any) => (
+                      <div key={attachment.tid}>
+                        <Attachment
+                          attachment={attachment}
+                          isPreview
+                          removeSelected={removeUpload}
+                          key={attachment.tid}
+                          setVideoIsReadyToSend={setVideoIsReadyToSend}
+                          borderRadius={selectedAttachmentsBorderRadius}
+                          selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
+                          backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
+                          selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
+                          selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
+                          selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
+                        />
+                      </div>
+                    ))}
+                  </ChosenAttachments>
                 )}
-              </SendMessageInputContainer>
-            </React.Fragment>
-          )}
-        </React.Fragment>
-      )}
-    </Container>
+                <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
+                  <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
+                  {showRecording ? (
+                    <AudioCont />
+                  ) : (
+                    <MessageInputWrapper
+                      className='message_input_wrapper'
+                      borderRadius={borderRadius}
+                      ref={inputWrapperRef}
+                      backgroundColor={inputBackgroundColor || colors.backgroundColor}
+                      channelDetailsIsOpen={channelDetailsIsOpen}
+                      messageInputOrder={inputOrder}
+                      messageInputPaddings={inputPaddings}
+                    >
+                      {showAddEmojis && (
+                        <EmojiButton
+                          order={emojiIcoOrder}
+                          isEmojisOpened={isEmojisOpened}
+                          ref={emojiBtnRef}
+                          hoverColor={colors.primary}
+                          height={inputContainerHeight || minHeight}
+                          onClick={() => {
+                            setIsEmojisOpened(!isEmojisOpened)
+                          }}
+                        >
+                          {AddEmojisIcon || <EmojiSmileIcon />}
+                        </EmojiButton>
+                      )}
+                      {showAddAttachments && (
+                        <DropDown
+                          theme={theme}
+                          forceClose={showChooseAttachmentType}
+                          position={addAttachmentsInRightSide ? 'top' : 'topRight'}
+                          margin='auto 0 0'
+                          order={attachmentIcoOrder}
+                          trigger={
+                            <AddAttachmentIcon
+                              ref={addAttachmentsBtnRef}
+                              color={colors.primary}
+                              height={inputContainerHeight || minHeight}
+                            >
+                              {AddAttachmentsIcon || <AttachmentIcon />}
+                            </AddAttachmentIcon>
+                          }
+                        >
+                          <DropdownOptionsUl>
+                            <DropdownOptionLi
+                              key={1}
+                              textColor={colors.textColor1}
+                              hoverBackground={colors.hoverBackgroundColor}
+                              onClick={() => onOpenFileUploader(mediaExtensions)}
+                              iconWidth='20px'
+                              iconColor={colors.textColor2}
+                            >
+                              <ChoseMediaIcon />
+                              Photo or video
+                            </DropdownOptionLi>
+                            <DropdownOptionLi
+                              key={2}
+                              textColor={colors.textColor1}
+                              hoverBackground={colors.hoverBackgroundColor}
+                              onClick={() => onOpenFileUploader('')}
+                              iconWidth='20px'
+                              iconColor={colors.textColor2}
+                            >
+                              <ChoseFileIcon />
+                              File
+                            </DropdownOptionLi>
+                          </DropdownOptionsUl>
+                        </DropDown>
+                      )}
+                      <LexicalWrapper
+                        ref={messageInputRef}
+                        order={inputOrder}
+                        paddings={inputPaddings}
+                        mentionColor={colors.primary}
+                        className={inputCustomClassname}
+                        selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+                        borderRadius={inputBorderRadius}
+                        color={colors.textColor1}
+                      >
+                        <LexicalComposer initialConfig={initialConfig}>
+                          <AutoFocusPlugin messageForReply={messageForReply} />
+                          <ClearEditorPlugin
+                            shouldClearEditor={shouldClearEditor}
+                            setEditorCleared={() => setShouldClearEditor({ clear: false })}
+                          />
+                          {/* eslint-disable-next-line react/jsx-no-bind */}
+                          <OnChangePlugin onChange={onChange} />
+                          <EditMessagePlugin
+                            editMessage={messageToEdit}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
+                            setMentionedMember={setMentionedMembers}
+                          />
+                          <FormatMessagePlugin
+                            editorState={realEditorState}
+                            setMessageBodyAttributes={setMessageBodyAttributes}
+                            setMessageText={messageToEdit ? setEditMessageText : setMessageText}
+                            messageToEdit={messageToEdit}
+                          />
+                          <React.Fragment>
+                            {isEmojisOpened && (
+                              <EmojisPopup
+                                // handleAddEmoji={handleAddEmoji}
+                                // messageText={messageText}
+                                // ccc={handleTyping}
+                                handleEmojiPopupToggle={handleEmojiPopupToggle}
+                                rightSide={emojisInRightSide}
+                                bottomPosition={`${emojisPopupBottomPosition}px`}
+                                leftPosition={`${emojisPopupLeftPosition}px`}
+                              />
+                            )}
+                            {allowSetMention && (
+                              <MentionsPlugin
+                                setMentionMember={handleSetMentionMember}
+                                contactsMap={contactsMap}
+                                userId={user.id}
+                                getFromContacts={getFromContacts}
+                                members={activeChannelMembers}
+                                setMentionsIsOpen={setMentionsIsOpen}
+                              />
+                            )}
+                            <HistoryPlugin />
+                            <RichTextPlugin
+                              contentEditable={
+                                <div
+                                  onKeyDown={handleSendEditMessage}
+                                  onDoubleClick={handleDoubleClick}
+                                  className='rich_text_editor'
+                                  ref={onRef}
+                                >
+                                  <ContentEditable className='content_editable_input' />
+                                </div>
+                              }
+                              placeholder={
+                                <Placeholder color={placeholderTextColor} paddings={inputPaddings}>
+                                  {placeholderText || 'Type message here ...'}
+                                </Placeholder>
+                              }
+                              ErrorBoundary={LexicalErrorBoundary}
+                            />
+                            {floatingAnchorElem && !isSmallWidthViewport && allowTextEdit && (
+                              <React.Fragment>
+                                {/* <DraggableBlockPlugin anchorElem={floatingAnchorElem} /> */}
+                                {/* <CodeActionMenuPlugin anchorElem={floatingAnchorElem} /> */}
+                                <FloatingTextFormatToolbarPlugin anchorElem={floatingAnchorElem} />
+                              </React.Fragment>
+                            )}
+                          </React.Fragment>
+                        </LexicalComposer>
+                      </LexicalWrapper>
+                    </MessageInputWrapper>
+                  )}
+
+                  {sendMessageIsActive || !voiceMessage || messageToEdit ? (
+                    <SendMessageIcon
+                      isActive={sendMessageIsActive}
+                      order={sendIconOrder}
+                      color={colors.backgroundColor}
+                      height={inputContainerHeight || minHeight}
+                      onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                    >
+                      <SendIcon />
+                    </SendMessageIcon>
+                  ) : (
+                    <SendMessageIcon
+                      isActive={true}
+                      order={sendIconOrder}
+                      height={inputContainerHeight || minHeight}
+                      color={colors.primary}
+                    >
+                      <AudioRecord
+                        sendRecordedFile={setRecordedFile}
+                        setShowRecording={setShowRecording}
+                        showRecording={showRecording}
+                      />
+                    </SendMessageIcon>
+                  )}
+                </SendMessageInputContainer>
+              </React.Fragment>
+            )}
+          </React.Fragment>
+        )}
+      </Container>
+    </SendMessageWrapper>
   )
 }
 
+const SendMessageWrapper = styled.div<{ backgroundColor?: string }>`
+  background-color: ${(props) => props.backgroundColor};
+`
 const Container = styled.div<{
   margin?: string
   border?: string
@@ -1664,7 +1680,7 @@ const Container = styled.div<{
   }
 `
 
-const EditReplyMessageCont = styled.div<{backgroundColor?: string; color?: string}>`
+const EditReplyMessageCont = styled.div<{ backgroundColor?: string; color?: string }>`
   position: relative;
   left: -12px;
   width: calc(100% - 8px);
@@ -1673,8 +1689,8 @@ const EditReplyMessageCont = styled.div<{backgroundColor?: string; color?: strin
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${props => props.color || colors.textColor1};
-  background-color: ${props => props.backgroundColor || colors.backgroundColor};
+  color: ${(props) => props.color || colors.textColor1};
+  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
 `
@@ -1868,12 +1884,12 @@ const LexicalWrapper = styled.div<{
   }
 `
 
-const Placeholder = styled.span<{ paddings?: string }>`
+const Placeholder = styled.span<{ paddings?: string; color?: string }>`
   position: absolute;
   top: calc(50% - 10px);
   left: 0;
   pointer-events: none;
-  color: ${colors.placeholderTextColor};
+  color: ${(props) => props.color || colors.placeholderTextColor};
   margin-left: 6px;
 `
 

@@ -81,7 +81,8 @@ const CreateMessageDateDivider = ({
   noMargin,
   theme,
   marginBottom,
-  marginTop
+  marginTop,
+  chatBackgroundColor
 }: {
   lastIndex: boolean
   currentMessageDate: Date
@@ -96,6 +97,7 @@ const CreateMessageDateDivider = ({
   theme?: any
   marginBottom?: string
   marginTop?: string
+  chatBackgroundColor?: string
 }) => {
   const today = moment().endOf('day')
   const current = moment(currentMessageDate).endOf('day')
@@ -121,6 +123,7 @@ const CreateMessageDateDivider = ({
       noMargin={noMargin}
       marginBottom={marginBottom}
       marginTop={marginTop}
+      chatBackgroundColor={chatBackgroundColor}
     />
   )
 }
@@ -181,6 +184,14 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  messageStatusSize?: string
+  messageStatusColor?: string
+  messageReadStatusColor?: string
+  messageStateFontSize?: string
+  messageStateColor?: string
+  messageTimeFontSize?: string
+  messageTimeColor?: string
+  messageStatusAndTimeLineHeight?: string
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -252,6 +263,9 @@ interface MessagesProps {
   attachmentsPreview?: boolean
   sameUserMessageSpacing?: string
   differentUserMessageSpacing?: string
+  backgroundColor?: string
+  messageTextFontSize?: string
+  messageTextLineHeight?: string
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -366,7 +380,18 @@ const MessageList: React.FC<MessagesProps> = ({
   videoAttachmentMaxHeight,
   attachmentsPreview = true,
   sameUserMessageSpacing,
-  differentUserMessageSpacing
+  differentUserMessageSpacing,
+  backgroundColor,
+  messageTextFontSize,
+  messageTextLineHeight,
+  messageStatusSize,
+  messageStatusColor,
+  messageReadStatusColor,
+  messageStateFontSize,
+  messageStateColor,
+  messageTimeFontSize,
+  messageTimeColor,
+  messageStatusAndTimeLineHeight
 }) => {
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
@@ -375,7 +400,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
   const tabIsActive = useSelector(tabIsActiveSelector, shallowEqual)
-
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
@@ -1034,6 +1058,7 @@ const MessageList: React.FC<MessagesProps> = ({
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
           onDragEnter={handleDragIn}
+          backgroundColor={backgroundColor}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1066,6 +1091,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerTextColor={dateDividerTextColor}
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
+                      chatBackgroundColor={backgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
                         prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
@@ -1206,6 +1232,16 @@ const MessageList: React.FC<MessagesProps> = ({
                           connectionStatus={connectionStatus}
                           openedMessageMenuId={openedMessageMenuId}
                           tabIsActive={tabIsActive}
+                          messageTextFontSize={messageTextFontSize}
+                          messageTextLineHeight={messageTextLineHeight}
+                          messageStatusSize={messageStatusSize}
+                          messageStatusColor={messageStatusColor}
+                          messageReadStatusColor={messageReadStatusColor}
+                          messageStateFontSize={messageStateFontSize}
+                          messageStateColor={messageStateColor}
+                          messageTimeFontSize={messageTimeFontSize}
+                          messageTimeColor={messageTimeColor}
+                          messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                         />
                       </MessageWrapper>
                     )}
@@ -1222,6 +1258,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
                         marginTop={message.type === 'system' ? '0px' : ''}
                         marginBottom={message.type === 'system' ? '16px' : '0'}
+                        chatBackgroundColor={backgroundColor}
                         unread
                       />
                     ) : null}
@@ -1263,7 +1300,7 @@ interface MessageBoxProps {
   readonly attachmentsSelected: boolean
 }
 
-export const Container = styled.div<{ stopScrolling?: boolean }>`
+export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string }>`
   display: flex;
   flex-direction: column-reverse;
   //flex-direction: column;
@@ -1273,6 +1310,7 @@ export const Container = styled.div<{ stopScrolling?: boolean }>`
   overflow: auto;
   scroll-behavior: smooth;
   will-change: left, top;
+  background-color: ${(props) => props.backgroundColor};
 `
 export const EmptyDiv = styled.div`
   height: 300px;
@@ -1324,7 +1362,9 @@ export const MessageTopDate = styled.div<{
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 0 2px rgba(0, 0, 0, 0.08),
+      0 2px 24px rgba(0, 0, 0, 0.08);
     text-overflow: ellipsis;
     overflow: hidden;
   }
@@ -1428,7 +1468,9 @@ export const NoMessagesTitle = styled.h4<{ color?: string }>`
 export const NoMessagesText = styled.p<{ color?: string }>`
   margin: 0;
   text-align: center;
-  font-feature-settings: 'clig' off, 'liga' off;
+  font-feature-settings:
+    'clig' off,
+    'liga' off;
   font-family: Inter, sans-serif;
   font-size: 15px;
   font-style: normal;

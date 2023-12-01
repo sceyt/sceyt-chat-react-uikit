@@ -21,6 +21,12 @@ interface IChannelProps {
   selectedChannelPaddings?: string
   channelsPaddings?: string
   channelsMargin?: string
+  channelHoverBackground?: string
+  channelSubjectFontSize?: string
+  channelSubjectLineHeight?: string
+  channelSubjectColor?: string
+  channelAvatarSize?: number
+  channelAvatarTextSize?: number
   // eslint-disable-next-line no-unused-vars
   createChatWithContact: (contact: IContact) => void
 }
@@ -31,7 +37,13 @@ const ContactItem: React.FC<IChannelProps> = ({
   theme,
   showAvatar = true,
   channelsPaddings,
-  channelsMargin
+  channelsMargin,
+  channelHoverBackground,
+  channelSubjectFontSize,
+  channelSubjectLineHeight,
+  channelSubjectColor,
+  channelAvatarSize,
+  channelAvatarTextSize
 }) => {
   const getFromContacts = getShowOnlyContactUsers()
 
@@ -43,6 +55,7 @@ const ContactItem: React.FC<IChannelProps> = ({
       channelsPaddings={channelsPaddings}
       channelsMargin={channelsMargin}
       onClick={() => createChatWithContact(contact)}
+      hoverBackground={channelHoverBackground}
     >
       {showAvatar && (
         <AvatarWrapper>
@@ -50,8 +63,8 @@ const ContactItem: React.FC<IChannelProps> = ({
             // customAvatarColors={userAvatarColors}
             name={contactUserName}
             image={contact.user.avatarUrl}
-            size={50}
-            textSize={16}
+            size={channelAvatarSize || 50}
+            textSize={channelAvatarTextSize || 16}
             setDefaultAvatar
           />
           {hideUserPresence &&
@@ -62,7 +75,13 @@ const ContactItem: React.FC<IChannelProps> = ({
             )}
         </AvatarWrapper>
       )}
-      <ChannelInfo theme={theme} avatar={showAvatar}>
+      <ChannelInfo
+        theme={theme}
+        avatar={showAvatar}
+        subjectFontSize={channelSubjectFontSize}
+        subjectLineHeight={channelSubjectLineHeight}
+        subjectColor={channelSubjectColor}
+      >
         <h3>{contactUserName}</h3>
       </ChannelInfo>
     </Container>
@@ -77,6 +96,7 @@ const Container = styled.div<{
   selectedChannelPaddings?: string
   channelsMargin?: string
   theme?: string
+  hoverBackground?: string
 }>`
   position: relative;
   display: flex;
@@ -84,9 +104,18 @@ const Container = styled.div<{
   cursor: pointer;
   padding: ${(props) => props.channelsPaddings || '8px'};
   margin: ${(props) => props.channelsMargin || '0 8px'};
+  &:hover {
+    background-color: ${(props) => props.hoverBackground};
+  }
 `
 
-export const ChannelInfo = styled.div<{ avatar?: boolean; theme?: string }>`
+export const ChannelInfo = styled.div<{
+  avatar?: boolean
+  theme?: string
+  subjectFontSize?: string
+  subjectLineHeight?: string
+  subjectColor?: string
+}>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
@@ -95,15 +124,16 @@ export const ChannelInfo = styled.div<{ avatar?: boolean; theme?: string }>`
   h3 {
     display: inline-block;
     margin: 0;
-    font-size: 15px;
+    font-size: ${(props) => props.subjectFontSize || '15px'};
     font-weight: 500;
     text-overflow: ellipsis;
-    line-height: 18px;
+    line-height: ${(props) => props.subjectLineHeight || '18px'};
     letter-spacing: -0.2px;%;
     max-width: calc(100% - 2px);
     overflow: hidden;
     white-space: nowrap;
-    color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+    color: ${(props) =>
+      props.subjectColor || (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
   }
 `
 

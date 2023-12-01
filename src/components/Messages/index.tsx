@@ -131,6 +131,17 @@ interface MessagesProps {
   attachmentsPreview?: boolean
   sameUserMessageSpacing?: string
   differentUserMessageSpacing?: string
+  backgroundColor?: string
+  messageTextFontSize?: string
+  messageTextLineHeight?: string
+  messageStatusSize?: string
+  messageStatusColor?: string
+  messageReadStatusColor?: string
+  messageStateFontSize?: string
+  messageStateColor?: string
+  messageTimeFontSize?: string
+  messageTimeColor?: string
+  messageStatusAndTimeLineHeight?: string
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -244,7 +255,18 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   videoAttachmentMaxHeight,
   attachmentsPreview = true,
   sameUserMessageSpacing,
-  differentUserMessageSpacing
+  differentUserMessageSpacing,
+  backgroundColor,
+  messageTextFontSize,
+  messageTextLineHeight,
+  messageStatusSize,
+  messageStatusColor,
+  messageReadStatusColor,
+  messageStateFontSize,
+  messageStateColor,
+  messageTimeFontSize,
+  messageTimeColor,
+  messageStatusAndTimeLineHeight
 }) => {
   const messages = useSelector(activeChannelMessagesSelector) || []
   return (
@@ -362,6 +384,17 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         attachmentsPreview={attachmentsPreview}
         sameUserMessageSpacing={sameUserMessageSpacing}
         differentUserMessageSpacing={differentUserMessageSpacing}
+        backgroundColor={backgroundColor}
+        messageTextFontSize={messageTextFontSize}
+        messageTextLineHeight={messageTextLineHeight}
+        messageStatusSize={messageStatusSize}
+        messageStatusColor={messageStatusColor}
+        messageReadStatusColor={messageReadStatusColor}
+        messageStateFontSize={messageStateFontSize}
+        messageStateColor={messageStateColor}
+        messageTimeFontSize={messageTimeFontSize}
+        messageTimeColor={messageTimeColor}
+        messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
       />
     </React.Fragment>
   )

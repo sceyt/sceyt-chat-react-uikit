@@ -111,12 +111,12 @@ export const makeUsername = (contact?: IContact, user?: IUser, fromContact?: boo
         : `${contact.firstName.trim()} ${contact.lastName?.trim()}`.trim()
       : contact.id
     : user
-    ? user.firstName
-      ? getFirstNameOnly
-        ? `${fromContact ? '~' : ''}${user.firstName.split(' ')[0]}`
-        : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`.trim()
-      : user.id || 'Deleted user'
-    : 'Deleted user'
+      ? user.firstName
+        ? getFirstNameOnly
+          ? `${fromContact ? '~' : ''}${user.firstName.split(' ')[0]}`
+          : `${fromContact ? '~' : ''}${user.firstName.trim()} ${user.lastName.trim()}`.trim()
+        : user.id || 'Deleted user'
+      : 'Deleted user'
 }
 
 export const isJSON = (str: any) => {

@@ -17,7 +17,13 @@ const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string
   }
 `
 
-const SearchInput = styled.input<{ inline?: boolean; borderRadius?: string; backgroundColor?: string; color?: string }>`
+const SearchInput = styled.input<{
+  inline?: boolean
+  borderRadius?: string
+  backgroundColor?: string
+  color?: string
+  fontSize?: string
+}>`
   padding: 0 34px;
   background: ${(props) => props.backgroundColor};
   color: ${(props) => props.color};
@@ -27,12 +33,12 @@ const SearchInput = styled.input<{ inline?: boolean; borderRadius?: string; back
   height: 36px;
   outline: none;
   box-sizing: border-box;
-  font-size: 15px;
+  font-size: ${(props) => props.fontSize || '15px'};
 
   &::placeholder {
     font-style: normal;
     font-weight: normal;
-    font-size: 15px;
+    font-size: ${(props) => props.fontSize || '15px'};
     //line-height: 22px;
     color: ${colors.textColor2};
     opacity: 1;
@@ -42,12 +48,14 @@ const SearchInput = styled.input<{ inline?: boolean; borderRadius?: string; back
 interface IChannelSearchProps {
   searchValue: string
   theme?: string
+  // eslint-disable-next-line no-unused-vars
   handleSearchValueChange: (e: any) => void
   getMyChannels: () => void
   inline?: boolean
   borderRadius?: string
   searchInputBackgroundColor?: string
   searchInputTextColor?: string
+  fontSize?: string
 }
 
 const ChannelSearch: React.FC<IChannelSearchProps> = ({
@@ -58,7 +66,8 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   inline,
   borderRadius,
   searchInputBackgroundColor,
-  searchInputTextColor
+  searchInputTextColor,
+  fontSize
 }) => (
   <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
     <StyledSearchSvg left={!inline ? '22px' : ''} />
@@ -72,6 +81,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
       onChange={handleSearchValueChange}
       value={searchValue}
       placeholder='Search for channels'
+      fontSize={fontSize}
     />
     {searchValue && <ClearTypedText onClick={getMyChannels} />}
   </SearchInputContainer>

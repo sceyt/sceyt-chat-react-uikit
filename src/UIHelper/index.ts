@@ -338,8 +338,8 @@ export const CustomInput = styled.input<{
       props.error
         ? `1px solid ${colors.red2}`
         : props.theme !== THEME.DARK
-        ? `2px solid ${colors.backgroundColor}`
-        : 'none'};
+          ? `2px solid ${colors.backgroundColor}`
+          : 'none'};
   }
   &:disabled {
     background-color: ${colors.gray0};
@@ -570,10 +570,17 @@ export const PopupFooter = styled(ButtonBlock)`
   z-index: 2;
 `
 
-export const SectionHeader = styled.h4<{ color?: string; margin?: string; theme?: string; uppercase?: boolean }>`
+export const SectionHeader = styled.h4<{
+  color?: string
+  margin?: string
+  theme?: string
+  uppercase?: boolean
+  fontSize?: string
+  lineHeight?: string
+}>`
   font-weight: 500;
-  font-size: 15px;
-  line-height: 20px;
+  font-size: ${(props) => props.fontSize || '15px'};
+  line-height: ${(props) => props.lineHeight || '20px'};
   color: ${(props) => props.color || colors.textColor1};
   margin: ${(props) => props.margin || 0};
   text-transform: ${(props) => props.uppercase && 'uppercase'};
@@ -665,7 +672,9 @@ export const SwitcherLabel = styled.label`
     top: 2px;
     left: 2px;
     border-radius: 20px;
-    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.251475), 0 2px 6px rgba(0, 0, 0, 0.404256);
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.251475),
+      0 2px 6px rgba(0, 0, 0, 0.404256);
     background: #fff;
   }
 `
@@ -783,18 +792,18 @@ export const MessageText = styled.pre<{
         ? '0 12px 10px'
         : '0 0 10px'
       : props.isForwarded
-      ? props.withPaddings
-        ? '4px 12px 10px'
-        : '4px 0px 10px'
-      : '8px 12px 10px')};
+        ? props.withPaddings
+          ? '4px 12px 10px'
+          : '4px 0px 10px'
+        : '8px 12px 10px')};
   padding-bottom: ${(props) => props.withAttachment && !props.withMediaAttachment && '2px'};
   //font-size: ${(props) => props.fontSize || '15px'};
   font-size: ${(props) => props.fontSize || '16px'};
+  line-height: ${(props) => props.lineHeight || '20px'};
   font-weight: 400;
   word-wrap: break-word;
   white-space: pre-wrap;
   //white-space: normal;
-  line-height: ${(props) => props.lineHeight || '20px'};
   //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
   color: ${(props) => props.color || colors.textColor1};
@@ -874,9 +883,9 @@ export const StyledSearchSvg = styled(SearchSvg)`
   top: 12px;
   left: ${(props) => props.left || '14px'};
 `
-export const SubTitle = styled.span<{ color?: string; margin?: string }>`
-  font-size: 13px;
-  line-height: 16px;
+export const SubTitle = styled.span<{ color?: string; margin?: string; fontSize?: string; lineHeight?: string }>`
+  font-size: ${(props) => props.fontSize || '13px'};
+  line-height: ${(props) => props.lineHeight || '16px'};
   letter-spacing: -0.078px;
   color: ${(props) => props.color || colors.textColor2};
   margin: ${(props) => props.margin};
@@ -997,7 +1006,8 @@ export const UploadProgress = styled.div<{
   align-items: center;
   justify-content: center;
   //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
-  background-image: url(${(props) => props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
+  background-image: url(${(props) =>
+    props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
   background-size: cover;
   background-position: center;
   border-radius: ${(props) =>
@@ -1030,7 +1040,7 @@ export const UploadProgress = styled.div<{
   `}
 `
 
-export const AttachmentPreviewTitle = styled.span<{ color?: string }>`
+export const AttachmentPreviewTitle = styled.span<{ color?: string; fontSize?: string; lineHeight?: string }>`
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -1038,8 +1048,8 @@ export const AttachmentPreviewTitle = styled.span<{ color?: string }>`
   max-width: calc(100% - 20px);
   font-style: normal;
   font-weight: normal;
-  font-size: 15px;
-  line-height: 20px;
-  height: 20px;
+  font-size: ${(props) => props.fontSize || '15px'};
+  line-height: ${(props) => props.lineHeight || '20px'};
+  height: ${(props) => props.lineHeight || '20px'};
   color: ${(props) => props.color || colors.textColor1};
 `

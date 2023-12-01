@@ -27,9 +27,16 @@ import { themeSelector } from '../../store/theme/selector'
 interface IProps {
   backgroundColor?: string
   titleColor?: string
+  titleFontSize?: string
+  titleLineHeight?: string
   memberInfoTextColor?: string
+  memberInfoFontSize?: string
+  memberInfoLineHeight?: string
+  avatarSize?: number
+  avatarTextSize?: number
   showMemberInfo?: boolean
   infoIcon?: JSX.Element
+  borderBottom?: string
 }
 
 export default function ChatHeader({
@@ -37,7 +44,14 @@ export default function ChatHeader({
   backgroundColor,
   titleColor,
   memberInfoTextColor,
-  showMemberInfo = true
+  memberInfoFontSize,
+  memberInfoLineHeight,
+  showMemberInfo = true,
+  avatarSize,
+  avatarTextSize,
+  borderBottom,
+  titleFontSize,
+  titleLineHeight
 }: IProps) {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -58,12 +72,12 @@ export default function ChatHeader({
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
       : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
-      ? activeChannel.memberCount > 1
-        ? 'subscribers'
-        : 'subscriber'
-      : activeChannel.memberCount > 1
-      ? 'members'
-      : 'member'
+        ? activeChannel.memberCount > 1
+          ? 'subscribers'
+          : 'subscriber'
+        : activeChannel.memberCount > 1
+          ? 'members'
+          : 'member'
   const channelDetailsOnOpen = () => {
     dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
   }
@@ -86,7 +100,7 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderColor={colors.backgroundColor}>
+    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={colors.backgroundColor}>
       {activeChannel.isLinkedChannel && (
         <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight}>
           <ArrowLeftIcon />
@@ -103,8 +117,8 @@ export default function ChatHeader({
               image={
                 activeChannel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
               }
-              size={36}
-              textSize={13}
+              size={avatarSize || 36}
+              textSize={avatarTextSize || 13}
               setDefaultAvatar={isDirectChannel}
             />
           )}
@@ -114,7 +128,9 @@ export default function ChatHeader({
           <SectionHeader
             color={titleColor || colors.textColor1}
             theme={theme}
+            fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+            lineHeight={titleLineHeight}
           >
             {activeChannel.subject ||
               (isDirectChannel && directChannelUser
@@ -123,7 +139,7 @@ export default function ChatHeader({
           </SectionHeader>
           {showMemberInfo &&
             (isDirectChannel && directChannelUser ? (
-              <SubTitle color={memberInfoTextColor}>
+              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
                 {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
                   : directChannelUser.presence &&
@@ -133,7 +149,7 @@ export default function ChatHeader({
                         userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
               </SubTitle>
             ) : (
-              <SubTitle color={memberInfoTextColor}>
+              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
                 {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} ${displayMemberText} `}
               </SubTitle>
             ))}
@@ -151,14 +167,14 @@ export default function ChatHeader({
   )
 }
 
-const Container = styled.div<{ background?: string; borderColor?: string }>`
+const Container = styled.div<{ background?: string; borderColor?: string; borderBottom?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor || colors.backgroundColor}`};
   background-color: ${(props) => props.background};
 `
 

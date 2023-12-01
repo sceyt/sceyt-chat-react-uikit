@@ -23,6 +23,10 @@ interface IProps {
   filePreviewSizeColor?: string
   filePreviewHoverBackgroundColor?: string
   filePreviewDownloadIcon?: JSX.Element
+  fileNameFontSize?: string
+  fileNameLineHeight?: string
+  fileSizeFontSize?: string
+  fileSizeLineHeight?: string
 }
 
 const Files = ({
@@ -33,11 +37,17 @@ const Files = ({
   filePreviewTitleColor,
   filePreviewSizeColor,
   filePreviewHoverBackgroundColor,
-  filePreviewDownloadIcon
+  filePreviewDownloadIcon,
+  fileNameFontSize,
+  fileNameLineHeight,
+  fileSizeFontSize,
+  fileSizeLineHeight
 }: IProps) => {
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
+  const nameSizeNum = fileNameFontSize && Number(fileNameFontSize.slice(0, -2))
+  const nameMaxLength = nameSizeNum ? 32 - (nameSizeNum - 15) * (nameSizeNum < 20 ? 2 : 1) : 32
   const handleCompleteDownload = (attachmentId: string) => {
     const stateCopy = { ...downloadingFilesMap }
     delete stateCopy[attachmentId]
@@ -90,10 +100,18 @@ const Files = ({
                 </React.Fragment>
               )}
               <div>
-                <AttachmentPreviewTitle color={filePreviewTitleColor}>
-                  {formatLargeText(file.name, 32)}
+                <AttachmentPreviewTitle
+                  fontSize={fileNameFontSize}
+                  lineHeight={fileNameLineHeight}
+                  color={filePreviewTitleColor}
+                >
+                  {formatLargeText(file.name, nameMaxLength)}
                 </AttachmentPreviewTitle>
-                <FileSizeAndDate color={filePreviewSizeColor}>
+                <FileSizeAndDate
+                  fontSize={fileSizeFontSize}
+                  lineHeight={fileSizeLineHeight}
+                  color={filePreviewSizeColor}
+                >
                   {file.size ? bytesToSize(file.size) : ''}
                 </FileSizeAndDate>
               </div>
@@ -233,12 +251,12 @@ const FileItem = styled.div<any>`
 
   }*/
 `
-const FileSizeAndDate = styled.span`
+const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string }>`
   display: block;
   font-style: normal;
   font-weight: normal;
-  font-size: 13px;
-  line-height: 16px;
+  font-size: ${(props) => props.fontSize || '13px'};
+  line-height: ${(props) => props.lineHeight || '16px'};
   color: ${(props) => props.color || colors.textColor1};
   margin-top: 2px;
 `

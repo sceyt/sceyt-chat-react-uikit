@@ -54,6 +54,7 @@ interface IProps {
   muteUnmuteNotificationSwitcherColor?: string
   muteUnmuteNotificationTextColor?: string
   timeOptionsToMuteNotifications?: [MuteTime, ...MuteTime[]]
+
   showStarredMessages?: boolean
   starredMessagesOrder?: number
   staredMessagesIcon?: JSX.Element
@@ -108,6 +109,10 @@ interface IProps {
   blockAndLeaveChannelIconColor?: string
   blockAndLeaveChannelTextColor?: string
   unblockUserTextColor?: string
+
+  actionItemsFontSize?: string
+
+  borderColor?: string
 }
 
 const Actions = ({
@@ -170,7 +175,9 @@ const Actions = ({
   // showDeleteAllMessages,
   deleteAllMessagesOrder,
   deleteAllMessagesIcon,
-  deleteAllMessagesTextColor
+  deleteAllMessagesTextColor,
+  actionItemsFontSize,
+  borderColor
 }: IProps) => {
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -314,7 +321,7 @@ const Actions = ({
   }
 
   return (
-    <Container isDirect={isDirectChannel} theme={theme} borderColor={colors.backgroundColor}>
+    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || colors.backgroundColor}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader>ACTIONS</SectionHeader>
@@ -335,6 +342,7 @@ const Actions = ({
               iconColor={muteNotificationIconColor || colors.textColor2}
               color={muteUnmuteNotificationTextColor || colors.textColor1}
               hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
+              fontSize={actionItemsFontSize}
             >
               <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
               {/* <ToggleSwitch backgroundColor={muteUnmuteNotificationSwitcherColor} state={channel.muted} /> */}
@@ -353,6 +361,7 @@ const Actions = ({
                   iconColor={unmuteNotificationIconColor || colors.textColor2}
                   color={muteUnmuteNotificationTextColor || colors.textColor1}
                   hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
+                  fontSize={actionItemsFontSize}
                 >
                   <React.Fragment>{unmuteNotificationIcon || <NotificationIcon />} Mute notifications</React.Fragment>
                   {/* <ToggleSwitch state={channel.muted} /> */}
@@ -418,6 +427,7 @@ const Actions = ({
             iconColor={staredMessagesIconColor || colors.textColor2}
             color={staredMessagesTextColor || colors.textColor1}
             hoverColor={staredMessagesTextColor || colors.textColor1}
+            fontSize={actionItemsFontSize}
           >
             <React.Fragment>{staredMessagesIcon || <StarIcon />} Starred messages </React.Fragment>
           </ActionItem>
@@ -432,6 +442,7 @@ const Actions = ({
               iconColor={pinChannelIconColor || colors.textColor2}
               color={pinChannelTextColor || colors.textColor1}
               hoverColor={pinChannelTextColor || colors.textColor1}
+              fontSize={actionItemsFontSize}
             >
               <React.Fragment>{pinChannelIcon || <PinIcon />} Pin</React.Fragment>
             </ActionItem>
@@ -447,6 +458,7 @@ const Actions = ({
               iconColor={markAsReadIconColor || colors.textColor2}
               color={markAsReadUnreadTextColor || colors.textColor1}
               hoverColor={markAsReadUnreadTextColor || colors.textColor1}
+              fontSize={actionItemsFontSize}
             >
               <React.Fragment>{markAsReadIcon || <MarkAsRead />} Mark as read</React.Fragment>
             </ActionItem>
@@ -458,6 +470,7 @@ const Actions = ({
               iconColor={markAsUnreadIconColor || colors.textColor2}
               color={markAsReadUnreadTextColor || colors.textColor1}
               hoverColor={markAsReadUnreadTextColor || colors.textColor1}
+              fontSize={actionItemsFontSize}
             >
               <React.Fragment>{markAsUnreadIcon || <MarkAsUnRead />} Mark as unread</React.Fragment>
             </ActionItem>
@@ -470,6 +483,7 @@ const Actions = ({
             color={leaveChannelTextColor || colors.red1}
             iconColor={leaveChannelIconColor || colors.red1}
             hoverColor={leaveChannelTextColor || colors.red1}
+            fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Leave')
               setPopupTitle(
@@ -477,8 +491,8 @@ const Actions = ({
                   channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                     ? 'group'
                     : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                    ? 'channel'
-                    : channel.type
+                      ? 'channel'
+                      : channel.type
                 }`
               )
               handleToggleLeaveChannelPopupOpen()
@@ -489,8 +503,8 @@ const Actions = ({
               channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                 ? 'group'
                 : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                ? 'channel'
-                : channel.type
+                  ? 'channel'
+                  : channel.type
             }`}
           </ActionItem>
         )}
@@ -504,6 +518,7 @@ const Actions = ({
                   key={5}
                   color={unblockUserTextColor || colors.textColor1}
                   hoverColor={unblockUserTextColor || colors.textColor1}
+                  fontSize={actionItemsFontSize}
                   onClick={() => {
                     handleUnblockUser()
                   }}
@@ -516,6 +531,7 @@ const Actions = ({
                   color={deleteChannelTextColor || colors.red1}
                   iconColor={deleteChannelIconColor || colors.red1}
                   hoverColor={deleteChannelTextColor || colors.red1}
+                  fontSize={actionItemsFontSize}
                   onClick={() => {
                     setPopupButtonText('Block')
                     setPopupTitle('Block user')
@@ -531,6 +547,7 @@ const Actions = ({
                 color={deleteChannelTextColor || colors.red1}
                 iconColor={deleteChannelIconColor || colors.red1}
                 hoverColor={deleteChannelTextColor || colors.red1}
+                fontSize={actionItemsFontSize}
                 key={7}
                 onClick={() => toggleReportUserPopup()}
               >
@@ -547,6 +564,7 @@ const Actions = ({
                 color={blockAndLeaveChannelTextColor || colors.red1}
                 iconColor={blockAndLeaveChannelIconColor || colors.red1}
                 hoverColor={blockAndLeaveChannelTextColor || colors.red1}
+                fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Block')
                   setPopupTitle(
@@ -554,10 +572,10 @@ const Actions = ({
                       channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                         ? 'group'
                         : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                        ? 'channel'
-                        : channel.type === CHANNEL_TYPE.DIRECT
-                        ? 'chat'
-                        : channel.type
+                          ? 'channel'
+                          : channel.type === CHANNEL_TYPE.DIRECT
+                            ? 'chat'
+                            : channel.type
                     }`
                   )
                   handleToggleBlockChannelPopupOpen()
@@ -568,10 +586,10 @@ const Actions = ({
                   channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                     ? 'group'
                     : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                    ? 'channel'
-                    : channel.type === 'direct'
-                    ? 'chat'
-                    : channel.type
+                      ? 'channel'
+                      : channel.type === 'direct'
+                        ? 'chat'
+                        : channel.type
                 }
                 `}
               </ActionItem>
@@ -583,6 +601,7 @@ const Actions = ({
                 color={reportChannelTextColor || colors.red1}
                 iconColor={reportChannelIconColor || colors.red1}
                 hoverColor={reportChannelTextColor || colors.red1}
+                fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Report')
                   setPopupTitle('Report channel')
@@ -594,8 +613,8 @@ const Actions = ({
                 {channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
                   ? 'channel'
                   : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
-                  ? 'group'
-                  : 'chat'}
+                    ? 'group'
+                    : 'chat'}
               </ActionItem>
             )}
           </React.Fragment>
@@ -610,6 +629,7 @@ const Actions = ({
               color={clearHistoryTextColor || colors.red1}
               iconColor={clearHistoryTextColor || colors.red1}
               order={clearHistoryOrder}
+              fontSize={actionItemsFontSize}
               hoverColor={clearHistoryTextColor || colors.red1}
               onClick={() => {
                 setPopupButtonText('Clear')
@@ -630,6 +650,7 @@ const Actions = ({
               iconColor={deleteAllMessagesTextColor || colors.red1}
               order={deleteAllMessagesOrder}
               hoverColor={deleteAllMessagesTextColor || colors.red1}
+              fontSize={actionItemsFontSize}
               onClick={() => {
                 setPopupButtonText('Clear')
                 setPopupTitle(`Clear history`)
@@ -647,6 +668,7 @@ const Actions = ({
             color={deleteChannelTextColor || colors.red1}
             iconColor={deleteChannelIconColor || colors.red1}
             hoverColor={deleteChannelTextColor || colors.red1}
+            fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Delete')
               setPopupTitle(
@@ -654,10 +676,10 @@ const Actions = ({
                   channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
                     ? 'group'
                     : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                    ? 'channel'
-                    : channel.type === CHANNEL_TYPE.DIRECT
-                    ? 'chat'
-                    : channel.type
+                      ? 'channel'
+                      : channel.type === CHANNEL_TYPE.DIRECT
+                        ? 'chat'
+                        : channel.type
                 }`
               )
               handleToggleDeleteChannelPopupOpen()
@@ -668,10 +690,10 @@ const Actions = ({
               channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
                 ? 'group'
                 : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-                ? 'channel'
-                : channel.type === CHANNEL_TYPE.DIRECT
-                ? 'chat'
-                : channel.type
+                  ? 'channel'
+                  : channel.type === CHANNEL_TYPE.DIRECT
+                    ? 'chat'
+                    : channel.type
             }`}
           </ActionItem>
         )}
@@ -699,10 +721,11 @@ const Actions = ({
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you delete this chat it will be removed from the chat list with its message history.'
               : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
-              ? 'Once you delete this group it will be permanently removed along with its entire history for all the group members.'
-              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-              ? 'Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.'
-              : 'Once you delete this channel it will be permanently removed along with its entire history for all the channel members.'
+                ? 'Once you delete this group it will be permanently removed along with its entire history for all the group members.'
+                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                  ? // eslint-disable-next-line max-len
+                    'Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.'
+                  : 'Once you delete this channel it will be permanently removed along with its entire history for all the channel members.'
           }
           title={popupTitle}
         />
@@ -748,10 +771,10 @@ const Actions = ({
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
               : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
-              ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-              ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
-              : 'Are you sure you want to clear history? This action cannot be undone.'
+                ? 'Once you clear the history it will be permanently removed for you.'
+                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                  ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
+                  : 'Are you sure you want to clear history? This action cannot be undone.'
           }
           title={popupTitle}
         />
@@ -765,10 +788,10 @@ const Actions = ({
             channel.type === CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
               : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
-              ? 'Once you clear the history it will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-              ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
-              : 'Are you sure you want to delete all messages? This action cannot be undone.'
+                ? 'Once you clear the history it will be permanently removed for you.'
+                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                  ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
+                  : 'Are you sure you want to delete all messages? This action cannot be undone.'
           }
           title={popupTitle}
         />
@@ -845,6 +868,7 @@ const DefaultMutedIcon = styled(NotificationOffIcon)``
 
 const ActionItem = styled.li<{
   color?: string
+  fontSize?: string
   disableEvent?: boolean
   iconColor?: string
   hoverColor?: string
@@ -854,7 +878,7 @@ const ActionItem = styled.li<{
   display: flex;
   align-items: center;
   padding: 10px 0;
-  font-size: 15px;
+  font-size: ${(props) => props.fontSize || '15px'};
   color: ${(props) => props.color || colors.textColor1};
   cursor: pointer;
   order: ${(props) => props.order};
