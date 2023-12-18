@@ -216,3 +216,13 @@ export const getChannelGroupName = (channel: IChannel) =>
   channel.type === CHANNEL_TYPE.DIRECT || channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
     ? CHANNEL_GROUP_TYPES.DIRECT_PRIVATE
     : CHANNEL_GROUP_TYPES.PUBLIC
+
+let openChatOnUserInteraction = true
+
+export const setOpenChatOnUserInteraction = (state: boolean) => {
+  openChatOnUserInteraction = state
+}
+
+export const getOpenChatOnUserInteraction = () => {
+  return openChatOnUserInteraction
+}

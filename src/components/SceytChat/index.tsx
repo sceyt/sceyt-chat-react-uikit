@@ -7,7 +7,8 @@ import {
   setActiveChannelId,
   setChannelTypesMemberDisplayTextMap,
   setDefaultRolesByChannelTypesMap,
-  setHandleNewMessages
+  setHandleNewMessages,
+  setOpenChatOnUserInteraction
 } from '../../helpers/channelHalper'
 import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
@@ -42,7 +43,8 @@ const SceytChat = ({
   defaultRolesByChannelTypesMap,
   customColors,
   hideUserPresence,
-  showNotifications
+  showNotifications,
+  openChatOnUserInteraction = true
 }: IChatClientProps) => {
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -248,10 +250,15 @@ const SceytChat = ({
   }, [tabIsActive])
 
   useEffect(() => {
-    if(theme) {
+    if (theme) {
       handleChangedTheme(theme)
     }
   }, [theme])
+
+  useEffect(() => {
+    setOpenChatOnUserInteraction(openChatOnUserInteraction)
+  }, [openChatOnUserInteraction])
+
   useDidUpdate(() => {
     if (getRolesFail) {
       console.log('getRolesFail ... ', getRolesFail)
