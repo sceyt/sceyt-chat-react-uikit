@@ -474,8 +474,8 @@ function* getChannelsForForward(): any {
       channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === CHANNEL_TYPE.DIRECT
-        ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
-        : true
+          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          : true
     )
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(setChannelsForForwardAC(mappedChannels))
@@ -666,8 +666,8 @@ function* channelsForForwardLoadMore(action: IAction): any {
       channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === CHANNEL_TYPE.DIRECT
-        ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
-        : true
+          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          : true
     )
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(addChannelsForForwardAC(mappedChannels))
@@ -804,7 +804,6 @@ function* notificationsTurnOff(action: IAction): any {
 
   try {
     const updatedChannel = yield call(channel.mute, expireTime)
-    console.log('updatedChannel. . . . . .. ', updatedChannel)
     updateChannelOnAllChannels(channel.id, {
       muted: updatedChannel.muted,
       mutedTill: updatedChannel.mutedTill

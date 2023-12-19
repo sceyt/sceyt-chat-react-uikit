@@ -61,6 +61,7 @@ export interface IChatClientProps {
     deletedUserAvatarBackground?: string
     defaultAvatarBackground?: string
   }
+  openChatOnUserInteraction?: boolean
 }
 
 const SceytChatContainer = ({
@@ -77,7 +78,8 @@ const SceytChatContainer = ({
   CustomUploader,
   customColors,
   showNotifications = true,
-  hideUserPresence
+  hideUserPresence,
+  openChatOnUserInteraction
 }: IChatClientProps) => {
   return (
     <Provider store={store}>
@@ -96,6 +98,7 @@ const SceytChatContainer = ({
         customColors={customColors}
         showNotifications={showNotifications}
         hideUserPresence={hideUserPresence}
+        openChatOnUserInteraction={openChatOnUserInteraction}
       />
     </Provider>
   )

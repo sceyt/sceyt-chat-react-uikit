@@ -342,6 +342,20 @@ export default function* watchForEvents(): any {
           unblockedMembers
         }
       })
+    channelListener.onChannelFrozen = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.FROZEN,
+        args: {
+          channel
+        }
+      })
+    channelListener.onChannelUnfrozen = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.UNFROZEN,
+        args: {
+          channel
+        }
+      })
     channelListener.onReceivedChannelEvent = (channelId: string, user: IUser, eventName: string) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_EVENT,
@@ -1104,6 +1118,16 @@ export default function* watchForEvents(): any {
             })
           }
         }
+        break
+      }
+      case CHANNEL_EVENT_TYPES.FROZEN: {
+        const { channel } = args
+        console.log('channel frozen  channel ... ', channel)
+        break
+      }
+      case CHANNEL_EVENT_TYPES.UNFROZEN: {
+        const { channel } = args
+        console.log('channel unfrozen  channel ... ', channel)
         break
       }
       /* case CHANNEL_EVENT_TYPES.MEMBER_BLOCKED: {

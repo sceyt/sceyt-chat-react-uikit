@@ -29,7 +29,8 @@ import { contactsMapSelector } from '../../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import {
   getChannelTypesMemberDisplayTextMap,
-  getDefaultRolesByChannelTypesMap
+  getDefaultRolesByChannelTypesMap,
+  getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { createChannelAC } from '../../../../store/channel/actions'
 
@@ -198,7 +199,7 @@ const Members = ({
     setAddMemberPopupOpen(!addMemberPopupOpen)
   }
   const handleCreateChat = (user?: any) => {
-    if (user) {
+    if (getOpenChatOnUserInteraction() && user) {
       dispatch(
         createChannelAC(
           {

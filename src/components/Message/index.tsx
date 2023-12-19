@@ -54,6 +54,7 @@ import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { useDidUpdate, useOnScreen } from '../../hooks'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 // import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
@@ -683,7 +684,7 @@ const Message = ({
   }
 
   const handleCreateChat = (user?: any) => {
-    if (user && !selectionIsActive) {
+    if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
       dispatch(
         createChannelAC(
           {
