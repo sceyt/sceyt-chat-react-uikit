@@ -390,7 +390,8 @@ const Channel: React.FC<IChannelProps> = ({
               messageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
-                iconColor: colors.primary
+                iconColor: colors.primary,
+                size: '16px'
               })}
           </DeliveryIconCont>
         )}

@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React from 'react'
+import React, { FC } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
@@ -16,7 +16,7 @@ import { AvatarWrapper, UserStatus } from '../Channel'
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
 import { colors } from '../../UIHelper/constants'
-import { IContactsMap, IMember } from '../../types'
+import { IChannel, IContactsMap, IMember } from '../../types'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
@@ -37,6 +37,13 @@ interface IProps {
   showMemberInfo?: boolean
   infoIcon?: JSX.Element
   borderBottom?: string
+  CustomActions?: FC<{
+    activeChannel: IChannel
+  }>
+  backButtonOrder?: number
+  channelInfoOrder?: number
+  infoIconOrder?: number
+  customActionsOrder?: number
 }
 
 export default function ChatHeader({
@@ -51,7 +58,12 @@ export default function ChatHeader({
   avatarTextSize,
   borderBottom,
   titleFontSize,
-  titleLineHeight
+  titleLineHeight,
+  CustomActions,
+  backButtonOrder,
+  channelInfoOrder,
+  infoIconOrder,
+  customActionsOrder
 }: IProps) {
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -102,11 +114,15 @@ export default function ChatHeader({
   return (
     <Container background={backgroundColor} borderBottom={borderBottom} borderColor={colors.backgroundColor}>
       {activeChannel.isLinkedChannel && (
-        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight}>
+        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight} order={backButtonOrder}>
           <ArrowLeftIcon />
         </BackButtonWrapper>
       )}
-      <ChannelInfo onClick={!channelListHidden && channelDetailsOnOpen} clickable={!channelListHidden}>
+      <ChannelInfo
+        onClick={!channelListHidden && channelDetailsOnOpen}
+        clickable={!channelListHidden}
+        order={channelInfoOrder}
+      >
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
             <Avatar
@@ -155,10 +171,16 @@ export default function ChatHeader({
             ))}
         </ChannelName>
       </ChannelInfo>
+      {CustomActions && (
+        <CustomActionsWrapper order={customActionsOrder}>
+          <CustomActions activeChannel={activeChannel} />
+        </CustomActionsWrapper>
+      )}
       {!channelListHidden && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.textColor2}
+          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.borderColor2}
+          order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}
         </ChanelInfo>
@@ -178,13 +200,14 @@ const Container = styled.div<{ background?: string; borderColor?: string; border
   background-color: ${(props) => props.background};
 `
 
-const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any }>`
+const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any; order?: number }>`
   display: flex;
   align-items: center;
   width: 650px;
   max-width: calc(100% - 70px);
   cursor: ${(props) => props.clickable && 'pointer'};
   margin-right: auto;
+  order: ${(props) => props.order};
 
   & ${UserStatus} {
     width: 10px;
@@ -204,19 +227,26 @@ const ChannelName = styled.div`
   }
 `
 
-const ChanelInfo = styled.span<{ infoIconColor?: string }>`
+const CustomActionsWrapper = styled.div<{ order?: number }>`
+  order: ${(props) => props.order};
+`
+
+const ChanelInfo = styled.span<{ infoIconColor?: string; order?: number }>`
+  display: flex;
   cursor: pointer;
+  order: ${(props) => props.order};
 
   > svg {
     color: ${(props) => props.infoIconColor};
   }
 `
-const BackButtonWrapper = styled.span<{ hoverBackground?: string }>`
+const BackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number }>`
   display: inline-flex;
   cursor: pointer;
   margin-right: 16px;
   border-radius: 50%;
   transition: all 0.2s;
+  order: ${(props) => props.order};
   &:hover {
     background-color: ${(props) => props.hoverBackground || colors.primaryLight};
   }

@@ -1,7 +1,7 @@
 import React from 'react'
 // import useIsMounted from '../../hooks/basic/useIsMounted'
 import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
-import { ReactComponent as DefaultAvatar } from '../../assets/svg/devaultAvatar32.svg'
+import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/devaultAvatar32.svg'
 // import DefaultAvatarSrc from '../../assets/img/defaultAvatar.png'
 // import defaultAvatarSrc from ''
 import styled from 'styled-components'
@@ -15,6 +15,7 @@ interface IProps {
   textSize?: number
   marginAuto?: boolean
   setDefaultAvatar?: boolean
+  DefaultAvatar?: JSX.Element
   DeletedIcon?: JSX.Element
   border?: string
   handleAvatarClick?: () => void
@@ -28,6 +29,7 @@ const Avatar: React.FC<IProps> = ({
   DeletedIcon,
   marginAuto,
   setDefaultAvatar,
+  DefaultAvatar,
   border,
   handleAvatarClick
   // customAvatarColors
@@ -89,7 +91,7 @@ const Avatar: React.FC<IProps> = ({
       ) : // : !avatarImage.src && name
       !image ? (
         setDefaultAvatar ? (
-          <DefaultAvatarWrapper color={colors.defaultAvatarBackground} />
+          DefaultAvatar || <DefaultAvatarWrapper color={colors.defaultAvatarBackground} />
         ) : (
           <span>{avatarText}</span>
         )
@@ -170,7 +172,7 @@ export const AvatarImage = styled.img<AvatarImageProps>`
   object-fit: cover;
 `
 
-export const DefaultAvatarWrapper = styled(DefaultAvatar)`
+export const DefaultAvatarWrapper = styled(DefaultAvatarIcon)`
   color: ${(props) => props.color || colors.defaultAvatarBackground};
 `
 

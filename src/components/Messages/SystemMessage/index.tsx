@@ -100,33 +100,41 @@ const Message = ({
         {message.body === 'CC'
           ? ' created this channel '
           : message.body === 'CG'
-          ? ' created this group'
-          : message.body === 'AM'
-          ? ` added ${
-              !!(messageMetas && messageMetas.m) &&
-              messageMetas.m
-                .slice(0, 5)
-                .map((mem: string) =>
-                  mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
-                )
-            } ${
-              messageMetas && messageMetas.m && messageMetas.m.length > 5 ? `and ${messageMetas.m.length - 5} more` : ''
-            }`
-          : message.body === 'RM'
-          ? ` removed ${
-              messageMetas &&
-              messageMetas.m &&
-              messageMetas.m
-                .slice(0, 5)
-                .map((mem: string) =>
-                  mem === user.id ? 'You' : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
-                )
-            } ${
-              messageMetas && messageMetas.m && messageMetas.m.length > 5 ? `and ${messageMetas.m.length - 5} more` : ''
-            }`
-          : message.body === 'LG'
-          ? ' left the group'
-          : ''}
+            ? ' created this group'
+            : message.body === 'AM'
+              ? ` added ${
+                  !!(messageMetas && messageMetas.m) &&
+                  messageMetas.m
+                    .slice(0, 5)
+                    .map((mem: string) =>
+                      mem === user.id
+                        ? 'You'
+                        : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
+                    )
+                } ${
+                  messageMetas && messageMetas.m && messageMetas.m.length > 5
+                    ? `and ${messageMetas.m.length - 5} more`
+                    : ''
+                }`
+              : message.body === 'RM'
+                ? ` removed ${
+                    messageMetas &&
+                    messageMetas.m &&
+                    messageMetas.m
+                      .slice(0, 5)
+                      .map((mem: string) =>
+                        mem === user.id
+                          ? 'You'
+                          : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
+                      )
+                  } ${
+                    messageMetas && messageMetas.m && messageMetas.m.length > 5
+                      ? `and ${messageMetas.m.length - 5} more`
+                      : ''
+                  }`
+                : message.body === 'LG'
+                  ? ' left the group'
+                  : ''}
       </span>
     </Container>
   )
@@ -175,7 +183,9 @@ export const Container = styled.div<{
     border: ${(props) => props.border};
     border-radius: ${(props) => props.borderRadius || '14px'};
     padding: 5px 16px;
-    box-shadow: 0 0 2px rgba(0, 0, 0, 0.08), 0 2px 24px rgba(0, 0, 0, 0.08);
+    box-shadow:
+      0 0 2px rgba(0, 0, 0, 0.08),
+      0 2px 24px rgba(0, 0, 0, 0.08);
     text-overflow: ellipsis;
     overflow: hidden;
   }
