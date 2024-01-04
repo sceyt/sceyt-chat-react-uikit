@@ -650,11 +650,12 @@ export const UnreadInfo = styled.span<{ bottom?: string }>`
   margin-left: auto;
 `
 const UnreadCount = styled.span<UnreadCountProps>`
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   background-color: ${(props) => props.backgroundColor || colors.primary};
   padding: 0 4px;
   font-size: ${(props) => props.fontSize || '13px'};
-  line-height: 20px;
   min-width: ${(props) => props.width || '20px'};
   height: ${(props) => props.height || '20px'};
   text-align: center;
@@ -663,5 +664,5 @@ const UnreadCount = styled.span<UnreadCountProps>`
   border-radius: 10px;
   box-sizing: border-box;
 
-  /*${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}*/
+  ${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}
 `
