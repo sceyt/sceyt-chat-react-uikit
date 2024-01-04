@@ -1887,7 +1887,6 @@ function* getMessagesQuery(action: IAction): any {
           setAllMessages([])
           // }
           result = yield call(messageQuery.loadPreviousMessageId, '0')
-          console.log('result.messages..... . .. . ', result.messages)
           if (result.messages.length === 50) {
             messageQuery.limit = 20
             const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
