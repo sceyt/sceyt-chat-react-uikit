@@ -303,7 +303,7 @@ const Details = ({
                   {channel.memberCount} {displayMemberText}
                 </SubTitle>
               )}
-              {!isDirectChannel && checkActionPermission('editChannel') && (
+              {!isDirectChannel && checkActionPermission('updateChannel') && (
                 <EditButton
                   topPosition={channelEditIconTopPosition}
                   rightPosition={channelEditIconRightPosition}
