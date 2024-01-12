@@ -2,18 +2,7 @@ import React, { useEffect } from 'react'
 import styled from 'styled-components'
 
 const PopupContainer = ({ children }: any) => {
-  // const [popupContainerDimensions, setPopupContainerDimensions] = useState<any>({})
   useEffect(() => {
-    /* const sceytChatContainer = document.getElementById('sceyt_chat_container')
-    if (sceytChatContainer) {
-      const rect = sceytChatContainer.getBoundingClientRect()
-      setPopupContainerDimensions({
-        width: rect.width,
-        height: rect.height,
-        top: rect.top,
-        left: rect.left
-      })
-    } */
     const body = document.querySelector('body')
     if (body) {
       body.style.overflow = 'hidden'
@@ -25,16 +14,7 @@ const PopupContainer = ({ children }: any) => {
       }
     }
   }, [])
-  return (
-    <Container
-    // width={popupContainerDimensions.width}
-    // height={popupContainerDimensions.height}
-    // left={popupContainerDimensions.left}
-    // top={popupContainerDimensions.top}
-    >
-      {children}
-    </Container>
-  )
+  return <Container>{children}</Container>
 }
 
 export default PopupContainer

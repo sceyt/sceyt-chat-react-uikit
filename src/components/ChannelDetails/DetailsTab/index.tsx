@@ -1,16 +1,19 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { useDispatch } from 'react-redux'
+// Store
+import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
+// Helpers
+import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
+import { IChannel } from '../../../types'
+// Components
 import Members from './Members'
 import Media from './Media'
 import Files from './Files'
 import Links from './Links'
-import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
-import { IChannel } from '../../../types'
 import Voices from './Voices'
-import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 
 interface IProps {
   channel: IChannel

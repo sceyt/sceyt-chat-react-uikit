@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
-import { setClient } from '../../common/client'
+// Store
+import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
+import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
+import { setThemeAC } from '../../store/theme/actions'
+import { contactsMapSelector } from '../../store/user/selector'
+import { getRolesAC } from '../../store/member/actions'
+import { getRolesFailSelector } from '../../store/member/selector'
+// Hooks
+import { useDidUpdate } from '../../hooks'
+// Helpers
 import {
   destroyChannelsMap,
   setActiveChannelId,
@@ -10,24 +19,18 @@ import {
   setHandleNewMessages,
   setOpenChatOnUserInteraction
 } from '../../helpers/channelHalper'
-import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
+import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
-import { contactsMapSelector } from '../../store/user/selector'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { colors } from '../../UIHelper/constants'
-import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
-import { setThemeAC } from '../../store/theme/actions'
 import { THEME } from '../../helpers/constants'
-import { useDidUpdate } from '../../hooks'
-import { getRolesAC } from '../../store/member/actions'
-import { getRolesFailSelector } from '../../store/member/selector'
 
 const SceytChat = ({
   client,

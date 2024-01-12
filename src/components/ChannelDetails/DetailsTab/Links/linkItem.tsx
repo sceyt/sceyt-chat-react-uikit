@@ -2,7 +2,6 @@ import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../../assets/svg/linkIcon.svg'
 import { colors } from '../../../../UIHelper/constants'
-// import { AttachmentPreviewTitle } from '../../../../UIHelper'
 
 interface IProps {
   link: string

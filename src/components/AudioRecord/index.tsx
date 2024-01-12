@@ -1,17 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-
 // @ts-ignore
 import MicRecorder from 'mic-recorder-to-mp3'
-
+// Hooks
+import { useDidUpdate } from '../../hooks'
+// Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/playRecord.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pauseRecord.svg'
 import { ReactComponent as CancelRecordIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
+// Helpers
 import { colors } from '../../UIHelper/constants'
-import { useDidUpdate } from '../../hooks'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -146,99 +147,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           }
 
           soundAllowed(stream)
-          /* const analyser = audioContext.createAnalyser()
-
-          const source = audioContext.createMediaStreamSource(stream)
-          source.connect(analyser)
-          source.connect(analyser)
-
-          analyser.fftSize = 2048
-          const bufferLength = analyser.frequencyBinCount // half the FFT value
-          const dataArray = new Uint8Array(bufferLength) // Uint8Array should be the same length as the frequencyBinCount
-
-          const canvas = document.getElementById('waveform')
-          if (canvas) {
-            // @ts-ignore
-            canvas.width = 300
-            // @ts-ignore
-            canvas.height = 32
-          }
-          // @ts-ignore
-          const canvasCtx = canvas.getContext('2d')
-          let x = 0 // the initial drawing position
-          let draws = 0
-
-          const framesToSkip = 2 // Skip drawing for this many frames
-          let frameCounter = 0
-          const browser = detectBrowser()
-          async function drawWaveform() {
-            draws++
-            // console.log('drawWaveform. . .. . .  .', shouldDraw)
-            if (!shouldDraw) {
-              x = 0 // reset x to start drawing from the start again
-              // @ts-ignore
-              canvasCtx.clearRect(0, 0, canvas.width, canvas.height) // clear the canvas
-
-              return
-            }
-
-            requestAnimationFrame(drawWaveform)
-
-            // Draw only every few frames
-            if (frameCounter % framesToSkip !== 0) {
-              frameCounter++
-              return
-            }
-            frameCounter = 1
-
-            analyser.getByteFrequencyData(dataArray)
-            if (draws >= 40) {
-              // @ts-ignore
-              const barWidth = (canvas.width / bufferLength) * 2.5 // Increase width of each bar
-              const barSpacing = barWidth * 0.2 // spacing between bars
-              let barHeight
-              let renderHeight
-
-              // clear only the part of the canvas where the next bar will be drawn
-              // @ts-ignore
-              canvasCtx.clearRect(x, 0, barWidth + barSpacing, canvas.height) // clear space includes barSpacing
-              // let r = 0
-              console.log('dataArray..         ... . . ', dataArray)
-              for (let i = 0; i < bufferLength; i++) {
-                barHeight = dataArray[i]
-                // r++
-                // skip the drawing, so the drawing became slower
-                if (i !== 1) continue
-                if (barHeight === 0) {
-                  barHeight = 1
-                }
-                canvasCtx.fillStyle = colors.textColor2
-                if (browser !== 'Safari') {
-                  console.log(
-                    'make it half the height of the canvas to start from the middle >>>>>>>................ ..>>>>>>'
-                  )
-                  renderHeight = -(barHeight / 2)
-                } else {
-                  renderHeight = -barHeight
-                }
-                // make it half the height of the canvas to start from the middle
-                // console.log('renderHeight', -renderHeight)
-                // @ts-ignore
-                canvasCtx.fillRect(x, canvas.height / 2 + renderHeight / 2, 1, -renderHeight)
-
-                x += barWidth + 2 // add barSpacing to the increment
-
-                // if we've reached or exceeded the end of the canvas, loop back
-                // @ts-ignore
-                if (x + barWidth + barSpacing > canvas.width) {
-                  x = 0
-                  // @ts-ignore
-                  canvasCtx.clearRect(0, 0, canvas.width, canvas.height) // clear the canvas
-                }
-              }
-            }
-          } */
-          // drawWaveform()
         })
         .catch((e: any) => {
           console.error(e)

@@ -1,18 +1,21 @@
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
+import { CircularProgressbar } from 'react-circular-progressbar'
+// Store
+import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
+import { getAttachmentsAC } from '../../../../store/message/actions'
+// Assets
 import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
+// Helpers
 import { bytesToSize, downloadFile, formatLargeText } from '../../../../helpers'
-import { colors } from '../../../../UIHelper/constants'
-import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
-import { IAttachment } from '../../../../types'
-import { getAttachmentsAC } from '../../../../store/message/actions'
-import { channelDetailsTabs } from '../../../../helpers/constants'
-import { AttachmentPreviewTitle } from '../../../../UIHelper'
-import { CircularProgressbar } from 'react-circular-progressbar'
 import { isJSON } from '../../../../helpers/message'
 import { base64ToToDataURL } from '../../../../helpers/resizeImage'
+import { IAttachment } from '../../../../types'
+import { channelDetailsTabs } from '../../../../helpers/constants'
+import { AttachmentPreviewTitle } from '../../../../UIHelper'
+import { colors } from '../../../../UIHelper/constants'
 
 interface IProps {
   channelId: string

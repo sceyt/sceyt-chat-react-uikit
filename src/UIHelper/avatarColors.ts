@@ -1,4 +1,4 @@
-import { ICustomAvatarColors } from '../components/Channel/types'
+import { ICustomAvatarColors } from '../types'
 
 let _avatarColors = ['#FF3E74', '#4F6AFF', '#FBB019', '#00CC99', '#9F35E7', '#63AFFF']
 

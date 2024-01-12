@@ -2,26 +2,7 @@ import styled from 'styled-components'
 import React, { FC, useEffect, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import moment from 'moment'
-// import { ReactComponent as ReactionIcon } from '../../assets/lib/svg/react2.svg'
-import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
-import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
-// import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
-import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
-import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.svg'
-// import { ReactComponent as ResendIcon } from '../../assets/svg/refresh.svg'
-// import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteChannel.svg'
-import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
-import { isJSON, makeUsername, MessageTextFormat } from '../../helpers/message'
-import { getClient } from '../../common/client'
-import MessageActions from './MessageActions'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
-import Avatar from '../Avatar'
-import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
-import Attachment from '../Attachment'
-import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
-// import EmojisPopup from '../Emojis'
-// import AudioPlayer from '../AudioPlayer'
+// Store
 import {
   addReactionAC,
   addSelectedMessageAC,
@@ -37,25 +18,41 @@ import {
   setMessageMenuOpenedAC,
   setMessageToEditAC
 } from '../../store/message/actions'
-import ConfirmPopup from '../../common/popups/delete'
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
-import ForwardMessagePopup from '../../common/popups/forwardMessage'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { CONNECTION_STATUS } from '../../store/user/constants'
+// Hooks
+import { useDidUpdate, useOnScreen } from '../../hooks'
+// Assets
+import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
+import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
+import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.svg'
+// Helpers
 import {
   deletePendingMessage,
   getPendingAttachment,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from '../../helpers/messagesHalper'
-// import DropDown from '../../common/dropdown'
+import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
+import { isJSON, makeUsername, MessageTextFormat } from '../../helpers/message'
+import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
+import { getClient } from '../../common/client'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
+import { colors } from '../../UIHelper/constants'
+import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
+// Components
+import MessageActions from './MessageActions'
+import Avatar from '../Avatar'
+import Attachment from '../Attachment'
+import ConfirmPopup from '../../common/popups/delete'
+import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
-import { useDidUpdate, useOnScreen } from '../../hooks'
-import { CONNECTION_STATUS } from '../../store/user/constants'
-import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
-// import { getPendingAttachment } from '../../helpers/messagesHalper'
 
 interface IMessageProps {
   message: IMessage
@@ -432,21 +429,6 @@ const Message = ({
 
   const isSelectedMessage = selectedMessagesMap && selectedMessagesMap.get(message.id || message.tid!)
   const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= 30
-
-  /* const handleClick = (e: any) => {
-    if (emojisRef.current && !emojisRef?.current?.contains(e.target)) {
-      setReactionIsOpen(false)
-    }
-  } */
-
-  /* useEffect(() => {
-    if (message.reactionScores) {
-      document.addEventListener('mousedown', handleClick)
-    }
-    return () => {
-      document.removeEventListener('mousedown', handleClick)
-    }
-  }, []) */
 
   const toggleEditMode = () => {
     // setEditMode(!editMode)

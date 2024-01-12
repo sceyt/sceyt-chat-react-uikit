@@ -1,9 +1,8 @@
 import React from 'react'
 import { Provider } from 'react-redux'
 import store from '../../store'
-import { ICustomAvatarColors } from '../Channel/types'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, IMessage, IUser } from '../../types'
+import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
 export interface IProgress {
   loaded: number
   total: number

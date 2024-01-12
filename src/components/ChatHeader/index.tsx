@@ -1,28 +1,32 @@
 import styled from 'styled-components'
 import React, { FC } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
-import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
-import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+// Store
+import { switchChannelActionAC, switchChannelInfoAC } from '../../store/channel/actions'
 import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
   channelListHiddenSelector
 } from '../../store/channel/selector'
-import Avatar from '../Avatar'
-import { SectionHeader, SubTitle } from '../../UIHelper'
-import { switchChannelActionAC, switchChannelInfoAC } from '../../store/channel/actions'
-import { AvatarWrapper, UserStatus } from '../Channel'
+import { themeSelector } from '../../store/theme/selector'
+import { contactsMapSelector } from '../../store/user/selector'
+import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+// Assets
+import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
+import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
+// Helpers
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
-import { colors } from '../../UIHelper/constants'
-import { IChannel, IContactsMap, IMember } from '../../types'
-import { contactsMapSelector } from '../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { themeSelector } from '../../store/theme/selector'
+import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+import { SectionHeader, SubTitle } from '../../UIHelper'
+import { AvatarWrapper, UserStatus } from '../Channel'
+import { colors } from '../../UIHelper/constants'
+import { IChannel, IContactsMap, IMember } from '../../types'
+// Components
+import Avatar from '../Avatar'
 
 interface IProps {
   backgroundColor?: string

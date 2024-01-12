@@ -1,17 +1,18 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
-// @ts-ignore
-
+// Hooks
 import { useDidUpdate } from '../../hooks'
-
+// Store
+import { playingAudioIdSelector } from '../../store/message/selector'
+import { setPlayingAudioIdAC } from '../../store/message/actions'
+// Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
+// Helpers
 import { colors } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
-import { useDispatch, useSelector } from 'react-redux'
-import { playingAudioIdSelector } from '../../store/message/selector'
-import { setPlayingAudioIdAC } from '../../store/message/actions'
 
 interface Recording {
   recordingSeconds: number
@@ -28,7 +29,6 @@ interface AudioPlayerProps {
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
-  // const AudioPlayer: React.FC<AudioPlayerProps> = ({ file }) => {
   const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -42,11 +42,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
   const [isRendered, setIsRendered] = useState<any>(false)
   const [playAudio, setPlayAudio] = useState<any>(false)
-  // const [payingAudioId, setPayingAudioId] = useState<any>(false)
 
   const [currentTime, setCurrentTime] = useState<any>('')
   const [audioRate, setAudioRate] = useState<any>(1)
-  // const [voiceUrl, setVoiceUrl] = useState<any>('')
 
   const wavesurfer = useRef<any>(null)
   const wavesurferContainer = useRef<any>(null)
@@ -80,15 +78,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           if (currentTime >= 0) {
             setCurrentTime(formatAudioVideoTime(currentTime))
           }
-          /*   setCurrentTime(() => {
-            if (time <= 9) {
-              return `00${wavesurfer.current.getCurrentTime().toFixed(0)}`
-            }
-            if (time <= 19) {
-              return `0${wavesurfer.current.getCurrentTime().toFixed(0)}`
-            }
-            return `${wavesurfer.current.getCurrentTime().toFixed(0)}`
-          }) */
         }, 10)
       } else {
         if (playingAudioId === file.id) {
@@ -172,19 +161,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           barMinHeight: 2,
           height: 20
         })
-        /* .then((blob) => {
-          // Here's where you get access to the blob
-          // And you can use it for whatever you want
-          // Like calling ref().put(blob)
-
-          console.log('blob --- ', blob);
-          // wavesurfer.current.loadBlob(blob);
-          // Here, I use it to make an image appear on the page
-          const objectURL = URL.createObjectURL(blob);
-
-          console.log('object url ........ ', objectURL);
-        }); */
-        // wavesurfer.current.load(url);
         let peaks
         if (file.metadata) {
           if (file.metadata.dur) {

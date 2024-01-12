@@ -1,16 +1,19 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef } from 'react'
 import { useDispatch } from 'react-redux'
+// Store
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
+// Hooks
+import { useDidUpdate, useOnScreen } from '../../../hooks'
+// Helpers
+import { isJSON, makeUsername } from '../../../helpers/message'
+import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { colors } from '../../../UIHelper/constants'
-import { isJSON, makeUsername } from '../../../helpers/message'
-import { systemMessageUserName } from '../../../helpers'
 import { getClient } from '../../../common/client'
-import { useDidUpdate, useOnScreen } from '../../../hooks'
 
 interface ISystemMessageProps {
   channel: IChannel

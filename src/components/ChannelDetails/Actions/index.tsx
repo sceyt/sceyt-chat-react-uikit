@@ -1,6 +1,24 @@
 import React, { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
+// Hooks
+import usePermissions from '../../../hooks/usePermissions'
+
+// Store
+import {
+  blockChannelAC,
+  clearHistoryAC,
+  deleteAllMessagesAC,
+  deleteChannelAC,
+  leaveChannelAC,
+  markChannelAsReadAC,
+  markChannelAsUnReadAC,
+  turnOffNotificationsAC,
+  turnOnNotificationsAC
+} from '../../../store/channel/actions'
+import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
+// import { reportUserAC } from '../../../../store/member/actions'
+// Assets
 import { ReactComponent as BottomIcon } from '../../../assets/svg/bottom.svg'
 // import { ReactComponent as DeleteIcon } from '../../../assets/lib/svg/clearHistory.svg'
 import { ReactComponent as NotificationIcon } from '../../../assets/svg/notifications.svg'
@@ -14,30 +32,18 @@ import { ReactComponent as BlockIcon } from '../../../assets/svg/blockChannel.sv
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report.svg'
 import { ReactComponent as StarIcon } from '../../../assets/svg/star.svg'
 import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
+// Helpers
+import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import ConfirmPopup from '../../../common/popups/delete'
 import { CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
 import { colors } from '../../../UIHelper/constants'
-// import ReportPopup from '../../../../common/Popups/report';
-// import { reportUserAC } from '../../../../store/member/actions'
 import { IChannel, IMember, MuteTime } from '../../../types'
-import DropDown from '../../../common/dropdown'
-import {
-  blockChannelAC,
-  clearHistoryAC,
-  deleteAllMessagesAC,
-  deleteChannelAC,
-  leaveChannelAC,
-  markChannelAsReadAC,
-  markChannelAsUnReadAC,
-  turnOffNotificationsAC,
-  turnOnNotificationsAC
-} from '../../../store/channel/actions'
-import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
-import usePermissions from '../../../hooks/usePermissions'
 import { getClient } from '../../../common/client'
-import { hideUserPresence } from '../../../helpers/userHelper'
+// Components
+// import ReportPopup from '../../../../common/Popups/report';
+import ConfirmPopup from '../../../common/popups/delete'
+import DropDown from '../../../common/dropdown'
 
 interface IProps {
   channel: IChannel

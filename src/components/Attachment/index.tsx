@@ -1,16 +1,26 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { CircularProgressbar } from 'react-circular-progressbar'
-// import 'react-circular-progressbar/dist/styles.css'
-// import { ReactComponent as DownloadFileIcon } from '../../assets/svg/download.svg'
+// Store
+import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
+import { connectionStatusSelector } from '../../store/user/selector'
+import { themeSelector } from '../../store/theme/selector'
+import {
+  pauseAttachmentUploadingAC,
+  resumeAttachmentUploadingAC,
+  updateAttachmentUploadingStateAC,
+  updateMessageAC
+} from '../../store/message/actions'
+// Hooks
+import { useDidUpdate } from '../../hooks'
+// Assets
+import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/fileIcon.svg'
 import { ReactComponent as RemoveAttachment } from '../../assets/svg/deleteUpload.svg'
-// import { ReactComponent as RemoveFaledAttachment } from '../../assets/svg/deleteFailed.svg'
-// import { ReactComponent as PlayIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as UploadIcon } from '../../assets/svg/upload.svg'
 import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
+// Helpers
 import {
   bytesToSize,
   calculateRenderedImageWidth,
@@ -19,27 +29,18 @@ import {
   formatLargeText,
   setDownloadFilePromise
 } from '../../helpers'
-import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
-import { IAttachment } from '../../types'
 import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { colors } from '../../UIHelper/constants'
-import VideoPreview from '../VideoPreview'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
-import {
-  pauseAttachmentUploadingAC,
-  resumeAttachmentUploadingAC,
-  updateAttachmentUploadingStateAC,
-  updateMessageAC
-} from '../../store/message/actions'
-import AudioPlayer from '../AudioPlayer'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
-import { connectionStatusSelector } from '../../store/user/selector'
-import { CONNECTION_STATUS } from '../../store/user/constants'
-import { themeSelector } from '../../store/theme/selector'
 import { base64ToToDataURL } from '../../helpers/resizeImage'
-import { useDidUpdate } from '../../hooks'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
+import { CONNECTION_STATUS } from '../../store/user/constants'
+import { IAttachment } from '../../types'
+// Components
+import VideoPreview from '../VideoPreview'
+import AudioPlayer from '../AudioPlayer'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -58,7 +59,6 @@ interface AttachmentPops {
   selectedFileAttachmentsTitleColor?: string
   selectedFileAttachmentsSizeColor?: string
   selectedFileAttachmentsIcon?: JSX.Element
-  fileNameMaxLength?: number
   imageMinWidth?: string
   // eslint-disable-next-line no-unused-vars
   closeMessageActions?: (state: boolean) => void
@@ -83,7 +83,6 @@ const Attachment = ({
   selectedFileAttachmentsTitleColor,
   selectedFileAttachmentsSizeColor,
   isDetailsView,
-  // fileNameMaxLength,
   imageMinWidth,
   closeMessageActions,
   fileAttachmentWidth,
@@ -147,27 +146,6 @@ const Attachment = ({
       console.log('error on get attachmentThumb', e)
     }
   }
-  // const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
-  // TODO check after and remove in not nedded
-  /* const [mediaFile, setMediaFile] = useState<IAttachment | null>(null)
-  const sliderAttachments = attachments.filter(
-    (a: IAttachment) => a.type === 'image' || a.type === 'video'
-  )
-  const handleMediaItemClick = () => {
-    setMediaFile(attachment)
-  } */
-
-  /* const RenderAttachmentImage = () =>
-    useMemo(
-      () => (
-        <AttachmentImg
-          src={attachment.attachmentUrl || attachment.url}
-          borderRadius={borderRadius}
-          // onClick={handleMediaItemClick}
-        />
-      ),
-      [attachment.url]
-    ) */
 
   const downloadImage = (url: string) => {
     const image = new Image()
@@ -193,13 +171,11 @@ const Attachment = ({
       }
     } else {
       setAttachmentUrl('')
-      console.log('set downlod is cancelled true')
       setDownloadIsCancelled(true)
     }
   }
   const handlePauseResumeUpload = (e: Event) => {
     e.stopPropagation()
-    console.log('handlePauseResumeUpload. . . . .', handlePauseResumeUpload)
     if (downloadingFile) {
       handleStopStartDownloadFile(attachment)
     } else {
@@ -279,17 +255,13 @@ const Attachment = ({
       })
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
-      // customDownloader(attachment.url, true, (progress) => {}).then(async (data) => {
-      // if (attachment.type === attachmentTypes.video) {
       const url = URL.createObjectURL(result.Body)
       setSizeProgress(undefined)
       const response = await fetch(url)
       setAttachmentToCache(attachment.url, response)
       setIsCached(true)
-      // }
       setDownloadingFile(false)
       setAttachmentUrl(url)
-      // })
     } else {
       setAttachmentUrl(attachment.url)
       fetch(attachment.url).then(async (response) => {
@@ -339,17 +311,13 @@ const Attachment = ({
               setIsCached(false)
               setDownloadingFile(true)
               if (customDownloader) {
-                // console.log('is not cached, download with custom downloader')
                 customDownloader(attachment.url, false).then(async (url) => {
-                  // console.log('image is downloaded. . . should load image', url)
                   downloadImage(url)
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.url, response)
                   setIsCached(true)
                 })
               } else {
-                // console.log('is not cached, load attachment.url', attachment.url)
-                // console.log('is not cached, load attachment.attachmentUrl', attachment.attachmentUrl)
                 downloadImage(attachment.url)
                 fetch(attachment.url).then(async (response) => {
                   setAttachmentToCache(attachment.url, response)
@@ -364,14 +332,10 @@ const Attachment = ({
               setIsCached(true)
             } else {
               setIsCached(false)
-              /* if (attachment.attachmentUrl) {
-                setAttachmentUrl(attachment.attachmentUrl)
-              } else { */
               if (attachment.type === attachmentTypes.voice) {
                 setAttachmentUrl('_')
               }
               handleDownloadFile()
-              // }
             }
           }
         })
@@ -434,28 +398,9 @@ const Attachment = ({
       }
     }
   }, [attachmentsUploadProgress])
-  /* useEffect(() => {
-    console.log('isCached. . . . . . . ', attachment.name, isCached)
-  }, [isCached])
-  console.log(
-    'should show loading 1..... ',
-    attachment.name,
-    '- - -- ',
-    (attachmentCompilationState[attachment.tid!] &&
-      (attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
-        attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)) ||
-      !isCached
-  )
-  console.log(
-    'should show loading 2..... ',
-    attachment.name,
-    '- - -- ',
-    attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING || !isCached
-  ) */
 
   return (
     <React.Fragment>
-      {/* {ext === 'jpg' || ext === 'jpeg' || ext === 'png' || ext === 'gif' ? ( */}
       {attachment.type === 'image' ? (
         <AttachmentImgCont
           draggable={false}
@@ -472,7 +417,6 @@ const Attachment = ({
           width={!isPreview && !isRepliedMessage ? renderWidth : undefined}
           height={!isPreview && !isRepliedMessage && !isDetailsView ? renderHeight : undefined}
         >
-          {/* {(attachment.attachmentUrl || attachmentUrl) && ( */}
           <AttachmentImg
             draggable={false}
             // hidden={imageLoading}
@@ -490,21 +434,6 @@ const Attachment = ({
             }
             onLoad={() => setImageLoading(false)}
           />
-          {/* )} */}
-
-          {/* {!imgIsLoaded && ( */}
-          {/*    {!isPreview && attachment.metadata && attachment.metadata.tmb && (
-            <ImageThumbnail
-              src={attachment.metadata.tmb}
-              fitTheContainer={isDetailsView}
-              width={attachment.metadata.szw}
-              height={attachment.metadata.szh}
-              isRepliedMessage={isRepliedMessage}
-              borderRadius={borderRadius}
-              isLoaded={!imgIsLoaded}
-            />
-          )} */}
-          {/* )} */}
           {!isPreview && (isInUploadingState || imageLoading) ? (
             <UploadProgress
               backgroundImage={attachmentThumb}
@@ -545,11 +474,6 @@ const Attachment = ({
                         background={true}
                         text=''
                         styles={{
-                          // Rotation of path and trail, in number of turns (0-1)
-                          // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-
-                          // Text size
-                          // textSize: '16px',
                           background: {
                             fill: 'rgba(23, 25, 28, 0.40)'
                           },
@@ -953,8 +877,6 @@ const Attachment = ({
           }
         </AttachmentFile>
       )}
-      {/* eslint-disable-next-line max-len */}
-      {/* {mediaFile && <SliderPopup setIsSliderOpen={setMediaFile} mediaFiles={sliderAttachments} currentMediaFile={mediaFile} user={user} />} */}
     </React.Fragment>
   )
 }
@@ -1006,13 +928,9 @@ const AttachmentImgCont = styled.div<{
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  //flex-direction: column;
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
-  //max-width: 420px;
-  //max-height: 400px;
   min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '165px'};
   height: ${(props) => props.fitTheContainer && '100%'};
-
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
   max-width: 100%;

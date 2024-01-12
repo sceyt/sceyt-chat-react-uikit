@@ -1,5 +1,11 @@
 import React from 'react'
+import { useSelector } from 'react-redux'
 import styled from 'styled-components'
+// Store
+import { themeSelector } from '../../../store/theme/selector'
+// Hooks
+import usePermissions from '../../../hooks/usePermissions'
+// Assets
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteIcon.svg'
 import { ReactComponent as SelectIcon } from '../../../assets/svg/checkCircle.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report_icon.svg'
@@ -10,15 +16,12 @@ import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
+// Helpers
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
-// import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import usePermissions from '../../../hooks/usePermissions'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
-import { useSelector } from 'react-redux'
-import { themeSelector } from '../../../store/theme/selector'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
@@ -289,7 +292,9 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
   background-color: ${(props) => props.backgroundColor};
   box-sizing: border-box;
   border-radius: 12px;
-  box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
+  box-shadow:
+    0 0 2px rgba(17, 21, 57, 0.08),
+    0 0 24px rgba(17, 21, 57, 0.16);
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;

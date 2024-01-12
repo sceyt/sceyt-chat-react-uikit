@@ -41,8 +41,8 @@ export const messageStatusIcon = ({
   messageStatus,
   messageStatusDisplayingType,
   iconColor,
-  size,
-  readIconColor
+  readIconColor,
+  size
 }: {
   messageStatus: string
   messageStatusDisplayingType: string

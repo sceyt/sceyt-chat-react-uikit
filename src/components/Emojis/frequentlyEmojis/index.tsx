@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from 'react'
+import { useSelector } from 'react-redux'
 import styled from 'styled-components'
-import { colors } from '../../../UIHelper/constants'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
-import { useSelector } from 'react-redux'
+import { colors } from '../../../UIHelper/constants'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 
@@ -124,8 +124,15 @@ const Container = styled.div<{ rendered?: boolean; rightSide?: boolean; backgrou
 `
 
 const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   display: flex;
   align-items: center;
   justify-content: center;

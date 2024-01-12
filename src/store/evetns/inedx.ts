@@ -221,7 +221,9 @@ export default function* watchForEvents(): any {
       channel: IChannel,
       unreadChannels: number,
       totalUnread: number,
-      channelUnreadCount: number
+      channelUnreadCount: number,
+      channelUnreadMentions: number,
+      channelUnreadReactions: number
     ) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO,
@@ -229,7 +231,9 @@ export default function* watchForEvents(): any {
           channel,
           unreadChannels,
           totalUnread,
-          channelUnreadCount
+          channelUnreadCount,
+          channelUnreadMentions,
+          channelUnreadReactions
         }
       })
     channelListener.onHidden = (channel: IChannel) =>

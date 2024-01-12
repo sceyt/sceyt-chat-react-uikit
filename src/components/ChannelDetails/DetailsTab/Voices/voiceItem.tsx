@@ -1,21 +1,25 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
+import moment from 'moment/moment'
+// Store
+import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
+import { playingAudioIdSelector } from '../../../../store/message/selector'
+import { setPlayingAudioIdAC } from '../../../../store/message/actions'
+// Hooks
+import { useDidUpdate } from '../../../../hooks'
+// Assets
 import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePreview.svg'
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 import { ReactComponent as VoicePlayHoverIcon } from '../../../../assets/svg/voicePreviewHoverIcon.svg'
 import { ReactComponent as VoicePauseHoverIcon } from '../../../../assets/svg/voicePreviewPauseHover.svg'
-import { colors } from '../../../../UIHelper/constants'
-import { IAttachment } from '../../../../types'
+// Helpers
 import { getCustomDownloader } from '../../../../helpers/customUploader'
-import { useDispatch, useSelector } from 'react-redux'
-import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
 import { formatAudioVideoTime } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
-import moment from 'moment/moment'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
-import { useDidUpdate } from '../../../../hooks'
-import { playingAudioIdSelector } from '../../../../store/message/selector'
-import { setPlayingAudioIdAC } from '../../../../store/message/actions'
+import { colors } from '../../../../UIHelper/constants'
+import { IAttachment } from '../../../../types'
 
 interface IProps {
   file: IAttachment
@@ -83,16 +87,10 @@ const VoiceItem = ({
   }
 
   useDidUpdate(() => {
-    console.log('voice item payingAudioId. . . . .', playingAudioId)
     if (audioIsPlaying && playingAudioId && playingAudioId !== `voice_${file.id}` && audioRef.current) {
       setAudioIsPlaying(false)
       audioRef.current.pause()
     }
-    /* if (playingVoiceId && playingVoiceId !== file.id) {
-      clearInterval(intervalRef.current)
-      setAudioIsPlaying(false)
-      audioRef.current?.pause()
-    } */
   }, [playingAudioId])
   useEffect(() => {
     if (customDownloader) {

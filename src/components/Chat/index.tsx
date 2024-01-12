@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+// Store
 import {
   activeChannelSelector,
   addedChannelSelector,
@@ -9,8 +10,10 @@ import {
   channelListWidthSelector
 } from '../../store/channel/selector'
 import { getChannelsAC, setActiveChannelAC, setHideChannelListAC } from '../../store/channel/actions'
-import { IChannel } from '../../types'
+// Hooks
 import { useDidUpdate } from '../../hooks'
+// Helpers
+import { IChannel } from '../../types'
 import { setActiveChannelId } from '../../helpers/channelHalper'
 
 interface IProps {
@@ -32,7 +35,6 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
 
   useEffect(() => {
-    // console.log('channelListWidth.  ... . . . ', channelListWidth)
     if (hideChannelList && !channelListWidth) {
       dispatch(setHideChannelListAC(true))
       dispatch(getChannelsAC({ filter: {}, limit: 1, sort: 'byLastMessage', search: '' }, false))

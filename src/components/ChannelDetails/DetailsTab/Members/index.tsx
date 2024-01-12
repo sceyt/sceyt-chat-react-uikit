@@ -1,9 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
-import { ReactComponent as AddMemberIcon } from '../../../../assets/svg/addMember.svg'
-import { ReactComponent as MoreIcon } from '../../../../assets/svg/more_vert.svg'
-import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
+// Store
 import {
   blockMemberAC,
   changeMemberRoleAC,
@@ -12,27 +10,33 @@ import {
   loadMoreMembersAC
 } from '../../../../store/member/actions'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
-import Avatar from '../../../Avatar'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
-import DropDown from '../../../../common/dropdown'
-import { colors } from '../../../../UIHelper/constants'
-import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
-import { UserStatus } from '../../../Channel'
-import ConfirmPopup from '../../../../common/popups/delete'
-import ChangeMemberRole from './change-member-role'
-import { getClient } from '../../../../common/client'
-import { userLastActiveDateFormat } from '../../../../helpers'
-import { makeUsername } from '../../../../helpers/message'
-import UsersPopup from '../../../../common/popups/users'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
-import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
+import { createChannelAC } from '../../../../store/channel/actions'
+// Assets
+import { ReactComponent as AddMemberIcon } from '../../../../assets/svg/addMember.svg'
+import { ReactComponent as MoreIcon } from '../../../../assets/svg/more_vert.svg'
+// Helpers
+import { userLastActiveDateFormat } from '../../../../helpers'
 import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap,
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
-import { createChannelAC } from '../../../../store/channel/actions'
+import { makeUsername } from '../../../../helpers/message'
+import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
+import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
+import { UserStatus } from '../../../Channel'
+import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
+import { getClient } from '../../../../common/client'
+import { colors } from '../../../../UIHelper/constants'
+import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
+// Components
+import ConfirmPopup from '../../../../common/popups/delete'
+import ChangeMemberRole from './change-member-role'
+import Avatar from '../../../Avatar'
+import DropDown from '../../../../common/dropdown'
+import UsersPopup from '../../../../common/popups/users'
 
 interface IProps {
   channel: IChannel
