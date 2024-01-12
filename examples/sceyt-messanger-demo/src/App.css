@@ -1,0 +1,266 @@
+
+.main {
+  width: 100vw;
+  height: 100vh;
+  margin: auto;
+  overflow-y: auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.theme_switcher {
+  display: flex;
+  align-items: center;
+  width: 298px;
+  padding: 4px 5px;
+  border-radius: 24px;
+  background-color: rgba(255, 255, 255, 0.40);
+  margin: 0 auto 20px;
+}
+
+.theme_switcher_item {
+  display: flex;
+  align-items: center;
+  width: 140px;
+  padding: 6px 12px;
+  color: #111539;
+  font-size: 15px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 20px;
+  white-space: nowrap;
+  cursor: pointer;
+  margin-right: 8px;
+  transition: all 0.2s ease-in-out;
+}
+
+.theme_switcher_item span {
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.theme_switcher_item.dark_mode {
+  margin-right: 0;
+}
+
+
+.theme_switcher_item.active {
+  background-color: #fff;
+  border-radius: 24px;
+}
+
+.theme_switcher_item.dark_mode.active {
+  background-color: #111539;
+  color: #fff;
+  border-radius: 24px;
+}
+
+.messenger_demo_wrapper {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 20px 32px 32px;
+  background-color: #D1CFFF;
+}
+
+.sceyt_chat_wrapper {
+  position: relative;
+  height: calc(100% - 115px);
+  overflow: auto;
+  background-color: #fff;
+  border-radius: 0 0 16px 16px;
+}
+
+.messenger_demo_header {
+  padding: 12px 24px;
+  border-radius: 12px 12px 0 0;
+  background-color: #E3E2FF;
+}
+
+.messenger_demo_header span {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 50%;
+}
+
+.messenger_demo_header span.red_circle {
+  background-color: #ED6A5E;
+}
+
+.messenger_demo_header span.orange_circle {
+  background-color: #F4BF4F;
+}
+
+.messenger_demo_header span.green_circle {
+  background-color: #61C554;
+}
+
+.messenger_loading {
+  position: absolute;
+  top: calc(50% - 60px);
+  left: calc(50% - 60px);
+  animation: zoomAnimation 2s linear infinite;
+}
+
+.messenger_loading img {
+  max-width: 120px;
+  max-height: 100%;
+}
+
+.channels_title {
+  font-size: 16px;
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 28px;
+}
+
+.channels_title.dark {
+  color: #fff;
+}
+
+.channels_custom_list {
+  overflow-y: auto;
+  width: 360px;
+  border-right: 1px solid #EDEDED;
+  height: 100%;
+  padding: 0 12px;
+  background-color: #1B1C25;
+}
+
+.channels_custom_list.dark {
+  border-color: #1B1C25;
+}
+
+.channels_group_name {
+  color: #707388;
+  font-size: 14px;
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 23px;
+}
+
+.custom_channel_item {
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: 8px 12px;
+  border-radius: 12px;
+  transition: all .1s;
+}
+
+.custom_channel_item:hover {
+  background-color: #202128;
+}
+
+.custom_channel_item.active {
+  background-color: #25262E;
+}
+
+.channel_name {
+  color: rgba(255, 255, 255, 0.80);
+  font-size: 15px;
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  margin: 0;
+}
+
+.channel_name.withAvatar {
+  color: rgba(255, 255, 255, 0.80);
+  font-size: 15px;
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 24px;
+  margin-left: 8px;
+}
+
+.channel_unread_count {
+  background-color: #FA4C56;
+  color: #fff;
+  padding: 2px 6px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 14px;
+  font-weight: 500;
+  margin-left: auto;
+}
+
+.custom_create_channel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  overflow: hidden;
+  margin-left: 12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.custom_create_channel img {
+  color: #6B72FF;
+}
+
+.custom_create_channel:hover {
+  background-color: #34353d;
+}
+
+.custom_ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.custom_li {
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  font-size: 14px;
+  line-height: 20px;
+  color: #111539;
+  padding: 6px 6px 6px 16px;
+  transition: all .2s;
+}
+
+.custom_li.dark {
+  color: #ffffffcc;
+}
+
+.custom_li:hover {
+  background: #f1f2f6;
+}
+
+.custom_li.dark:hover {
+  background: #34353d;
+}
+
+.custom_li img {
+  width: 20px;
+  min-width: 20px;
+  height: 20px;
+  margin-right: 10px;
+}
+
+@keyframes zoomAnimation {
+  0% {
+    transform: scale(100%);
+  }
+  50% {
+    transform: scale(130%);
+  }
+  100% {
+    transform: scale(100%);
+  }
+}
+
+@media screen and (max-width: 480px), screen and (max-height: 700px) {
+
+}

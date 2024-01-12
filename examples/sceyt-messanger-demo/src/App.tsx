@@ -1,0 +1,227 @@
+import React, {useEffect, useState} from 'react';
+import SceytChatClient from "sceyt-chat";
+import {v4 as uuidv4} from 'uuid'
+import {
+  ChannelDetails,
+  ChannelList, Chat, ChatHeader, MessageList, MessagesScrollToBottomButton,
+  SceytChat, SendMessage,
+} from 'sceyt-chat-react-uikit';
+import lightModeIcon from './svg/lightModeIcon.svg';
+import darkModeIcon from './svg/darkModeIcon.svg';
+import sceytIcon from './img/sceyt_rounded.png';
+import './App.css';
+import {genToken} from "./api";
+import {SceytContext} from './sceytContext';
+import ChannelCustomList from "./ChannelCustomList";
+import CreateChannelButton from "./CreateChannel";
+import useDidUpdate from "./hooks/useDidUpdate";
+
+function App() {
+  const [client, setClient] = useState<SceytChatClient>();
+  const [clientState, setClientState] = useState('');
+  const [chatToken, setChatToken] = useState(null);
+  const [theme, setTheme] = useState<'light' | 'dark' | undefined>('light');
+  const [userId, setUserId] = useState('');
+  const guestsUsersList = ["alice", "ben", "charlie", "david", "emma", "emily", "ethan", "grace", "harry", "isabella", "jacob", "james", "john", "lily", "michael", "olivia", "sophia", "thomas", "william", "zoe",]
+  const genTokenUrl = 'https://tlnig20qy7.execute-api.us-east-2.amazonaws.com/dev/user/genToken'
+
+  function getRandomNumber() {
+    // Generate a random number between 0 and 1.
+    const randomNumber = Math.random();
+
+    // Return the rounded number.
+    return Math.floor(randomNumber * 20);
+  }
+
+  const getToken = () => {
+    genToken(userId).then(async (tokenData) => {
+      const {token} = await tokenData.json()
+      console.log('token ... ', token)
+      setChatToken(token)
+    })
+      .catch((e) => {
+        console.log('error on gen token. .. ', e)
+      })
+  }
+
+  const connectClient = (token: string) => {
+    const sceytClient = new SceytChatClient('https://us-ohio-api.sceyt.com', '8lwox2ge93', uuidv4());
+
+    sceytClient.setLogLevel('trace')
+
+    // @ts-ignore
+    const listener = new sceytClient.ConnectionListener();
+    listener.onConnectionStateChanged = async (status: string) => {
+      setClientState(status)
+      if (status === 'Failed') {
+        await getToken()
+      } else if (status === 'Connected') {
+        console.log('client user.. .. ', sceytClient.user)
+        try {
+          sceytClient.setPresence('online')
+        } catch (e) {
+          console.log('error on setPresence. .. ', e)
+        }
+      }
+    }
+    listener.onTokenWillExpire = async () => {
+      getToken()
+    }
+    listener.onTokenExpired = async () => {
+      if (clientState === 'Connected') {
+        getToken()
+        // handlegetToken(
+      } else {
+        await getToken()
+      }
+    }
+    sceytClient.addConnectionListener('listener_id', listener);
+
+    sceytClient.connect(token)
+      .then(() => {
+        setClient(sceytClient);
+        if (typeof window !== 'undefined' && window != null && window.addEventListener != null) {
+          window.addEventListener('offline', (e) => onlineStatusChanged(e, sceytClient));
+          window.addEventListener('online', (e) => onlineStatusChanged(e, sceytClient));
+        }
+      })
+      .catch((e) => {
+        const date = new Date()
+        console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
+        getToken()
+      });
+  }
+
+  const onlineStatusChanged = (event: any, client: SceytChatClient) => {
+    const date = new Date()
+    console.info(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Online status changed : `, event.type)
+    if (event.type === 'online') {
+      setTimeout(() => {
+        if (client && (!client.accessToken || client.connectionState === 'Disconnected')) {
+          getToken()
+        }
+      }, 1000)
+    }
+  }
+
+  useDidUpdate(() => {
+    if (chatToken) {
+      if (client && clientState === 'Connected') {
+        client.updateToken(chatToken)
+      } else {
+        if (client && chatToken) {
+          client.connect(chatToken)
+            .then(() => {
+              setClientState('Connected')
+            })
+            .catch((e: any) => {
+              const date = new Date()
+              console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect after updating the token ... `, e);
+              if (e.code === 10005 && client && client && client.connectionState === 'Connected') {
+                setClientState('Connected')
+              } else {
+                getToken()
+              }
+            });
+        } else {
+          connectClient(chatToken)
+        }
+      }
+    }
+  }, [chatToken])
+
+  useEffect(() => {
+    if (!userId) {
+      setUserId(guestsUsersList[getRandomNumber()])
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!chatToken && userId) {
+      console.log('call get token ... ')
+      getToken()
+    }
+  }, [userId])
+
+  return (
+    <div className="main">
+      <SceytContext.Provider value={{client, theme}}>
+        <div className='messenger_demo_wrapper'>
+          <div className='theme_switcher'>
+            <div className={`theme_switcher_item light_mode ${theme === 'light' ? 'active' : ''}`}
+                 onClick={() => setTheme('light')}>
+
+              <img src={lightModeIcon} alt="ligh mode"/>
+              <span>Light Mode</span>
+            </div>
+            <div className={`theme_switcher_item dark_mode ${theme === 'dark' ? 'active' : ''}`}
+                 onClick={() => setTheme('dark')}>
+              <img src={darkModeIcon} alt="dark mode"/>
+              <span>Dark Mode</span>
+            </div>
+          </div>
+          <div className='messenger_demo_header'>
+            <span className='red_circle'></span>
+            <span className='orange_circle'></span>
+            <span className='green_circle'></span>
+          </div>
+          <div className='sceyt_chat_wrapper'>
+            {client ? (
+              <SceytChat
+                theme={theme}
+                showNotifications={false}
+                customColors={{primaryColor: '#5159F6'}}
+                client={client}
+              >
+                <ChannelList
+                  List={ChannelCustomList}
+                  CreateChannel={<CreateChannelButton/>}
+                  backgroundColor={'#1B1C25'}
+                  searchInputBackgroundColor={'#25262E'}
+                  selectedChannelBackground={'#25262E'}
+                  searchInputTextColor={'#ffffffcc'}
+                  ChannelsTitle={<div className={`channels_title ${theme} dark`}> 👨‍💻 Workspace</div>}
+                />
+                <Chat>
+                  <ChatHeader/>
+                  <MessageList
+                    reactionsContainerBackground={'inherit'}
+                    reactionsContainerBoxShadow={'inherit'}
+                    reactionsContainerPadding={'0 0 4px'}
+                    reactionItemPadding={'5px 10px'}
+                    ownMessageOnRightSide={false}
+                    showSenderNameOnOwnMessages
+                    showSenderNameOnDirectChannel
+                    showOwnAvatar
+                    incomingMessageBackground='inherit'
+                    ownMessageBackground='inherit'
+                    showMessageTimeAndStatusOnlyOnHover
+                    reportMessage={false}
+                    replyMessageInThread={false}
+                  />
+                  <MessagesScrollToBottomButton bottomPosition={65} rightPosition={4}/>
+                  <SendMessage
+                    margin='30px 0 10px -1px'
+                    inputPaddings='6px 0'
+                    backgroundColor='inherit'
+                    emojiIcoOrder={1}
+                    inputCustomClassname='sceyt_send_message_input'
+                  />
+                </Chat>
+
+                <ChannelDetails size='small' avatarAndNameDirection='column' showDeleteChannel/>
+              </SceytChat>
+            ) : (
+              <div className='messenger_loading'>
+                <img src={sceytIcon} alt="sceyt logo"/>
+              </div>
+            )}
+          </div>
+        </div>
+      </SceytContext.Provider>
+
+    </div>
+  );
+}
+
+export default App;
