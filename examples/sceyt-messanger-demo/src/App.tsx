@@ -20,7 +20,7 @@ function App() {
   const [client, setClient] = useState<SceytChatClient>();
   const [clientState, setClientState] = useState('');
   const [chatToken, setChatToken] = useState(null);
-  const [theme, setTheme] = useState<'light' | 'dark' | undefined>('light');
+  const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [userId, setUserId] = useState('');
   const guestsUsersList = ["alice", "ben", "charlie", "david", "emma", "emily", "ethan", "grace", "harry", "isabella", "jacob", "james", "john", "lily", "michael", "olivia", "sophia", "thomas", "william", "zoe",]
   const genTokenUrl = 'https://tlnig20qy7.execute-api.us-east-2.amazonaws.com/dev/user/genToken'
@@ -168,7 +168,13 @@ function App() {
           <div className='sceyt_chat_wrapper'>
             {client ? (
               <SceytChat
-                theme={theme}
+                theme={
+                  {
+                    name: theme,
+                    primaryColor: theme === 'dark' ? '#6B72FF' : '#5159F6',
+                    primaryLight: theme === 'dark' ? '#1c1f47' : '#E3E7FF',
+                    textColor1: theme === 'dark' ? '#ffffffcc' : '#111539'
+                  }}
                 showNotifications={false}
                 customColors={{primaryColor: '#5159F6'}}
                 client={client}

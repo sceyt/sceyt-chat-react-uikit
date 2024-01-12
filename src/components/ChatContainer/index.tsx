@@ -33,7 +33,12 @@ export interface ICustomUploader {
 
 export interface IChatClientProps {
   client: any
-  theme?: 'dark' | 'light'
+  theme?: {
+    name: 'dark' | 'light'
+    primaryColor: string
+    primaryLight: string
+    textColor1: string
+  }
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars
   hideUserPresence?: (user: IUser) => boolean

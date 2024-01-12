@@ -224,20 +224,25 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: string) => {
-    if (theme === THEME.DARK) {
+  const handleChangedTheme = (theme: {
+    name: 'dark' | 'light'
+    primaryColor: string
+    primaryLight: string
+    textColor1: string
+  }) => {
+    if (theme.name === THEME.DARK) {
       dispatch(setThemeAC(THEME.DARK))
-      colors.primary = colors.darkModePrimary
-      colors.textColor1 = colors.darkModeTextColor1
-      colors.primaryLight = colors.darkModePrimaryLight
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
       colors.backgroundColor = colors.darkModeBackgroundColor
       colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
       setDarkTheme(true)
     } else {
       dispatch(setThemeAC(THEME.LIGHT))
-      colors.primary = colors.lightModePrimary
-      colors.textColor1 = colors.lightModeTextColor1
-      colors.primaryLight = colors.lightModePrimaryLight
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
       colors.backgroundColor = colors.lightModeBackgroundColor
       colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
       setDarkTheme(false)
