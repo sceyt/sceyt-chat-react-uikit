@@ -63,7 +63,8 @@ import {
   getChannelFromAllChannels,
   updateChannelOnAllChannels,
   deleteChannelFromAllChannels,
-  getChannelGroupName
+  getChannelGroupName,
+  getAutoSelectFitsChannel
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -321,7 +322,7 @@ function* getChannels(action: IAction): any {
       ;[activeChannel] = channelsData.channels
     }
     query.channelQuery = channelQuery
-    if (activeChannel) {
+    if (activeChannel && getAutoSelectFitsChannel()) {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))

@@ -159,8 +159,8 @@ const Details = ({
   // const [tabFixed, setTabFixed] = useState(false)
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
-  const channel = useSelector(activeChannelSelector, shallowEqual)
-  const [checkActionPermission] = usePermissions(channel.userRole)
+  const activeChannel = useSelector(activeChannelSelector, shallowEqual)
+  const [checkActionPermission] = usePermissions(activeChannel ? activeChannel.userRole : '')
   const membersLoading = useSelector(membersLoadingStateSelector)
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
@@ -169,21 +169,22 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
-    memberDisplayText && memberDisplayText[channel.type]
-      ? channel.memberCount > 1
-        ? `${memberDisplayText[channel.type]}s`
-        : memberDisplayText[channel.type]
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-        ? channel.memberCount > 1
+    memberDisplayText &&
+    (memberDisplayText[activeChannel.type]
+      ? activeChannel.memberCount > 1
+        ? `${memberDisplayText[activeChannel.type]}s`
+        : memberDisplayText[activeChannel.type]
+      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+        ? activeChannel.memberCount > 1
           ? 'subscribers'
           : 'subscriber'
-        : channel.memberCount > 1
+        : activeChannel.memberCount > 1
           ? 'members'
-          : 'member'
-  const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+          : 'member')
+  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
     // setCloseMenu(true)
@@ -253,7 +254,7 @@ const Details = ({
       {editMode && (
         <EditChannel
           theme={theme}
-          channel={channel}
+          channel={activeChannel}
           handleToggleEditMode={setEditMode}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
           editChannelSaveButtonTextColor={editChannelSaveButtonTextColor}
@@ -272,8 +273,11 @@ const Details = ({
         <DetailsHeader borderColor={bordersColor || colors.backgroundColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
-              image={channel.avatarUrl || (directChannelUser && directChannelUser.avatarUrl)}
-              name={channel.subject || (directChannelUser && (directChannelUser.firstName || directChannelUser.id))}
+              image={(activeChannel && activeChannel.avatarUrl) || (directChannelUser && directChannelUser.avatarUrl)}
+              name={
+                (activeChannel && activeChannel.subject) ||
+                (directChannelUser && (directChannelUser.firstName || directChannelUser.id))
+              }
               size={channelAvatarSize || 72}
               textSize={channelAvatarTextSize || 26}
               setDefaultAvatar={isDirectChannel}
@@ -285,7 +289,7 @@ const Details = ({
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
               >
-                {channel.subject ||
+                {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
                     ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                     : '')}
@@ -303,7 +307,7 @@ const Details = ({
                 </SubTitle>
               ) : (
                 <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {channel.memberCount} {displayMemberText}
+                  {activeChannel && activeChannel.memberCount} {displayMemberText}
                 </SubTitle>
               )}
               {!isDirectChannel && checkActionPermission('updateChannel') && (
@@ -318,17 +322,17 @@ const Details = ({
             </ChannelInfo>
           </ChannelAvatarAndName>
 
-          {showAboutChannel && channel.metadata && channel.metadata.d && (
+          {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
             <AboutChannel>
               {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
               <AboutChannelText color={colors.textColor1}>
-                {channel.metadata && channel.metadata.d ? channel.metadata.d : ''}
+                {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
               </AboutChannelText>
             </AboutChannel>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
         </DetailsHeader>
-        {channel.userRole && (
+        {activeChannel && activeChannel.userRole && (
           <Actions
             theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
@@ -385,7 +389,7 @@ const Details = ({
             blockAndLeaveChannelTextColor={blockAndLeaveChannelTextColor}
             unblockUserIcon={unblockUserIcon}
             muteNotificationIcon={muteNotificationIcon}
-            channel={channel}
+            channel={activeChannel}
             toggleable={false}
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
             actionItemsFontSize={actionItemsFontSize}
@@ -393,10 +397,10 @@ const Details = ({
           />
         )}
         {/* <div ref={tabsRef}> */}
-        {!channel.isMockChannel && (
+        {!(activeChannel && activeChannel.isMockChannel) && (
           <DetailsTab
             theme={theme}
-            channel={channel}
+            channel={activeChannel}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
             linkPreviewIcon={linkPreviewIcon}

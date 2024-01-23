@@ -15,6 +15,12 @@ import {SceytContext} from './sceytContext';
 import ChannelCustomList from "./ChannelCustomList";
 import CreateChannelButton from "./CreateChannel";
 import useDidUpdate from "./hooks/useDidUpdate";
+import useMobileView from "./hooks/useMobileView";
+
+const MOBILE_ACTIVE_VIEW = {
+  CHANNELS: 'channels',
+  CHAT: 'chat'
+}
 
 function App() {
   const [client, setClient] = useState<SceytChatClient>();
@@ -22,8 +28,20 @@ function App() {
   const [chatToken, setChatToken] = useState(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [userId, setUserId] = useState('');
+  const isMobile = useMobileView();
+  const [mobileActiveView, setMobileActiveView] = useState(MOBILE_ACTIVE_VIEW.CHANNELS);
   const guestsUsersList = ["alice", "ben", "charlie", "david", "emma", "emily", "ethan", "grace", "harry", "isabella", "jacob", "james", "john", "lily", "michael", "olivia", "sophia", "thomas", "william", "zoe",]
-  const genTokenUrl = 'https://tlnig20qy7.execute-api.us-east-2.amazonaws.com/dev/user/genToken'
+
+
+  const activeChannelIsChanged = (channel: any) => {
+    if(channel && channel.id) {
+      setMobileActiveView(MOBILE_ACTIVE_VIEW.CHAT)
+    }
+  }
+  const handleBackToChannels= () => {
+    setMobileActiveView(MOBILE_ACTIVE_VIEW.CHANNELS)
+  }
+
 
   function getRandomNumber() {
     // Generate a random number between 0 and 1.
@@ -138,7 +156,6 @@ function App() {
 
   useEffect(() => {
     if (!chatToken && userId) {
-      console.log('call get token ... ')
       getToken()
     }
   }, [userId])
@@ -165,9 +182,11 @@ function App() {
             <span className='orange_circle'></span>
             <span className='green_circle'></span>
           </div>
+          {/*<div className={`sceyt_chat_wrapper ${showChat ? 'show_chat' : ''}`}>*/}
           <div className='sceyt_chat_wrapper'>
             {client ? (
               <SceytChat
+                // autoSelectFirstChannel={true}
                 theme={
                   {
                     name: theme,
@@ -179,41 +198,54 @@ function App() {
                 customColors={{primaryColor: '#5159F6'}}
                 client={client}
               >
-                <ChannelList
-                  List={ChannelCustomList}
-                  CreateChannel={<CreateChannelButton/>}
-                  backgroundColor={'#1B1C25'}
-                  searchInputBackgroundColor={'#25262E'}
-                  selectedChannelBackground={'#25262E'}
-                  searchInputTextColor={'#ffffffcc'}
-                  ChannelsTitle={<div className={`channels_title ${theme} dark`}> 👨‍💻 Workspace</div>}
-                />
-                <Chat>
-                  <ChatHeader/>
-                  <MessageList
-                    reactionsContainerBackground={'inherit'}
-                    reactionsContainerBoxShadow={'inherit'}
-                    reactionsContainerPadding={'0 0 4px'}
-                    reactionItemPadding={'5px 10px'}
-                    ownMessageOnRightSide={false}
-                    showSenderNameOnOwnMessages
-                    showSenderNameOnDirectChannel
-                    showOwnAvatar
-                    incomingMessageBackground='inherit'
-                    ownMessageBackground='inherit'
-                    showMessageTimeAndStatusOnlyOnHover
-                    reportMessage={false}
-                    replyMessageInThread={false}
-                  />
-                  <MessagesScrollToBottomButton bottomPosition={65} rightPosition={4}/>
-                  <SendMessage
-                    margin='30px 0 10px -1px'
-                    inputPaddings='6px 0'
-                    backgroundColor='inherit'
-                    emojiIcoOrder={1}
-                    inputCustomClassname='sceyt_send_message_input'
-                  />
-                </Chat>
+               <>
+                 {(!isMobile || mobileActiveView === MOBILE_ACTIVE_VIEW.CHANNELS) && <ChannelList
+                   // className='custom_channel_list'
+                   List={(props) => <ChannelCustomList {...props}
+                                                       activeChannelIsChanged={activeChannelIsChanged}/>}
+                   CreateChannel={<CreateChannelButton/>}
+                   backgroundColor={'#1B1C25'}
+                   searchInputBackgroundColor={'#25262E'}
+                   selectedChannelBackground={'#25262E'}
+                   searchInputTextColor={'#ffffffcc'}
+                   ChannelsTitle={<div className={`channels_title ${theme} dark`}> 👨‍💻 Workspace</div>}
+                 />}
+               </>
+                {/*<Chat className={`custom_chat ${showChat ? '' : 'hide'}`}>*/}
+                <>
+                  {(!isMobile || mobileActiveView === MOBILE_ACTIVE_VIEW.CHAT) && <Chat className='custom_chat'>
+                    <ChatHeader mobileBackButtonClicked={handleBackToChannels} />
+                    <MessageList
+                      reactionsContainerBackground={'inherit'}
+                      reactionsContainerBoxShadow={'inherit'}
+                      reactionsContainerPadding={'0 0 4px'}
+                      reactionItemPadding={'5px 10px'}
+                      ownMessageOnRightSide={false}
+                      showSenderNameOnOwnMessages
+                      showSenderNameOnDirectChannel
+                      showOwnAvatar
+                      incomingMessageBackground='inherit'
+                      ownMessageBackground='inherit'
+                      showMessageTimeAndStatusOnlyOnHover
+                      reportMessage={false}
+                      replyMessageInThread={false}
+
+                      fileAttachmentsBoxWidth={isMobile ? 220 : undefined}
+                      imageAttachmentMaxWidth={isMobile ? 220 : undefined}
+                      imageAttachmentMaxHeight={isMobile ? 200 : undefined}
+                      videoAttachmentMaxWidth={isMobile ? 220 : undefined}
+                      videoAttachmentMaxHeight={isMobile ? 200 : undefined}
+                    />
+                    <MessagesScrollToBottomButton bottomPosition={65} rightPosition={4}/>
+                    <SendMessage
+                      margin='30px 0 10px -1px'
+                      inputPaddings='6px 0'
+                      backgroundColor='inherit'
+                      emojiIcoOrder={1}
+                      inputCustomClassname='sceyt_send_message_input'
+                    />
+                  </Chat>}
+                </>
 
                 <ChannelDetails size='small' avatarAndNameDirection='column' showDeleteChannel/>
               </SceytChat>

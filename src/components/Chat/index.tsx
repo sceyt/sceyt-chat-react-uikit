@@ -10,14 +10,19 @@ import {
   channelListWidthSelector
 } from '../../store/channel/selector'
 import { getChannelsAC, setActiveChannelAC, setHideChannelListAC } from '../../store/channel/actions'
+// Assets
+import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 // Hooks
 import { useDidUpdate } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
 import { setActiveChannelId } from '../../helpers/channelHalper'
+import { colors } from '../../UIHelper/constants'
+import { themeSelector } from '../../store/theme/selector'
 
 interface IProps {
   hideChannelList?: boolean
+  className?: string
   children?: JSX.Element | JSX.Element[]
   // eslint-disable-next-line no-unused-vars
   onActiveChannelUpdated?: (activeChannel: IChannel) => void
@@ -25,10 +30,11 @@ interface IProps {
 
 let detailsSwitcherTimeout: NodeJS.Timeout
 
-export default function Chat({ children, hideChannelList, onActiveChannelUpdated }: IProps) {
+export default function Chat({ children, hideChannelList, onActiveChannelUpdated, className }: IProps) {
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const theme = useSelector(themeSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -76,7 +82,16 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   }, [channelDetailsIsOpen])
 
   return (
-    <Container widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
+    <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
+      {(!activeChannel || !activeChannel.id) && (
+        <SelectChatContainer backgroundColor={(theme && theme.backgroundColor) || colors.white}>
+          <SelectChatContent iconColor={colors.primary}>
+            <MessageIcon />
+            <SelectChatTitle>Select a chat</SelectChatTitle>
+            <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
+          </SelectChatContent>
+        </SelectChatContainer>
+      )}
       {children}
     </Container>
   )
@@ -92,4 +107,44 @@ const Container = styled.div<{ widthOffset: number; channelDetailsWidth?: number
   display: flex;
   transition: all 0.1s;
   flex-direction: column;
+`
+
+const SelectChatContainer = styled.div<{ backgroundColor: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: absolute;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  background: ${(props) => props.backgroundColor};
+  z-index: 9999;
+`
+
+const SelectChatContent = styled.div<{ iconColor?: string }>`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  & > svg {
+    color: ${(props) => props.iconColor};
+  }
+`
+
+const SelectChatTitle = styled.h3`
+  font-size: 20px;
+  font-style: normal;
+  font-weight: 500;
+  line-height: 24px;
+  color: ${colors.textColor1};
+  margin: 24px 0 8px;
+`
+const SelectChatDescription = styled.p`
+  font-size: 16px;
+  font-style: normal;
+  font-weight: 400;
+  line-height: 22px;
+  margin: 0;
+  color: ${colors.textColor2};
 `

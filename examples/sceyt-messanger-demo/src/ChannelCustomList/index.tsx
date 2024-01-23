@@ -10,12 +10,14 @@ function ChannelCustomList({
                              setActiveChannel,
                              activeChannel,
                              searchValue,
+                             activeChannelIsChanged,
                            }:
                              {
                                channels: IChannel[],
                                searchedChannels: { chats_groups: [], channels: [], contacts: [] },
                                loadMoreChannels: (count?: number) => void,
                                setActiveChannel?: (channel: IChannel) => void,
+                               activeChannelIsChanged?: (channel: IChannel) => void,
                                activeChannel?: IChannel,
                                searchValue: string
                              }) {
@@ -55,6 +57,17 @@ function ChannelCustomList({
       channelsGroupList.push({groupName, channelList: channelGroupMap[key]})
     })
     setChannelListWithGroups(channelsGroupList)
+  }
+
+  const handleChangeActiveChannel = (channel: IChannel) => {
+    if (setActiveChannel) {
+      setActiveChannel(channel)
+    }
+    if (activeChannelIsChanged) {
+      setTimeout(() => {
+        activeChannelIsChanged(channel)
+      }, 200)
+    }
   }
 
   useEffect(() => {
@@ -117,10 +130,11 @@ function ChannelCustomList({
             const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== (user || {}).id)
             // const directChannelUser = isDirectChannel && channel.members[0]
             return (
-              <div key={channel.id} onClick={() => setActiveChannel && setActiveChannel(channel)}
+              <div key={channel.id} onClick={() => handleChangeActiveChannel(channel)}
                    className={`custom_channel_item ${activeChannel && activeChannel.id === channel.id && 'active'}`}>
                 {channel.type === 'direct' &&
-                  <Avatar name={(directChannelUser || {}).id || ''} size={32} image={(directChannelUser || {}).avatarUrl}
+                  <Avatar name={(directChannelUser || {}).id || ''} size={32}
+                          image={(directChannelUser || {}).avatarUrl}
                           setDefaultAvatar/>}
                 <h4 className={`channel_name ${isDirectChannel ? 'withAvatar' : ''}`}>
                   {isDirectChannel && directChannelUser ? makeUserName(directChannelUser) : `# ${channel.subject}`}

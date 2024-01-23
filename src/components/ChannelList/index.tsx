@@ -72,6 +72,7 @@ interface IChannelListProps {
     // eslint-disable-next-line no-unused-vars
     createChatWithContact?: (contact: IContact) => void
   }>
+  className?: string
   Profile?: JSX.Element
   CreateChannel?: JSX.Element
   ChannelsTitle?: JSX.Element
@@ -159,6 +160,7 @@ interface IChannelListProps {
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
+  className,
   selectedChannelBackground,
   selectedChannelLeftBorder,
   backgroundColor,
@@ -407,6 +409,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [channels])
   return (
     <Container
+      className={className}
       withCustomList={!!List}
       ref={channelListRef}
       backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.darkModeSecondaryBackgroundColor : '')}
@@ -847,7 +850,7 @@ const ChannelListHeader = styled.div<{
   //justify-content: flex-end;
   padding: 12px;
   box-sizing: border-box;
-  max-width: ${(props) => props.maxWidth && `${props.maxWidth}px`};
+  max-width: ${(props) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
   padding-left: ${(props) => props.withoutProfile && '52px'};
   border-right: ${(props) => props.withCustomList && `1px solid ${props.borderColor}`};
 `

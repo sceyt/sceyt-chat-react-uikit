@@ -13,6 +13,7 @@ type defaultRolesByChannelTypesMap = {
   [key: string]: string
 }
 
+let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
@@ -226,3 +227,9 @@ export const setOpenChatOnUserInteraction = (state: boolean) => {
 export const getOpenChatOnUserInteraction = () => {
   return openChatOnUserInteraction
 }
+
+export const setAutoSelectFitsChannel = (state: boolean) => {
+  autoSelectFitsChannel = state
+}
+
+export const getAutoSelectFitsChannel = () => autoSelectFitsChannel

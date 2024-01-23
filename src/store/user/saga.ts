@@ -37,7 +37,7 @@ function* blockUser(action: IAction): any {
 
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
     const directChannelUser =
       isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
     if (directChannelUser && directChannelUser.id === blockedUsers[0].id) {
@@ -76,7 +76,7 @@ function* unblockUser(action: IAction): any {
     const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
     const directChannelUser =
       isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
     if (directChannelUser && directChannelUser.id === unblockedUsers[0].id) {
