@@ -243,6 +243,9 @@ function App() {
                       backgroundColor='inherit'
                       emojiIcoOrder={1}
                       inputCustomClassname='sceyt_send_message_input'
+                      // replyMessageBackgroundColor={'#ea3636'}
+                      // replyMessageTextColor={'#0079e1'}
+                      CustomSendMessageButton={<div>Send</div>}
                     />
                   </Chat>}
                 </>
