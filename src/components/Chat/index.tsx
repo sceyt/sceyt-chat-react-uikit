@@ -26,11 +26,20 @@ interface IProps {
   children?: JSX.Element | JSX.Element[]
   // eslint-disable-next-line no-unused-vars
   onActiveChannelUpdated?: (activeChannel: IChannel) => void
+  noChannelSelectedBackgroundColor?: string
+  CustomNoChannelSelected?: JSX.Element
 }
 
 let detailsSwitcherTimeout: NodeJS.Timeout
 
-export default function Chat({ children, hideChannelList, onActiveChannelUpdated, className }: IProps) {
+export default function Chat({
+  children,
+  hideChannelList,
+  onActiveChannelUpdated,
+  className,
+  noChannelSelectedBackgroundColor,
+  CustomNoChannelSelected
+}: IProps) {
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -84,12 +93,16 @@ export default function Chat({ children, hideChannelList, onActiveChannelUpdated
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
       {(!activeChannel || !activeChannel.id) && (
-        <SelectChatContainer backgroundColor={(theme && theme.backgroundColor) || colors.white}>
-          <SelectChatContent iconColor={colors.primary}>
-            <MessageIcon />
-            <SelectChatTitle>Select a chat</SelectChatTitle>
-            <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
-          </SelectChatContent>
+        <SelectChatContainer
+          backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
+        >
+          {CustomNoChannelSelected || (
+            <SelectChatContent iconColor={colors.primary}>
+              <MessageIcon />
+              <SelectChatTitle>Select a chat</SelectChatTitle>
+              <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
+            </SelectChatContent>
+          )}
         </SelectChatContainer>
       )}
       {children}
