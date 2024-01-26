@@ -19,7 +19,7 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
-import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
+import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
@@ -80,6 +80,7 @@ export default function ChatHeader({
   // const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
   const theme = useSelector(themeSelector)
+  const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
@@ -99,7 +100,9 @@ export default function ChatHeader({
           ? 'members'
           : 'member'
   const channelDetailsOnOpen = () => {
-    dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
+    if (!channelListHidden && showChannelDetails) {
+      dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
+    }
   }
   const handleSwitchChannel = () => {
     if (activeChannel.linkedFrom) {
@@ -140,8 +143,8 @@ export default function ChatHeader({
         </BackButtonWrapper>
       )}
       <ChannelInfo
-        onClick={!channelListHidden && channelDetailsOnOpen}
-        clickable={!channelListHidden}
+        onClick={channelDetailsOnOpen}
+        clickable={!channelListHidden && showChannelDetails}
         order={channelInfoOrder}
       >
         <AvatarWrapper>
@@ -197,7 +200,7 @@ export default function ChatHeader({
           <CustomActions activeChannel={activeChannel} />
         </CustomActionsWrapper>
       )}
-      {!channelListHidden && (
+      {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
           infoIconColor={channelDetailsIsOpen ? colors.primary : colors.borderColor2}

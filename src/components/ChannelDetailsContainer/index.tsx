@@ -1,9 +1,10 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useSelector } from 'react-redux'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
+import { setShowChannelDetails } from '../../helpers/channelHalper'
 export interface IDetailsProps {
   size?: 'small' | 'medium' | 'large'
 
@@ -250,6 +251,9 @@ const ChannelDetailsContainer = ({
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
+  useEffect(() => {
+    setShowChannelDetails(true)
+  }, [])
   return (
     <DetailsWrapper id='channel_details_wrapper'>
       {channelDetailsIsOpen && (

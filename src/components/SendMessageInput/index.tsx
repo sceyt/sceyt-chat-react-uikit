@@ -200,6 +200,7 @@ interface SendMessageProps {
   handleAttachmentSelected?: (state: boolean) => void
   // eslint-disable-next-line no-unused-vars
   handleSendMessage?: (message: IMessage, channelId: string) => Promise<IMessage>
+  CustomSendMessageButton?: JSX.Element
   inputCustomClassname?: string
   disabled?: boolean
   CustomDisabledInput?: FC<{}>
@@ -217,6 +218,7 @@ interface SendMessageProps {
   minHeight?: string
   border?: string
   borderRadius?: string
+  borderRadiusOnOpenedEditReplyMessage?: string
   inputBorderRadius?: string
   inputBackgroundColor?: string
   inputPaddings?: string
@@ -227,7 +229,15 @@ interface SendMessageProps {
   selectedFileAttachmentsIcon?: JSX.Element
   selectedAttachmentsBorderRadius?: string
   replyMessageIcon?: JSX.Element
+  replyMessageBackgroundColor?: string
+  replyMessageTextColor?: string
+  replyEditMessageContainerWidth?: string
+  replyEditMessageContainerBorderRadius?: string
+  replyEditMessageContainerBottomPosition?: string
+  replyEditMessageContainerLeftPosition?: string
   editMessageIcon?: JSX.Element
+  editMessageBackgroundColor?: string
+  editMessageTextColor?: string
   voiceMessage?: boolean
   sendAttachmentSeparately?: boolean
   allowMentionUser?: boolean
@@ -243,6 +253,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   handleSendMessage,
   disabled = false,
   CustomDisabledInput,
+  CustomSendMessageButton,
   sendIconOrder,
   inputOrder = 1,
   showAddEmojis = true,
@@ -256,6 +267,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   border,
   minHeight,
   borderRadius,
+  borderRadiusOnOpenedEditReplyMessage = '0px 0px 18px 18px',
   inputBorderRadius,
   backgroundColor,
   inputBackgroundColor,
@@ -268,7 +280,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   selectedFileAttachmentsTitleColor,
   selectedFileAttachmentsSizeColor,
   replyMessageIcon,
+  replyMessageBackgroundColor,
+  replyMessageTextColor,
   editMessageIcon,
+  editMessageBackgroundColor,
+  editMessageTextColor,
+  replyEditMessageContainerWidth,
+  replyEditMessageContainerBorderRadius,
+  replyEditMessageContainerBottomPosition,
+  replyEditMessageContainerLeftPosition,
   sendAttachmentSeparately,
   allowMentionUser = true,
   allowTextEdit = true,
@@ -1337,7 +1357,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                 </TypingIndicator>
                 {messageToEdit && (
-                  <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
+                  <EditReplyMessageCont
+                    width={replyEditMessageContainerWidth}
+                    borderRadius={replyEditMessageContainerBorderRadius}
+                    left={replyEditMessageContainerLeftPosition}
+                    bottom={replyEditMessageContainerBottomPosition}
+                    color={editMessageTextColor || colors.textColor1}
+                    backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
+                  >
                     <CloseEditMode onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
@@ -1357,7 +1384,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </EditReplyMessageCont>
                 )}
                 {messageForReply && (
-                  <EditReplyMessageCont color={colors.textColor1} backgroundColor={colors.backgroundColor}>
+                  <EditReplyMessageCont
+                    width={replyEditMessageContainerWidth}
+                    borderRadius={replyEditMessageContainerBorderRadius}
+                    bottom={replyEditMessageContainerBottomPosition}
+                    left={replyEditMessageContainerLeftPosition}
+                    color={replyMessageTextColor || colors.textColor1}
+                    backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
+                  >
                     <CloseEditMode onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
@@ -1443,7 +1477,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   ) : (
                     <MessageInputWrapper
                       className='message_input_wrapper'
-                      borderRadius={borderRadius}
+                      borderRadius={
+                        messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
+                      }
                       ref={inputWrapperRef}
                       backgroundColor={inputBackgroundColor || colors.backgroundColor}
                       channelDetailsIsOpen={channelDetailsIsOpen}
@@ -1592,17 +1628,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   )}
 
                   {sendMessageIsActive || !voiceMessage || messageToEdit ? (
-                    <SendMessageIcon
+                    <SendMessageButton
+                      isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
                       order={sendIconOrder}
                       color={colors.backgroundColor}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
                     >
-                      <SendIcon />
-                    </SendMessageIcon>
+                      {CustomSendMessageButton || <SendIcon />}
+                    </SendMessageButton>
                   ) : (
-                    <SendMessageIcon
+                    <SendMessageButton
                       isActive={true}
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
@@ -1613,7 +1650,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         setShowRecording={setShowRecording}
                         showRecording={showRecording}
                       />
-                    </SendMessageIcon>
+                    </SendMessageButton>
                   )}
                 </SendMessageInputContainer>
               </React.Fragment>
@@ -1678,11 +1715,21 @@ const Container = styled.div<{
   }
 `
 
-const EditReplyMessageCont = styled.div<{ backgroundColor?: string; color?: string }>`
+const EditReplyMessageCont = styled.div<{
+  backgroundColor?: string
+  color?: string
+  width?: string
+  borderRadius?: string
+  left?: string
+  bottom?: string
+  padding?: string
+}>`
   position: relative;
-  left: -12px;
-  width: calc(100% - 8px);
-  padding: 8px 16px;
+  left: ${(props) => props.left || '0'};
+  bottom: ${(props) => props.bottom || '0'};
+  width: ${(props) => props.width || 'calc(100% - 82px)'};
+  border-radius: ${(props) => props.borderRadius || '18px 18px 0 0'};
+  padding: ${(props) => props.padding || '8px 16px 30px'};
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
@@ -1919,17 +1966,27 @@ const EmojiButton = styled.span<any>`
   }
 `
 
-const SendMessageIcon = styled.span<any>`
+const SendMessageButton = styled.span<{
+  height?: string
+  isActive?: boolean
+  order?: number
+  isCustomButton?: any
+  onClick?: any
+}>`
+  ${(props) =>
+    !props.isCustomButton &&
+    `
   display: flex;
-  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
+  height: ${props.height ? `${props.height}px` : '36px'};
   align-items: center;
   margin: 0 8px 0 auto;
-  cursor: ${(props) => props.isActive && 'pointer'};
+  cursor: ${props.isActive && 'pointer'};
   line-height: 13px;
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 4)};
+  order: ${props.order === 0 || props.order ? props.order : 4};
   -webkit-tap-highlight-color: transparent;
 
-  color: ${(props) => (props.isActive ? colors.primary : props.color)};
+  color: ${props.isActive ? colors.primary : props.color};
+  `}
 `
 
 const AudioCont = styled.div<any>`

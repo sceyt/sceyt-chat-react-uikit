@@ -20,6 +20,7 @@ let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
 let UploadImageIcon: JSX.Element
+let showChannelDetails: boolean = false
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
@@ -233,3 +234,9 @@ export const setAutoSelectFitsChannel = (state: boolean) => {
 }
 
 export const getAutoSelectFitsChannel = () => autoSelectFitsChannel
+
+export const setShowChannelDetails = (state: boolean) => {
+  showChannelDetails = state
+}
+
+export const getShowChannelDetails = () => showChannelDetails
