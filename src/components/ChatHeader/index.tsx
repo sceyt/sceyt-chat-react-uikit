@@ -41,6 +41,8 @@ interface IProps {
   showMemberInfo?: boolean
   infoIcon?: JSX.Element
   borderBottom?: string
+  mobileBackButtonClicked?: () => void
+  MobileBackButton?: JSX.Element
   CustomActions?: FC<{
     activeChannel: IChannel
   }>
@@ -57,6 +59,8 @@ export default function ChatHeader({
   memberInfoTextColor,
   memberInfoFontSize,
   memberInfoLineHeight,
+  mobileBackButtonClicked,
+  MobileBackButton,
   showMemberInfo = true,
   avatarSize,
   avatarTextSize,
@@ -102,6 +106,10 @@ export default function ChatHeader({
       dispatch(switchChannelActionAC({ ...activeChannel.linkedFrom, backToLinkedChannel: true }))
     }
   }
+  const handleBackToChannels = () => {
+    dispatch(switchChannelActionAC({}))
+    mobileBackButtonClicked && mobileBackButtonClicked()
+  }
 
   /* const channelDetailsOpen = false
 
@@ -117,6 +125,15 @@ export default function ChatHeader({
 
   return (
     <Container background={backgroundColor} borderBottom={borderBottom} borderColor={colors.backgroundColor}>
+      {/* {LefSideCustomActions && <LefSideCustomActions />} */}
+      <MobileButtonWrapper onClick={handleBackToChannels}>
+        {MobileBackButton || (
+          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={colors.primaryLight}>
+            <ArrowLeftIcon />
+          </MobileBackButtonWrapper>
+        )}
+      </MobileButtonWrapper>
+
       {activeChannel.isLinkedChannel && (
         <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight} order={backButtonOrder}>
           <ArrowLeftIcon />
@@ -245,6 +262,28 @@ const ChanelInfo = styled.span<{ infoIconColor?: string; order?: number }>`
   }
 `
 const BackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number }>`
+  display: inline-flex;
+  cursor: pointer;
+  margin-right: 16px;
+  border-radius: 50%;
+  transition: all 0.2s;
+  order: ${(props) => props.order};
+  &:hover {
+    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
+  }
+  @media (max-width: 768px) {
+    display: none;
+  }
+`
+
+const MobileButtonWrapper = styled.div`
+  display: none;
+  @media (max-width: 768px) {
+    display: inline-flex;
+  }
+`
+
+const MobileBackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number }>`
   display: inline-flex;
   cursor: pointer;
   margin-right: 16px;

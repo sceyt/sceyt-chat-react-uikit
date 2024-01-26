@@ -39,6 +39,7 @@ export interface IChatClientProps {
     primaryLight: string
     textColor1: string
   }
+  autoSelectFirstChannel?: boolean
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars
   hideUserPresence?: (user: IUser) => boolean
@@ -83,7 +84,8 @@ const SceytChatContainer = ({
   customColors,
   showNotifications = true,
   hideUserPresence,
-  openChatOnUserInteraction
+  openChatOnUserInteraction,
+  autoSelectFirstChannel
 }: IChatClientProps) => {
   return (
     <Provider store={store}>
@@ -103,6 +105,7 @@ const SceytChatContainer = ({
         showNotifications={showNotifications}
         hideUserPresence={hideUserPresence}
         openChatOnUserInteraction={openChatOnUserInteraction}
+        autoSelectFirstChannel={autoSelectFirstChannel}
       />
     </Provider>
   )

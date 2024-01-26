@@ -14,6 +14,7 @@ import { useDidUpdate } from '../../hooks'
 import {
   destroyChannelsMap,
   setActiveChannelId,
+  setAutoSelectFitsChannel,
   setChannelTypesMemberDisplayTextMap,
   setDefaultRolesByChannelTypesMap,
   setHandleNewMessages,
@@ -47,7 +48,8 @@ const SceytChat = ({
   customColors,
   hideUserPresence,
   showNotifications,
-  openChatOnUserInteraction = true
+  openChatOnUserInteraction = true,
+  autoSelectFirstChannel = false
 }: IChatClientProps) => {
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -262,6 +264,10 @@ const SceytChat = ({
       handleChangedTheme(theme)
     }
   }, [theme])
+
+  useEffect(() => {
+    setAutoSelectFitsChannel(autoSelectFirstChannel)
+  }, [autoSelectFirstChannel])
 
   useEffect(() => {
     setOpenChatOnUserInteraction(openChatOnUserInteraction)

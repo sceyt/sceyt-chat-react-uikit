@@ -248,6 +248,15 @@
   height: 20px;
   margin-right: 10px;
 }
+.icon_wrapper {
+display: none;
+  align-items: center;
+  justify-content: center;
+  transform: rotate(90deg);
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
 
 @keyframes zoomAnimation {
   0% {
@@ -261,6 +270,37 @@
   }
 }
 
+@media (max-width: 768px) {
+  .sceyt_chat_wrapper div#channel_details_wrapper {
+    position: absolute;
+    right: 0;
+    background: #fff;
+    z-index: 999;
+    height: 100%;
+  }
+  .icon_wrapper{
+
+    display: flex;
+  }
+  .sceyt_chat_wrapper .custom_chat {
+    max-width: inherit;
+  }
+  .sceyt_chat_wrapper .custom_chat.hide {
+    display: none;
+  }
+
+  .sceyt_chat_wrapper #sceyt_chat_container {
+    min-width: initial;
+  }
+
+  .sceyt_chat_wrapper.show_chat .custom_channel_list {
+    /*transform: translate(-100%, 0);*/
+    display: none;
+  }
+  .channels_custom_list {
+    width: calc(100vw - 88px);
+  }
+}
 @media screen and (max-width: 480px), screen and (max-height: 700px) {
 
 }

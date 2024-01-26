@@ -289,7 +289,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
-  const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
@@ -1889,6 +1889,11 @@ const Placeholder = styled.span<{ paddings?: string; color?: string }>`
   pointer-events: none;
   color: ${(props) => props.color || colors.placeholderTextColor};
   margin-left: 6px;
+
+  @media (max-width: 768px) {
+    font-size: 13px;
+    top: calc(50% - 8px);
+  }
 `
 
 const EmojiButton = styled.span<any>`

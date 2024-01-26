@@ -255,7 +255,7 @@ export function setActiveChannelAC(channel: IChannel) {
   }
 }
 
-export function switchChannelActionAC(channel: IChannel) {
+export function switchChannelActionAC(channel: IChannel | {}) {
   return {
     type: SWITCH_CHANNEL,
     payload: { channel }
