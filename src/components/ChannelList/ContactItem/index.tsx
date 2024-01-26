@@ -1,12 +1,12 @@
 import React from 'react'
 import styled from 'styled-components'
-import Avatar from '../../Avatar'
 import { makeUsername } from '../../../helpers/message'
 import { USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import { colors } from '../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { IContact } from '../../../types'
+import Avatar from '../../Avatar'
 
 interface IChannelProps {
   contact: IContact

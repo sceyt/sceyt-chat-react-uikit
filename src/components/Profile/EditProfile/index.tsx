@@ -3,7 +3,6 @@ import styled from 'styled-components'
 import {
   ButtonBlock,
   Popup,
-  PopupContainer,
   PopupName,
   CloseIcon,
   Label,
@@ -16,6 +15,7 @@ import { ReactComponent as DeleteUpload } from '../../../assets/svg/deleteUpload
 import { useStateComplex } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../Avatar'
+import PopupContainer from '../../../common/popups/popupContainer'
 // import { updateUser } from '../../../../store/user/actions';
 // import { setErrorNotification } from '../../../../store/channel/actions';
 

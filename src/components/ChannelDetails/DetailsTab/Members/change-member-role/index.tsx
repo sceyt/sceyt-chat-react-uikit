@@ -1,6 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
+// Store
+import { rolesSelector } from '../../../../../store/member/selector'
+import { changeMemberRoleAC, getRolesAC } from '../../../../../store/member/actions'
+// Helpers
 import {
   Popup,
   PopupName,
@@ -14,12 +18,11 @@ import {
   PopupBody,
   DropdownOptionLi
 } from '../../../../../UIHelper'
-import DropDown from '../../../../../common/dropdown'
 import { IMember, IRole } from '../../../../../types'
-import { rolesSelector } from '../../../../../store/member/selector'
-import { changeMemberRoleAC, getRolesAC } from '../../../../../store/member/actions'
 import { colors } from '../../../../../UIHelper/constants'
+// Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
+import DropDown from '../../../../../common/dropdown'
 
 interface IProps {
   theme: string

@@ -1227,7 +1227,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         margin={margin}
         border={border}
         ref={messageContRef}
-        theme={theme}
         mentionColor={colors.primary}
         toolBarTop={selectedText && selectedText.current ? selectedText.current.top : ''}
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
@@ -1635,7 +1634,6 @@ const Container = styled.div<{
   borderRadius?: string
   ref?: any
   height?: number
-  theme?: string
   mentionColor?: string
   toolBarTop: string
   toolBarLeft: string

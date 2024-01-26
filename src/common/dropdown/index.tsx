@@ -83,7 +83,10 @@ const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundC
   border-radius: 8px;
   max-height: 220px;
   overflow-y: auto;
-  box-shadow: 0.8px 0.8px 0 rgba(31, 35, 60, 0.06), 0 0 2px rgba(31, 35, 60, 0.08), 0 2px 6px rgba(31, 35, 60, 0.16);
+  box-shadow:
+    0.8px 0.8px 0 rgba(31, 35, 60, 0.06),
+    0 0 2px rgba(31, 35, 60, 0.08),
+    0 2px 6px rgba(31, 35, 60, 0.16);
 
   & > * {
     &:first-child {
@@ -100,15 +103,15 @@ const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundC
       ? `top: inherit;
          bottom: 100%;`
       : props.position === 'topRight'
-      ? `top: inherit;
+        ? `top: inherit;
          right: inherit;
          bottom: 100%`
-      : props.position === 'right' || props.position === 'center'
-      ? `right: inherit;`
-      : props.position === 'left'
-      ? `right: inherit;
+        : props.position === 'right' || props.position === 'center'
+          ? `right: inherit;`
+          : props.position === 'left'
+            ? `right: inherit;
           left: 0;`
-      : ''}
+            : ''}
 `
 
 interface IProps {
@@ -222,7 +225,7 @@ const DropDown = ({
         withIcon={React.isValidElement(trigger) ? withIcon : true}
         isOpen={isOpen}
         className={`dropdown-trigger ${isOpen ? 'open' : ''}`}
-        iconColor={iconColor || (theme === THEME.DARK ? colors.white : '')}
+        iconColor={iconColor || (theme === THEME.DARK ? colors.textColor1 : '')}
       >
         {React.isValidElement(trigger) ? trigger : <span>{trigger}</span>}
         {/* {React.cloneElement(trigger, { onClick: toggleDropdown })} */}

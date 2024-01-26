@@ -1,9 +1,8 @@
 import React from 'react'
 import { Provider } from 'react-redux'
 import store from '../../store'
-import { ICustomAvatarColors } from '../Channel/types'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, IMessage, IUser } from '../../types'
+import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
 export interface IProgress {
   loaded: number
   total: number
@@ -34,7 +33,12 @@ export interface ICustomUploader {
 
 export interface IChatClientProps {
   client: any
-  theme?: 'dark' | 'light'
+  theme?: {
+    name: 'dark' | 'light'
+    primaryColor: string
+    primaryLight: string
+    textColor1: string
+  }
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars
   hideUserPresence?: (user: IUser) => boolean

@@ -1,5 +1,9 @@
 import React, { createRef, useEffect, useRef, useState } from 'react'
+import { useSelector } from 'react-redux'
 import styled from 'styled-components'
+// Store
+import { themeSelector } from '../../store/theme/selector'
+// Assets
 import { ReactComponent as BodyPartEmoji } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as AnimalEmoji } from '../../assets/svg/emojiAnimalIcon.svg'
 import { ReactComponent as FoodEmoji } from '../../assets/svg/emojiFoodIcon.svg'
@@ -7,11 +11,10 @@ import { ReactComponent as TravelingEmoji } from '../../assets/svg/emojiTravelIc
 import { ReactComponent as ObjectEmoji } from '../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
+// Helpers
 import { colors } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
-import { useSelector } from 'react-redux'
-import { themeSelector } from '../../store/theme/selector'
 import { THEME } from '../../helpers/constants'
 
 interface EmojiCollectionProps {
@@ -312,8 +315,15 @@ const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
   padding-top: 2px;
   text-align: center;
   background: transparent;
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   & > * {
     font-size: 22px;
   }

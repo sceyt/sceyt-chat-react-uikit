@@ -1,11 +1,13 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-// import { getAttachments, loadMoreAttachments } from '../../../../../store/message/actions';
-import { channelDetailsTabs } from '../../../../helpers/constants'
-import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
-import { IAttachment } from '../../../../types'
+// Store
 import { getAttachmentsAC } from '../../../../store/message/actions'
+import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
+// Helpers
+import { IAttachment } from '../../../../types'
+import { channelDetailsTabs } from '../../../../helpers/constants'
+// Components
 import LinkItem from './linkItem'
 
 interface IProps {
@@ -31,7 +33,6 @@ const Links = ({
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link))
   }, [channelId])
-  console.log('attachments. .. . . ', attachments)
   return (
     <Container>
       {attachments.map((file: IAttachment) => (

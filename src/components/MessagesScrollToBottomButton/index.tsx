@@ -1,15 +1,17 @@
 import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
 import React from 'react'
-
-import { colors } from '../../UIHelper/constants'
+// Store
 import { activeChannelSelector } from '../../store/channel/selector'
 import { scrollToNewMessageAC } from '../../store/message/actions'
-import { IChannel } from '../../types'
-import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
-import { UnreadCountProps } from '../Channel'
 import { sendMessageInputHeightSelector, showScrollToNewMessageButtonSelector } from '../../store/message/selector'
 import { themeSelector } from '../../store/theme/selector'
+// Assets
+import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
+// Helpers
+import { colors } from '../../UIHelper/constants'
+import { IChannel } from '../../types'
+import { UnreadCountProps } from '../Channel'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element

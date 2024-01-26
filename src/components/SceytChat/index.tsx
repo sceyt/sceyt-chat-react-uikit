@@ -1,7 +1,16 @@
 import React, { useEffect, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
-import { setClient } from '../../common/client'
+// Store
+import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
+import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
+import { setThemeAC } from '../../store/theme/actions'
+import { contactsMapSelector } from '../../store/user/selector'
+import { getRolesAC } from '../../store/member/actions'
+import { getRolesFailSelector } from '../../store/member/selector'
+// Hooks
+import { useDidUpdate } from '../../hooks'
+// Helpers
 import {
   destroyChannelsMap,
   setActiveChannelId,
@@ -10,24 +19,18 @@ import {
   setHandleNewMessages,
   setOpenChatOnUserInteraction
 } from '../../helpers/channelHalper'
-import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
+import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
-import { contactsMapSelector } from '../../store/user/selector'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { colors } from '../../UIHelper/constants'
-import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
-import { setThemeAC } from '../../store/theme/actions'
 import { THEME } from '../../helpers/constants'
-import { useDidUpdate } from '../../hooks'
-import { getRolesAC } from '../../store/member/actions'
-import { getRolesFailSelector } from '../../store/member/selector'
 
 const SceytChat = ({
   client,
@@ -221,20 +224,25 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: string) => {
-    if (theme === THEME.DARK) {
+  const handleChangedTheme = (theme: {
+    name: 'dark' | 'light'
+    primaryColor: string
+    primaryLight: string
+    textColor1: string
+  }) => {
+    if (theme.name === THEME.DARK) {
       dispatch(setThemeAC(THEME.DARK))
-      colors.primary = colors.darkModePrimary
-      colors.textColor1 = colors.darkModeTextColor1
-      colors.primaryLight = colors.darkModePrimaryLight
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
       colors.backgroundColor = colors.darkModeBackgroundColor
       colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
       setDarkTheme(true)
     } else {
       dispatch(setThemeAC(THEME.LIGHT))
-      colors.primary = colors.lightModePrimary
-      colors.textColor1 = colors.lightModeTextColor1
-      colors.primaryLight = colors.lightModePrimaryLight
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
       colors.backgroundColor = colors.lightModeBackgroundColor
       colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
       setDarkTheme(false)

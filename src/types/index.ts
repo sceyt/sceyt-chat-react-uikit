@@ -249,3 +249,12 @@ export interface IContactsMap {
 }
 
 export type MuteTime = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 24
+
+export type ICustomAvatarColors = [string, string, string, string, string, string]
+
+export interface ChannelQueryParams {
+  filter?: { channelType?: string }
+  limit?: number
+  sort?: 'byLastMessage' | 'byCreationDate'
+  search: string
+}

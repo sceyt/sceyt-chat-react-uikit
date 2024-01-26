@@ -1,6 +1,10 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
+import moment from 'moment'
+// Hooks
+import useUpdatePresence from '../../hooks/useUpdatePresence'
+// Store
 import {
   activeChannelSelector,
   channelMessageDraftIsRemovedSelector,
@@ -12,26 +16,27 @@ import {
   switchChannelActionAC,
   updateChannelDataAC
 } from '../../store/channel/actions'
+import { clearMessagesAC } from '../../store/message/actions'
+// Assets
 import { ReactComponent as ImageIcon } from '../../assets/svg/picture.svg'
 import { ReactComponent as CameraIcon } from '../../assets/svg/video-call.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
+import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
+// Components
 import Avatar from '../Avatar'
+// Helpers
 import { messageStatusIcon, systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
-import { getClient } from '../../common/client'
-import { IChannel, IContact } from '../../types'
-import { clearMessagesAC } from '../../store/message/actions'
-import useUpdatePresence from '../../hooks/useUpdatePresence'
-import { colors } from '../../UIHelper/constants'
-import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
-import moment from 'moment'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
+import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
+import { colors } from '../../UIHelper/constants'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
+import { getClient } from '../../common/client'
+import { IChannel, IContact } from '../../types'
 
 interface IChannelProps {
   channel: IChannel
@@ -390,7 +395,7 @@ const Channel: React.FC<IChannelProps> = ({
               messageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
-                iconColor: colors.primary,
+                readIconColor: colors.primary,
                 size: '16px'
               })}
           </DeliveryIconCont>

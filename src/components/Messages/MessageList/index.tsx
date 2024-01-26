@@ -2,7 +2,15 @@ import styled from 'styled-components'
 import React, { useRef, useEffect, useState, useMemo, FC } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import moment from 'moment'
-// import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
+// Store
+import {
+  clearSelectedMessagesAC,
+  getMessagesAC,
+  loadMoreMessagesAC,
+  scrollToNewMessageAC,
+  setScrollToMessagesAC,
+  showScrollToNewMessageButtonAC
+} from '../../../store/message/actions'
 import {
   messagesHasNextSelector,
   messagesHasPrevSelector,
@@ -12,21 +20,19 @@ import {
   scrollToNewMessageSelector,
   selectedMessagesMapSelector
 } from '../../../store/message/selector'
-import { colors } from '../../../UIHelper/constants'
-import MessageDivider from '../../MessageDivider'
+import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
+import { themeSelector } from '../../../store/theme/selector'
 import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
-// import { LOADING_STATE } from '../../../helpers/constants'
-import {
-  clearSelectedMessagesAC,
-  getMessagesAC,
-  loadMoreMessagesAC,
-  scrollToNewMessageAC,
-  setScrollToMessagesAC,
-  showScrollToNewMessageButtonAC
-} from '../../../store/message/actions'
-import { IChannel, IContactsMap, IMessage } from '../../../types'
-import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
+// Hooks
+import { useDidUpdate } from '../../../hooks'
+// Assets
+import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
+import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'
+import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
+// Helpers
+import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
 import {
   clearMessagesMap,
   clearVisibleMessagesMap,
@@ -39,19 +45,15 @@ import {
   setHasNextCached,
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
-import SliderPopup from '../../../common/popups/sliderPopup'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'
-import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
-import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
-import { useDidUpdate } from '../../../hooks'
+import { colors } from '../../../UIHelper/constants'
+import { IChannel, IContactsMap, IMessage } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
-import { CONNECTION_STATUS } from '../../../store/user/constants'
-import { themeSelector } from '../../../store/theme/selector'
+// Components
+import MessageDivider from '../../MessageDivider'
+import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
-// const Message = lazy(() => import('../../Message'))
 
 let loading = false
 let loadFromServer = false
@@ -425,7 +427,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const messageForReply: any = {}
   const messageList = useMemo(() => messages, [messages])
   // const messagesLoading = useSelector(messagesLoadingState) || 2
-  // TODO fix when will implement send message with attachment
   const attachmentsSelected = false
   const messagesBoxRef = useRef<any>(null)
   const messageTopDateRef = useRef<any>(null)
@@ -487,19 +488,6 @@ const MessageList: React.FC<MessagesProps> = ({
       } else {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
-      // console.log('forceLoadPrevMessages..  . . . . . . .  ', forceLoadPrevMessages)
-      // console.log(
-      //   'connectionStatus === CONNECTION_STATUS.CONNECTED. . . . ',
-      //   connectionStatus === CONNECTION_STATUS.CONNECTED
-      // )
-      // console.log('!prevDisable. . . . . .', !prevDisable)
-      // console.log('messagesLoading !== LOADING_STATE.LOADING ... . . .  .', messagesLoading !== LOADING_STATE.LOADING)
-      // console.log('!scrollToNewMessage.scrollToBottom. . . . . . . .', !scrollToNewMessage.scrollToBottom)
-      // console.log('hasPrevMessages . . . . ', hasPrevMessages)
-      // console.log(
-      //   'messagesIndexMap[lastVisibleMessageId] < 15) . . . .. .. ',
-      //   messagesIndexMap[lastVisibleMessageId] < 15
-      // )
       if (messagesIndexMap[lastVisibleMessageId] < 15 || forceLoadPrevMessages) {
         if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
           if (messagesLoading === LOADING_STATE.LOADING || loading || prevDisable) {

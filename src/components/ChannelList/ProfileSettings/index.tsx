@@ -1,16 +1,20 @@
-import styled from 'styled-components'
 import React, { useState } from 'react'
+import { useSelector } from 'react-redux'
+import styled from 'styled-components'
+// Store
+import { userSelector } from '../../../store/user/selector'
+// Assets
 import { ReactComponent as ArrowLeft } from '../../../assets/svg/arrowLeft.svg'
 import { ReactComponent as DefaultAvatar } from '../../../assets/svg/devaultAvatar50.svg'
 import { ReactComponent as NotificationsIcon } from '../../../assets/svg/notifications.svg'
 import { ReactComponent as LockIcon } from '../../../assets/svg/lock.svg'
 import { ReactComponent as LogoutIcon } from '../../../assets/svg/leave.svg'
+// Helpers
 import { colors } from '../../../UIHelper/constants'
 import { DropdownOptionLi, DropdownOptionsUl, SectionHeader } from '../../../UIHelper'
+// Components
 import Avatar from '../../Avatar'
 import EditProfile from './EditProfile'
-import { useSelector } from 'react-redux'
-import { userSelector } from '../../../store/user/selector'
 
 interface IChannelTabsProps {
   handleCloseProfile: () => void

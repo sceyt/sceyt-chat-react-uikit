@@ -1,9 +1,9 @@
 import React from 'react'
+import styled from 'styled-components'
 import { shallowEqual, useSelector } from 'react-redux'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
-import styled from 'styled-components'
 export interface IDetailsProps {
   size?: 'small' | 'medium' | 'large'
 

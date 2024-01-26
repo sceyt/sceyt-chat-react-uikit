@@ -1,9 +1,18 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
+// Store
+import { updateChannelAC } from '../../../store/channel/actions'
+import { channelEditModeSelector } from '../../../store/channel/selector'
+// Hooks
+import { useDidUpdate, useStateComplex } from '../../../hooks'
+// Assets
 import { ReactComponent as CameraIcon } from '../../../assets/svg/cameraIcon.svg'
 import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteChannel.svg'
+// Helpers
+import { resizeImage } from '../../../helpers/resizeImage'
+import { getUploadImageIcon } from '../../../helpers/channelHalper'
 import {
   Button,
   ButtonBlock,
@@ -15,19 +24,15 @@ import {
   UploadFile,
   UploadFileLabel
 } from '../../../UIHelper'
+import { getClient } from '../../../common/client'
+import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
+import { colors } from '../../../UIHelper/constants'
+import { IChannel, IMember } from '../../../types'
+// Components
 import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
-import { updateChannelAC } from '../../../store/channel/actions'
-import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
-import { IChannel, IMember } from '../../../types'
-import { useDidUpdate, useStateComplex } from '../../../hooks'
-import ConfirmPopup from '../../../common/popups/delete'
 import ImageCrop from '../../../common/imageCrop'
-import { channelEditModeSelector } from '../../../store/channel/selector'
-import { colors } from '../../../UIHelper/constants'
-import { resizeImage } from '../../../helpers/resizeImage'
-import { getUploadImageIcon } from '../../../helpers/channelHalper'
-import { getClient } from '../../../common/client'
+import ConfirmPopup from '../../../common/popups/delete'
 
 const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor?: string }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};

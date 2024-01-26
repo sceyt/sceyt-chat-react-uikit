@@ -1,6 +1,7 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
+// Store
 import {
   activeChannelSelector,
   addedChannelSelector,
@@ -32,23 +33,24 @@ import {
   setSearchedChannelsAC,
   switchChannelActionAC
 } from '../../store/channel/actions'
+import { themeSelector } from '../../store/theme/selector'
+import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
+// Hooks
+import { useDidUpdate } from '../../hooks'
+// Helpers
+import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
+import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-
+import { colors, device } from '../../UIHelper/constants'
+import { UploadingIcon } from '../../UIHelper'
+import { IChannel, IContact, IContactsMap } from '../../types'
+// Components
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
-import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
-import { colors, device } from '../../UIHelper/constants'
-import { IChannel, IContact, IContactsMap } from '../../types'
-// import { ReactComponent as BottomIcon } from '../../assets/svg/chevronBottom.svg'
-import CreateChannelButton from './CreateChannelButton'
-import { getContactsAC } from '../../store/user/actions'
-import ProfileSettings from './ProfileSettings'
-import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { useDidUpdate } from '../../hooks'
-import { themeSelector } from '../../store/theme/selector'
-import { UploadingIcon } from '../../UIHelper'
 import ContactItem from './ContactItem'
+import CreateChannelButton from './CreateChannelButton'
+import ProfileSettings from './ProfileSettings'
 
 interface IChannelListProps {
   List?: FC<{
@@ -207,14 +209,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchedChannelsTitleFontSize
 }) => {
   const dispatch = useDispatch()
-  // const [searchValue, setSearchValue] = useState('');
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
   const channelListRef = useRef<HTMLInputElement>(null)
   const channelsScrollRef = useRef<HTMLInputElement>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
-  // const searchValue = useSelector(searchValueSelector) || ''
   const channels = useSelector(channelsSelector, shallowEqual) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const addedChannel = useSelector(addedChannelSelector)
@@ -225,8 +225,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const visibleChannel = useSelector(visibleChannelSelector)
   const channelsHasNext = useSelector(channelsHasNextSelector) || false
   const searchedChannels = useSelector(searchedChannelsSelector) || []
-  // const directChannels = searchValue ? channels.filter((channel: any) => channel.type === 'Direct') : []
-  // const groupChannels = searchValue ? channels.filter((channel: any) => channel.type !== 'Direct') : []
   const channelsLoading = useSelector(channelsLoadingState) || {}
   const activeChannel = useSelector(activeChannelSelector) || {}
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
@@ -266,9 +264,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     if (activeChannel.id !== chan.id) {
       dispatch(switchChannelActionAC(chan))
     }
-    /* if (searchValue) {
-      getMyChannels()
-    } */
   }
   const handleCrateChatWithContact = (contact: IContact) => {
     if (contact) {
@@ -370,24 +365,16 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [visibleChannel])
 
   useDidUpdate(() => {
-    // if (searchOption === 'default') {
     if (searchValue) {
       dispatch(searchChannelsAC({ filter, limit, sort, search: searchValue }, contactsMap))
     } else {
       dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
     }
-    // }
   }, [searchValue])
   useDidUpdate(() => {
     if (getActiveChannel) {
       getActiveChannel(activeChannel)
     }
-    /*  if (searchValue) {
-      if (channelsScrollRef.current) {
-        channelsScrollRef.current.scrollTop = 0
-      }
-      getMyChannels()
-    } */
   }, [activeChannel.id])
 
   useDidUpdate(() => {
@@ -410,28 +397,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (channels && channels.length) {
       if (!listWidthIsSet) {
-        // console.log('set channels width ..... ', channelListRef.current && channelListRef.current.clientWidth)
         dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
         setListWidthIsSet(true)
       }
     } else {
-      // console.log('set channels width is set ..... ', false)
       setListWidthIsSet(false)
     }
     // console.log('channels. ...........................', channels)
   }, [channels])
-  /* useDidUpdate(() => {
-    /!* if (searchedChannels && searchedChannels.chats_groups && searchedChannels.chats_groups.length && !listWidthIsSet) {
-      dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
-      setListWidthIsSet(true)
-    } else {
-      setListWidthIsSet(false)
-    } *!/
-    console.log('searchedChannels. ...........................', searchedChannels)
-  }, [searchedChannels]) */
-  /*  useEffect(() => {
-     console.log('contactsMap. ...........................', contactsMap)
-   }, [contactsMap]) */
   return (
     <Container
       withCustomList={!!List}

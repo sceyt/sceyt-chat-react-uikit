@@ -1,11 +1,11 @@
-import styled from 'styled-components'
 import React, { useState } from 'react'
+import { useDispatch } from 'react-redux'
+import styled from 'styled-components'
 import { colors } from '../../../../UIHelper/constants'
 import { Button, CustomInput, Label, PopupFooter } from '../../../../UIHelper'
-import Avatar from '../../../Avatar'
 import { IUser } from '../../../../types'
 import { updateProfileAC } from '../../../../store/user/actions'
-import { useDispatch } from 'react-redux'
+import Avatar from '../../../Avatar'
 
 interface IProps {
   user: IUser

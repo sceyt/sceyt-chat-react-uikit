@@ -1,14 +1,17 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
-import { channelDetailsTabs } from '../../../../helpers/constants'
+// Store
 import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
-import { IAttachment, IChannel } from '../../../../types'
-import SliderPopup from '../../../../common/popups/sliderPopup'
-import Attachment from '../../../Attachment'
-import { colors } from '../../../../UIHelper/constants'
+// Helpers
 import { isJSON } from '../../../../helpers/message'
+import { channelDetailsTabs } from '../../../../helpers/constants'
+import { colors } from '../../../../UIHelper/constants'
+import { IAttachment, IChannel } from '../../../../types'
+// Components
+import Attachment from '../../../Attachment'
+import SliderPopup from '../../../../common/popups/sliderPopup'
 
 interface IProps {
   channel: IChannel

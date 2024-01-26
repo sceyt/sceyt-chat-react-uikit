@@ -1,14 +1,17 @@
 import React, { useState } from 'react'
 import styled from 'styled-components'
-import DropDown from '../../../common/dropdown'
+// Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { colors } from '../../../UIHelper/constants'
+// Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
 import { ReactComponent as CreateChatIcon } from '../../../assets/svg/createChat.svg'
 import { ReactComponent as AddChannelIcon } from '../../../assets/svg/addChat.svg'
+// Components
 import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
+import DropDown from '../../../common/dropdown'
 
 interface IChannelListProps {
   showSearch?: boolean

@@ -56,8 +56,7 @@ import {
   UPDATE_USER_STATUS_ON_CHANNEL,
   WATCH_FOR_EVENTS
 } from './constants'
-import { ChannelQueryParams } from '../../components/Channel/types'
-import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
+import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
 export function createChannelAC(channelData: ICreateChannel, dontCreateIfNotExists?: boolean) {
   return {

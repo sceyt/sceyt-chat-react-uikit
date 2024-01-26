@@ -1,10 +1,9 @@
 import React from 'react'
-// import useIsMounted from '../../hooks/basic/useIsMounted'
+import styled from 'styled-components'
+// Assets
 import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
 import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/devaultAvatar32.svg'
-// import DefaultAvatarSrc from '../../assets/img/defaultAvatar.png'
-// import defaultAvatarSrc from ''
-import styled from 'styled-components'
+// Helpers
 import { generateAvatarColor } from '../../UIHelper'
 import { colors } from '../../UIHelper/constants'
 
@@ -34,9 +33,6 @@ const Avatar: React.FC<IProps> = ({
   handleAvatarClick
   // customAvatarColors
 }) => {
-  // const isMounted = useIsMounted()
-  // const [avatarImage, setAvatarImage] = useState<{loaded: boolean, src?: string}>({ loaded: false, src: image });
-  // const [imageLoaded, setImageLoaded] = useState(isMessage);
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
   if (!image && name) {
@@ -58,22 +54,7 @@ const Avatar: React.FC<IProps> = ({
       avatarText = firstCharOfFirstWord ? String.fromCodePoint(firstCharOfFirstWord) : ''
     }
   }
-  /* useEffect(() => {
-    if (!isMessage) {
-      const imageSrc = image;
-      const img = new Image();
-      img.onload = () => {
-        if (isMounted.current) {
-          setAvatarImage({ loaded: true, src: imageSrc });
-        }
-      };
-      img.onerror = () => {
-        setAvatarImage({ loaded: false, src: imageSrc });
-      };
-      img.src = imageSrc || '';
-    }
-  }, [image]); */
-  // console.log('isDeletedUserAvatar .. ', isDeletedUserAvatar);
+
   return (
     <Container
       border={border}
@@ -86,30 +67,15 @@ const Avatar: React.FC<IProps> = ({
       cursorPointer={!!handleAvatarClick}
     >
       {isDeletedUserAvatar ? (
-        // DeletedIcon || <DeletedAvatarIcon />
         DeletedIcon || <DeletedAvatarWrapper color={colors.deleteUserIconBackground} />
-      ) : // : !avatarImage.src && name
-      !image ? (
+      ) : !image ? (
         setDefaultAvatar ? (
           DefaultAvatar || <DefaultAvatarWrapper color={colors.defaultAvatarBackground} />
         ) : (
           <span>{avatarText}</span>
         )
       ) : (
-        <AvatarImage
-          draggable={false}
-          showImage
-          // showImage={imageLoaded}
-          // src={avatarImage.src!}
-          src={image}
-          size={size}
-          // onLoad={() => setImageLoaded(true)}
-          /* onError={(e:any) => {
-                  e.target.onerror = null; // prevents looping
-                  setAvatarImage({ loaded: true, src: '' });
-                }} */
-          alt=''
-        />
+        <AvatarImage draggable={false} showImage src={image} size={size} alt='' />
       )}
     </Container>
   )
