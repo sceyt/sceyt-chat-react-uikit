@@ -857,7 +857,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
-          setUnreadMessageId(channel.lastDisplayedMsgId)
+          setUnreadMessageId(channel.lastDisplayedMessageId)
         } else {
           setUnreadMessageId('')
         }
@@ -1007,7 +1007,7 @@ const MessageList: React.FC<MessagesProps> = ({
       if (scrollRef.current) {
         scrollRef.current.style.scrollBehavior = 'inherit'
       }
-      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMsgId)
+      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
       if (lastReadMessageNode) {
         scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
         if (scrollRef.current) {
