@@ -67,11 +67,11 @@ import {
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
 import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
-import { MessageTextFormat } from '../../helpers/message'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { messagesHasNextSelector } from '../message/selector'
+import { MessageTextFormat } from '../../messageUtils'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()

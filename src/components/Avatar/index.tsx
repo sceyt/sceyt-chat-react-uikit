@@ -17,6 +17,7 @@ interface IProps {
   DefaultAvatar?: JSX.Element
   DeletedIcon?: JSX.Element
   border?: string
+  borderRadius?: string
   handleAvatarClick?: () => void
 }
 
@@ -30,6 +31,7 @@ const Avatar: React.FC<IProps> = ({
   setDefaultAvatar,
   DefaultAvatar,
   border,
+  borderRadius,
   handleAvatarClick
   // customAvatarColors
 }) => {
@@ -65,6 +67,7 @@ const Avatar: React.FC<IProps> = ({
       textSize={textSize}
       onClick={handleAvatarClick}
       cursorPointer={!!handleAvatarClick}
+      borderRadius={borderRadius}
     >
       {isDeletedUserAvatar ? (
         DeletedIcon || <DeletedAvatarWrapper color={colors.deleteUserIconBackground} />
@@ -90,6 +93,7 @@ interface ContainerProps {
   isImage?: boolean
   marginAuto?: boolean
   border?: string
+  borderRadius?: string
   cursorPointer?: boolean
 }
 
@@ -107,7 +111,7 @@ export const Container = styled.div<ContainerProps>`
   width: ${(props) => (props.size ? `${props.size}px` : '38px')};
   height: ${(props) => (props.size ? `${props.size}px` : '38px')};
   border: ${(props) => props.border};
-  border-radius: 50%;
+  border-radius: ${(props) => props.borderRadius || '50%'};
   color: #fff;
   overflow: hidden;
   margin: ${(props) => (props.marginAuto ? 'auto' : '')};

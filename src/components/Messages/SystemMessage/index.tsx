@@ -112,7 +112,7 @@ const Message = ({
                     .map((mem: string) =>
                       mem === user.id
                         ? 'You'
-                        : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
+                        : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
                     )
                 } ${
                   messageMetas && messageMetas.m && messageMetas.m.length > 5
@@ -128,7 +128,7 @@ const Message = ({
                       .map((mem: string) =>
                         mem === user.id
                           ? 'You'
-                          : ` ${systemMessageUserName(contactsMap[mem], mem, message.mentionedUsers)}`
+                          : ` ${systemMessageUserName(mem, contactsMap[mem], message.mentionedUsers)}`
                       )
                   } ${
                     messageMetas && messageMetas.m && messageMetas.m.length > 5

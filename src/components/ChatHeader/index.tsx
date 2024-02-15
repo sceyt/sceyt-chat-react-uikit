@@ -30,6 +30,7 @@ import Avatar from '../Avatar'
 
 interface IProps {
   backgroundColor?: string
+  avatarBorderRadius?: string
   titleColor?: string
   titleFontSize?: string
   titleLineHeight?: string
@@ -56,6 +57,7 @@ export default function ChatHeader({
   infoIcon,
   backgroundColor,
   titleColor,
+  avatarBorderRadius,
   memberInfoTextColor,
   memberInfoFontSize,
   memberInfoLineHeight,
@@ -150,6 +152,7 @@ export default function ChatHeader({
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
             <Avatar
+              borderRadius={avatarBorderRadius}
               name={
                 activeChannel.subject ||
                 (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')

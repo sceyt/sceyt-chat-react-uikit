@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { colors } from '../../UIHelper/constants'
-import { IChannel, IMessage } from '../../types'
+import { IAttachment, IChannel, IMessage, IUser } from '../../types'
 interface MessagesProps {
   fontFamily?: string
   ownMessageOnRightSide?: boolean

@@ -2010,7 +2010,7 @@ function* getMessagesQuery(action: IAction): any {
         setAllMessages([...result.messages])
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
         /*
-        if (channel.lastDisplayedMsgId) {
+        if (channel.lastDisplayedMessageId) {
           yield put(setMessagesNextCompleteAC(true))
           yield put(setMessagesPrevCompleteAC(true))
           messageQuery.limit = 30

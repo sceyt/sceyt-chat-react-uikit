@@ -27,8 +27,8 @@ import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNo
 // Components
 import Avatar from '../Avatar'
 // Helpers
-import { messageStatusIcon, systemMessageUserName } from '../../helpers'
-import { isJSON, lastMessageDateFormat, makeUsername, MessageTextFormat } from '../../helpers/message'
+import { systemMessageUserName } from '../../helpers'
+import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
@@ -37,16 +37,18 @@ import { colors } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
+import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 
 interface IChannelProps {
   channel: IChannel
   showAvatar?: boolean
+  avatarBorderRadius?: string
   theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
   selectedChannelLeftBorder?: string
   selectedChannelBackground?: string
-  contactsMap: { [key: string]: IContact }
+  contactsMap?: { [key: string]: IContact }
   selectedChannelBorderRadius?: string
   selectedChannelPaddings?: string
   channelsPaddings?: string
@@ -66,6 +68,7 @@ const Channel: React.FC<IChannelProps> = ({
   channel,
   theme,
   showAvatar = true,
+  avatarBorderRadius,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
   selectedChannelLeftBorder,
@@ -169,6 +172,7 @@ const Channel: React.FC<IChannelProps> = ({
               channel.subject ||
               (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
             }
+            borderRadius={avatarBorderRadius}
             image={channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
             size={channelAvatarSize || 50}
             textSize={channelAvatarTextSize || 16}
@@ -198,7 +202,7 @@ const Channel: React.FC<IChannelProps> = ({
         <h3>
           {channel.subject ||
             (isDirectChannel && directChannelUser
-              ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+              ? makeUsername(contactsMap && contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
               : '')}
         </h3>
         {channel.muted && (
@@ -217,7 +221,12 @@ const Channel: React.FC<IChannelProps> = ({
               !isDirectChannel ? (
                 <LastMessageAuthor theme={theme}>
                   <span ref={messageAuthorRef}>
-                    {makeUsername(contactsMap[typingIndicator.from.id], typingIndicator.from, getFromContacts, true)}
+                    {makeUsername(
+                      contactsMap && contactsMap[typingIndicator.from.id],
+                      typingIndicator.from,
+                      getFromContacts,
+                      true
+                    )}
                   </span>
                 </LastMessageAuthor>
               ) : null
@@ -232,7 +241,7 @@ const Channel: React.FC<IChannelProps> = ({
                     {channel.newReactions[0].user.id === user.id
                       ? 'You'
                       : makeUsername(
-                          contactsMap[channel.newReactions[0].user.id],
+                          contactsMap && contactsMap[channel.newReactions[0].user.id],
                           channel.newReactions[0].user,
                           getFromContacts,
                           true
@@ -249,7 +258,12 @@ const Channel: React.FC<IChannelProps> = ({
                   <span ref={messageAuthorRef}>
                     {lastMessage.user.id === user.id
                       ? 'You'
-                      : makeUsername(contactsMap[lastMessage.user.id], lastMessage.user, getFromContacts, true)}
+                      : makeUsername(
+                          contactsMap && contactsMap[lastMessage.user.id],
+                          lastMessage.user,
+                          getFromContacts,
+                          true
+                        )}
                   </span>
                 </LastMessageAuthor>
               )
@@ -291,7 +305,7 @@ const Channel: React.FC<IChannelProps> = ({
                   (lastMessage.user.id === user.id
                     ? 'You '
                     : makeUsername(
-                        lastMessage.user && contactsMap[lastMessage.user.id],
+                        lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
                         lastMessage.user,
                         getFromContacts
                       ))
@@ -309,7 +323,11 @@ const Channel: React.FC<IChannelProps> = ({
                               .map((mem: string) =>
                                 mem === user.id
                                   ? ' You'
-                                  : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
+                                  : ` ${systemMessageUserName(
+                                      mem,
+                                      contactsMap && contactsMap[mem],
+                                      lastMessage.mentionedUsers
+                                    )}`
                               )
                           } ${
                             lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
@@ -325,7 +343,11 @@ const Channel: React.FC<IChannelProps> = ({
                                 .map((mem: string) =>
                                   mem === user.id
                                     ? ' You'
-                                    : ` ${systemMessageUserName(contactsMap[mem], mem, lastMessage.mentionedUsers)}`
+                                    : ` ${systemMessageUserName(
+                                        mem,
+                                        contactsMap && contactsMap[mem],
+                                        lastMessage.mentionedUsers
+                                      )}`
                                 )
                             } ${
                               lastMessageMetas && lastMessageMetas.m && lastMessageMetas.m.length > 5
@@ -392,7 +414,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.user &&
               lastMessage.user.id === user.id &&
               lastMessage.type !== 'system' &&
-              messageStatusIcon({
+              MessageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
                 readIconColor: colors.primary,

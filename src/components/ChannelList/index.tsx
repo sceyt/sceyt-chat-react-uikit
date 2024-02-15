@@ -87,6 +87,7 @@ interface IChannelListProps {
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   showAvatar?: boolean
+  avatarBorderRadius?: string
   showSearch?: boolean
   searchOption?: 'custom' | 'default'
   forceUpdateChannelList?: () => void
@@ -182,6 +183,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   limit,
   sort,
   showAvatar = true,
+  avatarBorderRadius,
   showSearch = true,
   showCreateChannelIcon = true,
   uriPrefixOnCreateChannel,
@@ -407,6 +409,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
     // console.log('channels. ...........................', channels)
   }, [channels])
+
+  /* useEffect(() => {
+    if (contactsMap) {
+      console.log('contactsMap.>>>...', contactsMap)
+    }
+  }, [contactsMap]) */
   return (
     <Container
       className={className}
@@ -501,6 +509,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                     showAvatar={showAvatar}
+                    avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
                     key={channel.id}
                     contactsMap={contactsMap}
@@ -545,6 +554,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                             showAvatar={showAvatar}
+                            avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}
@@ -582,6 +592,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                             showAvatar={showAvatar}
+                            avatarBorderRadius={avatarBorderRadius}
                             contact={contact}
                             createChatWithContact={handleCrateChatWithContact}
                             key={contact.id}
@@ -618,6 +629,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                             showAvatar={showAvatar}
+                            avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}
@@ -663,6 +675,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                     showAvatar={showAvatar}
+                    avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
                     key={channel.id}
                     contactsMap={contactsMap}
@@ -708,6 +721,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                             showAvatar={showAvatar}
+                            avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
                             contactsMap={contactsMap}
                             key={channel.id}
@@ -743,6 +757,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
                             showAvatar={showAvatar}
+                            avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}

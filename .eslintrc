@@ -31,11 +31,7 @@
     "import/export": 0,
     "no-use-before-define": ["error", { "functions": false, "classes": false,"variables": false }],
     "max-len": ["error", { "code": 140 }],
-    "no-unused-vars": [
-      "warn",
-      {
-        "varsIgnorePattern": "^[I]"
-      }
-    ]
+
+    "no-unused-vars": ["error", { "args": "none" }]
   }
 }

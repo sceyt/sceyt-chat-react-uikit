@@ -63,8 +63,7 @@ import {
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
-  makeUsername,
-  MessageTextFormat
+  makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
 import { colors } from '../../UIHelper/constants'
@@ -126,6 +125,7 @@ import AudioRecord from '../AudioRecord'
 import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
+import { MessageTextFormat } from '../../messageUtils'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -215,6 +215,7 @@ interface SendMessageProps {
   CustomTypingIndicator?: FC<{ from: IUser; typingState: boolean }>
   backgroundColor?: string
   margin?: string
+  padding?: string
   minHeight?: string
   border?: string
   borderRadius?: string
@@ -235,6 +236,7 @@ interface SendMessageProps {
   replyEditMessageContainerBorderRadius?: string
   replyEditMessageContainerBottomPosition?: string
   replyEditMessageContainerLeftPosition?: string
+  replyEditMessageContainerPadding?: string
   editMessageIcon?: JSX.Element
   editMessageBackgroundColor?: string
   editMessageTextColor?: string
@@ -264,6 +266,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   attachmentIcoOrder = 0,
   CustomTypingIndicator,
   margin,
+  padding,
   border,
   minHeight,
   borderRadius,
@@ -288,6 +291,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   replyEditMessageContainerWidth,
   replyEditMessageContainerBorderRadius,
   replyEditMessageContainerBottomPosition,
+  replyEditMessageContainerPadding,
   replyEditMessageContainerLeftPosition,
   sendAttachmentSeparately,
   allowMentionUser = true,
@@ -1245,6 +1249,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     <SendMessageWrapper backgroundColor={backgroundColor}>
       <Container
         margin={margin}
+        padding={padding}
         border={border}
         ref={messageContRef}
         mentionColor={colors.primary}
@@ -1362,6 +1367,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderRadius={replyEditMessageContainerBorderRadius}
                     left={replyEditMessageContainerLeftPosition}
                     bottom={replyEditMessageContainerBottomPosition}
+                    padding={replyEditMessageContainerPadding}
                     color={editMessageTextColor || colors.textColor1}
                     backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
                   >
@@ -1389,6 +1395,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     borderRadius={replyEditMessageContainerBorderRadius}
                     bottom={replyEditMessageContainerBottomPosition}
                     left={replyEditMessageContainerLeftPosition}
+                    padding={replyEditMessageContainerPadding}
                     color={replyMessageTextColor || colors.textColor1}
                     backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
                   >
@@ -1667,6 +1674,7 @@ const SendMessageWrapper = styled.div<{ backgroundColor?: string }>`
 `
 const Container = styled.div<{
   margin?: string
+  padding?: string
   border?: string
   borderRadius?: string
   ref?: any
@@ -1680,7 +1688,7 @@ const Container = styled.div<{
   border: ${(props) => props.border || ''};
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
-  padding: 0 12px;
+  padding: ${(props) => props.padding || '0 12px'};
 
   & span.rdw-suggestion-dropdown {
     position: absolute;
@@ -1729,7 +1737,7 @@ const EditReplyMessageCont = styled.div<{
   bottom: ${(props) => props.bottom || '0'};
   width: ${(props) => props.width || 'calc(100% - 82px)'};
   border-radius: ${(props) => props.borderRadius || '18px 18px 0 0'};
-  padding: ${(props) => props.padding || '8px 16px 30px'};
+  padding: ${(props) => props.padding || '8px 16px 12px'};
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
