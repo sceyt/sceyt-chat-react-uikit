@@ -166,6 +166,38 @@ interface MessagesProps {
     isThreadMessage?: boolean
     rtlDirection?: boolean
   }>
+  CustomMessageItem?: FC<{
+    channel: IChannel
+    message: IMessage
+    prevMessage: IMessage
+    nextMessage: IMessage
+    unreadMessageId: string
+    isUnreadMessage: boolean
+    messageActionsShow: boolean
+    selectionIsActive?: boolean
+    emojisPopupOpen: boolean
+    frequentlyEmojisOpen: boolean
+    messageTextRef: any
+    emojisPopupPosition: string
+    handleSetMessageForEdit?: () => void
+    handleResendMessage?: () => void
+    handleOpenDeleteMessage?: () => void
+    handleOpenForwardMessage?: () => void
+    handleCopyMessage?: () => void
+    handleReportMessage?: () => void
+    handleSelectMessage?: () => void
+    handleOpenEmojis?: () => void
+    handleReplyMessage?: () => void
+    handleMouseEnter: () => void
+    handleMouseLeave: () => void
+    closeMessageActions?: () => void
+    setEmojisPopupOpen: () => void
+    handleCreateChat: (user: IUser) => void
+    handleReactionAddDelete: (selectedEmoji: any) => void
+    handleScrollToRepliedMessage: (messageId: string) => void
+    handleMediaItemClick?: (attachment: IAttachment) => void
+    isThreadMessage?: boolean
+  }>
   messageReaction?: boolean
   editMessage?: boolean
   copyMessage?: boolean
@@ -292,6 +324,7 @@ const MessageList: React.FC<MessagesProps> = ({
   showSenderNameOnGroupChannel = true,
   showOwnAvatar = false,
   MessageActionsMenu,
+  CustomMessageItem,
   messageReaction,
   editMessage,
   copyMessage,
@@ -1138,6 +1171,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
                           showSenderNameOnGroupChannel={showSenderNameOnGroupChannel}
                           MessageActionsMenu={MessageActionsMenu}
+                          CustomMessageItem={CustomMessageItem}
                           messageReaction={messageReaction}
                           editMessage={editMessage}
                           copyMessage={copyMessage}

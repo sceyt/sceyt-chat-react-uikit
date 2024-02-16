@@ -34,8 +34,8 @@ import {
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from '../../helpers/messagesHalper'
-import { calculateRenderedImageWidth, messageStatusIcon } from '../../helpers'
-import { isJSON, makeUsername, MessageTextFormat } from '../../helpers/message'
+import { calculateRenderedImageWidth } from '../../helpers'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -43,7 +43,7 @@ import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUpload
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
 import { colors } from '../../UIHelper/constants'
-import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
+import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
 import Avatar from '../Avatar'
@@ -53,6 +53,7 @@ import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
+import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 
 interface IMessageProps {
   message: IMessage
@@ -74,16 +75,45 @@ interface IMessageProps {
     isThreadMessage?: boolean
     rtlDirection?: boolean
   }>
+
+  CustomMessageItem?: FC<{
+    channel: IChannel
+    message: IMessage
+    prevMessage?: IMessage
+    nextMessage?: IMessage
+    unreadMessageId: string
+    isUnreadMessage: boolean
+    messageActionsShow: boolean
+    selectionIsActive?: boolean
+    emojisPopupOpen: boolean
+    frequentlyEmojisOpen: boolean
+    messageTextRef: any
+    emojisPopupPosition: string
+    handleSetMessageForEdit?: () => void
+    handleResendMessage?: () => void
+    handleOpenDeleteMessage?: () => void
+    handleOpenForwardMessage?: () => void
+    handleCopyMessage?: () => void
+    handleReportMessage?: () => void
+    handleSelectMessage?: () => void
+    handleOpenEmojis?: () => void
+    handleReplyMessage?: () => void
+    handleMouseEnter: () => void
+    handleMouseLeave: () => void
+    closeMessageActions?: () => void
+    setEmojisPopupOpen: () => void
+    handleCreateChat: (user: IUser) => void
+    handleReactionAddDelete: (selectedEmoji: any) => void
+    handleScrollToRepliedMessage: (messageId: string) => void
+    handleMediaItemClick?: (attachment: IAttachment) => void
+    isThreadMessage?: boolean
+  }>
   isPendingMessage?: boolean
   prevMessage?: IMessage
   nextMessage: IMessage
-  // eslint-disable-next-line no-unused-vars
   stopScrolling: (stop: boolean) => void
-  // eslint-disable-next-line no-unused-vars
   setLastVisibleMessageId?: (msgId: string) => void
-  // eslint-disable-next-line no-unused-vars
-  handleScrollToRepliedMessage?: (msgId: string) => void
-  // eslint-disable-next-line no-unused-vars
+  handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
   isUnreadMessage: boolean
@@ -205,6 +235,7 @@ const Message = ({
   message,
   channel,
   MessageActionsMenu,
+  CustomMessageItem,
   // forwardSenderFromContact,
   handleScrollToRepliedMessage,
   handleMediaItemClick,
@@ -453,7 +484,7 @@ const Message = ({
     stopScrolling(!forwardPopupOpen)
   }
 
-  const handleReplyMessage = (threadReply: boolean) => {
+  const handleReplyMessage = (threadReply?: boolean) => {
     if (threadReply) {
       // dispatch(setMessageForThreadReply(message));
     } else {
@@ -468,7 +499,7 @@ const Message = ({
 
     setMessageActionsShow(false)
   }
-  const handleSelectMessage = (e: any) => {
+  const handleSelectMessage = (e?: any) => {
     if (e) {
       e.preventDefault()
       e.stopPropagation()
@@ -552,7 +583,7 @@ const Message = ({
     }
   }
 
-  const closeMessageActions = (close: boolean) => {
+  const closeMessageActions = (close?: boolean) => {
     setMessageActionsShow(!close)
     if (close && !messageActionsShow && messageActionsTimeout.current) {
       clearTimeout(messageActionsTimeout.current)
@@ -600,6 +631,8 @@ const Message = ({
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
+      channel.newMessageCount &&
+      channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
       console.log('send displayed marker for message ... ', message)
@@ -836,268 +869,302 @@ const Message = ({
         )}
         {/* {withAttachments && !message.body && <MessageHeader />} */}
 
-        <MessageBody
-          className='messageBody'
-          isSelfMessage={!message.incoming}
-          isReplyMessage={!!(message.parentMessage && message.parentMessage.id && !isThreadMessage)}
-          rtlDirection={ownMessageOnRightSide && !message.incoming}
-          parentMessageIsVoice={
-            message.parentMessage &&
-            message.parentMessage.attachments &&
-            message.parentMessage.attachments[0] &&
-            message.parentMessage.attachments[0].type === attachmentTypes.voice
-          }
-          ownMessageBackground={ownMessageBackground}
-          incomingMessageBackground={incomingMessageBackground}
-          borderRadius={borderRadius}
-          withAttachments={notLinkAttachment}
-          attachmentWidth={
-            withAttachments
-              ? mediaAttachment
-                ? (attachmentMetas &&
-                    getSendAttachmentsAsSeparateMessages() &&
-                    attachmentMetas.szw &&
-                    calculateRenderedImageWidth(
-                      attachmentMetas.szw,
-                      attachmentMetas.szh,
+        {CustomMessageItem ? (
+          <CustomMessageItem
+            channel={channel}
+            message={message}
+            prevMessage={prevMessage}
+            nextMessage={nextMessage}
+            unreadMessageId={unreadMessageId}
+            isUnreadMessage={isUnreadMessage}
+            messageActionsShow={messageActionsShow}
+            selectionIsActive={selectionIsActive}
+            emojisPopupOpen={emojisPopupOpen}
+            frequentlyEmojisOpen={frequentlyEmojisOpen}
+            messageTextRef={messageTextRef}
+            emojisPopupPosition={emojisPopupPosition}
+            handleSetMessageForEdit={toggleEditMode}
+            handleResendMessage={handleResendMessage}
+            handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
+            handleOpenForwardMessage={handleToggleForwardMessagePopup}
+            handleCopyMessage={handleCopyMessage}
+            handleReportMessage={handleToggleReportPopupOpen}
+            handleSelectMessage={handleSelectMessage}
+            handleOpenEmojis={handleOpenEmojis}
+            handleReplyMessage={handleReplyMessage}
+            handleMouseEnter={handleMouseEnter}
+            handleMouseLeave={handleMouseLeave}
+            closeMessageActions={closeMessageActions}
+            setEmojisPopupOpen={() => setEmojisPopupOpen(!emojisPopupOpen)}
+            handleCreateChat={handleCreateChat}
+            handleReactionAddDelete={handleReactionAddDelete}
+            handleScrollToRepliedMessage={handleScrollToRepliedMessage}
+            handleMediaItemClick={handleMediaItemClick}
+            isThreadMessage={isThreadMessage}
+          />
+        ) : (
+          <MessageBody
+            className='messageBody'
+            isSelfMessage={!message.incoming}
+            isReplyMessage={!!(message.parentMessage && message.parentMessage.id && !isThreadMessage)}
+            rtlDirection={ownMessageOnRightSide && !message.incoming}
+            parentMessageIsVoice={
+              message.parentMessage &&
+              message.parentMessage.attachments &&
+              message.parentMessage.attachments[0] &&
+              message.parentMessage.attachments[0].type === attachmentTypes.voice
+            }
+            ownMessageBackground={ownMessageBackground}
+            incomingMessageBackground={incomingMessageBackground}
+            borderRadius={borderRadius}
+            withAttachments={notLinkAttachment}
+            attachmentWidth={
+              withAttachments
+                ? mediaAttachment
+                  ? (attachmentMetas &&
+                      getSendAttachmentsAsSeparateMessages() &&
+                      attachmentMetas.szw &&
+                      calculateRenderedImageWidth(
+                        attachmentMetas.szw,
+                        attachmentMetas.szh,
 
-                      mediaAttachment.type === attachmentTypes.image
-                        ? imageAttachmentMaxWidth
-                        : videoAttachmentMaxWidth,
-                      mediaAttachment.type === attachmentTypes.image
-                        ? imageAttachmentMaxHeight
-                        : videoAttachmentMaxHeight
-                      // imageAttachmentMaxWidth,
-                      // imageAttachmentMaxHeight
-                    )[0]) ||
-                  420
-                : /*: message.attachments[0].type === attachmentTypes.link
+                        mediaAttachment.type === attachmentTypes.image
+                          ? imageAttachmentMaxWidth
+                          : videoAttachmentMaxWidth,
+                        mediaAttachment.type === attachmentTypes.image
+                          ? imageAttachmentMaxHeight
+                          : videoAttachmentMaxHeight
+                        // imageAttachmentMaxWidth,
+                        // imageAttachmentMaxHeight
+                      )[0]) ||
+                    420
+                  : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
-                  message.attachments[0].type === attachmentTypes.voice
-                  ? 254
-                  : message.attachments[0].type === attachmentTypes.file
-                    ? fileAttachmentsBoxWidth
-                    : undefined
-              : undefined
-          }
-          noBody={!message.body && !withAttachments}
-          onMouseEnter={handleMouseEnter}
-          onMouseLeave={handleMouseLeave}
-        >
-          {/* {withAttachments && !!message.body && <MessageHeader />} */}
-          {showMessageSenderName && <MessageHeader />}
-          {!isThreadMessage &&
-            messageActionsShow &&
-            !selectionIsActive &&
-            !emojisPopupOpen &&
-            !frequentlyEmojisOpen &&
-            (MessageActionsMenu ? (
-              <MessageActionsMenu
-                message={message}
-                channel={channel}
-                isThreadMessage={isThreadMessage}
-                rtlDirection={ownMessageOnRightSide && !message.incoming}
-                handleSetMessageForEdit={toggleEditMode}
-                handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
-                handleCopyMessage={handleCopyMessage}
-                handleOpenForwardMessage={handleToggleForwardMessagePopup}
-                handleResendMessage={handleResendMessage}
-                handleReplyMessage={() => handleReplyMessage(false)}
-                handleReportMessage={handleToggleReportPopupOpen}
-                handleSelectMessage={handleSelectMessage}
-                handleOpenEmojis={handleOpenEmojis}
-              />
-            ) : (
-              <MessageActions
-                messageFrom={message.user}
-                channel={channel}
-                editModeToggle={toggleEditMode}
-                messageStatus={message.deliveryStatus || MESSAGE_DELIVERY_STATUS.PENDING}
-                handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
-                handleCopyMessage={handleCopyMessage}
-                handleDeletePendingMessage={handleDeletePendingMessage}
-                handleOpenForwardMessage={handleToggleForwardMessagePopup}
-                handleResendMessage={handleResendMessage}
-                handleReplyMessage={handleReplyMessage}
-                handleReportMessage={handleToggleReportPopupOpen}
-                handleSelectMessage={handleSelectMessage}
-                handleOpenEmojis={handleOpenEmojis}
-                selfMessage={message.user && messageUserID === user.id}
-                isThreadMessage={isThreadMessage}
-                rtlDirection={ownMessageOnRightSide && !message.incoming}
-                showMessageReaction={messageReaction}
-                showEditMessage={
-                  editMessage &&
-                  !message.forwardingDetails &&
-                  !(
-                    message.attachments &&
-                    message.attachments.length &&
                     message.attachments[0].type === attachmentTypes.voice
-                  )
-                }
-                showCopyMessage={copyMessage && message.body}
-                showReplyMessage={replyMessage}
-                showReplyMessageInThread={replyMessageInThread}
-                showForwardMessage={forwardMessage}
-                showDeleteMessage={deleteMessage}
-                showSelectMessage={selectMessage}
-                showReportMessage={reportMessage}
-                reactionIcon={reactionIcon}
-                editIcon={editIcon}
-                copyIcon={copyIcon}
-                replyIcon={replyIcon}
-                replyInThreadIcon={replyInThreadIcon}
-                forwardIcon={forwardIcon}
-                deleteIcon={deleteIcon}
-                selectIcon={selectIcon}
-                allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
-                starIcon={starIcon}
-                staredIcon={staredIcon}
-                reportIcon={reportIcon}
-                reactionIconOrder={reactionIconOrder}
-                editIconOrder={editIconOrder}
-                copyIconOrder={copyIconOrder}
-                replyIconOrder={replyIconOrder}
-                replyInThreadIconOrder={replyInThreadIconOrder}
-                forwardIconOrder={forwardIconOrder}
-                deleteIconOrder={deleteIconOrder}
-                selectIconOrder={selectIconOrder}
-                starIconOrder={starIconOrder}
-                reportIconOrder={reportIconOrder}
-                reactionIconTooltipText={reactionIconTooltipText}
-                editIconTooltipText={editIconTooltipText}
-                copyIconTooltipText={copyIconTooltipText}
-                replyIconTooltipText={replyIconTooltipText}
-                replyInThreadIconTooltipText={replyInThreadIconTooltipText}
-                forwardIconTooltipText={forwardIconTooltipText}
-                deleteIconTooltipText={deleteIconTooltipText}
-                selectIconTooltipText={selectIconTooltipText}
-                starIconTooltipText={starIconTooltipText}
-                reportIconTooltipText={reportIconTooltipText}
-                messageActionIconsColor={messageActionIconsColor}
-                myRole={channel.userRole}
-                isIncoming={message.incoming}
-              />
-            ))}
-          {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
-            <ReplyMessageContainer
-              withSenderName={showMessageSenderName}
-              withBody={!!message.body}
-              withAttachments={withAttachments && notLinkAttachment}
-              leftBorderColor={colors.primary}
-              backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
-              onClick={() =>
-                handleScrollToRepliedMessage &&
-                !selectionIsActive &&
-                handleScrollToRepliedMessage(message!.parentMessage!.id)
-              }
-            >
-              {
-                message.parentMessage.attachments &&
-                  !!message.parentMessage.attachments.length &&
-                  message.parentMessage.attachments[0].type !== attachmentTypes.voice &&
-                  parentNotLinkAttachment &&
-                  // <MessageAttachments>
-                  (message.parentMessage.attachments as any[]).map((attachment, index) => (
-                    <Attachment
-                      key={attachment.tid || attachment.url}
-                      backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
-                      attachment={{
-                        ...attachment,
-                        metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-                      }}
-                      removeSelected={handleRemoveFailedAttachment}
-                      selectedFileAttachmentsIcon={fileAttachmentsIcon}
-                      isRepliedMessage
-                      borderRadius={index === message.parentMessage!.attachments.length - 1 ? borderRadius : '16px'}
-                      selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-                      selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
-                      selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                      fileAttachmentWidth={fileAttachmentsBoxWidth}
-                      imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-                      imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-                      videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-                      videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-                      // fileNameMaxLength={}
-                    />
-                  ))
-                // </MessageAttachments>
-              }
-              <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
-                <MessageOwner
-                  className='reply-message-owner'
-                  color={colors.primary}
-                  fontSize='12px'
+                    ? 254
+                    : message.attachments[0].type === attachmentTypes.file
+                      ? fileAttachmentsBoxWidth
+                      : undefined
+                : undefined
+            }
+            noBody={!message.body && !withAttachments}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+          >
+            {/* {withAttachments && !!message.body && <MessageHeader />} */}
+            {showMessageSenderName && <MessageHeader />}
+            {!isThreadMessage &&
+              messageActionsShow &&
+              !selectionIsActive &&
+              !emojisPopupOpen &&
+              !frequentlyEmojisOpen &&
+              (MessageActionsMenu ? (
+                <MessageActionsMenu
+                  message={message}
+                  channel={channel}
+                  isThreadMessage={isThreadMessage}
                   rtlDirection={ownMessageOnRightSide && !message.incoming}
-                  // clickable={parentMessageOwnerIsNotCurrentUser}
-                  /* onClick={() =>
+                  handleSetMessageForEdit={toggleEditMode}
+                  handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
+                  handleCopyMessage={handleCopyMessage}
+                  handleOpenForwardMessage={handleToggleForwardMessagePopup}
+                  handleResendMessage={handleResendMessage}
+                  handleReplyMessage={() => handleReplyMessage(false)}
+                  handleReportMessage={handleToggleReportPopupOpen}
+                  handleSelectMessage={handleSelectMessage}
+                  handleOpenEmojis={handleOpenEmojis}
+                />
+              ) : (
+                <MessageActions
+                  messageFrom={message.user}
+                  channel={channel}
+                  editModeToggle={toggleEditMode}
+                  messageStatus={message.deliveryStatus || MESSAGE_DELIVERY_STATUS.PENDING}
+                  handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
+                  handleCopyMessage={handleCopyMessage}
+                  handleDeletePendingMessage={handleDeletePendingMessage}
+                  handleOpenForwardMessage={handleToggleForwardMessagePopup}
+                  handleResendMessage={handleResendMessage}
+                  handleReplyMessage={handleReplyMessage}
+                  handleReportMessage={handleToggleReportPopupOpen}
+                  handleSelectMessage={handleSelectMessage}
+                  handleOpenEmojis={handleOpenEmojis}
+                  selfMessage={message.user && messageUserID === user.id}
+                  isThreadMessage={isThreadMessage}
+                  rtlDirection={ownMessageOnRightSide && !message.incoming}
+                  showMessageReaction={messageReaction}
+                  showEditMessage={
+                    editMessage &&
+                    !message.forwardingDetails &&
+                    !(
+                      message.attachments &&
+                      message.attachments.length &&
+                      message.attachments[0].type === attachmentTypes.voice
+                    )
+                  }
+                  showCopyMessage={copyMessage && message.body}
+                  showReplyMessage={replyMessage}
+                  showReplyMessageInThread={replyMessageInThread}
+                  showForwardMessage={forwardMessage}
+                  showDeleteMessage={deleteMessage}
+                  showSelectMessage={selectMessage}
+                  showReportMessage={reportMessage}
+                  reactionIcon={reactionIcon}
+                  editIcon={editIcon}
+                  copyIcon={copyIcon}
+                  replyIcon={replyIcon}
+                  replyInThreadIcon={replyInThreadIcon}
+                  forwardIcon={forwardIcon}
+                  deleteIcon={deleteIcon}
+                  selectIcon={selectIcon}
+                  allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
+                  starIcon={starIcon}
+                  staredIcon={staredIcon}
+                  reportIcon={reportIcon}
+                  reactionIconOrder={reactionIconOrder}
+                  editIconOrder={editIconOrder}
+                  copyIconOrder={copyIconOrder}
+                  replyIconOrder={replyIconOrder}
+                  replyInThreadIconOrder={replyInThreadIconOrder}
+                  forwardIconOrder={forwardIconOrder}
+                  deleteIconOrder={deleteIconOrder}
+                  selectIconOrder={selectIconOrder}
+                  starIconOrder={starIconOrder}
+                  reportIconOrder={reportIconOrder}
+                  reactionIconTooltipText={reactionIconTooltipText}
+                  editIconTooltipText={editIconTooltipText}
+                  copyIconTooltipText={copyIconTooltipText}
+                  replyIconTooltipText={replyIconTooltipText}
+                  replyInThreadIconTooltipText={replyInThreadIconTooltipText}
+                  forwardIconTooltipText={forwardIconTooltipText}
+                  deleteIconTooltipText={deleteIconTooltipText}
+                  selectIconTooltipText={selectIconTooltipText}
+                  starIconTooltipText={starIconTooltipText}
+                  reportIconTooltipText={reportIconTooltipText}
+                  messageActionIconsColor={messageActionIconsColor}
+                  myRole={channel.userRole}
+                  isIncoming={message.incoming}
+                />
+              ))}
+            {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
+              <ReplyMessageContainer
+                withSenderName={showMessageSenderName}
+                withBody={!!message.body}
+                withAttachments={withAttachments && notLinkAttachment}
+                leftBorderColor={colors.primary}
+                backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
+                onClick={() =>
+                  handleScrollToRepliedMessage &&
+                  !selectionIsActive &&
+                  handleScrollToRepliedMessage(message!.parentMessage!.id)
+                }
+              >
+                {
+                  message.parentMessage.attachments &&
+                    !!message.parentMessage.attachments.length &&
+                    message.parentMessage.attachments[0].type !== attachmentTypes.voice &&
+                    parentNotLinkAttachment &&
+                    // <MessageAttachments>
+                    (message.parentMessage.attachments as any[]).map((attachment, index) => (
+                      <Attachment
+                        key={attachment.tid || attachment.url}
+                        backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                        attachment={{
+                          ...attachment,
+                          metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+                        }}
+                        removeSelected={handleRemoveFailedAttachment}
+                        selectedFileAttachmentsIcon={fileAttachmentsIcon}
+                        isRepliedMessage
+                        borderRadius={index === message.parentMessage!.attachments.length - 1 ? borderRadius : '16px'}
+                        selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+                        selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
+                        selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
+                        fileAttachmentWidth={fileAttachmentsBoxWidth}
+                        imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+                        imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+                        videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+                        videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+                        // fileNameMaxLength={}
+                      />
+                    ))
+                  // </MessageAttachments>
+                }
+                <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
+                  <MessageOwner
+                    className='reply-message-owner'
+                    color={colors.primary}
+                    fontSize='12px'
+                    rtlDirection={ownMessageOnRightSide && !message.incoming}
+                    // clickable={parentMessageOwnerIsNotCurrentUser}
+                    /* onClick={() =>
                     handleCreateChat(
                       parentMessageOwnerIsNotCurrentUser && message.parentMessage && message.parentMessage.user.id
                     )
                   } */
-                >
-                  {message.parentMessage.user.id === user.id
-                    ? 'You'
-                    : makeUsername(
-                        contactsMap[message.parentMessage.user.id],
-                        message.parentMessage.user,
-                        getFromContacts
-                      )}
-                </MessageOwner>
+                  >
+                    {message.parentMessage.user.id === user.id
+                      ? 'You'
+                      : makeUsername(
+                          contactsMap[message.parentMessage.user.id],
+                          message.parentMessage.user,
+                          getFromContacts
+                        )}
+                  </MessageOwner>
 
-                <ReplyMessageText fontSize='14px' lineHeight='16px'>
-                  {!!message.parentMessage.attachments.length &&
-                    message.parentMessage.attachments[0].type === attachmentTypes.voice && (
-                      <VoiceIconWrapper color={colors.primary} />
+                  <ReplyMessageText fontSize='14px' lineHeight='16px'>
+                    {!!message.parentMessage.attachments.length &&
+                      message.parentMessage.attachments[0].type === attachmentTypes.voice && (
+                        <VoiceIconWrapper color={colors.primary} />
+                      )}
+                    {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
+                      <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+                    ) : message.parentMessage.body ? (
+                      MessageTextFormat({
+                        text: message.parentMessage.body,
+                        message: message.parentMessage,
+                        contactsMap,
+                        getFromContacts,
+                        asSampleText: true
+                      })
+                    ) : (
+                      parentNotLinkAttachment &&
+                      (message.parentMessage.attachments[0].type === attachmentTypes.image
+                        ? 'Photo'
+                        : message.parentMessage.attachments[0].type === attachmentTypes.video
+                          ? 'Video'
+                          : message.parentMessage.attachments[0].type === attachmentTypes.voice
+                            ? ' Voice'
+                            : 'File')
                     )}
-                  {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
-                    <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
-                  ) : message.parentMessage.body ? (
-                    MessageTextFormat({
-                      text: message.parentMessage.body,
-                      message: message.parentMessage,
-                      contactsMap,
-                      getFromContacts,
-                      asSampleText: true
-                    })
-                  ) : (
-                    parentNotLinkAttachment &&
-                    (message.parentMessage.attachments[0].type === attachmentTypes.image
-                      ? 'Photo'
-                      : message.parentMessage.attachments[0].type === attachmentTypes.video
-                        ? 'Video'
-                        : message.parentMessage.attachments[0].type === attachmentTypes.voice
-                          ? ' Voice'
-                          : 'File')
-                  )}
-                </ReplyMessageText>
-              </ReplyMessageBody>
-            </ReplyMessageContainer>
-          )}
-          {message.state !== MESSAGE_STATUS.DELETE &&
-            message.forwardingDetails &&
-            message.forwardingDetails.user &&
-            message.user &&
-            message.forwardingDetails.user.id !== message.user.id && (
-              <ForwardedTitle
-                withPadding={withAttachments && notLinkAttachment}
-                withAttachments={withAttachments}
-                withMediaAttachment={withMediaAttachment}
-                withBody={!!message.body}
-                showSenderName={showMessageSenderName}
-                leftPadding={
-                  message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
-                }
-                color={colors.primary}
-              >
-                <ForwardIcon />
-                Forwarded message
-                {/* {message.forwardingDetails.user.id === user.id
+                  </ReplyMessageText>
+                </ReplyMessageBody>
+              </ReplyMessageContainer>
+            )}
+            {message.state !== MESSAGE_STATUS.DELETE &&
+              message.forwardingDetails &&
+              message.forwardingDetails.user &&
+              message.user &&
+              message.forwardingDetails.user.id !== message.user.id && (
+                <ForwardedTitle
+                  withPadding={withAttachments && notLinkAttachment}
+                  withAttachments={withAttachments}
+                  withMediaAttachment={withMediaAttachment}
+                  withBody={!!message.body}
+                  showSenderName={showMessageSenderName}
+                  leftPadding={
+                    message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
+                  }
+                  color={colors.primary}
+                >
+                  <ForwardIcon />
+                  Forwarded message
+                  {/* {message.forwardingDetails.user.id === user.id
                 ? ' You'
                 : ` ${makeUsername(forwardSenderFromContact, message.forwardingDetails.user, getFromContacts)}`} */}
-              </ForwardedTitle>
-            )}
-          {/* {message.type === 'voice' && message.attachments[0] ? (
+                </ForwardedTitle>
+              )}
+            {/* {message.type === 'voice' && message.attachments[0] ? (
             <React.Fragment>
               <AudioPlayer url={message.attachments[0].url} />
               <AudioMessageTime>
@@ -1110,194 +1177,195 @@ const Message = ({
               </AudioMessageTime>
             </React.Fragment>
           ) : ( */}
-          <MessageText
-            theme={theme}
-            draggable={false}
-            color={colors.textColor1}
-            fontSize={messageTextFontSize}
-            lineHeight={messageTextLineHeight}
-            showMessageSenderName={showMessageSenderName}
-            withPaddings={
-              message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
-            }
-            withAttachment={notLinkAttachment && !!message.body}
-            withMediaAttachment={withMediaAttachment}
-            fontFamily={fontFamily}
-            isForwarded={!!message.forwardingDetails}
-          >
-            <span ref={messageTextRef}>
-              {MessageTextFormat({
-                text: message.body,
-                message,
-                contactsMap,
-                getFromContacts
-              })}
-            </span>
-            {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
-            {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
-              <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
-            ) : (
-              ''
-            )}
-            {messageStatusAndTimePosition === 'onMessage' &&
-            !notLinkAttachment &&
-            (messageStatusVisible || messageTimeVisible) ? (
-              <MessageStatusAndTime
-                lineHeight={messageStatusAndTimeLineHeight}
-                showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-                leftMargin
-                isSelfMessage={!message.incoming}
-              >
-                {message.state === MESSAGE_STATUS.EDIT ? (
-                  <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
-                    edited
-                  </MessageStatusUpdated>
-                ) : (
-                  ''
-                )}
-                {messageTimeVisible && (
-                  <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                    message.createdAt
-                  ).format('HH:mm')}`}</HiddenMessageTime>
-                )}
-                {messageStatusVisible && (
-                  <MessageStatus height={messageStatusAndTimeLineHeight}>
-                    {messageStatusIcon({
+            <MessageText
+              theme={theme}
+              draggable={false}
+              color={colors.textColor1}
+              fontSize={messageTextFontSize}
+              lineHeight={messageTextLineHeight}
+              showMessageSenderName={showMessageSenderName}
+              withPaddings={
+                message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
+              }
+              withAttachment={notLinkAttachment && !!message.body}
+              withMediaAttachment={withMediaAttachment}
+              fontFamily={fontFamily}
+              isForwarded={!!message.forwardingDetails}
+            >
+              <span ref={messageTextRef}>
+                {MessageTextFormat({
+                  text: message.body,
+                  message,
+                  contactsMap,
+                  getFromContacts
+                })}
+              </span>
+              {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
+              {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
+                <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+              ) : (
+                ''
+              )}
+              {messageStatusAndTimePosition === 'onMessage' &&
+              !notLinkAttachment &&
+              (messageStatusVisible || messageTimeVisible) ? (
+                <MessageStatusAndTime
+                  lineHeight={messageStatusAndTimeLineHeight}
+                  showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+                  leftMargin
+                  isSelfMessage={!message.incoming}
+                >
+                  {message.state === MESSAGE_STATUS.EDIT ? (
+                    <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+                      edited
+                    </MessageStatusUpdated>
+                  ) : (
+                    ''
+                  )}
+                  {messageTimeVisible && (
+                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+                      message.createdAt
+                    ).format('HH:mm')}`}</HiddenMessageTime>
+                  )}
+                  {messageStatusVisible && (
+                    <MessageStatus height={messageStatusAndTimeLineHeight}>
+                      {MessageStatusIcon({
+                        messageStatus: message.deliveryStatus,
+                        messageStatusDisplayingType,
+                        size: messageStatusSize,
+                        iconColor: messageStatusColor,
+                        readIconColor: messageReadStatusColor
+                      })}
+                    </MessageStatus>
+                  )}
+                </MessageStatusAndTime>
+              ) : null}
+            </MessageText>
+            {/* )} */}
+            {notLinkAttachment &&
+              messageStatusAndTimePosition === 'onMessage' &&
+              (messageStatusVisible || messageTimeVisible) && (
+                <MessageStatusAndTime
+                  lineHeight={messageStatusAndTimeLineHeight}
+                  showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+                  withAttachment
+                  leftMargin
+                  isSelfMessage={!message.incoming}
+                  fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
+                >
+                  {message.state === MESSAGE_STATUS.EDIT ? (
+                    <MessageStatusUpdated
+                      fontSize={messageStateFontSize}
+                      color={
+                        message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
+                          ? colors.white
+                          : messageStateColor
+                      }
+                    >
+                      edited
+                    </MessageStatusUpdated>
+                  ) : (
+                    ''
+                  )}
+                  {messageTimeVisible && (
+                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+                      message.createdAt
+                    ).format('HH:mm')}`}</HiddenMessageTime>
+                  )}
+                  {messageStatusVisible &&
+                    MessageStatusIcon({
                       messageStatus: message.deliveryStatus,
                       messageStatusDisplayingType,
                       size: messageStatusSize,
-                      iconColor: messageStatusColor,
+                      iconColor:
+                        message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
+                          ? colors.white
+                          : '',
                       readIconColor: messageReadStatusColor
                     })}
-                  </MessageStatus>
-                )}
-              </MessageStatusAndTime>
-            ) : null}
-          </MessageText>
-          {/* )} */}
-          {notLinkAttachment &&
-            messageStatusAndTimePosition === 'onMessage' &&
-            (messageStatusVisible || messageTimeVisible) && (
-              <MessageStatusAndTime
-                lineHeight={messageStatusAndTimeLineHeight}
-                showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-                withAttachment
-                leftMargin
-                isSelfMessage={!message.incoming}
-                fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
-              >
-                {message.state === MESSAGE_STATUS.EDIT ? (
-                  <MessageStatusUpdated
-                    fontSize={messageStateFontSize}
-                    color={
-                      message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                        ? colors.white
-                        : messageStateColor
-                    }
-                  >
-                    edited
-                  </MessageStatusUpdated>
-                ) : (
-                  ''
-                )}
-                {messageTimeVisible && (
-                  <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                    message.createdAt
-                  ).format('HH:mm')}`}</HiddenMessageTime>
-                )}
-                {messageStatusVisible &&
-                  messageStatusIcon({
-                    messageStatus: message.deliveryStatus,
-                    messageStatusDisplayingType,
-                    size: messageStatusSize,
-                    iconColor:
-                      message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                        ? colors.white
-                        : '',
-                    readIconColor: messageReadStatusColor
-                  })}
-              </MessageStatusAndTime>
-            )}
-          {
-            withAttachments &&
-              /* <MessageAttachments
-              prefixBackground={
-                showMessageSenderName || message.body
-                  ? message.incoming
-                    ? incomingMessageBackground
-                    : ownMessageBackground
-                  : ''
-              }
-              directionLeft={ownMessageOnRightSide && !message.incoming}
-              className='message_attachments'
-            > */
-              (message.attachments as any[]).map((attachment: any) => (
-                <Attachment
-                  key={attachment.tid || attachment.url}
-                  handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
-                  attachment={{
-                    ...attachment,
-                    metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-                  }}
-                  removeSelected={handleRemoveFailedAttachment}
-                  imageMinWidth={
-                    message.parentMessage &&
-                    message.parentMessage.attachments &&
-                    message.parentMessage.attachments[0] &&
-                    message.parentMessage.attachments[0].type === attachmentTypes.voice
-                      ? '210px'
-                      : undefined
-                  }
-                  borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
-                  selectedFileAttachmentsIcon={fileAttachmentsIcon}
-                  backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
-                  selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-                  selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
-                  selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                  closeMessageActions={closeMessageActions}
-                  fileAttachmentWidth={fileAttachmentsBoxWidth}
-                  imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-                  imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-                  videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-                  videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-                />
-              ))
-            // </MessageAttachments>
-          }
-          {emojisPopupOpen && emojisPopupPosition && (
-            <EmojiContainer
-              id={`${message.id}_emoji_popup_container`}
-              position={emojisPopupPosition}
-              rtlDirection={ownMessageOnRightSide && !message.incoming}
-            >
-              {message.deliveryStatus && message.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
-                <EmojisPopup
-                  relativePosition
-                  emojisPopupPosition={emojisPopupPosition}
-                  emojisCategoryIconsPosition={emojisCategoryIconsPosition}
-                  emojisContainerBorderRadius={emojisContainerBorderRadius}
-                  fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
-                  rtlDirection={ownMessageOnRightSide && !message.incoming}
-                  handleEmojiPopupToggle={setEmojisPopupOpen}
-                  handleAddEmoji={handleReactionAddDelete}
-                />
+                </MessageStatusAndTime>
               )}
-            </EmojiContainer>
-          )}
-          {frequentlyEmojisOpen && !emojisPopupOpen && (
-            <FrequentlyEmojisContainer
-              id='frequently_emojis_container'
-              rtlDirection={ownMessageOnRightSide && !message.incoming}
-            >
-              <FrequentlyEmojis
+            {
+              withAttachments &&
+                /* <MessageAttachments
+            prefixBackground={
+              showMessageSenderName || message.body
+                ? message.incoming
+                  ? incomingMessageBackground
+                  : ownMessageBackground
+                : ''
+            }
+            directionLeft={ownMessageOnRightSide && !message.incoming}
+            className='message_attachments'
+          > */
+                (message.attachments as any[]).map((attachment: any) => (
+                  <Attachment
+                    key={attachment.tid || attachment.url}
+                    handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
+                    attachment={{
+                      ...attachment,
+                      metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+                    }}
+                    removeSelected={handleRemoveFailedAttachment}
+                    imageMinWidth={
+                      message.parentMessage &&
+                      message.parentMessage.attachments &&
+                      message.parentMessage.attachments[0] &&
+                      message.parentMessage.attachments[0].type === attachmentTypes.voice
+                        ? '210px'
+                        : undefined
+                    }
+                    borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
+                    selectedFileAttachmentsIcon={fileAttachmentsIcon}
+                    backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                    selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+                    selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
+                    selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
+                    closeMessageActions={closeMessageActions}
+                    fileAttachmentWidth={fileAttachmentsBoxWidth}
+                    imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+                    imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+                    videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+                    videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+                  />
+                ))
+              // </MessageAttachments>
+            }
+            {emojisPopupOpen && emojisPopupPosition && (
+              <EmojiContainer
+                id={`${message.id}_emoji_popup_container`}
+                position={emojisPopupPosition}
                 rtlDirection={ownMessageOnRightSide && !message.incoming}
-                handleAddEmoji={handleReactionAddDelete}
-                handleEmojiPopupToggle={setEmojisPopupOpen}
-                frequentlyEmojis={message.userReactions}
-              />
-            </FrequentlyEmojisContainer>
-          )}
-        </MessageBody>
+              >
+                {message.deliveryStatus && message.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
+                  <EmojisPopup
+                    relativePosition
+                    emojisPopupPosition={emojisPopupPosition}
+                    emojisCategoryIconsPosition={emojisCategoryIconsPosition}
+                    emojisContainerBorderRadius={emojisContainerBorderRadius}
+                    fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
+                    rtlDirection={ownMessageOnRightSide && !message.incoming}
+                    handleEmojiPopupToggle={setEmojisPopupOpen}
+                    handleAddEmoji={handleReactionAddDelete}
+                  />
+                )}
+              </EmojiContainer>
+            )}
+            {frequentlyEmojisOpen && !emojisPopupOpen && (
+              <FrequentlyEmojisContainer
+                id='frequently_emojis_container'
+                rtlDirection={ownMessageOnRightSide && !message.incoming}
+              >
+                <FrequentlyEmojis
+                  rtlDirection={ownMessageOnRightSide && !message.incoming}
+                  handleAddEmoji={handleReactionAddDelete}
+                  handleEmojiPopupToggle={setEmojisPopupOpen}
+                  frequentlyEmojis={message.userReactions}
+                />
+              </FrequentlyEmojisContainer>
+            )}
+          </MessageBody>
+        )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
           // (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) ? (
           <MessageStatusAndTime
@@ -1322,7 +1390,7 @@ const Message = ({
             )}
             {messageStatusVisible && (
               <MessageStatus height={messageStatusAndTimeLineHeight}>
-                {messageStatusIcon({
+                {MessageStatusIcon({
                   messageStatus: message.deliveryStatus,
                   messageStatusDisplayingType,
                   size: messageStatusSize,
