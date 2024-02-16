@@ -193,7 +193,8 @@ function App() {
                     primaryColor: theme === 'dark' ? '#6B72FF' : '#5159F6',
                     primaryLight: theme === 'dark' ? '#1c1f47' : '#E3E7FF',
                     textColor1: theme === 'dark' ? '#ffffffcc' : '#111539'
-                  }}
+                  }
+                }
                 showNotifications={false}
                 customColors={{primaryColor: '#5159F6'}}
                 client={client}

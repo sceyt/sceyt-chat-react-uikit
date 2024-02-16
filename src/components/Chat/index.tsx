@@ -16,7 +16,7 @@ import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 import { useDidUpdate } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
-import { setActiveChannelId } from '../../helpers/channelHalper'
+import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
 import { colors } from '../../UIHelper/constants'
 import { themeSelector } from '../../store/theme/selector'
 
@@ -47,6 +47,7 @@ export default function Chat({
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
+  const autoSelectChannel = getAutoSelectFitsChannel()
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
 
   useEffect(() => {
@@ -92,7 +93,7 @@ export default function Chat({
 
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
-      {(!activeChannel || !activeChannel.id) && (
+      {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
         <SelectChatContainer
           backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
         >
@@ -132,7 +133,7 @@ const SelectChatContainer = styled.div<{ backgroundColor: string }>`
   width: 100%;
   height: 100%;
   background: ${(props) => props.backgroundColor};
-  z-index: 9999;
+  z-index: 99;
 `
 
 const SelectChatContent = styled.div<{ iconColor?: string }>`

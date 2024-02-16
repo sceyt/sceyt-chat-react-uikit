@@ -11,6 +11,7 @@ import Avatar from '../../Avatar'
 interface IChannelProps {
   contact: IContact
   showAvatar?: boolean
+  avatarBorderRadius?: string
   theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
@@ -36,6 +37,7 @@ const ContactItem: React.FC<IChannelProps> = ({
   createChatWithContact,
   theme,
   showAvatar = true,
+  avatarBorderRadius,
   channelsPaddings,
   channelsMargin,
   channelHoverBackground,
@@ -62,6 +64,7 @@ const ContactItem: React.FC<IChannelProps> = ({
           <Avatar
             // customAvatarColors={userAvatarColors}
             name={contactUserName}
+            borderRadius={avatarBorderRadius}
             image={contact.user.avatarUrl}
             size={channelAvatarSize || 50}
             textSize={channelAvatarTextSize || 16}

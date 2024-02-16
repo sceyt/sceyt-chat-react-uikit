@@ -1,5 +1,6 @@
 import SceytChat from './ChatContainer'
 import ChannelList from './ChannelList'
+import Channel from './Channel'
 import Chat from './Chat'
 import ChatHeader from './ChatHeader'
 import MessageList from './Messages'
@@ -9,11 +10,15 @@ import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
 import CreateChannel from './../common/popups/createChannel'
 import ChannelSearch from './ChannelList/ChannelSearch'
 import Avatar from './Avatar'
+import Attachment from './Attachment'
+import EmojisPopup from './Emojis'
+import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
 
 export {
   SceytChat,
   ChannelList,
+  Channel,
   Chat,
   ChatHeader,
   MessageList,
@@ -23,7 +28,10 @@ export {
   CreateChannel,
   ChannelSearch,
   Avatar,
-  DropDown
+  DropDown,
+  Attachment,
+  EmojisPopup,
+  FrequentlyEmojis
 }
 
 declare global {

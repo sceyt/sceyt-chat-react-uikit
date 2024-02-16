@@ -1,14 +1,8 @@
-import React from 'react'
 import { attachmentTypes } from './constants'
-import { StyledText } from '../UIHelper'
-import { IBodyAttribute, IContact, IContactsMap, IUser } from '../types'
+import { IBodyAttribute, IContact, IUser } from '../types'
 import moment from 'moment'
-import { colors } from '../UIHelper/constants'
-import { getClient } from '../common/client'
-import LinkifyIt from 'linkify-it'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
-
 export const typingTextFormat = ({
   text,
   formatAttributes,
@@ -127,33 +121,6 @@ export const isJSON = (str: any) => {
   }
 }
 
-const linkifyTextPart = (textPart: string, match: any) => {
-  let newMessageText: any
-  let prevMatchEnd = 0
-  let lastFoundIndex = 0
-  match.forEach((matchItem: any, index: number) => {
-    const matchIndex = textPart.indexOf(matchItem.text, lastFoundIndex)
-    lastFoundIndex = matchIndex + matchItem.text.length
-    if (index === 0) {
-      newMessageText = [
-        textPart.substring(0, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
-      ]
-    } else {
-      newMessageText.push(
-        textPart.substring(prevMatchEnd, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
-      )
-    }
-
-    prevMatchEnd = matchIndex + matchItem.text.length
-    if (index === match.length - 1) {
-      newMessageText.push(textPart.substring(prevMatchEnd))
-    }
-  })
-  return newMessageText || textPart
-}
-
 export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAttribute[] => {
   const sortedAttributes: any = attributes.sort((a: any, b: any) => a.offset - b.offset)
   const combinedAttributes = {}
@@ -177,167 +144,6 @@ export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAtt
     }
   })
   return Object.values(combinedAttributes)
-}
-
-export const MessageTextFormat = ({
-  text,
-  message,
-  contactsMap,
-  getFromContacts,
-  isLastMessage,
-  asSampleText
-}: {
-  text: string
-  message: any
-  contactsMap: IContactsMap
-  getFromContacts: boolean
-  isLastMessage?: boolean
-  asSampleText?: boolean
-}) => {
-  let messageText: any = []
-  const linkify = new LinkifyIt()
-  const messageBodyAttributes = JSON.parse(JSON.stringify(message.bodyAttributes))
-  if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
-    const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
-    const textPart = text
-    let nextPartIndex: any
-
-    combinedAttributesList.forEach((attribute: any, index: number) => {
-      const attributeOffset = attribute.offset
-
-      try {
-        let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
-
-        const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
-
-        if (!isLastMessage && !asSampleText && firstPartMatch) {
-          firstPart = linkifyTextPart(firstPart, firstPartMatch)
-        }
-        let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
-        const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
-        if (!isLastMessage && !asSampleText && secondPartMatch) {
-          secondPart = linkifyTextPart(secondPart, secondPartMatch)
-        }
-
-        if (attribute.type.includes('mention')) {
-          const mentionDisplay =
-            message.mentionedUsers && message.mentionedUsers.find((men: any) => men.id === attribute.metadata)
-          // const idLength = attribute.metadata.length
-
-          const user = getClient().user
-          let mentionDisplayName = text.slice(attributeOffset, attributeOffset + attribute.length)
-          if (mentionDisplay) {
-            mentionDisplayName = `@${makeUsername(
-              user.id === mentionDisplay.id ? mentionDisplay : contactsMap[mentionDisplay.id],
-              mentionDisplay,
-              getFromContacts
-            ).trim()}`
-          }
-          if (nextPartIndex > attributeOffset) {
-            messageText = messageText.slice(0, -2)
-            const prevAtt = combinedAttributesList[index - 1]
-            const start = nextPartIndex - prevAtt.length
-            const currentTextPart = `${textPart ? textPart?.substring(start || 0, start + prevAtt.length) : ''}`
-            const currentMentionIndex = currentTextPart.indexOf(`@${attribute.metadata}`)
-            const firsTextPart = `${currentTextPart.substring(0, currentMentionIndex)}`
-            const secondTextPart = `${currentTextPart.substring(
-              currentMentionIndex + attribute.length,
-              prevAtt.length
-            )}`
-            secondPart = `${textPart ? textPart?.substring(prevAtt.offset + prevAtt.length) : ''}`
-            nextPartIndex = prevAtt.offset + prevAtt.length
-            messageText.push(
-              // @ts-ignore
-              asSampleText ? (
-                currentTextPart
-              ) : (
-                <StyledText
-                  className={`${combinedAttributesList[index - 1].type}`}
-                  isLastMessage={isLastMessage}
-                  key={attributeOffset + index}
-                >
-                  {firsTextPart}
-                  <StyledText
-                    className='mention'
-                    isLastMessage={isLastMessage}
-                    color={colors.primary}
-                    key={attributeOffset + index}
-                  >
-                    {mentionDisplayName}
-                  </StyledText>
-                  {secondTextPart}
-                </StyledText>
-              ),
-              index === combinedAttributesList.length - 1 ? secondPart : ''
-            )
-          } else {
-            nextPartIndex = attribute.offset + attribute.length
-            messageText.push(
-              firstPart,
-              // @ts-ignore
-              asSampleText ? (
-                mentionDisplayName
-              ) : (
-                <StyledText
-                  className={attribute.type}
-                  isLastMessage={isLastMessage}
-                  color={colors.primary}
-                  key={attributeOffset}
-                >
-                  {mentionDisplayName}
-                </StyledText>
-              ),
-              index === combinedAttributesList.length - 1 ? secondPart : ''
-            )
-          }
-        } else {
-          nextPartIndex = attributeOffset + attribute.length
-
-          messageText.push(
-            firstPart,
-            // @ts-ignore
-            asSampleText ? (
-              `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
-            ) : (
-              <StyledText
-                isLastMessage={isLastMessage}
-                className={attribute.type}
-                key={`${attributeOffset}-${attribute.type}`}
-              >
-                {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
-              </StyledText>
-            ),
-            index === combinedAttributesList.length - 1 ? secondPart : ''
-          )
-        }
-      } catch (e) {
-        console.log('Error on format message text, message: ', message, 'error: ', e)
-      }
-    })
-  } else {
-    const match = linkify.match(text)
-    if (!isLastMessage && !asSampleText && match) {
-      // console.log('newMessageText ... . ', newMessageText)
-      messageText = linkifyTextPart(text, match)
-    }
-  }
-
-  /* messageText.forEach((textPart, index) => {
-    // if (urlRegex.test(textPart)) {
-     messageText.forEach((textPart, index) => {
-    if (urlRegex.test(textPart)) {
-      const textArray = textPart.split(urlRegex)
-      const urlArray = textArray.map((part) => {
-        if (urlRegex.test(part)) {
-          return <a key={part} href={part} target='_blank' rel='noreferrer'>{`${part} `}</a>
-        }
-        return `${part} `
-      }) *!/
-      // @ts-ignore
-      messageText.splice(index, 1, ...urlArray)
-    }
-  }) */
-  return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
 }
 
 export const bytesToSize = (bytes: number, decimals = 2) => {

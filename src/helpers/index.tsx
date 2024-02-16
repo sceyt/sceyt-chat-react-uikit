@@ -1,84 +1,8 @@
-import React from 'react'
-import styled from 'styled-components'
-import { ReactComponent as ReadIcon } from '../assets/svg/ticks_read.svg'
-import { ReactComponent as DeliveredIcon } from '../assets/svg/ticks_delivered.svg'
-import { ReactComponent as SentIcon } from '../assets/svg/ticks_sent.svg'
-import { ReactComponent as PendingIcon } from '../assets/svg/pending_icon.svg'
-import { MESSAGE_DELIVERY_STATUS } from './constants'
 import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
-import { colors } from '../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 
-const StatusText = styled.span<{ color?: string; fontSize?: string }>`
-  color: ${(props) => props.color || colors.textColor2};
-  font-weight: 400;
-  font-size: ${(props) => props.fontSize || '12px'};
-`
-const ReadIconWrapper = styled(ReadIcon)`
-  width: ${(props) => props.width}!important;
-  height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.primary};
-`
-const DeliveredIconWrapper = styled(DeliveredIcon)`
-  width: ${(props) => props.width}!important;
-  height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
-`
-const SentIconWrapper = styled(SentIcon)`
-  width: ${(props) => props.width}!important;
-  height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
-`
-const PendingIconWrapper = styled(PendingIcon)`
-  width: ${(props) => props.width}!important;
-  height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
-`
-
-export const messageStatusIcon = ({
-  messageStatus,
-  messageStatusDisplayingType,
-  iconColor,
-  readIconColor,
-  size
-}: {
-  messageStatus: string
-  messageStatusDisplayingType: string
-  size?: string
-  iconColor?: string
-  readIconColor?: string
-}) => {
-  switch (messageStatus) {
-    case MESSAGE_DELIVERY_STATUS.READ:
-      return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor || colors.primary} />
-      ) : (
-        <StatusText fontSize={size} color={iconColor}>
-          • Seen
-        </StatusText>
-      )
-    case MESSAGE_DELIVERY_STATUS.DELIVERED:
-      return messageStatusDisplayingType === 'ticks' ? (
-        <DeliveredIconWrapper width={size} height={size} color={iconColor} />
-      ) : (
-        <StatusText fontSize={size} color={iconColor}>
-          • Not seen yet
-        </StatusText>
-      )
-    case MESSAGE_DELIVERY_STATUS.SENT:
-      return messageStatusDisplayingType === 'ticks' ? (
-        <SentIconWrapper color={iconColor} width={size} height={size} />
-      ) : (
-        <StatusText fontSize={size} color={iconColor}>
-          • Not seen yet
-        </StatusText>
-      )
-    default:
-      return <PendingIconWrapper color={iconColor} />
-  }
-}
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
 
@@ -91,7 +15,7 @@ export const bytesToSize = (bytes: number, decimals = 2) => {
   return `${parseFloat((bytes / k ** i).toFixed(dm))} ${sizes[i]}`
 }
 
-export const systemMessageUserName = (contact: IContact, userId: string, mentionedUsers?: IUser[]) => {
+export const systemMessageUserName = (userId: string, contact?: IContact, mentionedUsers?: IUser[]) => {
   let user
   if (!contact && mentionedUsers && mentionedUsers.length) {
     user = mentionedUsers.find((menUser) => menUser.id === userId)

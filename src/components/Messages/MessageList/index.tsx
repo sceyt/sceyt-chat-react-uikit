@@ -47,7 +47,7 @@ import {
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { colors } from '../../../UIHelper/constants'
-import { IChannel, IContactsMap, IMessage } from '../../../types'
+import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
 import MessageDivider from '../../MessageDivider'
@@ -592,7 +592,6 @@ const MessageList: React.FC<MessagesProps> = ({
   }
 
   const handleScrollToRepliedMessage = async (messageId: string) => {
-    console.log('set prev disabled ............ . . . . 2. .')
     prevDisable = true
     nextDisable = true
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
