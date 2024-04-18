@@ -8647,10 +8647,10 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.5.6-beta.15:
-  version "1.5.6-beta.15"
-  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.5.6-beta.15.tgz#56b83adcf2f6fcd2dfba11bbd3acf819a3aebe2a"
-  integrity sha512-E4TVUapnJNz+KK+p0hu5vKcUJ8q6rKsGQBfYhFZ5OsNDRyQ69fwaLJ/IjyRSzPgRNIodN7xEQXvGertlY+ltog==
+sceyt-chat-react-uikit@^1.5.7:
+  version "1.5.7"
+  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.5.7.tgz#ff2063e47c772f831be3085af3a4653220f23309"
+  integrity sha512-JFj/uD9pQrci4dDf12Q+5okF8jEDIWFQ0lncvUfrBao04vA/n/z9NWgCqhtgw18s6XHGw5MFdhCFZupgC3dIZg==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
@@ -8668,10 +8668,10 @@ sceyt-chat-react-uikit@^1.5.6-beta.15:
     uuid "^9.0.0"
     wavesurfer.js "^6.6.3"
 
-sceyt-chat@^1.5.6:
-  version "1.5.6"
-  resolved "https://registry.yarnpkg.com/sceyt-chat/-/sceyt-chat-1.5.6.tgz#75cfa10d38f268be52abf5aa402824811866aa1c"
-  integrity sha512-pW1eRnBq8ChqQl4kqtBuYSUyT8u3YOHn0AuTzVHjiiAQ8Qqi+RXLV4Ipoe7FvefOCSO/tGbOh0FU5dV2JNTyLA==
+sceyt-chat@^1.5.7:
+  version "1.5.7"
+  resolved "https://registry.yarnpkg.com/sceyt-chat/-/sceyt-chat-1.5.7.tgz#f08bd9d17e693ae46aa1adec12f08e86a7401c2e"
+  integrity sha512-PudNBpUvjvqFdftlh5AVEqYU9eCKeuBUwkcljzwHVOjNlI931sBx8EfjTGxGZVDlH0l+hLGRv7hT2h5+Cdl2qw==
   dependencies:
     axios "^0.21.0"
     hashids "^2.2.1"
