@@ -97,7 +97,7 @@ interface IMessageProps {
     handleReportMessage?: () => void
     handleSelectMessage?: () => void
     handleOpenEmojis?: () => void
-    handleReplyMessage?: () => void
+    handleReplyMessage?: (threadReply?: boolean) => void
     handleMouseEnter: () => void
     handleMouseLeave: () => void
     closeMessageActions?: () => void

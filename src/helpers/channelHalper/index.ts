@@ -75,7 +75,6 @@ export function checkChannelExists(channelId: string) {
 
 export function destroyChannelsMap() {
   channelsMap = {}
-  activeChannelId = ''
   allChannels = []
   defaultRolesByChannelTypesMap = {}
   channelTypesMemberDisplayTextMap = {}
