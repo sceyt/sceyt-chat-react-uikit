@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC } from 'react'
+import React from 'react'
 // Store
 import { switchChannelActionAC, switchChannelInfoAC } from '../../store/channel/actions'
 import {
@@ -24,7 +24,7 @@ import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
 import { colors } from '../../UIHelper/constants'
-import { IChannel, IContactsMap, IMember } from '../../types'
+import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
 
@@ -44,9 +44,7 @@ interface IProps {
   borderBottom?: string
   mobileBackButtonClicked?: () => void
   MobileBackButton?: JSX.Element
-  CustomActions?: FC<{
-    activeChannel: IChannel
-  }>
+  CustomActions?: JSX.Element
   backButtonOrder?: number
   channelInfoOrder?: number
   infoIconOrder?: number
@@ -198,11 +196,7 @@ export default function ChatHeader({
             ))}
         </ChannelName>
       </ChannelInfo>
-      {CustomActions && (
-        <CustomActionsWrapper order={customActionsOrder}>
-          <CustomActions activeChannel={activeChannel} />
-        </CustomActionsWrapper>
-      )}
+      {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}

@@ -578,7 +578,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
-        console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel: ', channel)
+        console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
         if (messageToHandle && channel) {
           const activeChannelId = yield call(getActiveChannelId)

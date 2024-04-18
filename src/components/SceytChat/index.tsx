@@ -120,7 +120,6 @@ const SceytChat = ({
       }
       dispatch(getRolesAC())
     } else {
-      console.log('clearing all data  1 ....')
       clearMessagesMap()
       removeAllMessages()
       setActiveChannelId('')
@@ -134,35 +133,9 @@ const SceytChat = ({
     window.onfocus = () => {
       setTabIsActive(true)
     }
-    return () => {
-      clearMessagesMap()
-      removeAllMessages()
-      setActiveChannelId('')
-      destroyChannelsMap()
-      dispatch(destroySession())
-    }
   }, [client])
 
   useEffect(() => {
-    if (CustomUploader) {
-      setCustomUploader(CustomUploader)
-      /* const up = new CustomUploader()
-
-      up.getFile('empy').then((file: any) => {
-        console.log('my file url ,,, ', file)
-        setVideoBlob(file)
-      }) */
-    }
-    if (membersDisplayTextByChannelTypesMap) {
-      setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
-    }
-    if (defaultRolesByChannelTypesMap) {
-      setDefaultRolesByChannelTypesMap(defaultRolesByChannelTypesMap)
-    }
-    if (handleNewMessages) {
-      setHandleNewMessages(handleNewMessages)
-    }
-
     if (customColors) {
       if (customColors.primaryColor) {
         colors.primary = customColors.primaryColor
@@ -185,6 +158,45 @@ const SceytChat = ({
       if (customColors.deletedUserAvatarBackground) {
         colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
       }
+    }
+  }, [customColors])
+
+  const handleChangedTheme = (theme: {
+    name: 'dark' | 'light'
+    primaryColor: string
+    primaryLight: string
+    textColor1: string
+  }) => {
+    if (theme.name === THEME.DARK) {
+      dispatch(setThemeAC(THEME.DARK))
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
+      colors.backgroundColor = colors.darkModeBackgroundColor
+      colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
+      setDarkTheme(true)
+    } else {
+      dispatch(setThemeAC(THEME.LIGHT))
+      colors.primary = theme.primaryColor
+      colors.textColor1 = theme.textColor1
+      colors.primaryLight = theme.primaryLight
+      colors.backgroundColor = colors.lightModeBackgroundColor
+      colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
+      setDarkTheme(false)
+    }
+  }
+  useEffect(() => {
+    if (CustomUploader) {
+      setCustomUploader(CustomUploader)
+    }
+    if (membersDisplayTextByChannelTypesMap) {
+      setChannelTypesMemberDisplayTextMap(membersDisplayTextByChannelTypesMap)
+    }
+    if (defaultRolesByChannelTypesMap) {
+      setDefaultRolesByChannelTypesMap(defaultRolesByChannelTypesMap)
+    }
+    if (handleNewMessages) {
+      setHandleNewMessages(handleNewMessages)
     }
     if (sendAttachmentsAsSeparateMessages) {
       setSendAttachmentsAsSeparateMessages(sendAttachmentsAsSeparateMessages)
@@ -223,33 +235,13 @@ const SceytChat = ({
       window.removeEventListener('focus', () => handleFocusChange(true))
       window.removeEventListener('blur', () => handleFocusChange(false))
       document.removeEventListener(visibilityChange, handleVisibilityChange)
+      clearMessagesMap()
+      removeAllMessages()
+      setActiveChannelId('')
+      destroyChannelsMap()
+      dispatch(destroySession())
     }
-  }, [customColors])
-
-  const handleChangedTheme = (theme: {
-    name: 'dark' | 'light'
-    primaryColor: string
-    primaryLight: string
-    textColor1: string
-  }) => {
-    if (theme.name === THEME.DARK) {
-      dispatch(setThemeAC(THEME.DARK))
-      colors.primary = theme.primaryColor
-      colors.textColor1 = theme.textColor1
-      colors.primaryLight = theme.primaryLight
-      colors.backgroundColor = colors.darkModeBackgroundColor
-      colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
-      setDarkTheme(true)
-    } else {
-      dispatch(setThemeAC(THEME.LIGHT))
-      colors.primary = theme.primaryColor
-      colors.textColor1 = theme.textColor1
-      colors.primaryLight = theme.primaryLight
-      colors.backgroundColor = colors.lightModeBackgroundColor
-      colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
-      setDarkTheme(false)
-    }
-  }
+  }, [])
   useEffect(() => {
     dispatch(setTabIsActiveAC(tabIsActive))
     if (tabIsActive && showNotifications) {

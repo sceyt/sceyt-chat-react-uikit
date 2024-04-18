@@ -1169,7 +1169,6 @@ function* joinChannel(action: IAction): any {
       channel = yield call(SceytChatClient.getChannel, channelId)
     }
     const joinedChannel = yield call(channel.join)
-    console.log('set close search channels. . ` . .', true)
     yield put(setCloseSearchChannelsAC(true))
 
     yield put(setChannelToAddAC(JSON.parse(JSON.stringify(joinedChannel))))
