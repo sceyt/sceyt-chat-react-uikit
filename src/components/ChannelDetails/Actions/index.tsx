@@ -208,6 +208,7 @@ const Actions = ({
   const oneDay = oneHour * 24
 
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const disableAction = directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
@@ -338,6 +339,7 @@ const Actions = ({
       )}
       <ActionsMenu isOpen={menuIsOpen}>
         {showMuteUnmuteNotifications &&
+          !isSelfChannel &&
           !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.muted ? (
@@ -454,6 +456,7 @@ const Actions = ({
             </ActionItem>
           )}
         {showMarkAsReadUnread &&
+          !isSelfChannel &&
           !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) &&
           (channel.unread ? (

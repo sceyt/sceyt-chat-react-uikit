@@ -101,7 +101,7 @@ interface IMessageProps {
     handleMouseEnter: () => void
     handleMouseLeave: () => void
     closeMessageActions?: () => void
-    setEmojisPopupOpen: () => void
+    setEmojisPopupOpen: (state: boolean) => void
     handleCreateChat: (user: IUser) => void
     handleReactionAddDelete: (selectedEmoji: any) => void
     handleScrollToRepliedMessage: (messageId: string) => void
@@ -895,7 +895,7 @@ const Message = ({
             handleMouseEnter={handleMouseEnter}
             handleMouseLeave={handleMouseLeave}
             closeMessageActions={closeMessageActions}
-            setEmojisPopupOpen={() => setEmojisPopupOpen(!emojisPopupOpen)}
+            setEmojisPopupOpen={setEmojisPopupOpen}
             handleCreateChat={handleCreateChat}
             handleReactionAddDelete={handleReactionAddDelete}
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}

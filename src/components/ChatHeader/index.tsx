@@ -84,6 +84,7 @@ export default function ChatHeader({
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
@@ -148,15 +149,24 @@ export default function ChatHeader({
         order={channelInfoOrder}
       >
         <AvatarWrapper>
-          {(activeChannel.subject || (isDirectChannel && directChannelUser)) && (
+          {(activeChannel.subject || (isDirectChannel && (directChannelUser || isSelfChannel))) && (
             <Avatar
               borderRadius={avatarBorderRadius}
               name={
                 activeChannel.subject ||
-                (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
+                (isDirectChannel && directChannelUser
+                  ? directChannelUser.firstName || directChannelUser.id
+                  : isSelfChannel
+                    ? 'Me'
+                    : '')
               }
               image={
-                activeChannel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                activeChannel.avatarUrl ||
+                (isDirectChannel && directChannelUser
+                  ? directChannelUser.avatarUrl
+                  : isSelfChannel
+                    ? user.avatarUrl
+                    : '')
               }
               size={avatarSize || 36}
               textSize={avatarTextSize || 13}
@@ -176,9 +186,12 @@ export default function ChatHeader({
             {activeChannel.subject ||
               (isDirectChannel && directChannelUser
                 ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                : '')}
+                : isSelfChannel
+                  ? 'Me'
+                  : '')}
           </SectionHeader>
           {showMemberInfo &&
+            !isSelfChannel &&
             (isDirectChannel && directChannelUser ? (
               <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
                 {hideUserPresence && hideUserPresence(directChannelUser)
