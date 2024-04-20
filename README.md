@@ -96,10 +96,6 @@ function App() {
 }
 ```
 
-
-### To set custom colors on SceytUIKit:
-
-
 ## License
 
 MIT ©
