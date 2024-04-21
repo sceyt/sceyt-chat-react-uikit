@@ -47,6 +47,7 @@ import { useDidUpdate } from '../../../hooks'
 import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
+import { getClient } from '../../client'
 
 interface ISelectedUserData {
   id: string
@@ -81,6 +82,8 @@ const UsersPopup = ({
   popupWidth
 }: IProps) => {
   const dispatch = useDispatch()
+  const ChatClient = getClient()
+  const { user: selfUser } = ChatClient
   // const showContactInfo = getShowContactInfo()
   // const roles = useSelector(rolesSelector).map((role) => role.name)
   const contactList = useSelector(contactListSelector)
@@ -96,7 +99,7 @@ const UsersPopup = ({
   const [userSearchValue, setUserSearchValue] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
-  const [filteredUsers, setFilteredUsers] = useState([])
+  const [filteredUsers, setFilteredUsers] = useState<IUser[]>([])
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
 
@@ -105,8 +108,8 @@ const UsersPopup = ({
     (memberDisplayText && memberDisplayText[channel.type]
       ? `Add ${memberDisplayText[channel.type]}s`
       : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-      ? 'Subscribers'
-      : 'Members')
+        ? 'Subscribers'
+        : 'Members')
   /* const handleGetUsers = (option) => {
     dispatch(
       getUsers({
@@ -147,8 +150,8 @@ const UsersPopup = ({
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
           : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
-          ? 'subscriber'
-          : 'participant'
+            ? 'subscriber'
+            : 'participant'
         : 'participant'
       newSelectedMembers.push({
         id: contact.id,
@@ -243,10 +246,14 @@ const UsersPopup = ({
   useEffect(() => {
     if (getFromContacts) {
       if (!userSearchValue) {
-        setFilteredUsers(contactList.map((cont: IContact) => cont.user))
+        setFilteredUsers([selfUser, ...contactList.map((cont: IContact) => cont.user)])
       }
     } else {
-      setFilteredUsers(usersList)
+      let userList = usersList
+      if (!userSearchValue) {
+        userList = [selfUser, ...usersList]
+      }
+      setFilteredUsers(userList)
     }
   }, [contactList, usersList])
 
@@ -264,7 +271,7 @@ const UsersPopup = ({
         })
         setFilteredUsers(filteredContacts.map((cont: IContact) => cont.user))
       } else {
-        setFilteredUsers(contactList.map((cont: IContact) => cont.user))
+        setFilteredUsers([selfUser, ...contactList.map((cont: IContact) => cont.user)])
       }
     } else {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
@@ -349,7 +356,11 @@ const UsersPopup = ({
                 return null
               }
               const isSelected = selectedMembers.findIndex((member) => member.id === user.id) >= 0
-              const memberDisplayName = makeUsername(contactsMap[user.id], user, getFromContacts)
+              const memberDisplayName = makeUsername(
+                contactsMap[user.id],
+                user,
+                selfUser.id !== user.id && getFromContacts
+              )
               return (
                 <ListRow
                   isAdd={actionType !== 'createChat'}

@@ -105,6 +105,9 @@ function* createChannel(action: IAction): any {
       }
       createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
     }
+    if (channelData.type === CHANNEL_TYPE.DIRECT && channelData.members[0].id === SceytChatClient.user.id) {
+      createChannelData.metadata = { s: 1 }
+    }
     delete createChannelData.avatarFile
     let channelIsExistOnAllChannels = false
     let createdChannel
@@ -147,6 +150,9 @@ function* createChannel(action: IAction): any {
     if (createdChannel.type === CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
     }
+    createdChannel.metadata = isJSON(createdChannel.metadata)
+      ? JSON.parse(createdChannel.metadata)
+      : createdChannel.metadata
     if (!checkChannelExist) {
       yield call(setChannelInMap, createdChannel)
       if (createdChannel.type !== CHANNEL_TYPE.DIRECT) {

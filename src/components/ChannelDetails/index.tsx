@@ -170,6 +170,7 @@ const Details = ({
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
     memberDisplayText &&
@@ -273,10 +274,15 @@ const Details = ({
         <DetailsHeader borderColor={bordersColor || colors.backgroundColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
-              image={(activeChannel && activeChannel.avatarUrl) || (directChannelUser && directChannelUser.avatarUrl)}
+              image={
+                (activeChannel && activeChannel.avatarUrl) ||
+                (directChannelUser && directChannelUser.avatarUrl) ||
+                (isSelfChannel && user.avatarUrl)
+              }
               name={
                 (activeChannel && activeChannel.subject) ||
-                (directChannelUser && (directChannelUser.firstName || directChannelUser.id))
+                (directChannelUser && (directChannelUser.firstName || directChannelUser.id)) ||
+                (isSelfChannel && 'Me')
               }
               size={channelAvatarSize || 72}
               textSize={channelAvatarTextSize || 26}
@@ -292,7 +298,9 @@ const Details = ({
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
                     ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                    : '')}
+                    : isSelfChannel
+                      ? 'Me'
+                      : '')}
               </ChannelName>
               {isDirectChannel ? (
                 <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>

@@ -95,6 +95,7 @@ const Channel: React.FC<IChannelProps> = ({
   const activeChannel = useSelector(activeChannelSelector) || {}
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
@@ -105,6 +106,15 @@ const Channel: React.FC<IChannelProps> = ({
     lastMessage.metadata &&
     (isJSON(lastMessage.metadata) ? JSON.parse(lastMessage.metadata) : lastMessage.metadata)
   const [statusWidth, setStatusWidth] = useState(0)
+
+  const avatarName =
+    channel.subject ||
+    (isDirectChannel && directChannelUser
+      ? directChannelUser.firstName || directChannelUser.id
+      : isSelfChannel
+        ? 'Me'
+        : '')
+
   const handleChangeActiveChannel = (chan: IChannel) => {
     if (activeChannel.id !== chan.id) {
       dispatch(sendTypingAC(false))
@@ -168,12 +178,12 @@ const Channel: React.FC<IChannelProps> = ({
         <AvatarWrapper>
           <Avatar
             // customAvatarColors={userAvatarColors}
-            name={
-              channel.subject ||
-              (isDirectChannel && directChannelUser ? directChannelUser.firstName || directChannelUser.id : '')
-            }
+            name={avatarName}
             borderRadius={avatarBorderRadius}
-            image={channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')}
+            image={
+              channel.avatarUrl ||
+              (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : isSelfChannel ? user.avatarUrl : '')
+            }
             size={channelAvatarSize || 50}
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
@@ -203,7 +213,9 @@ const Channel: React.FC<IChannelProps> = ({
           {channel.subject ||
             (isDirectChannel && directChannelUser
               ? makeUsername(contactsMap && contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-              : '')}
+              : channel.metadata?.s
+                ? 'Me'
+                : '')}
         </h3>
         {channel.muted && (
           <MutedIcon color={notificationsIsMutedIconColor}>
