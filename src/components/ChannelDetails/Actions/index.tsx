@@ -13,8 +13,10 @@ import {
   leaveChannelAC,
   markChannelAsReadAC,
   markChannelAsUnReadAC,
+  pinChannelAC,
   turnOffNotificationsAC,
-  turnOnNotificationsAC
+  turnOnNotificationsAC,
+  unpinChannelAC
 } from '../../../store/channel/actions'
 import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
 // import { reportUserAC } from '../../../../store/member/actions'
@@ -32,6 +34,7 @@ import { ReactComponent as BlockIcon } from '../../../assets/svg/blockChannel.sv
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report.svg'
 import { ReactComponent as StarIcon } from '../../../assets/svg/star.svg'
 import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
+import { ReactComponent as UnpinIcon } from '../../../assets/svg/unpin.svg'
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
@@ -80,6 +83,7 @@ interface IProps {
   showPinChannel?: boolean
   pinChannelOrder?: number
   pinChannelIcon?: JSX.Element
+  unpinChannelIcon?: JSX.Element
   pinChannelIconColor?: string
   pinChannelTextColor?: string
 
@@ -143,6 +147,7 @@ const Actions = ({
   showPinChannel = false,
   pinChannelOrder,
   pinChannelIcon,
+  unpinChannelIcon,
   pinChannelIconColor,
   pinChannelTextColor,
   showMarkAsReadUnread = true,
@@ -206,7 +211,6 @@ const Actions = ({
   const oneHour = 60 * 60 * 1000
   const twoHours = oneHour * 2
   const oneDay = oneHour * 24
-
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
@@ -324,6 +328,14 @@ const Actions = ({
       dispatch(markChannelAsReadAC(channel.id))
     } else {
       dispatch(markChannelAsUnReadAC(channel.id))
+    }
+  }
+
+  const handlePinUnpinChannel = () => {
+    if (channel.pinnedAt) {
+      dispatch(unpinChannelAC(channel.id))
+    } else {
+      dispatch(pinChannelAC(channel.id))
     }
   }
 
@@ -445,14 +457,17 @@ const Actions = ({
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
             <ActionItem
               key={2}
-              onClick={() => console.log('pin channel')}
+              onClick={handlePinUnpinChannel}
               order={pinChannelOrder}
               iconColor={pinChannelIconColor || colors.textColor2}
               color={pinChannelTextColor || colors.textColor1}
               hoverColor={pinChannelTextColor || colors.textColor1}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>{pinChannelIcon || <PinIcon />} Pin</React.Fragment>
+              <React.Fragment>
+                {channel.pinnedAt ? unpinChannelIcon || <UnpinIcon /> : pinChannelIcon || <PinIcon />}
+                {channel.pinnedAt ? 'Unpin' : 'Pin'}
+              </React.Fragment>
             </ActionItem>
           )}
         {showMarkAsReadUnread &&

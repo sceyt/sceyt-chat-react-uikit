@@ -239,3 +239,22 @@ export const setShowChannelDetails = (state: boolean) => {
 }
 
 export const getShowChannelDetails = () => showChannelDetails
+
+export const sortChannelByLastMessage = (channels: IChannel[]) => {
+  return channels.sort((a, b) => {
+    const aPinnedAt = a.pinnedAt ? new Date(a.pinnedAt) : null
+    const bPinnedAt = b.pinnedAt ? new Date(b.pinnedAt) : null
+
+    if (aPinnedAt && bPinnedAt) {
+      return bPinnedAt.getTime() - aPinnedAt.getTime()
+    } else if (aPinnedAt) {
+      return -1
+    } else if (bPinnedAt) {
+      return 1
+    } else {
+      const aDate = a.lastMessage?.createdAt || a.createdAt
+      const bDate = b.lastMessage?.createdAt || b.createdAt
+      return new Date(bDate).getTime() - new Date(aDate).getTime()
+    }
+  })
+}

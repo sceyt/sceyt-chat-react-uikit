@@ -36,6 +36,8 @@ import {
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  PIN_CHANNEL,
+  UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
   SEARCH_CHANNELS,
   SEARCH_CHANNELS_FOR_FORWARD,
@@ -889,6 +891,37 @@ function* markChannelAsUnRead(action: IAction): any {
   }
 }
 
+function* pinChannel(action: IAction): any {
+  try {
+    const { channelId } = action.payload
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+    const updatedChannel = yield call(channel.pin)
+    updateChannelOnAllChannels(channel.id, { pinnedAt: updatedChannel.pinnedAt })
+    yield put(updateChannelDataAC(updatedChannel.id, { pinnedAt: updatedChannel.pinnedAt }, true))
+  } catch (error) {
+    console.log(error, 'Error in pinChannel')
+  }
+}
+
+function* unpinChannel(action: IAction): any {
+  try {
+    const { channelId } = action.payload
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+
+    const updatedChannel = yield call(channel.unpin)
+    updateChannelOnAllChannels(channel.id, { pinnedAt: updatedChannel.pinnedAt })
+    yield put(updateChannelDataAC(updatedChannel.id, { pinnedAt: updatedChannel.pinnedAt }, false, true))
+  } catch (error) {
+    console.log(error, 'Error in unpinChannel')
+  }
+}
+
 function* removeChannelCaches(action: IAction): any {
   const { payload } = action
   const { channelId } = payload
@@ -1214,6 +1247,8 @@ export default function* ChannelsSaga() {
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
   yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
   yield takeLatest(SEND_TYPING, sendTyping)
+  yield takeLatest(PIN_CHANNEL, pinChannel)
+  yield takeLatest(UNPIN_CHANNEL, unpinChannel)
   yield takeLatest(CLEAR_HISTORY, clearHistory)
   yield takeLatest(JOIN_TO_CHANNEL, joinChannel)
   yield takeLatest(DELETE_ALL_MESSAGES, deleteAllMessages)

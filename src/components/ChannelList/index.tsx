@@ -95,6 +95,7 @@ interface IChannelListProps {
   uriPrefixOnCreateChannel?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
+  pinedIcon?: JSX.Element
   createChannelIcon?: JSX.Element
   newChannelIcon?: JSX.Element
   newGroupIcon?: JSX.Element
@@ -194,6 +195,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   onAddedToChannel,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
+  pinedIcon,
   // forceUpdateChannelList
   createChannelIcon,
   newChannelIcon,
@@ -508,6 +510,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                    pinedIcon={pinedIcon}
                     showAvatar={showAvatar}
                     avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
@@ -553,6 +556,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -628,6 +632,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -674,6 +679,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                    pinedIcon={pinedIcon}
                     showAvatar={showAvatar}
                     avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
@@ -720,6 +726,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -756,6 +763,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}

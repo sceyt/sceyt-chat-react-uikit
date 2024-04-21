@@ -37,6 +37,7 @@ import { IAction, IChannel, IContact, IMember } from '../../types'
 import { CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
+import { sortChannelByLastMessage } from '../../helpers/channelHalper'
 
 const initialState: {
   channelsLoadingState: string | null
@@ -247,7 +248,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case UPDATE_CHANNEL_DATA: {
-      const { config, channelId, moveUp } = payload
+      const { config, channelId, moveUp, sort } = payload
       if (moveUp) {
         let updateChannel: any
         const updatedChannels = newState.channels.filter((chan) => {
@@ -267,6 +268,9 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           }
           return channel
         })
+        if (sort) {
+          newState.channels = sortChannelByLastMessage(newState.channels)
+        }
       }
 
       if ((newState.activeChannel as IChannel).id === channelId) {
