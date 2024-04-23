@@ -101,7 +101,7 @@ export default function Chat({
             <SelectChatContent iconColor={colors.primary}>
               <MessageIcon />
               <SelectChatTitle>Select a chat</SelectChatTitle>
-              <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
+              <SelectChatDescription>Please select a chat to start messaging in waafi.</SelectChatDescription>
             </SelectChatContent>
           )}
         </SelectChatContainer>

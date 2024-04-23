@@ -485,37 +485,39 @@ const ChannelList: React.FC<IChannelListProps> = ({
         >
           {!searchValue ? (
             <React.Fragment>
-              {channels.map((channel: IChannel) =>
-                ListItem ? (
-                  <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
-                ) : (
-                  <Channel
-                    theme={theme}
-                    selectedChannelLeftBorder={selectedChannelLeftBorder}
-                    selectedChannelBackground={selectedChannelBackground}
-                    selectedChannelBorderRadius={selectedChannelBorderRadius}
-                    selectedChannelPaddings={selectedChannelPaddings}
-                    channelHoverBackground={channelHoverBackground}
-                    channelSubjectFontSize={channelSubjectFontSize}
-                    channelSubjectLineHeight={channelSubjectLineHeight}
-                    channelSubjectColor={channelSubjectColor}
-                    channelLastMessageFontSize={channelLastMessageFontSize}
-                    channelLastMessageHeight={channelLastMessageHeight}
-                    channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
-                    channelAvatarSize={channelAvatarSize}
-                    channelAvatarTextSize={channelAvatarTextSize}
-                    channelsPaddings={channelsPaddings}
-                    channelsMargin={channelsMargin}
-                    notificationsIsMutedIcon={notificationsIsMutedIcon}
-                    notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                    showAvatar={showAvatar}
-                    avatarBorderRadius={avatarBorderRadius}
-                    channel={channel}
-                    key={channel.id}
-                    contactsMap={contactsMap}
-                  />
-                )
-              )}
+              {channels
+                .filter((channel: IChannel) => channel.type !== 'system')
+                .map((channel: IChannel) =>
+                  ListItem ? (
+                    <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                  ) : (
+                    <Channel
+                      theme={theme}
+                      selectedChannelLeftBorder={selectedChannelLeftBorder}
+                      selectedChannelBackground={selectedChannelBackground}
+                      selectedChannelBorderRadius={selectedChannelBorderRadius}
+                      selectedChannelPaddings={selectedChannelPaddings}
+                      channelHoverBackground={channelHoverBackground}
+                      channelSubjectFontSize={channelSubjectFontSize}
+                      channelSubjectLineHeight={channelSubjectLineHeight}
+                      channelSubjectColor={channelSubjectColor}
+                      channelLastMessageFontSize={channelLastMessageFontSize}
+                      channelLastMessageHeight={channelLastMessageHeight}
+                      channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                      channelAvatarSize={channelAvatarSize}
+                      channelAvatarTextSize={channelAvatarTextSize}
+                      channelsPaddings={channelsPaddings}
+                      channelsMargin={channelsMargin}
+                      notificationsIsMutedIcon={notificationsIsMutedIcon}
+                      notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                      showAvatar={showAvatar}
+                      avatarBorderRadius={avatarBorderRadius}
+                      channel={channel}
+                      key={channel.id}
+                      contactsMap={contactsMap}
+                    />
+                  )
+                )}
             </React.Fragment>
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
             <React.Fragment>
