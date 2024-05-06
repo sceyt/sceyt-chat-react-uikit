@@ -21,6 +21,7 @@ let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
 let UploadImageIcon: JSX.Element
 let showChannelDetails: boolean = false
+let channelTypesFilter: string[] = []
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
@@ -121,6 +122,14 @@ export function getChannelTypesMemberDisplayTextMap() {
 
 export function setChannelTypesMemberDisplayTextMap(map: channelTypesMemberDisplayTextMap) {
   channelTypesMemberDisplayTextMap = map
+}
+
+export function getChannelTypesFilter() {
+  return channelTypesFilter
+}
+
+export function setChannelTypesFilter(types: string[]) {
+  channelTypesFilter = types
 }
 
 export function getDefaultRolesByChannelTypesMap() {

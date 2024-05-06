@@ -51,6 +51,7 @@ export interface IChatClientProps {
   children?: JSX.Element | JSX.Element[]
   logoSrc?: string
   CustomUploader?: ICustomUploader
+  channelTypeFilter?: string[]
   membersDisplayTextByChannelTypesMap?: {
     [key: string]: string
   }
@@ -79,6 +80,7 @@ const SceytChatContainer = ({
   sendAttachmentsAsSeparateMessages,
   membersDisplayTextByChannelTypesMap,
   defaultRolesByChannelTypesMap,
+  channelTypeFilter,
   logoSrc,
   CustomUploader,
   customColors,
@@ -106,6 +108,7 @@ const SceytChatContainer = ({
         hideUserPresence={hideUserPresence}
         openChatOnUserInteraction={openChatOnUserInteraction}
         autoSelectFirstChannel={autoSelectFirstChannel}
+        channelTypeFilter={channelTypeFilter}
       />
     </Provider>
   )

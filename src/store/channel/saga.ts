@@ -66,7 +66,8 @@ import {
   updateChannelOnAllChannels,
   deleteChannelFromAllChannels,
   getChannelGroupName,
-  getAutoSelectFitsChannel
+  getAutoSelectFitsChannel,
+  getChannelTypesFilter
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -209,21 +210,28 @@ function* getChannels(action: IAction): any {
     const SceytChatClient = getClient()
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-    if (params.filter && params.filter.channelType) {
-      channelQueryBuilder.types(params.filter.channelType)
+    const channelTypesFilter = getChannelTypesFilter()
+    let types: string[] = []
+    if (channelTypesFilter?.length) {
+      types = channelTypesFilter
+    }
+    if (params?.filter?.channelType) {
+      types.push(params.filter.channelType)
+    }
+    if (types?.length) {
+      channelQueryBuilder.types(types)
     }
     channelQueryBuilder.order('lastMessage')
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
+    const channelList = channelsData.channels
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
     yield call(destroyChannelsMap)
-    let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
-      setChannelsInMap,
-      channelsData.channels
-    )
+
+    let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
     if (channelsForUpdateLastReactionMessage.length) {
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
@@ -327,7 +335,7 @@ function* getChannels(action: IAction): any {
       } */
     yield put(setChannelsAC(mappedChannels))
     if (!channelId) {
-      ;[activeChannel] = channelsData.channels
+      ;[activeChannel] = channelList
     }
     query.channelQuery = channelQuery
     if (activeChannel && getAutoSelectFitsChannel()) {
@@ -337,6 +345,9 @@ function* getChannels(action: IAction): any {
 
     const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     allChannelsQueryBuilder.order('lastMessage')
+    if (channelTypesFilter?.length) {
+      channelQueryBuilder.types(channelTypesFilter)
+    }
     allChannelsQueryBuilder.limit(50)
     const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
     let hasNext = true
@@ -345,7 +356,8 @@ function* getChannels(action: IAction): any {
         try {
           const allChannelsData = yield call(allChannelsQuery.loadNextPage)
           hasNext = allChannelsData.hasNext
-          addChannelsToAllChannels(allChannelsData.channels)
+          const allChannelList = allChannelsData.channels
+          addChannelsToAllChannels(allChannelList)
         } catch (e) {
           console.log(e, 'Error on get all channels')
         }
@@ -370,8 +382,16 @@ function* searchChannels(action: IAction): any {
     const { search: searchBy } = params
     if (searchBy) {
       const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      if (params.filter && params.filter.channelType) {
-        channelQueryBuilder.types(params.filter.channelType)
+      const channelTypesFilter = getChannelTypesFilter()
+      let types: string[] = []
+      if (channelTypesFilter?.length) {
+        types = channelTypesFilter
+      }
+      if (params?.filter?.channelType) {
+        types.push(params.filter.channelType)
+      }
+      if (types?.length) {
+        channelQueryBuilder.types(types)
       }
 
       const allChannels = getAllChannels()
@@ -473,8 +493,11 @@ function* getChannelsForForward(): any {
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
 
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-
+    const channelTypesFilter = getChannelTypesFilter()
     channelQueryBuilder.order('lastMessage')
+    if (channelTypesFilter?.length) {
+      channelQueryBuilder.types(channelTypesFilter)
+    }
     channelQueryBuilder.limit(20)
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
@@ -508,8 +531,16 @@ function* searchChannelsForForward(action: IAction): any {
     const { search: searchBy } = params
     if (searchBy) {
       const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-      if (params.filter && params.filter.channelType) {
-        channelQueryBuilder.types(params.filter.channelType)
+      const channelTypesFilter = getChannelTypesFilter()
+      let types: string[] = []
+      if (channelTypesFilter?.length) {
+        types = channelTypesFilter
+      }
+      if (params?.filter?.channelType) {
+        types.push(params.filter.channelType)
+      }
+      if (types?.length) {
+        channelQueryBuilder.types(types)
       }
 
       const allChannels = getAllChannels()

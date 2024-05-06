@@ -72,6 +72,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
+import { isJSON } from '../../helpers/message'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -253,6 +254,20 @@ export default function* watchForEvents(): any {
     channelListener.onUnmuted = (channel: IChannel) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.UNMUTE,
+        args: {
+          channel
+        }
+      })
+    channelListener.onPined = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.PINED,
+        args: {
+          channel
+        }
+      })
+    channelListener.onUnpined = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.UNPINED,
         args: {
           channel
         }
@@ -581,6 +596,7 @@ export default function* watchForEvents(): any {
         console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
         if (messageToHandle && channel) {
+          channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
           const channelForAdd = JSON.parse(JSON.stringify(channel))
@@ -1034,6 +1050,44 @@ export default function* watchForEvents(): any {
         updateChannelOnAllChannels(channel.id, {
           muted: channel.muted,
           mutedTill: channel.mutedTill
+        })
+
+        break
+      }
+      case CHANNEL_EVENT_TYPES.PINED: {
+        const { channel } = args
+        console.log('channel PINED ... ')
+
+        yield put(
+          updateChannelDataAC(
+            channel.id,
+            {
+              pinnedAt: channel.pinnedAt
+            },
+            true
+          )
+        )
+        updateChannelOnAllChannels(channel.id, {
+          pinnedAt: channel.pinnedAt
+        })
+        break
+      }
+      case CHANNEL_EVENT_TYPES.UNPINED: {
+        const { channel } = args
+        console.log('channel UNPINED ... ')
+
+        yield put(
+          updateChannelDataAC(
+            channel.id,
+            {
+              pinnedAt: channel.pinnedAt
+            },
+            false,
+            true
+          )
+        )
+        updateChannelOnAllChannels(channel.id, {
+          pinnedAt: channel.pinnedAt
         })
 
         break

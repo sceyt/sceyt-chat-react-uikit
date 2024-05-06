@@ -15,6 +15,7 @@ import {
   destroyChannelsMap,
   setActiveChannelId,
   setAutoSelectFitsChannel,
+  setChannelTypesFilter,
   setChannelTypesMemberDisplayTextMap,
   setDefaultRolesByChannelTypesMap,
   setHandleNewMessages,
@@ -44,6 +45,7 @@ const SceytChat = ({
   handleNewMessages,
   sendAttachmentsAsSeparateMessages,
   membersDisplayTextByChannelTypesMap,
+  channelTypeFilter,
   defaultRolesByChannelTypesMap,
   customColors,
   hideUserPresence,
@@ -211,6 +213,9 @@ const SceytChat = ({
     }
     if (showOnlyContactUsers) {
       setShowOnlyContactUsers(showOnlyContactUsers)
+    }
+    if (channelTypeFilter) {
+      setChannelTypesFilter(channelTypeFilter)
     }
     if (showNotifications) {
       try {

@@ -156,7 +156,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case ADD_CHANNEL: {
       if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
-        newState.channels = [payload.channel, ...newState.channels]
+        newState.channels = sortChannelByLastMessage([payload.channel, ...newState.channels])
       }
       return newState
     }
@@ -259,7 +259,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         })
         if (updateChannel) {
           updateChannel = { ...updateChannel, ...config }
-          newState.channels = [updateChannel, ...updatedChannels]
+          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       } else {
         newState.channels = newState.channels.map((channel) => {
@@ -354,7 +354,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         const updatedChannels = newState.channels.filter((chan) => chan.id !== channel.id)
         if (updateChannel) {
           updateChannel = { ...updateChannel, lastMessage: message }
-          newState.channels = [updateChannel, ...updatedChannels]
+          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       }
       return newState
@@ -362,7 +362,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_CHANNEL_LAST_MESSAGE_STATUS: {
       const { channel, message } = payload
-
       newState.channels = newState.channels.map((chan) => {
         if (chan.id === channel.id) {
           return {
