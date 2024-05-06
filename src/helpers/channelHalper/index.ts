@@ -42,6 +42,7 @@ export function setChannelsInMap(channels: IChannel[]) {
     /* if (!channelsMap[channel.id]) {
       channelsArr.push(channel)
     } */
+    channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
     if (
       channel.newReactions &&
       channel.newReactions.length &&
@@ -50,7 +51,6 @@ export function setChannelsInMap(channels: IChannel[]) {
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
-    channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
     channelsMap[channel.id] = { ...channel }
 
     return channel

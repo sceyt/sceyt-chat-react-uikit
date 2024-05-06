@@ -402,7 +402,11 @@ function* searchChannels(action: IAction): any {
       const lowerCaseSearchBy = searchBy.toLowerCase()
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
-          const directChannelUser = channel.members.find((member) => member.id !== SceytChatClient.user.id)
+          channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+          const isSelfChannel = channel.metadata?.s
+          const directChannelUser = isSelfChannel
+            ? SceytChatClient.user
+            : channel.members.find((member) => member.id !== SceytChatClient.user.id)
           if (directChannelUser && contactsMap[directChannelUser.id]) {
             contactsWithChannelsMap[directChannelUser.id] = true
           }
@@ -411,7 +415,7 @@ function* searchChannels(action: IAction): any {
             directChannelUser,
             getFromContacts
           ).toLowerCase()
-          if (userName.includes(lowerCaseSearchBy)) {
+          if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
             // directChannels.push(JSON.parse(JSON.stringify(channel)))
             chatsGroups.push(channel)
           }
@@ -502,13 +506,15 @@ function* getChannelsForForward(): any {
     const channelQuery = yield call(channelQueryBuilder.build)
     const channelsData = yield call(channelQuery.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
-    const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+    const channelsToAdd = channelsData.channels.filter((channel: IChannel) => {
+      channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+      const isSelfChannel = channel.metadata?.s
+      return channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
         : channel.type === CHANNEL_TYPE.DIRECT
-          ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
+          ? isSelfChannel || channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
           : true
-    )
+    })
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(setChannelsForForwardAC(mappedChannels))
     query.channelQueryForward = channelQuery
@@ -551,7 +557,11 @@ function* searchChannelsForForward(action: IAction): any {
       const lowerCaseSearchBy = searchBy.toLowerCase()
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
-          const directChannelUser = channel.members.find((member) => member.id !== SceytChatClient.user.id)
+          channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+          const isSelfChannel = channel.metadata?.s
+          const directChannelUser = isSelfChannel
+            ? SceytChatClient.user
+            : channel.members.find((member) => member.id !== SceytChatClient.user.id)
           if (directChannelUser && contactsMap[directChannelUser.id]) {
             contactsWithChannelsMap[directChannelUser.id] = true
           }
@@ -560,7 +570,7 @@ function* searchChannelsForForward(action: IAction): any {
             directChannelUser,
             getFromContacts
           ).toLowerCase()
-          if (userName.includes(lowerCaseSearchBy)) {
+          if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
             // directChannels.push(JSON.parse(JSON.stringify(channel)))
             chatsGroups.push(channel)
           }

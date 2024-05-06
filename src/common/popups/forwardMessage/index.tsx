@@ -84,15 +84,18 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
     const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+    const isSelfChannel = isDirectChannel && channel.metadata?.s
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (event.target.checked && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
           channel.subject ||
-          (isDirectChannel && directChannelUser
-            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-            : '')
+          (isDirectChannel && isSelfChannel
+            ? 'Me'
+            : directChannelUser
+              ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+              : '')
       })
     } else {
       const itemToDeleteIndex = newSelectedChannels.findIndex((chan) => channel.id === chan.id)
@@ -169,8 +172,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                      const isSelfChannel = isDirectChannel && channel.metadata?.s
                       const directChannelUser =
-                        isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+                        isDirectChannel && isSelfChannel
+                          ? user
+                          : channel.members.find((member: IMember) => member.id !== user.id)
                       return (
                         <ChannelItem key={channel.id}>
                           <Avatar
@@ -179,7 +185,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                 ? directChannelUser.firstName || directChannelUser.id
                                 : channel.subject || ''
                             }
-                            image={directChannelUser ? directChannelUser.avatarUrl : channel.avatarUrl}
+                            image={
+                              channel.avatarUrl ||
+                              (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                            }
                             size={40}
                             textSize={12}
                             setDefaultAvatar={true}
@@ -187,9 +196,15 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           <ChannelInfo>
                             <ChannelTitle>
                               {isDirectChannel
-                                ? directChannelUser
-                                  ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                                  : 'Deleted User'
+                                ? isSelfChannel
+                                  ? 'Me'
+                                  : directChannelUser
+                                    ? makeUsername(
+                                        contactsMap[directChannelUser.id],
+                                        directChannelUser,
+                                        getFromContacts
+                                      )
+                                    : 'Deleted User'
                                 : channel.subject}
                             </ChannelTitle>
                             <ChannelMembers>
@@ -243,8 +258,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     ? 'subscribers'
                                     : 'subscriber'
                                   : channel.memberCount > 1
-                                  ? 'members'
-                                  : 'member'
+                                    ? 'members'
+                                    : 'member'
                               } `}
                             </ChannelMembers>
                           </ChannelInfo>
@@ -264,8 +279,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             ) : (
               channels.map((channel: IChannel) => {
                 const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                const isSelfChannel = isDirectChannel && channel.metadata?.s
                 const directChannelUser =
-                  isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+                  isDirectChannel && isSelfChannel
+                    ? user
+                    : channel.members.find((member: IMember) => member.id !== user.id)
                 const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                 return (
                   <ChannelItem key={channel.id}>
@@ -286,9 +304,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     <ChannelInfo>
                       <ChannelTitle>
                         {channel.subject ||
-                          (isDirectChannel && directChannelUser
-                            ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                            : '')}
+                          (isDirectChannel && isSelfChannel
+                            ? 'Me'
+                            : directChannelUser
+                              ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                              : '')}
                       </ChannelTitle>
                       <ChannelMembers>
                         {isDirectChannel && directChannelUser
@@ -309,8 +329,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                   ? 'subscribers'
                                   : 'subscriber'
                                 : channel.memberCount > 1
-                                ? 'members'
-                                : 'member'
+                                  ? 'members'
+                                  : 'member'
                             } `}
                       </ChannelMembers>
                     </ChannelInfo>

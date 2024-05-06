@@ -138,83 +138,87 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
         wavesurfer.current.destroy()
       }
       const initWaveSurfer = async () => {
-        const WaveSurfer = await import('wavesurfer.js')
-        wavesurfer.current = WaveSurfer.default.create({
-          container: wavesurferContainer.current,
-          waveColor: colors.textColor2,
-          skipLength: 0,
-          progressColor: colors.primary,
-          // audioContext,
-          // cursorColor: 'transparent',
-          // splitChannels: true,
-          // barWidth: 1.5,
-          audioRate,
-          // barHeight: 3,
+        try {
+          const WaveSurfer = await import('wavesurfer.js')
+          wavesurfer.current = WaveSurfer.default.create({
+            container: wavesurferContainer.current,
+            waveColor: colors.textColor2,
+            skipLength: 0,
+            progressColor: colors.primary,
+            // audioContext,
+            // cursorColor: 'transparent',
+            // splitChannels: true,
+            // barWidth: 1.5,
+            audioRate,
+            // barHeight: 3,
 
-          barWidth: 1,
-          barHeight: 1,
+            barWidth: 1,
+            barHeight: 1,
 
-          hideScrollbar: true,
-          barRadius: 1.5,
-          cursorWidth: 0,
-          barGap: 2,
-          barMinHeight: 2,
-          height: 20
-        })
-        let peaks
-        if (file.metadata) {
-          if (file.metadata.dur) {
-            setCurrentTime(formatAudioVideoTime(file.metadata.dur))
+            hideScrollbar: true,
+            barRadius: 1.5,
+            cursorWidth: 0,
+            barGap: 2,
+            barMinHeight: 2,
+            height: 20
+          })
+          let peaks
+          if (file.metadata) {
+            if (file.metadata.dur) {
+              setCurrentTime(formatAudioVideoTime(file.metadata.dur))
+            }
+            if (file.metadata.tmb) {
+              const maxVal = Math.max(...file.metadata.tmb)
+              const dec = maxVal / 100
+              peaks = file.metadata.tmb.map((peak: number) => {
+                return peak / dec / 100
+              })
+            }
           }
-          if (file.metadata.tmb) {
-            const maxVal = Math.max(...file.metadata.tmb)
-            const dec = maxVal / 100
-            peaks = file.metadata.tmb.map((peak: number) => {
-              return peak / dec / 100
-            })
+
+          wavesurfer.current.load(url, peaks)
+
+          wavesurfer.current.on('ready', () => {
+            const audioDuration = wavesurfer.current.getDuration()
+            setCurrentTime(formatAudioVideoTime(audioDuration))
+
+            wavesurfer.current.drawBuffer = (d: any) => {
+              console.log('filters --- ', d)
+            }
+          })
+          /* wavesurfer.current.drawBuffer = () => {
+           return file.metadata.tmb
+         } */
+          wavesurfer.current.on('finish', () => {
+            setPlayAudio(false)
+            wavesurfer.current.seekTo(0)
+            const audioDuration = wavesurfer.current.getDuration()
+            // const currentTime = wavesurfer.current.getCurrentTime()
+            setCurrentTime(formatAudioVideoTime(audioDuration))
+            if (playingAudioId === file.id) {
+              dispatch(setPlayingAudioIdAC(null))
+            }
+            clearInterval(intervalRef.current)
+          })
+
+          wavesurfer.current.on('pause', () => {
+            setPlayAudio(false)
+            if (playingAudioId === file.id) {
+              dispatch(setPlayingAudioIdAC(null))
+            }
+            clearInterval(intervalRef.current)
+          })
+
+          wavesurfer.current.on('interaction', () => {
+            // const audioDuration = wavesurfer.current.getDuration()
+            const currentTime = wavesurfer.current.getCurrentTime()
+            setCurrentTime(formatAudioVideoTime(currentTime))
+          })
+          if (url !== '_') {
+            setIsRendered(true)
           }
-        }
-
-        wavesurfer.current.load(url, peaks)
-
-        wavesurfer.current.on('ready', () => {
-          const audioDuration = wavesurfer.current.getDuration()
-          setCurrentTime(formatAudioVideoTime(audioDuration))
-
-          wavesurfer.current.drawBuffer = (d: any) => {
-            console.log('filters --- ', d)
-          }
-        })
-        /* wavesurfer.current.drawBuffer = () => {
-          return file.metadata.tmb
-        } */
-        wavesurfer.current.on('finish', () => {
-          setPlayAudio(false)
-          wavesurfer.current.seekTo(0)
-          const audioDuration = wavesurfer.current.getDuration()
-          // const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(formatAudioVideoTime(audioDuration))
-          if (playingAudioId === file.id) {
-            dispatch(setPlayingAudioIdAC(null))
-          }
-          clearInterval(intervalRef.current)
-        })
-
-        wavesurfer.current.on('pause', () => {
-          setPlayAudio(false)
-          if (playingAudioId === file.id) {
-            dispatch(setPlayingAudioIdAC(null))
-          }
-          clearInterval(intervalRef.current)
-        })
-
-        wavesurfer.current.on('interaction', () => {
-          // const audioDuration = wavesurfer.current.getDuration()
-          const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(formatAudioVideoTime(currentTime))
-        })
-        if (url !== '_') {
-          setIsRendered(true)
+        } catch (e) {
+          console.log('Failed to init wavesurfer')
         }
       }
       initWaveSurfer()

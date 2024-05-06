@@ -277,53 +277,57 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   useDidUpdate(() => {
     if (recordedFile) {
       const initWaveSurfer = async () => {
-        if (!WaveSurfer) {
-          WaveSurfer = await import('wavesurfer.js')
+        try {
+          if (!WaveSurfer) {
+            WaveSurfer = await import('wavesurfer.js')
+          }
+          if (wavesurfer.current) {
+            wavesurfer.current.destroy()
+          }
+          wavesurfer.current = WaveSurfer.default.create({
+            container: wavesurferContainer.current,
+            waveColor: colors.textColor2,
+            skipLength: 0,
+            progressColor: colors.primary,
+            barWidth: 1,
+            barHeight: 2,
+            audioRate: 1,
+            hideScrollbar: true,
+            barRadius: 1.5,
+            cursorWidth: 0,
+            barGap: 2.5,
+            barMinHeight: 1.5,
+            height: 28
+          })
+
+          wavesurfer.current.load(recordedFile.objectUrl)
+          // wavesurfer.current.loadBlob(recordedFile.file)
+
+          wavesurfer.current.on('ready', () => {
+            setRecordingIsReadyToPlay(true)
+            const audioDuration = wavesurfer.current.getDuration()
+            setCurrentTime(audioDuration)
+          })
+          wavesurfer.current.on('finish', () => {
+            setPlayAudio(false)
+            wavesurfer.current.seekTo(0)
+            const audioDuration = wavesurfer.current.getDuration()
+            setCurrentTime(audioDuration)
+            clearInterval(intervalRef.current)
+          })
+
+          wavesurfer.current.on('pause', () => {
+            setPlayAudio(false)
+            clearInterval(intervalRef.current)
+          })
+
+          wavesurfer.current.on('interaction', () => {
+            const currentTime = wavesurfer.current.getCurrentTime()
+            setCurrentTime(currentTime)
+          })
+        } catch (e) {
+          console.log('Failed to init wavesurfer')
         }
-        if (wavesurfer.current) {
-          wavesurfer.current.destroy()
-        }
-        wavesurfer.current = WaveSurfer.default.create({
-          container: wavesurferContainer.current,
-          waveColor: colors.textColor2,
-          skipLength: 0,
-          progressColor: colors.primary,
-          barWidth: 1,
-          barHeight: 2,
-          audioRate: 1,
-          hideScrollbar: true,
-          barRadius: 1.5,
-          cursorWidth: 0,
-          barGap: 2.5,
-          barMinHeight: 1.5,
-          height: 28
-        })
-
-        wavesurfer.current.load(recordedFile.objectUrl)
-        // wavesurfer.current.loadBlob(recordedFile.file)
-
-        wavesurfer.current.on('ready', () => {
-          setRecordingIsReadyToPlay(true)
-          const audioDuration = wavesurfer.current.getDuration()
-          setCurrentTime(audioDuration)
-        })
-        wavesurfer.current.on('finish', () => {
-          setPlayAudio(false)
-          wavesurfer.current.seekTo(0)
-          const audioDuration = wavesurfer.current.getDuration()
-          setCurrentTime(audioDuration)
-          clearInterval(intervalRef.current)
-        })
-
-        wavesurfer.current.on('pause', () => {
-          setPlayAudio(false)
-          clearInterval(intervalRef.current)
-        })
-
-        wavesurfer.current.on('interaction', () => {
-          const currentTime = wavesurfer.current.getCurrentTime()
-          setCurrentTime(currentTime)
-        })
       }
       initWaveSurfer()
     } else {
