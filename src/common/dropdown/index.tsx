@@ -69,9 +69,9 @@ const DropDownTriggerContainer = styled.div<{
         `};
 `
 
-const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor?: string }>`
+const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor?: string; zIndex?: string }>`
   position: absolute;
-  z-index: 30;
+  z-index: ${(props) => props.zIndex || '30'};
   min-width: 200px;
   right: ${(props) => props.position !== 'left' && '0'};
   left: ${(props) => props.position === 'left' && '0'};
@@ -130,6 +130,7 @@ interface IProps {
   height?: string
   children?: JSX.Element | JSX.Element[]
   theme?: string
+  zIndex?: string
 }
 
 const DropDown = ({
@@ -146,7 +147,8 @@ const DropDown = ({
   height,
   children,
   theme,
-  order
+  order,
+  zIndex
 }: IProps) => {
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
@@ -237,6 +239,7 @@ const DropDown = ({
           className='dropdown-body'
           ref={dropDownBodyRef}
           position={position}
+          zIndex={zIndex}
         >
           {children}
         </DropDownBody>

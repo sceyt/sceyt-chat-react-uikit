@@ -10,6 +10,7 @@ import {
   getActiveChannelId,
   getChannelFromMap,
   getChannelGroupName,
+  getChannelTypesFilter,
   getLastChannelFromMap,
   handleNewMessages,
   removeChannelFromMap,
@@ -398,17 +399,20 @@ export default function* watchForEvents(): any {
     switch (type) {
       case CHANNEL_EVENT_TYPES.CREATE: {
         const { createdChannel } = args
-        const getFromContacts = getShowOnlyContactUsers()
-        console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
-        const channelExists = checkChannelExists(createdChannel.id)
-        if (!channelExists) {
-          if (getFromContacts) {
-            yield put(getContactsAC())
+        const channelFilterTypes = getChannelTypesFilter()
+        if (channelFilterTypes.includes(createdChannel.type)) {
+          const getFromContacts = getShowOnlyContactUsers()
+          console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
+          const channelExists = checkChannelExists(createdChannel.id)
+          if (!channelExists) {
+            if (getFromContacts) {
+              yield put(getContactsAC())
+            }
+            yield call(setChannelInMap, createdChannel)
+            yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
           }
-          yield call(setChannelInMap, createdChannel)
-          yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
+          addChannelToAllChannels(createdChannel)
         }
-        addChannelToAllChannels(createdChannel)
         break
       }
       case CHANNEL_EVENT_TYPES.JOIN: {
@@ -594,8 +598,11 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
         console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
+
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
-        if (messageToHandle && channel) {
+
+        const channelFilterTypes = getChannelTypesFilter()
+        if (messageToHandle && channel && channelFilterTypes.includes(channel.type)) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)

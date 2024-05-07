@@ -12,21 +12,9 @@ import {
   PopupBody,
   SubTitle
 } from '../../../UIHelper'
-/* import {
-  rolesSelector,
-  usersLoadingStateSelector,
-  usersSelector
-} from '../../../../../../store/channel/selector' */
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
-// import { ReactComponent as CreateChannelIcon } from '../../../../../assets/svg/add.svg'
 import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
-/* import {
-  createChannel,
-  getRoles,
-  getUsers,
-  loadMoreUsers
-} from '../../../../../../store/channel/actions' */
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
 import { colors } from '../../../UIHelper/constants'
@@ -253,7 +241,7 @@ const UsersPopup = ({
         setFilteredUsers(userList)
       }
     } else {
-      const userList = usersList
+      const userList = [...usersList]
       if (actionType === 'createChat') {
         userList.unshift(selfUser)
       }

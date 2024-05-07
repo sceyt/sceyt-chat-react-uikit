@@ -55,6 +55,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         forceClose={showAddMemberPopup || !!showCreateChannel}
         position='center'
         theme={theme}
+        zIndex='300'
         trigger={
           <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch}>
             {createChannelIcon || <AddChannelIcon />}
