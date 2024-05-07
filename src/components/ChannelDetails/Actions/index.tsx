@@ -144,7 +144,7 @@ const Actions = ({
   staredMessagesIcon,
   staredMessagesIconColor,
   staredMessagesTextColor,
-  showPinChannel = false,
+  showPinChannel = true,
   pinChannelOrder,
   pinChannelIcon,
   unpinChannelIcon,
@@ -167,7 +167,7 @@ const Actions = ({
   reportChannelOrder,
   reportChannelIconColor,
   reportChannelTextColor,
-  showDeleteChannel,
+  showDeleteChannel = true,
   deleteChannelIcon,
   deleteChannelIconColor,
   deleteChannelTextColor,
@@ -179,7 +179,7 @@ const Actions = ({
   blockAndLeaveChannelIconColor,
   blockAndLeaveChannelTextColor,
   unblockUserTextColor,
-  showClearHistory,
+  showClearHistory = true,
   clearHistoryOrder,
   clearHistoryIcon,
   clearHistoryTextColor,
@@ -214,7 +214,7 @@ const Actions = ({
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-  const disableAction = directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)
+  const disableAction = directChannelUser && !isSelfChannel && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
@@ -582,7 +582,7 @@ const Actions = ({
           </React.Fragment>
         ) : (
           <React.Fragment>
-            {showBlockAndLeaveChannel && !channel.isMockChannel && (
+            {showBlockAndLeaveChannel && !isSelfChannel && !channel.isMockChannel && (
               <ActionItem
                 key={8}
                 color={blockAndLeaveChannelTextColor || colors.red1}
