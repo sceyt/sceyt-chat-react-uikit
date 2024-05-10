@@ -5,7 +5,7 @@ import styled from 'styled-components'
 import { userSelector } from '../../../store/user/selector'
 // Assets
 import { ReactComponent as ArrowLeft } from '../../../assets/svg/arrowLeft.svg'
-import { ReactComponent as DefaultAvatar } from '../../../assets/svg/devaultAvatar50.svg'
+import { ReactComponent as DefaultAvatar } from '../../../assets/svg/avatar.svg'
 import { ReactComponent as NotificationsIcon } from '../../../assets/svg/notifications.svg'
 import { ReactComponent as LockIcon } from '../../../assets/svg/lock.svg'
 import { ReactComponent as LogoutIcon } from '../../../assets/svg/leave.svg'

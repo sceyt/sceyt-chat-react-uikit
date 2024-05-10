@@ -38,7 +38,7 @@ export const colors = {
 
   purple: '#7A6EF6',
 
-  defaultAvatarBackground: '#D0D8E3',
+  defaultAvatarBackground: '#A0A1B0',
   deleteUserIconBackground: '#D0D8E3'
 }
 
