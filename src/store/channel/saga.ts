@@ -108,7 +108,9 @@ function* createChannel(action: IAction): any {
       }
       createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
     }
+    let isSelfChannel = false
     if (channelData.type === CHANNEL_TYPE.DIRECT && channelData.members[0].id === SceytChatClient.user.id) {
+      isSelfChannel = true
       createChannelData.metadata = { s: 1 }
     }
     delete createChannelData.avatarFile
@@ -119,9 +121,16 @@ function* createChannel(action: IAction): any {
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
-          const directChannelUser = channel.members.find((member) => member.id === memberId)
-          if (directChannelUser) {
-            channelIsExistOnAllChannels = true
+          if (isSelfChannel) {
+            const meta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+            if (meta?.s) {
+              channelIsExistOnAllChannels = true
+            }
+          } else {
+            const directChannelUser = channel.members.find((member) => member.id === memberId)
+            if (directChannelUser) {
+              channelIsExistOnAllChannels = true
+            }
           }
         }
       })
@@ -186,9 +195,16 @@ function* createChannel(action: IAction): any {
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
-          const directChannelUser = channel.members.find((member) => member.id === memberId)
-          if (directChannelUser) {
-            channelIsExistOnAllChannels = true
+          if (isSelfChannel) {
+            const meta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+            if (meta?.s) {
+              channelIsExistOnAllChannels = true
+            }
+          } else {
+            const directChannelUser = channel.members.find((member) => member.id === memberId)
+            if (directChannelUser) {
+              channelIsExistOnAllChannels = true
+            }
           }
         }
       })

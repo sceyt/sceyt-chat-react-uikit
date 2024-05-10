@@ -1,7 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-// @ts-ignore
-import MicRecorder from 'mic-recorder-to-mp3'
 // Hooks
 import { useDidUpdate } from '../../hooks'
 // Assets
@@ -339,12 +337,23 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       clearInterval(intervalRef.current)
     }
   }, [recordedFile])
+
   useEffect(() => {
-    setRecorder(
-      new MicRecorder({
-        bitRate: 128
-      })
-    )
+    ;(async () => {
+      if (!recorder) {
+        try {
+          // @ts-ignore
+          const MicRecorderModule = await import('mic-recorder-to-mp3')
+          const MicRecorder = MicRecorderModule.default
+          const recorder = new MicRecorder({
+            bitRate: 128
+          })
+          setRecorder(recorder)
+        } catch (e) {
+          console.log('Failed to init mic-recorder-to-mp3')
+        }
+      }
+    })()
   }, [])
 
   return (

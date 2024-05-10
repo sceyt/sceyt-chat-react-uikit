@@ -598,11 +598,13 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
         console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
-
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
-
         const channelFilterTypes = getChannelTypesFilter()
-        if (messageToHandle && channel && channelFilterTypes.includes(channel.type)) {
+        if (
+          messageToHandle &&
+          channel &&
+          (channelFilterTypes && channelFilterTypes.length ? channelFilterTypes.includes(channel.type) : true)
+        ) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
@@ -673,8 +675,6 @@ export default function* watchForEvents(): any {
           if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
             if (Notification.permission === 'granted') {
               const tabIsActive = yield select(browserTabIsActiveSelector)
-              console.log('document.visibilityState ... ', document.visibilityState)
-              console.log('tabIsActive ... ', tabIsActive)
               if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
                 const contactsMap = yield select(contactsMapSelector)
                 const getFromContacts = getShowOnlyContactUsers()

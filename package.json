@@ -101,7 +101,7 @@
     "file-saver": "^2.0.5",
     "lexical": "^0.12.2",
     "linkify-it": "^4.0.1",
-    "mic-recorder-to-mp3": "^2.2.2",
+    "mic-recorder-to-mp3": "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git",
     "react-circular-progressbar": "^2.1.0",
     "react-easy-crop": "^4.6.2",
     "react-elastic-carousel": "^0.11.5",
