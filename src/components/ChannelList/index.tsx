@@ -522,11 +522,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
             </React.Fragment>
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
             <React.Fragment>
-              {!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) &&
-              !(searchedChannels.channels && searchedChannels.channels.length) &&
-              !(searchedChannels.contacts && searchedChannels.contacts.length) ? (
-                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
-              ) : (
+              {searchedChannels?.chats_groups?.length ||
+              searchedChannels?.channels?.length ||
+              searchedChannels?.contacts?.length ? (
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
@@ -606,7 +604,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       )}
                     </GroupChannels>
                   )}
-                  {!!(searchedChannels.channels && searchedChannels.channels.length) && (
+                  {!!searchedChannels.channels?.length && (
                     <GroupChannels>
                       <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
@@ -644,6 +642,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     </GroupChannels>
                   )}
                 </React.Fragment>
+              ) : (
+                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
               )}
             </React.Fragment>
           ) : (
@@ -692,7 +692,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
           )}
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
-              !searchedChannels.chats_groups.length && !searchedChannels.chats_groups.length ? (
+              !searchedChannels.chats_groups?.length &&
+              !searchedChannels.chats_groups?.length &&
+              !searchedChannels.channels?.length ? (
                 <NoData fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>

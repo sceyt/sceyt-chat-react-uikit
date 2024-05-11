@@ -416,6 +416,7 @@ function* searchChannels(action: IAction): any {
       const contactsList: IContact[] = []
       const contactsWithChannelsMap: { [key: string]: boolean } = {}
       const lowerCaseSearchBy = searchBy.toLowerCase()
+      // const publicChannelsMap: { [key: string]: boolean } = {}
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === CHANNEL_TYPE.DIRECT) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
@@ -438,6 +439,7 @@ function* searchChannels(action: IAction): any {
         } else {
           if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
             if (channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST) {
+              // publicChannelsMap[channel.id] = true
               publicChannels.push(channel)
             } else {
               chatsGroups.push(channel)
@@ -471,6 +473,13 @@ function* searchChannels(action: IAction): any {
       channelQueryBuilder.searchOperator('contains')
       const channelQuery = yield call(channelQueryBuilder.build)
       const channelsData = yield call(channelQuery.loadNextPage)
+
+      /* const channelsToAdd = channelsData.channels.filter((channel: IChannel) => {
+        return (
+          (channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST) &&
+          !publicChannelsMap[channel.id]
+        )
+      }) */
       const channelsToAdd = channelsData.channels.filter(
         (channel: IChannel) => channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST
       )

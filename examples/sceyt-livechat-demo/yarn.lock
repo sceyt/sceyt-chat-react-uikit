@@ -6889,10 +6889,9 @@ methods@~1.1.2:
   resolved "https://registry.yarnpkg.com/methods/-/methods-1.1.2.tgz#5529a4d67654134edcc5266656835b0f851afcee"
   integrity sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==
 
-mic-recorder-to-mp3@^2.2.2:
+"mic-recorder-to-mp3@git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
   version "2.2.2"
-  resolved "https://registry.yarnpkg.com/mic-recorder-to-mp3/-/mic-recorder-to-mp3-2.2.2.tgz#32e767d1196fb81d10e279f31c304350c9501d01"
-  integrity sha512-xDkOaHbojW3bdKOGn9CI5dT+Mc0RrfczsX/Y1zGJp3FUB4zei5ZKFnNm7Nguc9v910wkd7T3csnCTq5EtCF3Zw==
+  resolved "git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
   dependencies:
     lamejs "^1.2.0"
 
@@ -8643,17 +8642,17 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.5.9-beta.4:
-  version "1.5.9-beta.4"
-  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.5.9-beta.4.tgz#f69568804ff48347ebfa1eb3fb9648af149448b4"
-  integrity sha512-moIh8ab5G463fIdQGvmzVm/yBOD+S5ezsegSQ5NRjINNiMUlTye/ZyZLSBQShzhJR4xL2AtSxF9TZN7irw8Izg==
+sceyt-chat-react-uikit@^1.5.10:
+  version "1.5.10"
+  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.5.10.tgz#c120bacb84fbb66bb5bbffd8110bd1f0e4c46373"
+  integrity sha512-aAX4uTYcBkp8JjD/+yidVOzih6mUgDBDQPFMB1l+aygIkPob/UheeR5kRMQOBCXI/5BZY5HJjXY5vMWVnZhgMA==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
     file-saver "^2.0.5"
     lexical "^0.12.2"
     linkify-it "^4.0.1"
-    mic-recorder-to-mp3 "^2.2.2"
+    mic-recorder-to-mp3 "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git"
     react-circular-progressbar "^2.1.0"
     react-easy-crop "^4.6.2"
     react-elastic-carousel "^0.11.5"
