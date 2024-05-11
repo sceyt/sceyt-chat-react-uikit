@@ -59,6 +59,7 @@ export interface IDetailsProps {
   showPinChannel?: boolean
   pinChannelOrder?: number
   pinChannelIcon?: JSX.Element
+  unpinChannelIcon?: JSX.Element
   pinChannelIconColor?: string
   pinChannelTextColor?: string
 
@@ -180,6 +181,7 @@ const ChannelDetailsContainer = ({
   showPinChannel,
   pinChannelOrder,
   pinChannelIcon,
+  unpinChannelIcon,
   pinChannelIconColor,
   pinChannelTextColor,
   showMarkAsReadUnread,
@@ -286,6 +288,7 @@ const ChannelDetailsContainer = ({
           showPinChannel={showPinChannel}
           pinChannelOrder={pinChannelOrder}
           pinChannelIcon={pinChannelIcon}
+          unpinChannelIcon={unpinChannelIcon}
           pinChannelIconColor={pinChannelIconColor}
           pinChannelTextColor={pinChannelTextColor}
           showMarkAsReadUnread={showMarkAsReadUnread}

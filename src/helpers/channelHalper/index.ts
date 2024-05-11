@@ -21,6 +21,7 @@ let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
 let UploadImageIcon: JSX.Element
 let showChannelDetails: boolean = false
+let channelTypesFilter: string[] = []
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
@@ -41,6 +42,7 @@ export function setChannelsInMap(channels: IChannel[]) {
     /* if (!channelsMap[channel.id]) {
       channelsArr.push(channel)
     } */
+    channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
     if (
       channel.newReactions &&
       channel.newReactions.length &&
@@ -49,7 +51,6 @@ export function setChannelsInMap(channels: IChannel[]) {
     ) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
-    channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
     channelsMap[channel.id] = { ...channel }
 
     return channel
@@ -121,6 +122,14 @@ export function getChannelTypesMemberDisplayTextMap() {
 
 export function setChannelTypesMemberDisplayTextMap(map: channelTypesMemberDisplayTextMap) {
   channelTypesMemberDisplayTextMap = map
+}
+
+export function getChannelTypesFilter() {
+  return channelTypesFilter
+}
+
+export function setChannelTypesFilter(types: string[]) {
+  channelTypesFilter = types
 }
 
 export function getDefaultRolesByChannelTypesMap() {
@@ -239,3 +248,22 @@ export const setShowChannelDetails = (state: boolean) => {
 }
 
 export const getShowChannelDetails = () => showChannelDetails
+
+export const sortChannelByLastMessage = (channels: IChannel[]) => {
+  return channels.sort((a, b) => {
+    const aPinnedAt = a.pinnedAt ? new Date(a.pinnedAt) : null
+    const bPinnedAt = b.pinnedAt ? new Date(b.pinnedAt) : null
+
+    if (aPinnedAt && bPinnedAt) {
+      return bPinnedAt.getTime() - aPinnedAt.getTime()
+    } else if (aPinnedAt) {
+      return -1
+    } else if (bPinnedAt) {
+      return 1
+    } else {
+      const aDate = a.lastMessage?.createdAt || a.createdAt
+      const bDate = b.lastMessage?.createdAt || b.createdAt
+      return new Date(bDate).getTime() - new Date(aDate).getTime()
+    }
+  })
+}

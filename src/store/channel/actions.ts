@@ -21,6 +21,8 @@ import {
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  PIN_CHANNEL,
+  UNPIN_CHANNEL,
   REMOVE_CHANNEL,
   REMOVE_CHANNEL_CACHES,
   SEARCH_CHANNELS,
@@ -272,13 +274,14 @@ export function updateChannelAC(channelId: string, config: any) {
   }
 }
 
-export function updateChannelDataAC(channelId: string, config: any, moveUp?: boolean) {
+export function updateChannelDataAC(channelId: string, config: any, moveUp?: boolean, sort?: boolean) {
   return {
     type: UPDATE_CHANNEL_DATA,
     payload: {
       channelId,
       config,
-      moveUp
+      moveUp,
+      sort
     }
   }
 }
@@ -365,6 +368,20 @@ export function markChannelAsReadAC(channelId: string) {
 export function markChannelAsUnReadAC(channelId: string) {
   return {
     type: MARK_CHANNEL_AS_UNREAD,
+    payload: { channelId }
+  }
+}
+
+export function pinChannelAC(channelId: string) {
+  return {
+    type: PIN_CHANNEL,
+    payload: { channelId }
+  }
+}
+
+export function unpinChannelAC(channelId: string) {
+  return {
+    type: UNPIN_CHANNEL,
     payload: { channelId }
   }
 }

@@ -197,7 +197,7 @@ function* getUsers(action: IAction): any {
 
     const { users } = yield call(usersQuery.loadNextPage)
 
-    yield put(setUsersAC(users))
+    yield put(setUsersAC(JSON.parse(JSON.stringify(users))))
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {

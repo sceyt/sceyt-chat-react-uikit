@@ -10,6 +10,7 @@ import {
   getActiveChannelId,
   getChannelFromMap,
   getChannelGroupName,
+  getChannelTypesFilter,
   getLastChannelFromMap,
   handleNewMessages,
   removeChannelFromMap,
@@ -72,6 +73,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
+import { isJSON } from '../../helpers/message'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -257,6 +259,20 @@ export default function* watchForEvents(): any {
           channel
         }
       })
+    channelListener.onPined = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.PINED,
+        args: {
+          channel
+        }
+      })
+    channelListener.onUnpined = (channel: IChannel) =>
+      emitter({
+        type: CHANNEL_EVENT_TYPES.UNPINED,
+        args: {
+          channel
+        }
+      })
     channelListener.onShown = (channel: IChannel) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.UNHIDE,
@@ -383,17 +399,20 @@ export default function* watchForEvents(): any {
     switch (type) {
       case CHANNEL_EVENT_TYPES.CREATE: {
         const { createdChannel } = args
-        const getFromContacts = getShowOnlyContactUsers()
-        console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
-        const channelExists = checkChannelExists(createdChannel.id)
-        if (!channelExists) {
-          if (getFromContacts) {
-            yield put(getContactsAC())
+        const channelFilterTypes = getChannelTypesFilter()
+        if (channelFilterTypes.includes(createdChannel.type)) {
+          const getFromContacts = getShowOnlyContactUsers()
+          console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
+          const channelExists = checkChannelExists(createdChannel.id)
+          if (!channelExists) {
+            if (getFromContacts) {
+              yield put(getContactsAC())
+            }
+            yield call(setChannelInMap, createdChannel)
+            yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
           }
-          yield call(setChannelInMap, createdChannel)
-          yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
+          addChannelToAllChannels(createdChannel)
         }
-        addChannelToAllChannels(createdChannel)
         break
       }
       case CHANNEL_EVENT_TYPES.JOIN: {
@@ -580,7 +599,13 @@ export default function* watchForEvents(): any {
         const { channel, message } = args
         console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
-        if (messageToHandle && channel) {
+        const channelFilterTypes = getChannelTypesFilter()
+        if (
+          messageToHandle &&
+          channel &&
+          (channelFilterTypes && channelFilterTypes.length ? channelFilterTypes.includes(channel.type) : true)
+        ) {
+          channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
           const channelForAdd = JSON.parse(JSON.stringify(channel))
@@ -650,8 +675,6 @@ export default function* watchForEvents(): any {
           if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
             if (Notification.permission === 'granted') {
               const tabIsActive = yield select(browserTabIsActiveSelector)
-              console.log('document.visibilityState ... ', document.visibilityState)
-              console.log('tabIsActive ... ', tabIsActive)
               if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
                 const contactsMap = yield select(contactsMapSelector)
                 const getFromContacts = getShowOnlyContactUsers()
@@ -1034,6 +1057,44 @@ export default function* watchForEvents(): any {
         updateChannelOnAllChannels(channel.id, {
           muted: channel.muted,
           mutedTill: channel.mutedTill
+        })
+
+        break
+      }
+      case CHANNEL_EVENT_TYPES.PINED: {
+        const { channel } = args
+        console.log('channel PINED ... ')
+
+        yield put(
+          updateChannelDataAC(
+            channel.id,
+            {
+              pinnedAt: channel.pinnedAt
+            },
+            true
+          )
+        )
+        updateChannelOnAllChannels(channel.id, {
+          pinnedAt: channel.pinnedAt
+        })
+        break
+      }
+      case CHANNEL_EVENT_TYPES.UNPINED: {
+        const { channel } = args
+        console.log('channel UNPINED ... ')
+
+        yield put(
+          updateChannelDataAC(
+            channel.id,
+            {
+              pinnedAt: channel.pinnedAt
+            },
+            false,
+            true
+          )
+        )
+        updateChannelOnAllChannels(channel.id, {
+          pinnedAt: channel.pinnedAt
         })
 
         break

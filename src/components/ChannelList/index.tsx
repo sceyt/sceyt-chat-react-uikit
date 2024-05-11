@@ -95,6 +95,7 @@ interface IChannelListProps {
   uriPrefixOnCreateChannel?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
+  pinedIcon?: JSX.Element
   createChannelIcon?: JSX.Element
   newChannelIcon?: JSX.Element
   newGroupIcon?: JSX.Element
@@ -194,6 +195,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   onAddedToChannel,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
+  pinedIcon,
   // forceUpdateChannelList
   createChannelIcon,
   newChannelIcon,
@@ -508,6 +510,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                    pinedIcon={pinedIcon}
                     showAvatar={showAvatar}
                     avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
@@ -519,11 +522,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
             </React.Fragment>
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
             <React.Fragment>
-              {!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) &&
-              !(searchedChannels.channels && searchedChannels.channels.length) &&
-              !(searchedChannels.contacts && searchedChannels.contacts.length) ? (
-                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
-              ) : (
+              {searchedChannels?.chats_groups?.length ||
+              searchedChannels?.channels?.length ||
+              searchedChannels?.contacts?.length ? (
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
@@ -553,6 +554,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -602,7 +604,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       )}
                     </GroupChannels>
                   )}
-                  {!!(searchedChannels.channels && searchedChannels.channels.length) && (
+                  {!!searchedChannels.channels?.length && (
                     <GroupChannels>
                       <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
@@ -628,6 +630,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -639,6 +642,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     </GroupChannels>
                   )}
                 </React.Fragment>
+              ) : (
+                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
               )}
             </React.Fragment>
           ) : (
@@ -674,6 +679,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channelsMargin={channelsMargin}
                     notificationsIsMutedIcon={notificationsIsMutedIcon}
                     notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                    pinedIcon={pinedIcon}
                     showAvatar={showAvatar}
                     avatarBorderRadius={avatarBorderRadius}
                     channel={channel}
@@ -686,7 +692,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
           )}
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
-              !searchedChannels.chats_groups.length && !searchedChannels.chats_groups.length ? (
+              !searchedChannels.chats_groups?.length &&
+              !searchedChannels.chats_groups?.length &&
+              !searchedChannels.channels?.length ? (
                 <NoData fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
@@ -720,6 +728,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}
@@ -756,6 +765,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channelsMargin={channelsMargin}
                             notificationsIsMutedIcon={notificationsIsMutedIcon}
                             notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                            pinedIcon={pinedIcon}
                             showAvatar={showAvatar}
                             avatarBorderRadius={avatarBorderRadius}
                             channel={channel}

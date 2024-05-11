@@ -71,6 +71,7 @@ const Details = ({
   showPinChannel,
   pinChannelOrder,
   pinChannelIcon,
+  unpinChannelIcon,
   pinChannelIconColor,
   pinChannelTextColor,
   showMarkAsReadUnread,
@@ -366,6 +367,7 @@ const Details = ({
             showPinChannel={showPinChannel}
             pinChannelOrder={pinChannelOrder}
             pinChannelIcon={pinChannelIcon}
+            unpinChannelIcon={unpinChannelIcon}
             pinChannelIconColor={pinChannelIconColor}
             pinChannelTextColor={pinChannelTextColor}
             showMarkAsReadUnread={showMarkAsReadUnread}

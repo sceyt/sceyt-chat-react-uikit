@@ -175,6 +175,8 @@ export interface IChannel {
   hide: () => Promise<boolean>
   unhide: () => Promise<boolean>
   markAsUnRead: () => Promise<IChannel>
+  pin: () => Promise<IChannel>
+  unpin: () => Promise<IChannel>
   // eslint-disable-next-line no-unused-vars
   mute: (_muteExpireTime: number) => Promise<IChannel>
   unmute: () => Promise<IChannel>

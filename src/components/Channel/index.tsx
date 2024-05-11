@@ -24,6 +24,7 @@ import { ReactComponent as FileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
+import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
 // Components
 import Avatar from '../Avatar'
 // Helpers
@@ -48,6 +49,7 @@ interface IChannelProps {
   notificationsIsMutedIconColor?: string
   selectedChannelLeftBorder?: string
   selectedChannelBackground?: string
+  pinedIcon?: JSX.Element
   contactsMap?: { [key: string]: IContact }
   selectedChannelBorderRadius?: string
   selectedChannelPaddings?: string
@@ -71,6 +73,7 @@ const Channel: React.FC<IChannelProps> = ({
   avatarBorderRadius,
   notificationsIsMutedIcon,
   notificationsIsMutedIconColor,
+  pinedIcon,
   selectedChannelLeftBorder,
   selectedChannelBackground,
   contactsMap,
@@ -420,6 +423,7 @@ const Channel: React.FC<IChannelProps> = ({
       </ChannelInfo>
 
       <ChannelStatus ref={messageTimeAndStatusRef}>
+        {channel.pinnedAt && (pinedIcon || <PinedIcon />)}
         {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && (
           <DeliveryIconCont>
             {lastMessage &&
@@ -639,6 +643,12 @@ export const ChannelStatus = styled.div`
   flex-wrap: wrap;
   height: 42px;
   margin-left: auto;
+
+  & > svg {
+    width: 16px;
+    height: 16px;
+    color: ${colors.textColor2};
+  }
 `
 
 export const LastMessageDate = styled.span<{ fontSize?: string }>`

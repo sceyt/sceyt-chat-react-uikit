@@ -12,21 +12,9 @@ import {
   PopupBody,
   SubTitle
 } from '../../../UIHelper'
-/* import {
-  rolesSelector,
-  usersLoadingStateSelector,
-  usersSelector
-} from '../../../../../../store/channel/selector' */
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
-// import { ReactComponent as CreateChannelIcon } from '../../../../../assets/svg/add.svg'
 import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
-/* import {
-  createChannel,
-  getRoles,
-  getUsers,
-  loadMoreUsers
-} from '../../../../../../store/channel/actions' */
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
 import { colors } from '../../../UIHelper/constants'
@@ -246,12 +234,16 @@ const UsersPopup = ({
   useEffect(() => {
     if (getFromContacts) {
       if (!userSearchValue) {
-        setFilteredUsers([selfUser, ...contactList.map((cont: IContact) => cont.user)])
+        const userList = contactList.map((cont: IContact) => cont.user)
+        if (actionType === 'createChat') {
+          userList.unshift(selfUser)
+        }
+        setFilteredUsers(userList)
       }
     } else {
-      let userList = usersList
-      if (!userSearchValue) {
-        userList = [selfUser, ...usersList]
+      const userList = [...usersList]
+      if (actionType === 'createChat') {
+        userList.unshift(selfUser)
       }
       setFilteredUsers(userList)
     }
@@ -269,9 +261,21 @@ const UsersPopup = ({
             // key.toLowerCase().includes(userSearchValue.toLowerCase())))
           )
         })
+        if (
+          actionType === 'createChat' &&
+          ((selfUser.firstName && selfUser.firstName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
+            (selfUser.lastName && selfUser.lastName.toLowerCase().includes(userSearchValue.toLowerCase())) ||
+            selfUser.id.toLowerCase().includes(userSearchValue.toLowerCase()))
+        ) {
+          filteredContacts.unshift({ user: selfUser })
+        }
         setFilteredUsers(filteredContacts.map((cont: IContact) => cont.user))
       } else {
-        setFilteredUsers([selfUser, ...contactList.map((cont: IContact) => cont.user)])
+        const userList = contactList.map((cont: IContact) => cont.user)
+        if (actionType === 'createChat') {
+          userList.unshift(selfUser)
+        }
+        setFilteredUsers(userList)
       }
     } else {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
@@ -356,11 +360,11 @@ const UsersPopup = ({
                 return null
               }
               const isSelected = selectedMembers.findIndex((member) => member.id === user.id) >= 0
-              const memberDisplayName = makeUsername(
-                contactsMap[user.id],
-                user,
-                selfUser.id !== user.id && getFromContacts
-              )
+              const memberDisplayName =
+                selfUser.id === user.id
+                  ? 'Me'
+                  : makeUsername(contactsMap[user.id], user, selfUser.id !== user.id && getFromContacts)
+
               return (
                 <ListRow
                   isAdd={actionType !== 'createChat'}

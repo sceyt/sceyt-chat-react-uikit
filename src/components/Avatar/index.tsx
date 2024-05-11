@@ -2,7 +2,7 @@ import React from 'react'
 import styled from 'styled-components'
 // Assets
 import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
-import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/devaultAvatar32.svg'
+import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/avatar.svg'
 // Helpers
 import { generateAvatarColor } from '../../UIHelper'
 import { colors } from '../../UIHelper/constants'

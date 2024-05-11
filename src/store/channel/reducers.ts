@@ -37,6 +37,7 @@ import { IAction, IChannel, IContact, IMember } from '../../types'
 import { CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
+import { sortChannelByLastMessage } from '../../helpers/channelHalper'
 
 const initialState: {
   channelsLoadingState: string | null
@@ -155,7 +156,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case ADD_CHANNEL: {
       if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
-        newState.channels = [payload.channel, ...newState.channels]
+        newState.channels = sortChannelByLastMessage([payload.channel, ...newState.channels])
       }
       return newState
     }
@@ -247,7 +248,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
 
     case UPDATE_CHANNEL_DATA: {
-      const { config, channelId, moveUp } = payload
+      const { config, channelId, moveUp, sort } = payload
       if (moveUp) {
         let updateChannel: any
         const updatedChannels = newState.channels.filter((chan) => {
@@ -258,7 +259,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         })
         if (updateChannel) {
           updateChannel = { ...updateChannel, ...config }
-          newState.channels = [updateChannel, ...updatedChannels]
+          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       } else {
         newState.channels = newState.channels.map((channel) => {
@@ -267,6 +268,9 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           }
           return channel
         })
+        if (sort) {
+          newState.channels = sortChannelByLastMessage(newState.channels)
+        }
       }
 
       if ((newState.activeChannel as IChannel).id === channelId) {
@@ -350,7 +354,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         const updatedChannels = newState.channels.filter((chan) => chan.id !== channel.id)
         if (updateChannel) {
           updateChannel = { ...updateChannel, lastMessage: message }
-          newState.channels = [updateChannel, ...updatedChannels]
+          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       }
       return newState
@@ -358,7 +362,6 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_CHANNEL_LAST_MESSAGE_STATUS: {
       const { channel, message } = payload
-
       newState.channels = newState.channels.map((chan) => {
         if (chan.id === channel.id) {
           return {
