@@ -982,8 +982,6 @@ const MessageList: React.FC<MessagesProps> = ({
         scrollToBottom = false
       }, 100) */
     }
-
-    console.log('messages...', messages)
   }, [messages])
   useDidUpdate(() => {
     console.log('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
@@ -994,7 +992,6 @@ const MessageList: React.FC<MessagesProps> = ({
       clearMessagesMap()
       removeAllMessages()
       if (channel.id) {
-        console.log('should get messages...')
         dispatch(getMessagesAC(channel))
       }
       // dispatch(switchChannelActionAC(activeChannel.id))

@@ -1855,7 +1855,6 @@ function* editMessage(action: IAction): any {
 function* getMessagesQuery(action: IAction): any {
   try {
     const { channel, loadWithLastMessage, messageId, limit } = action.payload
-    console.log('getMessagesQuery ... ', action.payload)
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
       /* const attachmentQueryBuilder = new (SceytChatClient.AttachmentListQueryBuilder as any)(channel.id)
