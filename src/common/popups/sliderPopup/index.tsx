@@ -91,7 +91,7 @@ const SliderPopup = ({
     image.src = src
     image.onload = () => {
       if (setToDownloadedFiles) {
-        setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: src })
+        setDownloadedFiles({ ...downloadedFiles, [currentFile?.id]: src })
         visibilityTimeout.current = setTimeout(() => {
           setVisibleSlide(true)
         }, 100)
@@ -256,7 +256,7 @@ const SliderPopup = ({
     const currentMedia = attachmentsList.find((att: any) => att.id === currentMediaFile.id)
     setCurrentFile(currentMedia)
     if (currentMedia) {
-      const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia.id)
+      const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia?.id)
       if (!attachmentsList[indexOnList + 1]) {
         setNextButtonDisabled(true)
       } else {
