@@ -2245,6 +2245,7 @@ function* loadMoreReactions(action: IAction): any {
 function* getMessageAttachments(action: IAction): any {
   try {
     const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
+    console.log('get attachments saga: ', channelId)
     const SceytChatClient = getClient()
     let typeList = [
       attachmentTypes.video,
@@ -2271,13 +2272,18 @@ function* getMessageAttachments(action: IAction): any {
 
     let result: { attachments: any; hasNext: boolean }
     if (direction === queryDirection.NEXT) {
+      console.log('load attachments: next ')
       result = yield call(AttachmentByTypeQuery.loadPrevious)
     } else if (direction === queryDirection.NEAR) {
+      console.log('load attachments: near ')
       result = yield call(AttachmentByTypeQuery.loadNearMessageId, attachmentId)
     } else {
+      console.log('load attachments: prev ')
       result = yield call(AttachmentByTypeQuery.loadPrevious)
     }
+    console.log('attachments saga: res: ', result)
     if (forPopup) {
+      console.log('set attachments for popup... ')
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
       yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(result.attachments))))
       yield put(setAttachmentsCompleteForPopupAC(result.hasNext))
