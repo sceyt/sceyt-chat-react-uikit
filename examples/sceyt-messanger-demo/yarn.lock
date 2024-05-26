@@ -6888,9 +6888,9 @@ methods@~1.1.2:
   resolved "https://registry.yarnpkg.com/methods/-/methods-1.1.2.tgz#5529a4d67654134edcc5266656835b0f851afcee"
   integrity sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==
 
-"mic-recorder-to-mp3@git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
+"mic-recorder-to-mp3@https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
   version "2.2.2"
-  resolved "git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
+  resolved "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
   dependencies:
     lamejs "^1.2.0"
 

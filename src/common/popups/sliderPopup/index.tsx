@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
+import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
@@ -14,7 +15,6 @@ import { bytesToSize, downloadFile } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { attachmentsForPopupSelector } from '../../../store/message/selector'
 import { deleteMessageAC, forwardMessageAC, getAttachmentsAC, removeAttachmentAC } from '../../../store/message/actions'
 import { CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
@@ -90,7 +90,7 @@ const SliderPopup = ({
     const image = new Image()
     image.src = src
     image.onload = () => {
-      if (setToDownloadedFiles) {
+      if (setToDownloadedFiles && currentFile) {
         setDownloadedFiles({ ...downloadedFiles, [currentFile?.id]: src })
         visibilityTimeout.current = setTimeout(() => {
           setVisibleSlide(true)
@@ -182,9 +182,8 @@ const SliderPopup = ({
         videoElem.pause()
       }
     }
-
-    getAttachmentUrlFromCache(currentFile.url).then((cachedUrl) => {
-      if (currentFile) {
+    if (currentFile) {
+      getAttachmentUrlFromCache(currentFile.url).then((cachedUrl) => {
         if (cachedUrl) {
           if (!downloadedFiles[currentFile.id]) {
             setVisibleSlide(false)
@@ -248,24 +247,26 @@ const SliderPopup = ({
             }
           }
         }
-      }
-    })
+      })
+    }
   }, [currentFile])
 
   useDidUpdate(() => {
-    const currentMedia = attachmentsList.find((att: any) => att.id === currentMediaFile.id)
-    setCurrentFile(currentMedia)
-    if (currentMedia) {
-      const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia?.id)
-      if (!attachmentsList[indexOnList + 1]) {
-        setNextButtonDisabled(true)
-      } else {
-        setNextButtonDisabled(false)
-      }
-      if (!attachmentsList[indexOnList - 1]) {
-        setPrevButtonDisabled(true)
-      } else {
-        setPrevButtonDisabled(false)
+    if (currentMediaFile) {
+      const currentMedia = attachmentsList.find((att: any) => att.id === currentMediaFile.id)
+      if (currentMedia) {
+        setCurrentFile(currentMedia)
+        const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia?.id)
+        if (!attachmentsList[indexOnList + 1]) {
+          setNextButtonDisabled(true)
+        } else {
+          setNextButtonDisabled(false)
+        }
+        if (!attachmentsList[indexOnList - 1]) {
+          setPrevButtonDisabled(true)
+        } else {
+          setPrevButtonDisabled(false)
+        }
       }
     }
   }, [attachmentsList])
@@ -341,7 +342,7 @@ const SliderPopup = ({
         </FileInfo>
         <ActionsWrapper>
           <IconWrapper onClick={() => handleDownloadFile(currentFile)}>
-            {downloadingFilesMap[currentFile.id] ? (
+            {currentFile && downloadingFilesMap[currentFile.id] ? (
               // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
               <ProgressWrapper>
                 <CircularProgressbar
@@ -450,7 +451,7 @@ const SliderPopup = ({
                   ) : (
                     <React.Fragment>
                       <VideoPlayer
-                        activeFileId={currentFile.id}
+                        activeFileId={currentFile?.id || ''}
                         videoFileId={file.id}
                         src={downloadedFiles[file.id!]}
                       />
@@ -549,6 +550,7 @@ const SliderBody = styled.div`
       height: 100% !important;
     }
   }
+
   & .rec-carousel-item {
     display: flex;
     align-items: center;
@@ -642,6 +644,7 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   position: relative;
   display: flex;
   opacity: ${(props) => (props.visibleSlide ? 1 : 0)};
+
   img,
   video {
     //max-width: calc(100vw - 300px);
@@ -653,6 +656,7 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
       min-width: inherit;
     }
   }
+
   img {
     min-width: inherit;
   }
