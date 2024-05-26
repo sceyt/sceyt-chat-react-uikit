@@ -220,9 +220,9 @@ export default function* watchForEvents(): any {
         }
       })
     channelListener.onTotalUnreadCountUpdated = (
-      channel: IChannel,
       unreadChannels: number,
       totalUnread: number,
+      channel: IChannel,
       channelUnreadCount: number,
       channelUnreadMentions: number,
       channelUnreadReactions: number
@@ -230,9 +230,9 @@ export default function* watchForEvents(): any {
       emitter({
         type: CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO,
         args: {
-          channel,
           unreadChannels,
           totalUnread,
+          channel,
           channelUnreadCount,
           channelUnreadMentions,
           channelUnreadReactions
@@ -985,16 +985,19 @@ export default function* watchForEvents(): any {
       }
 
       case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
-        // const { channel, unreadChannels, totalUnread, channelUnreadCount } = args
-        const { channel, channelUnreadCount } = args
+        const { channel, unreadChannels, totalUnread } = args
+        // const { channel, channelUnreadCount } = args
         // console.log('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
         // console.log('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
-        console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
-
+        // console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
+        console.log(', unreadChannels ....... >>>>>  .. .  ', unreadChannels)
+        console.log(', totalUnread ....... >>>>>  .. .  ', totalUnread)
         // yield put(setChannelUnreadCount(0, channel.id));
-        const updatedChannel = JSON.parse(JSON.stringify(channel))
-        yield put(updateChannelDataAC(channel.id, updatedChannel))
-        updateChannelOnAllChannels(channel.id, updatedChannel)
+        if (channel) {
+          const updatedChannel = JSON.parse(JSON.stringify(channel))
+          yield put(updateChannelDataAC(channel.id, updatedChannel))
+          updateChannelOnAllChannels(channel.id, updatedChannel)
+        }
         break
       }
 

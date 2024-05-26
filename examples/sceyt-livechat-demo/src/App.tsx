@@ -153,7 +153,12 @@ function App() {
                     </div>
                     <div className='sceyt_livechat'>
                         {client ? (
-                            <SceytChat showNotifications={false} customColors={{primaryColor: '#5159F6'}} client={client}>
+                            <SceytChat
+                              showNotifications={false}
+                              customColors={{primaryColor: '#5159F6'}}
+                              client={client}
+                              autoSelectFirstChannel={true}
+                            >
                                 <Chat onActiveChannelUpdated={handleUpdateUnreadCount} hideChannelList={true}>
                                     <MessageList
                                         fontFamily="Inter, sans-serif"
