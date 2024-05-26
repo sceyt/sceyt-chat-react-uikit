@@ -80,7 +80,6 @@ const SliderPopup = ({
         getFromContacts && user.id !== currentFile.user.id
       )
     : ''
-  console.log('attachmentUserName: ', attachmentUserName)
   const handleClosePopup = () => {
     setAttachmentsList([])
     setIsSliderOpen(false)
@@ -183,7 +182,6 @@ const SliderPopup = ({
         videoElem.pause()
       }
     }
-    console.log('currentFile: ', 1, currentFile)
     if (currentFile) {
       getAttachmentUrlFromCache(currentFile.url).then((cachedUrl) => {
         if (cachedUrl) {
@@ -254,15 +252,11 @@ const SliderPopup = ({
   }, [currentFile])
 
   useDidUpdate(() => {
-    console.log('attachment list update on popup : ', attachmentsList)
     if (currentMediaFile) {
-      console.log('currentMediaFile: ', currentMediaFile)
       const currentMedia = attachmentsList.find((att: any) => att.id === currentMediaFile.id)
-      console.log('currentMedia: ', currentMedia)
-      setCurrentFile(currentMedia)
       if (currentMedia) {
+        setCurrentFile(currentMedia)
         const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia?.id)
-        console.log('indexOnList: ', indexOnList)
         if (!attachmentsList[indexOnList + 1]) {
           setNextButtonDisabled(true)
         } else {
@@ -457,7 +451,7 @@ const SliderPopup = ({
                   ) : (
                     <React.Fragment>
                       <VideoPlayer
-                        activeFileId={currentFile.id}
+                        activeFileId={currentFile?.id || ''}
                         videoFileId={file.id}
                         src={downloadedFiles[file.id!]}
                       />
@@ -556,6 +550,7 @@ const SliderBody = styled.div`
       height: 100% !important;
     }
   }
+
   & .rec-carousel-item {
     display: flex;
     align-items: center;
@@ -649,6 +644,7 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   position: relative;
   display: flex;
   opacity: ${(props) => (props.visibleSlide ? 1 : 0)};
+
   img,
   video {
     //max-width: calc(100vw - 300px);
@@ -660,6 +656,7 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
       min-width: inherit;
     }
   }
+
   img {
     min-width: inherit;
   }
