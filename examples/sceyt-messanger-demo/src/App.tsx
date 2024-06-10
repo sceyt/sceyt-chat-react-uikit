@@ -3,8 +3,13 @@ import SceytChatClient from "sceyt-chat";
 import {v4 as uuidv4} from 'uuid'
 import {
   ChannelDetails,
-  ChannelList, Chat, ChatHeader, MessageList, MessagesScrollToBottomButton,
-  SceytChat, SendMessage,
+  ChannelList,
+  Chat,
+  ChatHeader,
+  MessageList,
+  MessagesScrollToBottomButton,
+  SceytChat,
+  SendMessage,
 } from 'sceyt-chat-react-uikit';
 import lightModeIcon from './svg/lightModeIcon.svg';
 import darkModeIcon from './svg/darkModeIcon.svg';
@@ -16,6 +21,7 @@ import ChannelCustomList from "./ChannelCustomList";
 import CreateChannelButton from "./CreateChannel";
 import useDidUpdate from "./hooks/useDidUpdate";
 import useMobileView from "./hooks/useMobileView";
+import CustomMessageItem from './CustomMessageItem'
 
 const MOBILE_ACTIVE_VIEW = {
   CHANNELS: 'channels',
@@ -28,6 +34,7 @@ function App() {
   const [chatToken, setChatToken] = useState(null);
   const [theme, setTheme] = useState<'light' | 'dark'>('light');
   const [userId, setUserId] = useState('');
+  const [rolesMap, setRolesMap] = useState<any>();
   const isMobile = useMobileView();
   const [mobileActiveView, setMobileActiveView] = useState(MOBILE_ACTIVE_VIEW.CHANNELS);
   const guestsUsersList = ["alice", "ben", "charlie", "david", "emma", "emily", "ethan", "grace", "harry", "isabella", "jacob", "james", "john", "lily", "michael", "olivia", "sophia", "thomas", "william", "zoe",]
@@ -160,6 +167,24 @@ function App() {
     }
   }, [userId])
 
+  useEffect(() => {
+    if (client && clientState === 'Connected') {
+      client
+        .getRoles()
+        .then((roles: any[]) => {
+          const rolesMap: any = {};
+
+          roles.forEach((role: any) => {
+            rolesMap[role.name] = role.permissions;
+          });
+          setRolesMap(rolesMap);
+        })
+        .catch((e: any) => {
+          console.log('error on get roles', e);
+        });
+    }
+  }, [client]);
+
   return (
     <div className="main">
       <SceytContext.Provider value={{client, theme}}>
@@ -230,7 +255,9 @@ function App() {
                       showMessageTimeAndStatusOnlyOnHover
                       reportMessage={false}
                       replyMessageInThread={false}
-
+                      CustomMessageItem={(props) => (
+                        <CustomMessageItem {...props} client={client} rolesMap={rolesMap}/>
+                      )}
                       fileAttachmentsBoxWidth={isMobile ? 220 : undefined}
                       imageAttachmentMaxWidth={isMobile ? 220 : undefined}
                       imageAttachmentMaxHeight={isMobile ? 200 : undefined}
