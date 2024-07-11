@@ -31,14 +31,27 @@ export interface ICustomUploader {
   cancelRequest: (requestPromise: any) => void
 }
 
+interface IThemeColor {
+  light: string
+  dark?: string
+  [key: string]: string | undefined
+}
+
+export interface ISceytChatUIKitThemeType {
+  colors: {
+    accent: IThemeColor
+    background: IThemeColor
+  }
+}
+
+export interface IThemeMode {
+  mode: 'light' | 'dark' | string
+}
+
 export interface IChatClientProps {
   client: any
-  theme?: {
-    name: 'dark' | 'light'
-    primaryColor: string
-    primaryLight: string
-    textColor1: string
-  }
+  theme?: ISceytChatUIKitThemeType
+  themeMode?: IThemeMode
   autoSelectFirstChannel?: boolean
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars
@@ -73,6 +86,7 @@ export interface IChatClientProps {
 const SceytChatContainer = ({
   client,
   theme,
+  themeMode,
   avatarColors,
   children,
   showOnlyContactUsers,
@@ -94,6 +108,7 @@ const SceytChatContainer = ({
       <SceytChat
         client={client}
         theme={theme}
+        themeMode={themeMode}
         avatarColors={avatarColors}
         children={children}
         showOnlyContactUsers={showOnlyContactUsers}

@@ -1,3 +1,15 @@
+export const themeColors = {
+  colors: {
+    accent: {
+      light: '#d7596c',
+      dark: '#7A6EF6'
+    },
+    background: {
+      light: '#000000',
+      dark: '#438CED'
+    }
+  }
+}
 export const colors = {
   white: '#ffffff',
   black: '#000000',
@@ -39,7 +51,9 @@ export const colors = {
   purple: '#7A6EF6',
 
   defaultAvatarBackground: '#A0A1B0',
-  deleteUserIconBackground: '#D0D8E3'
+  deleteUserIconBackground: '#D0D8E3',
+  accent: themeColors.colors.accent.light,
+  background: themeColors.colors.background.light,
 }
 
 export const size = {

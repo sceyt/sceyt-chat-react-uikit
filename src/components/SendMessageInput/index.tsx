@@ -1642,6 +1642,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       color={colors.backgroundColor}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                      iconColor={colors.accent}
                     >
                       {CustomSendMessageButton || <SendIcon />}
                     </SendMessageButton>
@@ -1651,6 +1652,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
                       color={colors.primary}
+                      iconColor={colors.accent}
                     >
                       <AudioRecord
                         sendRecordedFile={setRecordedFile}
@@ -1767,7 +1769,7 @@ const CloseEditMode = styled.span`
   line-height: 22px;
   cursor: pointer;
 
-  & > svg {
+  & > svg { 
     color: ${colors.textColor2};
   }
 `
@@ -1980,6 +1982,7 @@ const SendMessageButton = styled.span<{
   order?: number
   isCustomButton?: any
   onClick?: any
+  iconColor?: string
 }>`
   ${(props) =>
     !props.isCustomButton &&
@@ -1994,6 +1997,9 @@ const SendMessageButton = styled.span<{
   -webkit-tap-highlight-color: transparent;
 
   color: ${props.isActive ? colors.primary : props.color};
+  & > svg { 
+    color: ${props.iconColor || colors.textColor2};
+  }
   `}
 `
 

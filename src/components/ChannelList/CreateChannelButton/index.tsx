@@ -58,8 +58,8 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch}>
-            {createChannelIcon || <AddChannelIcon />}
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={colors.accent}>
+            {createChannelIcon || <AddChannelIcon />} 
           </CreateDropdownButton>
         }
       >

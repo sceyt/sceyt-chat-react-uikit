@@ -4,7 +4,6 @@ import styled from 'styled-components'
 // Store
 import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
 import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
-import { setThemeAC } from '../../store/theme/actions'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { getRolesFailSelector } from '../../store/member/selector'
@@ -28,15 +27,15 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps } from '../ChatContainer'
-import { colors } from '../../UIHelper/constants'
+import { IChatClientProps, ISceytChatUIKitThemeType, IThemeMode } from '../ChatContainer'
+import { colors, themeColors } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
-import { THEME } from '../../helpers/constants'
 
 const SceytChat = ({
   client,
-  theme,
+  theme, 
+  themeMode,
   avatarColors,
   children,
   showOnlyContactUsers,
@@ -58,8 +57,7 @@ const SceytChat = ({
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
-  // const channels = useSelector(channelsSelector)
-  const [darkTheme, setDarkTheme] = useState(false)
+  const [currentTheme, setCurrentTheme] = useState('light')
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
 
@@ -163,30 +161,26 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: {
-    name: 'dark' | 'light'
-    primaryColor: string
-    primaryLight: string
-    textColor1: string
-  }) => {
-    if (theme.name === THEME.DARK) {
-      dispatch(setThemeAC(THEME.DARK))
-      colors.primary = theme.primaryColor
-      colors.textColor1 = theme.textColor1
-      colors.primaryLight = theme.primaryLight
-      colors.backgroundColor = colors.darkModeBackgroundColor
-      colors.hoverBackgroundColor = colors.darkModeHoverBackgroundColor
-      setDarkTheme(true)
-    } else {
-      dispatch(setThemeAC(THEME.LIGHT))
-      colors.primary = theme.primaryColor
-      colors.textColor1 = theme.textColor1
-      colors.primaryLight = theme.primaryLight
-      colors.backgroundColor = colors.lightModeBackgroundColor
-      colors.hoverBackgroundColor = colors.lightModeHoverBackgroundColor
-      setDarkTheme(false)
+  const handleChangedTheme = (theme: ISceytChatUIKitThemeType, currentTheme: string) => {
+    const updatedColors = { ...themeColors.colors }
+    for (const key in theme.colors) {
+      if (theme.colors.hasOwnProperty(key)) {
+        updatedColors[key] = {
+          ...themeColors.colors[key],
+          ...theme.colors[key]
+        }
+        colors[key] = theme.colors[key][currentTheme]
+      }
+    }
+    themeColors.colors = updatedColors
+  }
+
+  const handleChangedThemeMode = (themeMode: IThemeMode) => {
+    if (themeMode.mode) {
+      setCurrentTheme(themeMode.mode)
     }
   }
+
   useEffect(() => {
     if (CustomUploader) {
       setCustomUploader(CustomUploader)
@@ -258,9 +252,15 @@ const SceytChat = ({
 
   useEffect(() => {
     if (theme) {
-      handleChangedTheme(theme)
+      handleChangedTheme(theme, currentTheme)
     }
-  }, [theme])
+  }, [theme, currentTheme])
+
+  useEffect(() => {
+    if (themeMode) {
+      handleChangedThemeMode(themeMode)
+    }
+  }, [themeMode])
 
   useEffect(() => {
     setAutoSelectFitsChannel(autoSelectFirstChannel)
@@ -295,7 +295,7 @@ const SceytChat = ({
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
-          backgroundColor={darkTheme ? colors.dark : colors.white}
+          backgroundColor={colors.background}
           id='sceyt_chat_container'
         >
           {children}

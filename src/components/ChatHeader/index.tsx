@@ -214,7 +214,7 @@ export default function ChatHeader({
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.borderColor2}
+          infoIconColor={colors.accent}
           order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}

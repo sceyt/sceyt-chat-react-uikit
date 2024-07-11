@@ -380,7 +380,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
         {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
-      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()}>
+      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={colors.accent}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
     </Container>
@@ -411,9 +411,12 @@ const AudioWrapper = styled.div<{ recording?: boolean }>`
   border-radius: 20px;
 `
 
-const RecordIconWrapper = styled.span`
+const RecordIconWrapper = styled.span<{ iconColor?: string }>`
   display: flex;
   cursor: pointer;
+  > svg {
+    color: ${(props) => props.iconColor};
+  }
 `
 
 const AudioVisualization = styled.div<{ show?: boolean }>`
