@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, defaultTheme, defaultThemeMode } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -58,7 +58,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={colors.accent}>
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}>
             {createChannelIcon || <AddChannelIcon />} 
           </CreateDropdownButton>
         }

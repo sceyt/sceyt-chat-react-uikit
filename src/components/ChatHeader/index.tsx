@@ -23,7 +23,7 @@ import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../.
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors } from '../../UIHelper/constants'
+import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
@@ -214,7 +214,7 @@ export default function ChatHeader({
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={colors.accent}
+          infoIconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
           order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}

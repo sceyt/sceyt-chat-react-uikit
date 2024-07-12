@@ -66,7 +66,7 @@ import {
   makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
+import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
@@ -1642,7 +1642,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       color={colors.backgroundColor}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
-                      iconColor={colors.accent}
+                      iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
                     >
                       {CustomSendMessageButton || <SendIcon />}
                     </SendMessageButton>
@@ -1652,7 +1652,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
                       color={colors.primary}
-                      iconColor={colors.accent}
+                      iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
                     >
                       <AudioRecord
                         sendRecordedFile={setRecordedFile}

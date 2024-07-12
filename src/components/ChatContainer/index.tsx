@@ -37,7 +37,7 @@ interface IThemeColor {
   [key: string]: string | undefined
 }
 
-export interface ISceytChatUIKitThemeType {
+export interface ISceytChatUIKitTheme {
   colors: {
     accent: IThemeColor
     background: IThemeColor
@@ -45,12 +45,12 @@ export interface ISceytChatUIKitThemeType {
 }
 
 export interface IThemeMode {
-  mode: 'light' | 'dark' | string
+  name: 'light' | 'dark' | string
 }
 
 export interface IChatClientProps {
   client: any
-  theme?: ISceytChatUIKitThemeType
+  theme?: ISceytChatUIKitTheme
   themeMode?: IThemeMode
   autoSelectFirstChannel?: boolean
   avatarColors?: ICustomAvatarColors

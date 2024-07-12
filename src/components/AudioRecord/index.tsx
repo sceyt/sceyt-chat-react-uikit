@@ -10,7 +10,7 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -380,7 +380,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
         {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
-      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={colors.accent}>
+      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
     </Container>

@@ -27,8 +27,8 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps, ISceytChatUIKitThemeType, IThemeMode } from '../ChatContainer'
-import { colors, themeColors } from '../../UIHelper/constants'
+import { IChatClientProps, ISceytChatUIKitTheme, IThemeMode } from '../ChatContainer'
+import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 
@@ -57,7 +57,7 @@ const SceytChat = ({
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
-  const [currentTheme, setCurrentTheme] = useState('light')
+  const [currentThemeMode, setCurrentThemeMode] = useState(defaultThemeMode.name)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
 
@@ -161,23 +161,24 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: ISceytChatUIKitThemeType, currentTheme: string) => {
-    const updatedColors = { ...themeColors.colors }
+  const handleChangedTheme = (theme: ISceytChatUIKitTheme, currentThemeMode: string) => {
+    const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
       if (theme.colors.hasOwnProperty(key)) {
         updatedColors[key] = {
-          ...themeColors.colors[key],
+          ...defaultTheme.colors[key],
           ...theme.colors[key]
         }
-        colors[key] = theme.colors[key][currentTheme]
+        colors[key] = theme.colors[key][currentThemeMode]
       }
     }
-    themeColors.colors = updatedColors
+    defaultTheme.colors = updatedColors
   }
 
   const handleChangedThemeMode = (themeMode: IThemeMode) => {
-    if (themeMode.mode) {
-      setCurrentTheme(themeMode.mode)
+    if (themeMode.name) {
+      setCurrentThemeMode(themeMode.name)
+      defaultThemeMode.name = themeMode.name;
     }
   }
 
@@ -252,9 +253,9 @@ const SceytChat = ({
 
   useEffect(() => {
     if (theme) {
-      handleChangedTheme(theme, currentTheme)
+      handleChangedTheme(theme, currentThemeMode)
     }
-  }, [theme, currentTheme])
+  }, [theme, currentThemeMode])
 
   useEffect(() => {
     if (themeMode) {
