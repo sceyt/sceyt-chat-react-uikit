@@ -1,14 +1,18 @@
-export const themeColors = {
+import { ISceytChatUIKitTheme, IThemeMode } from "../components/ChatContainer"
+export const defaultTheme:ISceytChatUIKitTheme = {
   colors: {
     accent: {
-      light: '#d7596c',
-      dark: '#7A6EF6'
+      light: '#5159F6',
+      dark: '#FA4C56'
     },
     background: {
-      light: '#000000',
-      dark: '#438CED'
+      light: '#FFFFFF',
+      dark: '#19191B'
     }
   }
+}
+export const defaultThemeMode:IThemeMode = {
+  name: 'light'
 }
 export const colors = {
   white: '#ffffff',
@@ -52,8 +56,8 @@ export const colors = {
 
   defaultAvatarBackground: '#A0A1B0',
   deleteUserIconBackground: '#D0D8E3',
-  accent: themeColors.colors.accent.light,
-  background: themeColors.colors.background.light,
+  accent: defaultTheme.colors.accent.light,
+  background: defaultTheme.colors.background.light,
 }
 
 export const size = {
