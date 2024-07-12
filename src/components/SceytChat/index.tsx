@@ -296,7 +296,7 @@ const SceytChat = ({
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
-          backgroundColor={colors.background}
+          backgroundColor={defaultTheme.colors.background[defaultThemeMode.name]}
           id='sceyt_chat_container'
         >
           {children}
