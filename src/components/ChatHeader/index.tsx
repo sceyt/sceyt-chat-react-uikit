@@ -23,10 +23,11 @@ import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../.
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
+import { colors } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
+import { getThemeColors } from '../../store/currentTheme/selector'
 
 interface IProps {
   backgroundColor?: string
@@ -88,6 +89,7 @@ export default function ChatHeader({
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
+  const themeColors = useSelector(getThemeColors)
   const displayMemberText =
     memberDisplayText && memberDisplayText[activeChannel.type]
       ? activeChannel.memberCount > 1
@@ -110,7 +112,7 @@ export default function ChatHeader({
       dispatch(switchChannelActionAC({ ...activeChannel.linkedFrom, backToLinkedChannel: true }))
     }
   }
-
+  
   const handleBackToChannels = () => {
     dispatch(switchChannelActionAC({}))
     mobileBackButtonClicked && mobileBackButtonClicked()
@@ -214,7 +216,7 @@ export default function ChatHeader({
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
+          infoIconColor={themeColors.accent}
           order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}

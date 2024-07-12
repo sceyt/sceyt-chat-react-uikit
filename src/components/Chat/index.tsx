@@ -25,6 +25,7 @@ import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
 import { colors } from '../../UIHelper/constants'
 import { themeSelector } from '../../store/theme/selector'
+import { getThemeColors } from '../../store/currentTheme/selector'
 
 interface IProps {
   hideChannelList?: boolean
@@ -58,6 +59,7 @@ export default function Chat({
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const channels = useSelector(channelsSelector, shallowEqual)
   const theme = useSelector(themeSelector, shallowEqual)
+  const themeColors = useSelector(getThemeColors)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -127,7 +129,7 @@ export default function Chat({
           backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
         >
           {CustomNoChannelSelected || (
-            <SelectChatContent iconColor={colors.primary}>
+            <SelectChatContent iconColor={themeColors.accent}>
               <MessageIcon />
               <SelectChatTitle>Select a chat</SelectChatTitle>
               <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>

@@ -66,7 +66,7 @@ import {
   makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
+import { colors} from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
@@ -126,6 +126,7 @@ import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
+import { getThemeColors } from '../../store/currentTheme/selector'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -140,7 +141,6 @@ function AutoFocusPlugin({ messageForReply }: any) {
 
 function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
   const [editor] = useLexicalComposerContext()
-
   useDidUpdate(() => {
     if (shouldClearEditor.clear) {
       editor.update(() => {
@@ -318,7 +318,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
   const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
-
+  const themeColors = useSelector(getThemeColors)
   const allowSetMention =
     allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
 
@@ -1498,7 +1498,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           order={emojiIcoOrder}
                           isEmojisOpened={isEmojisOpened}
                           ref={emojiBtnRef}
-                          hoverColor={colors.primary}
+                          hoverColor={themeColors.accent}
                           height={inputContainerHeight || minHeight}
                           onClick={() => {
                             setIsEmojisOpened(!isEmojisOpened)
@@ -1517,7 +1517,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           trigger={
                             <AddAttachmentIcon
                               ref={addAttachmentsBtnRef}
-                              color={colors.primary}
+                              color={themeColors.accent}
                               height={inputContainerHeight || minHeight}
                             >
                               {AddAttachmentsIcon || <AttachmentIcon />}
@@ -1642,7 +1642,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       color={colors.backgroundColor}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
-                      iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
+                      iconColor={themeColors.accent}
                     >
                       {CustomSendMessageButton || <SendIcon />}
                     </SendMessageButton>
@@ -1652,7 +1652,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
                       color={colors.primary}
-                      iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}
+                      iconColor={themeColors.accent}
                     >
                       <AudioRecord
                         sendRecordedFile={setRecordedFile}
@@ -1805,12 +1805,12 @@ const AddAttachmentIcon = styled.span<any>`
   order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
   > svg {
-    ${(props) => (props.isActive ? `color: ${props.color || colors.primary};` : 'color: #898B99;')};
+    ${(props) => (props.isActive ? `color: ${props.color};` : `color: ${props.color};`)};
     width: 24px;
   }
 
   &:hover > svg {
-    color: ${(props) => props.color || colors.primary};
+    color: ${(props) => props.color};
   }
 `
 
@@ -1966,7 +1966,7 @@ const EmojiButton = styled.span<any>`
   -webkit-tap-highlight-color: transparent;
 
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')};
+    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : `color: ${props.hoverColor};`)};
     width: 24px;
     height: 24px;
   }

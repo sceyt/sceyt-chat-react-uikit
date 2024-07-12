@@ -10,8 +10,10 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
+import { colors} from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
+import { getThemeColors } from '../../store/currentTheme/selector'
+import { useSelector } from 'react-redux'
 
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
@@ -35,7 +37,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
-
+  const themeColors = useSelector(getThemeColors)
   async function startRecording() {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
     if (permissionStatus.state === 'granted') {
@@ -380,7 +382,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
         {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
-      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={defaultTheme.colors.accent[defaultThemeMode.name]}>
+      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={themeColors.accent}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
     </Container>

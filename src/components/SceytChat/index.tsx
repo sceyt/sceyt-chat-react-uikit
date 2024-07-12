@@ -31,6 +31,8 @@ import { IChatClientProps, ISceytChatUIKitTheme, IThemeMode } from '../ChatConta
 import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
+import { setTheme } from '../../store/currentTheme/actions'
+import { getThemeColors } from '../../store/currentTheme/selector'
 
 const SceytChat = ({
   client,
@@ -56,11 +58,11 @@ const SceytChat = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
-  const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
-  const [currentThemeMode, setCurrentThemeMode] = useState(defaultThemeMode.name)
+  const getRolesFail = useSelector(getRolesFailSelector, shallowEqual) 
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
-
+  const themeColors = useSelector(getThemeColors)
+  
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -161,7 +163,7 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: ISceytChatUIKitTheme, currentThemeMode: string) => {
+  const handleChangedTheme = (theme: ISceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
       if (theme.colors.hasOwnProperty(key)) {
@@ -169,15 +171,15 @@ const SceytChat = ({
           ...defaultTheme.colors[key],
           ...theme.colors[key]
         }
-        colors[key] = theme.colors[key][currentThemeMode]
       }
     }
-    defaultTheme.colors = updatedColors
+    const updatedTheme = { ...defaultTheme};
+    updatedTheme.colors = updatedColors
+    setTheme(updatedTheme)
   }
 
   const handleChangedThemeMode = (themeMode: IThemeMode) => {
     if (themeMode.name) {
-      setCurrentThemeMode(themeMode.name)
       defaultThemeMode.name = themeMode.name;
     }
   }
@@ -253,9 +255,12 @@ const SceytChat = ({
 
   useEffect(() => {
     if (theme) {
-      handleChangedTheme(theme, currentThemeMode)
+      handleChangedTheme(theme)
+      dispatch(setTheme(theme))
+    }else{
+      dispatch(setTheme(defaultTheme))
     }
-  }, [theme, currentThemeMode])
+  }, [theme])
 
   useEffect(() => {
     if (themeMode) {
@@ -296,7 +301,7 @@ const SceytChat = ({
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
-          backgroundColor={defaultTheme.colors.background[defaultThemeMode.name]}
+          backgroundColor={themeColors.background}
           id='sceyt_chat_container'
         >
           {children}
