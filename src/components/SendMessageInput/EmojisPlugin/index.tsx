@@ -15,9 +15,11 @@ import { useSelector } from 'react-redux'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
+import { getThemeColors } from '../../../store/currentTheme/selector'
 
 interface EmojiCollectionProps {
-  activeCollection: boolean
+  activeCollection: boolean,
+  iconColor: string
 }
 
 const EmojiIcon = ({ collectionName }: any) => {
@@ -69,6 +71,7 @@ function EmojisPopup({
   leftPosition?: string
 }) {
   const theme = useSelector(themeSelector)
+  const themeColors = useSelector(getThemeColors) 
   let richTextEditor: any
   try {
     const [editor] = useLexicalComposerContext()
@@ -160,6 +163,7 @@ function EmojisPopup({
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
+              iconColor={themeColors.accent}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
             >
               <EmojiIcon collectionName={emoji.key} />
@@ -220,6 +224,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
+              iconColor={themeColors.accent}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -297,7 +302,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.primary : colors.textColor3)};
+    color: ${(props) => (props.activeCollection ? props.iconColor : colors.textColor3)};
   }
 `
 const CollectionPointer = styled.span``
