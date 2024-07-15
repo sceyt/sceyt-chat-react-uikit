@@ -54,6 +54,7 @@ import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
+import { getThemeColors } from '../../../store/currentTheme/selector'
 
 let loading = false
 let loadFromServer = false
@@ -428,6 +429,7 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
+  const themeColors = useSelector(getThemeColors)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1035,14 +1037,14 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragOver}>
-            <IconWrapper draggable iconColor={colors.primary}>
+            <IconWrapper draggable iconColor={themeColors.accent}>
               <ChoseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
-              <IconWrapper draggable iconColor={colors.primary}>
+              <IconWrapper draggable iconColor={themeColors.accent}>
                 <ChoseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media
