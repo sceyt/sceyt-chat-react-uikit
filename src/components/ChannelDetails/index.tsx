@@ -32,6 +32,7 @@ import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
+import { getThemeColors } from '../../store/currentTheme/selector'
 
 const Details = ({
   detailsTitleText,
@@ -149,6 +150,7 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
+  const themeColors = useSelector(getThemeColors)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -248,7 +250,7 @@ const Details = ({
             <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
-            <CloseIcon color={colors.textColor1} onClick={handleDetailsClose} />
+            <CloseIcon color={themeColors.accent} onClick={handleDetailsClose} /> 
           </React.Fragment>
         )}
       </ChannelDetailsHeader>

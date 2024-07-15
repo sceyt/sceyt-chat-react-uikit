@@ -355,7 +355,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleForwardMessage}>
+          <Button type='button' backgroundColor={themeColors.accent} borderRadius='8px' onClick={handleForwardMessage}>
             {buttonText || 'Forward'}
           </Button>
         </PopupFooter>

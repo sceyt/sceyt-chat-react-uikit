@@ -1477,7 +1477,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                   </ChosenAttachments>
                 )}
-                <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
+                <SendMessageInputContainer iconColor={themeColors.accent} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
                   {showRecording ? (
                     <AudioCont />

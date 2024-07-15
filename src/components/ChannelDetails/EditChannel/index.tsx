@@ -33,6 +33,7 @@ import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
 import ImageCrop from '../../../common/imageCrop'
 import ConfirmPopup from '../../../common/popups/delete'
+import { getThemeColors } from '../../../store/currentTheme/selector'
 
 const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor?: string }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
@@ -100,6 +101,7 @@ const EditChannel = ({
   editChannelCancelButtonBackgroundColor,
   editChannelCancelButtonTextColor
 }: IProps) => {
+  const themeColors = useSelector(getThemeColors)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -314,7 +316,7 @@ const EditChannel = ({
             disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
             color={editChannelSaveButtonTextColor}
-            backgroundColor={editChannelSaveButtonBackgroundColor || colors.primary}
+            backgroundColor={editChannelSaveButtonBackgroundColor || themeColors.accent}
             onClick={handleSave}
           >
             Save

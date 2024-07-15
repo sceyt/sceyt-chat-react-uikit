@@ -36,6 +36,7 @@ import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap }
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
+import { getThemeColors } from '../../../store/currentTheme/selector'
 
 interface ISelectedUserData {
   id: string
@@ -69,6 +70,7 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
+  const themeColors = useSelector(getThemeColors)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -423,7 +425,7 @@ const UsersPopup = ({
                       index={user.id}
                       state={isSelected}
                       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-                      checkedBackgroundColor={colors.primary}
+                      checkedBackgroundColor={themeColors.accent}
                       onChange={(e) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
                       }
@@ -457,7 +459,7 @@ const UsersPopup = ({
             <Button
               type='button'
               color={colors.white}
-              backgroundColor={colors.primary}
+              backgroundColor={themeColors.accent}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
               onClick={() => handleCreateChannel()}
