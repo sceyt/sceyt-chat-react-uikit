@@ -39,8 +39,8 @@ interface IThemeColor {
 
 export interface ISceytChatUIKitTheme {
   colors: {
-    accent: IThemeColor
-    background: IThemeColor
+    accent?: IThemeColor
+    background?: IThemeColor
   }
 }
 

@@ -1374,7 +1374,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <CloseEditMode onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
-                    <EditReplyMessageHeader color={colors.primary}>
+                    <EditReplyMessageHeader color={themeColors.accent}>
                       {editMessageIcon || <EditIcon />}
                       Edit Message
                     </EditReplyMessageHeader>
@@ -1419,7 +1419,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           )
                         ))}
                       <div>
-                        <EditReplyMessageHeader color={colors.primary}>
+                        <EditReplyMessageHeader color={themeColors.accent}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
                             {user.id === messageForReply.user.id

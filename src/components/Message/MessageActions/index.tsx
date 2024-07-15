@@ -22,6 +22,7 @@ import { ItemNote } from '../../../UIHelper'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
+import { getThemeColors } from '../../../store/currentTheme/selector'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
@@ -89,6 +90,7 @@ export default function MessageActions({
   handleOpenEmojis
 }: any) {
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
+  const themeColors = useSelector(getThemeColors)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [checkActionPermission] = usePermissions(myRole)
@@ -139,7 +141,7 @@ export default function MessageActions({
               order={reactionIconOrder || 0}
               iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              hoverIconColor={themeColors.accent}
               onClick={handleOpenReaction}
             >
               <ItemNote direction='top'>{reactionIconTooltipText || 'React'}</ItemNote>
@@ -157,7 +159,7 @@ export default function MessageActions({
               order={editIconOrder || 1}
               iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              hoverIconColor={themeColors.accent}
               onClick={() => editModeToggle()}
             >
               <ItemNote direction='top'>{editIconTooltipText || 'Edit Message'}</ItemNote>
@@ -168,7 +170,7 @@ export default function MessageActions({
           <Action
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={themeColors.accent}
             onClick={() => handleResendMessage()}
           >
             <ItemNote direction='top'> Resend Message </ItemNote>
@@ -184,7 +186,7 @@ export default function MessageActions({
                   order={replyIconOrder || 2}
                   iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
                   hoverBackgroundColor={colors.hoverBackgroundColor}
-                  hoverIconColor={colors.primary}
+                  hoverIconColor={themeColors.accent}
                   onClick={() => handleReplyMessage()}
                 >
                   <ItemNote direction='top'>{replyIconTooltipText || 'Reply'}</ItemNote>
@@ -197,7 +199,7 @@ export default function MessageActions({
                 order={replyInThreadIconOrder || 3}
                 iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
                 hoverBackgroundColor={colors.hoverBackgroundColor}
-                hoverIconColor={colors.primary}
+                hoverIconColor={themeColors.accent}
                 onClick={() => handleReplyMessage(true)}
               >
                 <ItemNote direction='top'>{replyInThreadIconTooltipText || 'Reply in thread'}</ItemNote>
@@ -211,7 +213,7 @@ export default function MessageActions({
             order={copyIconOrder || 4}
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={themeColors.accent}
             onClick={() => handleCopyMessage()}
           >
             <ItemNote direction='top'>{copyIconTooltipText || 'Copy'}</ItemNote>
@@ -224,7 +226,7 @@ export default function MessageActions({
             order={forwardIconOrder || 5}
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={themeColors.accent}
             onClick={() => handleOpenForwardMessage()}
           >
             <ItemNote direction='top'>{forwardIconTooltipText || 'Forward Message'}</ItemNote>
@@ -236,7 +238,7 @@ export default function MessageActions({
             order={selectIconOrder || 6}
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={themeColors.accent}
             onClick={() => handleSelectMessage()}
           >
             <ItemNote direction='top'>{selectIconTooltipText || 'Select'}</ItemNote>
@@ -263,7 +265,7 @@ export default function MessageActions({
             order={reportIconOrder || 8}
             iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={themeColors.accent}
             onClick={() => handleReportMessage()}
           >
             <ItemNote direction='top'>{reportIconTooltipText || 'Report'}</ItemNote>

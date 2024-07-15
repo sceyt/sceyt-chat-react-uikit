@@ -12,6 +12,8 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
+import { useSelector } from 'react-redux'
+import { getThemeColors } from '../store/currentTheme/selector'
 
 const StatusText = styled.span<{ color?: string; fontSize?: string }>`
   color: ${(props) => props.color || colors.textColor2};
@@ -21,7 +23,7 @@ const StatusText = styled.span<{ color?: string; fontSize?: string }>`
 const ReadIconWrapper = styled(ReadIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color };
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
   width: ${(props) => props.width}!important;
@@ -54,8 +56,9 @@ const MessageStatusIcon = ({
 }) => {
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
+      const themeColors = useSelector(getThemeColors)
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor || colors.primary} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor: themeColors.accent } />
       ) : (
         <StatusText fontSize={size} color={iconColor}>
           • Seen
