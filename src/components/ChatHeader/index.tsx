@@ -7,7 +7,7 @@ import {
   channelInfoIsOpenSelector,
   channelListHiddenSelector
 } from '../../store/channel/selector'
-import { themeSelector } from '../../store/theme/selector'
+import { themeSelector, useColor } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Assets
@@ -27,8 +27,6 @@ import { colors } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
-import { getThemeColors } from '../../store/currentTheme/selector'
-
 interface IProps {
   backgroundColor?: string
   avatarBorderRadius?: string
@@ -74,6 +72,7 @@ export default function ChatHeader({
   infoIconOrder,
   customActionsOrder
 }: IProps) {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -89,7 +88,6 @@ export default function ChatHeader({
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
-  const themeColors = useSelector(getThemeColors)
   const displayMemberText =
     memberDisplayText && memberDisplayText[activeChannel.type]
       ? activeChannel.memberCount > 1
@@ -216,7 +214,7 @@ export default function ChatHeader({
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={themeColors.accent}
+          infoIconColor={accentColor}
           order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}

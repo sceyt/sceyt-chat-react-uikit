@@ -12,10 +12,9 @@ import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.s
 import { colors } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
-import { themeSelector } from '../../../store/theme/selector'
+import { themeSelector, useColor } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
-import { getThemeColors } from '../../../store/currentTheme/selector'
 
 interface EmojiCollectionProps {
   activeCollection: boolean,
@@ -70,8 +69,8 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
+  const accentColor = useColor('accent')
   const theme = useSelector(themeSelector)
-  const themeColors = useSelector(getThemeColors) 
   let richTextEditor: any
   try {
     const [editor] = useLexicalComposerContext()
@@ -163,7 +162,7 @@ function EmojisPopup({
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
-              iconColor={themeColors.accent}
+              iconColor={accentColor}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
             >
               <EmojiIcon collectionName={emoji.key} />
@@ -224,7 +223,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
-              iconColor={themeColors.accent}
+              iconColor={accentColor}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>

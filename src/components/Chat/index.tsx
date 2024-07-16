@@ -24,8 +24,7 @@ import { useDidUpdate } from '../../hooks'
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
 import { colors } from '../../UIHelper/constants'
-import { themeSelector } from '../../store/theme/selector'
-import { getThemeColors } from '../../store/currentTheme/selector'
+import { themeSelector, useColor } from '../../store/theme/selector'
 
 interface IProps {
   hideChannelList?: boolean
@@ -54,12 +53,12 @@ export default function Chat({
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
 }: IProps) {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const channels = useSelector(channelsSelector, shallowEqual)
   const theme = useSelector(themeSelector, shallowEqual)
-  const themeColors = useSelector(getThemeColors)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -129,7 +128,7 @@ export default function Chat({
           backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
         >
           {CustomNoChannelSelected || (
-            <SelectChatContent iconColor={themeColors.accent}>
+            <SelectChatContent iconColor={accentColor}>
               <MessageIcon />
               <SelectChatTitle>Select a chat</SelectChatTitle>
               <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>

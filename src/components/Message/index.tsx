@@ -54,8 +54,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
-import { getThemeColors } from '../../store/currentTheme/selector'
-import { useSelector } from 'react-redux'
+import { useColor } from '../../store/theme/selector'
 
 interface IMessageProps {
   message: IMessage
@@ -362,6 +361,7 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -388,7 +388,6 @@ const Message = ({
   const messageUserID = message.user ? message.user.id : 'deleted'
   const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
   const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null
-  const themeColors = useSelector(getThemeColors)
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
@@ -808,7 +807,7 @@ const Message = ({
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
         <SelectMessageWrapper
-          activeColor={themeColors.accent}
+          activeColor={accentColor}
           disabled={tooManySelected && !isSelectedMessage}
           onClick={handleSelectMessage}
         >

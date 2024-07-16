@@ -31,8 +31,8 @@ import { IChatClientProps, ISceytChatUIKitTheme, IThemeMode } from '../ChatConta
 import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
-import { setTheme } from '../../store/currentTheme/actions'
-import { getThemeColors } from '../../store/currentTheme/selector'
+import { setTheme } from '../../store/theme/actions'
+import { useColor } from '../../store/theme/selector'
 
 const SceytChat = ({
   client,
@@ -54,6 +54,7 @@ const SceytChat = ({
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false
 }: IChatClientProps) => {
+  const backgroundColor = useColor('background');
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
@@ -61,7 +62,6 @@ const SceytChat = ({
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual) 
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
-  const themeColors = useSelector(getThemeColors)
   
   let hidden: any = null
   let visibilityChange: any = null
@@ -301,7 +301,7 @@ const SceytChat = ({
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
-          backgroundColor={themeColors.background}
+          backgroundColor={backgroundColor}
           id='sceyt_chat_container'
         >
           {children}

@@ -24,7 +24,7 @@ import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
-import { themeSelector } from '../../../store/theme/selector'
+import { themeSelector, useColor } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 
 interface ICreateChannelPopup {
@@ -54,6 +54,7 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -322,7 +323,7 @@ export default function CreateChannel({
                         </AvatarWrapper>
                       ) : (
                         <UploadAvatarLabel
-                          iconColor={colors.primary}
+                          iconColor={accentColor}
                           backgroundColor={colors.primaryLight}
                           htmlFor='uploadImage'
                         >
@@ -411,7 +412,7 @@ export default function CreateChannel({
               </button> */}
                   <Button
                     type='button'
-                    backgroundColor={colors.primary}
+                    backgroundColor={accentColor}
                     borderRadius='8px'
                     onClick={() => GoToAddMember()}
                     disabled={nextButtonDisable}

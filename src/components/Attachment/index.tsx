@@ -5,7 +5,7 @@ import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
 import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { connectionStatusSelector } from '../../store/user/selector'
-import { themeSelector } from '../../store/theme/selector'
+import { themeSelector, useColor } from '../../store/theme/selector'
 import {
   pauseAttachmentUploadingAC,
   resumeAttachmentUploadingAC,
@@ -91,6 +91,7 @@ const Attachment = ({
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight
 }: AttachmentPops) => {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -728,7 +729,7 @@ const Attachment = ({
             <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
           ) : (
             // <FileThumbnail src={base64ToToDataURL(attachment.metadata.tmb)} />
-            <AttachmentIconCont backgroundColor={colors.primary} className='icon-warpper'>
+            <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === 'video' ? (
                 <VideoPreview
                   file={attachment}
@@ -760,7 +761,7 @@ const Attachment = ({
               // visible={downloadingFile}
               // absolutePosition={downloadingFile}
               widthThumb={!!attachmentThumb}
-              backgroundColor={attachmentThumb ? 'rgba(0,0,0,0.4)' : colors.primary}
+              backgroundColor={attachmentThumb ? 'rgba(0,0,0,0.4)' : accentColor}
               onClick={() => handleStopStartDownloadFile(attachment)}
               onMouseEnter={() => handleMouseEvent(true)}
               onMouseLeave={() => handleMouseEvent(false)}
@@ -780,7 +781,7 @@ const Attachment = ({
                     ? ''
                     : attachment.attachmentUrl || attachmentThumb
                       ? 'rgba(0,0,0,0.4)'
-                      : colors.primary
+                      : accentColor
                 }
               >
                 {(isInUploadingState || downloadingFile) && (

@@ -37,7 +37,7 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
-import { getThemeColors } from '../../../../store/currentTheme/selector'
+import { useColor } from '../../../../store/theme/selector'
 
 interface IProps {
   channel: IChannel
@@ -71,7 +71,7 @@ const Members = ({
   memberAvatarSize,
   memberPresenceFontSize
 }: IProps) => {
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -242,7 +242,7 @@ const Members = ({
               hoverBackground={
                 hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
               }
-              addMemberIconColor={themeColors.accent}
+              addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
             >
               {addMemberIcon || <AddMemberIcon />}
@@ -278,9 +278,9 @@ const Members = ({
                           )}
                     </MemberName>
                     {member.role === 'owner' ? (
-                      <RoleBadge color={themeColors.accent}>Owner</RoleBadge>
+                      <RoleBadge color={accentColor}>Owner</RoleBadge>
                     ) : member.role === 'admin' ? (
-                      <RoleBadge color={themeColors.accent}>Admin</RoleBadge>
+                      <RoleBadge color={accentColor}>Admin</RoleBadge>
                     ) : (
                       ''
                     )}

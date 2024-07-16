@@ -9,7 +9,7 @@ import { loadMoreMembersAC } from '../../store/member/actions'
 import { membersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
-import { themeSelector } from '../../store/theme/selector'
+import { themeSelector, useColor } from '../../store/theme/selector'
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
 // Assets
@@ -32,7 +32,6 @@ import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
-import { getThemeColors } from '../../store/currentTheme/selector'
 
 const Details = ({
   detailsTitleText,
@@ -150,7 +149,7 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -250,7 +249,7 @@ const Details = ({
             <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
-            <CloseIcon color={themeColors.accent} onClick={handleDetailsClose} /> 
+            <CloseIcon color={accentColor} onClick={handleDetailsClose} /> 
           </React.Fragment>
         )}
       </ChannelDetailsHeader>

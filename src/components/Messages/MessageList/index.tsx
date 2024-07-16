@@ -21,7 +21,7 @@ import {
   selectedMessagesMapSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
-import { themeSelector } from '../../../store/theme/selector'
+import { themeSelector, useColor } from '../../../store/theme/selector'
 import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
@@ -54,7 +54,6 @@ import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
-import { getThemeColors } from '../../../store/currentTheme/selector'
 
 let loading = false
 let loadFromServer = false
@@ -429,7 +428,7 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1037,14 +1036,14 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragOver}>
-            <IconWrapper draggable iconColor={themeColors.accent}>
+            <IconWrapper draggable iconColor={accentColor}>
               <ChoseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
-              <IconWrapper draggable iconColor={themeColors.accent}>
+              <IconWrapper draggable iconColor={accentColor}>
                 <ChoseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media

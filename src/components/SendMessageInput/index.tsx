@@ -56,7 +56,7 @@ import {
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { activeChannelMembersSelector } from '../../store/member/selector'
-import { themeSelector } from '../../store/theme/selector'
+import { themeSelector, useColor } from '../../store/theme/selector'
 
 // Helpers
 import {
@@ -126,7 +126,6 @@ import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
-import { getThemeColors } from '../../store/currentTheme/selector'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -301,6 +300,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderText,
   placeholderTextColor
 }) => {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -318,7 +318,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
   const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
-  const themeColors = useSelector(getThemeColors)
   const allowSetMention =
     allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
 
@@ -1374,7 +1373,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <CloseEditMode onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
-                    <EditReplyMessageHeader color={themeColors.accent}>
+                    <EditReplyMessageHeader color={accentColor}>
                       {editMessageIcon || <EditIcon />}
                       Edit Message
                     </EditReplyMessageHeader>
@@ -1419,7 +1418,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           )
                         ))}
                       <div>
-                        <EditReplyMessageHeader color={themeColors.accent}>
+                        <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
                             {user.id === messageForReply.user.id
@@ -1477,7 +1476,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                   </ChosenAttachments>
                 )}
-                <SendMessageInputContainer iconColor={themeColors.accent} minHeight={minHeight}>
+                <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
                   {showRecording ? (
                     <AudioCont />
@@ -1498,7 +1497,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           order={emojiIcoOrder}
                           isEmojisOpened={isEmojisOpened}
                           ref={emojiBtnRef}
-                          hoverColor={themeColors.accent}
+                          hoverColor={accentColor}
                           height={inputContainerHeight || minHeight}
                           onClick={() => {
                             setIsEmojisOpened(!isEmojisOpened)
@@ -1517,7 +1516,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           trigger={
                             <AddAttachmentIcon
                               ref={addAttachmentsBtnRef}
-                              color={themeColors.accent}
+                              color={accentColor}
                               height={inputContainerHeight || minHeight}
                             >
                               {AddAttachmentsIcon || <AttachmentIcon />}
@@ -1642,7 +1641,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       color={colors.backgroundColor}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
-                      iconColor={themeColors.accent}
+                      iconColor={accentColor}
                     >
                       {CustomSendMessageButton || <SendIcon />}
                     </SendMessageButton>
@@ -1652,7 +1651,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
                       color={colors.primary}
-                      iconColor={themeColors.accent}
+                      iconColor={accentColor}
                     >
                       <AudioRecord
                         sendRecordedFile={setRecordedFile}

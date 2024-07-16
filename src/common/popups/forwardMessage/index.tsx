@@ -29,7 +29,7 @@ import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
 import PopupContainer from '../popupContainer'
-import { getThemeColors } from '../../../store/currentTheme/selector'
+import { useColor } from '../../../store/theme/selector'
 interface ISelectedChannelsData {
   id: string
   displayName: string
@@ -58,7 +58,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -230,7 +230,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             state={isSelected}
                             onChange={(e) => handleChannelSelect(e, channel)}
                             size='18px'
-                            tickColor={themeColors.accent}
+                            tickColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -271,7 +271,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             state={isSelected}
                             onChange={(e) => handleChannelSelect(e, channel)}
                             size='18px'
-                            tickColor={themeColors.accent}
+                            tickColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -343,7 +343,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       state={isSelected}
                       onChange={(e) => handleChannelSelect(e, channel)}
                       size='18px'
-                      tickColor={themeColors.accent}
+                      tickColor={accentColor}
                     />
                   </ChannelItem>
                 )
@@ -355,7 +355,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={themeColors.accent} borderRadius='8px' onClick={handleForwardMessage}>
+          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleForwardMessage}>
             {buttonText || 'Forward'}
           </Button>
         </PopupFooter>

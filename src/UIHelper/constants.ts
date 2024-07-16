@@ -3,7 +3,7 @@ export const defaultTheme:ISceytChatUIKitTheme = {
   colors: {
     accent: {
       light: '#5159F6',
-      dark: '#FA4C56'
+      dark: '#6B72FF'
     },
     background: {
       light: '#FFFFFF',
@@ -56,8 +56,8 @@ export const colors = {
 
   defaultAvatarBackground: '#A0A1B0',
   deleteUserIconBackground: '#D0D8E3',
-  accent: defaultTheme.colors.accent.light,
-  background: defaultTheme.colors.background.light,
+  accent: defaultTheme.colors.accent?.light,
+  background: defaultTheme.colors.background?.light,
 }
 
 export const size = {

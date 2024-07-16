@@ -39,7 +39,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
-import { getThemeColors } from '../../store/currentTheme/selector'
+import { useColor } from '../../store/theme/selector'
 
 interface IChannelProps {
   channel: IChannel
@@ -92,7 +92,7 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
@@ -435,7 +435,7 @@ const Channel: React.FC<IChannelProps> = ({
               MessageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
-                readIconColor: themeColors.accent,
+                readIconColor: accentColor,
                 size: '16px'
               })}
           </DeliveryIconCont>
@@ -457,7 +457,7 @@ const Channel: React.FC<IChannelProps> = ({
           </UnreadMentionIconWrapper>
         )}
         {!!(channel.newMessageCount || channel.unread) && (
-          <UnreadCount backgroundColor={themeColors.accent} isMuted={channel.muted}>
+          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted}>
             {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
           </UnreadCount>
         )}

@@ -13,8 +13,7 @@ import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
 import DropDown from '../../../common/dropdown'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
-import { useSelector } from 'react-redux'
-import { getThemeColors } from '../../../store/currentTheme/selector'
+import { useColor } from '../../../store/theme/selector'
 
 interface IChannelListProps {
   showSearch?: boolean
@@ -41,7 +40,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
-  const themeColors = useSelector(getThemeColors)
+  const accentColor = useColor('accent')
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
@@ -60,7 +59,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={themeColors.accent}>
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />} 
           </CreateDropdownButton>
         }
