@@ -11,9 +11,7 @@ export const defaultTheme:ISceytChatUIKitTheme = {
     }
   }
 }
-export const defaultThemeMode:IThemeMode = {
-  name: 'light'
-}
+export const defaultThemeMode:IThemeMode = 'light'
 export const colors = {
   white: '#ffffff',
   black: '#000000',

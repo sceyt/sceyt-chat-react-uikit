@@ -28,10 +28,10 @@ import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '..
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps, ISceytChatUIKitTheme, IThemeMode } from '../ChatContainer'
-import { colors, defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
+import { colors, defaultTheme } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
-import { setTheme } from '../../store/theme/actions'
+import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { useColor } from '../../store/theme/selector'
 
 const SceytChat = ({
@@ -175,12 +175,12 @@ const SceytChat = ({
     }
     const updatedTheme = { ...defaultTheme};
     updatedTheme.colors = updatedColors
-    setTheme(updatedTheme)
+    dispatch(setTheme(updatedTheme))
   }
 
   const handleChangedThemeMode = (themeMode: IThemeMode) => {
-    if (themeMode.name) {
-      defaultThemeMode.name = themeMode.name;
+    if (themeMode) {
+      dispatch(setThemeAC(themeMode)) 
     }
   }
 

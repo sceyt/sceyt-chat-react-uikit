@@ -1,7 +1,7 @@
 import { SET_THEME, SET_THEME_NEW } from './constants'
 import { IAction } from '../../types'
 import { ISceytChatUIKitTheme } from '../../components/ChatContainer'
-import { defaultTheme } from '../../UIHelper/constants'
+import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 
 export interface IThemeStore {
   theme?: string,
@@ -9,7 +9,7 @@ export interface IThemeStore {
 }
 
 const initialState: IThemeStore = {
-  theme: 'light',
+  theme: defaultThemeMode,
   newTheme: defaultTheme
 }
 
@@ -18,7 +18,7 @@ export default (state = initialState, { type, payload }: IAction) => {
   
   switch (type) {
     case SET_THEME: {
-      const { theme } = payload
+      const { theme } = payload 
       newState.theme = theme
       return newState
     }

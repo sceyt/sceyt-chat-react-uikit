@@ -44,9 +44,7 @@ export interface ISceytChatUIKitTheme {
   }
 }
 
-export interface IThemeMode {
-  name: 'light' | 'dark' | string
-}
+export type IThemeMode = "light" | "dark" | string;
 
 export interface IChatClientProps {
   client: any
