@@ -53,9 +53,9 @@ const MessageStatusIcon = ({
   iconColor?: string
   readIconColor?: string
 }) => {
+  const accentColor = useColor('accent')
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
-      const accentColor = useColor('accent')
       return messageStatusDisplayingType === 'ticks' ? (
         <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor : accentColor} />
       ) : (
