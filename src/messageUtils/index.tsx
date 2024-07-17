@@ -12,7 +12,7 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
-import { useColor } from '../store/theme/selector'
+import { useColor } from '../hooks'
 
 const StatusText = styled.span<{ color?: string; fontSize?: string }>`
   color: ${(props) => props.color || colors.textColor2};
