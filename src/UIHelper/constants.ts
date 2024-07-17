@@ -8,6 +8,10 @@ export const defaultTheme:ISceytChatUIKitTheme = {
     background: {
       light: '#FFFFFF',
       dark: '#19191B'
+    },
+    outgoing: {
+      light: '#E3E7FF',
+      dark: '#212239'
     }
   }
 }
@@ -53,9 +57,7 @@ export const colors = {
   purple: '#7A6EF6',
 
   defaultAvatarBackground: '#A0A1B0',
-  deleteUserIconBackground: '#D0D8E3',
-  accent: defaultTheme.colors.accent?.light,
-  background: defaultTheme.colors.background?.light,
+  deleteUserIconBackground: '#D0D8E3'
 }
 
 export const size = {

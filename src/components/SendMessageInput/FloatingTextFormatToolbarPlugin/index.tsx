@@ -23,7 +23,7 @@ import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import { colors } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
-import { useEventListener } from '../../../hooks'
+import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
 type Func = () => void
 export function mergeRegister(...func: Array<Func>): () => void {
@@ -117,6 +117,7 @@ function TextFormatFloatingToolbar({
   setShowMenu: (showMenu: boolean) => void
   showMenu: boolean
 }): JSX.Element {
+  const accentColor = useColor('accent')
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -233,7 +234,7 @@ function TextFormatFloatingToolbar({
             aria-label='Format text as bold'
             iconColor={colors.textColor2}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             isActive={isBold}
           >
             <ItemNote direction='top'>Bold</ItemNote>
@@ -243,7 +244,7 @@ function TextFormatFloatingToolbar({
           <Action
             iconColor={colors.textColor2}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
             onClick={() => {
@@ -257,7 +258,7 @@ function TextFormatFloatingToolbar({
           <Action
             iconColor={colors.textColor2}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
             onClick={() => {
@@ -272,7 +273,7 @@ function TextFormatFloatingToolbar({
             type='button'
             iconColor={colors.textColor2}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')
@@ -286,7 +287,7 @@ function TextFormatFloatingToolbar({
             type='button'
             iconColor={colors.textColor2}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')

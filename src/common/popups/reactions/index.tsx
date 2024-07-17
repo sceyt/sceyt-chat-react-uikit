@@ -11,7 +11,7 @@ import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { useEventListener } from '../../../hooks'
+import { useColor, useEventListener } from '../../../hooks'
 import { SubTitle } from '../../../UIHelper'
 import { getReactionsAC, loadMoreReactionsAC, setReactionsListAC } from '../../../store/message/actions'
 import {
@@ -49,6 +49,7 @@ export default function ReactionsPopup({
   reactionsDetailsPopupHeaderItemsStyle,
   rtlDirection
 }: IReactionsPopupProps) {
+  const accentColor = useColor('accent')
   const popupRef = useRef<HTMLDivElement>(null)
   const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
@@ -164,7 +165,7 @@ export default function ReactionsPopup({
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
             active={activeTabKey === 'all'}
-            activeColor={colors.primary}
+            activeColor={accentColor}
             onClick={() => handleGetReactions()}
           >
             <span>{`All ${totalReactions}`}</span>
@@ -175,7 +176,7 @@ export default function ReactionsPopup({
               key={reaction.key}
               onClick={() => handleGetReactions(reaction.key)}
               active={activeTabKey === reaction.key}
-              activeColor={colors.primary}
+              activeColor={accentColor}
             >
               <span>
                 <TabKey>{reaction.key}</TabKey>
@@ -343,7 +344,7 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
     font-weight: 600;
     font-size: 14px;
     line-height: ${(props) => (props.bubbleStyle ? '18px' : '30px')};
-    background-color: ${(props) => props.active && props.bubbleStyle && colors.primary};
+    background-color: ${(props) => props.active && props.bubbleStyle && props.activeColor};
     color: ${(props) => props.active && props.bubbleStyle && colors.white};
     ${(props) =>
       props.active &&

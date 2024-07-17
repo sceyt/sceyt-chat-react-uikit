@@ -12,6 +12,7 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
+import { useColor } from '../hooks'
 
 const StatusText = styled.span<{ color?: string; fontSize?: string }>`
   color: ${(props) => props.color || colors.textColor2};
@@ -126,6 +127,7 @@ const MessageTextFormat = ({
   isLastMessage?: boolean
   asSampleText?: boolean
 }) => {
+  const accentColor = useColor('accent')
   let messageText: any = []
   const linkify = new LinkifyIt()
   const messageBodyAttributes = JSON.parse(JSON.stringify(message.bodyAttributes))
@@ -213,7 +215,7 @@ const MessageTextFormat = ({
                 <StyledText
                   className={attribute.type}
                   isLastMessage={isLastMessage}
-                  color={colors.primary}
+                  color={accentColor}
                   key={attributeOffset}
                 >
                   {mentionDisplayName}

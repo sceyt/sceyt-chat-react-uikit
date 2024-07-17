@@ -16,6 +16,7 @@ import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { colors } from '../../../../UIHelper/constants'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   channelId: string
@@ -46,6 +47,7 @@ const Files = ({
   fileSizeFontSize,
   fileSizeLineHeight
 }: IProps) => {
+  const accentColor = useColor('accent')
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
@@ -98,8 +100,8 @@ const Files = ({
                 <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
               ) : (
                 <React.Fragment>
-                  <FileIconCont>{filePreviewIcon || <FileIcon />}</FileIconCont>
-                  <FileHoverIconCont>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
+                  <FileIconCont iconColor={accentColor}>{filePreviewIcon || <FileIcon />}</FileIconCont>
+                  <FileHoverIconCont iconColor={accentColor}>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
                 </React.Fragment>
               )}
               <div>
@@ -118,7 +120,7 @@ const Files = ({
                   {file.size ? bytesToSize(file.size) : ''}
                 </FileSizeAndDate>
               </div>
-              <DownloadWrapper visible={downloadingFilesMap[file.id!]} onClick={() => handleDownloadFile(file)}>
+              <DownloadWrapper visible={downloadingFilesMap[file.id!]} iconColor={accentColor} onClick={() => handleDownloadFile(file)}>
                 {downloadingFilesMap[file.id!] ? (
                   // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
                   <ProgressWrapper>
@@ -171,7 +173,7 @@ const Container = styled.ul`
 `
 // eslint-disable-next-line max-len
 // ${(props) => (props.optionsMenuIsOpen ? 'height: calc(100vh - 495px)' : (props.noActions ? 'height: calc(100vh - 544px)' : 'height: calc(100vh - 445px)'))}
-const DownloadWrapper = styled.a<{ visible?: boolean }>`
+const DownloadWrapper = styled.a<{ visible?: boolean, iconColor?:string }>`
   text-decoration: none;
   visibility: ${(props) => (props.visible ? 'visible' : 'hidden')};
   padding: 5px 6px;
@@ -179,6 +181,9 @@ const DownloadWrapper = styled.a<{ visible?: boolean }>`
   top: 25%;
   right: 16px;
   cursor: pointer;
+  & > svg {
+    color:${(props) => props.iconColor};
+  }
 `
 const ProgressWrapper = styled.span`
   display: inline-block;
@@ -205,17 +210,19 @@ const ProgressWrapper = styled.span`
   }
 ` */
 
-const FileIconCont = styled.span`
+const FileIconCont = styled.span<{iconColor:string}>`
   display: inline-flex;
 
   & > svg {
     width: 40px;
     height: 40px;
+    color:${(props) => props.iconColor};
   }
 `
-const FileHoverIconCont = styled.span`
+const FileHoverIconCont = styled.span<{iconColor:string}>`
   display: none;
   & > svg {
+    color:${(props) => props.iconColor};
     width: 40px;
     height: 40px;
   }
