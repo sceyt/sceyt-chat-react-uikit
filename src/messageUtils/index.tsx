@@ -12,7 +12,6 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
-import { useColor } from '../hooks'
 
 const StatusText = styled.span<{ color?: string; fontSize?: string }>`
   color: ${(props) => props.color || colors.textColor2};
@@ -45,15 +44,16 @@ const MessageStatusIcon = ({
   messageStatusDisplayingType,
   iconColor,
   readIconColor,
-  size
+  size,
+  accentColor
 }: {
   messageStatus: string
   messageStatusDisplayingType: string
   size?: string
   iconColor?: string
   readIconColor?: string
-}) => {
-  const accentColor = useColor('accent')
+  accentColor?: string
+}) => { 
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (

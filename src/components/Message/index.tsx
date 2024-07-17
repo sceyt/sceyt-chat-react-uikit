@@ -1234,7 +1234,8 @@ const Message = ({
                         messageStatusDisplayingType,
                         size: messageStatusSize,
                         iconColor: messageStatusColor,
-                        readIconColor: messageReadStatusColor
+                        readIconColor: messageReadStatusColor,
+                        accentColor:accentColor
                       })}
                     </MessageStatus>
                   )}
@@ -1281,7 +1282,8 @@ const Message = ({
                         message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                           ? colors.white
                           : '',
-                      readIconColor: messageReadStatusColor
+                      readIconColor: messageReadStatusColor,
+                      accentColor:accentColor
                     })}
                 </MessageStatusAndTime>
               )}
@@ -1395,7 +1397,8 @@ const Message = ({
                   messageStatusDisplayingType,
                   size: messageStatusSize,
                   iconColor: messageStatusColor,
-                  readIconColor: messageReadStatusColor
+                  readIconColor: messageReadStatusColor,
+                  accentColor:accentColor
                 })}
               </MessageStatus>
             )}
