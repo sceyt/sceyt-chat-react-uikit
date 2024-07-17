@@ -13,7 +13,7 @@ import {
   InputErrorMessage
 } from '../../../UIHelper'
 import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIcon.svg'
-import { useStateComplex } from '../../../hooks'
+import { useStateComplex, useColor } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
 import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
@@ -24,7 +24,7 @@ import { colors } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
-import { themeSelector, useColor } from '../../../store/theme/selector'
+import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 
 interface ICreateChannelPopup {

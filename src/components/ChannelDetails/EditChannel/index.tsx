@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { updateChannelAC } from '../../../store/channel/actions'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 // Hooks
-import { useDidUpdate, useStateComplex } from '../../../hooks'
+import { useDidUpdate, useStateComplex, useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as CameraIcon } from '../../../assets/svg/cameraIcon.svg'
 import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
@@ -33,7 +33,6 @@ import DropDown from '../../../common/dropdown'
 import Avatar from '../../Avatar'
 import ImageCrop from '../../../common/imageCrop'
 import ConfirmPopup from '../../../common/popups/delete'
-import { useColor } from '../../../store/theme/selector'
 
 const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor?: string }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};

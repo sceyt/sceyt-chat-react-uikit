@@ -14,7 +14,7 @@ import Media from './Media'
 import Files from './Files'
 import Links from './Links'
 import Voices from './Voices'
-import { useColor } from '../../../store/theme/selector'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   channel: IChannel

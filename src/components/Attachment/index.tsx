@@ -5,7 +5,7 @@ import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
 import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { connectionStatusSelector } from '../../store/user/selector'
-import { themeSelector, useColor } from '../../store/theme/selector'
+import { themeSelector } from '../../store/theme/selector'
 import {
   pauseAttachmentUploadingAC,
   resumeAttachmentUploadingAC,
@@ -13,7 +13,7 @@ import {
   updateMessageAC
 } from '../../store/message/actions'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { ReactComponent as FileIcon } from '../../assets/svg/fileIcon.svg'

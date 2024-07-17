@@ -13,7 +13,7 @@ import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
 import DropDown from '../../../common/dropdown'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
-import { useColor } from '../../../store/theme/selector'
+import { useColor } from '../../../hooks'
 
 interface IChannelListProps {
   showSearch?: boolean

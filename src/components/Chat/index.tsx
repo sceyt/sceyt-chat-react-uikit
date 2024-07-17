@@ -19,12 +19,12 @@ import {
 // Assets
 import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
 import { colors } from '../../UIHelper/constants'
-import { themeSelector, useColor } from '../../store/theme/selector'
+import { themeSelector } from '../../store/theme/selector'
 
 interface IProps {
   hideChannelList?: boolean

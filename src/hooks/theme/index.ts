@@ -2,7 +2,7 @@ import { useSelector } from 'react-redux';
 import { useMemo } from 'react';
 import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants';
 
-const useThemeColor = (colorKey: string): string => {
+const useColor = (colorKey: string): string => {
   const themeReducer = useSelector((state: any) => state.ThemeReducer);
   const currentThemeMode = themeReducer.theme ? themeReducer.theme : defaultThemeMode;
   const theme = themeReducer.newTheme ? themeReducer.newTheme : defaultTheme;
@@ -16,4 +16,4 @@ const useThemeColor = (colorKey: string): string => {
   return themeColors;
 };
 
-export default useThemeColor;
+export default useColor;

@@ -9,7 +9,7 @@ import { loadMoreMembersAC } from '../../store/member/actions'
 import { membersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
-import { themeSelector, useColor } from '../../store/theme/selector'
+import { themeSelector } from '../../store/theme/selector'
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
 // Assets
@@ -32,6 +32,7 @@ import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
+import { useColor } from '../../hooks'
 
 const Details = ({
   detailsTitleText,

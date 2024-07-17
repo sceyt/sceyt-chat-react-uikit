@@ -2,7 +2,7 @@ import React from 'react'
 import { useSelector } from 'react-redux'
 import styled from 'styled-components'
 // Store
-import { themeSelector, useColor } from '../../../store/theme/selector'
+import { themeSelector } from '../../../store/theme/selector'
 // Hooks
 import usePermissions from '../../../hooks/usePermissions'
 // Assets
@@ -22,6 +22,7 @@ import { ItemNote } from '../../../UIHelper'
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
+import { useColor } from '../../../hooks'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean

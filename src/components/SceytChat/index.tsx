@@ -8,7 +8,7 @@ import { contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { getRolesFailSelector } from '../../store/member/selector'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
 import {
   destroyChannelsMap,
@@ -32,7 +32,6 @@ import { colors, defaultTheme } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
-import { useColor } from '../../store/theme/selector'
 
 const SceytChat = ({
   client,

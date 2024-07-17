@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/playRecord.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pauseRecord.svg'
@@ -12,7 +12,6 @@ import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
 import { colors} from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
-import { useColor } from '../../store/theme/selector'
 
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars

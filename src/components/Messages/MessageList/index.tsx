@@ -21,12 +21,12 @@ import {
   selectedMessagesMapSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
-import { themeSelector, useColor } from '../../../store/theme/selector'
+import { themeSelector } from '../../../store/theme/selector'
 import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useDidUpdate } from '../../../hooks'
+import { useDidUpdate, useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'

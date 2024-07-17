@@ -21,7 +21,7 @@ import {
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
-import { useDidUpdate, useOnScreen } from '../../hooks'
+import { useDidUpdate, useOnScreen, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
@@ -54,7 +54,6 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
-import { useColor } from '../../store/theme/selector'
 
 interface IMessageProps {
   message: IMessage

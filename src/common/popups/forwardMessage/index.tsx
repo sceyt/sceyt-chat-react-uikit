@@ -29,7 +29,7 @@ import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
 import PopupContainer from '../popupContainer'
-import { useColor } from '../../../store/theme/selector'
+import { useColor } from '../../../hooks'
 interface ISelectedChannelsData {
   id: string
   displayName: string

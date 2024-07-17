@@ -39,7 +39,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
-import { useColor } from '../../store/theme/selector'
+import { useColor } from '../../hooks'
 
 interface IChannelProps {
   channel: IChannel
@@ -450,7 +450,7 @@ const Channel: React.FC<IChannelProps> = ({
       <UnreadInfo bottom={!(lastMessage || !!typingIndicator || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
           <UnreadMentionIconWrapper
-            iconColor={colors.primary}
+            iconColor={accentColor}
             rightMargin={!!(channel.newMessageCount || channel.unread)}
           >
             <MentionIcon />

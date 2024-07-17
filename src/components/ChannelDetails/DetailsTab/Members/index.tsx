@@ -37,7 +37,7 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
-import { useColor } from '../../../../store/theme/selector'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   channel: IChannel

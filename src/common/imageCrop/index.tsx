@@ -1,12 +1,11 @@
 import React, { useState, useCallback } from 'react'
 import styled from 'styled-components'
 import Cropper from 'react-easy-crop'
-import { useStateComplex } from '../../hooks'
+import { useStateComplex, useColor } from '../../hooks'
 import getCroppedImg from './crop-image'
 import { colors } from '../../UIHelper/constants'
 import { Popup, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
 import PopupContainer from '../popups/popupContainer'
-import { useColor } from '../../store/theme/selector'
 
 interface IProps {
   image: any

@@ -56,7 +56,7 @@ import {
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { activeChannelMembersSelector } from '../../store/member/selector'
-import { themeSelector, useColor } from '../../store/theme/selector'
+import { themeSelector } from '../../store/theme/selector'
 
 // Helpers
 import {
@@ -99,7 +99,7 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 
 // Icons
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'

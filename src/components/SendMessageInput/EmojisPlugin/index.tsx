@@ -12,9 +12,10 @@ import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.s
 import { colors } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
-import { themeSelector, useColor } from '../../../store/theme/selector'
+import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
+import { useColor } from '../../../hooks'
 
 interface EmojiCollectionProps {
   activeCollection: boolean,

@@ -7,7 +7,7 @@ import {
   channelInfoIsOpenSelector,
   channelListHiddenSelector
 } from '../../store/channel/selector'
-import { themeSelector, useColor } from '../../store/theme/selector'
+import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Assets
@@ -27,6 +27,7 @@ import { colors } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
+import { useColor } from '../../hooks'
 interface IProps {
   backgroundColor?: string
   avatarBorderRadius?: string
