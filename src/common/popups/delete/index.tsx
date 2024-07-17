@@ -5,6 +5,7 @@ import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
 import usePermissions from '../../../hooks/usePermissions'
 import PopupContainer from '../popupContainer'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   title: string
@@ -39,6 +40,7 @@ function ConfirmPopup({
   myRole = '',
   loading
 }: IProps) {
+  const accentColor = useColor('accent')
   const [checkActionPermission] = usePermissions(myRole)
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
@@ -85,6 +87,7 @@ function ConfirmPopup({
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
                     onChange={(e) => handleChoseDeleteOption(e, 'forEveryone')}
+                    checkedBorder={accentColor}
                   />
                   Delete for everyone
                 </DeleteOptionItem>
@@ -95,6 +98,7 @@ function ConfirmPopup({
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
                   onChange={(e) => handleChoseDeleteOption(e, 'forMe')}
+                  checkedBorder={accentColor}
                 />
                 Delete for me
               </DeleteOptionItem>

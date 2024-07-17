@@ -1051,7 +1051,7 @@ const Message = ({
                 withSenderName={showMessageSenderName}
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
-                leftBorderColor={colors.primary}
+                leftBorderColor={accentColor}
                 backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
                 onClick={() =>
                   handleScrollToRepliedMessage &&
@@ -1093,7 +1093,7 @@ const Message = ({
                 <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
                   <MessageOwner
                     className='reply-message-owner'
-                    color={colors.primary}
+                    color={accentColor}
                     fontSize='12px'
                     rtlDirection={ownMessageOnRightSide && !message.incoming}
                     // clickable={parentMessageOwnerIsNotCurrentUser}
@@ -1155,7 +1155,7 @@ const Message = ({
                   leftPadding={
                     message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
                   }
-                  color={colors.primary}
+                  color={accentColor}
                 >
                   <ForwardIcon />
                   Forwarded message

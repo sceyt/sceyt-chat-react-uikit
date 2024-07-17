@@ -411,7 +411,7 @@ const Members = ({
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
-          buttonBackground={colors.primary}
+          buttonBackground={accentColor}
           title='Promote admin'
           description={
             <span>
