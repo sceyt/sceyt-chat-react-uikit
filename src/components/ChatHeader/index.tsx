@@ -54,7 +54,7 @@ interface IProps {
 export default function ChatHeader({
   infoIcon,
   backgroundColor,
-  titleColor,
+  titleColor=useColor("primary"),
   avatarBorderRadius,
   memberInfoTextColor,
   memberInfoFontSize,

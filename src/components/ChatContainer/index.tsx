@@ -41,7 +41,7 @@ export interface SceytChatUIKitTheme {
   colors: {
     accent?: IThemeColor
     background?: IThemeColor
-    outgoing?: IThemeColor
+    primary?:IThemeColor 
   }
 }
 

@@ -55,6 +55,7 @@ export default function Chat({
 }: IProps) {
   const accentColor = useColor('accent')
   const backgroundColor = useColor('background')
+  const primaryColor = useColor('primary')
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -131,7 +132,7 @@ export default function Chat({
           {CustomNoChannelSelected || (
             <SelectChatContent iconColor={accentColor}>
               <MessageIcon />
-              <SelectChatTitle>Select a chat</SelectChatTitle>
+              <SelectChatTitle color={primaryColor}> Select a chat</SelectChatTitle>
               <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
             </SelectChatContent>
           )}
@@ -178,12 +179,12 @@ const SelectChatContent = styled.div<{ iconColor?: string }>`
   }
 `
 
-const SelectChatTitle = styled.h3`
+const SelectChatTitle = styled.h3<{color?:string}>`
   font-size: 20px;
   font-style: normal;
   font-weight: 500;
   line-height: 24px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   margin: 24px 0 8px;
 `
 const SelectChatDescription = styled.p`

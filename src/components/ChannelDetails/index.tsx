@@ -151,6 +151,7 @@ const Details = ({
   bordersColor
 }: IDetailsProps) => {
   const accentColor = useColor('accent')
+  const primaryColor = useColor('primary')
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -241,13 +242,13 @@ const Details = ({
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={primaryColor}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} color={primaryColor}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
             <CloseIcon color={accentColor} onClick={handleDetailsClose} /> 
@@ -297,6 +298,7 @@ const Details = ({
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
+                color={primaryColor}
               >
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
@@ -557,6 +559,7 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   white-space: nowrap;
   max-width: ${(props) => (props.isDirect ? '200px' : '168px')};
   text-overflow: ellipsis;
+  text-color:${(props) => (props.color)};
   overflow: hidden;
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `

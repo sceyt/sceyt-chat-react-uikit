@@ -47,6 +47,7 @@ import { getClient } from '../../../common/client'
 // import ReportPopup from '../../../../common/Popups/report';
 import ConfirmPopup from '../../../common/popups/delete'
 import DropDown from '../../../common/dropdown'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -137,7 +138,7 @@ const Actions = ({
   unmuteNotificationIcon,
   muteNotificationIconColor,
   unmuteNotificationIconColor,
-  muteUnmuteNotificationTextColor,
+  muteUnmuteNotificationTextColor=useColor('primary'),
   timeOptionsToMuteNotifications,
   showStarredMessages = false,
   starredMessagesOrder,
@@ -149,14 +150,14 @@ const Actions = ({
   pinChannelIcon,
   unpinChannelIcon,
   pinChannelIconColor,
-  pinChannelTextColor,
+  pinChannelTextColor=useColor("primary"),
   showMarkAsReadUnread = true,
   markAsReadUnreadOrder,
   markAsReadIcon,
   markAsUnreadIcon,
   markAsReadIconColor,
   markAsUnreadIconColor,
-  markAsReadUnreadTextColor,
+  markAsReadUnreadTextColor=useColor("primary"),
   showLeaveChannel = true,
   leaveChannelOrder,
   leaveChannelIcon,

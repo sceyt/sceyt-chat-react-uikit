@@ -9,6 +9,10 @@ export const defaultTheme:SceytChatUIKitTheme = {
       light: '#FFFFFF',
       dark: '#19191B'
     },
+    primary: {
+      light: '#111539',
+      dark: '#E1E3E6'
+    },
     outgoing: {
       light: '#E3E7FF',
       dark: '#212239'
