@@ -666,7 +666,7 @@ const Message = ({
       {showMessageSenderName && (
         <MessageOwner
           className='message-owner'
-          color={colors.primary}
+          color={accentColor}
           rtlDirection={ownMessageOnRightSide && !message.incoming}
           clickable={messageOwnerIsNotCurrentUser}
           onClick={() => handleCreateChat(messageOwnerIsNotCurrentUser && message.user)}

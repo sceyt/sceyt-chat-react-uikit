@@ -27,12 +27,12 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps, ISceytChatUIKitTheme, IThemeMode } from '../ChatContainer'
+import { IChatClientProps} from '../ChatContainer'
 import { colors, defaultTheme } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
-
+import { SceytChatUIKitTheme,ThemeMode } from '../../components'
 const SceytChat = ({
   client,
   theme, 
@@ -162,7 +162,7 @@ const SceytChat = ({
     }
   }, [customColors])
 
-  const handleChangedTheme = (theme: ISceytChatUIKitTheme) => {
+  const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
       if (theme.colors.hasOwnProperty(key)) {
@@ -177,7 +177,7 @@ const SceytChat = ({
     dispatch(setTheme(updatedTheme))
   }
 
-  const handleChangedThemeMode = (themeMode: IThemeMode) => {
+  const handleChangedThemeMode = (themeMode: ThemeMode) => {
     if (themeMode) {
       dispatch(setThemeAC(themeMode)) 
     }

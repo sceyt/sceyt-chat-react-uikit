@@ -1,11 +1,11 @@
 import { SET_THEME, SET_THEME_NEW } from './constants'
 import { IAction } from '../../types'
-import { ISceytChatUIKitTheme } from '../../components/ChatContainer'
+import { SceytChatUIKitTheme } from '../../components'
 import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 
 export interface IThemeStore {
   theme?: string,
-  newTheme?: ISceytChatUIKitTheme
+  newTheme?: SceytChatUIKitTheme
 }
 
 const initialState: IThemeStore = {

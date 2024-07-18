@@ -1,4 +1,4 @@
-import { ISceytChatUIKitTheme } from '../../components/ChatContainer'
+import { SceytChatUIKitTheme } from '../../components'
 import { SET_THEME, SET_THEME_NEW } from './constants'
 
 export function setThemeAC(theme: string) {
@@ -7,7 +7,7 @@ export function setThemeAC(theme: string) {
     payload: { theme }
   }
 }
-export function setTheme(theme: ISceytChatUIKitTheme) {
+export function setTheme(theme: SceytChatUIKitTheme) {
   return {
     type: SET_THEME_NEW,
     payload: { theme }

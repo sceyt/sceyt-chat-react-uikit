@@ -1324,7 +1324,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
               </React.Fragment>
             ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-              <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+              <JoinChannelCont onClick={handleJoinToChannel} color={accentColor }>
                 Join
               </JoinChannelCont>
             ) : (
@@ -1332,7 +1332,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
                   : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
               ) ? (
-              <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
+              <ReadOnlyCont color={colors.textColor1} iconColor={accentColor}>
                 <EyeIcon /> Read only
               </ReadOnlyCont>
             ) : (

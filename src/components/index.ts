@@ -1,4 +1,4 @@
-import SceytChat from './ChatContainer'
+import SceytChat,{SceytChatUIKitTheme,ThemeMode} from './ChatContainer'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -31,7 +31,9 @@ export {
   DropDown,
   Attachment,
   EmojisPopup,
-  FrequentlyEmojis
+  FrequentlyEmojis,
+  SceytChatUIKitTheme,
+  ThemeMode
 }
 
 declare global {

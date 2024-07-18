@@ -1,5 +1,5 @@
-import { ISceytChatUIKitTheme, IThemeMode } from "../components/ChatContainer"
-export const defaultTheme:ISceytChatUIKitTheme = {
+import { SceytChatUIKitTheme, ThemeMode } from "../components"
+export const defaultTheme:SceytChatUIKitTheme = {
   colors: {
     accent: {
       light: '#5159F6',
@@ -15,7 +15,7 @@ export const defaultTheme:ISceytChatUIKitTheme = {
     }
   }
 }
-export const defaultThemeMode:IThemeMode = 'light'
+export const defaultThemeMode:ThemeMode = 'light'
 export const colors = {
   white: '#ffffff',
   black: '#000000',

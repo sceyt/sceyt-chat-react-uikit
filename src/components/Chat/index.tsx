@@ -54,6 +54,7 @@ export default function Chat({
   CustomNoChannelSelected
 }: IProps) {
   const accentColor = useColor('accent')
+  const backgroundColor = useColor('background')
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -125,7 +126,7 @@ export default function Chat({
       )}
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
         <SelectChatContainer
-          backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
+          backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || backgroundColor}
         >
           {CustomNoChannelSelected || (
             <SelectChatContent iconColor={accentColor}>

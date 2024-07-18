@@ -37,7 +37,7 @@ interface IThemeColor {
   [key: string]: string | undefined
 }
 
-export interface ISceytChatUIKitTheme {
+export interface SceytChatUIKitTheme {
   colors: {
     accent?: IThemeColor
     background?: IThemeColor
@@ -45,12 +45,12 @@ export interface ISceytChatUIKitTheme {
   }
 }
 
-export type IThemeMode = "light" | "dark" | string;
+export type ThemeMode = "light" | "dark" | string;
 
 export interface IChatClientProps {
   client: any
-  theme?: ISceytChatUIKitTheme
-  themeMode?: IThemeMode
+  theme?: SceytChatUIKitTheme
+  themeMode?: ThemeMode
   autoSelectFirstChannel?: boolean
   avatarColors?: ICustomAvatarColors
   // eslint-disable-next-line no-unused-vars
