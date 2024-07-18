@@ -1383,7 +1383,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         message: messageToEdit,
                         contactsMap,
                         getFromContacts,
-                        asSampleText: true
+                        asSampleText: true,
+                        accentColor:accentColor
                       })}
                     </EditMessageText>
                   </EditReplyMessageCont>
@@ -1447,7 +1448,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             text: messageForReply.body,
                             message: messageForReply,
                             contactsMap,
-                            getFromContacts
+                            getFromContacts,
+                            accentColor:accentColor
                           })
                         )}
                       </div>

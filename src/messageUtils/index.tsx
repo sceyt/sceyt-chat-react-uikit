@@ -12,7 +12,6 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
-import { useColor } from '../hooks'
 
 const StatusText = styled.span<{ color?: string; fontSize?: string }>`
   color: ${(props) => props.color || colors.textColor2};
@@ -58,7 +57,7 @@ const MessageStatusIcon = ({
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor : accentColor} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor : (accentColor ? accentColor : colors.primary)} />
       ) : (
         <StatusText fontSize={size} color={iconColor}>
           • Seen
@@ -118,7 +117,8 @@ const MessageTextFormat = ({
   contactsMap,
   getFromContacts,
   isLastMessage,
-  asSampleText
+  asSampleText,
+  accentColor
 }: {
   text: string
   message: any
@@ -126,8 +126,8 @@ const MessageTextFormat = ({
   getFromContacts: boolean
   isLastMessage?: boolean
   asSampleText?: boolean
+  accentColor?: string
 }) => {
-  const accentColor = useColor('accent')
   let messageText: any = []
   const linkify = new LinkifyIt()
   const messageBodyAttributes = JSON.parse(JSON.stringify(message.bodyAttributes))
@@ -215,7 +215,7 @@ const MessageTextFormat = ({
                 <StyledText
                   className={attribute.type}
                   isLastMessage={isLastMessage}
-                  color={accentColor}
+                  color={accentColor ? accentColor : colors.primary}
                   key={attributeOffset}
                 >
                   {mentionDisplayName}

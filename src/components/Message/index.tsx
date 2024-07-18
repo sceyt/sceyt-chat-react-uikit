@@ -1125,7 +1125,8 @@ const Message = ({
                         message: message.parentMessage,
                         contactsMap,
                         getFromContacts,
-                        asSampleText: true
+                        asSampleText: true,
+                        accentColor:accentColor
                       })
                     ) : (
                       parentNotLinkAttachment &&
@@ -1197,7 +1198,8 @@ const Message = ({
                   text: message.body,
                   message,
                   contactsMap,
-                  getFromContacts
+                  getFromContacts,
+                  accentColor:accentColor
                 })}
               </span>
               {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
