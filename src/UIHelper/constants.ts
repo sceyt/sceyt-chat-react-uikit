@@ -2,7 +2,7 @@ import { SceytChatUIKitTheme, ThemeMode } from "../components"
 export const THEME_COLOR_NAMES = {
   ACCENT:'accent',
   BACKGROUND: 'background',
-  TEXT_PRIMARY: 'primary',
+  TEXT_PRIMARY: 'textPrimary',
   OUTGOING: 'outgoing',
   INCOMING: 'incoming',
 }

@@ -3,6 +3,7 @@ import { Provider } from 'react-redux'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
+import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 export interface IProgress {
   loaded: number
   total: number
@@ -39,10 +40,8 @@ interface IThemeColor {
 
 export interface SceytChatUIKitTheme {
   colors: {
-    accent?: IThemeColor
-    background?: IThemeColor
-    primary?:IThemeColor 
-  }
+    [key in keyof typeof THEME_COLOR_NAMES]?: IThemeColor;
+  };
 }
 
 export type ThemeMode = "light" | "dark" | string;
