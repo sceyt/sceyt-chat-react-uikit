@@ -1,5 +1,4 @@
 import { SceytChatUIKitTheme, ThemeMode } from "../components"
-import { hexToRGBA } from "../helpers"
 export const THEME_COLORS_KEYS = {
   ACCENT:'accent',
   BACKGROUND: 'background',
