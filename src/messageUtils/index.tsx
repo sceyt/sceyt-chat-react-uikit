@@ -21,7 +21,7 @@ const StatusText = styled.span<{ color?: string; fontSize?: string }>`
 const ReadIconWrapper = styled(ReadIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color };
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
   width: ${(props) => props.width}!important;
@@ -44,18 +44,20 @@ const MessageStatusIcon = ({
   messageStatusDisplayingType,
   iconColor,
   readIconColor,
-  size
+  size,
+  accentColor
 }: {
   messageStatus: string
   messageStatusDisplayingType: string
   size?: string
   iconColor?: string
   readIconColor?: string
-}) => {
+  accentColor?: string
+}) => { 
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor || colors.primary} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor : (accentColor ? accentColor : colors.primary)} />
       ) : (
         <StatusText fontSize={size} color={iconColor}>
           • Seen
@@ -115,7 +117,8 @@ const MessageTextFormat = ({
   contactsMap,
   getFromContacts,
   isLastMessage,
-  asSampleText
+  asSampleText,
+  accentColor
 }: {
   text: string
   message: any
@@ -123,6 +126,7 @@ const MessageTextFormat = ({
   getFromContacts: boolean
   isLastMessage?: boolean
   asSampleText?: boolean
+  accentColor?: string
 }) => {
   let messageText: any = []
   const linkify = new LinkifyIt()
@@ -211,7 +215,7 @@ const MessageTextFormat = ({
                 <StyledText
                   className={attribute.type}
                   isLastMessage={isLastMessage}
-                  color={colors.primary}
+                  color={accentColor ? accentColor : colors.primary}
                   key={attributeOffset}
                 >
                   {mentionDisplayName}

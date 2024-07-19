@@ -51,7 +51,7 @@ const CustomLabel = styled.label<{
   cursor: pointer;
   border: ${(props) =>
     props.isChecked
-      ? props.checkedBorder || `6px solid ${colors.primary}`
+      ? `6px solid ${props.checkedBorder}`
       : props.border || `1px solid ${colors.textColor2}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
 `

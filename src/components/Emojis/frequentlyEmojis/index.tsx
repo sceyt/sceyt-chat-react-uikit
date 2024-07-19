@@ -3,9 +3,10 @@ import { useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 function FrequentlyEmojis({
   handleAddEmoji,
@@ -18,6 +19,7 @@ function FrequentlyEmojis({
   frequentlyEmojis?: IReaction[]
   rtlDirection?: boolean
 }) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
     '😍': { key: '😍', reacted: false },
@@ -95,6 +97,7 @@ function FrequentlyEmojis({
         onClick={() => handleEmojiPopupToggle(true)}
         iconBackgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
         hoverBackground={colors.hoverBackgroundColor}
+        iconColor={accentColor}
       >
         <PlusIcon />
       </OpenMoreEmojis>
@@ -149,7 +152,7 @@ const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
   }
 `
 
-const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackground?: string }>`
+const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackground?: string, iconColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -165,6 +168,9 @@ const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackgrou
   }
   &:hover {
     background-color: ${(props) => props.hoverBackground || colors.hoverBackgroundColor};
+    & > svg {
+      color: ${(props) => props.iconColor};
+    }
   }
   border-radius: 50%;
 `

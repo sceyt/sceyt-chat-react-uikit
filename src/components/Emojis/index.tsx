@@ -12,12 +12,14 @@ import { ReactComponent as ObjectEmoji } from '../../assets/svg/emojiObjectIcon.
 import { ReactComponent as SymbolEmoji } from '../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
 import { THEME } from '../../helpers/constants'
+import { useColor } from '../../hooks'
 
 interface EmojiCollectionProps {
+  iconColor:string
   activeCollection: boolean
 }
 
@@ -68,6 +70,7 @@ function EmojisPopup({
   emojisPopupPosition?: string
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')
@@ -146,6 +149,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
+              iconColor={accentColor}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -205,6 +209,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
+              iconColor={accentColor}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -278,7 +283,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.primary : colors.textColor3)};
+    color: ${(props) => (props.activeCollection ? props.iconColor : colors.textColor3)};
   }
 `
 const CollectionPointer = styled.span``

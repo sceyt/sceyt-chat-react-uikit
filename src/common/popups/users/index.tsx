@@ -17,7 +17,7 @@ import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -31,7 +31,7 @@ import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate } from '../../../hooks'
+import { useDidUpdate, useColor } from '../../../hooks'
 import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
@@ -69,6 +69,7 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -423,7 +424,7 @@ const UsersPopup = ({
                       index={user.id}
                       state={isSelected}
                       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-                      checkedBackgroundColor={colors.primary}
+                      checkedBackgroundColor={accentColor}
                       onChange={(e) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
                       }
@@ -457,7 +458,7 @@ const UsersPopup = ({
             <Button
               type='button'
               color={colors.white}
-              backgroundColor={colors.primary}
+              backgroundColor={accentColor}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
               onClick={() => handleCreateChannel()}

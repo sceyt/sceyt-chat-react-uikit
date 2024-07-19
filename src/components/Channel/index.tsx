@@ -34,11 +34,12 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
+import { useColor } from '../../hooks'
 
 interface IChannelProps {
   channel: IChannel
@@ -91,6 +92,7 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
@@ -412,7 +414,8 @@ const Channel: React.FC<IChannelProps> = ({
                       message: lastMessage,
                       contactsMap,
                       getFromContacts,
-                      isLastMessage: true
+                      isLastMessage: true,
+                      accentColor:accentColor
                     })}
                   {channel.lastReactedMessage && '"'}
                 </React.Fragment>
@@ -433,7 +436,8 @@ const Channel: React.FC<IChannelProps> = ({
               MessageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
-                readIconColor: colors.primary,
+                readIconColor: accentColor,
+                accentColor:accentColor,
                 size: '16px'
               })}
           </DeliveryIconCont>
@@ -448,14 +452,14 @@ const Channel: React.FC<IChannelProps> = ({
       <UnreadInfo bottom={!(lastMessage || !!typingIndicator || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
           <UnreadMentionIconWrapper
-            iconColor={colors.primary}
+            iconColor={accentColor}
             rightMargin={!!(channel.newMessageCount || channel.unread)}
           >
             <MentionIcon />
           </UnreadMentionIconWrapper>
         )}
         {!!(channel.newMessageCount || channel.unread) && (
-          <UnreadCount backgroundColor={colors.primary} isMuted={channel.muted}>
+          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted}>
             {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
           </UnreadCount>
         )}

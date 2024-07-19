@@ -13,14 +13,14 @@ import {
   InputErrorMessage
 } from '../../../UIHelper'
 import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIcon.svg'
-import { useStateComplex } from '../../../hooks'
+import { useStateComplex, useColor } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
 import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
@@ -54,6 +54,7 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -322,7 +323,7 @@ export default function CreateChannel({
                         </AvatarWrapper>
                       ) : (
                         <UploadAvatarLabel
-                          iconColor={colors.primary}
+                          iconColor={accentColor}
                           backgroundColor={colors.primaryLight}
                           htmlFor='uploadImage'
                         >
@@ -411,7 +412,7 @@ export default function CreateChannel({
               </button> */}
                   <Button
                     type='button'
-                    backgroundColor={colors.primary}
+                    backgroundColor={accentColor}
                     borderRadius='8px'
                     onClick={() => GoToAddMember()}
                     disabled={nextButtonDisable}

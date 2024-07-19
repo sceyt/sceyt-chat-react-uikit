@@ -10,5 +10,5 @@ export default combineReducers({
   MessageReducer,
   MembersReducer,
   ThemeReducer,
-  UserReducer
+  UserReducer,
 })

@@ -19,10 +19,11 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors } from '../../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
+import { useColor } from '../../../../../hooks'
 
 interface IProps {
   theme: string
@@ -32,6 +33,7 @@ interface IProps {
 }
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
@@ -106,7 +108,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
           >
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleSave}>
+          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleSave}>
             Save
           </Button>
         </PopupFooter>

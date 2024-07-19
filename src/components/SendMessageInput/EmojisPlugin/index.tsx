@@ -9,15 +9,17 @@ import { ReactComponent as TravelingEmoji } from '../../../assets/svg/emojiTrave
 import { ReactComponent as ObjectEmoji } from '../../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.svg'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
+import { useColor } from '../../../hooks'
 
 interface EmojiCollectionProps {
-  activeCollection: boolean
+  activeCollection: boolean,
+  iconColor: string
 }
 
 const EmojiIcon = ({ collectionName }: any) => {
@@ -68,6 +70,7 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
@@ -160,6 +163,7 @@ function EmojisPopup({
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
+              iconColor={accentColor}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
             >
               <EmojiIcon collectionName={emoji.key} />
@@ -220,6 +224,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
+              iconColor={accentColor}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -297,7 +302,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.primary : colors.textColor3)};
+    color: ${(props) => (props.activeCollection ? props.iconColor : colors.textColor3)};
   }
 `
 const CollectionPointer = styled.span``

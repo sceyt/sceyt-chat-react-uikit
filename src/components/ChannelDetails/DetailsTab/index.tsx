@@ -6,7 +6,7 @@ import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
 import Members from './Members'
@@ -14,6 +14,7 @@ import Media from './Media'
 import Files from './Files'
 import Links from './Links'
 import Voices from './Voices'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -106,6 +107,7 @@ const DetailsTab = ({
   tabItemsLineHeight,
   tabItemsMinWidth
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
@@ -133,7 +135,7 @@ const DetailsTab = ({
   return (
     <Container theme={theme}>
       <DetailsTabHeader
-        activeTabColor={colors.primary}
+        activeTabColor={accentColor}
         backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
         borderColor={borderColor}
         fontSize={tabItemsFontSize}

@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/playRecord.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pauseRecord.svg'
@@ -10,7 +10,7 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES} from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -35,7 +35,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
-
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   async function startRecording() {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
     if (permissionStatus.state === 'granted') {
@@ -286,7 +286,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
             container: wavesurferContainer.current,
             waveColor: colors.textColor2,
             skipLength: 0,
-            progressColor: colors.primary,
+            progressColor: accentColor,
             barWidth: 1,
             barHeight: 2,
             audioRate: 1,
@@ -359,7 +359,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   return (
     <Container recording={showRecording}>
       {showRecording && (
-        <PlayPause onClick={() => cancelRecording()}>
+        <PlayPause iconColor={accentColor} onClick={() => cancelRecording()}>
           <CancelRecordIcon />
         </PlayPause>
       )}
@@ -375,12 +375,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         {recording && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
 
         {recordingIsReadyToPlay && (
-          <PlayPause onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
+          <PlayPause iconColor={accentColor} onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
         )}
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
         {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
-      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()}>
+      <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={accentColor}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
       </RecordIconWrapper>
     </Container>
@@ -411,9 +411,12 @@ const AudioWrapper = styled.div<{ recording?: boolean }>`
   border-radius: 20px;
 `
 
-const RecordIconWrapper = styled.span`
+const RecordIconWrapper = styled.span<{ iconColor?: string }>`
   display: flex;
   cursor: pointer;
+  > svg {
+    color: ${(props) => props.iconColor};
+  }
 `
 
 const AudioVisualization = styled.div<{ show?: boolean }>`
@@ -427,9 +430,12 @@ const AudioVisualization = styled.div<{ show?: boolean }>`
   left: 40px;
 `
 
-const PlayPause = styled.div`
+const PlayPause = styled.div<{ iconColor?: string }>`
   cursor: pointer;
   padding: 10px;
+  > svg {
+    color: ${(props) => props.iconColor};
+  }
 `
 const Canvas = styled.canvas<{ recording?: boolean; hide?: any }>`
   height: 28px;

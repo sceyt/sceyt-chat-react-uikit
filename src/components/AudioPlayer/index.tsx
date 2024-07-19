@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useColor, useDidUpdate } from '../../hooks'
 // Store
 import { playingAudioIdSelector } from '../../store/message/selector'
 import { setPlayingAudioIdAC } from '../../store/message/actions'
@@ -10,7 +10,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 
@@ -37,6 +37,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
@@ -144,7 +145,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             container: wavesurferContainer.current,
             waveColor: colors.textColor2,
             skipLength: 0,
-            progressColor: colors.primary,
+            progressColor: accentColor,
             // audioContext,
             // cursorColor: 'transparent',
             // splitChannels: true,
@@ -236,7 +237,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
 
   return (
     <Container>
-      <PlayPause onClick={handlePlayPause} iconColor={colors.primary}>
+      <PlayPause onClick={handlePlayPause} iconColor={accentColor}>
         {playAudio ? <PauseIcon /> : <PlayIcon />}
       </PlayPause>
       <WaveContainer>

@@ -29,7 +29,7 @@ import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
 import { getClient } from '../../../../common/client'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 // Components
 import ConfirmPopup from '../../../../common/popups/delete'
@@ -37,6 +37,7 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -70,6 +71,8 @@ const Members = ({
   memberAvatarSize,
   memberPresenceFontSize
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -236,11 +239,11 @@ const Members = ({
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
-              color={colors.textColor1}
+              color={textPrimaryColor}
               hoverBackground={
                 hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
               }
-              addMemberIconColor={colors.primary}
+              addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
             >
               {addMemberIcon || <AddMemberIcon />}
@@ -252,7 +255,7 @@ const Members = ({
             members.map((member, index) => (
               <MemberItem
                 key={member.id + index}
-                color={colors.textColor1}
+                color={textPrimaryColor}
                 hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
@@ -276,9 +279,9 @@ const Members = ({
                           )}
                     </MemberName>
                     {member.role === 'owner' ? (
-                      <RoleBadge color={colors.primary}>Owner</RoleBadge>
+                      <RoleBadge color={accentColor}>Owner</RoleBadge>
                     ) : member.role === 'admin' ? (
-                      <RoleBadge color={colors.purple}>Admin</RoleBadge>
+                      <RoleBadge color={accentColor}>Admin</RoleBadge>
                     ) : (
                       ''
                     )}
@@ -409,7 +412,7 @@ const Members = ({
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
-          buttonBackground={colors.primary}
+          buttonBackground={accentColor}
           title='Promote admin'
           description={
             <span>
