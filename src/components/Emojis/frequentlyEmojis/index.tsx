@@ -158,7 +158,7 @@ const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackgrou
   justify-content: center;
   width: 28px;
   height: 28px;
-  background-color: ${(props) => props.iconBackgroundColor || "red"};
+  background-color: ${(props) => props.iconBackgroundColor || colors.backgroundColor};
   cursor: pointer;
 
   & > svg {

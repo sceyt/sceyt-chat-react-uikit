@@ -112,7 +112,7 @@ export default function ChatHeader({
       dispatch(switchChannelActionAC({ ...activeChannel.linkedFrom, backToLinkedChannel: true }))
     }
   }
-  
+
   const handleBackToChannels = () => {
     dispatch(switchChannelActionAC({}))
     mobileBackButtonClicked && mobileBackButtonClicked()
