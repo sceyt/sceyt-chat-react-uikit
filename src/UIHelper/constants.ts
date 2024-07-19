@@ -1,5 +1,8 @@
 import { SceytChatUIKitTheme, ThemeMode } from "../components"
-export const THEME_COLOR_NAMES = {
+interface IThemeColorName { 
+  [key: string]: string
+}
+export const THEME_COLOR_NAMES:IThemeColorName = {
   ACCENT:'accent',
   BACKGROUND: 'background',
   TEXT_PRIMARY: 'textPrimary'

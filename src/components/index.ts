@@ -14,6 +14,7 @@ import Attachment from './Attachment'
 import EmojisPopup from './Emojis'
 import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
+import {THEME_COLOR_NAMES} from '../UIHelper/constants'
 
 export {
   SceytChat,
@@ -33,7 +34,8 @@ export {
   EmojisPopup,
   FrequentlyEmojis,
   SceytChatUIKitTheme,
-  ThemeMode
+  ThemeMode,
+  THEME_COLOR_NAMES
 }
 
 declare global {
