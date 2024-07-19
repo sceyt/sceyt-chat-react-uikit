@@ -42,7 +42,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
@@ -360,8 +360,8 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
-  const primaryColor = useColor(THEME_COLORS_KEYS.PRIMARY)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient

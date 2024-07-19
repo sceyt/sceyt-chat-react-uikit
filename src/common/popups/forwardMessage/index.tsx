@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
@@ -58,7 +58,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))

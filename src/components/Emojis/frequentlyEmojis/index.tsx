@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
@@ -19,7 +19,7 @@ function FrequentlyEmojis({
   frequentlyEmojis?: IReaction[]
   rtlDirection?: boolean
 }) {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
     '😍': { key: '😍', reacted: false },

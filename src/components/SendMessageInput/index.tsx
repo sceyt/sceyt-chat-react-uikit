@@ -66,7 +66,7 @@ import {
   makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors, THEME_COLORS_KEYS} from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES} from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
@@ -300,7 +300,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderText,
   placeholderTextColor
 }) => {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient

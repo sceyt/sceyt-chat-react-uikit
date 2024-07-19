@@ -40,7 +40,7 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
 import { getClient } from '../../../common/client'
 // Components
@@ -191,7 +191,7 @@ const Actions = ({
   actionItemsFontSize,
   borderColor
 }: IProps) => {
-  const primaryColor=useColor(THEME_COLORS_KEYS.PRIMARY)
+  const primaryColor=useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)

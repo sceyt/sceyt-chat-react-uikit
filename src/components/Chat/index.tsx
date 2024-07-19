@@ -23,7 +23,7 @@ import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
-import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { themeSelector } from '../../store/theme/selector'
 
 interface IProps {
@@ -53,9 +53,9 @@ export default function Chat({
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
 }: IProps) {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
-  const backgroundColor = useColor(THEME_COLORS_KEYS.BACKGROUND)
-  const primaryColor = useColor(THEME_COLORS_KEYS.PRIMARY)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
+  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)

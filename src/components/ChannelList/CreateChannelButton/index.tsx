@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -40,8 +40,8 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
-  const outgoingColor = useColor(THEME_COLORS_KEYS.OUTGOING)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const outgoingColor = useColor(THEME_COLOR_NAMES.OUTGOING)
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {

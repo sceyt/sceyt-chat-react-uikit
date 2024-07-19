@@ -20,7 +20,7 @@ import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
@@ -54,7 +54,7 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)

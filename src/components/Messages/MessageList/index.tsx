@@ -46,7 +46,7 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -428,8 +428,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
-  const primaryColor = useColor(THEME_COLORS_KEYS.PRIMARY)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)

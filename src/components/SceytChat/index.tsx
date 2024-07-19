@@ -28,7 +28,7 @@ import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '..
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps} from '../ChatContainer'
-import { colors, defaultTheme, THEME_COLORS_KEYS } from '../../UIHelper/constants'
+import { colors, defaultTheme, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
@@ -53,7 +53,7 @@ const SceytChat = ({
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false
 }: IChatClientProps) => {
-  const backgroundColor = useColor(THEME_COLORS_KEYS.BACKGROUND)
+  const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)

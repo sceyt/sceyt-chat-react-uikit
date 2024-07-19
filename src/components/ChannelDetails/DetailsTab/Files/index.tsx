@@ -15,7 +15,7 @@ import { base64ToToDataURL } from '../../../../helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
-import { colors, THEME_COLORS_KEYS } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
@@ -47,7 +47,7 @@ const Files = ({
   fileSizeFontSize,
   fileSizeLineHeight
 }: IProps) => {
-  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
