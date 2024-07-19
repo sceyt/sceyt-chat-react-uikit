@@ -41,7 +41,6 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const outgoingColor = useColor(THEME_COLOR_NAMES.OUTGOING)
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
@@ -60,7 +59,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={outgoingColor} leftAuto={!showSearch} iconColor={accentColor}>
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />} 
           </CreateDropdownButton>
         }
