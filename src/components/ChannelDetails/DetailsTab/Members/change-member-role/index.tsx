@@ -19,7 +19,7 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors } from '../../../../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
@@ -33,7 +33,7 @@ interface IProps {
 }
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()

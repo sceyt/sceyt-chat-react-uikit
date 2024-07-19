@@ -17,7 +17,7 @@ import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -69,7 +69,7 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient

@@ -6,7 +6,7 @@ import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
 import Members from './Members'
@@ -107,7 +107,7 @@ const DetailsTab = ({
   tabItemsLineHeight,
   tabItemsMinWidth
 }: IProps) => {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')

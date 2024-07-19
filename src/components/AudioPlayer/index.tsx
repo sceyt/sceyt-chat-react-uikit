@@ -10,7 +10,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 
@@ -37,7 +37,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)

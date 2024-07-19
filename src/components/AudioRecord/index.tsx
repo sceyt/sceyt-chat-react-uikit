@@ -10,7 +10,7 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors} from '../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS} from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -35,7 +35,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   async function startRecording() {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
     if (permissionStatus.state === 'granted') {

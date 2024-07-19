@@ -12,7 +12,7 @@ import { ReactComponent as ObjectEmoji } from '../../assets/svg/emojiObjectIcon.
 import { ReactComponent as SymbolEmoji } from '../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
 import { THEME } from '../../helpers/constants'
@@ -70,7 +70,7 @@ function EmojisPopup({
   emojisPopupPosition?: string
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')

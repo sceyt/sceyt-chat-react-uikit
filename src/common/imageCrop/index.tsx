@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import Cropper from 'react-easy-crop'
 import { useStateComplex, useColor } from '../../hooks'
 import getCroppedImg from './crop-image'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
 import { Popup, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
 import PopupContainer from '../popups/popupContainer'
 
@@ -15,7 +15,7 @@ interface IProps {
 }
 const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
-  const accentColor = useColor('accent');
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT);
 
   const [state, setState] = useStateComplex({
     image: image.url,

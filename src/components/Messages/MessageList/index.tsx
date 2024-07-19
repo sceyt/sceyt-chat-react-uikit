@@ -46,7 +46,7 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -428,7 +428,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const primaryColor = useColor(THEME_COLORS_KEYS.PRIMARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1289,7 +1290,7 @@ const MessageList: React.FC<MessagesProps> = ({
             messagesLoading === LOADING_STATE.LOADED && (
               <NoMessagesContainer color={colors.textColor1}>
                 <NoMessagesIcon />
-                <NoMessagesTitle color={colors.textColor1}>No Messages yet</NoMessagesTitle>
+                <NoMessagesTitle color={primaryColor}>No Messages yet</NoMessagesTitle>
                 <NoMessagesText color={colors.textColor2}>No messages yet, start the chat</NoMessagesText>
                 {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'

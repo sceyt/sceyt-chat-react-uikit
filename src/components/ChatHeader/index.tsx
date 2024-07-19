@@ -23,7 +23,7 @@ import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../.
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
@@ -54,7 +54,7 @@ interface IProps {
 export default function ChatHeader({
   infoIcon,
   backgroundColor,
-  titleColor=useColor("primary"),
+  titleColor,
   avatarBorderRadius,
   memberInfoTextColor,
   memberInfoFontSize,
@@ -73,7 +73,8 @@ export default function ChatHeader({
   infoIconOrder,
   customActionsOrder
 }: IProps) {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
+  const primaryColor = useColor(THEME_COLORS_KEYS.PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -179,7 +180,7 @@ export default function ChatHeader({
         </AvatarWrapper>
         <ChannelName>
           <SectionHeader
-            color={titleColor || colors.textColor1}
+            color={titleColor || primaryColor}
             theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}

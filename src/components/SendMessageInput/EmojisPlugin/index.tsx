@@ -9,7 +9,7 @@ import { ReactComponent as TravelingEmoji } from '../../../assets/svg/emojiTrave
 import { ReactComponent as ObjectEmoji } from '../../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.svg'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS_KEYS } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
 import { themeSelector } from '../../../store/theme/selector'
@@ -70,7 +70,7 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
-  const accentColor = useColor('accent')
+  const accentColor = useColor(THEME_COLORS_KEYS.ACCENT)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {

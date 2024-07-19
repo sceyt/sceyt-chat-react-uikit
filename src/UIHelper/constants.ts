@@ -1,19 +1,27 @@
 import { SceytChatUIKitTheme, ThemeMode } from "../components"
+import { hexToRGBA } from "../helpers"
+export const THEME_COLORS_KEYS = {
+  ACCENT:'accent',
+  BACKGROUND: 'background',
+  PRIMARY: 'primary',
+  OUTGOING: 'outgoing',
+  INCOMING: 'incoming',
+}
 export const defaultTheme:SceytChatUIKitTheme = {
   colors: {
-    accent: {
+    [THEME_COLORS_KEYS.ACCENT]: {
       light: '#5159F6',
       dark: '#6B72FF'
     },
-    background: {
+    [THEME_COLORS_KEYS.BACKGROUND]: {
       light: '#FFFFFF',
       dark: '#19191B'
     },
-    primary: {
+    [THEME_COLORS_KEYS.PRIMARY]: {
       light: '#111539',
       dark: '#E1E3E6'
     },
-    outgoing: {
+    [THEME_COLORS_KEYS.OUTGOING]: {
       light: '#E3E7FF',
       dark: '#212239'
     }
