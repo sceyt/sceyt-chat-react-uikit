@@ -361,7 +361,7 @@ const Message = ({
   messageTextLineHeight
 }: IMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -1182,7 +1182,7 @@ const Message = ({
             <MessageText
               theme={theme}
               draggable={false}
-              color={primaryColor}
+              color={textPrimaryColor}
               fontSize={messageTextFontSize}
               lineHeight={messageTextLineHeight}
               showMessageSenderName={showMessageSenderName}

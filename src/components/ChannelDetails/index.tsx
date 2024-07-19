@@ -151,7 +151,7 @@ const Details = ({
   bordersColor
 }: IDetailsProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -242,13 +242,13 @@ const Details = ({
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={primaryColor}>
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimaryColor}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader fontSize={detailsTitleFontSize} color={primaryColor}>
+            <SectionHeader fontSize={detailsTitleFontSize} color={textPrimaryColor}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
             <CloseIcon color={accentColor} onClick={handleDetailsClose} /> 
@@ -298,7 +298,7 @@ const Details = ({
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
-                color={primaryColor}
+                color={textPrimaryColor}
               >
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser

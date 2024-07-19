@@ -72,7 +72,7 @@ const Members = ({
   memberPresenceFontSize
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -239,7 +239,7 @@ const Members = ({
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
-              color={primaryColor}
+              color={textPrimaryColor}
               hoverBackground={
                 hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
               }
@@ -255,7 +255,7 @@ const Members = ({
             members.map((member, index) => (
               <MemberItem
                 key={member.id + index}
-                color={primaryColor}
+                color={textPrimaryColor}
                 hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}

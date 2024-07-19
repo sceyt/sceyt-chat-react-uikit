@@ -429,7 +429,7 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1290,7 +1290,7 @@ const MessageList: React.FC<MessagesProps> = ({
             messagesLoading === LOADING_STATE.LOADED && (
               <NoMessagesContainer color={colors.textColor1}>
                 <NoMessagesIcon />
-                <NoMessagesTitle color={primaryColor}>No Messages yet</NoMessagesTitle>
+                <NoMessagesTitle color={textPrimaryColor}>No Messages yet</NoMessagesTitle>
                 <NoMessagesText color={colors.textColor2}>No messages yet, start the chat</NoMessagesText>
                 {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'

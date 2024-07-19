@@ -55,7 +55,7 @@ export default function Chat({
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
-  const primaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -132,7 +132,7 @@ export default function Chat({
           {CustomNoChannelSelected || (
             <SelectChatContent iconColor={accentColor}>
               <MessageIcon />
-              <SelectChatTitle color={primaryColor}> Select a chat</SelectChatTitle>
+              <SelectChatTitle color={textPrimaryColor}> Select a chat</SelectChatTitle>
               <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
             </SelectChatContent>
           )}
