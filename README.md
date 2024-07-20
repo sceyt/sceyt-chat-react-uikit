@@ -95,6 +95,38 @@ function App() {
     )
 }
 ```
+## Component "SceytChat"
+The main component of the UI Kit is "SceytChat", which should wrap all other components. Other components imported from
+the UI Kit cannot be used outside of "SceytChat".
+### For a description of SceytChat properties, see below.
+
+### Required "client"
+"SceytChat" is takes a required "client" property where you need to pass the Sceyt Chat client:
+
+### "theme"
+You can pass your own color scheme using the "theme" property with different theme modes like light, dark, or create
+your own theme mode.
+
+### "themeMode"
+With "themeMode" you can set the active theme mode for your application.
+
+### "autoSelectFirstChannel"
+Setting "autoSelectFirstChannel" to "true" UiKit will select the first channel in the "ChannelList" component.
+automatically on initial loading. Default value is 'false'
+
+### "hideUserPresence"
+hideUserPresence is a callback function that has a "user" argument. If you want to hide the presence indicator of any
+user in your application, you can pass your own function which should return true or false for that user. If the
+function returns false, then UiKit will hide the presence indicator for this user.
+
+### "handleNewMessages"
+handleNewMessages is a callback function that has two arguments: the first is “message”, the second is “channel”.
+If you want to handle received messages, you can pass your own message handler using this property, where you can get
+the received message by the first argument, and by the second argument, the channel in which the message was received.
+If you want to prevent this message from appearing in your application, you can simply return "null" and then UiKit
+will ignore this message. If you want to change the message by adding metadata or any other option, you can change it
+and return the modified message. It is not recommended to change existing data in the message.
+
 
 ## License
 
