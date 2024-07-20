@@ -184,6 +184,7 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
 
   return null
 }
+
 // Catch any errors that occur during Lexical updates and log them
 // or throw them as needed. If you don't throw them, Lexical will
 // try to recover gracefully without losing user data.
@@ -208,6 +209,15 @@ interface SendMessageProps {
   AddEmojisIcon?: JSX.Element
   emojiIcoOrder?: number
   showAddAttachments?: boolean
+  allowedMediaExtensions?: string[]
+  showChoseFileAttachment?: boolean
+  showChoseMediaAttachment?: boolean
+  attachmentSizeLimitErrorMessage?: string
+  allowedMediaExtensionsErrorMessage?: string
+  choseMediaAttachmentText?: string
+  choseFileAttachmentText?: string
+  mediaAttachmentSizeLimit?: number
+  fileAttachmentSizeLimit?: number
   AddAttachmentsIcon?: JSX.Element
   attachmentIcoOrder?: number
   sendIconOrder?: number
@@ -262,6 +272,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   AddEmojisIcon,
   emojiIcoOrder = 2,
   showAddAttachments = true,
+  showChoseFileAttachment = true,
+  showChoseMediaAttachment = true,
+  choseMediaAttachmentText,
+  choseFileAttachmentText,
+  mediaAttachmentSizeLimit,
+  attachmentSizeLimitErrorMessage,
+  allowedMediaExtensions,
+  allowedMediaExtensionsErrorMessage,
   AddAttachmentsIcon,
   attachmentIcoOrder = 0,
   CustomTypingIndicator,
@@ -357,6 +375,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [isIncomingMessage, setIsIncomingMessage] = useState(false)
+  const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
+  const [uploadErrorMessage, setUploadErrorMessage] = useState('')
 
   const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -372,6 +392,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
+
+  const addAttachmentByMenu = showChoseFileAttachment && showChoseMediaAttachment
+
   function onChange(editorState: any) {
     setRealEditorState(editorState)
   }
@@ -388,7 +411,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     nodes: [MentionNode],
     onError
   }
-  const mediaExtensions = '.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif'
 
   const handleSendTypingState = (typingState: boolean) => {
     if (typingState) {
@@ -572,6 +594,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       dispatch(setCloseSearchChannelsAC(true))
     }
   }
+
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
     if (messageTexToSend) {
@@ -604,11 +627,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     handleCloseEditMode()
   }
+
   const handleCloseEditMode = () => {
     setEditMessageText('')
     setMentionedMembers([])
     dispatch(setMessageToEditAC(null))
   }
+
   const removeUpload = (attachmentId: string) => {
     if (attachmentId) {
       const updatedAttachments = attachmentsUpdate.filter((item: any) => item.tid !== attachmentId)
@@ -621,12 +646,43 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
+  const showFileUploadError = (message: string) => {
+    setUploadErrorMessage(message)
+    setTimeout(() => {
+      setUploadErrorMessage('')
+    }, 3000)
+  }
+
   const handleFileUpload = (e: any) => {
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
 
     fileList.forEach(async (file: any) => {
-      handleAddAttachment(file, isMediaAttachment)
+      let allowUpload = true
+      let errorMessage = ''
+      if (isMediaAttachment) {
+        if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
+          allowUpload = false
+          errorMessage =
+            attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
+        }
+        if (allowedMediaExtensions?.length) {
+          const fileName = file.name
+          const fileExtension = fileName.split('.').pop().toLowerCase()
+
+          if (!allowedMediaExtensions.includes(fileExtension)) {
+            allowUpload = false
+            errorMessage =
+              allowedMediaExtensionsErrorMessage ??
+              `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
+          }
+        }
+      }
+      if (allowUpload) {
+        handleAddAttachment(file, isMediaAttachment)
+      } else {
+        showFileUploadError(errorMessage)
+      }
     })
 
     fileUploader.current.value = ''
@@ -645,7 +701,29 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         e.preventDefault()
         const fileList: File[] = Object.values(e.clipboardData.files)
         fileList.forEach(async (file: any) => {
-          handleAddAttachment(file, true)
+          let allowUpload = true
+          let errorMessage = ''
+          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
+            allowUpload = false
+            errorMessage =
+              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
+          }
+          if (allowedMediaExtensions?.length) {
+            const fileName = file.name
+            const fileExtension = fileName.split('.').pop().toLowerCase()
+
+            if (!allowedMediaExtensions.includes(fileExtension)) {
+              allowUpload = false
+              errorMessage =
+                allowedMediaExtensionsErrorMessage ??
+                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
+            }
+          }
+          if (allowUpload) {
+            handleAddAttachment(file, true)
+          } else {
+            showFileUploadError(errorMessage)
+          }
         })
       } else {
         e.preventDefault()
@@ -681,6 +759,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setIsEmojisOpened(false)
     }
   }
+
   const handleToggleForwardMessagePopup = () => {
     setForwardPopupOpen(!forwardPopupOpen)
   }
@@ -698,6 +777,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     dispatch(clearSelectedMessagesAC())
   }
+
   const handleDeletePendingMessage = (message: IMessage) => {
     deletePendingMessage(activeChannel.id, message)
     dispatch(deleteMessageFromListAC(message.id || message.tid!))
@@ -716,6 +796,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     setDeletePopupOpen(!deletePopupOpen)
   }
+
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
     for (const message of selectedMessagesMap.values()) {
       if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
@@ -726,6 +807,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     dispatch(clearSelectedMessagesAC())
   }
+
   const handleCloseSelectMessages = () => {
     dispatch(clearSelectedMessagesAC())
   }
@@ -733,6 +815,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleSetMentionMember = (mentionMember: any) => {
     setMentionedMembers((prevState: any[]) => [...prevState, mentionMember])
   }
+
   const handleAddAttachment = async (file: File, isMediaAttachment: boolean) => {
     const customUploader = getCustomUploader()
     const fileType = file.type.split('/')[0]
@@ -960,6 +1043,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [typingTimout])
 
+  useEffect(() => {
+    if (allowedMediaExtensions?.length) {
+      setMediaExtensions(`.${allowedMediaExtensions.join(',.')}`)
+    }
+  }, [allowedMediaExtensions])
+
   useDidUpdate(() => {
     if (draggedAttachments.length > 0) {
       const attachmentsFiles = draggedAttachments.map((draggedData: any) => {
@@ -972,8 +1061,35 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         return new File([u8arr], draggedData.name, { type: draggedData.type })
       })
+      const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
       attachmentsFiles.forEach(async (file: any) => {
-        handleAddAttachment(file, draggedAttachments[0].attachmentType === 'media')
+        let allowUpload = true
+        let errorMessage = ''
+
+        if (isMediaAttachment) {
+          if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
+            allowUpload = false
+            errorMessage =
+              attachmentSizeLimitErrorMessage ?? `File size exceeds the limit of ${mediaAttachmentSizeLimit} KB.`
+          }
+          if (allowedMediaExtensions?.length) {
+            const fileName = file.name
+            const fileExtension = fileName.split('.').pop().toLowerCase()
+
+            if (!allowedMediaExtensions.includes(fileExtension)) {
+              allowUpload = false
+              errorMessage =
+                allowedMediaExtensionsErrorMessage ??
+                `Invalid file type. Allowed extensions are: ${allowedMediaExtensions.join(', ')}.`
+            }
+          }
+        }
+
+        if (allowUpload) {
+          handleAddAttachment(file, isMediaAttachment)
+        } else {
+          showFileUploadError(errorMessage)
+        }
       })
       dispatch(setDraggedAttachmentsAC([], ''))
     }
@@ -1139,6 +1255,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
   }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
+
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
       setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
@@ -1257,6 +1374,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
         selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
       >
+        {uploadErrorMessage && <UploadErrorMessage>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
             {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
@@ -1507,7 +1625,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           {AddEmojisIcon || <EmojiSmileIcon />}
                         </EmojiButton>
                       )}
-                      {showAddAttachments && (
+                      {showAddAttachments && addAttachmentByMenu ? (
                         <DropDown
                           theme={theme}
                           forceClose={showChooseAttachmentType}
@@ -1525,30 +1643,45 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           }
                         >
                           <DropdownOptionsUl>
-                            <DropdownOptionLi
-                              key={1}
-                              textColor={colors.textColor1}
-                              hoverBackground={colors.hoverBackgroundColor}
-                              onClick={() => onOpenFileUploader(mediaExtensions)}
-                              iconWidth='20px'
-                              iconColor={colors.textColor2}
-                            >
-                              <ChoseMediaIcon />
-                              Photo or video
-                            </DropdownOptionLi>
-                            <DropdownOptionLi
-                              key={2}
-                              textColor={colors.textColor1}
-                              hoverBackground={colors.hoverBackgroundColor}
-                              onClick={() => onOpenFileUploader('')}
-                              iconWidth='20px'
-                              iconColor={colors.textColor2}
-                            >
-                              <ChoseFileIcon />
-                              File
-                            </DropdownOptionLi>
+                            {showChoseMediaAttachment && (
+                              <DropdownOptionLi
+                                key={1}
+                                textColor={colors.textColor1}
+                                hoverBackground={colors.hoverBackgroundColor}
+                                onClick={() => onOpenFileUploader(mediaExtensions)}
+                                iconWidth='20px'
+                                iconColor={colors.textColor2}
+                              >
+                                <ChoseMediaIcon />
+                                {choseMediaAttachmentText ?? 'Photo or video'}
+                              </DropdownOptionLi>
+                            )}
+                            {showChoseFileAttachment && (
+                              <DropdownOptionLi
+                                key={2}
+                                textColor={colors.textColor1}
+                                hoverBackground={colors.hoverBackgroundColor}
+                                onClick={() => onOpenFileUploader('')}
+                                iconWidth='20px'
+                                iconColor={colors.textColor2}
+                              >
+                                <ChoseFileIcon />
+                                {choseFileAttachmentText ?? 'File'}
+                              </DropdownOptionLi>
+                            )}
                           </DropdownOptionsUl>
                         </DropDown>
+                      ) : (
+                        (showChoseMediaAttachment || showChoseFileAttachment) && (
+                          <AddAttachmentIcon
+                            ref={addAttachmentsBtnRef}
+                            color={colors.primary}
+                            height={inputContainerHeight || minHeight}
+                            onClick={() => onOpenFileUploader(showChoseMediaAttachment ? mediaExtensions : '')}
+                          >
+                            {AddAttachmentsIcon || <AttachmentIcon />}
+                          </AddAttachmentIcon>
+                        )
                       )}
                       <LexicalWrapper
                         ref={messageInputRef}
@@ -1714,6 +1847,7 @@ const Container = styled.div<{
   & .rdw-suggestion-option-active {
     background-color: rgb(243, 245, 248);
   }
+
   & .custom_editor {
     cursor: text;
 
@@ -1755,6 +1889,12 @@ const EditMessageText = styled.p<any>`
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+`
+const UploadErrorMessage = styled.p<any>`
+  margin: 0;
+  position: absolute;
+  top: -30px;
+  color: ${colors.red1};
 `
 
 const CloseEditMode = styled.span`
@@ -1879,6 +2019,7 @@ const LexicalWrapper = styled.div<{
     padding: ${(props) => props.paddings};
     color: ${(props) => props.color};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+
     & p {
       font-size: 15px;
       line-height: 20px;
@@ -1888,9 +2029,11 @@ const LexicalWrapper = styled.div<{
     &::selection {
       background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
     }
+
     & *::selection {
       background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
     }
+
     & span::selection {
       background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
     }
@@ -1903,6 +2046,7 @@ const LexicalWrapper = styled.div<{
       border: none !important;
       outline: none !important;
     }
+
     & .mention {
       color: ${(props) => props.mentionColor || colors.primary};
       background-color: inherit !important;
@@ -1912,24 +2056,31 @@ const LexicalWrapper = styled.div<{
     & span.bold {
       font-weight: bold;
     }
+
     & .editor_paragraph {
       margin: 0;
     }
+
     & .text_bold {
       font-weight: 600;
     }
+
     & .text_italic {
       font-style: italic;
     }
+
     & .text_underline {
       text-decoration: underline;
     }
+
     & .text_strikethrough {
       text-decoration: line-through;
     }
+
     & .text_underlineStrikethrough {
       text-decoration: underline line-through;
     }
+
     & code {
       font-family: inherit;
       letter-spacing: 4px;

@@ -11,6 +11,10 @@
   "main": "dist/index.js",
   "module": "dist/index.modern.js",
   "source": "src/index.tsx",
+  "files": [
+    "dist",
+    "assets"
+  ],
   "engines": {
     "node": ">=10"
   },
@@ -91,10 +95,6 @@
     "typescript": "^5.3.2",
     "webpack-cli": "^5.1.1"
   },
-  "files": [
-    "dist",
-    "assets"
-  ],
   "dependencies": {
     "@lexical/offset": "^0.12.2",
     "@lexical/react": "^0.12.2",
