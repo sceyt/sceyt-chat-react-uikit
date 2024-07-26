@@ -107,8 +107,63 @@ the UI Kit cannot be used outside of "SceytChat".
 You can pass your own color scheme using the "theme" property with different theme modes like light, dark, or create
 your own theme mode.
 
+```tsx
+import {
+    SceytChat,
+} from 'sceyt-ui-kit';
+
+function App() {
+    return (
+        <SceytChat
+          client={client}
+          theme={{
+            colors: {
+              accent: {
+                ligth: '#555DF6',
+                dark: '#5459b1'
+              },
+              background: {
+                ligth: '#cfcfcf',
+                dark: '#636363'
+              }
+            }
+          }}
+        >
+        </SceytChat>
+    )
+}
+```
+
 ### "themeMode"
-With "themeMode" you can set the active theme mode for your application.
+With "themeMode" you can set the active theme mode for your application. Default value is light.
+
+```tsx
+import {
+    SceytChat,
+} from 'sceyt-ui-kit';
+
+function App() {
+    return (
+        <SceytChat
+          client={client}
+          theme={{
+            colors: {
+              accent: {
+                ligth: '#555DF6',
+                dark: '#5459b1'
+              },
+              background: {
+                ligth: '#cfcfcf',
+                dark: '#636363'
+              }
+            }
+          }}
+          themeMode='dark'
+        >
+        </SceytChat>
+    )
+}
+```
 
 ### "autoSelectFirstChannel"
 Setting "autoSelectFirstChannel" to "true" UiKit will select the first channel in the "ChannelList" component.
@@ -117,8 +172,28 @@ automatically on initial loading. Default value is 'false'
 ### "hideUserPresence"
 hideUserPresence is a callback function that has a "user" argument. If you want to hide the presence indicator of any
 user in your application, you can pass your own function which should return true or false for that user. If the
-function returns false, then UiKit will hide the presence indicator for this user.
+function returns true, then UiKit will hide the presence indicator for this user.
 
+```tsx
+import {
+    SceytChat,
+} from 'sceyt-ui-kit';
+
+function App() {
+
+  const handleHideUserPresence = (user: any) => {
+    return user.id === 'admin' ||  user.id.includes('hide_precense');
+  };
+
+  return (
+      <SceytChat
+        client={client}
+        hideUserPresence={handleHideUserPresence}
+      >
+      </SceytChat>
+  )
+}
+```
 ### "handleNewMessages"
 handleNewMessages is a callback function that has two arguments: the first is “message”, the second is “channel”.
 If you want to handle received messages, you can pass your own message handler using this property, where you can get
@@ -127,6 +202,32 @@ If you want to prevent this message from appearing in your application, you can 
 will ignore this message. If you want to change the message by adding metadata or any other option, you can change it
 and return the modified message. It is not recommended to change existing data in the message.
 
+```tsx
+import {
+    SceytChat,
+} from 'sceyt-ui-kit';
+
+function App() {
+
+  const handleNewMessages = (message: any) => {
+    switch (message.type) {
+      case 'system':
+      case 'hidden':
+        return null;
+      default:
+        return message;
+    }
+  };
+
+  return (
+      <SceytChat
+        client={client}
+        handleNewMessages={handleNewMessages}
+      >
+      </SceytChat>
+  )
+}
+```
 
 ## License
 
