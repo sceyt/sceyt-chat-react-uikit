@@ -28,7 +28,7 @@ import {
 import { IAction, IAttachment, IChannel, IMessage } from '../../types'
 import { getClient } from '../../common/client'
 import {
-  addChannelsToAllChannels,
+  addChannelToAllChannels,
   getActiveChannelId,
   getChannelFromAllChannels,
   getChannelFromMap,
@@ -131,9 +131,9 @@ function* sendMessage(action: IAction): any {
   const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    let channel = yield call(getChannelFromMap, channelId)
+    let channel: IChannel = yield call(getChannelFromMap, channelId)
     if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
+      channel = getChannelFromAllChannels(channelId)!
       if (channel) {
         setChannelInMap(channel)
       }
@@ -148,7 +148,7 @@ function* sendMessage(action: IAction): any {
       }
       channel = yield call(SceytChatClient.Channel.create, createChannelData)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
-      addChannelsToAllChannels(channel)
+      addChannelToAllChannels(channel)
       setChannelInMap(channel)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
@@ -1245,9 +1245,9 @@ function* sendTextMessage(action: IAction): any {
   const { payload } = action
   const { message, connectionState, channelId } = payload
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-  let channel = yield call(getChannelFromMap, channelId)
+  let channel: IChannel = yield call(getChannelFromMap, channelId)
   if (!channel) {
-    channel = getChannelFromAllChannels(channelId)
+    channel = getChannelFromAllChannels(channelId)!
     if (channel) {
       setChannelInMap(channel)
     }
@@ -1265,7 +1265,7 @@ function* sendTextMessage(action: IAction): any {
       }
       channel = yield call(SceytChatClient.Channel.create, createChannelData)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
-      addChannelsToAllChannels(channel)
+      addChannelToAllChannels(channel)
       setChannelInMap(channel)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))

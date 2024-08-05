@@ -39,6 +39,8 @@ export interface IAttachment {
   url: any
   size: number
   createdAt: Date
+  progress: any
+  completion: any
   upload: boolean
   user?: IUser
   tid?: string
@@ -54,15 +56,12 @@ declare class AttachmentBuilder {
   metadata?: string
   upload?: boolean
 
-  // eslint-disable-next-line no-unused-vars
   constructor(url: string, type: string)
 
-  // eslint-disable-next-line no-unused-vars
   setName: (name: string) => this
-  // eslint-disable-next-line no-unused-vars
   setMetadata: (metadata: string) => this
-  // eslint-disable-next-line no-unused-vars
   setUpload: (upload: boolean) => this
+  setFileSize: (fileSize: number) => this
   create: () => IAttachment
 }
 

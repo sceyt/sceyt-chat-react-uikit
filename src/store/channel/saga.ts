@@ -1,6 +1,7 @@
 import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
+  addChannelAC,
   addChannelsAC,
   addChannelsForForwardAC,
   channelHasNextAC,
@@ -67,7 +68,8 @@ import {
   deleteChannelFromAllChannels,
   getChannelGroupName,
   getAutoSelectFitsChannel,
-  getChannelTypesFilter
+  getChannelTypesFilter,
+  addChannelToAllChannels
 } from '../../helpers/channelHalper'
 import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -115,7 +117,7 @@ function* createChannel(action: IAction): any {
     }
     delete createChannelData.avatarFile
     let channelIsExistOnAllChannels = false
-    let createdChannel
+    let createdChannel: IChannel
     if (channelData.type === CHANNEL_TYPE.DIRECT && dontCreateIfNotExists) {
       const allChannels = getAllChannels()
       const memberId = channelData.members[0].id
@@ -188,7 +190,7 @@ function* createChannel(action: IAction): any {
     )
     if (dontCreateIfNotExists) {
       if (!channelIsExistOnAllChannels) {
-        addChannelsToAllChannels(createdChannel)
+        addChannelToAllChannels(createdChannel)
       }
     } else {
       const allChannels = getAllChannels()
@@ -209,7 +211,7 @@ function* createChannel(action: IAction): any {
         }
       })
       if (!channelIsExistOnAllChannels) {
-        addChannelsToAllChannels(createdChannel)
+        addChannelToAllChannels(createdChannel)
       }
     }
     yield call(setActiveChannelId, createdChannel.id)
@@ -839,21 +841,33 @@ function* markMessagesDelivered(action: IAction): any {
   }
 }
 
-function* switchChannel(action: IAction) {
+function* switchChannel(action: IAction): any {
   try {
     const { payload } = action
     const { channel } = payload
     const existingChannel = checkChannelExists(channel.id)
+    let channelToSwitch = channel
     if (!existingChannel) {
       const addChannel = getChannelFromAllChannels(channel.id)
       if (addChannel) {
         setChannelInMap(addChannel)
+      } else {
+        const SceytChatClient = getClient()
+        const fetchedChannel = yield call(SceytChatClient.getChannel, channel.id)
+        addChannelToAllChannels(fetchedChannel)
+        setChannelInMap(fetchedChannel)
+        yield put(addChannelAC(JSON.parse(JSON.stringify(fetchedChannel))))
+        channelToSwitch = { ...channelToSwitch, ...fetchedChannel }
       }
+    } else {
+      const channelFromMap = getChannelFromMap(channel.id)
+      channelToSwitch = { ...channelToSwitch, ...channelFromMap }
     }
+
     const currentActiveChannel = getChannelFromMap(getActiveChannelId())
+    channelToSwitch = { ...channelToSwitch, ...currentActiveChannel }
     yield call(setUnreadScrollTo, true)
     yield call(setActiveChannelId, channel && channel.id)
-    const channelToSwitch = channel
     if (channel.isLinkedChannel) {
       channelToSwitch.linkedFrom = currentActiveChannel
     }
@@ -1273,12 +1287,12 @@ function* joinChannel(action: IAction): any {
     if (!channel) {
       channel = yield call(SceytChatClient.getChannel, channelId)
     }
-    const joinedChannel = yield call(channel.join)
+    const joinedChannel: IChannel = yield call(channel.join)
     yield put(setCloseSearchChannelsAC(true))
 
     yield put(setChannelToAddAC(JSON.parse(JSON.stringify(joinedChannel))))
     yield put(switchChannelActionAC(JSON.parse(JSON.stringify(joinedChannel))))
-    addChannelsToAllChannels(joinedChannel)
+    addChannelToAllChannels(joinedChannel)
     yield call(setActiveChannelId, joinedChannel.id)
     // yield put(switchChannelAction({ ...JSON.parse(JSON.stringify(channel)), myRole: updatedChannel.myRole }));
   } catch (error) {
