@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Store
@@ -7,15 +7,9 @@ import {
   addedChannelSelector,
   addedToChannelSelector,
   channelInfoIsOpenSelector,
-  channelListWidthSelector,
-  channelsSelector
+  channelListWidthSelector
 } from '../../store/channel/selector'
-import {
-  getChannelsAC,
-  setActiveChannelAC,
-  setHideChannelListAC,
-  switchChannelActionAC
-} from '../../store/channel/actions'
+import { getChannelsAC, setActiveChannelAC, setHideChannelListAC } from '../../store/channel/actions'
 // Assets
 import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 // Hooks
@@ -30,14 +24,8 @@ interface IProps {
   hideChannelList?: boolean
   className?: string
   children?: JSX.Element | JSX.Element[]
-  // eslint-disable-next-line no-unused-vars
   onActiveChannelUpdated?: (activeChannel: IChannel) => void
-  setActiveChannel?: (channel: IChannel) => void
-  CustomChannelHandler?: FC<{
-    channels: IChannel[]
-    activeChannel?: IChannel
-    setActiveChannel?: (channel: IChannel) => void
-  }>
+  activeChannelId?: string
   noChannelSelectedBackgroundColor?: string
   CustomNoChannelSelected?: JSX.Element
 }
@@ -48,7 +36,7 @@ export default function Chat({
   children,
   hideChannelList,
   onActiveChannelUpdated,
-  CustomChannelHandler,
+  activeChannelId,
   className,
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
@@ -56,19 +44,12 @@ export default function Chat({
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const channels = useSelector(channelsSelector, shallowEqual)
   const theme = useSelector(themeSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
   const autoSelectChannel = getAutoSelectFitsChannel()
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
-
-  const handleChangeActiveChannel = (chan: IChannel) => {
-    if (activeChannel && chan && activeChannel.id !== chan.id) {
-      dispatch(switchChannelActionAC(chan))
-    }
-  }
 
   useEffect(() => {
     if (hideChannelList && !channelListWidth) {
@@ -98,6 +79,13 @@ export default function Chat({
   }, [addedChannel])
 
   useDidUpdate(() => {
+    if (activeChannelId && (activeChannel ? activeChannel.id !== activeChannelId : true)) {
+      setActiveChannelId(activeChannelId)
+      dispatch(setActiveChannelAC({ id: activeChannelId } as IChannel))
+    }
+  }, [activeChannelId])
+
+  useDidUpdate(() => {
     if (channelDetailsIsOpen) {
       detailsSwitcherTimeout = setTimeout(() => {
         const detailsContainer = document.getElementById('channel_details_wrapper')
@@ -113,15 +101,6 @@ export default function Chat({
 
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
-      {CustomChannelHandler && (
-        <ChannelHandlerWrapper>
-          <CustomChannelHandler
-            channels={channels}
-            activeChannel={activeChannel}
-            setActiveChannel={handleChangeActiveChannel}
-          />
-        </ChannelHandlerWrapper>
-      )}
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
         <SelectChatContainer
           backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
@@ -191,8 +170,4 @@ const SelectChatDescription = styled.p`
   line-height: 22px;
   margin: 0;
   color: ${colors.textColor2};
-`
-
-const ChannelHandlerWrapper = styled.div`
-  display: none;
 `
