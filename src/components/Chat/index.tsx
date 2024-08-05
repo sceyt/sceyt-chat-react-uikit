@@ -9,7 +9,12 @@ import {
   channelInfoIsOpenSelector,
   channelListWidthSelector
 } from '../../store/channel/selector'
-import { getChannelsAC, setActiveChannelAC, setHideChannelListAC } from '../../store/channel/actions'
+import {
+  getChannelsAC,
+  setActiveChannelAC,
+  setHideChannelListAC,
+  switchChannelActionAC
+} from '../../store/channel/actions'
 // Assets
 import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 // Hooks
@@ -73,8 +78,7 @@ export default function Chat({
 
   useDidUpdate(() => {
     if (hideChannelList && (!activeChannel || !activeChannel.id) && addedChannel && addedChannel.id) {
-      setActiveChannelId(addedChannel.id)
-      dispatch(setActiveChannelAC(addedChannel))
+      dispatch(switchChannelActionAC(addedChannel))
     }
   }, [addedChannel])
 
