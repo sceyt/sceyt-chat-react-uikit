@@ -8,6 +8,7 @@ import {
   checkChannelExists,
   deleteChannelFromAllChannels,
   getActiveChannelId,
+  getChannelFromAllChannels,
   getChannelFromMap,
   getChannelGroupName,
   getChannelTypesFilter,
@@ -399,10 +400,10 @@ export default function* watchForEvents(): any {
     switch (type) {
       case CHANNEL_EVENT_TYPES.CREATE: {
         const { createdChannel } = args
+        console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
         const channelFilterTypes = getChannelTypesFilter()
-        if (channelFilterTypes.includes(createdChannel.type)) {
+        if (channelFilterTypes?.length ? channelFilterTypes.includes(createdChannel.type) : true) {
           const getFromContacts = getShowOnlyContactUsers()
-          console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
           const channelExists = checkChannelExists(createdChannel.id)
           if (!channelExists) {
             if (getFromContacts) {
@@ -411,19 +412,25 @@ export default function* watchForEvents(): any {
             yield call(setChannelInMap, createdChannel)
             yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
           }
-          addChannelToAllChannels(createdChannel)
+          const chan = getChannelFromAllChannels(createdChannel.id)
+          if (!chan) {
+            addChannelToAllChannels(createdChannel)
+          }
         }
         break
       }
       case CHANNEL_EVENT_TYPES.JOIN: {
         // const { channel, joinedMember } = args
         const { channel } = args
-        console.log('channel JOIN ... ', channel)
+        console.log('channel JOIN ... . ', channel)
         const activeChannelId = yield call(getActiveChannelId)
         if (activeChannelId === channel.id) {
           // yield put(addMembersToListAC([joinedMember]));
         }
-        addChannelToAllChannels(channel)
+        const chan = getChannelFromAllChannels(channel.id)
+        if (!chan) {
+          addChannelToAllChannels(channel)
+        }
         // TODO notification
         /* const not = {
           id: createId(),
@@ -603,7 +610,7 @@ export default function* watchForEvents(): any {
         if (
           messageToHandle &&
           channel &&
-          (channelFilterTypes && channelFilterTypes.length ? channelFilterTypes.includes(channel.type) : true)
+          (channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
         ) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const activeChannelId = yield call(getActiveChannelId)

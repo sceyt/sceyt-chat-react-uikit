@@ -56,20 +56,16 @@ interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
     searchedChannels: { chats_groups: []; channels: []; contacts: [] }
-    // eslint-disable-next-line no-unused-vars
     loadMoreChannels: (count?: number) => void
     searchValue: string
     children: React.ReactNode
     activeChannel?: IChannel
-    // eslint-disable-next-line no-unused-vars
     setActiveChannel?: (channel: IChannel) => void
   }>
   ListItem?: FC<{
     channel?: IChannel
     contact?: IContact
-    // eslint-disable-next-line no-unused-vars
     setActiveChannel?: (channel: IChannel) => void
-    // eslint-disable-next-line no-unused-vars
     createChatWithContact?: (contact: IContact) => void
   }>
   className?: string
@@ -81,7 +77,6 @@ interface IChannelListProps {
   searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
-  // eslint-disable-next-line no-unused-vars
   getActiveChannel?: (channel: IChannel) => void
   filter?: { channelType?: string }
   limit?: number
@@ -120,43 +115,28 @@ interface IChannelListProps {
   searchChannelInputFontSize?: string
   searchedChannelsTitleFontSize?: string
   onChannelDeleted?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     deletedChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelCreated?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     createdChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelHidden?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     hiddenChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelVisible?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     visibleChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onAddedToChannel?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     channel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
 }

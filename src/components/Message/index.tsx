@@ -1907,7 +1907,7 @@ export const MessageStatusAndTime = styled.span<{
   direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
   transform: translate(0px, 4px);
   white-space: nowrap;
-  width: ${(props) => props.bottomOfMessage && '30px'};
+  width: ${(props) => props.bottomOfMessage && '100%'};
   justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
   & > svg {
     margin-left: 4px;
