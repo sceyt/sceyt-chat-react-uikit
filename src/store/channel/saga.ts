@@ -865,7 +865,6 @@ function* switchChannel(action: IAction): any {
     }
 
     const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-    channelToSwitch = { ...channelToSwitch, ...currentActiveChannel }
     yield call(setUnreadScrollTo, true)
     yield call(setActiveChannelId, channel && channel.id)
     if (channel.isLinkedChannel) {
