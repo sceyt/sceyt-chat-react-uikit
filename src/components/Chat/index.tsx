@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Store
@@ -7,8 +7,7 @@ import {
   addedChannelSelector,
   addedToChannelSelector,
   channelInfoIsOpenSelector,
-  channelListWidthSelector,
-  channelsSelector
+  channelListWidthSelector
 } from '../../store/channel/selector'
 import {
   getChannelsAC,
@@ -30,14 +29,8 @@ interface IProps {
   hideChannelList?: boolean
   className?: string
   children?: JSX.Element | JSX.Element[]
-  // eslint-disable-next-line no-unused-vars
-  onActiveChannelUpdated?: (activeChannel: IChannel) => void
-  setActiveChannel?: (channel: IChannel) => void
-  CustomChannelHandler?: FC<{
-    channels: IChannel[]
-    activeChannel?: IChannel
-    setActiveChannel?: (channel: IChannel) => void
-  }>
+  onSelectedChannelUpdated?: (selectedChannel: IChannel) => void
+  selectedChannelId?: string
   noChannelSelectedBackgroundColor?: string
   CustomNoChannelSelected?: JSX.Element
 }
@@ -47,8 +40,8 @@ let detailsSwitcherTimeout: NodeJS.Timeout
 export default function Chat({
   children,
   hideChannelList,
-  onActiveChannelUpdated,
-  CustomChannelHandler,
+  onSelectedChannelUpdated,
+  selectedChannelId,
   className,
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
@@ -56,19 +49,12 @@ export default function Chat({
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const channels = useSelector(channelsSelector, shallowEqual)
   const theme = useSelector(themeSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
   const autoSelectChannel = getAutoSelectFitsChannel()
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
-
-  const handleChangeActiveChannel = (chan: IChannel) => {
-    if (activeChannel && chan && activeChannel.id !== chan.id) {
-      dispatch(switchChannelActionAC(chan))
-    }
-  }
 
   useEffect(() => {
     if (hideChannelList && !channelListWidth) {
@@ -78,8 +64,8 @@ export default function Chat({
   }, [channelListWidth])
 
   useEffect(() => {
-    if (onActiveChannelUpdated) {
-      onActiveChannelUpdated(activeChannel)
+    if (onSelectedChannelUpdated) {
+      onSelectedChannelUpdated(activeChannel)
     }
   }, [activeChannel])
 
@@ -92,10 +78,16 @@ export default function Chat({
 
   useDidUpdate(() => {
     if (hideChannelList && (!activeChannel || !activeChannel.id) && addedChannel && addedChannel.id) {
-      setActiveChannelId(addedChannel.id)
-      dispatch(setActiveChannelAC(addedChannel))
+      dispatch(switchChannelActionAC(addedChannel))
     }
   }, [addedChannel])
+
+  useDidUpdate(() => {
+    if (selectedChannelId && (activeChannel ? activeChannel.id !== selectedChannelId : true)) {
+      setActiveChannelId(selectedChannelId)
+      dispatch(setActiveChannelAC({ id: selectedChannelId } as IChannel))
+    }
+  }, [selectedChannelId])
 
   useDidUpdate(() => {
     if (channelDetailsIsOpen) {
@@ -113,15 +105,6 @@ export default function Chat({
 
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
-      {CustomChannelHandler && (
-        <ChannelHandlerWrapper>
-          <CustomChannelHandler
-            channels={channels}
-            activeChannel={activeChannel}
-            setActiveChannel={handleChangeActiveChannel}
-          />
-        </ChannelHandlerWrapper>
-      )}
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
         <SelectChatContainer
           backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
@@ -191,8 +174,4 @@ const SelectChatDescription = styled.p`
   line-height: 22px;
   margin: 0;
   color: ${colors.textColor2};
-`
-
-const ChannelHandlerWrapper = styled.div`
-  display: none;
 `
