@@ -51,7 +51,7 @@ function ConfirmPopup({
     togglePopup()
   }
 
-  const handleChoseDeleteOption = (e: any, option: 'forEveryone' | 'forMe') => {
+  const handleChooseDeleteOption = (e: any, option: 'forEveryone' | 'forMe') => {
     if (e.target.checked) {
       setDeleteMessageOption(option)
     }
@@ -84,7 +84,7 @@ function ConfirmPopup({
                     index='1'
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
-                    onChange={(e) => handleChoseDeleteOption(e, 'forEveryone')}
+                    onChange={(e) => handleChooseDeleteOption(e, 'forEveryone')}
                   />
                   Delete for everyone
                 </DeleteOptionItem>
@@ -94,7 +94,7 @@ function ConfirmPopup({
                   index='2'
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
-                  onChange={(e) => handleChoseDeleteOption(e, 'forMe')}
+                  onChange={(e) => handleChooseDeleteOption(e, 'forMe')}
                 />
                 Delete for me
               </DeleteOptionItem>

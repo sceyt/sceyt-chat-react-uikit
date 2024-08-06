@@ -108,9 +108,9 @@ import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
-import { ReactComponent as ChoseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as ChooseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../assets/svg/choseMedia.svg'
+import { ReactComponent as ChooseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
@@ -210,12 +210,12 @@ interface SendMessageProps {
   emojiIcoOrder?: number
   showAddAttachments?: boolean
   allowedMediaExtensions?: string[]
-  showChoseFileAttachment?: boolean
-  showChoseMediaAttachment?: boolean
+  showChooseFileAttachment?: boolean
+  showChooseMediaAttachment?: boolean
   attachmentSizeLimitErrorMessage?: string
   allowedMediaExtensionsErrorMessage?: string
-  choseMediaAttachmentText?: string
-  choseFileAttachmentText?: string
+  chooseMediaAttachmentText?: string
+  chooseFileAttachmentText?: string
   mediaAttachmentSizeLimit?: number
   fileAttachmentSizeLimit?: number
   AddAttachmentsIcon?: JSX.Element
@@ -272,10 +272,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   AddEmojisIcon,
   emojiIcoOrder = 2,
   showAddAttachments = true,
-  showChoseFileAttachment = true,
-  showChoseMediaAttachment = true,
-  choseMediaAttachmentText,
-  choseFileAttachmentText,
+  showChooseFileAttachment = true,
+  showChooseMediaAttachment = true,
+  chooseMediaAttachmentText,
+  chooseFileAttachmentText,
   mediaAttachmentSizeLimit,
   attachmentSizeLimitErrorMessage,
   allowedMediaExtensions,
@@ -393,7 +393,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
 
-  const addAttachmentByMenu = showChoseFileAttachment && showChoseMediaAttachment
+  const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
 
   function onChange(editorState: any) {
     setRealEditorState(editorState)
@@ -1532,7 +1532,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         ) : (
                           messageForReply.attachments[0].type === attachmentTypes.file && (
                             <ReplyIconWrapper backgroundColor={colors.primary}>
-                              <ChoseFileIcon />
+                              <ChooseFileIcon />
                             </ReplyIconWrapper>
                           )
                         ))}
@@ -1643,7 +1643,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           }
                         >
                           <DropdownOptionsUl>
-                            {showChoseMediaAttachment && (
+                            {showChooseMediaAttachment && (
                               <DropdownOptionLi
                                 key={1}
                                 textColor={colors.textColor1}
@@ -1652,11 +1652,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 iconWidth='20px'
                                 iconColor={colors.textColor2}
                               >
-                                <ChoseMediaIcon />
-                                {choseMediaAttachmentText ?? 'Photo or video'}
+                                <ChooseMediaIcon />
+                                {chooseMediaAttachmentText ?? 'Photo or video'}
                               </DropdownOptionLi>
                             )}
-                            {showChoseFileAttachment && (
+                            {showChooseFileAttachment && (
                               <DropdownOptionLi
                                 key={2}
                                 textColor={colors.textColor1}
@@ -1665,19 +1665,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 iconWidth='20px'
                                 iconColor={colors.textColor2}
                               >
-                                <ChoseFileIcon />
-                                {choseFileAttachmentText ?? 'File'}
+                                <ChooseFileIcon />
+                                {chooseFileAttachmentText ?? 'File'}
                               </DropdownOptionLi>
                             )}
                           </DropdownOptionsUl>
                         </DropDown>
                       ) : (
-                        (showChoseMediaAttachment || showChoseFileAttachment) && (
+                        (showChooseMediaAttachment || showChooseFileAttachment) && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
                             color={colors.primary}
                             height={inputContainerHeight || minHeight}
-                            onClick={() => onOpenFileUploader(showChoseMediaAttachment ? mediaExtensions : '')}
+                            onClick={() => onOpenFileUploader(showChooseMediaAttachment ? mediaExtensions : '')}
                           >
                             {AddAttachmentsIcon || <AttachmentIcon />}
                           </AddAttachmentIcon>

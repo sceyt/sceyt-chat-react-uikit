@@ -28,8 +28,8 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
 import { useDidUpdate } from '../../../hooks'
 // Assets
-import { ReactComponent as ChoseFileIcon } from '../../../assets/svg/choseFile.svg'
-import { ReactComponent as ChoseMediaIcon } from '../../../assets/svg/choseMedia.svg'
+import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.svg'
+import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
 // Helpers
 import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
@@ -1036,14 +1036,14 @@ const MessageList: React.FC<MessagesProps> = ({
           {/*  <React.Fragment> */}
           <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragOver}>
             <IconWrapper draggable iconColor={colors.primary}>
-              <ChoseFileIcon />
+              <ChooseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
               <IconWrapper draggable iconColor={colors.primary}>
-                <ChoseMediaIcon />
+                <ChooseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media
             </DropAttachmentArea>
