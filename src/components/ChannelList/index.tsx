@@ -56,20 +56,16 @@ interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
     searchedChannels: { chats_groups: []; channels: []; contacts: [] }
-    // eslint-disable-next-line no-unused-vars
     loadMoreChannels: (count?: number) => void
     searchValue: string
     children: React.ReactNode
-    activeChannel?: IChannel
-    // eslint-disable-next-line no-unused-vars
-    setActiveChannel?: (channel: IChannel) => void
+    selectedChannel?: IChannel
+    setSelectedChannel?: (channel: IChannel) => void
   }>
   ListItem?: FC<{
     channel?: IChannel
     contact?: IContact
-    // eslint-disable-next-line no-unused-vars
-    setActiveChannel?: (channel: IChannel) => void
-    // eslint-disable-next-line no-unused-vars
+    setSelectedChannel?: (channel: IChannel) => void
     createChatWithContact?: (contact: IContact) => void
   }>
   className?: string
@@ -81,8 +77,7 @@ interface IChannelListProps {
   searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
-  // eslint-disable-next-line no-unused-vars
-  getActiveChannel?: (channel: IChannel) => void
+  getSelectedChannel?: (channel: IChannel) => void
   filter?: { channelType?: string }
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
@@ -120,43 +115,28 @@ interface IChannelListProps {
   searchChannelInputFontSize?: string
   searchedChannelsTitleFontSize?: string
   onChannelDeleted?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     deletedChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelCreated?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     createdChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelHidden?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     hiddenChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onChannelVisible?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     visibleChannel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
   onAddedToChannel?: (
-    // eslint-disable-next-line no-unused-vars
     channelList: IChannel[],
-    // eslint-disable-next-line no-unused-vars
     channel: IChannel,
-    // eslint-disable-next-line no-unused-vars
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
 }
@@ -176,7 +156,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   channelsMargin,
   List,
   ListItem,
-  getActiveChannel,
+  getSelectedChannel,
   Profile,
   CreateChannel,
   ChannelsTitle,
@@ -378,8 +358,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [searchValue])
   useDidUpdate(() => {
-    if (getActiveChannel) {
-      getActiveChannel(activeChannel)
+    if (getSelectedChannel) {
+      getSelectedChannel(activeChannel)
     }
   }, [activeChannel.id])
 
@@ -480,8 +460,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
         <List
           channels={channels}
           searchedChannels={searchedChannels}
-          activeChannel={activeChannel}
-          setActiveChannel={handleChangeActiveChannel}
+          selectedChannel={activeChannel}
+          setSelectedChannel={handleChangeActiveChannel}
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
         >
@@ -489,7 +469,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             <React.Fragment>
               {channels.map((channel: IChannel) =>
                 ListItem ? (
-                  <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                  <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                 ) : (
                   <Channel
                     theme={theme}
@@ -533,7 +513,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -573,7 +553,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem
                             contact={contact}
                             createChatWithContact={handleCrateChatWithContact}
-                            setActiveChannel={handleChangeActiveChannel}
+                            setSelectedChannel={handleChangeActiveChannel}
                             key={contact.id}
                           />
                         ) : (
@@ -609,7 +589,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -658,7 +638,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             <ChannelsList ref={channelsScrollRef} onScroll={handleAllChannelsListScroll}>
               {channels.map((channel: IChannel) =>
                 ListItem ? (
-                  <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                  <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                 ) : (
                   <Channel
                     theme={theme}
@@ -707,7 +687,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -744,7 +724,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setActiveChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}

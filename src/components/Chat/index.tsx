@@ -29,8 +29,8 @@ interface IProps {
   hideChannelList?: boolean
   className?: string
   children?: JSX.Element | JSX.Element[]
-  onActiveChannelUpdated?: (activeChannel: IChannel) => void
-  activeChannelId?: string
+  onSelectedChannelUpdated?: (selectedChannel: IChannel) => void
+  selectedChannelId?: string
   noChannelSelectedBackgroundColor?: string
   CustomNoChannelSelected?: JSX.Element
 }
@@ -40,8 +40,8 @@ let detailsSwitcherTimeout: NodeJS.Timeout
 export default function Chat({
   children,
   hideChannelList,
-  onActiveChannelUpdated,
-  activeChannelId,
+  onSelectedChannelUpdated,
+  selectedChannelId,
   className,
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
@@ -64,8 +64,8 @@ export default function Chat({
   }, [channelListWidth])
 
   useEffect(() => {
-    if (onActiveChannelUpdated) {
-      onActiveChannelUpdated(activeChannel)
+    if (onSelectedChannelUpdated) {
+      onSelectedChannelUpdated(activeChannel)
     }
   }, [activeChannel])
 
@@ -83,11 +83,11 @@ export default function Chat({
   }, [addedChannel])
 
   useDidUpdate(() => {
-    if (activeChannelId && (activeChannel ? activeChannel.id !== activeChannelId : true)) {
-      setActiveChannelId(activeChannelId)
-      dispatch(setActiveChannelAC({ id: activeChannelId } as IChannel))
+    if (selectedChannelId && (activeChannel ? activeChannel.id !== selectedChannelId : true)) {
+      setActiveChannelId(selectedChannelId)
+      dispatch(setActiveChannelAC({ id: selectedChannelId } as IChannel))
     }
-  }, [activeChannelId])
+  }, [selectedChannelId])
 
   useDidUpdate(() => {
     if (channelDetailsIsOpen) {
