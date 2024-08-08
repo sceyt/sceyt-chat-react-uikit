@@ -84,8 +84,7 @@ export default function Chat({
 
   useDidUpdate(() => {
     if (selectedChannelId && (activeChannel ? activeChannel.id !== selectedChannelId : true)) {
-      setActiveChannelId(selectedChannelId)
-      dispatch(setActiveChannelAC({ id: selectedChannelId } as IChannel))
+      dispatch(switchChannelActionAC({ id: selectedChannelId } as IChannel))
     }
   }, [selectedChannelId])
 
