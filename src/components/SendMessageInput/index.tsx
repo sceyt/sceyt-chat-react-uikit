@@ -1821,7 +1821,7 @@ const Container = styled.div<{
   border: ${(props) => props.border || ''};
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
-  padding: ${(props) => props.padding || '0 12px'};
+  padding: ${(props) => props.padding || '0 calc(4% + 32px)'};
 
   & span.rdw-suggestion-dropdown {
     position: absolute;
@@ -1955,6 +1955,7 @@ const AddAttachmentIcon = styled.span<any>`
 const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: string; messageForReply?: string }>`
   display: flex;
   align-items: flex-end;
+  justify-content: space-between;
   position: relative;
   min-height: ${(props) => props.minHeight || '36px'};
   box-sizing: border-box;
@@ -2138,7 +2139,7 @@ const SendMessageButton = styled.span<{
   display: flex;
   height: ${props.height ? `${props.height}px` : '36px'};
   align-items: center;
-  margin: 0 8px 0 auto;
+  // margin: 0 8px 0 auto;
   cursor: ${props.isActive && 'pointer'};
   line-height: 13px;
   order: ${props.order === 0 || props.order ? props.order : 4};
