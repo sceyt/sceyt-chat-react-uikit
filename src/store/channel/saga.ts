@@ -1,4 +1,4 @@
-import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
+import { put, takeLatest, call, takeEvery, select } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   addChannelAC,
@@ -94,6 +94,7 @@ import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
+import { channelListHiddenSelector } from './selector'
 
 function* createChannel(action: IAction): any {
   try {
@@ -360,24 +361,26 @@ function* getChannels(action: IAction): any {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
-
-    const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
-    allChannelsQueryBuilder.order('lastMessage')
-    if (channelTypesFilter?.length) {
-      channelQueryBuilder.types(channelTypesFilter)
-    }
-    allChannelsQueryBuilder.limit(50)
-    const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
-    let hasNext = true
-    for (let i = 0; i <= 4; i++) {
-      if (hasNext) {
-        try {
-          const allChannelsData = yield call(allChannelsQuery.loadNextPage)
-          hasNext = allChannelsData.hasNext
-          const allChannelList = allChannelsData.channels
-          addChannelsToAllChannels(allChannelList)
-        } catch (e) {
-          console.log(e, 'Error on get all channels')
+    const hiddenList = yield select(channelListHiddenSelector)
+    if (!hiddenList) {
+      const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+      allChannelsQueryBuilder.order('lastMessage')
+      if (channelTypesFilter?.length) {
+        channelQueryBuilder.types(channelTypesFilter)
+      }
+      allChannelsQueryBuilder.limit(50)
+      const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
+      let hasNext = true
+      for (let i = 0; i <= 4; i++) {
+        if (hasNext) {
+          try {
+            const allChannelsData = yield call(allChannelsQuery.loadNextPage)
+            hasNext = allChannelsData.hasNext
+            const allChannelList = allChannelsData.channels
+            addChannelsToAllChannels(allChannelList)
+          } catch (e) {
+            console.log(e, 'Error on get all channels')
+          }
         }
       }
     }
@@ -851,6 +854,8 @@ function* switchChannel(action: IAction): any {
       const addChannel = getChannelFromAllChannels(channel.id)
       if (addChannel) {
         setChannelInMap(addChannel)
+        yield put(addChannelAC(JSON.parse(JSON.stringify(addChannel))))
+        channelToSwitch = { ...channelToSwitch, ...addChannel }
       } else {
         const SceytChatClient = getClient()
         const fetchedChannel = yield call(SceytChatClient.getChannel, channel.id)
@@ -865,7 +870,6 @@ function* switchChannel(action: IAction): any {
     }
 
     const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-    channelToSwitch = { ...channelToSwitch, ...currentActiveChannel }
     yield call(setUnreadScrollTo, true)
     yield call(setActiveChannelId, channel && channel.id)
     if (channel.isLinkedChannel) {
