@@ -159,7 +159,7 @@ function App() {
                               client={client}
                               autoSelectFirstChannel={true}
                             >
-                                <Chat onActiveChannelUpdated={handleUpdateUnreadCount} hideChannelList={true}>
+                                <Chat onSelectedChannelUpdated={handleUpdateUnreadCount} hideChannelList={true}>
                                     <MessageList
                                         fontFamily="Inter, sans-serif"
                                         messageWidthPercent={70}
