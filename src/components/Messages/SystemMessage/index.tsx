@@ -5,14 +5,14 @@ import { useDispatch } from 'react-redux'
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useDidUpdate, useOnScreen } from '../../../hooks'
+import { useColor, useDidUpdate, useOnScreen } from '../../../hooks'
 // Helpers
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 
 interface ISystemMessageProps {
@@ -44,6 +44,7 @@ const Message = ({
   borderRadius,
   contactsMap
 }: ISystemMessageProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -91,7 +92,7 @@ const Message = ({
       marginTop={differentUserMessageSpacing || '16px'}
       marginBottom={nextMessage && nextMessage.type !== 'system' ? differentUserMessageSpacing || '16px' : ''}
       fontSize={fontSize}
-      textColor={textColor || colors.textColor1}
+      textColor={textColor || textPrimary}
       border={border}
       backgroundColor={backgroundColor || colors.backgroundColor}
       borderRadius={borderRadius}
@@ -159,7 +160,7 @@ export const Container = styled.div<{
   marginTop?: string
   marginBottom?: string
   visible?: boolean
-  textColor?: string
+  textColor: string
   backgroundColor?: string
   borderRadius?: string
   fontSize?: string
@@ -180,7 +181,7 @@ export const Container = styled.div<{
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.fontSize || '14px'};
-    color: ${(props) => props.textColor || colors.textColor1};
+    color: ${(props) => props.textColor};
     background: ${(props) => props.backgroundColor || '#ffffff'};
     box-sizing: border-box;
     border: ${(props) => props.border};

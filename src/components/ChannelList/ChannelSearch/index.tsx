@@ -1,8 +1,9 @@
 import styled from 'styled-components'
 import React from 'react'
 import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { THEME } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string }>`
   position: relative;
@@ -68,23 +69,27 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   searchInputBackgroundColor,
   searchInputTextColor,
   fontSize
-}) => (
-  <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
-    <StyledSearchSvg left={!inline ? '22px' : ''} />
-    <SearchInput
-      backgroundColor={
-        searchInputBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
-      }
-      color={searchInputTextColor || colors.textColor1}
-      borderRadius={borderRadius}
-      type='text'
-      onChange={handleSearchValueChange}
-      value={searchValue}
-      placeholder='Search for channels'
-      fontSize={fontSize}
-    />
-    {searchValue && <ClearTypedText onClick={getMyChannels} />}
-  </SearchInputContainer>
-)
+}) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+
+  return (
+    <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
+      <StyledSearchSvg left={!inline ? '22px' : ''} />
+      <SearchInput
+        backgroundColor={
+          searchInputBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
+        }
+        color={searchInputTextColor || textPrimary}
+        borderRadius={borderRadius}
+        type='text'
+        onChange={handleSearchValueChange}
+        value={searchValue}
+        placeholder='Search for channels'
+        fontSize={fontSize}
+      />
+      {searchValue && <ClearTypedText onClick={getMyChannels} />}
+    </SearchInputContainer>
+  )
+}
 
 export default ChannelSearch

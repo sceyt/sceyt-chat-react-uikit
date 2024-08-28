@@ -66,7 +66,7 @@ import {
   makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors, THEME_COLOR_NAMES} from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
@@ -301,6 +301,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderTextColor
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -1313,7 +1314,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 {disableInput && CustomDisabledInput ? (
                   <CustomDisabledInput />
                 ) : (
-                  <BlockedUserInfo color={colors.textColor1}>
+                  <BlockedUserInfo color={textPrimary}>
                     <BlockInfoIcon />{' '}
                     {isDeletedUserChat
                       ? 'This user has been deleted.'
@@ -1324,7 +1325,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
               </React.Fragment>
             ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-              <JoinChannelCont onClick={handleJoinToChannel} color={accentColor }>
+              <JoinChannelCont onClick={handleJoinToChannel} color={accentColor}>
                 Join
               </JoinChannelCont>
             ) : (
@@ -1332,7 +1333,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
                   : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
               ) ? (
-              <ReadOnlyCont color={colors.textColor1} iconColor={accentColor}>
+              <ReadOnlyCont color={textPrimary} iconColor={accentColor}>
                 <EyeIcon /> Read only
               </ReadOnlyCont>
             ) : (
@@ -1367,7 +1368,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     left={replyEditMessageContainerLeftPosition}
                     bottom={replyEditMessageContainerBottomPosition}
                     padding={replyEditMessageContainerPadding}
-                    color={editMessageTextColor || colors.textColor1}
+                    color={editMessageTextColor || textPrimary}
                     backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
                   >
                     <CloseEditMode onClick={handleCloseEditMode}>
@@ -1384,7 +1385,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         contactsMap,
                         getFromContacts,
                         asSampleText: true,
-                        accentColor:accentColor
+                        accentColor
                       })}
                     </EditMessageText>
                   </EditReplyMessageCont>
@@ -1396,7 +1397,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     bottom={replyEditMessageContainerBottomPosition}
                     left={replyEditMessageContainerLeftPosition}
                     padding={replyEditMessageContainerPadding}
-                    color={replyMessageTextColor || colors.textColor1}
+                    color={replyMessageTextColor || textPrimary}
                     backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
                   >
                     <CloseEditMode onClick={handleCloseReply}>
@@ -1449,7 +1450,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             message: messageForReply,
                             contactsMap,
                             getFromContacts,
-                            accentColor:accentColor
+                            accentColor
                           })
                         )}
                       </div>
@@ -1528,7 +1529,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           <DropdownOptionsUl>
                             <DropdownOptionLi
                               key={1}
-                              textColor={colors.textColor1}
+                              textColor={textPrimary}
                               hoverBackground={colors.hoverBackgroundColor}
                               onClick={() => onOpenFileUploader(mediaExtensions)}
                               iconWidth='20px'
@@ -1539,7 +1540,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             </DropdownOptionLi>
                             <DropdownOptionLi
                               key={2}
-                              textColor={colors.textColor1}
+                              textColor={textPrimary}
                               hoverBackground={colors.hoverBackgroundColor}
                               onClick={() => onOpenFileUploader('')}
                               iconWidth='20px'
@@ -1559,7 +1560,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         className={inputCustomClassname}
                         selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
                         borderRadius={inputBorderRadius}
-                        color={colors.textColor1}
+                        color={textPrimary}
                       >
                         <LexicalComposer initialConfig={initialConfig}>
                           <AutoFocusPlugin messageForReply={messageForReply} />
@@ -1728,7 +1729,7 @@ const Container = styled.div<{
 
 const EditReplyMessageCont = styled.div<{
   backgroundColor?: string
-  color?: string
+  color: string
   width?: string
   borderRadius?: string
   left?: string
@@ -1745,7 +1746,7 @@ const EditReplyMessageCont = styled.div<{
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
@@ -1770,7 +1771,7 @@ const CloseEditMode = styled.span`
   line-height: 22px;
   cursor: pointer;
 
-  & > svg { 
+  & > svg {
     color: ${colors.textColor2};
   }
 `
@@ -1967,7 +1968,8 @@ const EmojiButton = styled.span<any>`
   -webkit-tap-highlight-color: transparent;
 
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : `color: ${props.hoverColor};`)};
+    ${(props) =>
+      props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : `color: ${props.hoverColor};`};
     width: 24px;
     height: 24px;
   }
@@ -1998,7 +2000,7 @@ const SendMessageButton = styled.span<{
   -webkit-tap-highlight-color: transparent;
 
   color: ${props.isActive ? colors.primary : props.color};
-  & > svg { 
+  & > svg {
     color: ${props.iconColor || colors.textColor2};
   }
   `}
@@ -2119,7 +2121,7 @@ const TypingAnimation = styled.div`
 const Loading = styled.div`
   height: 36px;
 `
-const BlockedUserInfo = styled.div`
+const BlockedUserInfo = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2127,7 +2129,7 @@ const BlockedUserInfo = styled.div`
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 
   & > svg {
     margin-right: 12px;

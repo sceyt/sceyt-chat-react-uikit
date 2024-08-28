@@ -92,6 +92,7 @@ const Attachment = ({
   videoAttachmentMaxHeight
 }: AttachmentPops) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -777,11 +778,7 @@ const Attachment = ({
                 borderRadius={!(attachmentThumb || (attachment.attachmentUrl && isPreview)) ? '50%' : undefined}
                 isDetailsView={isDetailsView}
                 backgroundColor={
-                  downloadingFile
-                    ? ''
-                    : attachment.attachmentUrl || attachmentThumb
-                      ? 'rgba(0,0,0,0.4)'
-                      : accentColor
+                  downloadingFile ? '' : attachment.attachmentUrl || attachmentThumb ? 'rgba(0,0,0,0.4)' : accentColor
                 }
               >
                 {(isInUploadingState || downloadingFile) && (
@@ -844,13 +841,13 @@ const Attachment = ({
           {!isRepliedMessage && (
             <AttachmentFileInfo isPreview={isPreview}>
               {/* @ts-ignore */}
-              <AttachmentName color={selectedFileAttachmentsTitleColor} ref={fileNameRef}>
+              <AttachmentName color={selectedFileAttachmentsTitleColor || textPrimary} ref={fileNameRef}>
                 {formatLargeText(
                   isPreview ? attachment.data.name : attachment.name,
                   fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
-              <AttachmentSize color={selectedFileAttachmentsSizeColor}>
+              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary}>
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
@@ -1090,18 +1087,18 @@ const FailedFileIcon = styled(ErrorIcon)`
   cursor: pointer;
 ` */
 
-const AttachmentName = styled.h3<{ color?: string }>`
+const AttachmentName = styled.h3<{ color: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 18px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   max-width: 275px;
   white-space: nowrap;
   margin: 0;
 `
-const AttachmentSize = styled.span<{ color?: string }>`
+const AttachmentSize = styled.span<{ color: string }>`
   font-size: 13px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   & > span {
     color: ${colors.red1};
     margin-left: 8px;

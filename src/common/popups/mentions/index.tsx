@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
 import { LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
@@ -13,7 +13,7 @@ import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { useDidUpdate } from '../../../hooks'
+import { useColor, useDidUpdate } from '../../../hooks'
 import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
@@ -33,6 +33,7 @@ export default function MentionMembersPopup({
   handleMentionsPopupClose,
   searchMention
 }: IMentionsPopupProps) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -202,7 +203,7 @@ export default function MentionMembersPopup({
               />
             </AvatarWrapper>
             <UserNamePresence>
-              <MemberName color={colors.textColor1}>
+              <MemberName color={textPrimary}>
                 {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
               <SubTitle>
@@ -248,7 +249,7 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const EditMemberIcon = styled.span`
@@ -266,7 +267,7 @@ export const MembersList = styled.ul<{ ref?: any }>`
   overflow-x: hidden;
   list-style: none;
   transition: all 0.2s;
-  height: calc(100% - 10px); ;
+  height: calc(100% - 10px);
 `
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
   display: flex;

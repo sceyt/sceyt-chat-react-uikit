@@ -93,6 +93,7 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarTextSize
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
@@ -211,7 +212,7 @@ const Channel: React.FC<IChannelProps> = ({
         uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
         subjectFontSize={channelSubjectFontSize}
         subjectLineHeight={channelSubjectLineHeight}
-        subjectColor={channelSubjectColor}
+        subjectColor={channelSubjectColor || (theme === THEME.DARK ? colors.darkModeTextColor1 : textPrimary)}
         avatarSize={channelAvatarSize}
       >
         <h3>
@@ -229,6 +230,7 @@ const Channel: React.FC<IChannelProps> = ({
         )}
         {(lastMessage || !!typingIndicator || draftMessageText) && (
           <LastMessage
+            color={textPrimary}
             markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
             unreadMentions={!!(channel.newMentionCount && channel.newMentionCount > 0)}
             fontSize={channelLastMessageFontSize}
@@ -236,7 +238,7 @@ const Channel: React.FC<IChannelProps> = ({
           >
             {typingIndicator ? (
               !isDirectChannel ? (
-                <LastMessageAuthor theme={theme}>
+                <LastMessageAuthor color={theme === THEME.DARK ? colors.darkModeTextColor1 : textPrimary}>
                   <span ref={messageAuthorRef}>
                     {makeUsername(
                       contactsMap && contactsMap[typingIndicator.from.id],
@@ -253,7 +255,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
               ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
               lastMessage.type !== 'system' && (
-                <LastMessageAuthor theme={theme}>
+                <LastMessageAuthor color={theme === THEME.DARK ? colors.darkModeTextColor1 : textPrimary}>
                   <span ref={messageAuthorRef}>
                     {channel.newReactions[0].user.id === user.id
                       ? 'You'
@@ -271,7 +273,7 @@ const Channel: React.FC<IChannelProps> = ({
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
               ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
               lastMessage.type !== 'system' && (
-                <LastMessageAuthor theme={theme}>
+                <LastMessageAuthor color={theme === THEME.DARK ? colors.darkModeTextColor1 : textPrimary}>
                   <span ref={messageAuthorRef}>
                     {lastMessage.user.id === user.id
                       ? 'You'
@@ -415,7 +417,7 @@ const Channel: React.FC<IChannelProps> = ({
                       contactsMap,
                       getFromContacts,
                       isLastMessage: true,
-                      accentColor:accentColor
+                      accentColor
                     })}
                   {channel.lastReactedMessage && '"'}
                 </React.Fragment>
@@ -437,7 +439,7 @@ const Channel: React.FC<IChannelProps> = ({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
                 readIconColor: accentColor,
-                accentColor:accentColor,
+                accentColor,
                 size: '16px'
               })}
           </DeliveryIconCont>
@@ -451,10 +453,7 @@ const Channel: React.FC<IChannelProps> = ({
       </ChannelStatus>
       <UnreadInfo bottom={!(lastMessage || !!typingIndicator || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
-          <UnreadMentionIconWrapper
-            iconColor={accentColor}
-            rightMargin={!!(channel.newMessageCount || channel.unread)}
-          >
+          <UnreadMentionIconWrapper iconColor={accentColor} rightMargin={!!(channel.newMessageCount || channel.unread)}>
             <MentionIcon />
           </UnreadMentionIconWrapper>
         )}
@@ -519,7 +518,7 @@ export const ChannelInfo = styled.div<{
   uppercase?: boolean
   subjectFontSize?: string
   subjectLineHeight?: string
-  subjectColor?: string
+  subjectColor: string
   avatarSize?: number
 }>`
   text-align: left;
@@ -538,8 +537,7 @@ export const ChannelInfo = styled.div<{
     max-width: ${(props) => `calc(100% - ${props.statusWidth + (props.isMuted ? 28 : 4) + 2}px)`};
     overflow: hidden;
     white-space: nowrap;
-    color: ${(props) =>
-      props.subjectColor || (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+    color: ${(props) => props.subjectColor};
     text-transform: ${(props) => props.uppercase && 'uppercase'};
   }
 `
@@ -555,6 +553,7 @@ export const MutedIcon = styled.span`
 `
 
 export const LastMessage = styled.div<{
+  color: string
   markedAsUnread?: boolean
   unreadMentions?: boolean
   fontSize?: string
@@ -563,7 +562,7 @@ export const LastMessage = styled.div<{
   display: flex;
   align-items: center;
   font-size: ${(props) => props.fontSize || '14px'};
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   max-width: ${(props) =>
     props.markedAsUnread || props.unreadMentions
       ? // @ts-ignore
@@ -597,10 +596,10 @@ export const DraftMessageTitle = styled.span<any>`
 export const DraftMessageText = styled.span<any>`
   color: ${colors.textColor2};
 `
-export const LastMessageAuthor = styled.div<{ theme?: string; typing?: boolean }>`
+export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean }>`
   max-width: 120px;
   font-weight: 500;
-  color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+  color: ${(props) => props.color};
 
   & > span {
     display: block;

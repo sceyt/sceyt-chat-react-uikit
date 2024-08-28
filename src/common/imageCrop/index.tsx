@@ -15,7 +15,8 @@ interface IProps {
 }
 const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT);
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
 
   const [state, setState] = useStateComplex({
     image: image.url,
@@ -85,12 +86,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
           </div>
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button
-            type='button'
-            color={colors.textColor1}
-            backgroundColor='transparent'
-            onClick={() => handleClosePopup()}
-          >
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
           <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={returnCroppedImage}>
@@ -110,7 +106,7 @@ const CropperWrapper = styled.div`
   height: 300px;
   margin: 14px 0;
 `
-const Controls = styled.div<{background:string}>`
+const Controls = styled.div<{ background: string }>`
   & > input {
     width: 100%;
     -webkit-appearance: none;

@@ -41,6 +41,7 @@ function ConfirmPopup({
   loading
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const [checkActionPermission] = usePermissions(myRole)
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
@@ -73,8 +74,8 @@ function ConfirmPopup({
         padding='0'
       >
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon color={colors.textColor1} onClick={() => togglePopup()} />
-          <PopupName color={colors.textColor1} isDelete marginBottom='20px'>
+          <CloseIcon color={textPrimary} onClick={() => togglePopup()} />
+          <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
           <PopupDescription>{description}</PopupDescription>
@@ -106,7 +107,7 @@ function ConfirmPopup({
           )}
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button

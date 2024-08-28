@@ -1,11 +1,12 @@
 import React from 'react'
 import styled from 'styled-components'
 import { USER_PRESENCE_STATUS } from '../../../../helpers/constants'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { AvatarWrapper, UserStatus } from '../../../../components/Channel'
 import { Avatar } from '../../../../components'
 import { userLastActiveDateFormat } from '../../../../helpers'
 import { SubTitle } from '../../../../UIHelper'
+import { useColor } from '../../../../hooks'
 
 interface IMentionsPopupProps {
   mention: any
@@ -15,6 +16,7 @@ interface IMentionsPopupProps {
 }
 
 export default function MentionMember({ mention, isFocused, ...parentProps }: IMentionsPopupProps) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   return (
     <MemberItem
       key={mention.id}
@@ -26,7 +28,7 @@ export default function MentionMember({ mention, isFocused, ...parentProps }: IM
         <Avatar name={mention.name} image={mention.avatar} size={32} textSize={14} setDefaultAvatar />
       </AvatarWrapper>
       <UserNamePresence>
-        <MemberName color={colors.textColor1}>{mention.name}</MemberName>
+        <MemberName color={textPrimary}>{mention.name}</MemberName>
         <SubTitle>
           {mention.presence && mention.presence.state === USER_PRESENCE_STATUS.ONLINE
             ? 'Online'
@@ -54,7 +56,7 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const EditMemberIcon = styled.span`

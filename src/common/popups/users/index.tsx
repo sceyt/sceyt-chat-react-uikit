@@ -70,6 +70,7 @@ const UsersPopup = ({
   popupWidth
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -325,9 +326,9 @@ const UsersPopup = ({
               type='text'
               widthBorder={theme !== THEME.DARK}
               backgroundColor={colors.backgroundColor}
-              color={colors.textColor1}
+              color={textPrimary}
             />
-            {userSearchValue && <ClearTypedText color={colors.textColor1} onClick={() => setUserSearchValue('')} />}
+            {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
           {actionType !== 'createChat' && selectedMembers.length !== 0 && (
             <SelectedMembersContainer ref={selectedMembersCont}>
@@ -342,7 +343,7 @@ const UsersPopup = ({
                       setDefaultAvatar
                       border={'0.5px solid rgba(0, 0, 0, 0.1)'}
                     />
-                    <SelectedMemberName color={colors.textColor1}>{member.displayName}</SelectedMemberName>
+                    <SelectedMemberName color={textPrimary}>{member.displayName}</SelectedMemberName>
                     <StyledSubtractSvg onClick={() => removeMember(member)} />
                   </SelectedMemberBubble>
                 )
@@ -382,7 +383,7 @@ const UsersPopup = ({
                   />
 
                   <UserNamePresence>
-                    <MemberName color={colors.textColor1}>{memberDisplayName}</MemberName>
+                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
                     <SubTitle>
                       {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
@@ -447,11 +448,11 @@ const UsersPopup = ({
         {actionType !== 'createChat' && (
           <PopupFooter backgroundColor={colors.backgroundColor} marginTop='auto'>
             {actionType === 'selectUsers' ? (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={handleGoBack}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleGoBack}>
                 Back
               </Button>
             ) : (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={toggleCreatePopup}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={toggleCreatePopup}>
                 Cancel
               </Button>
             )}
@@ -556,7 +557,7 @@ const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?:
   box-sizing: border-box;
   border-radius: 8px;
   padding-left: 36px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
 
   &::placeholder {
@@ -602,7 +603,7 @@ const MemberName = styled.h4<{ color?: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin: 0;
   max-width: calc(100% - 10px);
   text-overflow: ellipsis;
@@ -640,7 +641,7 @@ const SelectedMemberName = styled.span`
   font-size: 14px;
   line-height: 16px;
   margin-left: 8px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

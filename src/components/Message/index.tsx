@@ -361,7 +361,7 @@ const Message = ({
   messageTextLineHeight
 }: IMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -1127,7 +1127,7 @@ const Message = ({
                         contactsMap,
                         getFromContacts,
                         asSampleText: true,
-                        accentColor:accentColor
+                        accentColor
                       })
                     ) : (
                       parentNotLinkAttachment &&
@@ -1182,7 +1182,7 @@ const Message = ({
             <MessageText
               theme={theme}
               draggable={false}
-              color={textPrimaryColor}
+              color={textPrimary}
               fontSize={messageTextFontSize}
               lineHeight={messageTextLineHeight}
               showMessageSenderName={showMessageSenderName}
@@ -1200,7 +1200,7 @@ const Message = ({
                   message,
                   contactsMap,
                   getFromContacts,
-                  accentColor:accentColor
+                  accentColor
                 })}
               </span>
               {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
@@ -1238,7 +1238,7 @@ const Message = ({
                         size: messageStatusSize,
                         iconColor: messageStatusColor,
                         readIconColor: messageReadStatusColor,
-                        accentColor:accentColor
+                        accentColor
                       })}
                     </MessageStatus>
                   )}
@@ -1286,7 +1286,7 @@ const Message = ({
                           ? colors.white
                           : '',
                       readIconColor: messageReadStatusColor,
-                      accentColor:accentColor
+                      accentColor
                     })}
                 </MessageStatusAndTime>
               )}
@@ -1401,7 +1401,7 @@ const Message = ({
                   size: messageStatusSize,
                   iconColor: messageStatusColor,
                   readIconColor: messageReadStatusColor,
-                  accentColor:accentColor
+                  accentColor
                 })}
               </MessageStatus>
             )}
@@ -1452,7 +1452,7 @@ const Message = ({
               {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
                 <MessageReaction
                   key={summery.key}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   // onClick={() => handleReactionAddDelete(key)}
                   self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
@@ -1465,14 +1465,16 @@ const Message = ({
                 >
                   <MessageReactionKey>
                     {summery.key}
-                    {showEachReactionCount && <ReactionItemCount>{summery.count}</ReactionItemCount>}
+                    {showEachReactionCount && (
+                      <ReactionItemCount color={textPrimary}>{summery.count}</ReactionItemCount>
+                    )}
                   </MessageReactionKey>
                 </MessageReaction>
               ))}
               {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
                 <MessageReaction
                   border={reactionItemBorder}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   borderRadius={reactionItemBorderRadius}
                   backgroundColor={reactionItemBackground}
                   padding={reactionItemPadding}
@@ -1557,13 +1559,13 @@ const MessageReactionKey = styled.span`
     segoe ui symbol;
 `
 
-const ReactionItemCount = styled.span<{ color?: string }>`
+const ReactionItemCount = styled.span<{ color: string }>`
   margin-left: 2px;
   font-family: Inter, sans-serif;
   font-weight: 400;
   font-size: 14px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const MessageReaction = styled.span<{
