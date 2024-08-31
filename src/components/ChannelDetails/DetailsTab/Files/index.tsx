@@ -48,6 +48,7 @@ const Files = ({
   fileSizeLineHeight
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
@@ -115,12 +116,16 @@ const Files = ({
                 <FileSizeAndDate
                   fontSize={fileSizeFontSize}
                   lineHeight={fileSizeLineHeight}
-                  color={filePreviewSizeColor}
+                  color={filePreviewSizeColor || textPrimary}
                 >
                   {file.size ? bytesToSize(file.size) : ''}
                 </FileSizeAndDate>
               </div>
-              <DownloadWrapper visible={downloadingFilesMap[file.id!]} iconColor={accentColor} onClick={() => handleDownloadFile(file)}>
+              <DownloadWrapper
+                visible={downloadingFilesMap[file.id!]}
+                iconColor={accentColor}
+                onClick={() => handleDownloadFile(file)}
+              >
                 {downloadingFilesMap[file.id!] ? (
                   // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
                   <ProgressWrapper>
@@ -173,7 +178,7 @@ const Container = styled.ul`
 `
 // eslint-disable-next-line max-len
 // ${(props) => (props.optionsMenuIsOpen ? 'height: calc(100vh - 495px)' : (props.noActions ? 'height: calc(100vh - 544px)' : 'height: calc(100vh - 445px)'))}
-const DownloadWrapper = styled.a<{ visible?: boolean, iconColor?:string }>`
+const DownloadWrapper = styled.a<{ visible?: boolean; iconColor?: string }>`
   text-decoration: none;
   visibility: ${(props) => (props.visible ? 'visible' : 'hidden')};
   padding: 5px 6px;
@@ -182,7 +187,7 @@ const DownloadWrapper = styled.a<{ visible?: boolean, iconColor?:string }>`
   right: 16px;
   cursor: pointer;
   & > svg {
-    color:${(props) => props.iconColor};
+    color: ${(props) => props.iconColor};
   }
 `
 const ProgressWrapper = styled.span`
@@ -210,19 +215,19 @@ const ProgressWrapper = styled.span`
   }
 ` */
 
-const FileIconCont = styled.span<{iconColor:string}>`
+const FileIconCont = styled.span<{ iconColor: string }>`
   display: inline-flex;
 
   & > svg {
     width: 40px;
     height: 40px;
-    color:${(props) => props.iconColor};
+    color: ${(props) => props.iconColor};
   }
 `
-const FileHoverIconCont = styled.span<{iconColor:string}>`
+const FileHoverIconCont = styled.span<{ iconColor: string }>`
   display: none;
   & > svg {
-    color:${(props) => props.iconColor};
+    color: ${(props) => props.iconColor};
     width: 40px;
     height: 40px;
   }
@@ -267,6 +272,6 @@ const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string }>`
   font-weight: normal;
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: ${(props) => props.lineHeight || '16px'};
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin-top: 2px;
 `

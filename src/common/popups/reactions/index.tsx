@@ -50,6 +50,7 @@ export default function ReactionsPopup({
   rtlDirection
 }: IReactionsPopupProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const popupRef = useRef<HTMLDivElement>(null)
   const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
@@ -165,7 +166,9 @@ export default function ReactionsPopup({
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
             active={activeTabKey === 'all'}
-            activeColor={accentColor}
+            color={colors.textColor2}
+            activeBackgroundColor={accentColor}
+            activeColor={textPrimary}
             onClick={() => handleGetReactions()}
           >
             <span>{`All ${totalReactions}`}</span>
@@ -176,7 +179,9 @@ export default function ReactionsPopup({
               key={reaction.key}
               onClick={() => handleGetReactions(reaction.key)}
               active={activeTabKey === reaction.key}
-              activeColor={accentColor}
+              color={colors.textColor2}
+              activeBackgroundColor={accentColor}
+              activeColor={textPrimary}
             >
               <span>
                 <TabKey>{reaction.key}</TabKey>
@@ -244,7 +249,9 @@ const Container = styled.div<{
   max-height: 320px;
   background: #ffffff;
   //border: 1px solid #dfe0eb;
-  box-shadow: 0 6px 24px -6px rgba(15, 34, 67, 0.12), 0px 1px 3px rgba(24, 23, 37, 0.14);
+  box-shadow:
+    0 6px 24px -6px rgba(15, 34, 67, 0.12),
+    0px 1px 3px rgba(24, 23, 37, 0.14);
   box-sizing: border-box;
   //box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: ${(props) => props.borderRadius || '12px'};
@@ -321,7 +328,14 @@ const ReactionScoresList = styled.div<{ borderBottom: boolean }>`
 `
 
 const TabKey = styled.span``
-const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; activeColor?: string }>`
+
+const ReactionScoreItem = styled.div<{
+  bubbleStyle: boolean
+  color: string
+  activeColor: string
+  activeBackgroundColor: string
+  active?: boolean
+}>`
   position: relative;
   display: flex;
   white-space: nowrap;
@@ -329,7 +343,7 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
   font-weight: 500;
   font-size: 13px;
   border-bottom: ${(props) => !props.bubbleStyle && `1px solid ${colors.gray1}`};
-  color: ${(props) => (props.active ? colors.textColor1 : colors.textColor2)};
+  color: ${(props) => (props.active ? props.activeColor : props.color)};
   margin-bottom: -1px;
   cursor: pointer;
   & > span {
@@ -344,7 +358,7 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
     font-weight: 600;
     font-size: 14px;
     line-height: ${(props) => (props.bubbleStyle ? '18px' : '30px')};
-    background-color: ${(props) => props.active && props.bubbleStyle && props.activeColor};
+    background-color: ${(props) => props.active && props.bubbleStyle && props.activeBackgroundColor};
     color: ${(props) => props.active && props.bubbleStyle && colors.white};
     ${(props) =>
       props.active &&
@@ -363,8 +377,15 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
   `}
 
     & ${TabKey} {
-      font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-        twemoji mozilla, segoe ui symbol;
+      font-family:
+        apple color emoji,
+        segoe ui emoji,
+        noto color emoji,
+        android emoji,
+        emojisymbols,
+        emojione mozilla,
+        twemoji mozilla,
+        segoe ui symbol;
       margin-right: 4px;
       font-size: 15px;
     }
@@ -372,8 +393,15 @@ const ReactionScoreItem = styled.div<{ bubbleStyle: boolean; active?: boolean; a
 `
 
 const ReactionKey = styled.span`
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   font-size: 20px;
   cursor: pointer;
 `
