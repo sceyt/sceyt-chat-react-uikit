@@ -184,7 +184,9 @@ function EmojisPopup({
             return (
               <React.Fragment key={mainCollectionKey}>
                 {!fixEmojiCategoriesTitleOnTop && (
-                  <EmojiHeader padding='6px 8px 0'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
+                  <EmojiHeader color={textSecondary} padding='6px 8px 0'>
+                    {getEmojisCategoryTitle(mainCollectionKey)}
+                  </EmojiHeader>
                 )}
                 {emojiBigCollection.array.map((emojiSmallCollection, bigIndex) => {
                   const label = emojiSmallCollection.key

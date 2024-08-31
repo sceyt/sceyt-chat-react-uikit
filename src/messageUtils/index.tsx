@@ -71,7 +71,7 @@ const MessageStatusIcon = ({
       return messageStatusDisplayingType === 'ticks' ? (
         <DeliveredIconWrapper width={size} height={size} color={color} />
       ) : (
-        <StatusText fontSize={size} color={iconColor}>
+        <StatusText fontSize={size} color={color}>
           • Not seen yet
         </StatusText>
       )
@@ -79,7 +79,7 @@ const MessageStatusIcon = ({
       return messageStatusDisplayingType === 'ticks' ? (
         <SentIconWrapper color={color} width={size} height={size} />
       ) : (
-        <StatusText fontSize={size} color={iconColor}>
+        <StatusText fontSize={size} color={color}>
           • Not seen yet
         </StatusText>
       )
