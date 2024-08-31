@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
-import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
@@ -110,13 +110,13 @@ const DetailsTab = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'subscribers'
         : 'members'
   const handleTabClick = (tabIndex: string) => {

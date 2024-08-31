@@ -38,7 +38,7 @@ import { ReactComponent as UnpinIcon } from '../../../assets/svg/unpin.svg'
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
@@ -214,7 +214,7 @@ const Actions = ({
   const oneHour = 60 * 60 * 1000
   const twoHours = oneHour * 2
   const oneDay = oneHour * 24
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const disableAction = directChannelUser && !isSelfChannel && hideUserPresence && hideUserPresence(directChannelUser)
@@ -520,9 +520,9 @@ const Actions = ({
               setPopupButtonText('Leave')
               setPopupTitle(
                 `Leave ${
-                  channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+                  channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                     ? 'group'
-                    : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                    : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                       ? 'channel'
                       : channel.type
                 }`
@@ -532,9 +532,9 @@ const Actions = ({
           >
             {leaveChannelIcon || <LeaveIcon />}
             {` Leave ${
-              channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+              channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'group'
-                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'channel'
                   : channel.type
             }`}
@@ -602,11 +602,12 @@ const Actions = ({
                   setPopupButtonText('Block')
                   setPopupTitle(
                     `Block and Leave ${
-                      channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+                      channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                         ? 'group'
-                        : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                        : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                            channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                           ? 'channel'
-                          : channel.type === CHANNEL_TYPE.DIRECT
+                          : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                             ? 'chat'
                             : channel.type
                     }`
@@ -616,9 +617,9 @@ const Actions = ({
               >
                 {blockAndLeaveChannelIcon || <BlockIcon />}
                 {`Block and Leave ${
-                  channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+                  channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                     ? 'group'
-                    : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                    : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                       ? 'channel'
                       : channel.type === 'direct'
                         ? 'chat'
@@ -643,9 +644,9 @@ const Actions = ({
                 }}
               >
                 {reportChannelIcon || <ReportIcon />} Report{' '}
-                {channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                {channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'channel'
-                  : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+                  : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                     ? 'group'
                     : 'chat'}
               </ActionItem>
@@ -654,9 +655,9 @@ const Actions = ({
         )}
         {showClearHistory &&
           !channel.isMockChannel &&
-          (channel.type === CHANNEL_TYPE.GROUP ||
-            channel.type === CHANNEL_TYPE.PRIVATE ||
-            channel.type === CHANNEL_TYPE.DIRECT) && (
+          (channel.type === DEFAULT_CHANNEL_TYPE.GROUP ||
+            channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE ||
+            channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) && (
             <ActionItem
               key={10}
               color={clearHistoryTextColor || colors.red1}
@@ -675,7 +676,7 @@ const Actions = ({
           )}
         {showClearHistory &&
           !channel.isMockChannel &&
-          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
+          (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC) &&
           checkActionPermission('clearAllMessages') && (
             <ActionItem
               key={11}
@@ -706,11 +707,11 @@ const Actions = ({
               setPopupButtonText('Delete')
               setPopupTitle(
                 `Delete   ${
-                  channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
+                  channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || channel.type === DEFAULT_CHANNEL_TYPE.GROUP
                     ? 'group'
-                    : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                    : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                       ? 'channel'
-                      : channel.type === CHANNEL_TYPE.DIRECT
+                      : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                         ? 'chat'
                         : channel.type
                 }`
@@ -720,11 +721,11 @@ const Actions = ({
           >
             {deleteChannelIcon || <DeleteChannel />}
             {` Delete ${
-              channel.type === CHANNEL_TYPE.PRIVATE || channel.type === CHANNEL_TYPE.GROUP
+              channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || channel.type === DEFAULT_CHANNEL_TYPE.GROUP
                 ? 'group'
-                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'channel'
-                  : channel.type === CHANNEL_TYPE.DIRECT
+                  : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                     ? 'chat'
                     : channel.type
             }`}
@@ -738,7 +739,7 @@ const Actions = ({
           togglePopup={handleToggleLeaveChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+            channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
               ? 'Once you leave this group it will be removed for you along with its entire history.'
               : 'Once you leave this channel it will be removed for you along with its entire history.'
           }
@@ -751,11 +752,11 @@ const Actions = ({
           togglePopup={handleToggleDeleteChannelPopupOpen}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT
+            channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
               ? 'Once you delete this chat it will be removed from the chat list with its message history.'
-              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+              : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'Once you delete this group it will be permanently removed along with its entire history for all the group members.'
-                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? // eslint-disable-next-line max-len
                     'Once you delete this channel it will be permanently removed along with its entire history for all the channel subscribers.'
                   : 'Once you delete this channel it will be permanently removed along with its entire history for all the channel members.'
@@ -770,7 +771,7 @@ const Actions = ({
           buttonText={popupButtonText}
           description={`Are you sure you want to block the ${
             channel.subject ||
-            (channel.type === CHANNEL_TYPE.DIRECT
+            (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
               ? channel.members && (channel.members[0].firstName || channel.members[0].id)
               : 'channel')
           }`}
@@ -801,11 +802,11 @@ const Actions = ({
           togglePopup={handleToggleClearHistoryPopup}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT
+            channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+              : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'Once you clear the history it will be permanently removed for you.'
-                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
                   : 'Are you sure you want to clear history? This action cannot be undone.'
           }
@@ -818,11 +819,11 @@ const Actions = ({
           togglePopup={handleToggleDeleteAllMessagesPopup}
           buttonText={popupButtonText}
           description={
-            channel.type === CHANNEL_TYPE.DIRECT
+            channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
               ? 'Once you clear the history, the messages in this chat will be permanently removed for you.'
-              : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+              : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'Once you clear the history it will be permanently removed for you.'
-                : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'Once you clear the history, the messages in this channel will be permanently removed for all the subscribers.'
                   : 'Are you sure you want to delete all messages? This action cannot be undone.'
           }

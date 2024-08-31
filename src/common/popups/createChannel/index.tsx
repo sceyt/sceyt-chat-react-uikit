@@ -16,7 +16,7 @@ import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIco
 import { useStateComplex, useColor } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
-import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
@@ -78,7 +78,7 @@ export default function CreateChannel({
   })
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   // const [pagination, setPagination] = useState(false)
-  const createGroupChannel = channelType === CHANNEL_TYPE.GROUP || channelType === CHANNEL_TYPE.PRIVATE
+  const createGroupChannel = channelType === DEFAULT_CHANNEL_TYPE.GROUP || channelType === DEFAULT_CHANNEL_TYPE.PRIVATE
   const requiredFields = channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType]
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
@@ -412,6 +412,7 @@ export default function CreateChannel({
                   <Button
                     type='button'
                     backgroundColor={accentColor}
+                    color={colors.white}
                     borderRadius='8px'
                     onClick={() => GoToAddMember()}
                     disabled={nextButtonDisable}

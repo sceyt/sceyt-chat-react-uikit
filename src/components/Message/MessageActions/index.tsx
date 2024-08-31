@@ -19,7 +19,7 @@ import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInTh
 // Helpers
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
-import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
 import { useColor } from '../../../hooks'
@@ -97,7 +97,7 @@ export default function MessageActions({
   const { user } = ChatClient
   const [checkActionPermission] = usePermissions(myRole)
   const theme = useSelector(themeSelector)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const editMessagePermitted = isIncoming
     ? checkActionPermission('editAnyMessage')
@@ -265,7 +265,7 @@ export default function MessageActions({
           </Action>
         )}
         {showDeleteMessage &&
-          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? myRole === 'owner' || myRole === 'admin'
             : true) && (
             <Action

@@ -68,7 +68,7 @@ import {
 } from './actions'
 import {
   attachmentTypes,
-  CHANNEL_TYPE,
+  DEFAULT_CHANNEL_TYPE,
   channelDetailsTabs,
   DB_NAMES,
   DB_STORE_NAMES,
@@ -1414,7 +1414,7 @@ function* forwardMessage(action: IAction): any {
     let attachments = message.attachments
     if (
       !(
-        (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC) &&
+        (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC) &&
         !(channel.userRole === 'admin' || channel.userRole === 'owner')
       )
     ) {

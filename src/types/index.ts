@@ -1,4 +1,4 @@
-import { CHANNEL_TYPE } from '../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE } from '../helpers/constants'
 
 export interface IAction {
   type: string
@@ -28,7 +28,7 @@ export interface IAddMember {
 export interface ICreateChannel {
   metadata?: any
   label?: string
-  type: (typeof CHANNEL_TYPE)[keyof typeof CHANNEL_TYPE]
+  type: (typeof DEFAULT_CHANNEL_TYPE)[keyof typeof DEFAULT_CHANNEL_TYPE] | string
   userId?: string
   members?: IAddMember[]
 }

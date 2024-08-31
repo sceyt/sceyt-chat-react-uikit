@@ -20,7 +20,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../../helpers/channelHalper'
-import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
@@ -86,7 +86,7 @@ export default function ChatHeader({
   const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -96,7 +96,7 @@ export default function ChatHeader({
       ? activeChannel.memberCount > 1
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
-      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+      : activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? activeChannel.memberCount > 1
           ? 'subscribers'
           : 'subscriber'

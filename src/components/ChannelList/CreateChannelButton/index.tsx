@@ -12,7 +12,7 @@ import { ReactComponent as AddChannelIcon } from '../../../assets/svg/addChat.sv
 import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
 import DropDown from '../../../common/dropdown'
-import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
 
 interface IChannelListProps {
@@ -112,7 +112,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           channelType={creatingChannelType}
           uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
           uploadPhotoIcon={uploadPhotoIcon}
-          showUri={creatingChannelType !== CHANNEL_TYPE.GROUP}
+          showUri={creatingChannelType !== DEFAULT_CHANNEL_TYPE.GROUP}
         />
       )}
     </React.Fragment>

@@ -41,7 +41,7 @@ import { useColor, useDidUpdate } from '../../hooks'
 // Helpers
 import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
 import { colors, device, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
@@ -258,7 +258,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       const channelData: ICreateChannel = {
         metadata: '',
         label: '',
-        type: CHANNEL_TYPE.DIRECT,
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
         members: [
           {
             ...contact,

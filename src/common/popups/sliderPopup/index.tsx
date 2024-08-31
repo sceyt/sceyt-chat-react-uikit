@@ -17,7 +17,7 @@ import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
 import { attachmentsForPopupSelector } from '../../../store/message/selector'
 import { deleteMessageAC, forwardMessageAC, getAttachmentsAC, removeAttachmentAC } from '../../../store/message/actions'
-import { CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { queryDirection } from '../../../store/message/constants'
 import { useColor, useDidUpdate } from '../../../hooks'
 import { Avatar } from '../../../components'
@@ -493,7 +493,7 @@ const SliderPopup = ({
           isIncomingMessage={messageToDelete.incoming}
           myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}

@@ -40,7 +40,7 @@ import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
@@ -433,7 +433,7 @@ const Message = ({
   // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+    !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
   const borderRadius =
@@ -455,7 +455,7 @@ const Message = ({
 
   const showMessageSenderName =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    (channel.type === CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
+    (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
     (message.incoming || showSenderNameOnOwnMessages)
 
   const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
@@ -706,7 +706,7 @@ const Message = ({
         createChannelAC(
           {
             metadata: '',
-            type: CHANNEL_TYPE.DIRECT,
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
             members: [
               {
                 ...user,
@@ -831,7 +831,7 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
-          !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+          !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
           !(!message.incoming && !showOwnAvatar)
         }
         className='messageContent'
@@ -1502,7 +1502,7 @@ const Message = ({
           isIncomingMessage={message.incoming}
           myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}

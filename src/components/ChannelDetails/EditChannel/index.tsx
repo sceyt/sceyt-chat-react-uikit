@@ -25,7 +25,7 @@ import {
   UploadFileLabel
 } from '../../../UIHelper'
 import { getClient } from '../../../common/client'
-import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember } from '../../../types'
 // Components
@@ -121,7 +121,7 @@ const EditChannel = ({
 
   const editContainer = useRef<any>(null)
   const fileUploader = useRef<any>(null)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
 
   const onOpenFileUploader = () => {

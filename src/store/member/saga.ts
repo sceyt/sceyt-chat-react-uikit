@@ -9,7 +9,7 @@ import {
   getRolesFailAC
 } from './actions'
 import { getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 
 import {
   GET_MEMBERS,
@@ -87,7 +87,7 @@ function* addMembers(action: IAction): any {
       })
 
       const addedMembers = yield call(channel.addMembers, membersToAdd)
-      if (channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE) {
+      if (channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE) {
         const membersIds: string[] = []
         addedMembers.forEach((mem: IMember) => {
           membersIds.push(mem.id)
@@ -119,7 +119,7 @@ function* kickMemberFromChannel(action: IAction): any {
     const channel = yield call(getChannelFromMap, channelId)
 
     const removedMembers = yield call(channel.kickMembers, [memberId])
-    if (channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE) {
+    if (channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE) {
       const membersIds: string[] = []
       removedMembers.forEach((mem: IMember) => {
         membersIds.push(mem.id)

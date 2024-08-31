@@ -13,7 +13,7 @@ import {
   SubTitle
 } from '../../../UIHelper'
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
@@ -98,7 +98,7 @@ const UsersPopup = ({
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
       ? `Add ${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'Subscribers'
         : 'Members')
   /* const handleGetUsers = (option) => {
@@ -140,7 +140,7 @@ const UsersPopup = ({
       const role = channel
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? 'subscriber'
             : 'participant'
         : 'participant'
@@ -196,7 +196,7 @@ const UsersPopup = ({
       const channelData = {
         metadata: '',
         label: '',
-        type: CHANNEL_TYPE.DIRECT,
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
         members: [
           {
             ...selectedUser,

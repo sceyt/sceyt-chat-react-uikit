@@ -25,7 +25,7 @@ import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
-import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
 import Actions from './Actions'
@@ -174,7 +174,7 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
-  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
@@ -183,7 +183,7 @@ const Details = ({
       ? activeChannel.memberCount > 1
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
-      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+      : activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? activeChannel.memberCount > 1
           ? 'subscribers'
           : 'subscriber'

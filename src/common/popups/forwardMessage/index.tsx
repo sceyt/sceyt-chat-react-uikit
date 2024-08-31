@@ -18,7 +18,7 @@ import {
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
@@ -86,7 +86,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
-    const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
     const isSelfChannel = isDirectChannel && channel.metadata?.s
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (event.target.checked && selectedChannels.length < 5) {
@@ -176,7 +176,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     </ChannelsGroupTitle>
                     {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
-                      const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                      const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                       const isSelfChannel = isDirectChannel && channel.metadata?.s
                       const directChannelUser =
                         isDirectChannel && isSelfChannel
@@ -259,7 +259,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
                             <ChannelMembers color={textSecondary}>
                               {`${channel.memberCount} ${
-                                channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                                channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                                channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                                   ? channel.memberCount > 1
                                     ? 'subscribers'
                                     : 'subscriber'
@@ -285,7 +286,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
               </React.Fragment>
             ) : (
               channels.map((channel: IChannel) => {
-                const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                 const isSelfChannel = isDirectChannel && channel.metadata?.s
                 const directChannelUser =
                   isDirectChannel && isSelfChannel
@@ -331,7 +332,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               directChannelUser.presence.lastActiveAt &&
                               userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
                           : `${channel.memberCount} ${
-                              channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                              channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                              channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                                 ? channel.memberCount > 1
                                   ? 'subscribers'
                                   : 'subscriber'

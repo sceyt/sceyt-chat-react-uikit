@@ -33,7 +33,13 @@ import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/messa
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  DEFAULT_CHANNEL_TYPE,
+  MESSAGE_STATUS,
+  USER_PRESENCE_STATUS,
+  THEME
+} from '../../helpers/constants'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
@@ -101,7 +107,7 @@ const Channel: React.FC<IChannelProps> = ({
   const { user } = ChatClient
   const activeChannel = useSelector(activeChannelSelector) || {}
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))

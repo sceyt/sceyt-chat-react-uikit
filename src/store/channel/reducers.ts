@@ -34,7 +34,7 @@ import {
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
 import { IAction, IChannel, IContact, IMember } from '../../types'
-import { CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
 import { sortChannelByLastMessage } from '../../helpers/channelHalper'
@@ -236,7 +236,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case SET_ACTIVE_CHANNEL: {
       newState.activeChannel = payload.channel || {}
-      if (payload.channel.type === CHANNEL_TYPE.DIRECT) {
+      if (payload.channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
         const ChatClient = getClient()
         const { user } = ChatClient
         const directChannelUser = payload.channel.members.find((member: IMember) => member.id !== user.id)
@@ -305,7 +305,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       const ChatClient = getClient()
       const { user } = ChatClient
       const updatedChannels = newState.channels.map((channel) => {
-        const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+        const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
         const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
         if (isDirectChannel && directChannelUser && usersMap[directChannelUser.id]) {
           const membersToUpdate = channel.members.map((member) => {
@@ -320,7 +320,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         return channel
       })
       const activeChannelUser =
-        (newState.activeChannel as IChannel).type === CHANNEL_TYPE.DIRECT &&
+        (newState.activeChannel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT &&
         (newState.activeChannel as IChannel).members.find((member: IMember) => member.id !== user.id)
       if (activeChannelUser && usersMap[activeChannelUser.id]) {
         newState.activeChannel = {
