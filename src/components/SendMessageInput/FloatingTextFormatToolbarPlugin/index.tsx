@@ -239,7 +239,7 @@ function TextFormatFloatingToolbar({
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Bold
             </ItemNote>
             <BoldIcon />
@@ -256,7 +256,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Italic
             </ItemNote>
             <ItalicIcon />
@@ -272,7 +272,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {' '}
               Strikethrough{' '}
             </ItemNote>
@@ -289,7 +289,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Monospace
             </ItemNote>
             <MonoIcon />
@@ -305,7 +305,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Underline
             </ItemNote>
             <UnderlineIcon />

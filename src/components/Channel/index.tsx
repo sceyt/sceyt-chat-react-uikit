@@ -419,7 +419,8 @@ const Channel: React.FC<IChannelProps> = ({
                       contactsMap,
                       getFromContacts,
                       isLastMessage: true,
-                      accentColor
+                      accentColor,
+                      textSecondary
                     })}
                   {channel.lastReactedMessage && '"'}
                 </React.Fragment>

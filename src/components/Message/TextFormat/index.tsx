@@ -81,7 +81,7 @@ export default function TextFormat({
             onClick={() => handleFormatToBold(editorProps)}
             isActive={isBoldText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Bold
             </ItemNote>
             <BoldIcon />
@@ -96,7 +96,7 @@ export default function TextFormat({
             onClick={() => handleFormatToItalic(editorProps)}
             isActive={isItalicText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Italic
             </ItemNote>
             <ItalicIcon />
@@ -111,7 +111,7 @@ export default function TextFormat({
             onClick={() => handleFormatToStrikethrough(editorProps)}
             isActive={isStrikethroughText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {' '}
               Strikethrough{' '}
             </ItemNote>
@@ -128,7 +128,7 @@ export default function TextFormat({
               onClick={() => handleFormatToMonospace(editorProps)}
               isActive={isMonospaceText}
             >
-              <ItemNote bgColor={textPrimary} direction='top'>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                 Monospace
               </ItemNote>
               <MonoIcon />

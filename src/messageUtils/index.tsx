@@ -122,7 +122,8 @@ const MessageTextFormat = ({
   getFromContacts,
   isLastMessage,
   asSampleText,
-  accentColor
+  accentColor,
+  textSecondary
 }: {
   text: string
   message: any
@@ -131,6 +132,7 @@ const MessageTextFormat = ({
   isLastMessage?: boolean
   asSampleText?: boolean
   accentColor?: string
+  textSecondary?: string
 }) => {
   let messageText: any = []
   const linkify = new LinkifyIt()
@@ -193,12 +195,13 @@ const MessageTextFormat = ({
                   className={`${combinedAttributesList[index - 1].type}`}
                   isLastMessage={isLastMessage}
                   key={attributeOffset + index}
+                  color={isLastMessage ? textSecondary : accentColor}
                 >
                   {firsTextPart}
                   <StyledText
                     className='mention'
                     isLastMessage={isLastMessage}
-                    color={colors.primary}
+                    color={isLastMessage ? textSecondary : accentColor}
                     key={attributeOffset + index}
                   >
                     {mentionDisplayName}
@@ -219,7 +222,7 @@ const MessageTextFormat = ({
                 <StyledText
                   className={attribute.type}
                   isLastMessage={isLastMessage}
-                  color={accentColor || colors.primary}
+                  color={isLastMessage ? textSecondary : accentColor}
                   key={attributeOffset}
                 >
                   {mentionDisplayName}
@@ -241,6 +244,7 @@ const MessageTextFormat = ({
                 isLastMessage={isLastMessage}
                 className={attribute.type}
                 key={`${attributeOffset}-${attribute.type}`}
+                color={isLastMessage ? textSecondary : accentColor}
               >
                 {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
               </StyledText>

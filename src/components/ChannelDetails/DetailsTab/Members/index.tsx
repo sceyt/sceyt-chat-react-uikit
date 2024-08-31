@@ -73,6 +73,7 @@ const Members = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -287,7 +288,7 @@ const Members = ({
                     )}
                   </MemberNameWrapper>
 
-                  <SubTitle margin='1px 0 0' fontSize={memberPresenceFontSize}>
+                  <SubTitle color={textSecondary} margin='1px 0 0' fontSize={memberPresenceFontSize}>
                     {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
@@ -310,6 +311,7 @@ const Members = ({
                     <DropdownOptionsUl>
                       {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
                         <DropdownOptionLi
+                          textColor={textPrimary}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleChangeRolePopup(e)

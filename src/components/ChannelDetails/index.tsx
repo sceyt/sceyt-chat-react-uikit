@@ -152,6 +152,7 @@ const Details = ({
 }: IDetailsProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -308,7 +309,7 @@ const Details = ({
                       : '')}
               </ChannelName>
               {isDirectChannel ? (
-                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
+                <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                     ? ''
                     : directChannelUser &&
@@ -319,7 +320,7 @@ const Details = ({
                           userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
                 </SubTitle>
               ) : (
-                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
+                <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {activeChannel && activeChannel.memberCount} {displayMemberText}
                 </SubTitle>
               )}

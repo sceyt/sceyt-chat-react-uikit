@@ -212,7 +212,7 @@ export default function ReactionsPopup({
                   getFromContacts
                 )}
               </MemberName>
-              <SubTitle>
+              <SubTitle color={textSecondary}>
                 {reaction.user.presence && reaction.user.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : reaction.user.presence &&

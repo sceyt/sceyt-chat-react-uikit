@@ -79,7 +79,7 @@ function ConfirmPopup({
           <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
-          <PopupDescription>{description}</PopupDescription>
+          <PopupDescription color={textSecondary}>{description}</PopupDescription>
           {isDeleteMessage && (
             <DeleteMessageOptions>
               {deleteForEveryoneIsPermitted && (

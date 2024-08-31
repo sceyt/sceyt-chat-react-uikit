@@ -388,7 +388,7 @@ const UsersPopup = ({
 
                   <UserNamePresence>
                     <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
-                    <SubTitle>
+                    <SubTitle color={textSecondary}>
                       {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
                         : user.presence &&

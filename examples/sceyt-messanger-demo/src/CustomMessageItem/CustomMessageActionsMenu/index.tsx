@@ -66,7 +66,7 @@ function CustomMessageActionsMenu({
     <Container rtlDirection={rtlDirection} isThreadMessage={isThreadMessage}>
       <ActionsMenu rtlDirection={rtlDirection}>
         <Action onClick={handleOpenEmojis}>
-          <ItemNote direction='top'>React</ItemNote>
+          <ItemNote direction='top' d>React</ItemNote>
           <ReactionIcon />
         </Action>
 

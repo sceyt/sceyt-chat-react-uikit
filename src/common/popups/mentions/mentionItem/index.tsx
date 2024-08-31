@@ -17,6 +17,7 @@ interface IMentionsPopupProps {
 
 export default function MentionMember({ mention, isFocused, ...parentProps }: IMentionsPopupProps) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   return (
     <MemberItem
       key={mention.id}
@@ -29,7 +30,7 @@ export default function MentionMember({ mention, isFocused, ...parentProps }: IM
       </AvatarWrapper>
       <UserNamePresence>
         <MemberName color={textPrimary}>{mention.name}</MemberName>
-        <SubTitle>
+        <SubTitle color={textSecondary}>
           {mention.presence && mention.presence.state === USER_PRESENCE_STATUS.ONLINE
             ? 'Online'
             : mention.presence &&

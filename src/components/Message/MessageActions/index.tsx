@@ -146,7 +146,7 @@ export default function MessageActions({
               hoverIconColor={accentColor}
               onClick={handleOpenReaction}
             >
-              <ItemNote bgColor={textPrimary} direction='top'>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                 {reactionIconTooltipText || 'React'}
               </ItemNote>
               {reactionIcon || <ReactionIcon />}
@@ -166,7 +166,7 @@ export default function MessageActions({
               hoverIconColor={accentColor}
               onClick={() => editModeToggle()}
             >
-              <ItemNote bgColor={textPrimary} direction='top'>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                 {editIconTooltipText || 'Edit Message'}
               </ItemNote>
               {editIcon || <EditIcon />}
@@ -179,7 +179,7 @@ export default function MessageActions({
             hoverIconColor={accentColor}
             onClick={() => handleResendMessage()}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {' '}
               Resend Message{' '}
             </ItemNote>
@@ -198,7 +198,7 @@ export default function MessageActions({
                   hoverIconColor={accentColor}
                   onClick={() => handleReplyMessage()}
                 >
-                  <ItemNote bgColor={textPrimary} direction='top'>
+                  <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                     {replyIconTooltipText || 'Reply'}
                   </ItemNote>
                   {replyIcon || <ReplyIcon />}
@@ -213,7 +213,7 @@ export default function MessageActions({
                 hoverIconColor={accentColor}
                 onClick={() => handleReplyMessage(true)}
               >
-                <ItemNote bgColor={textPrimary} direction='top'>
+                <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                   {replyInThreadIconTooltipText || 'Reply in thread'}
                 </ItemNote>
                 {replyInThreadIcon || <ReplyThreadIcon />}
@@ -229,7 +229,7 @@ export default function MessageActions({
             hoverIconColor={accentColor}
             onClick={() => handleCopyMessage()}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {copyIconTooltipText || 'Copy'}
             </ItemNote>
             {copyIcon || <CopyIcon />}
@@ -244,7 +244,7 @@ export default function MessageActions({
             hoverIconColor={accentColor}
             onClick={() => handleOpenForwardMessage()}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {forwardIconTooltipText || 'Forward Message'}
             </ItemNote>
             {forwardIcon || <ForwardIcon />}
@@ -258,7 +258,7 @@ export default function MessageActions({
             hoverIconColor={accentColor}
             onClick={() => handleSelectMessage()}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {selectIconTooltipText || 'Select'}
             </ItemNote>
             {selectIcon || <SelectIcon />}
@@ -275,7 +275,7 @@ export default function MessageActions({
               hoverIconColor={accentColor}
               onClick={() => handleOpenDeleteMessage()}
             >
-              <ItemNote bgColor={textPrimary} direction='top'>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                 {deleteIconTooltipText || 'Delete Message'}
               </ItemNote>
               {deleteIcon || <DeleteIcon />}
@@ -289,7 +289,7 @@ export default function MessageActions({
             hoverIconColor={accentColor}
             onClick={() => handleReportMessage()}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {reportIconTooltipText || 'Report'}
             </ItemNote>
             {reportIcon || <ReportIcon />}

@@ -5,6 +5,8 @@ import { Attachment, MessageTextFormat } from 'sceyt-chat-react-uikit'
 import { isJSON, makeUsername } from '../../helpers'
 import { ReactComponent as VoiceIcon } from '../../svg/voiceIcon.svg'
 import { attachmentTypes, MESSAGE_STATUS, messagesCustomColor } from '../../helpers/constants'
+import { useColor } from '../../../../../src/hooks'
+import { THEME_COLOR_NAMES } from '../../../../../src'
 
 function ReplyMessage(
   {
@@ -28,6 +30,8 @@ function ReplyMessage(
     borderRadius?: string;
     handleScrollToRepliedMessage: (messageId: string) => void;
   }) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
 
   return (
     <ReplyMessageContainer
@@ -111,10 +115,12 @@ function ReplyMessage(
             </MessageStatusDeleted>
           ) : message.parentMessage?.body ? (
             MessageTextFormat({
+              accentColor,
+              textSecondary,
               text: message.parentMessage?.body,
               message: message.parentMessage,
               getFromContacts: true,
-              asSampleText: true
+              asSampleText: true,
             })
           ) : (
             parentNotLinkAttachment &&

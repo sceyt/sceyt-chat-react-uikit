@@ -514,7 +514,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -553,7 +553,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!(searchedChannels.contacts && searchedChannels.contacts.length) && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Contacts</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Contacts
+                      </SearchedChannelsHeader>
                       {searchedChannels.contacts.map((contact: IContact) =>
                         ListItem ? (
                           <ListItem
@@ -592,7 +594,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels?.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Channels
+                      </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
@@ -629,7 +633,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                 </React.Fragment>
               ) : (
-                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
+                <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                  No channels found
+                </NoData>
               )}
             </React.Fragment>
           ) : (
@@ -681,14 +687,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
               !searchedChannels.chats_groups?.length &&
               !searchedChannels.chats_groups?.length &&
               !searchedChannels.channels?.length ? (
-                <NoData fontSize={searchedChannelsTitleFontSize}>
+                <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
               ) : (
                 <SearchedChannels>
                   {!!searchedChannels.chats_groups.length && (
                     <DirectChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -727,7 +733,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Channels
+                      </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />

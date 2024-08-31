@@ -75,6 +75,7 @@ export default function ChatHeader({
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -196,7 +197,11 @@ export default function ChatHeader({
           {showMemberInfo &&
             !isSelfChannel &&
             (isDirectChannel && directChannelUser ? (
-              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
+              <SubTitle
+                fontSize={memberInfoFontSize}
+                lineHeight={memberInfoLineHeight}
+                color={memberInfoTextColor || textSecondary}
+              >
                 {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
                   : directChannelUser.presence &&
@@ -206,7 +211,11 @@ export default function ChatHeader({
                         userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
               </SubTitle>
             ) : (
-              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
+              <SubTitle
+                fontSize={memberInfoFontSize}
+                lineHeight={memberInfoLineHeight}
+                color={memberInfoTextColor || textSecondary}
+              >
                 {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} ${displayMemberText} `}
               </SubTitle>
             ))}
