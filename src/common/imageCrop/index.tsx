@@ -53,7 +53,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} />
           <Row align='center'>
-            <PopupName>Crop image</PopupName>
+            <PopupName color={textPrimary}>Crop image</PopupName>
           </Row>
           <div className='crop-container'>
             <CropperWrapper>
@@ -89,7 +89,13 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={returnCroppedImage}>
+          <Button
+            type='button'
+            backgroundColor={accentColor}
+            color={colors.white}
+            borderRadius='8px'
+            onClick={returnCroppedImage}
+          >
             Save
           </Button>
         </PopupFooter>

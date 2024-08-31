@@ -49,6 +49,7 @@ export default function TextFormat({
   theme?: string
   editorProps: any
 }) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
@@ -80,7 +81,9 @@ export default function TextFormat({
             onClick={() => handleFormatToBold(editorProps)}
             isActive={isBoldText}
           >
-            <ItemNote direction='top'>Bold</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Bold
+            </ItemNote>
             <BoldIcon />
           </Action>
         )}
@@ -93,7 +96,9 @@ export default function TextFormat({
             onClick={() => handleFormatToItalic(editorProps)}
             isActive={isItalicText}
           >
-            <ItemNote direction='top'>Italic</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Italic
+            </ItemNote>
             <ItalicIcon />
           </Action>
         )}
@@ -106,7 +111,10 @@ export default function TextFormat({
             onClick={() => handleFormatToStrikethrough(editorProps)}
             isActive={isStrikethroughText}
           >
-            <ItemNote direction='top'> Strikethrough </ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              {' '}
+              Strikethrough{' '}
+            </ItemNote>
             <StrikethroughIcon />
           </Action>
         )}
@@ -120,7 +128,9 @@ export default function TextFormat({
               onClick={() => handleFormatToMonospace(editorProps)}
               isActive={isMonospaceText}
             >
-              <ItemNote direction='top'>Monospace</ItemNote>
+              <ItemNote bgColor={textPrimary} direction='top'>
+                Monospace
+              </ItemNote>
               <MonoIcon />
             </Action>
           </React.Fragment>

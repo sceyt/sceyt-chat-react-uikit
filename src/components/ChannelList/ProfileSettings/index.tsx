@@ -28,6 +28,7 @@ const settingsPages = {
 }
 
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
@@ -45,12 +46,14 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         >
           <ArrowLeft />
         </ArrowLeftWrapper>
-        <SectionHeader>{activeSettingPage === settingsPages.profile ? 'Edit profile' : 'Settings'}</SectionHeader>
+        <SectionHeader color={textPrimary}>
+          {activeSettingPage === settingsPages.profile ? 'Edit profile' : 'Settings'}
+        </SectionHeader>
       </SettingsHeader>
 
       <ProfileInfo>
         <Avatar name={user.firstName || user.id} size={144} image={user.avatarUrl} setDefaultAvatar />
-        <Username>{`${user.firstName} ${user.lastName}`}</Username>
+        <Username color={textPrimary}>{`${user.firstName} ${user.lastName}`}</Username>
         <UserNumber color={textSecondary}>{`+${user.id}`}</UserNumber>
       </ProfileInfo>
 
@@ -58,7 +61,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
+          textColor={textPrimary}
           iconColor={textSecondary}
           margin='0 0 24px'
           onClick={handleOpenEditProfile}
@@ -68,7 +71,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
+          textColor={textPrimary}
           iconColor={textSecondary}
           margin='0 0 24px'
         >
@@ -77,7 +80,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
+          textColor={textPrimary}
           iconColor={textSecondary}
           margin='0 0 24px'
         >
@@ -132,13 +135,13 @@ const ProfileInfo = styled.div`
   margin: 20px 0 24px;
 `
 
-const Username = styled.h3`
+const Username = styled.h3<{ color: string }>`
   margin: 16px 0 0;
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const UserNumber = styled.h4<{ color: string }>`

@@ -2,11 +2,12 @@ import React from 'react'
 import styled from 'styled-components'
 import { makeUsername } from '../../../helpers/message'
 import { USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { IContact } from '../../../types'
 import Avatar from '../../Avatar'
+import { useColor } from '../../../hooks'
 
 interface IChannelProps {
   contact: IContact
@@ -47,6 +48,7 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const getFromContacts = getShowOnlyContactUsers()
 
   const contactUserName = makeUsername(contact, undefined, getFromContacts)
@@ -84,6 +86,8 @@ const ContactItem: React.FC<IChannelProps> = ({
         subjectFontSize={channelSubjectFontSize}
         subjectLineHeight={channelSubjectLineHeight}
         subjectColor={channelSubjectColor}
+        lightTextColor={textPrimary}
+        darkTextColor={colors.darkModeTextColor1}
       >
         <h3>{contactUserName}</h3>
       </ChannelInfo>
@@ -113,6 +117,8 @@ const Container = styled.div<{
 `
 
 export const ChannelInfo = styled.div<{
+  lightTextColor: string
+  darkTextColor: string
   avatar?: boolean
   theme?: string
   subjectFontSize?: string
@@ -136,7 +142,7 @@ export const ChannelInfo = styled.div<{
     overflow: hidden;
     white-space: nowrap;
     color: ${(props) =>
-      props.subjectColor || (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+      props.subjectColor || (props.theme === THEME.DARK ? props.darkTextColor : props.lightTextColor)};
   }
 `
 

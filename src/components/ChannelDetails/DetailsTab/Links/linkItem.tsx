@@ -22,6 +22,7 @@ const LinkItem = ({
   linkPreviewHoverBackgroundColor
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   // const [title, setTitle] = useState('')
   // const [imageSrc, setImageSrc] = useState('')
   // const [loading, setLoading] = useState(true)
@@ -55,7 +56,7 @@ const LinkItem = ({
         <LinkInfoCont>
           {/* <AttachmentPreviewTitle color={linkPreviewTitleColor}>{title}</AttachmentPreviewTitle> */}
           {/* <AttachmentPreviewTitle color={linkPreviewTitleColor}>Link</AttachmentPreviewTitle> */}
-          <LinkUrl color={linkPreviewColor}>{link}</LinkUrl>
+          <LinkUrl color={linkPreviewColor || textPrimary}>{link}</LinkUrl>
         </LinkInfoCont>
       </a>
     </FileItem>
@@ -98,7 +99,7 @@ const FileItem = styled.li<any>`
   }
 `
 
-const LinkUrl = styled.span<{ color?: string }>`
+const LinkUrl = styled.span<{ color: string }>`
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -109,7 +110,7 @@ const LinkUrl = styled.span<{ color?: string }>`
   font-size: 13px;
   line-height: 16px;
   text-decoration: underline;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 /*

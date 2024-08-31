@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
+import { useColor } from '../../hooks'
 
 export const Container = styled.div<{
   chatBackgroundColor?: string
@@ -42,7 +43,7 @@ export const Container = styled.div<{
       font-style: normal;
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};
-      color: ${(props) => props.dateDividerTextColor || colors.textColor1};
+      color: ${(props) => props.dateDividerTextColor};
       background: ${(props) => props.dateDividerBackgroundColor};
       //border: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
       box-sizing: border-box;
@@ -127,6 +128,7 @@ export default function MessageDivider({
   marginBottom,
   chatBackgroundColor
 }: IProps) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textRef = React.useRef<HTMLSpanElement>(null)
   const [textHeight, setTextHeight] = React.useState<number>(0)
 
@@ -142,7 +144,7 @@ export default function MessageDivider({
       marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}
-      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor || colors.textColor1}
+      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor || textPrimary}
       dateDividerBorder={dateDividerBorder || newMessagesSeparatorBorder}
       dateDividerBackgroundColor={
         dateDividerBackgroundColor || newMessagesSeparatorBackground || colors.backgroundColor

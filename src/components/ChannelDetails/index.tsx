@@ -151,7 +151,7 @@ const Details = ({
   bordersColor
 }: IDetailsProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -242,16 +242,16 @@ const Details = ({
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimaryColor}>
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimary}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader fontSize={detailsTitleFontSize} color={textPrimaryColor}>
+            <SectionHeader fontSize={detailsTitleFontSize} color={textPrimary}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
-            <CloseIcon color={accentColor} onClick={handleDetailsClose} /> 
+            <CloseIcon color={accentColor} onClick={handleDetailsClose} />
           </React.Fragment>
         )}
       </ChannelDetailsHeader>
@@ -298,7 +298,7 @@ const Details = ({
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
-                color={textPrimaryColor}
+                color={textPrimary}
               >
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
@@ -338,7 +338,7 @@ const Details = ({
           {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
             <AboutChannel>
               {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
-              <AboutChannelText color={colors.textColor1}>
+              <AboutChannelText color={textPrimary}>
                 {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
               </AboutChannelText>
             </AboutChannel>
@@ -559,7 +559,7 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   white-space: nowrap;
   max-width: ${(props) => (props.isDirect ? '200px' : '168px')};
   text-overflow: ellipsis;
-  text-color:${(props) => (props.color)};
+  text-color: ${(props) => props.color};
   overflow: hidden;
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `

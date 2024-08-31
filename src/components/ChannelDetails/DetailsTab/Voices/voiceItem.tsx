@@ -42,6 +42,7 @@ const VoiceItem = ({
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor
 }: IProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
@@ -128,7 +129,7 @@ const VoiceItem = ({
         </React.Fragment>
       )}
       <AudioInfo>
-        <AudioTitle color={voicePreviewTitleColor}>
+        <AudioTitle color={voicePreviewTitleColor || textPrimary}>
           {file.user &&
             (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
@@ -202,7 +203,7 @@ const AudioTitle = styled.span<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: calc(100% - 72px);
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const AudioDate = styled.span<{ color: string }>`

@@ -1114,7 +1114,7 @@ const Message = ({
                         )}
                   </MessageOwner>
 
-                  <ReplyMessageText fontSize='14px' lineHeight='16px'>
+                  <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px'>
                     {!!message.parentMessage.attachments.length &&
                       message.parentMessage.attachments[0].type === attachmentTypes.voice && (
                         <VoiceIconWrapper color={colors.primary} />
