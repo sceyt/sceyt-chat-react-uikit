@@ -320,6 +320,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -1463,7 +1464,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
                     ) : (
                       <TypingIndicatorCont>
-                        <TypingFrom>
+                        <TypingFrom color={textSecondary}>
                           {makeUsername(
                             getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
                             typingIndicator.from,
@@ -1489,7 +1490,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     color={editMessageTextColor || textPrimary}
                     backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
                   >
-                    <CloseEditMode onClick={handleCloseEditMode}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
                     <EditReplyMessageHeader color={accentColor}>
@@ -1518,7 +1519,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     color={replyMessageTextColor || textPrimary}
                     backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
                   >
-                    <CloseEditMode onClick={handleCloseReply}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
                     <ReplyMessageCont>
@@ -1652,7 +1653,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader(mediaExtensions)}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseMediaIcon />
                                 {chooseMediaAttachmentText ?? 'Photo or video'}
@@ -1665,7 +1666,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader('')}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseFileIcon />
                                 {chooseFileAttachmentText ?? 'File'}
@@ -1901,7 +1902,7 @@ const UploadErrorMessage = styled.p<any>`
   color: ${colors.red1};
 `
 
-const CloseEditMode = styled.span`
+const CloseEditMode = styled.span<{ color: string }>`
   position: absolute;
   top: 8px;
   right: 12px;
@@ -1912,7 +1913,7 @@ const CloseEditMode = styled.span`
   cursor: pointer;
 
   & > svg {
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
   }
 `
 
@@ -2137,7 +2138,7 @@ const SendMessageButton = styled.span<{
   order?: number
   isCustomButton?: any
   onClick?: any
-  iconColor?: string
+  iconColor: string
 }>`
   ${(props) =>
     !props.isCustomButton &&
@@ -2153,7 +2154,7 @@ const SendMessageButton = styled.span<{
 
   color: ${props.isActive ? colors.primary : props.color};
   & > svg {
-    color: ${props.iconColor || colors.textColor2};
+    color: ${props.iconColor};
   }
   `}
 `
@@ -2197,13 +2198,13 @@ const TypingIndicatorCont = styled.div`
   margin-bottom: 12px;
 `
 
-const TypingFrom = styled.h5`
+const TypingFrom = styled.h5<{ color: string }>`
   margin: 0 4px 0 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const sizeAnimation = keyframes`
   0% {

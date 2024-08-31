@@ -118,6 +118,7 @@ function TextFormatFloatingToolbar({
   showMenu: boolean
 }): JSX.Element {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -232,7 +233,7 @@ function TextFormatFloatingToolbar({
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
             }}
             aria-label='Format text as bold'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isBold}
@@ -242,7 +243,7 @@ function TextFormatFloatingToolbar({
           </Action>
 
           <Action
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isItalic}
@@ -256,7 +257,7 @@ function TextFormatFloatingToolbar({
             <ItalicIcon />
           </Action>
           <Action
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
@@ -271,7 +272,7 @@ function TextFormatFloatingToolbar({
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isCode}
@@ -285,7 +286,7 @@ function TextFormatFloatingToolbar({
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isUnderline}
@@ -581,7 +582,7 @@ const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
 `
 const Action = styled.button<{
   color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
   hoverIconColor?: string
   hoverBackgroundColor?: string
@@ -597,7 +598,7 @@ const Action = styled.button<{
   //margin: 8px 6px;
   cursor: pointer;
   transition: all 0.2s;
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
   ${(props) =>
     props.isActive &&

@@ -4,9 +4,10 @@ import { ReactComponent as ItalicIcon } from '../../../assets/svg/italic.svg'
 import { ReactComponent as StrikethroughIcon } from '../../../assets/svg/strikethrough.svg'
 import { ReactComponent as MonoIcon } from '../../../assets/svg/mono.svg'
 import { ReactComponent as BoldIcon } from '../../../assets/svg/bold.svg'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { THEME } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 export default function TextFormat({
   handleFormatToBold,
@@ -48,6 +49,7 @@ export default function TextFormat({
   theme?: string
   editorProps: any
 }) {
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {
@@ -72,7 +74,7 @@ export default function TextFormat({
         {handleFormatToBold && (
           <Action
             order={0}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToBold(editorProps)}
@@ -85,7 +87,7 @@ export default function TextFormat({
         {handleFormatToItalic && (
           <Action
             order={1}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToItalic(editorProps)}
@@ -98,7 +100,7 @@ export default function TextFormat({
         {handleFormatToStrikethrough && (
           <Action
             order={2}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToStrikethrough(editorProps)}
@@ -112,7 +114,7 @@ export default function TextFormat({
           <React.Fragment>
             <Action
               order={3}
-              iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+              iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
               onClick={() => handleFormatToMonospace(editorProps)}
@@ -145,7 +147,9 @@ const EditMessageContainer = styled.div<{ backgroundColor?: string; rtlDirection
   background-color: ${(props) => props.backgroundColor};
   box-sizing: border-box;
   border-radius: 12px;
-  box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
+  box-shadow:
+    0 0 2px rgba(17, 21, 57, 0.08),
+    0 0 24px rgba(17, 21, 57, 0.16);
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;
@@ -153,8 +157,7 @@ const EditMessageContainer = styled.div<{ backgroundColor?: string; rtlDirection
 `
 
 const Action = styled.div<{
-  color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
   hoverIconColor?: string
   hoverBackgroundColor?: string
@@ -167,7 +170,7 @@ const Action = styled.div<{
   cursor: pointer;
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
   ${(props) =>
     props.isActive &&

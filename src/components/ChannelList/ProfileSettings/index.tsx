@@ -10,11 +10,12 @@ import { ReactComponent as NotificationsIcon } from '../../../assets/svg/notific
 import { ReactComponent as LockIcon } from '../../../assets/svg/lock.svg'
 import { ReactComponent as LogoutIcon } from '../../../assets/svg/leave.svg'
 // Helpers
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { DropdownOptionLi, DropdownOptionsUl, SectionHeader } from '../../../UIHelper'
 // Components
 import Avatar from '../../Avatar'
 import EditProfile from './EditProfile'
+import { useColor } from '../../../hooks'
 
 interface IChannelTabsProps {
   handleCloseProfile: () => void
@@ -27,6 +28,7 @@ const settingsPages = {
 }
 
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
   const user = useSelector(userSelector)
@@ -49,7 +51,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
       <ProfileInfo>
         <Avatar name={user.firstName || user.id} size={144} image={user.avatarUrl} setDefaultAvatar />
         <Username>{`${user.firstName} ${user.lastName}`}</Username>
-        <UserNumber>{`+${user.id}`}</UserNumber>
+        <UserNumber color={textSecondary}>{`+${user.id}`}</UserNumber>
       </ProfileInfo>
 
       <DropdownOptionsUl>
@@ -57,7 +59,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
           onClick={handleOpenEditProfile}
         >
@@ -67,7 +69,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <NotificationsIcon /> Notifications
@@ -76,7 +78,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <LockIcon /> About
@@ -139,11 +141,11 @@ const Username = styled.h3`
   color: ${colors.textColor1};
 `
 
-const UserNumber = styled.h4`
+const UserNumber = styled.h4<{ color: string }>`
   margin: 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

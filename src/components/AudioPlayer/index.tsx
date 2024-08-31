@@ -38,6 +38,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     audio: undefined
   }
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
@@ -143,7 +144,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           const WaveSurfer = await import('wavesurfer.js')
           wavesurfer.current = WaveSurfer.default.create({
             container: wavesurferContainer.current,
-            waveColor: colors.textColor2,
+            waveColor: textSecondary,
             skipLength: 0,
             progressColor: accentColor,
             // audioContext,
@@ -242,12 +243,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
-        <AudioRate onClick={handleSetAudioRate}>
+        <AudioRate color={textSecondary} onClick={handleSetAudioRate}>
           {audioRate}
           <span>X</span>
         </AudioRate>
       </WaveContainer>
-      <Timer>{currentTime}</Timer>
+      <Timer color={textSecondary}>{currentTime}</Timer>
     </Container>
   )
 }
@@ -276,7 +277,7 @@ const PlayPause = styled.div<{ iconColor?: string }>`
 const AudioVisualization = styled.div`
   width: 100%;
 `
-const AudioRate = styled.div`
+const AudioRate = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -287,7 +288,7 @@ const AudioRate = styled.div`
   font-weight: 600;
   font-size: 12px;
   line-height: 14px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   height: 18px;
   box-sizing: border-box;
   margin-left: 14px;
@@ -306,7 +307,7 @@ const WaveContainer = styled.div`
   margin-left: 8px;
 `
 
-const Timer = styled.div`
+const Timer = styled.div<{ color: string }>`
   position: absolute;
   left: 59px;
   bottom: 12px;
@@ -314,5 +315,5 @@ const Timer = styled.div`
   font-weight: 400;
   font-size: 11px;
   line-height: 12px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

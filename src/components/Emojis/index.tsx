@@ -19,7 +19,7 @@ import { THEME } from '../../helpers/constants'
 import { useColor } from '../../hooks'
 
 interface EmojiCollectionProps {
-  iconColor:string
+  iconColor: string
   activeCollection: boolean
 }
 
@@ -71,6 +71,7 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')
@@ -157,7 +158,7 @@ function EmojisPopup({
         </EmojiFooter>
       )}
       {fixEmojiCategoriesTitleOnTop && (
-        <EmojiHeader padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
+        <EmojiHeader color={textSecondary} padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
@@ -168,7 +169,9 @@ function EmojisPopup({
             return (
               <React.Fragment key={mainCollectionKey}>
                 {!fixEmojiCategoriesTitleOnTop && (
-                  <EmojiHeader padding='6px 8px 0'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
+                  <EmojiHeader color={textSecondary} padding='6px 8px 0'>
+                    {getEmojisCategoryTitle(mainCollectionKey)}
+                  </EmojiHeader>
                 )}
                 {emojiBigCollection.array.map((emojiSmallCollection, bigIndex) => {
                   const label = emojiSmallCollection.key
@@ -256,14 +259,14 @@ const Container = styled.div<{
     height: 225px;
   `};
 `
-const EmojiHeader = styled.div<{ padding?: string }>`
+const EmojiHeader = styled.div<{ color: string; padding?: string }>`
   align-items: flex-end;
   font-style: normal;
   font-weight: 500;
   font-size: 12px;
   line-height: 22px;
   text-transform: uppercase;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `

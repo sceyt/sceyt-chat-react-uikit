@@ -51,6 +51,7 @@ const SliderPopup = ({
 }: IProps) => {
   const dispatch = useDispatch()
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const getFromContacts = getShowOnlyContactUsers()
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
@@ -333,9 +334,9 @@ const SliderPopup = ({
             <UserName>{attachmentUserName}</UserName>
             {/* <FileName>{currentFile.name}</FileName> */}
             {/* <FileSize></FileSize> */}
-            <FileDateAndSize>
+            <FileDateAndSize color={textSecondary}>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
-              <FileSize>
+              <FileSize color={textSecondary}>
                 {currentFile && currentFile.size && currentFile.size > 0 ? bytesToSize(currentFile.size, 1) : ''}
               </FileSize>
             </FileDateAndSize>
@@ -344,7 +345,6 @@ const SliderPopup = ({
         <ActionsWrapper>
           <IconWrapper onClick={() => handleDownloadFile(currentFile)}>
             {currentFile && downloadingFilesMap[currentFile.id] ? (
-              // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
               <ProgressWrapper>
                 <CircularProgressbar
                   minValue={0}
@@ -587,15 +587,15 @@ const ClosePopupWrapper = styled.div`
   margin-bottom: 4px;
 ` */
 
-const FileDateAndSize = styled.span`
+const FileDateAndSize = styled.span<{ color: string }>`
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 
-const FileSize = styled.span`
+const FileSize = styled.span<{ color: string }>`
   position: relative;
   margin-left: 12px;
 
@@ -607,7 +607,7 @@ const FileSize = styled.span`
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background-color: ${colors.textColor2};
+    background-color: ${(props) => props.color};
   }
 `
 

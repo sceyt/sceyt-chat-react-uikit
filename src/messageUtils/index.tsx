@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { colors } from '../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../UIHelper/constants'
 import { MESSAGE_DELIVERY_STATUS } from '../helpers/constants'
 
 import { ReactComponent as ReadIcon } from '../assets/svg/ticks_read.svg'
@@ -12,31 +12,32 @@ import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
+import { useColor } from '../hooks'
 
-const StatusText = styled.span<{ color?: string; fontSize?: string }>`
-  color: ${(props) => props.color || colors.textColor2};
+const StatusText = styled.span<{ color: string; fontSize?: string }>`
+  color: ${(props) => props.color};
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
 `
 const ReadIconWrapper = styled(ReadIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color };
+  color: ${(props) => props.color};
 `
 const DeliveredIconWrapper = styled(DeliveredIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 const SentIconWrapper = styled(SentIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 const PendingIconWrapper = styled(PendingIcon)`
   width: ${(props) => props.width}!important;
   height: ${(props) => props.height}!important;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
 const MessageStatusIcon = ({
@@ -53,19 +54,22 @@ const MessageStatusIcon = ({
   iconColor?: string
   readIconColor?: string
   accentColor?: string
-}) => { 
+}) => {
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const color = iconColor || textSecondary
+
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor ? readIconColor : (accentColor ? accentColor : colors.primary)} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor || colors.primary} />
       ) : (
-        <StatusText fontSize={size} color={iconColor}>
+        <StatusText fontSize={size} color={color}>
           • Seen
         </StatusText>
       )
     case MESSAGE_DELIVERY_STATUS.DELIVERED:
       return messageStatusDisplayingType === 'ticks' ? (
-        <DeliveredIconWrapper width={size} height={size} color={iconColor} />
+        <DeliveredIconWrapper width={size} height={size} color={color} />
       ) : (
         <StatusText fontSize={size} color={iconColor}>
           • Not seen yet
@@ -73,14 +77,14 @@ const MessageStatusIcon = ({
       )
     case MESSAGE_DELIVERY_STATUS.SENT:
       return messageStatusDisplayingType === 'ticks' ? (
-        <SentIconWrapper color={iconColor} width={size} height={size} />
+        <SentIconWrapper color={color} width={size} height={size} />
       ) : (
         <StatusText fontSize={size} color={iconColor}>
           • Not seen yet
         </StatusText>
       )
     default:
-      return <PendingIconWrapper color={iconColor} />
+      return <PendingIconWrapper color={color} />
   }
 }
 
@@ -215,7 +219,7 @@ const MessageTextFormat = ({
                 <StyledText
                   className={attribute.type}
                   isLastMessage={isLastMessage}
-                  color={accentColor ? accentColor : colors.primary}
+                  color={accentColor || colors.primary}
                   key={attributeOffset}
                 >
                   {mentionDisplayName}

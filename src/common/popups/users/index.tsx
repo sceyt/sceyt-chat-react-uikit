@@ -71,6 +71,7 @@ const UsersPopup = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -313,7 +314,7 @@ const UsersPopup = ({
         boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
       >
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
-          <CloseIcon color={colors.textColor2} onClick={handleClosePopup} />
+          <CloseIcon color={textSecondary} onClick={handleClosePopup} />
 
           <PopupName padding='0 12px'>{actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}</PopupName>
           <SearchUserCont className='p-relative'>
@@ -327,6 +328,7 @@ const UsersPopup = ({
               widthBorder={theme !== THEME.DARK}
               backgroundColor={colors.backgroundColor}
               color={textPrimary}
+              placeholderColor={textSecondary}
             />
             {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
@@ -549,7 +551,12 @@ const SelectMember = styled.input`
   cursor: pointer;
 ` */
 
-const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?: string; color?: string }>`
+const SearchUsersInput = styled.input<{
+  widthBorder?: boolean
+  backgroundColor?: string
+  color: string
+  placeholderColor: string
+}>`
   height: 40px;
   width: 100%;
   font-size: 14px;
@@ -561,7 +568,7 @@ const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?:
   background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
 
   &::placeholder {
-    color: ${colors.textColor2};
+    color: ${(props) => props.placeholderColor};
     font-size: 14px;
     opacity: 1;
   }

@@ -10,7 +10,7 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES} from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -24,6 +24,7 @@ let shouldDraw = false
 let WaveSurfer: any
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording }) => {
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const [recording, setStartRecording] = useState<any>(null)
   const [recorder, setRecorder] = useState<any>(null)
   const [recordedFile, setRecordedFile] = useState<any>(null)
@@ -120,7 +121,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           function draw() {
             for (let i = 0; i < obj.bars.length; i++) {
               const bar = obj.bars[i]
-              obj.ctx.fillStyle = colors.textColor2
+              obj.ctx.fillStyle = textSecondary
               obj.ctx.fillRect(bar.x, bar.y, bar.width, bar.height)
               bar.x = bar.x - 1 // spacing between bars
 
@@ -284,7 +285,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           }
           wavesurfer.current = WaveSurfer.default.create({
             container: wavesurferContainer.current,
-            waveColor: colors.textColor2,
+            waveColor: textSecondary,
             skipLength: 0,
             progressColor: accentColor,
             barWidth: 1,
@@ -372,13 +373,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         )}
         <Canvas hide={recordedFile} id='waveform' recording={recording}></Canvas>
 
-        {recording && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
+        {recording && <Timer color={textSecondary}>{formatAudioVideoTime(currentTime)}</Timer>}
 
         {recordingIsReadyToPlay && (
-          <PlayPause iconColor={accentColor} onClick={handlePlayPause}>{playAudio ? <PauseIcon /> : <PlayIcon />}</PlayPause>
+          <PlayPause iconColor={accentColor} onClick={handlePlayPause}>
+            {playAudio ? <PauseIcon /> : <PlayIcon />}
+          </PlayPause>
         )}
         <AudioVisualization ref={wavesurferContainer} show={recordedFile} />
-        {recordingIsReadyToPlay && <Timer>{formatAudioVideoTime(currentTime)}</Timer>}
+        {recordingIsReadyToPlay && <Timer color={textSecondary}>{formatAudioVideoTime(currentTime)}</Timer>}
       </AudioWrapper>
       <RecordIconWrapper ref={recordButtonRef} onClick={() => startRecording()} iconColor={accentColor}>
         {showRecording ? <SendIcon /> : <RecordIcon />}
@@ -447,11 +450,11 @@ const Canvas = styled.canvas<{ recording?: boolean; hide?: any }>`
   left: 42px;
 `
 
-const Timer = styled.div`
+const Timer = styled.div<{ color: string }>`
   width: 40px;
   font-weight: 400;
   font-size: 16px;
   line-height: 12px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   margin-left: auto;
 `

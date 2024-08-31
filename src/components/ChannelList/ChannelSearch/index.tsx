@@ -19,6 +19,7 @@ const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string
 `
 
 const SearchInput = styled.input<{
+  placeholderColor: string
   inline?: boolean
   borderRadius?: string
   backgroundColor?: string
@@ -41,7 +42,7 @@ const SearchInput = styled.input<{
     font-weight: normal;
     font-size: ${(props) => props.fontSize || '15px'};
     //line-height: 22px;
-    color: ${colors.textColor2};
+    color: ${(props) => props.placeholderColor};
     opacity: 1;
   }
 `
@@ -71,6 +72,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   fontSize
 }) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
 
   return (
     <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
@@ -80,6 +82,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
           searchInputBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
         }
         color={searchInputTextColor || textPrimary}
+        placeholderColor={textSecondary}
         borderRadius={borderRadius}
         type='text'
         onChange={handleSearchValueChange}

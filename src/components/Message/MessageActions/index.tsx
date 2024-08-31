@@ -90,6 +90,7 @@ export default function MessageActions({
   handleOpenEmojis
 }: any) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -139,7 +140,7 @@ export default function MessageActions({
           checkActionPermission('addMessageReaction') && (
             <Action
               order={reactionIconOrder || 0}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={accentColor}
               onClick={handleOpenReaction}
@@ -157,7 +158,7 @@ export default function MessageActions({
             : true) && (
             <Action
               order={editIconOrder || 1}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={accentColor}
               onClick={() => editModeToggle()}
@@ -168,7 +169,7 @@ export default function MessageActions({
           )}
         {messageStatus === MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             onClick={() => handleResendMessage()}
@@ -184,7 +185,7 @@ export default function MessageActions({
               (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
                 <Action
                   order={replyIconOrder || 2}
-                  iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+                  iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
                   hoverBackgroundColor={colors.hoverBackgroundColor}
                   hoverIconColor={accentColor}
                   onClick={() => handleReplyMessage()}
@@ -197,7 +198,7 @@ export default function MessageActions({
             {showReplyMessageInThread && replyMessagePermitted && (
               <Action
                 order={replyInThreadIconOrder || 3}
-                iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+                iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
                 hoverBackgroundColor={colors.hoverBackgroundColor}
                 hoverIconColor={accentColor}
                 onClick={() => handleReplyMessage(true)}
@@ -211,7 +212,7 @@ export default function MessageActions({
         {showCopyMessage && (
           <Action
             order={copyIconOrder || 4}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             onClick={() => handleCopyMessage()}
@@ -224,7 +225,7 @@ export default function MessageActions({
         {showForwardMessage && forwardMessagePermitted && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={forwardIconOrder || 5}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             onClick={() => handleOpenForwardMessage()}
@@ -236,7 +237,7 @@ export default function MessageActions({
         {showSelectMessage && (
           <Action
             order={selectIconOrder || 6}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             onClick={() => handleSelectMessage()}
@@ -251,9 +252,9 @@ export default function MessageActions({
             : true) && (
             <Action
               order={deleteIconOrder || 7}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              hoverIconColor={accentColor}
               onClick={() => handleOpenDeleteMessage()}
             >
               <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
@@ -263,7 +264,7 @@ export default function MessageActions({
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={reportIconOrder || 8}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             onClick={() => handleReportMessage()}
@@ -304,10 +305,9 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
 `
 
 const Action = styled.div<{
-  color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
-  hoverIconColor?: string
+  hoverIconColor: string
   hoverBackgroundColor?: string
 }>`
   position: relative;
@@ -317,7 +317,7 @@ const Action = styled.div<{
   cursor: pointer;
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
 
   &:first-child {
@@ -329,7 +329,7 @@ const Action = styled.div<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverIconColor || colors.primary};
+    color: ${(props) => props.hoverIconColor};
     background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
 
     ${ItemNote} {

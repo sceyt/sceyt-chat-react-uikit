@@ -192,6 +192,7 @@ const Actions = ({
   borderColor
 }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
@@ -361,7 +362,7 @@ const Actions = ({
               key={0}
               order={muteUnmuteNotificationsOrder}
               onClick={() => handleNotificationOnOff()}
-              iconColor={muteNotificationIconColor || colors.textColor2}
+              iconColor={muteNotificationIconColor || textSecondary}
               color={muteUnmuteNotificationTextColor || textPrimary}
               hoverColor={muteUnmuteNotificationTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -380,7 +381,7 @@ const Actions = ({
                 <ActionItem
                   key={0}
                   disableEvent
-                  iconColor={unmuteNotificationIconColor || colors.textColor2}
+                  iconColor={unmuteNotificationIconColor || textSecondary}
                   color={muteUnmuteNotificationTextColor || textPrimary}
                   hoverColor={muteUnmuteNotificationTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
@@ -446,7 +447,7 @@ const Actions = ({
             key={1}
             onClick={() => console.log('stared messages')}
             order={starredMessagesOrder}
-            iconColor={staredMessagesIconColor || colors.textColor2}
+            iconColor={staredMessagesIconColor || textSecondary}
             color={staredMessagesTextColor || textPrimary}
             hoverColor={staredMessagesTextColor || textPrimary}
             fontSize={actionItemsFontSize}
@@ -461,7 +462,7 @@ const Actions = ({
               key={2}
               onClick={handlePinUnpinChannel}
               order={pinChannelOrder}
-              iconColor={pinChannelIconColor || colors.textColor2}
+              iconColor={pinChannelIconColor || textSecondary}
               color={pinChannelTextColor || textPrimary}
               hoverColor={pinChannelTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -481,7 +482,7 @@ const Actions = ({
               key={3}
               onClick={handleToggleChannelMarkAs}
               order={markAsReadUnreadOrder}
-              iconColor={markAsReadIconColor || colors.textColor2}
+              iconColor={markAsReadIconColor || textSecondary}
               color={markAsReadUnreadTextColor || textPrimary}
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -493,7 +494,7 @@ const Actions = ({
               key={3}
               order={markAsReadUnreadOrder}
               onClick={handleToggleChannelMarkAs}
-              iconColor={markAsUnreadIconColor || colors.textColor2}
+              iconColor={markAsUnreadIconColor || textSecondary}
               color={markAsReadUnreadTextColor || textPrimary}
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -544,6 +545,7 @@ const Actions = ({
                   key={5}
                   color={unblockUserTextColor || textPrimary}
                   hoverColor={unblockUserTextColor || textPrimary}
+                  iconColor={textSecondary}
                   fontSize={actionItemsFontSize}
                   onClick={() => {
                     handleUnblockUser()
@@ -896,7 +898,7 @@ const ActionItem = styled.li<{
   color: string
   fontSize?: string
   disableEvent?: boolean
-  iconColor?: string
+  iconColor: string
   hoverColor?: string
   order?: number
 }>`
@@ -916,7 +918,7 @@ const ActionItem = styled.li<{
 
   & > svg {
     margin-right: 16px;
-    color: ${(props) => props.iconColor || colors.textColor2};
+    color: ${(props) => props.iconColor};
   }
 
   &:hover {

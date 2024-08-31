@@ -37,12 +37,12 @@ import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useColor, useDidUpdate } from '../../hooks'
 // Helpers
 import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-import { colors, device } from '../../UIHelper/constants'
+import { colors, device, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { IChannel, IContact, IContactsMap } from '../../types'
 // Components
@@ -194,11 +194,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize
 }) => {
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
-  const channelListRef = useRef<HTMLInputElement>(null)
-  const channelsScrollRef = useRef<HTMLInputElement>(null)
+  const channelListRef = useRef<HTMLInputElement | null>(null)
+  const channelsScrollRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
   const channels = useSelector(channelsSelector, shallowEqual) || []
@@ -508,7 +509,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -547,7 +548,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!(searchedChannels.contacts && searchedChannels.contacts.length) && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Contacts</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Contacts
+                      </SearchedChannelsHeader>
                       {searchedChannels.contacts.map((contact: IContact) =>
                         ListItem ? (
                           <ListItem
@@ -586,7 +589,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels?.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Channels
+                      </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
@@ -623,7 +628,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                 </React.Fragment>
               ) : (
-                <NoData fontSize={searchedChannelsTitleFontSize}>No channels found</NoData>
+                <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                  No channels found
+                </NoData>
               )}
             </React.Fragment>
           ) : (
@@ -675,14 +682,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
               !searchedChannels.chats_groups?.length &&
               !searchedChannels.chats_groups?.length &&
               !searchedChannels.channels?.length ? (
-                <NoData fontSize={searchedChannelsTitleFontSize}>
+                <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
               ) : (
                 <SearchedChannels>
                   {!!searchedChannels.chats_groups.length && (
                     <DirectChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                         Chats & Groups
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
@@ -721,7 +728,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   )}
                   {!!searchedChannels.channels.length && (
                     <GroupChannels>
-                      <SearchedChannelsHeader fontSize={searchedChannelsTitleFontSize}>Channels</SearchedChannelsHeader>
+                      <SearchedChannelsHeader color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
+                        Channels
+                      </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
                           <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
@@ -811,12 +820,12 @@ const SearchedChannels = styled.div`
   height: calc(100vh - 123px);
   overflow-x: hidden;
 `
-const SearchedChannelsHeader = styled.p<{ fontSize?: string }>`
+const SearchedChannelsHeader = styled.p<{ color: string; fontSize?: string }>`
   padding-left: 16px;
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
   line-height: 14px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const DirectChannels = styled.div``
 const GroupChannels = styled.div``
@@ -831,11 +840,11 @@ const ChatsTitle = styled.h3<{ theme?: string }>`
   color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
 `
 
-const NoData = styled.div<{ fontSize?: string }>`
+const NoData = styled.div<{ color: string; fontSize?: string }>`
   text-align: center;
   padding: 10px;
   font-size: ${(props) => props.fontSize};
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const LoadingWrapper = styled.div`
   position: absolute;

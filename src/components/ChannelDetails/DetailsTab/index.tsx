@@ -108,6 +108,7 @@ const DetailsTab = ({
   tabItemsMinWidth
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
@@ -135,6 +136,7 @@ const DetailsTab = ({
   return (
     <Container theme={theme}>
       <DetailsTabHeader
+        color={textSecondary}
         activeTabColor={accentColor}
         backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
         borderColor={borderColor}
@@ -244,6 +246,7 @@ const DetailsTabHeader = styled.div<{
   fontSize?: string
   minWidth?: string
   lineHeight?: string
+  color: string
 }>`
   overflow: auto;
   padding: 0 20px;
@@ -285,7 +288,7 @@ const DetailsTabHeader = styled.div<{
     font-weight: 500;
     font-size: ${(props) => props.fontSize || '15px'};
     line-height: ${(props) => props.lineHeight || '20px'};
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
     min-width: ${(props) => props.minWidth || '70px'};
     cursor: pointer;
   }

@@ -49,6 +49,7 @@ const Files = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
@@ -127,7 +128,6 @@ const Files = ({
                 onClick={() => handleDownloadFile(file)}
               >
                 {downloadingFilesMap[file.id!] ? (
-                  // <UploadingIcon width='12px' height='12px' borderWidth='2px' color={colors.textColor2} />
                   <ProgressWrapper>
                     <CircularProgressbar
                       minValue={0}
@@ -141,7 +141,7 @@ const Files = ({
                           fill: 'transparent'
                         },
                         path: {
-                          stroke: colors.textColor2,
+                          stroke: textSecondary,
                           strokeLinecap: 'butt',
                           strokeWidth: '6px',
                           transition: 'stroke-dashoffset 0.5s ease 0s',
