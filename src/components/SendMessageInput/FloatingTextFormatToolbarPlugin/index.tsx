@@ -118,6 +118,7 @@ function TextFormatFloatingToolbar({
   showMenu: boolean
 }): JSX.Element {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -237,7 +238,9 @@ function TextFormatFloatingToolbar({
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote direction='top'>Bold</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Bold
+            </ItemNote>
             <BoldIcon />
           </Action>
 
@@ -252,7 +255,9 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote direction='top'>Italic</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Italic
+            </ItemNote>
             <ItalicIcon />
           </Action>
           <Action
@@ -266,7 +271,10 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote direction='top'> Strikethrough </ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              {' '}
+              Strikethrough{' '}
+            </ItemNote>
             <StrikethroughIcon />
           </Action>
           <Action
@@ -280,7 +288,9 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote direction='top'>Monospace</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Monospace
+            </ItemNote>
             <MonoIcon />
           </Action>
           <Action
@@ -294,7 +304,9 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote direction='top'>Underline</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Underline
+            </ItemNote>
             <UnderlineIcon />
           </Action>
         </React.Fragment>

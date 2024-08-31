@@ -104,7 +104,13 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleSave}>
+          <Button
+            type='button'
+            color={colors.white}
+            backgroundColor={accentColor}
+            borderRadius='8px'
+            onClick={handleSave}
+          >
             Save
           </Button>
         </PopupFooter>

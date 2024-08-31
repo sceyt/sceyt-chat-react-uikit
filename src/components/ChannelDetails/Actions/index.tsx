@@ -345,7 +345,7 @@ const Actions = ({
     <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || colors.backgroundColor}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
-          <SectionHeader>ACTIONS</SectionHeader>
+          <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
           <MenuTriggerIcon isOpen={menuIsOpen}>
             <BottomIcon />
           </MenuTriggerIcon>
@@ -396,6 +396,7 @@ const Actions = ({
                   timeOptionsToMuteNotifications.map((value, index) => {
                     return (
                       <DropdownOptionLi
+                        textColor={textPrimary}
                         key={value + index}
                         hoverBackground={colors.primaryLight}
                         onClick={() => handleNotificationOnOff(value * oneHour)}
@@ -407,6 +408,7 @@ const Actions = ({
                 ) : (
                   <React.Fragment>
                     <DropdownOptionLi
+                      textColor={textPrimary}
                       key={1}
                       hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(oneHour)}
@@ -414,6 +416,7 @@ const Actions = ({
                       Mute for 1 hour
                     </DropdownOptionLi>
                     <DropdownOptionLi
+                      textColor={textPrimary}
                       key={2}
                       hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(twoHours)}
@@ -421,6 +424,7 @@ const Actions = ({
                       Mute for 2 hours
                     </DropdownOptionLi>
                     <DropdownOptionLi
+                      textColor={textPrimary}
                       key={3}
                       hoverBackground={colors.primaryLight}
                       onClick={() => handleNotificationOnOff(oneDay)}
@@ -431,6 +435,7 @@ const Actions = ({
                 )}
 
                 <DropdownOptionLi
+                  textColor={textPrimary}
                   key={4}
                   hoverBackground={colors.primaryLight}
                   onClick={() => handleNotificationOnOff()}

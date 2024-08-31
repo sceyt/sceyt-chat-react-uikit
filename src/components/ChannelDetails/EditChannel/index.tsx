@@ -101,6 +101,7 @@ const EditChannel = ({
   editChannelCancelButtonTextColor
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -243,6 +244,7 @@ const EditChannel = ({
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
+                    textColor={textPrimary}
                     hoverBackground={colors.primaryLight}
                     onClick={() => onOpenFileUploader()}
                     iconWidth='20px'
@@ -275,11 +277,11 @@ const EditChannel = ({
           />
         </AvatarCont>
 
-        <Label> Name </Label>
+        <Label color={textPrimary}> Name </Label>
         <CustomInput
           error={subjectIsWrong}
           theme={theme}
-          color={colors.textColor1}
+          color={textPrimary}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e) => setNewSubject(e.target.value)}
@@ -288,11 +290,11 @@ const EditChannel = ({
           <InputErrorMessage>Channel name must be a minimum of 1 and a maximum of 250 symbols.</InputErrorMessage>
         )}
 
-        <Label> Description </Label>
+        <Label color={textPrimary}> Description </Label>
         <CustomInput
           error={descriptionIsWrong}
           theme={theme}
-          color={colors.textColor1}
+          color={textPrimary}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e) => setNewDescription(e.target.value)}
@@ -305,7 +307,7 @@ const EditChannel = ({
           <Button
             type='button'
             borderRadius='8px'
-            color={editChannelCancelButtonTextColor || colors.textColor1}
+            color={editChannelCancelButtonTextColor || textPrimary}
             backgroundColor={editChannelCancelButtonBackgroundColor || colors.backgroundColor}
             onClick={() => handleToggleEditMode(false)}
           >
@@ -314,7 +316,7 @@ const EditChannel = ({
           <Button
             disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
-            color={editChannelSaveButtonTextColor}
+            color={editChannelSaveButtonTextColor || colors.white}
             backgroundColor={editChannelSaveButtonBackgroundColor || accentColor}
             onClick={handleSave}
           >

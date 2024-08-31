@@ -113,7 +113,7 @@ function ConfirmPopup({
           <Button
             type='button'
             backgroundColor={buttonBackground || colors.red1}
-            color={buttonTextColor}
+            color={buttonTextColor || colors.white}
             borderRadius='8px'
             onClick={handleDelete}
             disabled={initialRender}

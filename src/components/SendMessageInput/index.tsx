@@ -1382,6 +1382,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               onClick={handleToggleForwardMessagePopup}
               backgroundColor={colors.primaryLight}
               marginLeft='32px'
+              color={textPrimary}
             >
               <ForwardIcon />
               Forward
@@ -1532,7 +1533,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           />
                         ) : (
                           messageForReply.attachments[0].type === attachmentTypes.file && (
-                            <ReplyIconWrapper backgroundColor={colors.primary}>
+                            <ReplyIconWrapper backgroundColor={accentColor}>
                               <ChooseFileIcon />
                             </ReplyIconWrapper>
                           )
@@ -1677,7 +1678,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         (showChooseMediaAttachment || showChooseFileAttachment) && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
-                            color={colors.primary}
+                            color={accentColor}
                             height={inputContainerHeight || minHeight}
                             onClick={() => onOpenFileUploader(showChooseMediaAttachment ? mediaExtensions : '')}
                           >
@@ -1786,7 +1787,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       isActive={true}
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
-                      color={colors.primary}
+                      color={accentColor}
                       iconColor={accentColor}
                     >
                       <AudioRecord
@@ -1816,7 +1817,7 @@ const Container = styled.div<{
   borderRadius?: string
   ref?: any
   height?: number
-  mentionColor?: string
+  mentionColor: string
   toolBarTop: string
   toolBarLeft: string
   selectionBackgroundColor: string
@@ -1856,7 +1857,7 @@ const Container = styled.div<{
     cursor: text;
 
     & .rdw-mention-link {
-      color: ${(props) => props.mentionColor || colors.primary};
+      color: ${(props) => props.mentionColor};
     }
   }
 `
@@ -1921,13 +1922,13 @@ const UserName = styled.span<any>`
   margin-left: 4px;
 `
 
-const EditReplyMessageHeader = styled.h4<any>`
+const EditReplyMessageHeader = styled.h4<{ color: string }>`
   display: flex;
   margin: 0 0 2px;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
 
   > svg {
     margin-right: 4px;
@@ -1956,7 +1957,7 @@ const AddAttachmentIcon = styled.span<any>`
   }
 `
 
-const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: string; messageForReply?: string }>`
+const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor: string; messageForReply?: string }>`
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1970,7 +1971,7 @@ const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: s
 
     & ${AddAttachmentIcon} {
       & > svg {
-        color: ${(props) => props.iconColor || colors.primary};
+        color: ${(props) => props.iconColor};
       }
     ;
     }
@@ -2002,7 +2003,7 @@ const LexicalWrapper = styled.div<{
   borderRadius?: string
   backgroundColor?: string
   paddings?: string
-  mentionColor?: string
+  mentionColor: string
   isChrome?: boolean
   selectionBackgroundColor?: string
 }>`
@@ -2032,15 +2033,15 @@ const LexicalWrapper = styled.div<{
     }
 
     &::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     & *::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     & span::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     &:empty:before {
@@ -2053,7 +2054,7 @@ const LexicalWrapper = styled.div<{
     }
 
     & .mention {
-      color: ${(props) => props.mentionColor || colors.primary};
+      color: ${(props) => props.mentionColor};
       background-color: inherit !important;
       user-modify: read-only;
     }
@@ -2301,7 +2302,7 @@ const JoinChannelCont = styled.div<{ color?: string }>`
   background-color: ${colors.backgroundColor};
   cursor: pointer;
 `
-const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
+const ReadOnlyCont = styled.div<{ color: string; iconColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2310,7 +2311,7 @@ const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 
   & > svg {
     margin-right: 12px;
@@ -2320,14 +2321,14 @@ const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
 const ReplyMessageCont = styled.div`
   display: flex;
 `
-const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
+const ReplyIconWrapper = styled.span<{ backgroundColor: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 12px;
   width: 40px;
   height: 40px;
-  background-color: ${(props) => props.backgroundColor || colors.primary};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
 
   & > svg {
@@ -2343,8 +2344,8 @@ const SelectedMessagesWrapper = styled.div`
   padding: 12px 16px;
 `
 
-const CustomButton = styled.span<{ color?: string; backgroundColor?: string; marginLeft?: string }>`
-  color: ${(props) => props.color || colors.textColor1};
+const CustomButton = styled.span<{ color: string; backgroundColor?: string; marginLeft?: string }>`
+  color: ${(props) => props.color};
   padding: 8px 16px;
   background-color: ${(props) => props.backgroundColor || colors.primaryLight};
   margin-left: ${(props) => props.marginLeft || '8px'};

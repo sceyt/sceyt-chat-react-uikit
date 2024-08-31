@@ -4,9 +4,10 @@ import { ReactComponent as ItalicIcon } from '../../../assets/svg/italic.svg'
 import { ReactComponent as StrikethroughIcon } from '../../../assets/svg/strikethrough.svg'
 import { ReactComponent as MonoIcon } from '../../../assets/svg/mono.svg'
 import { ReactComponent as BoldIcon } from '../../../assets/svg/bold.svg'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { THEME } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 export default function TextFormat({
   handleFormatToBold,
@@ -48,6 +49,7 @@ export default function TextFormat({
   theme?: string
   editorProps: any
 }) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {
@@ -78,7 +80,9 @@ export default function TextFormat({
             onClick={() => handleFormatToBold(editorProps)}
             isActive={isBoldText}
           >
-            <ItemNote direction='top'>Bold</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Bold
+            </ItemNote>
             <BoldIcon />
           </Action>
         )}
@@ -91,7 +95,9 @@ export default function TextFormat({
             onClick={() => handleFormatToItalic(editorProps)}
             isActive={isItalicText}
           >
-            <ItemNote direction='top'>Italic</ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              Italic
+            </ItemNote>
             <ItalicIcon />
           </Action>
         )}
@@ -104,7 +110,10 @@ export default function TextFormat({
             onClick={() => handleFormatToStrikethrough(editorProps)}
             isActive={isStrikethroughText}
           >
-            <ItemNote direction='top'> Strikethrough </ItemNote>
+            <ItemNote bgColor={textPrimary} direction='top'>
+              {' '}
+              Strikethrough{' '}
+            </ItemNote>
             <StrikethroughIcon />
           </Action>
         )}
@@ -118,7 +127,9 @@ export default function TextFormat({
               onClick={() => handleFormatToMonospace(editorProps)}
               isActive={isMonospaceText}
             >
-              <ItemNote direction='top'>Monospace</ItemNote>
+              <ItemNote bgColor={textPrimary} direction='top'>
+                Monospace
+              </ItemNote>
               <MonoIcon />
             </Action>
           </React.Fragment>
@@ -145,7 +156,9 @@ const EditMessageContainer = styled.div<{ backgroundColor?: string; rtlDirection
   background-color: ${(props) => props.backgroundColor};
   box-sizing: border-box;
   border-radius: 12px;
-  box-shadow: 0 0 2px rgba(17, 21, 57, 0.08), 0 0 24px rgba(17, 21, 57, 0.16);
+  box-shadow:
+    0 0 2px rgba(17, 21, 57, 0.08),
+    0 0 24px rgba(17, 21, 57, 0.16);
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;

@@ -147,7 +147,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
       <Popup maxWidth='522px' minWidth='522px' height='540px' isLoading={loading} padding='0'>
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
           <CloseIcon onClick={() => togglePopup()} />
-          <PopupName isDelete marginBottom='20px'>
+          <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
           <ChannelSearch
@@ -356,7 +356,13 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleForwardMessage}>
+          <Button
+            type='button'
+            color={colors.white}
+            backgroundColor={accentColor}
+            borderRadius='8px'
+            onClick={handleForwardMessage}
+          >
             {buttonText || 'Forward'}
           </Button>
         </PopupFooter>

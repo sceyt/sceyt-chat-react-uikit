@@ -36,11 +36,11 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   newChatIcon,
   uploadPhotoIcon
 }) => {
-  // const dispatch = useDispatch()
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
@@ -60,14 +60,14 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         zIndex='300'
         trigger={
           <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
-            {createChannelIcon || <AddChannelIcon />} 
+            {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
       >
         <DropdownOptionsUl>
           <DropdownOptionLi
             key={1}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
@@ -77,7 +77,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           </DropdownOptionLi>
           <DropdownOptionLi
             key={2}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
@@ -87,7 +87,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           </DropdownOptionLi>
           <DropdownOptionLi
             key={3}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
