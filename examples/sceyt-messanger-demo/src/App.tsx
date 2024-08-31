@@ -227,8 +227,7 @@ function App() {
                <>
                  {(!isMobile || mobileActiveView === MOBILE_ACTIVE_VIEW.CHANNELS) && <ChannelList
                    // className='custom_channel_list'
-                   List={(props) => <ChannelCustomList {...props}
-                                                       activeChannelIsChanged={activeChannelIsChanged}/>}
+                   List={(props) => <ChannelCustomList {...props} activeChannelIsChanged={activeChannelIsChanged}/>}
                    CreateChannel={<CreateChannelButton/>}
                    backgroundColor={'#1B1C25'}
                    searchInputBackgroundColor={'#25262E'}

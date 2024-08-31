@@ -7,8 +7,8 @@ function ChannelCustomList({
                              channels,
                              searchedChannels,
                              loadMoreChannels,
-                             setActiveChannel,
-                             activeChannel,
+                             setSelectedChannel,
+                             selectedChannel,
                              searchValue,
                              activeChannelIsChanged,
                            }:
@@ -16,9 +16,9 @@ function ChannelCustomList({
                                channels: IChannel[],
                                searchedChannels: { chats_groups: [], channels: [], contacts: [] },
                                loadMoreChannels: (count?: number) => void,
-                               setActiveChannel?: (channel: IChannel) => void,
+                               setSelectedChannel?: (channel: IChannel) => void,
                                activeChannelIsChanged?: (channel: IChannel) => void,
-                               activeChannel?: IChannel,
+                               selectedChannel?: IChannel,
                                searchValue: string
                              }) {
 
@@ -60,8 +60,8 @@ function ChannelCustomList({
   }
 
   const handleChangeActiveChannel = (channel: IChannel) => {
-    if (setActiveChannel) {
-      setActiveChannel(channel)
+    if (setSelectedChannel) {
+      setSelectedChannel(channel)
     }
     if (activeChannelIsChanged) {
       setTimeout(() => {
@@ -131,7 +131,7 @@ function ChannelCustomList({
             // const directChannelUser = isDirectChannel && channel.members[0]
             return (
               <div key={channel.id} onClick={() => handleChangeActiveChannel(channel)}
-                   className={`custom_channel_item ${activeChannel && activeChannel.id === channel.id && 'active'}`}>
+                   className={`custom_channel_item ${selectedChannel && selectedChannel.id === channel.id && 'active'}`}>
                 {channel.type === 'direct' &&
                   <Avatar name={(directChannelUser || {}).id || ''} size={32}
                           image={(directChannelUser || {}).avatarUrl}
