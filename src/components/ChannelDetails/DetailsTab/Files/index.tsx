@@ -109,7 +109,7 @@ const Files = ({
                 <AttachmentPreviewTitle
                   fontSize={fileNameFontSize}
                   lineHeight={fileNameLineHeight}
-                  color={filePreviewTitleColor}
+                  color={filePreviewTitleColor || textPrimary}
                 >
                   {formatLargeText(file.name, nameMaxLength)}
                 </AttachmentPreviewTitle>

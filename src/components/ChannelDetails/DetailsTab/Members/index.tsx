@@ -72,7 +72,7 @@ const Members = ({
   memberPresenceFontSize
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -239,7 +239,7 @@ const Members = ({
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
-              color={textPrimaryColor}
+              color={textPrimary}
               hoverBackground={
                 hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
               }
@@ -255,7 +255,7 @@ const Members = ({
             members.map((member, index) => (
               <MemberItem
                 key={member.id + index}
-                color={textPrimaryColor}
+                color={textPrimary}
                 hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
@@ -515,7 +515,7 @@ const MembersList = styled.ul`
   transition: all 0.2s;
 `
 const MemberItem = styled.li<{
-  color?: string
+  color: string
   hoverBackground?: string
   addMemberIconColor?: string
   addMemberBackground?: string
@@ -527,7 +527,7 @@ const MemberItem = styled.li<{
   font-weight: 500;
   padding: 6px 16px;
   transition: all 0.2s;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   cursor: pointer;
 
   &:first-child {

@@ -315,7 +315,9 @@ const UsersPopup = ({
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
           <CloseIcon color={colors.textColor2} onClick={handleClosePopup} />
 
-          <PopupName padding='0 12px'>{actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}</PopupName>
+          <PopupName color={textPrimary} padding='0 12px'>
+            {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
+          </PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg />
             <SearchUsersInput

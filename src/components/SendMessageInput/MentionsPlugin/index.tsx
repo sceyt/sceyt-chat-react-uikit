@@ -10,7 +10,7 @@ import {
 import { $createMentionNode } from '../MentionNode'
 import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
 import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -18,6 +18,7 @@ import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
+import { useColor } from '../../../hooks'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -181,6 +182,7 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   let className = 'item'
   if (isSelected) {
     className += ' selected'
@@ -203,7 +205,7 @@ function MentionsTypeaheadMenuItem({
         <Avatar name={option.name} image={option.avatarUrl} size={32} textSize={14} setDefaultAvatar />
       </AvatarWrapper>
       <UserNamePresence>
-        <MemberName color={colors.textColor1}>
+        <MemberName color={textPrimary}>
           {option.name}
           {/* {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)} */}
         </MemberName>
@@ -444,7 +446,7 @@ const UserNamePresence = styled.div`
   width: calc(100% - 44px);
   margin-left: 12px;
 `
-const MemberName = styled.h3<{ color?: string }>`
+const MemberName = styled.h3<{ color: string }>`
   margin: 0;
   max-width: calc(100% - 1px);
   font-weight: 500;
@@ -454,5 +456,5 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `

@@ -74,7 +74,7 @@ export default function ChatHeader({
   customActionsOrder
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -180,7 +180,7 @@ export default function ChatHeader({
         </AvatarWrapper>
         <ChannelName>
           <SectionHeader
-            color={titleColor || textPrimaryColor}
+            color={titleColor || textPrimary}
             theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
@@ -214,11 +214,7 @@ export default function ChatHeader({
       </ChannelInfo>
       {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
-        <ChanelInfo
-          onClick={() => channelDetailsOnOpen()}
-          infoIconColor={accentColor}
-          order={infoIconOrder}
-        >
+        <ChanelInfo onClick={() => channelDetailsOnOpen()} infoIconColor={accentColor} order={infoIconOrder}>
           {infoIcon || <InfoIcon />}
         </ChanelInfo>
       )}

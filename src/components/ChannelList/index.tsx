@@ -37,14 +37,14 @@ import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useColor, useDidUpdate } from '../../hooks'
 // Helpers
 import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-import { colors, device } from '../../UIHelper/constants'
+import { colors, device, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
-import { IChannel, IContact, IContactsMap } from '../../types'
+import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
 // Components
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
@@ -194,11 +194,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize
 }) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
-  const channelListRef = useRef<HTMLInputElement>(null)
-  const channelsScrollRef = useRef<HTMLInputElement>(null)
+  const channelListRef = useRef<HTMLInputElement | null>(null)
+  const channelsScrollRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
   const connectionStatus = useSelector(connectionStatusSelector)
   const channels = useSelector(channelsSelector, shallowEqual) || []
@@ -253,7 +254,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }
   const handleCrateChatWithContact = (contact: IContact) => {
     if (contact) {
-      const channelData = {
+      const channelData: ICreateChannel = {
         metadata: '',
         label: '',
         type: CHANNEL_TYPE.DIRECT,
@@ -383,7 +384,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   useDidUpdate(() => {
     if (channels && channels.length) {
       if (!listWidthIsSet) {
-        dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current.clientWidth) || 0))
+        dispatch(setChannelListWithAC((channelListRef.current && channelListRef.current?.clientWidth) || 0))
         setListWidthIsSet(true)
       }
     } else {
@@ -406,7 +407,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     >
       <ChannelListHeader
         withCustomList={!!List}
-        maxWidth={(channelListRef.current && channelListRef.current.clientWidth) || 0}
+        maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
         borderColor={colors.backgroundColor}
       >
         {Profile /* || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} /> */}
@@ -426,7 +427,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
             fontSize={searchChannelInputFontSize}
           />
         ) : (
-          ChannelsTitle || <ChatsTitle theme={theme}>Chats</ChatsTitle>
+          ChannelsTitle || (
+            <ChatsTitle lightColor={textPrimary} darkColor={colors.darkModeTextColor1} theme={theme}>
+              Chats
+            </ChatsTitle>
+          )
         )}
 
         {showCreateChannelIcon &&
@@ -787,7 +792,8 @@ const Container = styled.div<{ withCustomList?: boolean; ref?: any; backgroundCo
   position: relative;
   display: flex;
   flex-direction: column;
-  width: ${(props) => (props.withCustomList ? '' : '400px')};
+  width: ${(props: { withCustomList?: boolean; ref?: any; backgroundColor?: string }) =>
+    props.withCustomList ? '' : '400px'};
   min-width: ${(props) => (props.withCustomList ? '' : '400px')};
   border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${colors.backgroundColor}`)};
   background-color: ${(props) => props.backgroundColor};
@@ -814,27 +820,28 @@ const SearchedChannels = styled.div`
 const SearchedChannelsHeader = styled.p<{ fontSize?: string }>`
   padding-left: 16px;
   font-weight: 500;
-  font-size: ${(props) => props.fontSize || '15px'};
+  font-size: ${(props: { fontSize?: string }) => props.fontSize || '15px'};
   line-height: 14px;
   color: ${colors.textColor2};
 `
 const DirectChannels = styled.div``
 const GroupChannels = styled.div``
 
-const ChatsTitle = styled.h3<{ theme?: string }>`
+const ChatsTitle = styled.h3<{ lightColor: string; darkColor: string; theme?: string }>`
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 28px;
   margin: 0 auto;
-  color: ${(props) => (props.theme === THEME.DARK ? colors.darkModeTextColor1 : colors.textColor1)};
+  color: ${(props: { lightColor: string; darkColor: string; theme?: string }) =>
+    props.theme === THEME.DARK ? props.darkColor : props.lightColor};
 `
 
 const NoData = styled.div<{ fontSize?: string }>`
   text-align: center;
   padding: 10px;
-  font-size: ${(props) => props.fontSize};
+  font-size: ${(props: { fontSize?: string }) => props.fontSize};
   color: ${colors.textColor2};
 `
 const LoadingWrapper = styled.div`
@@ -852,10 +859,10 @@ const ChannelListHeader = styled.div<{
   align-items: center;
   flex-direction: row;
   justify-content: space-between;
-  //justify-content: flex-end;
+  max-width: ${(props: { maxWidth?: number; withoutProfile?: any; withCustomList?: boolean; borderColor?: string }) =>
+    props.maxWidth ? `${props.maxWidth}px` : 'inherit'};
   padding: 12px;
   box-sizing: border-box;
-  max-width: ${(props) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
   padding-left: ${(props) => props.withoutProfile && '52px'};
   border-right: ${(props) => props.withCustomList && `1px solid ${props.borderColor}`};
 `

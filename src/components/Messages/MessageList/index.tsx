@@ -429,7 +429,7 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1036,14 +1036,20 @@ const MessageList: React.FC<MessagesProps> = ({
         >
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
-          <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragOver}>
+          <DropAttachmentArea
+            color={textPrimary}
+            margin='32px 32px 12px'
+            draggable
+            onDrop={handleDropFile}
+            onDragOver={handleDragOver}
+          >
             <IconWrapper draggable iconColor={accentColor}>
               <ChooseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
-            <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
+            <DropAttachmentArea draggable color={textPrimary} onDrop={handleDropMedia} onDragOver={handleDragOver}>
               <IconWrapper draggable iconColor={accentColor}>
                 <ChooseMediaIcon />
               </IconWrapper>
@@ -1061,7 +1067,7 @@ const MessageList: React.FC<MessagesProps> = ({
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor || colors.textColor1}
+            dateDividerTextColor={dateDividerTextColor || textPrimary}
             dateDividerBorder={dateDividerBorder}
             dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
             dateDividerBorderRadius={dateDividerBorderRadius}
@@ -1288,9 +1294,9 @@ const MessageList: React.FC<MessagesProps> = ({
             </MessagesBox>
           ) : (
             messagesLoading === LOADING_STATE.LOADED && (
-              <NoMessagesContainer color={colors.textColor1}>
+              <NoMessagesContainer color={textPrimary}>
                 <NoMessagesIcon />
-                <NoMessagesTitle color={textPrimaryColor}>No Messages yet</NoMessagesTitle>
+                <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
                 <NoMessagesText color={colors.textColor2}>No messages yet, start the chat</NoMessagesText>
                 {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
@@ -1323,10 +1329,8 @@ interface MessageBoxProps {
 export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string }>`
   display: flex;
   flex-direction: column-reverse;
-  //flex-direction: column;
   flex-grow: 1;
   position: relative;
-  //overflow: ${(props) => (props.stopScrolling ? 'hidden' : 'auto')};
   overflow: auto;
   scroll-behavior: smooth;
   will-change: left, top;
@@ -1376,7 +1380,7 @@ export const MessageTopDate = styled.div<{
     font-style: normal;
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
-    color: ${(props) => props.dateDividerTextColor || colors.textColor1};
+    color: ${(props) => props.dateDividerTextColor};
     background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
     border: ${(props) => props.dateDividerBorder};
     box-sizing: border-box;
@@ -1406,7 +1410,7 @@ export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: nu
   z-index: 999;
 `
 
-export const IconWrapper = styled.span<{ iconColor?: string }>`
+export const IconWrapper = styled.span<{ iconColor: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1420,13 +1424,13 @@ export const IconWrapper = styled.span<{ iconColor?: string }>`
   pointer-events: none;
 
   & > svg {
-    color: ${(props) => props.iconColor || colors.primary};
+    color: ${(props) => props.iconColor};
     width: 32px;
     height: 32px;
   }
 `
 
-export const DropAttachmentArea = styled.div<{ margin?: string }>`
+export const DropAttachmentArea = styled.div<{ color: string; margin?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1439,7 +1443,7 @@ export const DropAttachmentArea = styled.div<{ margin?: string }>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   transition: all 0.1s;
 
   &.dragover {
@@ -1460,7 +1464,7 @@ export const MessageWrapper = styled.div<{}>`
   }
 `
 
-export const NoMessagesContainer = styled.div<{ color?: string }>`
+export const NoMessagesContainer = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1471,10 +1475,10 @@ export const NoMessagesContainer = styled.div<{ color?: string }>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
-export const NoMessagesTitle = styled.h4<{ color?: string }>`
+export const NoMessagesTitle = styled.h4<{ color: string }>`
   margin: 12px 0 8px;
   font-family: Inter, sans-serif;
   text-align: center;
@@ -1482,10 +1486,10 @@ export const NoMessagesTitle = styled.h4<{ color?: string }>`
   font-style: normal;
   font-weight: 500;
   line-height: 24px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
-export const NoMessagesText = styled.p<{ color?: string }>`
+export const NoMessagesText = styled.p<{ color: string }>`
   margin: 0;
   text-align: center;
   font-feature-settings:
@@ -1496,5 +1500,5 @@ export const NoMessagesText = styled.p<{ color?: string }>`
   font-style: normal;
   font-weight: 400;
   line-height: 20px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
