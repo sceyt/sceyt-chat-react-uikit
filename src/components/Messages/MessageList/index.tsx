@@ -26,7 +26,7 @@ import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useDidUpdate } from '../../../hooks'
+import { useDidUpdate, useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
@@ -46,7 +46,7 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -428,6 +428,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1035,14 +1037,14 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea margin='32px 32px 12px' draggable onDrop={handleDropFile} onDragOver={handleDragOver}>
-            <IconWrapper draggable iconColor={colors.primary}>
+            <IconWrapper draggable iconColor={accentColor}>
               <ChooseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
-              <IconWrapper draggable iconColor={colors.primary}>
+              <IconWrapper draggable iconColor={accentColor}>
                 <ChooseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media
@@ -1288,7 +1290,7 @@ const MessageList: React.FC<MessagesProps> = ({
             messagesLoading === LOADING_STATE.LOADED && (
               <NoMessagesContainer color={colors.textColor1}>
                 <NoMessagesIcon />
-                <NoMessagesTitle color={colors.textColor1}>No Messages yet</NoMessagesTitle>
+                <NoMessagesTitle color={textPrimaryColor}>No Messages yet</NoMessagesTitle>
                 <NoMessagesText color={colors.textColor2}>No messages yet, start the chat</NoMessagesText>
                 {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'

@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { updateChannelAC } from '../../../store/channel/actions'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 // Hooks
-import { useDidUpdate, useStateComplex } from '../../../hooks'
+import { useDidUpdate, useStateComplex, useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as CameraIcon } from '../../../assets/svg/cameraIcon.svg'
 import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
@@ -26,7 +26,7 @@ import {
 } from '../../../UIHelper'
 import { getClient } from '../../../common/client'
 import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember } from '../../../types'
 // Components
 import DropDown from '../../../common/dropdown'
@@ -100,6 +100,7 @@ const EditChannel = ({
   editChannelCancelButtonBackgroundColor,
   editChannelCancelButtonTextColor
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -314,7 +315,7 @@ const EditChannel = ({
             disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
             color={editChannelSaveButtonTextColor}
-            backgroundColor={editChannelSaveButtonBackgroundColor || colors.primary}
+            backgroundColor={editChannelSaveButtonBackgroundColor || accentColor}
             onClick={handleSave}
           >
             Save

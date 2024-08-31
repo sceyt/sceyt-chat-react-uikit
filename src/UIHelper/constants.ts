@@ -1,3 +1,27 @@
+import { SceytChatUIKitTheme, ThemeMode } from '../components'
+
+export const THEME_COLOR_NAMES = {
+  ACCENT: 'accent',
+  BACKGROUND: 'background',
+  TEXT_PRIMARY: 'textPrimary'
+}
+export const defaultTheme: SceytChatUIKitTheme = {
+  colors: {
+    [THEME_COLOR_NAMES.ACCENT]: {
+      light: '#5159F6',
+      dark: '#6B72FF'
+    },
+    [THEME_COLOR_NAMES.BACKGROUND]: {
+      light: '#FFFFFF',
+      dark: '#19191B'
+    },
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
+      light: '#111539',
+      dark: '#E1E3E6'
+    }
+  }
+}
+export const defaultThemeMode: ThemeMode = 'light'
 export const colors = {
   white: '#ffffff',
   black: '#000000',

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
@@ -29,7 +29,7 @@ import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
 import PopupContainer from '../popupContainer'
-
+import { useColor } from '../../../hooks'
 interface ISelectedChannelsData {
   id: string
   displayName: string
@@ -58,6 +58,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -157,7 +159,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             {selectedChannels.map((channel) => {
               return (
                 <SelectedChannelBuble key={`selected-${channel.id}`}>
-                  <SelectedChannelName>{channel.displayName}</SelectedChannelName>
+                  <SelectedChannelName color={textPrimary}>{channel.displayName}</SelectedChannelName>
                   <StyledSubtractSvg onClick={() => removeChannel(channel)} />
                 </SelectedChannelBuble>
               )
@@ -194,7 +196,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             setDefaultAvatar={true}
                           />
                           <ChannelInfo>
-                            <ChannelTitle>
+                            <ChannelTitle color={textPrimary}>
                               {isDirectChannel
                                 ? isSelfChannel
                                   ? 'Me'
@@ -229,6 +231,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             state={isSelected}
                             onChange={(e) => handleChannelSelect(e, channel)}
                             size='18px'
+                            tickColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -250,7 +253,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             setDefaultAvatar={false}
                           />
                           <ChannelInfo>
-                            <ChannelTitle>{channel.subject}</ChannelTitle>
+                            <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
                             <ChannelMembers>
                               {`${channel.memberCount} ${
                                 channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
@@ -269,6 +272,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             state={isSelected}
                             onChange={(e) => handleChannelSelect(e, channel)}
                             size='18px'
+                            tickColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -302,7 +306,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       setDefaultAvatar={isDirectChannel}
                     />
                     <ChannelInfo>
-                      <ChannelTitle>
+                      <ChannelTitle color={textPrimary}>
                         {channel.subject ||
                           (isDirectChannel && isSelfChannel
                             ? 'Me'
@@ -340,6 +344,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       state={isSelected}
                       onChange={(e) => handleChannelSelect(e, channel)}
                       size='18px'
+                      tickColor={accentColor}
                     />
                   </ChannelItem>
                 )
@@ -348,10 +353,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           </ForwardChannelsCont>
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleForwardMessage}>
+          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleForwardMessage}>
             {buttonText || 'Forward'}
           </Button>
         </PopupFooter>
@@ -388,13 +393,13 @@ const ChannelsGroupTitle = styled.h4<{ margin?: string }>`
   margin: ${(props) => props.margin || '20px 0 12px'};
   color: ${colors.textColor2};
 `
-const ChannelTitle = styled.h3<any>`
+const ChannelTitle = styled.h3<{ color: string }>`
   margin: 0 0 2px;
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
@@ -436,12 +441,12 @@ const SelectedChannelBuble = styled.div`
   box-sizing: border-box;
 `
 
-const SelectedChannelName = styled.span`
+const SelectedChannelName = styled.span<{ color: string }>`
   font-style: normal;
   font-weight: 500;
   font-size: 14px;
   line-height: 16px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

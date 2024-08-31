@@ -23,11 +23,11 @@ import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../.
 import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
-
+import { useColor } from '../../hooks'
 interface IProps {
   backgroundColor?: string
   avatarBorderRadius?: string
@@ -73,6 +73,8 @@ export default function ChatHeader({
   infoIconOrder,
   customActionsOrder
 }: IProps) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -178,7 +180,7 @@ export default function ChatHeader({
         </AvatarWrapper>
         <ChannelName>
           <SectionHeader
-            color={titleColor || colors.textColor1}
+            color={titleColor || textPrimaryColor}
             theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
@@ -214,7 +216,7 @@ export default function ChatHeader({
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo
           onClick={() => channelDetailsOnOpen()}
-          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.borderColor2}
+          infoIconColor={accentColor}
           order={infoIconOrder}
         >
           {infoIcon || <InfoIcon />}

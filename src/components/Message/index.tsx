@@ -21,7 +21,7 @@ import {
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
-import { useDidUpdate, useOnScreen } from '../../hooks'
+import { useDidUpdate, useOnScreen, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
@@ -42,7 +42,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
@@ -360,6 +360,8 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -386,7 +388,6 @@ const Message = ({
   const messageUserID = message.user ? message.user.id : 'deleted'
   const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
   const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null
-
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
@@ -666,7 +667,7 @@ const Message = ({
       {showMessageSenderName && (
         <MessageOwner
           className='message-owner'
-          color={colors.primary}
+          color={accentColor}
           rtlDirection={ownMessageOnRightSide && !message.incoming}
           clickable={messageOwnerIsNotCurrentUser}
           onClick={() => handleCreateChat(messageOwnerIsNotCurrentUser && message.user)}
@@ -806,7 +807,7 @@ const Message = ({
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
         <SelectMessageWrapper
-          activeColor={colors.primary}
+          activeColor={accentColor}
           disabled={tooManySelected && !isSelectedMessage}
           onClick={handleSelectMessage}
         >
@@ -1051,7 +1052,7 @@ const Message = ({
                 withSenderName={showMessageSenderName}
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
-                leftBorderColor={colors.primary}
+                leftBorderColor={accentColor}
                 backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
                 onClick={() =>
                   handleScrollToRepliedMessage &&
@@ -1093,7 +1094,7 @@ const Message = ({
                 <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
                   <MessageOwner
                     className='reply-message-owner'
-                    color={colors.primary}
+                    color={accentColor}
                     fontSize='12px'
                     rtlDirection={ownMessageOnRightSide && !message.incoming}
                     // clickable={parentMessageOwnerIsNotCurrentUser}
@@ -1125,7 +1126,8 @@ const Message = ({
                         message: message.parentMessage,
                         contactsMap,
                         getFromContacts,
-                        asSampleText: true
+                        asSampleText: true,
+                        accentColor
                       })
                     ) : (
                       parentNotLinkAttachment &&
@@ -1155,7 +1157,7 @@ const Message = ({
                   leftPadding={
                     message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
                   }
-                  color={colors.primary}
+                  color={accentColor}
                 >
                   <ForwardIcon />
                   Forwarded message
@@ -1180,7 +1182,7 @@ const Message = ({
             <MessageText
               theme={theme}
               draggable={false}
-              color={colors.textColor1}
+              color={textPrimary}
               fontSize={messageTextFontSize}
               lineHeight={messageTextLineHeight}
               showMessageSenderName={showMessageSenderName}
@@ -1197,7 +1199,8 @@ const Message = ({
                   text: message.body,
                   message,
                   contactsMap,
-                  getFromContacts
+                  getFromContacts,
+                  accentColor
                 })}
               </span>
               {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
@@ -1234,7 +1237,8 @@ const Message = ({
                         messageStatusDisplayingType,
                         size: messageStatusSize,
                         iconColor: messageStatusColor,
-                        readIconColor: messageReadStatusColor
+                        readIconColor: messageReadStatusColor,
+                        accentColor
                       })}
                     </MessageStatus>
                   )}
@@ -1281,7 +1285,8 @@ const Message = ({
                         message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                           ? colors.white
                           : '',
-                      readIconColor: messageReadStatusColor
+                      readIconColor: messageReadStatusColor,
+                      accentColor
                     })}
                 </MessageStatusAndTime>
               )}
@@ -1395,7 +1400,8 @@ const Message = ({
                   messageStatusDisplayingType,
                   size: messageStatusSize,
                   iconColor: messageStatusColor,
-                  readIconColor: messageReadStatusColor
+                  readIconColor: messageReadStatusColor,
+                  accentColor
                 })}
               </MessageStatus>
             )}
@@ -1446,7 +1452,7 @@ const Message = ({
               {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
                 <MessageReaction
                   key={summery.key}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   // onClick={() => handleReactionAddDelete(key)}
                   self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
@@ -1459,14 +1465,16 @@ const Message = ({
                 >
                   <MessageReactionKey>
                     {summery.key}
-                    {showEachReactionCount && <ReactionItemCount>{summery.count}</ReactionItemCount>}
+                    {showEachReactionCount && (
+                      <ReactionItemCount color={textPrimary}>{summery.count}</ReactionItemCount>
+                    )}
                   </MessageReactionKey>
                 </MessageReaction>
               ))}
               {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
                 <MessageReaction
                   border={reactionItemBorder}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   borderRadius={reactionItemBorderRadius}
                   backgroundColor={reactionItemBackground}
                   padding={reactionItemPadding}
@@ -1551,13 +1559,13 @@ const MessageReactionKey = styled.span`
     segoe ui symbol;
 `
 
-const ReactionItemCount = styled.span<{ color?: string }>`
+const ReactionItemCount = styled.span<{ color: string }>`
   margin-left: 2px;
   font-family: Inter, sans-serif;
   font-weight: 400;
   font-size: 14px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const MessageReaction = styled.span<{

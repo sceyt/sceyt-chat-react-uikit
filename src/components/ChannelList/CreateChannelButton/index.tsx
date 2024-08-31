@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -13,6 +13,7 @@ import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
 import DropDown from '../../../common/dropdown'
 import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 interface IChannelListProps {
   showSearch?: boolean
@@ -39,7 +40,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
-
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
@@ -58,8 +59,8 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch}>
-            {createChannelIcon || <AddChannelIcon />}
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
+            {createChannelIcon || <AddChannelIcon />} 
           </CreateDropdownButton>
         }
       >

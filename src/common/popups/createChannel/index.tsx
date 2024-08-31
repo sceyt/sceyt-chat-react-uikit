@@ -13,14 +13,14 @@ import {
   InputErrorMessage
 } from '../../../UIHelper'
 import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIcon.svg'
-import { useStateComplex } from '../../../hooks'
+import { useStateComplex, useColor } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
 import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
@@ -54,6 +54,8 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -302,9 +304,9 @@ export default function CreateChannel({
                 padding='0'
               >
                 <PopupBody paddingH='24px' paddingV='24px'>
-                  <CloseIcon color={colors.textColor1} onClick={toggleCreateGroupChannelPopup} />
+                  <CloseIcon color={textPrimary} onClick={toggleCreateGroupChannelPopup} />
 
-                  <PopupName color={colors.textColor1} marginBottom='20px'>
+                  <PopupName color={textPrimary} marginBottom='20px'>
                     Create {createGroupChannel ? 'Group' : 'Channel'}
                   </PopupName>
                   {!createGroupChannel && (
@@ -322,7 +324,7 @@ export default function CreateChannel({
                         </AvatarWrapper>
                       ) : (
                         <UploadAvatarLabel
-                          iconColor={colors.primary}
+                          iconColor={accentColor}
                           backgroundColor={colors.primaryLight}
                           htmlFor='uploadImage'
                         >
@@ -340,34 +342,34 @@ export default function CreateChannel({
                   )}
                   {showSubject && (
                     <React.Fragment>
-                      <Label color={colors.textColor1}> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
+                      <Label color={textPrimary}> {createGroupChannel ? 'Group' : 'Channel'} name</Label>
                       <CustomInput
                         type='text'
                         value={subjectValue}
                         onChange={handleTypeSubject}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
                         theme={theme}
-                        color={colors.textColor1}
+                        color={textPrimary}
                       />
                     </React.Fragment>
                   )}
 
                   {showDescription && (
                     <React.Fragment>
-                      <Label color={colors.textColor1}>Description</Label>
+                      <Label color={textPrimary}>Description</Label>
                       <CustomInput
                         type='text'
                         value={metadataValue}
                         onChange={handleTypeMetadata}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
                         theme={theme}
-                        color={colors.textColor1}
+                        color={textPrimary}
                       />
                     </React.Fragment>
                   )}
                   {showUri && (
                     <React.Fragment>
-                      <Label color={colors.textColor1}>URL</Label>
+                      <Label color={textPrimary}>URL</Label>
                       <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
                         {uriPrefixOnCreateChannel && (
                           <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>
@@ -380,7 +382,7 @@ export default function CreateChannel({
                           placeholder='chan12'
                           error={!!wrongUri}
                           theme={theme}
-                          color={colors.textColor1}
+                          color={textPrimary}
                         />
                         {!!wrongUri && (
                           <InputErrorMessage>
@@ -398,12 +400,7 @@ export default function CreateChannel({
                   )}
                 </PopupBody>
                 <PopupFooter backgroundColor={colors.backgroundColor}>
-                  <Button
-                    type='button'
-                    color={colors.textColor1}
-                    backgroundColor='transparent'
-                    onClick={() => handleClose()}
-                  >
+                  <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClose()}>
                     Cancel
                   </Button>
                   {/*  <button type='button' className='button gray' onClick={handleClose}>
@@ -411,7 +408,7 @@ export default function CreateChannel({
               </button> */}
                   <Button
                     type='button'
-                    backgroundColor={colors.primary}
+                    backgroundColor={accentColor}
                     borderRadius='8px'
                     onClick={() => GoToAddMember()}
                     disabled={nextButtonDisable}

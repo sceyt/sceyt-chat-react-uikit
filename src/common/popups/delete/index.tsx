@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
 import usePermissions from '../../../hooks/usePermissions'
 import PopupContainer from '../popupContainer'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   title: string
@@ -39,6 +40,8 @@ function ConfirmPopup({
   myRole = '',
   loading
 }: IProps) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const [checkActionPermission] = usePermissions(myRole)
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
@@ -71,8 +74,8 @@ function ConfirmPopup({
         padding='0'
       >
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon color={colors.textColor1} onClick={() => togglePopup()} />
-          <PopupName color={colors.textColor1} isDelete marginBottom='20px'>
+          <CloseIcon color={textPrimary} onClick={() => togglePopup()} />
+          <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
           <PopupDescription>{description}</PopupDescription>
@@ -85,6 +88,7 @@ function ConfirmPopup({
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
                     onChange={(e) => handleChooseDeleteOption(e, 'forEveryone')}
+                    checkedBorder={accentColor}
                   />
                   Delete for everyone
                 </DeleteOptionItem>
@@ -95,6 +99,7 @@ function ConfirmPopup({
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
                   onChange={(e) => handleChooseDeleteOption(e, 'forMe')}
+                  checkedBorder={accentColor}
                 />
                 Delete for me
               </DeleteOptionItem>
@@ -102,7 +107,7 @@ function ConfirmPopup({
           )}
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button

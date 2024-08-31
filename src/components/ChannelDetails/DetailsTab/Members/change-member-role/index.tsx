@@ -19,10 +19,11 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors } from '../../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
+import { useColor } from '../../../../../hooks'
 
 interface IProps {
   theme: string
@@ -32,6 +33,8 @@ interface IProps {
 }
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
@@ -63,19 +66,19 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
     <PopupContainer>
       <Popup backgroundColor={colors.backgroundColor} maxWidth='400px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon color={colors.textColor1} onClick={() => handleClosePopup()} />
-          <PopupName color={colors.textColor1}>Change member role</PopupName>
+          <CloseIcon color={textPrimary} onClick={() => handleClosePopup()} />
+          <PopupName color={textPrimary}>Change member role</PopupName>
 
           <RolesSelect>
-            <RoleLabel color={colors.textColor1}>Roles</RoleLabel>
+            <RoleLabel color={textPrimary}>Roles</RoleLabel>
 
-            <CustomSelect backgroundColor={colors.backgroundColor} color={colors.textColor1}>
+            <CustomSelect backgroundColor={colors.backgroundColor} color={textPrimary}>
               <DropDown
                 withIcon
                 theme={theme}
                 isSelect
                 trigger={
-                  <CustomSelectTrigger color={colors.textColor1}>
+                  <CustomSelectTrigger color={textPrimary}>
                     {selectedRole || member.role || 'Select'}
                   </CustomSelectTrigger>
                 }
@@ -87,7 +90,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
                         hoverBackground={colors.primaryLight}
                         key={role.name}
                         onClick={() => onChangeFunction(role.name)}
-                        textColor={colors.textColor1}
+                        textColor={textPrimary}
                       >
                         <RoleSpan>{role.name}</RoleSpan>
                       </DropdownOptionLi>
@@ -98,15 +101,10 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
           </RolesSelect>
         </PopupBody>
         <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button
-            type='button'
-            color={colors.textColor1}
-            backgroundColor='transparent'
-            onClick={() => handleClosePopup()}
-          >
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={handleSave}>
+          <Button type='button' backgroundColor={accentColor} borderRadius='8px' onClick={handleSave}>
             Save
           </Button>
         </PopupFooter>
@@ -119,12 +117,12 @@ const RolesSelect = styled.div`
   margin-bottom: 32px;
 `
 
-const RoleLabel = styled.div<{ color?: string }>`
+const RoleLabel = styled.div<{ color: string }>`
   font-style: normal;
   font-weight: 500;
   font-size: 14px;
   margin: 20px 0 8px;
-  color: ${({ color }) => color || colors.textColor1};
+  color: ${({ color }) => color};
 `
 
 const RoleSpan = styled.span`

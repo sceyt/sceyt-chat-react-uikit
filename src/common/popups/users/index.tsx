@@ -17,7 +17,7 @@ import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -31,7 +31,7 @@ import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate } from '../../../hooks'
+import { useDidUpdate, useColor } from '../../../hooks'
 import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
@@ -69,6 +69,8 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -324,9 +326,9 @@ const UsersPopup = ({
               type='text'
               widthBorder={theme !== THEME.DARK}
               backgroundColor={colors.backgroundColor}
-              color={colors.textColor1}
+              color={textPrimary}
             />
-            {userSearchValue && <ClearTypedText color={colors.textColor1} onClick={() => setUserSearchValue('')} />}
+            {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
           {actionType !== 'createChat' && selectedMembers.length !== 0 && (
             <SelectedMembersContainer ref={selectedMembersCont}>
@@ -341,7 +343,7 @@ const UsersPopup = ({
                       setDefaultAvatar
                       border={'0.5px solid rgba(0, 0, 0, 0.1)'}
                     />
-                    <SelectedMemberName color={colors.textColor1}>{member.displayName}</SelectedMemberName>
+                    <SelectedMemberName color={textPrimary}>{member.displayName}</SelectedMemberName>
                     <StyledSubtractSvg onClick={() => removeMember(member)} />
                   </SelectedMemberBubble>
                 )
@@ -381,7 +383,7 @@ const UsersPopup = ({
                   />
 
                   <UserNamePresence>
-                    <MemberName color={colors.textColor1}>{memberDisplayName}</MemberName>
+                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
                     <SubTitle>
                       {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
@@ -423,7 +425,7 @@ const UsersPopup = ({
                       index={user.id}
                       state={isSelected}
                       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-                      checkedBackgroundColor={colors.primary}
+                      checkedBackgroundColor={accentColor}
                       onChange={(e) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
                       }
@@ -446,18 +448,18 @@ const UsersPopup = ({
         {actionType !== 'createChat' && (
           <PopupFooter backgroundColor={colors.backgroundColor} marginTop='auto'>
             {actionType === 'selectUsers' ? (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={handleGoBack}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleGoBack}>
                 Back
               </Button>
             ) : (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={toggleCreatePopup}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={toggleCreatePopup}>
                 Cancel
               </Button>
             )}
             <Button
               type='button'
               color={colors.white}
-              backgroundColor={colors.primary}
+              backgroundColor={accentColor}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
               onClick={() => handleCreateChannel()}
@@ -555,7 +557,7 @@ const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?:
   box-sizing: border-box;
   border-radius: 8px;
   padding-left: 36px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
 
   &::placeholder {
@@ -601,7 +603,7 @@ const MemberName = styled.h4<{ color?: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin: 0;
   max-width: calc(100% - 10px);
   text-overflow: ellipsis;
@@ -639,7 +641,7 @@ const SelectedMemberName = styled.span`
   font-size: 14px;
   line-height: 16px;
   margin-left: 8px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

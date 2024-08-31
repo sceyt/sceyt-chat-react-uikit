@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
-import { useDidUpdate, useEventListener } from '../../hooks'
-import { colors } from '../../UIHelper/constants'
+import { useColor, useDidUpdate, useEventListener } from '../../hooks'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
 
 const DropDownContainer = styled.div<{
@@ -150,6 +150,7 @@ const DropDown = ({
   order,
   zIndex
 }: IProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)
@@ -227,7 +228,7 @@ const DropDown = ({
         withIcon={React.isValidElement(trigger) ? withIcon : true}
         isOpen={isOpen}
         className={`dropdown-trigger ${isOpen ? 'open' : ''}`}
-        iconColor={iconColor || (theme === THEME.DARK ? colors.textColor1 : '')}
+        iconColor={iconColor || (theme === THEME.DARK ? textPrimary : '')}
       >
         {React.isValidElement(trigger) ? trigger : <span>{trigger}</span>}
         {/* {React.cloneElement(trigger, { onClick: toggleDropdown })} */}

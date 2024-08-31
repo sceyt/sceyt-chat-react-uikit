@@ -40,13 +40,14 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
 import { getClient } from '../../../common/client'
 // Components
 // import ReportPopup from '../../../../common/Popups/report';
 import ConfirmPopup from '../../../common/popups/delete'
 import DropDown from '../../../common/dropdown'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -190,6 +191,7 @@ const Actions = ({
   actionItemsFontSize,
   borderColor
 }: IProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
@@ -360,8 +362,8 @@ const Actions = ({
               order={muteUnmuteNotificationsOrder}
               onClick={() => handleNotificationOnOff()}
               iconColor={muteNotificationIconColor || colors.textColor2}
-              color={muteUnmuteNotificationTextColor || colors.textColor1}
-              hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
+              color={muteUnmuteNotificationTextColor || textPrimary}
+              hoverColor={muteUnmuteNotificationTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
@@ -379,8 +381,8 @@ const Actions = ({
                   key={0}
                   disableEvent
                   iconColor={unmuteNotificationIconColor || colors.textColor2}
-                  color={muteUnmuteNotificationTextColor || colors.textColor1}
-                  hoverColor={muteUnmuteNotificationTextColor || colors.textColor1}
+                  color={muteUnmuteNotificationTextColor || textPrimary}
+                  hoverColor={muteUnmuteNotificationTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
                 >
                   <React.Fragment>{unmuteNotificationIcon || <NotificationIcon />} Mute notifications</React.Fragment>
@@ -445,8 +447,8 @@ const Actions = ({
             onClick={() => console.log('stared messages')}
             order={starredMessagesOrder}
             iconColor={staredMessagesIconColor || colors.textColor2}
-            color={staredMessagesTextColor || colors.textColor1}
-            hoverColor={staredMessagesTextColor || colors.textColor1}
+            color={staredMessagesTextColor || textPrimary}
+            hoverColor={staredMessagesTextColor || textPrimary}
             fontSize={actionItemsFontSize}
           >
             <React.Fragment>{staredMessagesIcon || <StarIcon />} Starred messages </React.Fragment>
@@ -460,8 +462,8 @@ const Actions = ({
               onClick={handlePinUnpinChannel}
               order={pinChannelOrder}
               iconColor={pinChannelIconColor || colors.textColor2}
-              color={pinChannelTextColor || colors.textColor1}
-              hoverColor={pinChannelTextColor || colors.textColor1}
+              color={pinChannelTextColor || textPrimary}
+              hoverColor={pinChannelTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>
@@ -480,8 +482,8 @@ const Actions = ({
               onClick={handleToggleChannelMarkAs}
               order={markAsReadUnreadOrder}
               iconColor={markAsReadIconColor || colors.textColor2}
-              color={markAsReadUnreadTextColor || colors.textColor1}
-              hoverColor={markAsReadUnreadTextColor || colors.textColor1}
+              color={markAsReadUnreadTextColor || textPrimary}
+              hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>{markAsReadIcon || <MarkAsRead />} Mark as read</React.Fragment>
@@ -492,8 +494,8 @@ const Actions = ({
               order={markAsReadUnreadOrder}
               onClick={handleToggleChannelMarkAs}
               iconColor={markAsUnreadIconColor || colors.textColor2}
-              color={markAsReadUnreadTextColor || colors.textColor1}
-              hoverColor={markAsReadUnreadTextColor || colors.textColor1}
+              color={markAsReadUnreadTextColor || textPrimary}
+              hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>{markAsUnreadIcon || <MarkAsUnRead />} Mark as unread</React.Fragment>
@@ -540,8 +542,8 @@ const Actions = ({
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}
-                  color={unblockUserTextColor || colors.textColor1}
-                  hoverColor={unblockUserTextColor || colors.textColor1}
+                  color={unblockUserTextColor || textPrimary}
+                  hoverColor={unblockUserTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
                   onClick={() => {
                     handleUnblockUser()
@@ -891,7 +893,7 @@ const ActionsMenu = styled.ul<{
 const DefaultMutedIcon = styled(NotificationOffIcon)``
 
 const ActionItem = styled.li<{
-  color?: string
+  color: string
   fontSize?: string
   disableEvent?: boolean
   iconColor?: string
@@ -903,7 +905,7 @@ const ActionItem = styled.li<{
   align-items: center;
   padding: 10px 0;
   font-size: ${(props) => props.fontSize || '15px'};
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   cursor: pointer;
   order: ${(props) => props.order};
   pointer-events: ${(props) => props.disableEvent && 'none'};

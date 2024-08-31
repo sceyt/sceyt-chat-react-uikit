@@ -22,7 +22,7 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
 import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
@@ -32,6 +32,7 @@ import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
+import { useColor } from '../../hooks'
 
 const Details = ({
   detailsTitleText,
@@ -149,6 +150,8 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -239,16 +242,16 @@ const Details = ({
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimaryColor}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} color={textPrimaryColor}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
-            <CloseIcon color={colors.textColor1} onClick={handleDetailsClose} />
+            <CloseIcon color={accentColor} onClick={handleDetailsClose} /> 
           </React.Fragment>
         )}
       </ChannelDetailsHeader>
@@ -295,6 +298,7 @@ const Details = ({
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
+                color={textPrimaryColor}
               >
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
@@ -555,6 +559,7 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   white-space: nowrap;
   max-width: ${(props) => (props.isDirect ? '200px' : '168px')};
   text-overflow: ellipsis;
+  text-color:${(props) => (props.color)};
   overflow: hidden;
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
