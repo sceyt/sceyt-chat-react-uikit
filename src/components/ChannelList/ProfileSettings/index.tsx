@@ -30,6 +30,7 @@ const settingsPages = {
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
   const user = useSelector(userSelector)
@@ -89,8 +90,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.red1}
-          iconColor={colors.red1}
+          textColor={errorColor}
+          iconColor={errorColor}
           margin='0 0 24px'
         >
           <LogoutIcon /> Log Out

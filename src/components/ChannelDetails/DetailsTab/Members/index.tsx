@@ -74,6 +74,7 @@ const Members = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -330,7 +331,7 @@ const Members = ({
                             toggleMakeAdminPopup(e, member.role === 'admin')
                             setCloseMenu('1')
                           }}
-                          textColor={member.role === 'admin' ? colors.red1 : ''}
+                          textColor={member.role === 'admin' ? errorColor : ''}
                           key={2}
                           hoverBackground={colors.hoverBackgroundColor}
                         >
@@ -344,7 +345,7 @@ const Members = ({
                             toggleKickMemberPopup(e)
                             setCloseMenu('1')
                           }}
-                          textColor={colors.red1}
+                          textColor={errorColor}
                           key={3}
                           hoverBackground={colors.hoverBackgroundColor}
                         >
@@ -353,7 +354,7 @@ const Members = ({
                       )}
                       {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
                         <DropdownOptionLi
-                          textColor={colors.red1}
+                          textColor={errorColor}
                           key={4}
                           hoverBackground={colors.hoverBackgroundColor}
                           onClick={(e: any) => {

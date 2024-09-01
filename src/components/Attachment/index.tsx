@@ -94,6 +94,7 @@ const Attachment = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -848,7 +849,7 @@ const Attachment = ({
                   fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
-              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary}>
+              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary} errorColor={errorColor}>
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
@@ -1097,11 +1098,11 @@ const AttachmentName = styled.h3<{ color: string }>`
   white-space: nowrap;
   margin: 0;
 `
-const AttachmentSize = styled.span<{ color: string }>`
+const AttachmentSize = styled.span<{ color: string; errorColor: string }>`
   font-size: 13px;
   color: ${(props) => props.color};
   & > span {
-    color: ${colors.red1};
+    color: ${(props) => props.errorColor};
     margin-left: 8px;
   }
 `

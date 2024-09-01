@@ -22,6 +22,8 @@ import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 
 export default function EditProfile({ toggleEditPopup, user }: any) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   // const dispatch = useDispatch()
 
   const fileUploader: any = useRef(null)
@@ -100,12 +102,21 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
 
         <EditProfileContainer>
           <Label color={textPrimary}>Username </Label>
-          <CustomInput type='text' color={textPrimary} value={user.id} disabled />
+          <CustomInput
+            errorColor={errorColor}
+            placeholderColor={textFootnote}
+            type='text'
+            color={textPrimary}
+            value={user.id}
+            disabled
+          />
 
           <Label color={textPrimary}>First name </Label>
           <CustomInput
             type='text'
             color={textPrimary}
+            errorColor={errorColor}
+            placeholderColor={textFootnote}
             value={firstNameValue}
             onChange={handleTypeFirstName}
             placeholder='Enter Firstname'
@@ -115,6 +126,8 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
           <CustomInput
             type='text'
             color={textPrimary}
+            errorColor={errorColor}
+            placeholderColor={textFootnote}
             value={lastNameValue}
             onChange={handleTypeLastName}
             placeholder='Enter Lastname'

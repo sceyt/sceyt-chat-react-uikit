@@ -228,6 +228,7 @@ export const CustomSelect = styled.div<{
   backgroundColor?: string
   color: string
   placeholderColor: string
+  errorColor: string
 }>`
   display: flex;
   height: 40px;
@@ -236,7 +237,7 @@ export const CustomSelect = styled.div<{
   min-width: ${(props) => props.minWidth};
   max-width: ${(props) => props.maxWidth};
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => (props.isError ? `1px solid ${colors.red1}` : `1px solid ${colors.gray1}`)};
+  border: ${(props) => (props.isError ? `1px solid ${props.errorColor}` : `1px solid ${colors.gray1}`)};
   box-sizing: border-box;
   border-radius: 4px;
   font-style: normal;
@@ -297,9 +298,9 @@ export const UploadFileLabel = styled.label`
   display: block;
 `
 
-export const InputErrorMessage = styled.p`
+export const InputErrorMessage = styled.p<{ color: string }>`
   font-size: 12px;
-  color: ${colors.red1};
+  color: ${(props) => props.color};
   margin: 4px 0 0;
 `
 
@@ -308,12 +309,13 @@ export const CustomInput = styled.input<{
   theme?: string
   color: string
   placeholderColor: string
+  errorColor: string
 }>`
   height: 40px;
   width: 100%;
   background: ${(props) => (props.theme === THEME.DARK ? colors.backgroundColor : colors.white)};
   border: ${(props) =>
-    props.error ? `1px solid ${colors.red1}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
+    props.error ? `1px solid ${props.errorColor}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
@@ -327,7 +329,7 @@ export const CustomInput = styled.input<{
   outline: none;
 
   &:focus {
-    border: 1px solid ${(props) => (props.error ? `1px solid ${colors.red1}` : colors.primary)};
+    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : colors.primary)};
     outline: ${(props) =>
       props.error
         ? `1px solid ${colors.red2}`

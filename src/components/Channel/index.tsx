@@ -101,6 +101,7 @@ const Channel: React.FC<IChannelProps> = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
@@ -257,7 +258,7 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               ) : null
             ) : draftMessageText ? (
-              <DraftMessageTitle>Draft</DraftMessageTitle>
+              <DraftMessageTitle color={errorColor}>Draft</DraftMessageTitle>
             ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
               lastMessage.state !== MESSAGE_STATUS.DELETE &&
               ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
@@ -305,7 +306,7 @@ const Channel: React.FC<IChannelProps> = ({
               : typingIndicator ||
                 draftMessageText ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
-              <Points color={draftMessageText && colors.red1}>: </Points>
+              <Points color={draftMessageText && errorColor}>: </Points>
             )}
             <LastMessageText
               color={textSecondary}
@@ -599,8 +600,8 @@ export const UserStatus = styled.span<{ backgroundColor?: string }>`
   box-sizing: border-box;
 `
 
-export const DraftMessageTitle = styled.span<any>`
-  color: ${colors.red1};
+export const DraftMessageTitle = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
 `
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};

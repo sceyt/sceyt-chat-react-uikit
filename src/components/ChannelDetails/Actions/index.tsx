@@ -193,6 +193,7 @@ const Actions = ({
 }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
@@ -512,9 +513,9 @@ const Actions = ({
           <ActionItem
             key={4}
             order={leaveChannelOrder}
-            color={leaveChannelTextColor || colors.red1}
-            iconColor={leaveChannelIconColor || colors.red1}
-            hoverColor={leaveChannelTextColor || colors.red1}
+            color={leaveChannelTextColor || errorColor}
+            iconColor={leaveChannelIconColor || errorColor}
+            hoverColor={leaveChannelTextColor || errorColor}
             fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Leave')
@@ -561,9 +562,9 @@ const Actions = ({
               ) : (
                 <ActionItem
                   key={6}
-                  color={deleteChannelTextColor || colors.red1}
-                  iconColor={deleteChannelIconColor || colors.red1}
-                  hoverColor={deleteChannelTextColor || colors.red1}
+                  color={deleteChannelTextColor || errorColor}
+                  iconColor={deleteChannelIconColor || errorColor}
+                  hoverColor={deleteChannelTextColor || errorColor}
                   fontSize={actionItemsFontSize}
                   onClick={() => {
                     setPopupButtonText('Block')
@@ -577,9 +578,9 @@ const Actions = ({
 
             {showReportChannel && (
               <ActionItem
-                color={deleteChannelTextColor || colors.red1}
-                iconColor={deleteChannelIconColor || colors.red1}
-                hoverColor={deleteChannelTextColor || colors.red1}
+                color={deleteChannelTextColor || errorColor}
+                iconColor={deleteChannelIconColor || errorColor}
+                hoverColor={deleteChannelTextColor || errorColor}
                 fontSize={actionItemsFontSize}
                 key={7}
                 onClick={() => toggleReportUserPopup()}
@@ -594,9 +595,9 @@ const Actions = ({
             {showBlockAndLeaveChannel && !isSelfChannel && !channel.isMockChannel && (
               <ActionItem
                 key={8}
-                color={blockAndLeaveChannelTextColor || colors.red1}
-                iconColor={blockAndLeaveChannelIconColor || colors.red1}
-                hoverColor={blockAndLeaveChannelTextColor || colors.red1}
+                color={blockAndLeaveChannelTextColor || errorColor}
+                iconColor={blockAndLeaveChannelIconColor || errorColor}
+                hoverColor={blockAndLeaveChannelTextColor || errorColor}
                 fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Block')
@@ -632,9 +633,9 @@ const Actions = ({
               <ActionItem
                 key={9}
                 order={reportChannelOrder}
-                color={reportChannelTextColor || colors.red1}
-                iconColor={reportChannelIconColor || colors.red1}
-                hoverColor={reportChannelTextColor || colors.red1}
+                color={reportChannelTextColor || errorColor}
+                iconColor={reportChannelIconColor || errorColor}
+                hoverColor={reportChannelTextColor || errorColor}
                 fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Report')
@@ -660,11 +661,11 @@ const Actions = ({
             channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) && (
             <ActionItem
               key={10}
-              color={clearHistoryTextColor || colors.red1}
-              iconColor={clearHistoryTextColor || colors.red1}
+              color={clearHistoryTextColor || errorColor}
+              iconColor={clearHistoryTextColor || errorColor}
               order={clearHistoryOrder}
               fontSize={actionItemsFontSize}
-              hoverColor={clearHistoryTextColor || colors.red1}
+              hoverColor={clearHistoryTextColor || errorColor}
               onClick={() => {
                 setPopupButtonText('Clear')
                 setPopupTitle('Clear history')
@@ -680,10 +681,10 @@ const Actions = ({
           checkActionPermission('clearAllMessages') && (
             <ActionItem
               key={11}
-              color={deleteAllMessagesTextColor || colors.red1}
-              iconColor={deleteAllMessagesTextColor || colors.red1}
+              color={deleteAllMessagesTextColor || errorColor}
+              iconColor={deleteAllMessagesTextColor || errorColor}
               order={deleteAllMessagesOrder}
-              hoverColor={deleteAllMessagesTextColor || colors.red1}
+              hoverColor={deleteAllMessagesTextColor || errorColor}
               fontSize={actionItemsFontSize}
               onClick={() => {
                 setPopupButtonText('Clear')
@@ -699,9 +700,9 @@ const Actions = ({
           <ActionItem
             key={12}
             order={deleteChannelOrder}
-            color={deleteChannelTextColor || colors.red1}
-            iconColor={deleteChannelIconColor || colors.red1}
-            hoverColor={deleteChannelTextColor || colors.red1}
+            color={deleteChannelTextColor || errorColor}
+            iconColor={deleteChannelIconColor || errorColor}
+            hoverColor={deleteChannelTextColor || errorColor}
             fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Delete')

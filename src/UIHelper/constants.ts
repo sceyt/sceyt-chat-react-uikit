@@ -5,7 +5,8 @@ export const THEME_COLOR_NAMES = {
   BACKGROUND: 'background',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
-  TEXT_FOOTNOTE: 'textFootnote'
+  TEXT_FOOTNOTE: 'textFootnote',
+  ERROR: 'error'
 }
 export const defaultTheme: SceytChatUIKitTheme = {
   colors: {
@@ -32,6 +33,10 @@ export const defaultTheme: SceytChatUIKitTheme = {
     [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: {
       light: '#A0A1B0',
       dark: '#76787A'
+    },
+    [THEME_COLOR_NAMES.ERROR]: {
+      light: '#FA4C56',
+      dark: '#FA4C56'
     }
   }
 }

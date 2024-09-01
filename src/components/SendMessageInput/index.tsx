@@ -321,6 +321,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -1376,7 +1377,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
         selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
       >
-        {uploadErrorMessage && <UploadErrorMessage>{uploadErrorMessage}</UploadErrorMessage>}
+        {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
             {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
@@ -1391,7 +1392,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             </CustomButton>
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
-              color={colors.red1}
+              color={errorColor}
               backgroundColor={colors.primaryLight}
               marginLeft='16px'
             >
@@ -1898,11 +1899,11 @@ const EditMessageText = styled.p<any>`
   overflow: hidden;
   text-overflow: ellipsis;
 `
-const UploadErrorMessage = styled.p<any>`
+const UploadErrorMessage = styled.p<{ color: string }>`
   margin: 0;
   position: absolute;
   top: -30px;
-  color: ${colors.red1};
+  color: ${(props) => props.color};
 `
 
 const CloseEditMode = styled.span<{ color: string }>`

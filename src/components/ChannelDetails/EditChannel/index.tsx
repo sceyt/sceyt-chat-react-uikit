@@ -102,6 +102,8 @@ const EditChannel = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -257,7 +259,7 @@ const EditChannel = ({
                     <DropdownOptionLi
                       key={2}
                       hoverBackground={colors.primaryLight}
-                      textColor={colors.red1}
+                      textColor={errorColor}
                       onClick={handleToggleDeleteAvatarPopup}
                       iconWidth='20px'
                     >
@@ -282,12 +284,16 @@ const EditChannel = ({
           error={subjectIsWrong}
           theme={theme}
           color={textPrimary}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e) => setNewSubject(e.target.value)}
         />
         {subjectIsWrong && (
-          <InputErrorMessage>Channel name must be a minimum of 1 and a maximum of 250 symbols.</InputErrorMessage>
+          <InputErrorMessage color={errorColor}>
+            Channel name must be a minimum of 1 and a maximum of 250 symbols.
+          </InputErrorMessage>
         )}
 
         <Label color={textPrimary}> Description </Label>
@@ -295,12 +301,14 @@ const EditChannel = ({
           error={descriptionIsWrong}
           theme={theme}
           color={textPrimary}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e) => setNewDescription(e.target.value)}
         />
         {descriptionIsWrong && (
-          <InputErrorMessage>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
+          <InputErrorMessage color={errorColor}>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
         )}
 
         <EditChannelFooter>
