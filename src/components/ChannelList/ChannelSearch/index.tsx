@@ -72,10 +72,11 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   fontSize
 }) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
 
   return (
-    <SearchInputContainer inline={inline} borderColor={colors.backgroundColor}>
+    <SearchInputContainer inline={inline} borderColor={sectionBackground}>
       <StyledSearchSvg left={!inline ? '22px' : ''} />
       <SearchInput
         backgroundColor={

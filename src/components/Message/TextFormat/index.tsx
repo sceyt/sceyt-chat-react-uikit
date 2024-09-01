@@ -36,20 +36,16 @@ export default function TextFormat({
   isStrikethroughText?: boolean
   isMonospaceText?: boolean
   isUnderlineText?: boolean
-  // eslint-disable-next-line no-unused-vars
   handleFormatToBold?: (props?: any) => void
-  // eslint-disable-next-line no-unused-vars
   handleFormatToItalic?: (props?: any) => void
-  // eslint-disable-next-line no-unused-vars
   handleFormatToStrikethrough?: (props?: any) => void
-  // eslint-disable-next-line no-unused-vars
   handleFormatToMonospace?: (props?: any) => void
-  // eslint-disable-next-line no-unused-vars
   handleClosePopup?: () => void
   theme?: string
   editorProps: any
 }) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const ref: any = React.useRef(null)
@@ -70,14 +66,14 @@ export default function TextFormat({
   return (
     <MessageActionsWrapper ref={ref} top={top} left={left} bottom={bottom} right={right}>
       <EditMessageContainer
-        backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+        backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
         className='message_actions_cont '
       >
         {handleFormatToBold && (
           <Action
             order={0}
             iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToBold(editorProps)}
             isActive={isBoldText}
@@ -92,7 +88,7 @@ export default function TextFormat({
           <Action
             order={1}
             iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToItalic(editorProps)}
             isActive={isItalicText}
@@ -107,7 +103,7 @@ export default function TextFormat({
           <Action
             order={2}
             iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToStrikethrough(editorProps)}
             isActive={isStrikethroughText}
@@ -124,7 +120,7 @@ export default function TextFormat({
             <Action
               order={3}
               iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
-              hoverBackgroundColor={colors.hoverBackgroundColor}
+              hoverBackgroundColor={sectionBackground}
               hoverIconColor={colors.primary}
               onClick={() => handleFormatToMonospace(editorProps)}
               isActive={isMonospaceText}
@@ -171,7 +167,7 @@ const Action = styled.div<{
   iconColor: string
   order?: number
   hoverIconColor?: string
-  hoverBackgroundColor?: string
+  hoverBackgroundColor: string
   isActive?: boolean
 }>`
   position: relative;
@@ -187,7 +183,7 @@ const Action = styled.div<{
     props.isActive &&
     `
     color: ${props.hoverIconColor || colors.primary};
-    background-color: ${props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${props.hoverBackgroundColor};
   `}
   &:first-child {
     margin-left: 8px;
@@ -199,7 +195,7 @@ const Action = styled.div<{
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};
-    background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {
       display: block;

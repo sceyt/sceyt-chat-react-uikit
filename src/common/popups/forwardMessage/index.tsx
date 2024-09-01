@@ -47,6 +47,7 @@ interface IProps {
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -159,7 +160,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <SelectedChannelsContainer ref={selectedChannelsContRef}>
             {selectedChannels.map((channel) => {
               return (
-                <SelectedChannelBuble key={`selected-${channel.id}`}>
+                <SelectedChannelBuble backgroundColor={sectionBackground} key={`selected-${channel.id}`}>
                   <SelectedChannelName color={textPrimary}>{channel.displayName}</SelectedChannelName>
                   <StyledSubtractSvg onClick={() => removeChannel(channel)} />
                 </SelectedChannelBuble>
@@ -357,7 +358,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             )}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.backgroundColor}>
+        <PopupFooter backgroundColor={sectionBackground}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
@@ -440,10 +441,10 @@ const SelectedChannelsContainer = styled.div<any>`
   //flex: 0 0 auto;
 `
 
-const SelectedChannelBuble = styled.div`
+const SelectedChannelBuble = styled.div<{ backgroundColor: string }>`
   display: flex;
   justify-content: space-between;
-  background: ${colors.backgroundColor};
+  background: ${(props) => props.backgroundColor};
   border-radius: 16px;
   align-items: center;
   padding: 4px 10px;

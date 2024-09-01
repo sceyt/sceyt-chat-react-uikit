@@ -101,6 +101,8 @@ const EditChannel = ({
   editChannelCancelButtonTextColor
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
@@ -284,8 +286,10 @@ const EditChannel = ({
           error={subjectIsWrong}
           theme={theme}
           color={textPrimary}
+          borderColor={borderColor}
           errorColor={errorColor}
           placeholderColor={textFootnote}
+          backgroundColor={sectionBackground}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e) => setNewSubject(e.target.value)}
@@ -302,6 +306,8 @@ const EditChannel = ({
           theme={theme}
           color={textPrimary}
           errorColor={errorColor}
+          borderColor={borderColor}
+          backgroundColor={sectionBackground}
           placeholderColor={textFootnote}
           placeholder='Channel description'
           value={newDescription}
@@ -316,7 +322,7 @@ const EditChannel = ({
             type='button'
             borderRadius='8px'
             color={editChannelCancelButtonTextColor || textPrimary}
-            backgroundColor={editChannelCancelButtonBackgroundColor || colors.backgroundColor}
+            backgroundColor={editChannelCancelButtonBackgroundColor || sectionBackground}
             onClick={() => handleToggleEditMode(false)}
           >
             Cancel

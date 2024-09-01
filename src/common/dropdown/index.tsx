@@ -69,7 +69,7 @@ const DropDownTriggerContainer = styled.div<{
         `};
 `
 
-const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor?: string; zIndex?: string }>`
+const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor: string; zIndex?: string }>`
   position: absolute;
   z-index: ${(props) => props.zIndex || '30'};
   min-width: 200px;
@@ -79,7 +79,7 @@ const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundC
   display: flex;
   direction: initial;
   flex-direction: column;
-  background: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background: ${(props) => props.backgroundColor};
   border-radius: 8px;
   max-height: 220px;
   overflow-y: auto;
@@ -151,6 +151,7 @@ const DropDown = ({
   zIndex
 }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)
@@ -235,7 +236,7 @@ const DropDown = ({
       </DropDownTriggerContainer>
       {isOpen && (
         <DropDownBody
-          backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+          backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
           onScroll={handleScrolling}
           className='dropdown-body'
           ref={dropDownBodyRef}

@@ -34,6 +34,7 @@ interface IProps {
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
@@ -66,7 +67,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
 
   return (
     <PopupContainer>
-      <Popup backgroundColor={colors.backgroundColor} maxWidth='400px' padding='0'>
+      <Popup backgroundColor={sectionBackground} maxWidth='400px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon color={textPrimary} onClick={() => handleClosePopup()} />
           <PopupName color={textPrimary}>Change member role</PopupName>
@@ -75,7 +76,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             <RoleLabel color={textPrimary}>Roles</RoleLabel>
 
             <CustomSelect
-              backgroundColor={colors.backgroundColor}
+              backgroundColor={sectionBackground}
               color={textPrimary}
               errorColor={errorColor}
               placeholderColor={textFootnote}
@@ -107,7 +108,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             </CustomSelect>
           </RolesSelect>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.backgroundColor}>
+        <PopupFooter backgroundColor={sectionBackground}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>

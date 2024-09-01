@@ -71,6 +71,7 @@ function EmojisPopup({
   leftPosition?: string
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const theme = useSelector(themeSelector)
@@ -144,7 +145,7 @@ function EmojisPopup({
 
   return (
     <Container
-      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
       noBorder={theme === THEME.DARK}
       relativePosition={relativePosition}
       borderRadius={emojisContainerBorderRadius}
@@ -194,7 +195,7 @@ function EmojisPopup({
                   const { array } = emojiSmallCollection
                   return array.map((emoji, i) => (
                     <Emoji
-                      hoverBackgroundColor={colors.hoverBackgroundColor}
+                      hoverBackgroundColor={sectionBackground}
                       key={`${emoji}`}
                       className='emoji-cont'
                       onClick={() => chooseEmoji(emoji)}
@@ -332,7 +333,7 @@ const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom';
   }
 `
 
-const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
+const Emoji = styled.li<{ hoverBackgroundColor: string }>`
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -356,6 +357,6 @@ const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
     font-size: 22px;
   }
   &:hover {
-    background: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    background: ${(props) => props.hoverBackgroundColor};
   }
 `

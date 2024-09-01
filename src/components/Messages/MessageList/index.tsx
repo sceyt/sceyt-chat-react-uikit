@@ -315,7 +315,7 @@ const MessageList: React.FC<MessagesProps> = ({
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.backgroundColor,
+  incomingMessageBackground,
   ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
   incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   hoverBackground = false,
@@ -429,6 +429,7 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
@@ -1038,20 +1039,27 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea
+            backgroundColor={sectionBackground}
             color={textSecondary}
             margin='32px 32px 12px'
             draggable
             onDrop={handleDropFile}
             onDragOver={handleDragOver}
           >
-            <IconWrapper draggable iconColor={accentColor}>
+            <IconWrapper backgroundColor={sectionBackground} draggable iconColor={accentColor}>
               <ChooseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
-            <DropAttachmentArea color={textSecondary} draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
-              <IconWrapper draggable iconColor={accentColor}>
+            <DropAttachmentArea
+              backgroundColor={sectionBackground}
+              color={textSecondary}
+              draggable
+              onDrop={handleDropMedia}
+              onDragOver={handleDragOver}
+            >
+              <IconWrapper backgroundColor={sectionBackground} draggable iconColor={accentColor}>
                 <ChooseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media
@@ -1070,7 +1078,7 @@ const MessageList: React.FC<MessagesProps> = ({
             dateDividerFontSize={dateDividerFontSize}
             dateDividerTextColor={dateDividerTextColor || textPrimary}
             dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor || colors.backgroundColor}
+            dateDividerBackgroundColor={dateDividerBackgroundColor || sectionBackground}
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >
@@ -1411,13 +1419,13 @@ export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: nu
   z-index: 999;
 `
 
-export const IconWrapper = styled.span<{ iconColor: string }>`
+export const IconWrapper = styled.span<{ backgroundColor: string; iconColor: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
   height: 64px;
   width: 64px;
-  background-color: ${colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
   text-align: center;
   margin-bottom: 16px;
@@ -1431,7 +1439,7 @@ export const IconWrapper = styled.span<{ iconColor: string }>`
   }
 `
 
-export const DropAttachmentArea = styled.div<{ color: string; margin?: string }>`
+export const DropAttachmentArea = styled.div<{ backgroundColor: string; color: string; margin?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1448,7 +1456,7 @@ export const DropAttachmentArea = styled.div<{ color: string; margin?: string }>
   transition: all 0.1s;
 
   &.dragover {
-    background-color: ${colors.backgroundColor};
+    background-color: ${(props) => props.backgroundColor};
 
     ${IconWrapper} {
       background-color: ${colors.white};

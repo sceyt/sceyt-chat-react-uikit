@@ -33,6 +33,7 @@ export default function MentionMembersPopup({
   handleMentionsPopupClose,
   searchMention
 }: IMentionsPopupProps) {
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
@@ -181,7 +182,7 @@ export default function MentionMembersPopup({
       className='mention_member_popup'
       hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
-      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
       withBorder={theme !== THEME.DARK}
       borderColor={borderColor}
     >

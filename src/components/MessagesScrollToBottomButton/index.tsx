@@ -49,6 +49,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountTextColor
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
   const theme = useSelector(themeSelector)
@@ -66,7 +67,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
           height={buttonHeight}
           border={buttonBorder}
           borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor || colors.backgroundColor}
+          backgroundColor={buttonBackgroundColor || sectionBackground}
           hoverBackgroundColor={buttonHoverBackgroundColor}
           shadow={buttonShadow}
           onClick={handleScrollToBottom}
@@ -101,7 +102,7 @@ const BottomButton = styled.div<{
   height?: string
   border?: string
   borderRadius?: string
-  backgroundColor?: string
+  backgroundColor: string
   hoverBackgroundColor?: string
   shadow?: string
   bottomOffset: number
@@ -115,7 +116,7 @@ const BottomButton = styled.div<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 50px;
   width: 48px;

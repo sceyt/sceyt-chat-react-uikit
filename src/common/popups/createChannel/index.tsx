@@ -56,7 +56,9 @@ export default function CreateChannel({
 }: ICreateChannelPopup) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -357,6 +359,8 @@ export default function CreateChannel({
                         color={textPrimary}
                         errorColor={errorColor}
                         placeholderColor={textFootnote}
+                        backgroundColor={sectionBackground}
+                        borderColor={borderColor}
                       />
                     </React.Fragment>
                   )}
@@ -373,6 +377,8 @@ export default function CreateChannel({
                         color={textPrimary}
                         errorColor={errorColor}
                         placeholderColor={textFootnote}
+                        backgroundColor={sectionBackground}
+                        borderColor={borderColor}
                       />
                     </React.Fragment>
                   )}
@@ -394,6 +400,8 @@ export default function CreateChannel({
                           color={textPrimary}
                           errorColor={errorColor}
                           placeholderColor={textFootnote}
+                          backgroundColor={sectionBackground}
+                          borderColor={borderColor}
                         />
                         {!!wrongUri && (
                           <InputErrorMessage color={errorColor}>
@@ -410,7 +418,7 @@ export default function CreateChannel({
                     </React.Fragment>
                   )}
                 </PopupBody>
-                <PopupFooter backgroundColor={colors.backgroundColor}>
+                <PopupFooter backgroundColor={sectionBackground}>
                   <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClose()}>
                     Cancel
                   </Button>
@@ -460,13 +468,13 @@ const CrateChannelTitle = styled.p<{ color: string }>`
   margin: 0 0 20px;
   color: ${(props) => props.color};
 `
-const UploadAvatarLabel = styled.label<{ backgroundColor?: string; iconColor?: string }>`
+const UploadAvatarLabel = styled.label<{ backgroundColor: string; iconColor?: string }>`
   display: flex;
   width: 90px;
   height: 90px;
   align-items: center;
   justify-content: center;
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
   cursor: pointer;
 

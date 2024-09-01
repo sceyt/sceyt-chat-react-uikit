@@ -41,6 +41,7 @@ function ConfirmPopup({
   loading
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
@@ -69,7 +70,7 @@ function ConfirmPopup({
     <PopupContainer>
       <Popup
         theme={theme}
-        backgroundColor={colors.backgroundColor}
+        backgroundColor={sectionBackground}
         maxWidth='520px'
         minWidth='520px'
         isLoading={loading}
@@ -110,7 +111,7 @@ function ConfirmPopup({
             </DeleteMessageOptions>
           )}
         </PopupBody>
-        <PopupFooter backgroundColor={colors.backgroundColor}>
+        <PopupFooter backgroundColor={sectionBackground}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>

@@ -70,6 +70,7 @@ const UsersPopup = ({
   popupWidth
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
@@ -328,7 +329,7 @@ const UsersPopup = ({
               placeholder='Search for users'
               type='text'
               widthBorder={theme !== THEME.DARK}
-              backgroundColor={colors.backgroundColor}
+              backgroundColor={sectionBackground}
               color={textPrimary}
               placeholderColor={textSecondary}
             />
@@ -338,7 +339,7 @@ const UsersPopup = ({
             <SelectedMembersContainer ref={selectedMembersCont}>
               {selectedMembers.map((member) => {
                 return (
-                  <SelectedMemberBubble backgroundColor={colors.backgroundColor} key={`selected-${member.id}`}>
+                  <SelectedMemberBubble backgroundColor={sectionBackground} key={`selected-${member.id}`}>
                     <Avatar
                       image={member.avatarUrl}
                       name={member.displayName || member.id}
@@ -428,7 +429,7 @@ const UsersPopup = ({
                     <CustomCheckbox
                       index={user.id}
                       state={isSelected}
-                      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+                      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
                       checkedBackgroundColor={accentColor}
                       onChange={(e) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
@@ -450,7 +451,7 @@ const UsersPopup = ({
         </PopupBody>
 
         {actionType !== 'createChat' && (
-          <PopupFooter backgroundColor={colors.backgroundColor} marginTop='auto'>
+          <PopupFooter backgroundColor={sectionBackground} marginTop='auto'>
             {actionType === 'selectUsers' ? (
               <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleGoBack}>
                 Back
@@ -567,7 +568,7 @@ const SearchUsersInput = styled.input<{
   border-radius: 8px;
   padding-left: 36px;
   color: ${(props) => props.color};
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
 
   &::placeholder {
     color: ${(props) => props.placeholderColor};
