@@ -310,6 +310,8 @@ export const CustomInput = styled.input<{
   color: string
   placeholderColor: string
   errorColor: string
+  errorColorBlur: string
+  borderColor: string
 }>`
   height: 40px;
   width: 100%;
@@ -332,9 +334,9 @@ export const CustomInput = styled.input<{
     border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : colors.primary)};
     outline: ${(props) =>
       props.error
-        ? `1px solid ${colors.red2}`
+        ? `1px solid ${colors.errorBlur}`
         : props.theme !== THEME.DARK
-          ? `2px solid ${colors.backgroundColor}`
+          ? `2px solid ${props.borderColor}`
           : 'none'};
   }
   &:disabled {

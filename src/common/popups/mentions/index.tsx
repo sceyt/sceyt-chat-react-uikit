@@ -35,6 +35,7 @@ export default function MentionMembersPopup({
 }: IMentionsPopupProps) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -182,6 +183,7 @@ export default function MentionMembersPopup({
       height={filteredMembers && filteredMembers.length * 44}
       backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
       withBorder={theme !== THEME.DARK}
+      borderColor={borderColor}
     >
       <MembersList ref={membersListRef} onScroll={handleMembersListScroll}>
         {filteredMembers.map((member: IMember, index: number) => (
@@ -222,13 +224,19 @@ export default function MentionMembersPopup({
   )
 }
 
-const Container = styled.div<{ height?: number; hidden?: boolean; backgroundColor?: string; withBorder?: boolean }>`
+const Container = styled.div<{
+  height?: number
+  hidden?: boolean
+  backgroundColor?: string
+  withBorder?: boolean
+  borderColor: string
+}>`
   width: 300px;
   height: ${(props) => props.height && props.height + 22}px;
   max-height: 240px;
   padding: 2px 0 0;
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};
+  border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;

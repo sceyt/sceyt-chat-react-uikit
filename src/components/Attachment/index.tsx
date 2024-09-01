@@ -93,7 +93,7 @@ const Attachment = ({
 }: AttachmentPops) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
@@ -537,10 +537,7 @@ const Attachment = ({
             </React.Fragment>
           ) : */ null}
           {isPreview && (
-            <RemoveChosenFile
-              color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-              onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-            />
+            <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
           )}
         </AttachmentImgCont>
       ) : attachment.type === 'video' ? (
@@ -694,10 +691,7 @@ const Attachment = ({
                 }
                 isPreview
               />
-              <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-              />
+              <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
             </AttachmentImgCont>
           )}
         </React.Fragment>
@@ -862,10 +856,7 @@ const Attachment = ({
           )}
           {
             isPreview && (
-              <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-              />
+              <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
             ) /*: attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL &&
             attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING ? (
             <DownloadFile download={attachment.name} onClick={() => downloadFile(attachment)}>

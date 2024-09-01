@@ -23,7 +23,6 @@ import { useDidUpdate, useColor } from '../../hooks'
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
 import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
-import { themeSelector } from '../../store/theme/selector'
 
 interface IProps {
   hideChannelList?: boolean
@@ -53,7 +52,6 @@ export default function Chat({
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const theme = useSelector(themeSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -109,9 +107,7 @@ export default function Chat({
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
-        <SelectChatContainer
-          backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || backgroundColor}
-        >
+        <SelectChatContainer backgroundColor={noChannelSelectedBackgroundColor || backgroundColor}>
           {CustomNoChannelSelected || (
             <SelectChatContent iconColor={accentColor}>
               <MessageIcon />

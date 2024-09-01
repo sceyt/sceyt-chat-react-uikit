@@ -19,17 +19,15 @@ import {
   unpinChannelAC
 } from '../../../store/channel/actions'
 import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
-// import { reportUserAC } from '../../../../store/member/actions'
 // Assets
 import { ReactComponent as BottomIcon } from '../../../assets/svg/bottom.svg'
-// import { ReactComponent as DeleteIcon } from '../../../assets/lib/svg/clearHistory.svg'
 import { ReactComponent as NotificationIcon } from '../../../assets/svg/notifications.svg'
 import { ReactComponent as NotificationOffIcon } from '../../../assets/svg/unmuteNotifications.svg'
-import { ReactComponent as MarkAsUnRead } from '../../../assets/svg/markAsUnRead.svg'
-import { ReactComponent as MarkAsRead } from '../../../assets/svg/markAsRead.svg'
+import { ReactComponent as MarkAsUnReadIconD } from '../../../assets/svg/markAsUnRead.svg'
+import { ReactComponent as MarkAsReadIconD } from '../../../assets/svg/markAsRead.svg'
 import { ReactComponent as LeaveIcon } from '../../../assets/svg/leave.svg'
-import { ReactComponent as DeleteChannel } from '../../../assets/svg/deleteChannel.svg'
-import { ReactComponent as CleareIcon } from '../../../assets/svg/clear.svg'
+import { ReactComponent as DeleteChannelIconD } from '../../../assets/svg/deleteChannel.svg'
+import { ReactComponent as ClearIcon } from '../../../assets/svg/clear.svg'
 import { ReactComponent as BlockIcon } from '../../../assets/svg/blockChannel.svg'
 import { ReactComponent as ReportIcon } from '../../../assets/svg/report.svg'
 import { ReactComponent as StarIcon } from '../../../assets/svg/star.svg'
@@ -193,6 +191,8 @@ const Actions = ({
 }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -344,12 +344,12 @@ const Actions = ({
   }
 
   return (
-    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || colors.backgroundColor}>
+    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || borderThemeColor}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
           <MenuTriggerIcon isOpen={menuIsOpen}>
-            <BottomIcon />
+            <DefaultBottomIcon color={iconPrimary} />
           </MenuTriggerIcon>
         </ActionHeader>
       )}
@@ -368,7 +368,9 @@ const Actions = ({
               hoverColor={muteUnmuteNotificationTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
+              <React.Fragment>
+                {muteNotificationIcon || <DefaultMutedIcon color={iconPrimary} />} Unmute notifications
+              </React.Fragment>
               {/* <ToggleSwitch backgroundColor={muteUnmuteNotificationSwitcherColor} state={channel.muted} /> */}
             </ActionItem>
           ) : (
@@ -387,7 +389,9 @@ const Actions = ({
                   hoverColor={muteUnmuteNotificationTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
                 >
-                  <React.Fragment>{unmuteNotificationIcon || <NotificationIcon />} Mute notifications</React.Fragment>
+                  <React.Fragment>
+                    {unmuteNotificationIcon || <DefaultMuteIcon color={iconPrimary} />} Mute notifications
+                  </React.Fragment>
                   {/* <ToggleSwitch state={channel.muted} /> */}
                 </ActionItem>
               }
@@ -458,7 +462,9 @@ const Actions = ({
             hoverColor={staredMessagesTextColor || textPrimary}
             fontSize={actionItemsFontSize}
           >
-            <React.Fragment>{staredMessagesIcon || <StarIcon />} Starred messages </React.Fragment>
+            <React.Fragment>
+              {staredMessagesIcon || <DefaultStarIcon color={iconPrimary} />} Starred messages{' '}
+            </React.Fragment>
           </ActionItem>
         )}
         {showPinChannel &&
@@ -474,7 +480,9 @@ const Actions = ({
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>
-                {channel.pinnedAt ? unpinChannelIcon || <UnpinIcon /> : pinChannelIcon || <PinIcon />}
+                {channel.pinnedAt
+                  ? unpinChannelIcon || <DefaultUnpinIcon color={iconPrimary} />
+                  : pinChannelIcon || <DefaultPinIcon color={iconPrimary} />}
                 {channel.pinnedAt ? 'Unpin' : 'Pin'}
               </React.Fragment>
             </ActionItem>
@@ -493,7 +501,9 @@ const Actions = ({
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>{markAsReadIcon || <MarkAsRead />} Mark as read</React.Fragment>
+              <React.Fragment>
+                {markAsReadIcon || <DefaultMarkAsRead color={iconPrimary} />} Mark as read
+              </React.Fragment>
             </ActionItem>
           ) : (
             <ActionItem
@@ -505,7 +515,9 @@ const Actions = ({
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>{markAsUnreadIcon || <MarkAsUnRead />} Mark as unread</React.Fragment>
+              <React.Fragment>
+                {markAsUnreadIcon || <DefaultMarkAsUnRead color={iconPrimary} />} Mark as unread
+              </React.Fragment>
             </ActionItem>
           ))}
 
@@ -531,7 +543,7 @@ const Actions = ({
               handleToggleLeaveChannelPopupOpen()
             }}
           >
-            {leaveChannelIcon || <LeaveIcon />}
+            {leaveChannelIcon || <DefaultMarkAsReadIcon color={iconPrimary} />}
             {` Leave ${
               channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'group'
@@ -557,7 +569,7 @@ const Actions = ({
                     handleUnblockUser()
                   }}
                 >
-                  {unblockUserIcon || <BlockIcon />} Unblock user
+                  {unblockUserIcon || <DefaultBlockIcon color={iconPrimary} />} Unblock user
                 </ActionItem>
               ) : (
                 <ActionItem
@@ -572,7 +584,7 @@ const Actions = ({
                     handleToggleBlockUserPopupOpen()
                   }}
                 >
-                  {blockAndLeaveChannelIcon || <BlockIcon />} Block user
+                  {blockAndLeaveChannelIcon || <DefaultBlockIcon color={iconPrimary} />} Block user
                 </ActionItem>
               ))}
 
@@ -585,7 +597,7 @@ const Actions = ({
                 key={7}
                 onClick={() => toggleReportUserPopup()}
               >
-                <ReportIcon />
+                <DefaultReportIcon color={iconPrimary} />
                 Report user
               </ActionItem>
             )}
@@ -616,7 +628,7 @@ const Actions = ({
                   handleToggleBlockChannelPopupOpen()
                 }}
               >
-                {blockAndLeaveChannelIcon || <BlockIcon />}
+                {blockAndLeaveChannelIcon || <DefaultBlockIcon color={iconPrimary} />}
                 {`Block and Leave ${
                   channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                     ? 'group'
@@ -644,7 +656,7 @@ const Actions = ({
                   console.log('Report channel')
                 }}
               >
-                {reportChannelIcon || <ReportIcon />} Report{' '}
+                {reportChannelIcon || <DefaultReportIcon color={iconPrimary} />} Report{' '}
                 {channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'channel'
                   : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
@@ -672,7 +684,7 @@ const Actions = ({
                 handleToggleClearHistoryPopup()
               }}
             >
-              {clearHistoryIcon || <CleareIcon />} Clear history
+              {clearHistoryIcon || <DefaultClearIcon color={iconPrimary} />} Clear history
             </ActionItem>
           )}
         {showClearHistory &&
@@ -692,7 +704,7 @@ const Actions = ({
                 handleToggleDeleteAllMessagesPopup()
               }}
             >
-              {deleteAllMessagesIcon || <CleareIcon />} Clear history
+              {deleteAllMessagesIcon || <DefaultClearIcon color={iconPrimary} />} Clear history
             </ActionItem>
           )}
 
@@ -720,7 +732,7 @@ const Actions = ({
               handleToggleDeleteChannelPopupOpen()
             }}
           >
-            {deleteChannelIcon || <DeleteChannel />}
+            {deleteChannelIcon || <DefaultDeleteChannelIcon color={iconPrimary} />}
             {` Delete ${
               channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || channel.type === DEFAULT_CHANNEL_TYPE.GROUP
                 ? 'group'
@@ -872,7 +884,7 @@ export default Actions
 
 const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor?: string }>`
   padding: 10px 16px;
-  border-bottom: 6px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: 6px solid ${(props) => props.borderColor};
 ]`
 
 const ActionHeader = styled.div`
@@ -900,6 +912,18 @@ const ActionsMenu = styled.ul<{
 `
 
 const DefaultMutedIcon = styled(NotificationOffIcon)``
+const DefaultMuteIcon = styled(NotificationIcon)``
+const DefaultStarIcon = styled(StarIcon)``
+const DefaultUnpinIcon = styled(UnpinIcon)``
+const DefaultPinIcon = styled(PinIcon)``
+const DefaultMarkAsRead = styled(MarkAsReadIconD)``
+const DefaultMarkAsUnRead = styled(MarkAsUnReadIconD)``
+const DefaultBlockIcon = styled(BlockIcon)``
+const DefaultReportIcon = styled(ReportIcon)``
+const DefaultClearIcon = styled(ClearIcon)``
+const DefaultDeleteChannelIcon = styled(DeleteChannelIconD)``
+const DefaultBottomIcon = styled(BottomIcon)``
+const DefaultMarkAsReadIcon = styled(LeaveIcon)``
 
 const ActionItem = styled.li<{
   color: string

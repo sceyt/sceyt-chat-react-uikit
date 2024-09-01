@@ -109,6 +109,7 @@ const DetailsTab = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
@@ -139,7 +140,7 @@ const DetailsTab = ({
         color={textSecondary}
         activeTabColor={accentColor}
         backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
-        borderColor={borderColor}
+        borderColor={borderColor || borderThemeColor}
         fontSize={tabItemsFontSize}
         lineHeight={tabItemsLineHeight}
         minWidth={tabItemsMinWidth}
@@ -241,7 +242,7 @@ const Container = styled.div<{ theme?: string }>`
 
 const DetailsTabHeader = styled.div<{
   activeTabColor?: string
-  borderColor?: string
+  borderColor: string
   backgroundColor?: string
   fontSize?: string
   minWidth?: string
@@ -250,7 +251,7 @@ const DetailsTabHeader = styled.div<{
 }>`
   overflow: auto;
   padding: 0 20px;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: 1px solid ${(props) => props.borderColor};
   background-color: ${(props) => props.backgroundColor || colors.white};
   display: flex;
   justify-content: space-between;
