@@ -153,6 +153,7 @@ const Details = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -338,7 +339,7 @@ const Details = ({
 
           {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
             <AboutChannel>
-              {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
+              {showAboutChannelTitle && <AboutChannelTitle color={textFootnote}>About</AboutChannelTitle>}
               <AboutChannelText color={textPrimary}>
                 {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
               </AboutChannelText>
@@ -507,11 +508,11 @@ const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: '
 const AboutChannel = styled.div`
   margin-top: 20px;
 `
-const AboutChannelTitle = styled.h4`
+const AboutChannelTitle = styled.h4<{ color: string }>`
   font-size: 12px;
   margin: 0;
   line-height: 16px;
-  color: ${colors.textColor3};
+  color: ${(props) => props.color};
 `
 
 const AboutChannelText = styled.h3<{ color: string }>`

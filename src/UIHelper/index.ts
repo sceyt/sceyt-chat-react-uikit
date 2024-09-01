@@ -227,6 +227,7 @@ export const CustomSelect = styled.div<{
   marginTop?: string
   backgroundColor?: string
   color: string
+  placeholderColor: string
 }>`
   display: flex;
   height: 40px;
@@ -246,7 +247,7 @@ export const CustomSelect = styled.div<{
   margin-top: ${(props) => props.marginTop};
 
   ::placeholder {
-    color: ${colors.textColor3};
+    color: ${(props) => props.placeholderColor};
   }
 
   &:disabled {
@@ -259,14 +260,6 @@ export const CustomSelect = styled.div<{
 
   .dropdown-body {
     width: 100%;
-  }
-
-  .dropdown-trigger {
-    & .default-selection {
-      color: ${colors.textColor3};
-    }
-
-    //width: calc(100% - 20px);
   }
 `
 
@@ -314,6 +307,7 @@ export const CustomInput = styled.input<{
   error?: boolean
   theme?: string
   color: string
+  placeholderColor: string
 }>`
   height: 40px;
   width: 100%;
@@ -348,7 +342,7 @@ export const CustomInput = styled.input<{
   }
   &::placeholder {
     opacity: 1;
-    color: ${colors.textColor3};
+    color: ${(props) => props.placeholderColor};
   }
 `
 

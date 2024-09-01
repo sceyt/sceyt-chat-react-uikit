@@ -196,6 +196,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
 }) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
@@ -640,7 +641,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             </React.Fragment>
           ) : (
             <LoadingWrapper>
-              <UploadingIcon color={colors.textColor3} />
+              <UploadingIcon color={textFootnote} />
             </LoadingWrapper>
           )}
         </List>
@@ -784,7 +785,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
               )
             ) : (
               <LoadingWrapper>
-                <UploadingIcon color={colors.textColor3} />
+                <UploadingIcon color={textFootnote} />
               </LoadingWrapper>
             ))}
         </React.Fragment>

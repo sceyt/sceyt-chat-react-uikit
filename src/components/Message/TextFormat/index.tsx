@@ -51,6 +51,7 @@ export default function TextFormat({
 }) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {
@@ -75,7 +76,7 @@ export default function TextFormat({
         {handleFormatToBold && (
           <Action
             order={0}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
+            iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToBold(editorProps)}
@@ -90,7 +91,7 @@ export default function TextFormat({
         {handleFormatToItalic && (
           <Action
             order={1}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
+            iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToItalic(editorProps)}
@@ -105,7 +106,7 @@ export default function TextFormat({
         {handleFormatToStrikethrough && (
           <Action
             order={2}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
+            iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToStrikethrough(editorProps)}
@@ -122,7 +123,7 @@ export default function TextFormat({
           <React.Fragment>
             <Action
               order={3}
-              iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
+              iconColor={theme === THEME.DARK ? textFootnote : textSecondary}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
               onClick={() => handleFormatToMonospace(editorProps)}
