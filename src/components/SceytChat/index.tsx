@@ -170,7 +170,7 @@ const SceytChat = ({
         updatedColors[key] = {
           ...defaultTheme.colors[key],
           ...theme.colors[key]
-        }
+        } as any
       }
       if (key === THEME_COLOR_NAMES.ERROR) {
         colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
@@ -259,7 +259,6 @@ const SceytChat = ({
   useEffect(() => {
     if (theme) {
       handleChangedTheme(theme)
-      dispatch(setTheme(theme))
     } else {
       dispatch(setTheme(defaultTheme))
     }
