@@ -34,6 +34,7 @@ export default function MentionMembersPopup({
   searchMention
 }: IMentionsPopupProps) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -206,7 +207,7 @@ export default function MentionMembersPopup({
               <MemberName color={textPrimary}>
                 {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
-              <SubTitle>
+              <SubTitle color={textSecondary}>
                 {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : member.presence &&

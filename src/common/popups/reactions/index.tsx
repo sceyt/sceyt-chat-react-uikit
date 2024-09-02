@@ -51,6 +51,7 @@ export default function ReactionsPopup({
 }: IReactionsPopupProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const popupRef = useRef<HTMLDivElement>(null)
   const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)
@@ -166,7 +167,7 @@ export default function ReactionsPopup({
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
             active={activeTabKey === 'all'}
-            color={colors.textColor2}
+            color={textSecondary}
             activeBackgroundColor={accentColor}
             activeColor={textPrimary}
             onClick={() => handleGetReactions()}
@@ -179,7 +180,7 @@ export default function ReactionsPopup({
               key={reaction.key}
               onClick={() => handleGetReactions(reaction.key)}
               active={activeTabKey === reaction.key}
-              color={colors.textColor2}
+              color={textSecondary}
               activeBackgroundColor={accentColor}
               activeColor={textPrimary}
             >
@@ -211,7 +212,7 @@ export default function ReactionsPopup({
                   getFromContacts
                 )}
               </MemberName>
-              <SubTitle>
+              <SubTitle color={textSecondary}>
                 {reaction.user.presence && reaction.user.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : reaction.user.presence &&

@@ -50,6 +50,7 @@ export default function TextFormat({
   editorProps: any
 }) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {
@@ -74,13 +75,13 @@ export default function TextFormat({
         {handleFormatToBold && (
           <Action
             order={0}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToBold(editorProps)}
             isActive={isBoldText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Bold
             </ItemNote>
             <BoldIcon />
@@ -89,13 +90,13 @@ export default function TextFormat({
         {handleFormatToItalic && (
           <Action
             order={1}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToItalic(editorProps)}
             isActive={isItalicText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Italic
             </ItemNote>
             <ItalicIcon />
@@ -104,13 +105,13 @@ export default function TextFormat({
         {handleFormatToStrikethrough && (
           <Action
             order={2}
-            iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+            iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={colors.primary}
             onClick={() => handleFormatToStrikethrough(editorProps)}
             isActive={isStrikethroughText}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {' '}
               Strikethrough{' '}
             </ItemNote>
@@ -121,13 +122,13 @@ export default function TextFormat({
           <React.Fragment>
             <Action
               order={3}
-              iconColor={theme === THEME.DARK ? colors.textColor3 : colors.textColor2}
+              iconColor={theme === THEME.DARK ? colors.textColor3 : textSecondary}
               hoverBackgroundColor={colors.hoverBackgroundColor}
               hoverIconColor={colors.primary}
               onClick={() => handleFormatToMonospace(editorProps)}
               isActive={isMonospaceText}
             >
-              <ItemNote bgColor={textPrimary} direction='top'>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
                 Monospace
               </ItemNote>
               <MonoIcon />
@@ -166,8 +167,7 @@ const EditMessageContainer = styled.div<{ backgroundColor?: string; rtlDirection
 `
 
 const Action = styled.div<{
-  color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
   hoverIconColor?: string
   hoverBackgroundColor?: string
@@ -180,7 +180,7 @@ const Action = styled.div<{
   cursor: pointer;
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
   ${(props) =>
     props.isActive &&

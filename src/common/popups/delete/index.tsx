@@ -42,7 +42,8 @@ function ConfirmPopup({
 }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const [checkActionPermission] = usePermissions(myRole)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const [checkActionPermission] = usePermissions(myRole ?? '')
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
     ? allowDeleteIncoming && !isDirectChannel && checkActionPermission('deleteAnyMessage')
@@ -78,28 +79,30 @@ function ConfirmPopup({
           <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
-          <PopupDescription>{description}</PopupDescription>
+          <PopupDescription color={textSecondary}>{description}</PopupDescription>
           {isDeleteMessage && (
             <DeleteMessageOptions>
               {deleteForEveryoneIsPermitted && (
-                <DeleteOptionItem onClick={() => setDeleteMessageOption('forEveryone')}>
+                <DeleteOptionItem color={textSecondary} onClick={() => setDeleteMessageOption('forEveryone')}>
                   <CustomRadio
                     index='1'
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
                     onChange={(e) => handleChooseDeleteOption(e, 'forEveryone')}
-                    checkedBorder={accentColor}
+                    checkedBorderColor={accentColor}
+                    borderColor={textSecondary}
                   />
                   Delete for everyone
                 </DeleteOptionItem>
               )}
-              <DeleteOptionItem onClick={() => setDeleteMessageOption('forMe')}>
+              <DeleteOptionItem color={textSecondary} onClick={() => setDeleteMessageOption('forMe')}>
                 <CustomRadio
                   index='2'
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
                   onChange={(e) => handleChooseDeleteOption(e, 'forMe')}
-                  checkedBorder={accentColor}
+                  checkedBorderColor={accentColor}
+                  borderColor={textSecondary}
                 />
                 Delete for me
               </DeleteOptionItem>
@@ -131,13 +134,13 @@ export default ConfirmPopup
 const DeleteMessageOptions = styled.div`
   margin-top: 14px;
 `
-const DeleteOptionItem = styled.div`
+const DeleteOptionItem = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   cursor: pointer;
   font-size: 15px;
   line-height: 160%;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   margin-bottom: 12px;
 
   & > label {

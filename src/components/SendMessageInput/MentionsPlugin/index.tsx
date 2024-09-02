@@ -183,6 +183,7 @@ function MentionsTypeaheadMenuItem({
   option: MentionTypeaheadOption
 }) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   let className = 'item'
   if (isSelected) {
     className += ' selected'
@@ -209,7 +210,7 @@ function MentionsTypeaheadMenuItem({
           {option.name}
           {/* {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)} */}
         </MemberName>
-        <SubTitle>
+        <SubTitle color={textSecondary}>
           {/* @ts-ignore */}
           {option.presence && option.presence.state === USER_PRESENCE_STATUS.ONLINE
             ? 'Online'

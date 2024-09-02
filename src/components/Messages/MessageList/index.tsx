@@ -430,6 +430,7 @@ const MessageList: React.FC<MessagesProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1037,7 +1038,7 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea
-            color={textPrimary}
+            color={textSecondary}
             margin='32px 32px 12px'
             draggable
             onDrop={handleDropFile}
@@ -1049,7 +1050,7 @@ const MessageList: React.FC<MessagesProps> = ({
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
-            <DropAttachmentArea draggable color={textPrimary} onDrop={handleDropMedia} onDragOver={handleDragOver}>
+            <DropAttachmentArea color={textSecondary} draggable onDrop={handleDropMedia} onDragOver={handleDragOver}>
               <IconWrapper draggable iconColor={accentColor}>
                 <ChooseMediaIcon />
               </IconWrapper>
@@ -1297,7 +1298,7 @@ const MessageList: React.FC<MessagesProps> = ({
               <NoMessagesContainer color={textPrimary}>
                 <NoMessagesIcon />
                 <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
-                <NoMessagesText color={colors.textColor2}>No messages yet, start the chat</NoMessagesText>
+                <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
                 {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
                   : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
@@ -1436,7 +1437,7 @@ export const DropAttachmentArea = styled.div<{ color: string; margin?: string }>
   justify-content: center;
   flex-direction: column;
   height: 100%;
-  border: 1px dashed ${colors.textColor2};
+  border: 1px dashed ${(props) => props.color};
   border-radius: 16px;
   margin: ${(props) => props.margin || '12px 32px 32px'};
   font-weight: 400;

@@ -119,6 +119,7 @@ function TextFormatFloatingToolbar({
 }): JSX.Element {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -233,19 +234,19 @@ function TextFormatFloatingToolbar({
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
             }}
             aria-label='Format text as bold'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Bold
             </ItemNote>
             <BoldIcon />
           </Action>
 
           <Action
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isItalic}
@@ -255,13 +256,13 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Italic
             </ItemNote>
             <ItalicIcon />
           </Action>
           <Action
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
@@ -271,7 +272,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               {' '}
               Strikethrough{' '}
             </ItemNote>
@@ -279,7 +280,7 @@ function TextFormatFloatingToolbar({
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isCode}
@@ -288,14 +289,14 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Monospace
             </ItemNote>
             <MonoIcon />
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
+            iconColor={textSecondary}
             hoverBackgroundColor={colors.hoverBackgroundColor}
             hoverIconColor={accentColor}
             isActive={isUnderline}
@@ -304,7 +305,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
               Underline
             </ItemNote>
             <UnderlineIcon />
@@ -593,7 +594,7 @@ const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
 `
 const Action = styled.button<{
   color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
   hoverIconColor?: string
   hoverBackgroundColor?: string
@@ -609,7 +610,7 @@ const Action = styled.button<{
   //margin: 8px 6px;
   cursor: pointer;
   transition: all 0.2s;
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
   ${(props) =>
     props.isActive &&

@@ -85,7 +85,7 @@ import {
 } from '../../helpers/messagesHalper'
 import {
   attachmentTypes,
-  CHANNEL_TYPE,
+  DEFAULT_CHANNEL_TYPE,
   DB_NAMES,
   DB_STORE_NAMES,
   MESSAGE_DELIVERY_STATUS,
@@ -320,6 +320,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -332,13 +333,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
-  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
   const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
   const allowSetMention =
-    allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
+    allowMentionUser &&
+    (activeChannel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || activeChannel.type === DEFAULT_CHANNEL_TYPE.GROUP)
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
@@ -1419,7 +1421,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 isIncomingMessage={isIncomingMessage}
                 myRole={activeChannel.userRole}
                 allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
-                isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
+                isDirectChannel={activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
                 title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
               />
             )}
@@ -1443,14 +1445,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </BlockedUserInfo>
                 )}
               </React.Fragment>
-            ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
+            ) : !activeChannel.userRole && activeChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT ? (
               <JoinChannelCont onClick={handleJoinToChannel} color={accentColor}>
                 Join
               </JoinChannelCont>
             ) : (
-                activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+                activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
-                  : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
+                  : activeChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
               ) ? (
               <ReadOnlyCont color={textPrimary} iconColor={accentColor}>
                 <EyeIcon /> Read only
@@ -1464,7 +1467,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
                     ) : (
                       <TypingIndicatorCont>
-                        <TypingFrom>
+                        <TypingFrom color={textSecondary}>
                           {makeUsername(
                             getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
                             typingIndicator.from,
@@ -1490,7 +1493,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     color={editMessageTextColor || textPrimary}
                     backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
                   >
-                    <CloseEditMode onClick={handleCloseEditMode}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
                     <EditReplyMessageHeader color={accentColor}>
@@ -1519,7 +1522,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     color={replyMessageTextColor || textPrimary}
                     backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
                   >
-                    <CloseEditMode onClick={handleCloseReply}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
                     <ReplyMessageCont>
@@ -1653,7 +1656,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader(mediaExtensions)}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseMediaIcon />
                                 {chooseMediaAttachmentText ?? 'Photo or video'}
@@ -1666,7 +1669,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader('')}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseFileIcon />
                                 {chooseFileAttachmentText ?? 'File'}
@@ -1902,7 +1905,7 @@ const UploadErrorMessage = styled.p<any>`
   color: ${colors.red1};
 `
 
-const CloseEditMode = styled.span`
+const CloseEditMode = styled.span<{ color: string }>`
   position: absolute;
   top: 8px;
   right: 12px;
@@ -1913,7 +1916,7 @@ const CloseEditMode = styled.span`
   cursor: pointer;
 
   & > svg {
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
   }
 `
 
@@ -2138,7 +2141,7 @@ const SendMessageButton = styled.span<{
   order?: number
   isCustomButton?: any
   onClick?: any
-  iconColor?: string
+  iconColor: string
 }>`
   ${(props) =>
     !props.isCustomButton &&
@@ -2154,7 +2157,7 @@ const SendMessageButton = styled.span<{
 
   color: ${props.isActive ? colors.primary : props.color};
   & > svg {
-    color: ${props.iconColor || colors.textColor2};
+    color: ${props.iconColor};
   }
   `}
 `
@@ -2198,13 +2201,13 @@ const TypingIndicatorCont = styled.div`
   margin-bottom: 12px;
 `
 
-const TypingFrom = styled.h5`
+const TypingFrom = styled.h5<{ color: string }>`
   margin: 0 4px 0 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const sizeAnimation = keyframes`
   0% {

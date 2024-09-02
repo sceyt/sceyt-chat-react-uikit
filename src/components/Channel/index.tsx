@@ -33,7 +33,13 @@ import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/messa
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS, THEME } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  DEFAULT_CHANNEL_TYPE,
+  MESSAGE_STATUS,
+  USER_PRESENCE_STATUS,
+  THEME
+} from '../../helpers/constants'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
@@ -94,13 +100,14 @@ const Channel: React.FC<IChannelProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
   const { user } = ChatClient
   const activeChannel = useSelector(activeChannelSelector) || {}
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
@@ -301,6 +308,7 @@ const Channel: React.FC<IChannelProps> = ({
               <Points color={draftMessageText && colors.red1}>: </Points>
             )}
             <LastMessageText
+              color={textSecondary}
               withAttachments={
                 !!(
                   lastMessage &&
@@ -315,7 +323,7 @@ const Channel: React.FC<IChannelProps> = ({
               {typingIndicator ? (
                 <TypingIndicator>typing...</TypingIndicator>
               ) : draftMessageText ? (
-                <DraftMessageText>{draftMessageText}</DraftMessageText>
+                <DraftMessageText color={textSecondary}>{draftMessageText}</DraftMessageText>
               ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
                 'Message was deleted.'
               ) : lastMessage.type === 'system' ? (
@@ -417,7 +425,8 @@ const Channel: React.FC<IChannelProps> = ({
                       contactsMap,
                       getFromContacts,
                       isLastMessage: true,
-                      accentColor
+                      accentColor,
+                      textSecondary
                     })}
                   {channel.lastReactedMessage && '"'}
                 </React.Fragment>
@@ -427,7 +436,7 @@ const Channel: React.FC<IChannelProps> = ({
         )}
       </ChannelInfo>
 
-      <ChannelStatus ref={messageTimeAndStatusRef}>
+      <ChannelStatus color={textSecondary} ref={messageTimeAndStatusRef}>
         {channel.pinnedAt && (pinedIcon || <PinedIcon />)}
         {lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && (
           <DeliveryIconCont>
@@ -444,7 +453,7 @@ const Channel: React.FC<IChannelProps> = ({
               })}
           </DeliveryIconCont>
         )}
-        <LastMessageDate fontSize={channelLastMessageTimeFontSize}>
+        <LastMessageDate color={textSecondary} fontSize={channelLastMessageTimeFontSize}>
           {lastMessage && lastMessage.createdAt && lastMessageDateFormat(lastMessage.createdAt)}
           {/* {lastMessage &&
             lastMessage.createdAt &&
@@ -593,8 +602,8 @@ export const UserStatus = styled.span<{ backgroundColor?: string }>`
 export const DraftMessageTitle = styled.span<any>`
   color: ${colors.red1};
 `
-export const DraftMessageText = styled.span<any>`
-  color: ${colors.textColor2};
+export const DraftMessageText = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean }>`
   max-width: 120px;
@@ -616,6 +625,7 @@ export const Points = styled.span<{ color?: string }>`
 `
 
 export const LastMessageText = styled.span<{
+  color: string
   withAttachments?: boolean
   noBody?: boolean
   deletedMessage?: boolean
@@ -623,7 +633,7 @@ export const LastMessageText = styled.span<{
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   font-style: ${(props) => props.deletedMessage && 'italic'};
   transform: ${(props) => props.withAttachments && 'translate(0px, -1px)'};
   //height: 20px;
@@ -632,13 +642,13 @@ export const LastMessageText = styled.span<{
     width: 16px;
     height: 16px;
     margin-right: 4px;
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
     //transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
     transform: translate(0px, 3px);
   }
 `
 
-export const ChannelStatus = styled.div`
+export const ChannelStatus = styled.div<{ color: string }>`
   position: absolute;
   right: 16px;
   top: 15px;
@@ -650,12 +660,12 @@ export const ChannelStatus = styled.div`
   & > svg {
     width: 16px;
     height: 16px;
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
   }
 `
 
-export const LastMessageDate = styled.span<{ fontSize?: string }>`
-  color: ${colors.textColor2};
+export const LastMessageDate = styled.span<{ color: string; fontSize?: string }>`
+  color: ${(props) => props.color};
   font-size: ${(props) => props.fontSize || '12px'};
   line-height: 16px;
 `

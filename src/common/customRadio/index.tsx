@@ -6,7 +6,8 @@ interface IProps {
   onChange: (e: any) => void
   state: boolean
   index: any
-  checkedBorder?: string
+  checkedBorderColor: string
+  borderColor: string
   border?: string
   tickColor?: string
   borderRadius?: string
@@ -14,13 +15,24 @@ interface IProps {
   disabled?: boolean
 }
 
-const CustomRadio = ({ index, state, onChange, checkedBorder, border, borderRadius, size, disabled }: IProps) => {
+const CustomRadio = ({
+  index,
+  state,
+  onChange,
+  checkedBorderColor,
+  borderColor,
+  border,
+  borderRadius,
+  size,
+  disabled
+}: IProps) => {
   return (
     <React.Fragment>
       <CustomLabel
         isChecked={state}
         size={size}
-        checkedBorder={checkedBorder}
+        checkedBorderColor={checkedBorderColor}
+        borderColor={borderColor}
         border={border}
         borderRadius={borderRadius}
         htmlFor={`radio-${index}`}
@@ -36,7 +48,8 @@ export default CustomRadio
 const CustomLabel = styled.label<{
   size?: string
   border?: string
-  checkedBorder?: string
+  borderColor: string
+  checkedBorderColor: string
   tickColor?: string
   borderRadius?: string
   isChecked: boolean
@@ -50,9 +63,7 @@ const CustomLabel = styled.label<{
   height: ${(props) => props.size || '12px'};
   cursor: pointer;
   border: ${(props) =>
-    props.isChecked
-      ? `6px solid ${props.checkedBorder}`
-      : props.border || `1px solid ${colors.textColor2}`};
+    props.isChecked ? `6px solid ${props.checkedBorderColor}` : props.border || `1px solid ${colors.borderColor}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
 `
 

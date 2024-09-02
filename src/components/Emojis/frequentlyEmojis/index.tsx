@@ -20,6 +20,7 @@ function FrequentlyEmojis({
   rtlDirection?: boolean
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
     '😍': { key: '😍', reacted: false },
@@ -97,7 +98,8 @@ function FrequentlyEmojis({
         onClick={() => handleEmojiPopupToggle(true)}
         iconBackgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
         hoverBackground={colors.hoverBackgroundColor}
-        iconColor={accentColor}
+        iconHoverColor={accentColor}
+        iconColor={textSecondary}
       >
         <PlusIcon />
       </OpenMoreEmojis>
@@ -152,7 +154,12 @@ const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
   }
 `
 
-const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackground?: string, iconColor?: string }>`
+const OpenMoreEmojis = styled.span<{
+  iconBackgroundColor?: string
+  hoverBackground?: string
+  iconColor: string
+  iconHoverColor: string
+}>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -162,14 +169,14 @@ const OpenMoreEmojis = styled.span<{ iconBackgroundColor?: string; hoverBackgrou
   cursor: pointer;
 
   & > svg {
-    color: ${colors.textColor2};
+    color: ${(props) => props.iconColor};
     height: 18px;
     width: 18px;
   }
   &:hover {
     background-color: ${(props) => props.hoverBackground || colors.hoverBackgroundColor};
     & > svg {
-      color: ${(props) => props.iconColor};
+      color: ${(props) => props.iconHoverColor};
     }
   }
   border-radius: 50%;

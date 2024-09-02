@@ -16,7 +16,7 @@ import { ReactComponent as UploadImageIcon } from '../../../assets/svg/cameraIco
 import { useStateComplex, useColor } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../../components/Avatar'
-import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
@@ -56,6 +56,7 @@ export default function CreateChannel({
 }: ICreateChannelPopup) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -77,7 +78,7 @@ export default function CreateChannel({
   })
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   // const [pagination, setPagination] = useState(false)
-  const createGroupChannel = channelType === CHANNEL_TYPE.GROUP || channelType === CHANNEL_TYPE.PRIVATE
+  const createGroupChannel = channelType === DEFAULT_CHANNEL_TYPE.GROUP || channelType === DEFAULT_CHANNEL_TYPE.PRIVATE
   const requiredFields = channelTypeRequiredFieldsMap && channelTypeRequiredFieldsMap[channelType]
   const toggleCreatePopup = () => {
     setUsersPopupVisible(!usersPopupVisible)
@@ -310,7 +311,9 @@ export default function CreateChannel({
                     Create {createGroupChannel ? 'Group' : 'Channel'}
                   </PopupName>
                   {!createGroupChannel && (
-                    <CrateChannelTitle>Create a Channel to post your content to a large audience.</CrateChannelTitle>
+                    <CrateChannelTitle color={textSecondary}>
+                      Create a Channel to post your content to a large audience.
+                    </CrateChannelTitle>
                   )}
 
                   {showUploadAvatar && (
@@ -392,7 +395,7 @@ export default function CreateChannel({
                           </InputErrorMessage>
                         )}
                       </UriInputWrapper>
-                      <ChannelUriDescription>
+                      <ChannelUriDescription color={textSecondary}>
                         Give a URL to your channel so you can share it with others inviting them to join. Choose a name
                         from the allowed range: a-z, 0-9, and _(underscores) between 5-50 characters.
                       </ChannelUriDescription>
@@ -409,6 +412,7 @@ export default function CreateChannel({
                   <Button
                     type='button'
                     backgroundColor={accentColor}
+                    color={colors.white}
                     borderRadius='8px'
                     onClick={() => GoToAddMember()}
                     disabled={nextButtonDisable}
@@ -441,12 +445,12 @@ export default function CreateChannel({
   )
 }
 
-const CrateChannelTitle = styled.p`
+const CrateChannelTitle = styled.p<{ color: string }>`
   font-size: 15px;
   font-weight: 400;
   line-height: 150%;
   margin: 0 0 20px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const UploadAvatarLabel = styled.label<{ backgroundColor?: string; iconColor?: string }>`
   display: flex;
@@ -503,13 +507,13 @@ const RemoveSelectedAvatar = styled.span`
   line-height: 20px;
   color: ${colors.red1};
 `
-const ChannelUriDescription = styled.p`
+const ChannelUriDescription = styled.p<{ color: string }>`
   margin-bottom: 8px;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 
 const UriInputWrapper = styled.div<{ uriPrefixWidth?: number }>`

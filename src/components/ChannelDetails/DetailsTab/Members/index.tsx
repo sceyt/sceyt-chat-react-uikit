@@ -24,7 +24,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -73,6 +73,7 @@ const Members = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -92,7 +93,7 @@ const Members = ({
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'subscribers'
         : 'members'
   const noMemberEditPermissions =
@@ -190,7 +191,7 @@ const Members = ({
       const role =
         channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? 'subscriber'
             : 'participant'
       const updateMember: IMember = {
@@ -211,7 +212,7 @@ const Members = ({
         createChannelAC(
           {
             metadata: '',
-            type: CHANNEL_TYPE.DIRECT,
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
             members: [
               {
                 ...user,
@@ -287,7 +288,7 @@ const Members = ({
                     )}
                   </MemberNameWrapper>
 
-                  <SubTitle margin='1px 0 0' fontSize={memberPresenceFontSize}>
+                  <SubTitle color={textSecondary} margin='1px 0 0' fontSize={memberPresenceFontSize}>
                     {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
@@ -310,6 +311,7 @@ const Members = ({
                     <DropdownOptionsUl>
                       {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
                         <DropdownOptionLi
+                          textColor={textPrimary}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleChangeRolePopup(e)
@@ -378,7 +380,7 @@ const Members = ({
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
           title={
-            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+            channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
               ? 'Remove member'
               : 'Remove subscriber'
           }
@@ -389,7 +391,10 @@ const Members = ({
                 <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
               )}
               from this{' '}
-              {channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
+              {channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+                ? 'channel'
+                : 'group'}
+              ?
             </span>
           }
         />

@@ -523,12 +523,12 @@ export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; p
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 
-export const PopupDescription = styled.span`
+export const PopupDescription = styled.span<{ color: string }>`
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
   line-height: 22px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   cursor: default;
   white-space: pre-line;
   margin-top: ${(props: any) => props.marginTop || '10px'};
@@ -568,7 +568,7 @@ export const SectionHeader = styled.h4<{
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
-export const ItemNote = styled.div<{ bgColor: string; direction: string }>`
+export const ItemNote = styled.div<{ disabledColor: string; bgColor: string; direction: string }>`
   display: none;
   position: absolute;
   z-index: 301;
@@ -622,11 +622,7 @@ export const ItemNote = styled.div<{ bgColor: string; direction: string }>`
         bottom: calc(100% + 15px);
         left: 50%;
         transform: translateX(-50%);
-    `} ${(props: any) =>
-    props.disabled &&
-    `
-        color: ${colors.textColor2};
-    `}
+    `} ${(props: any) => props.disabled && `color: ${(props: any) => props.disabledColor};`}
 `
 export const CustomSwitcher = styled.div`
   display: inline-block;
@@ -709,7 +705,7 @@ export const StyledText = styled.span<{
   letter-spacing: ${(props) => props.letterSpacing};
 
   &.mention {
-    color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
+    color: ${(props) => props.color || colors.textColor1};
     font-weight: ${(props) => props.isLastMessage && '500'};
   }
   &.bold {
@@ -866,11 +862,11 @@ export const StyledSearchSvg = styled(SearchSvg)`
   top: 12px;
   left: ${(props) => props.left || '14px'};
 `
-export const SubTitle = styled.span<{ color?: string; margin?: string; fontSize?: string; lineHeight?: string }>`
+export const SubTitle = styled.span<{ color: string; margin?: string; fontSize?: string; lineHeight?: string }>`
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: ${(props) => props.lineHeight || '16px'};
   letter-spacing: -0.078px;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
   margin: ${(props) => props.margin};
 `
 

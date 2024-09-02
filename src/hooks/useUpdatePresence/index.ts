@@ -6,7 +6,7 @@ import { updateUserStatusOnChannelAC } from '../../store/channel/actions'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { checkUserStatusAC } from '../../store/user/actions'
-import { CHANNEL_TYPE } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { deleteUserFromMap, setUserToMap, updateUserOnMap, usersMap } from '../../helpers/userHelper'
 // import { checkUserStatusAC } from '../../store/user/actions'
@@ -16,7 +16,7 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
   const { user } = ChatClient
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const userId = directChannelUser && directChannelUser.id
   if (userId && usersMap[userId] && !isVisible) {

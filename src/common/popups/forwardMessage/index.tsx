@@ -18,7 +18,7 @@ import {
 import { IChannel, IMember } from '../../../types'
 import ChannelSearch from '../../../components/ChannelList/ChannelSearch'
 import { Avatar } from '../../../components'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
@@ -45,6 +45,9 @@ interface IProps {
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -58,8 +61,6 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -85,7 +86,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelSelect = (event: any, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
-    const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
     const isSelfChannel = isDirectChannel && channel.metadata?.s
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (event.target.checked && selectedChannels.length < 5) {
@@ -170,10 +171,12 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
               <React.Fragment>
                 {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                   <React.Fragment>
-                    <ChannelsGroupTitle margin='0 0 12px'>Chats & Groups</ChannelsGroupTitle>
+                    <ChannelsGroupTitle color={textSecondary} margin='0 0 12px'>
+                      Chats & Groups
+                    </ChannelsGroupTitle>
                     {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
-                      const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                      const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                       const isSelfChannel = isDirectChannel && channel.metadata?.s
                       const directChannelUser =
                         isDirectChannel && isSelfChannel
@@ -209,7 +212,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     : 'Deleted User'
                                 : channel.subject}
                             </ChannelTitle>
-                            <ChannelMembers>
+                            <ChannelMembers color={textSecondary}>
                               {directChannelUser
                                 ? (
                                     hideUserPresence && hideUserPresence(directChannelUser)
@@ -240,7 +243,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                 )}
                 {!!(searchedChannels.channels && searchedChannels.channels.length) && (
                   <React.Fragment>
-                    <ChannelsGroupTitle>Channels</ChannelsGroupTitle>
+                    <ChannelsGroupTitle color={textSecondary}>Channels</ChannelsGroupTitle>
                     {searchedChannels.channels.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       return (
@@ -254,9 +257,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           />
                           <ChannelInfo>
                             <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
-                            <ChannelMembers>
+                            <ChannelMembers color={textSecondary}>
                               {`${channel.memberCount} ${
-                                channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                                channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                                channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                                   ? channel.memberCount > 1
                                     ? 'subscribers'
                                     : 'subscriber'
@@ -282,7 +286,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
               </React.Fragment>
             ) : (
               channels.map((channel: IChannel) => {
-                const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+                const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
                 const isSelfChannel = isDirectChannel && channel.metadata?.s
                 const directChannelUser =
                   isDirectChannel && isSelfChannel
@@ -314,7 +318,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                               : '')}
                       </ChannelTitle>
-                      <ChannelMembers>
+                      <ChannelMembers color={textSecondary}>
                         {isDirectChannel && directChannelUser
                           ? (
                               hideUserPresence && hideUserPresence(directChannelUser)
@@ -328,7 +332,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               directChannelUser.presence.lastActiveAt &&
                               userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
                           : `${channel.memberCount} ${
-                              channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+                              channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                              channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                                 ? channel.memberCount > 1
                                   ? 'subscribers'
                                   : 'subscriber'
@@ -392,12 +397,12 @@ const ChannelInfo = styled.div<any>`
   max-width: calc(100% - 74px);
 `
 
-const ChannelsGroupTitle = styled.h4<{ margin?: string }>`
+const ChannelsGroupTitle = styled.h4<{ color: string; margin?: string }>`
   font-weight: 500;
   font-size: 15px;
   line-height: 14px;
   margin: ${(props) => props.margin || '20px 0 12px'};
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const ChannelTitle = styled.h3<{ color: string }>`
   margin: 0 0 2px;
@@ -411,13 +416,13 @@ const ChannelTitle = styled.h3<{ color: string }>`
   overflow: hidden;
 `
 
-const ChannelMembers = styled.h4<any>`
+const ChannelMembers = styled.h4<{ color: string }>`
   margin: 0;
   font-weight: 400;
   font-size: 14px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;

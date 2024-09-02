@@ -29,6 +29,7 @@ const settingsPages = {
 
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
   const user = useSelector(userSelector)
@@ -53,7 +54,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
       <ProfileInfo>
         <Avatar name={user.firstName || user.id} size={144} image={user.avatarUrl} setDefaultAvatar />
         <Username color={textPrimary}>{`${user.firstName} ${user.lastName}`}</Username>
-        <UserNumber>{`+${user.id}`}</UserNumber>
+        <UserNumber color={textSecondary}>{`+${user.id}`}</UserNumber>
       </ProfileInfo>
 
       <DropdownOptionsUl>
@@ -61,7 +62,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={textPrimary}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
           onClick={handleOpenEditProfile}
         >
@@ -71,7 +72,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={textPrimary}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <NotificationsIcon /> Notifications
@@ -80,7 +81,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
           hoverBackground='none'
           iconWidth='20px'
           textColor={textPrimary}
-          iconColor={colors.textColor2}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <LockIcon /> About
@@ -143,11 +144,11 @@ const Username = styled.h3<{ color: string }>`
   color: ${(props) => props.color};
 `
 
-const UserNumber = styled.h4`
+const UserNumber = styled.h4<{ color: string }>`
   margin: 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

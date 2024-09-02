@@ -40,7 +40,7 @@ import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
@@ -362,6 +362,7 @@ const Message = ({
 }: IMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -432,7 +433,7 @@ const Message = ({
   // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+    !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
   const borderRadius =
@@ -454,7 +455,7 @@ const Message = ({
 
   const showMessageSenderName =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    (channel.type === CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
+    (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
     (message.incoming || showSenderNameOnOwnMessages)
 
   const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
@@ -705,7 +706,7 @@ const Message = ({
         createChannelAC(
           {
             metadata: '',
-            type: CHANNEL_TYPE.DIRECT,
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
             members: [
               {
                 ...user,
@@ -830,7 +831,7 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
-          !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+          !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
           !(!message.incoming && !showOwnAvatar)
         }
         className='messageContent'
@@ -1119,7 +1120,7 @@ const Message = ({
                         <VoiceIconWrapper color={colors.primary} />
                       )}
                     {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
-                      <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+                      <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
                     ) : message.parentMessage.body ? (
                       MessageTextFormat({
                         text: message.parentMessage.body,
@@ -1205,7 +1206,7 @@ const Message = ({
               </span>
               {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
               {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
-                <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+                <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
               ) : (
                 ''
               )}
@@ -1219,16 +1220,17 @@ const Message = ({
                   isSelfMessage={!message.incoming}
                 >
                   {message.state === MESSAGE_STATUS.EDIT ? (
-                    <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+                    <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
                       edited
                     </MessageStatusUpdated>
                   ) : (
                     ''
                   )}
                   {messageTimeVisible && (
-                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                      message.createdAt
-                    ).format('HH:mm')}`}</HiddenMessageTime>
+                    <HiddenMessageTime
+                      color={messageTimeColor || textSecondary}
+                      fontSize={messageTimeFontSize}
+                    >{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
                   )}
                   {messageStatusVisible && (
                     <MessageStatus height={messageStatusAndTimeLineHeight}>
@@ -1256,6 +1258,7 @@ const Message = ({
                   leftMargin
                   isSelfMessage={!message.incoming}
                   fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
+                  statusColor={textSecondary}
                 >
                   {message.state === MESSAGE_STATUS.EDIT ? (
                     <MessageStatusUpdated
@@ -1263,7 +1266,7 @@ const Message = ({
                       color={
                         message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                           ? colors.white
-                          : messageStateColor
+                          : messageStateColor || textSecondary
                       }
                     >
                       edited
@@ -1272,9 +1275,10 @@ const Message = ({
                     ''
                   )}
                   {messageTimeVisible && (
-                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                      message.createdAt
-                    ).format('HH:mm')}`}</HiddenMessageTime>
+                    <HiddenMessageTime
+                      color={messageTimeColor || textSecondary}
+                      fontSize={messageTimeFontSize}
+                    >{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
                   )}
                   {messageStatusVisible &&
                     MessageStatusIcon({
@@ -1382,14 +1386,14 @@ const Message = ({
             bottomOfMessage
           >
             {message.state === MESSAGE_STATUS.EDIT ? (
-              <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+              <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
                 edited
               </MessageStatusUpdated>
             ) : (
               ''
             )}
             {messageTimeVisible && (
-              <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+              <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
                 message.createdAt
               ).format('HH:mm')}`}</HiddenMessageTime>
             )}
@@ -1498,7 +1502,7 @@ const Message = ({
           isIncomingMessage={message.incoming}
           myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}
@@ -1882,11 +1886,11 @@ const MessageStatus = styled.span<{ height?: string }>`
   }
 `
 
-const HiddenMessageTime = styled.span<{ hide?: boolean; color?: string; fontSize?: string }>`
+const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?: string }>`
   display: ${(props) => props.hide && 'none'};
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
 export const MessageStatusAndTime = styled.span<{
@@ -1900,6 +1904,7 @@ export const MessageStatusAndTime = styled.span<{
   bottomOfMessage?: boolean
   showOnlyOnHover?: boolean
   lineHeight?: string
+  statusColor?: string
 }>`
   visibility: ${(props) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
@@ -1924,7 +1929,7 @@ export const MessageStatusAndTime = styled.span<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? colors.textColor2 : props.withAttachment ? colors.white : '')};
+    color: ${(props) => (props.fileAttachment ? props.statusColor : props.withAttachment ? colors.white : '')};
   }
 
   ${(props) =>
@@ -1937,16 +1942,16 @@ export const MessageStatusAndTime = styled.span<{
   `}
 `
 
-const MessageStatusUpdated = styled.span<{ color?: string; fontSize?: string }>`
+const MessageStatusUpdated = styled.span<{ color: string; fontSize?: string }>`
   margin-right: 4px;
   font-style: italic;
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
-const MessageStatusDeleted = styled.span<{ color?: string; fontSize?: string; withAttachment?: boolean }>`
-  color: ${(props) => props.color || colors.textColor2};
+const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; withAttachment?: boolean }>`
+  color: ${(props) => props.color};
   font-size: ${(props) => props.fontSize};
   font-style: italic;
 `

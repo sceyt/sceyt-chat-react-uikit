@@ -13,7 +13,7 @@ import {
   SubTitle
 } from '../../../UIHelper'
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
@@ -71,6 +71,7 @@ const UsersPopup = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -97,7 +98,7 @@ const UsersPopup = ({
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
       ? `Add ${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'Subscribers'
         : 'Members')
   /* const handleGetUsers = (option) => {
@@ -139,7 +140,7 @@ const UsersPopup = ({
       const role = channel
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? 'subscriber'
             : 'participant'
         : 'participant'
@@ -195,7 +196,7 @@ const UsersPopup = ({
       const channelData = {
         metadata: '',
         label: '',
-        type: CHANNEL_TYPE.DIRECT,
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
         members: [
           {
             ...selectedUser,
@@ -313,7 +314,7 @@ const UsersPopup = ({
         boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
       >
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
-          <CloseIcon color={colors.textColor2} onClick={handleClosePopup} />
+          <CloseIcon color={textSecondary} onClick={handleClosePopup} />
 
           <PopupName color={textPrimary} padding='0 12px'>
             {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
@@ -329,6 +330,7 @@ const UsersPopup = ({
               widthBorder={theme !== THEME.DARK}
               backgroundColor={colors.backgroundColor}
               color={textPrimary}
+              placeholderColor={textSecondary}
             />
             {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
@@ -386,7 +388,7 @@ const UsersPopup = ({
 
                   <UserNamePresence>
                     <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
-                    <SubTitle>
+                    <SubTitle color={textSecondary}>
                       {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
                         : user.presence &&
@@ -551,7 +553,12 @@ const SelectMember = styled.input`
   cursor: pointer;
 ` */
 
-const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?: string; color?: string }>`
+const SearchUsersInput = styled.input<{
+  widthBorder?: boolean
+  backgroundColor?: string
+  color: string
+  placeholderColor: string
+}>`
   height: 40px;
   width: 100%;
   font-size: 14px;
@@ -563,7 +570,7 @@ const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?:
   background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
 
   &::placeholder {
-    color: ${colors.textColor2};
+    color: ${(props) => props.placeholderColor};
     font-size: 14px;
     opacity: 1;
   }

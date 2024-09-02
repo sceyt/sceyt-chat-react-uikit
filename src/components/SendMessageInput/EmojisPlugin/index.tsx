@@ -18,7 +18,7 @@ import EMOJIS from '../../Emojis/emojis'
 import { useColor } from '../../../hooks'
 
 interface EmojiCollectionProps {
-  activeCollection: boolean,
+  activeCollection: boolean
   iconColor: string
 }
 
@@ -71,6 +71,7 @@ function EmojisPopup({
   leftPosition?: string
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
@@ -172,7 +173,7 @@ function EmojisPopup({
         </EmojiFooter>
       )}
       {fixEmojiCategoriesTitleOnTop && (
-        <EmojiHeader padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
+        <EmojiHeader color={textSecondary} padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
@@ -183,7 +184,9 @@ function EmojisPopup({
             return (
               <React.Fragment key={mainCollectionKey}>
                 {!fixEmojiCategoriesTitleOnTop && (
-                  <EmojiHeader padding='6px 8px 0'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
+                  <EmojiHeader color={textSecondary} padding='6px 8px 0'>
+                    {getEmojisCategoryTitle(mainCollectionKey)}
+                  </EmojiHeader>
                 )}
                 {emojiBigCollection.array.map((emojiSmallCollection, bigIndex) => {
                   const label = emojiSmallCollection.key
@@ -275,14 +278,14 @@ const Container = styled.div<{
     height: 225px;
   `};
 `
-const EmojiHeader = styled.div<{ padding?: string }>`
+const EmojiHeader = styled.div<{ color: string; padding?: string }>`
   align-items: flex-end;
   font-style: normal;
   font-weight: 500;
   font-size: 12px;
   line-height: 22px;
   text-transform: uppercase;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `
@@ -339,8 +342,15 @@ const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
   padding-top: 2px;
   text-align: center;
   background: transparent;
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   & > * {
     font-size: 22px;
   }
