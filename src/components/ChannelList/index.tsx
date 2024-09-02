@@ -197,6 +197,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -412,7 +413,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       <ChannelListHeader
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
-        borderColor={colors.backgroundColor}
+        borderColor={sectionBackground}
       >
         {Profile /* || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} /> */}
         {/* <ProfileCont onClick={handleOpenProfile}>

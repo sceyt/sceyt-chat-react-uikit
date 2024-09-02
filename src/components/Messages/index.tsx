@@ -188,7 +188,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.backgroundColor,
+  incomingMessageBackground,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   hoverBackground = false,

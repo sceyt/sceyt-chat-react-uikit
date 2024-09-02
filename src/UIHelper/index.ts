@@ -309,13 +309,13 @@ export const CustomInput = styled.input<{
   theme?: string
   color: string
   placeholderColor: string
+  backgroundColor: string
   errorColor: string
-  errorColorBlur: string
   borderColor: string
 }>`
   height: 40px;
   width: 100%;
-  background: ${(props) => (props.theme === THEME.DARK ? colors.backgroundColor : colors.white)};
+  background: ${(props) => (props.theme === THEME.DARK ? props.backgroundColor : colors.white)};
   border: ${(props) =>
     props.error ? `1px solid ${props.errorColor}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
   color: ${(props) => props.color};

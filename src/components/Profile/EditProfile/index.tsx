@@ -23,6 +23,8 @@ import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 export default function EditProfile({ toggleEditPopup, user }: any) {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   // const dispatch = useDispatch()
 
@@ -105,6 +107,8 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
           <CustomInput
             errorColor={errorColor}
             placeholderColor={textFootnote}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
             type='text'
             color={textPrimary}
             value={user.id}
@@ -116,6 +120,8 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
             type='text'
             color={textPrimary}
             errorColor={errorColor}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
             placeholderColor={textFootnote}
             value={firstNameValue}
             onChange={handleTypeFirstName}
@@ -128,6 +134,8 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
             color={textPrimary}
             errorColor={errorColor}
             placeholderColor={textFootnote}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
             value={lastNameValue}
             onChange={handleTypeLastName}
             placeholder='Enter Lastname'

@@ -256,7 +256,7 @@ const Message = ({
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.backgroundColor,
+  incomingMessageBackground,
   ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
   incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   showOwnAvatar = true,
@@ -361,6 +361,7 @@ const Message = ({
   messageTextLineHeight
 }: IMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
@@ -787,7 +788,7 @@ const Message = ({
       hoverBackground={
         hoverBackground
           ? message.incoming
-            ? incomingMessageBackground || 'rgb(238, 245, 255)'
+            ? incomingMessageBackground || sectionBackground
             : ownMessageBackground || 'rgb(238, 245, 255)'
           : ''
       }
@@ -917,7 +918,7 @@ const Message = ({
               message.parentMessage.attachments[0].type === attachmentTypes.voice
             }
             ownMessageBackground={ownMessageBackground}
-            incomingMessageBackground={incomingMessageBackground}
+            incomingMessageBackground={incomingMessageBackground || sectionBackground}
             borderRadius={borderRadius}
             withAttachments={notLinkAttachment}
             attachmentWidth={
@@ -1070,7 +1071,9 @@ const Message = ({
                     (message.parentMessage.attachments as any[]).map((attachment, index) => (
                       <Attachment
                         key={attachment.tid || attachment.url}
-                        backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                        backgroundColor={
+                          message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                        }
                         attachment={{
                           ...attachment,
                           metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
@@ -1326,7 +1329,9 @@ const Message = ({
                     }
                     borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
                     selectedFileAttachmentsIcon={fileAttachmentsIcon}
-                    backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                    backgroundColor={
+                      message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                    }
                     selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                     selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                     selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
@@ -1438,7 +1443,7 @@ const Message = ({
             borderRadius={reactionsContainerBorderRadius}
             topPosition={reactionsContainerTopPosition}
             padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground || colors.backgroundColor}
+            backgroundColor={reactionsContainerBackground || sectionBackground}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
           >
             {/* <ReactionEmojis>
@@ -1461,7 +1466,7 @@ const Message = ({
                   self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground || colors.backgroundColor}
+                  backgroundColor={reactionItemBackground || sectionBackground}
                   padding={reactionItemPadding}
                   margin={reactionItemMargin}
                   isLastReaction={reactionsCount === 1}

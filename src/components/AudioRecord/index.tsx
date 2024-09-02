@@ -10,7 +10,7 @@ import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 
 interface AudioPlayerProps {
@@ -25,6 +25,7 @@ let WaveSurfer: any
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording }) => {
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const [recording, setStartRecording] = useState<any>(null)
   const [recorder, setRecorder] = useState<any>(null)
   const [recordedFile, setRecordedFile] = useState<any>(null)
@@ -365,7 +366,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         </PlayPause>
       )}
 
-      <AudioWrapper recording={recording || recordedFile}>
+      <AudioWrapper backgroundColor={sectionBackground} recording={recording || recordedFile}>
         {recording && (
           <PlayPause onClick={() => stopRecording()}>
             <StopIcon />
@@ -401,7 +402,7 @@ const Container = styled.div<{ recording?: boolean }>`
   ${(props) => props.recording && `width: 400px`};
   transition: all 0.3s ease-in-out;
 `
-const AudioWrapper = styled.div<{ recording?: boolean }>`
+const AudioWrapper = styled.div<{ backgroundColor: string; recording?: boolean }>`
   position: relative;
   display: flex;
   align-items: center;
@@ -409,7 +410,7 @@ const AudioWrapper = styled.div<{ recording?: boolean }>`
   width: ${(props) => (props.recording ? 'calc(100% - 84px)' : '0')};
   overflow: hidden;
   margin: ${(props) => (props.recording ? '0 8px' : '0')};
-  background-color: ${colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   padding: ${(props) => (props.recording ? '0 12px 0 0' : '0')};
   border-radius: 20px;
 `

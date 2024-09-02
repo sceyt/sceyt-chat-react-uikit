@@ -22,7 +22,7 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
@@ -543,8 +543,8 @@ const ChannelInfo = styled.div<{ direction?: 'column' | 'row' }>`
   text-align: ${(props) => props.direction && props.direction === 'column' && 'center'};
 `
 
-const DetailsHeader = styled.div<{ borderColor?: string }>`
-  border-bottom: 6px solid ${(props) => props.borderColor || colors.backgroundColor};
+const DetailsHeader = styled.div<{ borderColor: string }>`
+  border-bottom: 6px solid ${(props) => props.borderColor};
   align-items: center;
   box-sizing: border-box;
   padding: 20px 16px;

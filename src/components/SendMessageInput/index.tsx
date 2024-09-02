@@ -319,6 +319,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderTextColor
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
@@ -1447,7 +1448,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
               </React.Fragment>
             ) : !activeChannel.userRole && activeChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT ? (
-              <JoinChannelCont onClick={handleJoinToChannel} color={accentColor}>
+              <JoinChannelCont backgroundColor={sectionBackground} onClick={handleJoinToChannel} color={accentColor}>
                 Join
               </JoinChannelCont>
             ) : (
@@ -1492,7 +1493,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     bottom={replyEditMessageContainerBottomPosition}
                     padding={replyEditMessageContainerPadding}
                     color={editMessageTextColor || textPrimary}
-                    backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
+                    backgroundColor={editMessageBackgroundColor || sectionBackground}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
@@ -1521,7 +1522,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     left={replyEditMessageContainerLeftPosition}
                     padding={replyEditMessageContainerPadding}
                     color={replyMessageTextColor || textPrimary}
-                    backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
+                    backgroundColor={replyMessageBackgroundColor || sectionBackground}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
@@ -1593,7 +1594,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           setVideoIsReadyToSend={setVideoIsReadyToSend}
                           borderRadius={selectedAttachmentsBorderRadius}
                           selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                          backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
+                          backgroundColor={selectedFileAttachmentsBoxBackground || sectionBackground}
                           selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
                           selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
                           selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
@@ -1613,7 +1614,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
                       }
                       ref={inputWrapperRef}
-                      backgroundColor={inputBackgroundColor || colors.backgroundColor}
+                      backgroundColor={inputBackgroundColor || sectionBackground}
                       channelDetailsIsOpen={channelDetailsIsOpen}
                       messageInputOrder={inputOrder}
                       messageInputPaddings={inputPaddings}
@@ -1779,7 +1780,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
                       order={sendIconOrder}
-                      color={colors.backgroundColor}
+                      color={sectionBackground}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
                       iconColor={accentColor}
@@ -1867,7 +1868,7 @@ const Container = styled.div<{
 `
 
 const EditReplyMessageCont = styled.div<{
-  backgroundColor?: string
+  backgroundColor: string
   color: string
   width?: string
   borderRadius?: string
@@ -1886,7 +1887,7 @@ const EditReplyMessageCont = styled.div<{
   line-height: 20px;
   letter-spacing: -0.2px;
   color: ${(props) => props.color};
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
 `
@@ -1985,7 +1986,7 @@ const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor: st
 
 const MessageInputWrapper = styled.div<{
   channelDetailsIsOpen?: boolean
-  backgroundColor?: string
+  backgroundColor: string
   borderRadius?: string
   messageInputOrder?: number
   messageInputPaddings?: string
@@ -1996,7 +1997,7 @@ const MessageInputWrapper = styled.div<{
   //max-width: ${(props) =>
     props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
   //max-width: calc(100% - 110px);
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
 `
@@ -2292,7 +2293,7 @@ const BlockedUserInfo = styled.div<{ color: string }>`
     margin-right: 12px;
   }
 `
-const JoinChannelCont = styled.div<{ color?: string }>`
+const JoinChannelCont = styled.div<{ backgroundColor: string; color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2303,7 +2304,7 @@ const JoinChannelCont = styled.div<{ color?: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   color: ${(props) => props.color || colors.primary};
-  background-color: ${colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   cursor: pointer;
 `
 const ReadOnlyCont = styled.div<{ color: string; iconColor?: string }>`

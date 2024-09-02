@@ -20,6 +20,7 @@ function FrequentlyEmojis({
   rtlDirection?: boolean
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
@@ -78,15 +79,10 @@ function FrequentlyEmojis({
   }, [])
 
   return (
-    <Container
-      id='emojisContainer'
-      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-      rendered={rendered}
-      rightSide={rtlDirection}
-    >
+    <Container id='emojisContainer' backgroundColor={sectionBackground} rendered={rendered} rightSide={rtlDirection}>
       {emojis.map((emoji: any) => (
         <EmojiItem
-          hoverBackground={colors.hoverBackgroundColor}
+          activeBackground={sectionBackground}
           active={emoji.reacted}
           key={emoji.key}
           onClick={() => chooseEmoji(emoji.key)}
@@ -96,8 +92,8 @@ function FrequentlyEmojis({
       ))}
       <OpenMoreEmojis
         onClick={() => handleEmojiPopupToggle(true)}
-        iconBackgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-        hoverBackground={colors.hoverBackgroundColor}
+        iconBackgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
+        hoverBackground={sectionBackground}
         iconHoverColor={accentColor}
         iconColor={textSecondary}
       >
@@ -128,7 +124,7 @@ const Container = styled.div<{ rendered?: boolean; rightSide?: boolean; backgrou
   `};
 `
 
-const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
+const EmojiItem = styled.span<{ active?: boolean; activeBackground: string }>`
   font-family:
     apple color emoji,
     segoe ui emoji,
@@ -148,9 +144,9 @@ const EmojiItem = styled.span<{ active?: boolean; hoverBackground?: string }>`
   border-radius: 50%;
   width: 36px;
   height: 36px;
-  background-color: ${(props) => props.active && colors.backgroundColor};
+  background-color: ${(props) => props.active && props.activeBackground};
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.backgroundColor};
+    background-color: ${(props) => props.activeBackground};
   }
 `
 
@@ -165,7 +161,7 @@ const OpenMoreEmojis = styled.span<{
   justify-content: center;
   width: 28px;
   height: 28px;
-  background-color: ${(props) => props.iconBackgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.iconBackgroundColor};
   cursor: pointer;
 
   & > svg {

@@ -16,6 +16,8 @@ interface IProps {
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -55,6 +57,8 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
           color={textPrimary}
           errorColor={errorColor}
           placeholderColor={textFootnote}
+          borderColor={borderColor}
+          backgroundColor={sectionBackground}
           value={firstName}
           onChange={handleTypeFirstName}
           placeholder='Firstname'
@@ -65,7 +69,9 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
           type='text'
           color={textPrimary}
           errorColor={errorColor}
+          borderColor={borderColor}
           placeholderColor={textFootnote}
+          backgroundColor={sectionBackground}
           value={lastName}
           onChange={handleTypeLastName}
           placeholder='Lastname'

@@ -118,6 +118,7 @@ function TextFormatFloatingToolbar({
   showMenu: boolean
 }): JSX.Element {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
@@ -235,7 +236,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as bold'
             iconColor={textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={accentColor}
             isActive={isBold}
           >
@@ -247,7 +248,7 @@ function TextFormatFloatingToolbar({
 
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
@@ -263,7 +264,7 @@ function TextFormatFloatingToolbar({
           </Action>
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
@@ -281,7 +282,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
@@ -297,7 +298,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
+            hoverBackgroundColor={sectionBackground}
             hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
@@ -597,7 +598,7 @@ const Action = styled.button<{
   iconColor: string
   order?: number
   hoverIconColor?: string
-  hoverBackgroundColor?: string
+  hoverBackgroundColor: string
   isActive?: boolean
 }>`
   border: 0;
@@ -616,7 +617,7 @@ const Action = styled.button<{
     props.isActive &&
     `
     color: ${props.hoverIconColor || colors.primary};
-    background-color: ${props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${props.hoverBackgroundColor};
   `}
 
   &:last-child {
@@ -625,7 +626,7 @@ const Action = styled.button<{
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};
-    background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {
       display: block;

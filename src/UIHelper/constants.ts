@@ -3,6 +3,7 @@ import { SceytChatUIKitTheme, ThemeMode } from '../components'
 export const THEME_COLOR_NAMES = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
+  SECTION_BACKGROUND: 'sectionBackground',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
@@ -20,6 +21,10 @@ export const defaultTheme: SceytChatUIKitTheme = {
     [THEME_COLOR_NAMES.BACKGROUND]: {
       light: '#FFFFFF',
       dark: '#19191B'
+    },
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: {
+      light: '#F1F2F6',
+      dark: '#232324'
     },
     [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
       light: '#111539',

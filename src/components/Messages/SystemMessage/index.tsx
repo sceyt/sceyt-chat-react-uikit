@@ -12,7 +12,7 @@ import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 
 interface ISystemMessageProps {
@@ -45,6 +45,7 @@ const Message = ({
   contactsMap
 }: ISystemMessageProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -94,7 +95,7 @@ const Message = ({
       fontSize={fontSize}
       textColor={textColor || textPrimary}
       border={border}
-      backgroundColor={backgroundColor || colors.backgroundColor}
+      backgroundColor={backgroundColor || sectionBackground}
       borderRadius={borderRadius}
     >
       <span>
