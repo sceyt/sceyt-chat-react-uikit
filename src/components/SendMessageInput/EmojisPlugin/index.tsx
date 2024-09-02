@@ -72,6 +72,7 @@ function EmojisPopup({
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
@@ -164,7 +165,7 @@ function EmojisPopup({
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
-              iconColor={accentColor}
+              iconColor={activeCollection === emoji.key ? accentColor : textFootnote}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
             >
               <EmojiIcon collectionName={emoji.key} />
@@ -227,7 +228,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
-              iconColor={accentColor}
+              iconColor={activeCollection === emoji.key ? accentColor : textFootnote}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -305,7 +306,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? props.iconColor : colors.textColor3)};
+    color: ${(props) => props.iconColor};
   }
 `
 const CollectionPointer = styled.span``

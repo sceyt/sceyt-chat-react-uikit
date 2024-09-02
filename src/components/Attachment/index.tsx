@@ -93,6 +93,7 @@ const Attachment = ({
 }: AttachmentPops) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -536,7 +537,7 @@ const Attachment = ({
           ) : */ null}
           {isPreview && (
             <RemoveChosenFile
-              color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+              color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
               onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
           )}
@@ -693,7 +694,7 @@ const Attachment = ({
                 isPreview
               />
               <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
                 onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
             </AttachmentImgCont>
@@ -861,7 +862,7 @@ const Attachment = ({
           {
             isPreview && (
               <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : colors.textColor3}
+                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
                 onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
             ) /*: attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL &&
@@ -1073,7 +1074,7 @@ const RemoveChosenFile = styled(RemoveAttachment)`
   right: -11px;
   padding: 2px;
   cursor: pointer;
-  color: ${(props) => props.color || colors.textColor3};
+  color: ${(props) => props.color};
   z-index: 4;
 `
 /*

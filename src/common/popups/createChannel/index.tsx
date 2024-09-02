@@ -57,6 +57,7 @@ export default function CreateChannel({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -353,6 +354,7 @@ export default function CreateChannel({
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
                         theme={theme}
                         color={textPrimary}
+                        placeholderColor={textFootnote}
                       />
                     </React.Fragment>
                   )}
@@ -367,6 +369,7 @@ export default function CreateChannel({
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
                         theme={theme}
                         color={textPrimary}
+                        placeholderColor={textFootnote}
                       />
                     </React.Fragment>
                   )}
@@ -386,6 +389,7 @@ export default function CreateChannel({
                           error={!!wrongUri}
                           theme={theme}
                           color={textPrimary}
+                          placeholderColor={textFootnote}
                         />
                         {!!wrongUri && (
                           <InputErrorMessage>

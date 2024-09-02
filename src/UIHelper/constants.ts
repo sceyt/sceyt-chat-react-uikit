@@ -4,7 +4,8 @@ export const THEME_COLOR_NAMES = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
   TEXT_PRIMARY: 'textPrimary',
-  TEXT_SECONDARY: 'textSecondary'
+  TEXT_SECONDARY: 'textSecondary',
+  TEXT_FOOTNOTE: 'textFootnote'
 }
 export const defaultTheme: SceytChatUIKitTheme = {
   colors: {
@@ -23,6 +24,14 @@ export const defaultTheme: SceytChatUIKitTheme = {
     [THEME_COLOR_NAMES.TEXT_SECONDARY]: {
       light: '#707388',
       dark: '#969A9F'
+    },
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: {
+      light: '#707388',
+      dark: '#969A9F'
+    },
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: {
+      light: '#A0A1B0',
+      dark: '#76787A'
     }
   }
 }

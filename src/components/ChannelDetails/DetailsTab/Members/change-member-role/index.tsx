@@ -35,6 +35,7 @@ interface IProps {
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
@@ -72,7 +73,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
           <RolesSelect>
             <RoleLabel color={textPrimary}>Roles</RoleLabel>
 
-            <CustomSelect backgroundColor={colors.backgroundColor} color={textPrimary}>
+            <CustomSelect backgroundColor={colors.backgroundColor} color={textPrimary} placeholderColor={textFootnote}>
               <DropDown
                 withIcon
                 theme={theme}
