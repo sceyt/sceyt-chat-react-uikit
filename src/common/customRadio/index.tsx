@@ -1,6 +1,5 @@
 import React from 'react'
 import styled from 'styled-components'
-import { colors } from '../../UIHelper/constants'
 
 interface IProps {
   onChange: (e: any) => void
@@ -63,7 +62,7 @@ const CustomLabel = styled.label<{
   height: ${(props) => props.size || '12px'};
   cursor: pointer;
   border: ${(props) =>
-    props.isChecked ? `6px solid ${props.checkedBorderColor}` : props.border || `1px solid ${colors.borderColor}`};
+    props.isChecked ? `6px solid ${props.checkedBorderColor}` : props.border || `1px solid ${props.borderColor}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
 `
 

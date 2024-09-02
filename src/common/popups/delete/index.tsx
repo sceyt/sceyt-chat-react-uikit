@@ -43,6 +43,7 @@ function ConfirmPopup({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const [checkActionPermission] = usePermissions(myRole ?? '')
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
@@ -115,7 +116,7 @@ function ConfirmPopup({
           </Button>
           <Button
             type='button'
-            backgroundColor={buttonBackground || colors.red1}
+            backgroundColor={buttonBackground || errorColor}
             color={buttonTextColor || colors.white}
             borderRadius='8px'
             onClick={handleDelete}

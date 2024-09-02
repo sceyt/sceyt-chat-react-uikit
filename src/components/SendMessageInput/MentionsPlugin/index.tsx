@@ -230,6 +230,7 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
   optionObj.selectedIndex = selectedIndex
@@ -276,7 +277,7 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList>
+      <MentionsList borderColor={borderColor}>
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -411,6 +412,7 @@ const MentionsList = styled.ul<{
   hidden?: boolean
   backgroundColor?: string
   withBorder?: boolean
+  borderColor: string
 }>`
   position: absolute;
   bottom: 100%;
@@ -421,7 +423,7 @@ const MentionsList = styled.ul<{
   z-index: 200;
   padding: 2px 0 0;
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};
+  border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;

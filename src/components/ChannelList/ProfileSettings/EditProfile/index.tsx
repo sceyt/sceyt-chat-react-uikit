@@ -16,6 +16,8 @@ interface IProps {
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const [firstName, setFirstName] = useState(user.firstName)
   const [lastName, setLastName] = useState(user.lastName)
@@ -51,6 +53,8 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
         <CustomInput
           type='text'
           color={textPrimary}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
           value={firstName}
           onChange={handleTypeFirstName}
           placeholder='Firstname'
@@ -60,6 +64,8 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
         <CustomInput
           type='text'
           color={textPrimary}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
           value={lastName}
           onChange={handleTypeLastName}
           placeholder='Lastname'

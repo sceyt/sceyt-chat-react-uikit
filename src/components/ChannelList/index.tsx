@@ -197,6 +197,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
@@ -405,6 +406,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       className={className}
       withCustomList={!!List}
       ref={channelListRef}
+      borderColor={borderColor}
       backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.darkModeSecondaryBackgroundColor : '')}
     >
       <ChannelListHeader
@@ -798,14 +800,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
 export default ChannelList
 
-const Container = styled.div<{ withCustomList?: boolean; ref?: any; backgroundColor?: string }>`
+const Container = styled.div<{ borderColor: string; withCustomList?: boolean; ref?: any; backgroundColor?: string }>`
   position: relative;
   display: flex;
   flex-direction: column;
   width: ${(props: { withCustomList?: boolean; ref?: any; backgroundColor?: string }) =>
     props.withCustomList ? '' : '400px'};
   min-width: ${(props) => (props.withCustomList ? '' : '400px')};
-  border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${colors.backgroundColor}`)};
+  border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${props.borderColor}`)};
   background-color: ${(props) => props.backgroundColor};
   ${(props) =>
     props.withCustomList

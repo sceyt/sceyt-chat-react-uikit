@@ -27,15 +27,16 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps} from '../ChatContainer'
+import { IChatClientProps } from '../ChatContainer'
 import { colors, defaultTheme, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
-import { SceytChatUIKitTheme,ThemeMode } from '../../components'
+import { SceytChatUIKitTheme, ThemeMode } from '../../components'
+import { moderateColor } from '../../UIHelper/moderateColor'
 const SceytChat = ({
   client,
-  theme, 
+  theme,
   themeMode,
   avatarColors,
   children,
@@ -58,10 +59,10 @@ const SceytChat = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
-  const getRolesFail = useSelector(getRolesFailSelector, shallowEqual) 
+  const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
-  
+
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -171,15 +172,18 @@ const SceytChat = ({
           ...theme.colors[key]
         }
       }
+      if (key === THEME_COLOR_NAMES.ERROR) {
+        colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
+      }
     }
-    const updatedTheme = { ...defaultTheme};
+    const updatedTheme = { ...defaultTheme }
     updatedTheme.colors = updatedColors
     dispatch(setTheme(updatedTheme))
   }
 
   const handleChangedThemeMode = (themeMode: ThemeMode) => {
     if (themeMode) {
-      dispatch(setThemeAC(themeMode)) 
+      dispatch(setThemeAC(themeMode))
     }
   }
 
@@ -256,7 +260,7 @@ const SceytChat = ({
     if (theme) {
       handleChangedTheme(theme)
       dispatch(setTheme(theme))
-    }else{
+    } else {
       dispatch(setTheme(defaultTheme))
     }
   }, [theme])

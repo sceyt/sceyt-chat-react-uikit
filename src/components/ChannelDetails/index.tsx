@@ -153,6 +153,7 @@ const Details = ({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -238,9 +239,9 @@ const Details = ({
       mounted={mounted}
       size={size}
       theme={theme}
-      borderColor={bordersColor || colors.backgroundColor}
+      borderColor={bordersColor || borderThemeColor}
     >
-      <ChannelDetailsHeader borderColor={bordersColor || colors.backgroundColor}>
+      <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
@@ -277,7 +278,7 @@ const Details = ({
         height={channelDetailsHeight}
         ref={detailsRef}
       >
-        <DetailsHeader borderColor={bordersColor || colors.backgroundColor}>
+        <DetailsHeader borderColor={bordersColor || borderThemeColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
               image={
@@ -476,7 +477,7 @@ const Container = styled.div<{
 }>`
   flex: 0 0 auto;
   width: 0;
-  border-left: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-left: 1px solid ${(props) => props.borderColor};
   //transition: all 0.1s;
   ${(props) =>
     props.mounted && ` width: ${props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px'};`}
@@ -491,7 +492,7 @@ const ChannelDetailsHeader = styled.div<{ borderColor?: string }>`
   position: relative;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: 1px solid ${(props) => props.borderColor};
 
   & svg {
     cursor: pointer;

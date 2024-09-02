@@ -93,7 +93,8 @@ const Attachment = ({
 }: AttachmentPops) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -536,10 +537,7 @@ const Attachment = ({
             </React.Fragment>
           ) : */ null}
           {isPreview && (
-            <RemoveChosenFile
-              color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-              onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-            />
+            <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
           )}
         </AttachmentImgCont>
       ) : attachment.type === 'video' ? (
@@ -693,10 +691,7 @@ const Attachment = ({
                 }
                 isPreview
               />
-              <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-              />
+              <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
             </AttachmentImgCont>
           )}
         </React.Fragment>
@@ -848,7 +843,7 @@ const Attachment = ({
                   fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
-              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary}>
+              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary} errorColor={errorColor}>
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
@@ -861,10 +856,7 @@ const Attachment = ({
           )}
           {
             isPreview && (
-              <RemoveChosenFile
-                color={theme === THEME.DARK ? colors.backgroundColor : textFootnote}
-                onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
-              />
+              <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
             ) /*: attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL &&
             attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING ? (
             <DownloadFile download={attachment.name} onClick={() => downloadFile(attachment)}>
@@ -1097,11 +1089,11 @@ const AttachmentName = styled.h3<{ color: string }>`
   white-space: nowrap;
   margin: 0;
 `
-const AttachmentSize = styled.span<{ color: string }>`
+const AttachmentSize = styled.span<{ color: string; errorColor: string }>`
   font-size: 13px;
   color: ${(props) => props.color};
   & > span {
-    color: ${colors.red1};
+    color: ${(props) => props.errorColor};
     margin-left: 8px;
   }
 `

@@ -58,6 +58,7 @@ export default function CreateChannel({
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -322,7 +323,7 @@ export default function CreateChannel({
                       {newAvatar.url ? (
                         <AvatarWrapper>
                           <Avatar image={newAvatar.url} size={90} name={subjectValue} />
-                          <RemoveSelectedAvatar onClick={() => setNewAvatar({ src: {}, url: '' })}>
+                          <RemoveSelectedAvatar color={errorColor} onClick={() => setNewAvatar({ src: {}, url: '' })}>
                             Remove
                           </RemoveSelectedAvatar>
                         </AvatarWrapper>
@@ -354,6 +355,7 @@ export default function CreateChannel({
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
                         theme={theme}
                         color={textPrimary}
+                        errorColor={errorColor}
                         placeholderColor={textFootnote}
                       />
                     </React.Fragment>
@@ -369,6 +371,7 @@ export default function CreateChannel({
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
                         theme={theme}
                         color={textPrimary}
+                        errorColor={errorColor}
                         placeholderColor={textFootnote}
                       />
                     </React.Fragment>
@@ -389,10 +392,11 @@ export default function CreateChannel({
                           error={!!wrongUri}
                           theme={theme}
                           color={textPrimary}
+                          errorColor={errorColor}
                           placeholderColor={textFootnote}
                         />
                         {!!wrongUri && (
-                          <InputErrorMessage>
+                          <InputErrorMessage color={errorColor}>
                             {wrongUri === 'short'
                               ? 'The name should be 5-50 characters long'
                               : 'The name is invalid. Please provide na name from the allowed range of characters'}
@@ -502,14 +506,14 @@ const UploadChannelAvatar = styled.div`
 const FileUploaderInput = styled.input`
   display: none;
 `
-const RemoveSelectedAvatar = styled.span`
+const RemoveSelectedAvatar = styled.span<{ color: string }>`
   display: inline-block;
   margin-left: 16px;
   cursor: pointer;
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${colors.red1};
+  color: ${(props) => props.color};
 `
 const ChannelUriDescription = styled.p<{ color: string }>`
   margin-bottom: 8px;

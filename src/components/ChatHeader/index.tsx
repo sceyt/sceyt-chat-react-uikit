@@ -11,7 +11,7 @@ import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Assets
-import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
+import { ReactComponent as InfoIconD } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
@@ -76,6 +76,8 @@ export default function ChatHeader({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -132,19 +134,19 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={colors.backgroundColor}>
+    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={borderColor}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
           <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={colors.primaryLight}>
-            <ArrowLeftIcon />
+            <WrapArrowLeftIcon color={iconPrimary} />
           </MobileBackButtonWrapper>
         )}
       </MobileButtonWrapper>
 
       {activeChannel.isLinkedChannel && (
         <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight} order={backButtonOrder}>
-          <ArrowLeftIcon />
+          <WrapArrowLeftIcon color={iconPrimary} />
         </BackButtonWrapper>
       )}
       <ChannelInfo
@@ -224,21 +226,21 @@ export default function ChatHeader({
       {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
         <ChanelInfo onClick={() => channelDetailsOnOpen()} infoIconColor={accentColor} order={infoIconOrder}>
-          {infoIcon || <InfoIcon />}
+          {infoIcon || <DefaultInfoIcon color={iconPrimary} />}
         </ChanelInfo>
       )}
     </Container>
   )
 }
 
-const Container = styled.div<{ background?: string; borderColor?: string; borderBottom?: string }>`
+const Container = styled.div<{ background?: string; borderColor: string; borderBottom?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor || colors.backgroundColor}`};
+  border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor}`};
   background-color: ${(props) => props.background};
 `
 
@@ -315,3 +317,6 @@ const MobileBackButtonWrapper = styled.span<{ hoverBackground?: string; order?: 
     background-color: ${(props) => props.hoverBackground || colors.primaryLight};
   }
 `
+
+const DefaultInfoIcon = styled(InfoIconD)``
+const WrapArrowLeftIcon = styled(ArrowLeftIcon)``

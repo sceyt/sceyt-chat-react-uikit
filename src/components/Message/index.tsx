@@ -1117,7 +1117,7 @@ const Message = ({
                   <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px'>
                     {!!message.parentMessage.attachments.length &&
                       message.parentMessage.attachments[0].type === attachmentTypes.voice && (
-                        <VoiceIconWrapper color={colors.primary} />
+                        <VoiceIconWrapper color={accentColor} />
                       )}
                     {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
                       <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
@@ -1413,7 +1413,7 @@ const Message = ({
         )}
         {/* ) : null} */}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
-          <ThreadMessageCountContainer onClick={() => handleReplyMessage(true)}>
+          <ThreadMessageCountContainer color={accentColor} onClick={() => handleReplyMessage(true)}>
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
@@ -1591,7 +1591,6 @@ const MessageReaction = styled.span<{
   margin: ${(props) => props.margin || '0 8px 0 0'};
   margin-right: ${(props) => props.isLastReaction && '0'};
   border: ${(props) => props.border};
-  border-color: ${(props) => props.self && colors.primary};
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: ${(props) => props.borderRadius || '16px'};
@@ -1606,9 +1605,9 @@ const MessageReaction = styled.span<{
   }
 `
 
-const ThreadMessageCountContainer = styled.div`
+const ThreadMessageCountContainer = styled.div<{ color: string }>`
   position: relative;
-  color: ${colors.primary};
+  color: ${(props) => props.color};
   font-weight: 500;
   font-size: 13px;
   line-height: 15px;
@@ -1656,7 +1655,7 @@ const SelectMessageWrapper = styled.div<{ activeColor?: string; disabled?: any }
   bottom: calc(50% - 22px);
   cursor: ${(props) => !props.disabled && 'pointer'};
   & > svg {
-    color: ${(props) => props.activeColor || colors.primary};
+    color: ${(props) => props.activeColor};
     width: 24px;
     height: 24px;
   }
@@ -1812,7 +1811,7 @@ const ForwardedTitle = styled.h3<{
   font-weight: 500;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
   //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
   padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
@@ -1833,7 +1832,7 @@ const ForwardedTitle = styled.h3<{
     margin-right: 4px;
     width: 16px;
     height: 16px;
-    color: ${(props) => props.color || colors.primary};
+    color: ${(props) => props.color};
   }
 `
 /*
@@ -2026,7 +2025,7 @@ const MessageContent = styled.div<{
 
 const VoiceIconWrapper = styled(VoiceIcon)`
   transform: translate(0px, 3.5px);
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
 `
 
 const MessageItem = styled.div<{

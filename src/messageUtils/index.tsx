@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { colors, THEME_COLOR_NAMES } from '../UIHelper/constants'
+import { THEME_COLOR_NAMES } from '../UIHelper/constants'
 import { MESSAGE_DELIVERY_STATUS } from '../helpers/constants'
 
 import { ReactComponent as ReadIcon } from '../assets/svg/ticks_read.svg'
@@ -55,13 +55,13 @@ const MessageStatusIcon = ({
   readIconColor?: string
   accentColor?: string
 }) => {
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const color = iconColor || textSecondary
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
+  const color = iconColor || iconPrimary
 
   switch (messageStatus) {
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
-        <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor || colors.primary} />
+        <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor} />
       ) : (
         <StatusText fontSize={size} color={color}>
           • Seen
