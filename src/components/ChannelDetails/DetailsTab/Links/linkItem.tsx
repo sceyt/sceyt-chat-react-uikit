@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../../assets/svg/linkIcon.svg'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   link: string
@@ -20,6 +21,8 @@ const LinkItem = ({
   linkPreviewColor,
   linkPreviewHoverBackgroundColor
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   // const [title, setTitle] = useState('')
   // const [imageSrc, setImageSrc] = useState('')
   // const [loading, setLoading] = useState(true)
@@ -46,14 +49,14 @@ const LinkItem = ({
           <LinkMetaImage src={imageSrc} />
         ) : ( */}
         <React.Fragment>
-          <LinkIconCont color={colors.primaryLight}>{linkPreviewIcon || <LinkIcon />}</LinkIconCont>
-          <LinkHoverIconCont color={colors.primaryLight}>{linkPreviewHoverIcon || <LinkIcon />}</LinkHoverIconCont>
+          <LinkIconCont color={accentColor}>{linkPreviewIcon || <LinkIcon />}</LinkIconCont>
+          <LinkHoverIconCont color={accentColor}>{linkPreviewHoverIcon || <LinkIcon />}</LinkHoverIconCont>
         </React.Fragment>
         {/* )} */}
         <LinkInfoCont>
           {/* <AttachmentPreviewTitle color={linkPreviewTitleColor}>{title}</AttachmentPreviewTitle> */}
           {/* <AttachmentPreviewTitle color={linkPreviewTitleColor}>Link</AttachmentPreviewTitle> */}
-          <LinkUrl color={linkPreviewColor}>{link}</LinkUrl>
+          <LinkUrl color={linkPreviewColor || textPrimary}>{link}</LinkUrl>
         </LinkInfoCont>
       </a>
     </FileItem>
@@ -64,11 +67,15 @@ export default LinkItem
 
 const LinkIconCont = styled.span<{ color?: string }>`
   display: inline-flex;
-  color: ${(props) => props.color};
+  > svg {
+    color: ${(props) => props.color};
+  }
 `
 const LinkHoverIconCont = styled.span<{ color?: string }>`
   display: none;
-  color: ${(props) => props.color};
+  > svg {
+    color: ${(props) => props.color};
+  }
 `
 const LinkInfoCont = styled.div`
   margin-left: 12px;
@@ -92,7 +99,7 @@ const FileItem = styled.li<any>`
   }
 `
 
-const LinkUrl = styled.span<{ color?: string }>`
+const LinkUrl = styled.span<{ color: string }>`
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -103,7 +110,7 @@ const LinkUrl = styled.span<{ color?: string }>`
   font-size: 13px;
   line-height: 16px;
   text-decoration: underline;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 /*

@@ -1,9 +1,9 @@
 import React, { useState, useCallback } from 'react'
 import styled from 'styled-components'
 import Cropper from 'react-easy-crop'
-import { useStateComplex } from '../../hooks'
+import { useStateComplex, useColor } from '../../hooks'
 import getCroppedImg from './crop-image'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { Popup, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
 import PopupContainer from '../popups/popupContainer'
 
@@ -15,6 +15,9 @@ interface IProps {
 }
 const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
 
   const [state, setState] = useStateComplex({
     image: image.url,
@@ -47,11 +50,11 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   }, [area])
   return (
     <PopupContainer>
-      <Popup theme={theme} backgroundColor={colors.backgroundColor} minWidth='500px' maxWidth='600px' padding='0'>
+      <Popup theme={theme} backgroundColor={sectionBackground} minWidth='500px' maxWidth='600px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} />
           <Row align='center'>
-            <PopupName>Crop image</PopupName>
+            <PopupName color={textPrimary}>Crop image</PopupName>
           </Row>
           <div className='crop-container'>
             <CropperWrapper>
@@ -67,7 +70,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
                 showGrid={false}
               />
             </CropperWrapper>
-            <Controls className='controls'>
+            <Controls className='controls' background={accentColor}>
               <input
                 type='range'
                 value={state.zoom}
@@ -83,16 +86,17 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
             </Controls>
           </div>
         </PopupBody>
-        <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button
-            type='button'
-            color={colors.textColor1}
-            backgroundColor='transparent'
-            onClick={() => handleClosePopup()}
-          >
+        <PopupFooter backgroundColor={sectionBackground}>
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
-          <Button type='button' backgroundColor={colors.primary} borderRadius='8px' onClick={returnCroppedImage}>
+          <Button
+            type='button'
+            backgroundColor={accentColor}
+            color={colors.white}
+            borderRadius='8px'
+            onClick={returnCroppedImage}
+          >
             Save
           </Button>
         </PopupFooter>
@@ -109,7 +113,7 @@ const CropperWrapper = styled.div`
   height: 300px;
   margin: 14px 0;
 `
-const Controls = styled.div`
+const Controls = styled.div<{ background: string }>`
   & > input {
     width: 100%;
     -webkit-appearance: none;
@@ -128,7 +132,7 @@ const Controls = styled.div`
       -webkit-appearance: none;
       height: 16px;
       cursor: ew-resize;
-      background: ${colors.primary};
+      background: ${(props) => props.background};
       border-radius: 50%;
       transform: translate(0, -5px);
     }

@@ -22,16 +22,17 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { colors } from '../../UIHelper/constants'
+import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
-import { CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
 import Actions from './Actions'
 import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
+import { useColor } from '../../hooks'
 
 const Details = ({
   detailsTitleText,
@@ -149,6 +150,11 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -170,7 +176,7 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
-  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
@@ -179,7 +185,7 @@ const Details = ({
       ? activeChannel.memberCount > 1
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
-      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+      : activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? activeChannel.memberCount > 1
           ? 'subscribers'
           : 'subscriber'
@@ -233,22 +239,22 @@ const Details = ({
       mounted={mounted}
       size={size}
       theme={theme}
-      borderColor={bordersColor || colors.backgroundColor}
+      borderColor={bordersColor || borderThemeColor}
     >
-      <ChannelDetailsHeader borderColor={bordersColor || colors.backgroundColor}>
+      <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
         {editMode ? (
           <React.Fragment>
             <ArrowLeft onClick={() => setEditMode(false)} />
-            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimary}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
           </React.Fragment>
         ) : (
           <React.Fragment>
-            <SectionHeader fontSize={detailsTitleFontSize} color={colors.textColor1}>
+            <SectionHeader fontSize={detailsTitleFontSize} color={textPrimary}>
               {detailsTitleText || 'Details'}
             </SectionHeader>{' '}
-            <CloseIcon color={colors.textColor1} onClick={handleDetailsClose} />
+            <CloseIcon color={accentColor} onClick={handleDetailsClose} />
           </React.Fragment>
         )}
       </ChannelDetailsHeader>
@@ -272,7 +278,7 @@ const Details = ({
         height={channelDetailsHeight}
         ref={detailsRef}
       >
-        <DetailsHeader borderColor={bordersColor || colors.backgroundColor}>
+        <DetailsHeader borderColor={bordersColor || borderThemeColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
               image={
@@ -295,6 +301,7 @@ const Details = ({
                 uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
                 fontSize={channelNameFontSize}
                 lineHeight={channelNameLineHeight}
+                color={textPrimary}
               >
                 {(activeChannel && activeChannel.subject) ||
                   (isDirectChannel && directChannelUser
@@ -304,7 +311,7 @@ const Details = ({
                       : '')}
               </ChannelName>
               {isDirectChannel ? (
-                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
+                <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                     ? ''
                     : directChannelUser &&
@@ -315,7 +322,7 @@ const Details = ({
                           userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
                 </SubTitle>
               ) : (
-                <SubTitle fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
+                <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {activeChannel && activeChannel.memberCount} {displayMemberText}
                 </SubTitle>
               )}
@@ -333,8 +340,8 @@ const Details = ({
 
           {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
             <AboutChannel>
-              {showAboutChannelTitle && <AboutChannelTitle>About</AboutChannelTitle>}
-              <AboutChannelText color={colors.textColor1}>
+              {showAboutChannelTitle && <AboutChannelTitle color={textFootnote}>About</AboutChannelTitle>}
+              <AboutChannelText color={textPrimary}>
                 {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
               </AboutChannelText>
             </AboutChannel>
@@ -470,7 +477,7 @@ const Container = styled.div<{
 }>`
   flex: 0 0 auto;
   width: 0;
-  border-left: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-left: 1px solid ${(props) => props.borderColor};
   //transition: all 0.1s;
   ${(props) =>
     props.mounted && ` width: ${props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px'};`}
@@ -485,7 +492,7 @@ const ChannelDetailsHeader = styled.div<{ borderColor?: string }>`
   position: relative;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: 1px solid ${(props) => props.borderColor};
 
   & svg {
     cursor: pointer;
@@ -502,11 +509,11 @@ const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: '
 const AboutChannel = styled.div`
   margin-top: 20px;
 `
-const AboutChannelTitle = styled.h4`
+const AboutChannelTitle = styled.h4<{ color: string }>`
   font-size: 12px;
   margin: 0;
   line-height: 16px;
-  color: ${colors.textColor3};
+  color: ${(props) => props.color};
 `
 
 const AboutChannelText = styled.h3<{ color: string }>`
@@ -536,8 +543,8 @@ const ChannelInfo = styled.div<{ direction?: 'column' | 'row' }>`
   text-align: ${(props) => props.direction && props.direction === 'column' && 'center'};
 `
 
-const DetailsHeader = styled.div<{ borderColor?: string }>`
-  border-bottom: 6px solid ${(props) => props.borderColor || colors.backgroundColor};
+const DetailsHeader = styled.div<{ borderColor: string }>`
+  border-bottom: 6px solid ${(props) => props.borderColor};
   align-items: center;
   box-sizing: border-box;
   padding: 20px 16px;
@@ -555,6 +562,7 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   white-space: nowrap;
   max-width: ${(props) => (props.isDirect ? '200px' : '168px')};
   text-overflow: ellipsis;
+  text-color: ${(props) => props.color};
   overflow: hidden;
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `

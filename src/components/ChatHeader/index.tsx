@@ -11,7 +11,7 @@ import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 // Assets
-import { ReactComponent as InfoIcon } from '../../assets/svg/info.svg'
+import { ReactComponent as InfoIconD } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
@@ -20,14 +20,14 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getClient } from '../../common/client'
 import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../../helpers/channelHalper'
-import { CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
-
+import { useColor } from '../../hooks'
 interface IProps {
   backgroundColor?: string
   avatarBorderRadius?: string
@@ -73,6 +73,11 @@ export default function ChatHeader({
   infoIconOrder,
   customActionsOrder
 }: IProps) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -83,7 +88,7 @@ export default function ChatHeader({
   const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const isDirectChannel = activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -93,7 +98,7 @@ export default function ChatHeader({
       ? activeChannel.memberCount > 1
         ? `${memberDisplayText[activeChannel.type]}s`
         : memberDisplayText[activeChannel.type]
-      : activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+      : activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? activeChannel.memberCount > 1
           ? 'subscribers'
           : 'subscriber'
@@ -129,19 +134,19 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={colors.backgroundColor}>
+    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={borderColor}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
           <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={colors.primaryLight}>
-            <ArrowLeftIcon />
+            <WrapArrowLeftIcon color={iconPrimary} />
           </MobileBackButtonWrapper>
         )}
       </MobileButtonWrapper>
 
       {activeChannel.isLinkedChannel && (
         <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight} order={backButtonOrder}>
-          <ArrowLeftIcon />
+          <WrapArrowLeftIcon color={iconPrimary} />
         </BackButtonWrapper>
       )}
       <ChannelInfo
@@ -178,7 +183,7 @@ export default function ChatHeader({
         </AvatarWrapper>
         <ChannelName>
           <SectionHeader
-            color={titleColor || colors.textColor1}
+            color={titleColor || textPrimary}
             theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
@@ -194,7 +199,11 @@ export default function ChatHeader({
           {showMemberInfo &&
             !isSelfChannel &&
             (isDirectChannel && directChannelUser ? (
-              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
+              <SubTitle
+                fontSize={memberInfoFontSize}
+                lineHeight={memberInfoLineHeight}
+                color={memberInfoTextColor || textSecondary}
+              >
                 {hideUserPresence && hideUserPresence(directChannelUser)
                   ? ''
                   : directChannelUser.presence &&
@@ -204,7 +213,11 @@ export default function ChatHeader({
                         userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
               </SubTitle>
             ) : (
-              <SubTitle fontSize={memberInfoFontSize} lineHeight={memberInfoLineHeight} color={memberInfoTextColor}>
+              <SubTitle
+                fontSize={memberInfoFontSize}
+                lineHeight={memberInfoLineHeight}
+                color={memberInfoTextColor || textSecondary}
+              >
                 {!activeChannel.subject && !isDirectChannel ? '' : `${activeChannel.memberCount} ${displayMemberText} `}
               </SubTitle>
             ))}
@@ -212,26 +225,22 @@ export default function ChatHeader({
       </ChannelInfo>
       {CustomActions && <CustomActionsWrapper order={customActionsOrder}>{CustomActions}</CustomActionsWrapper>}
       {!channelListHidden && showChannelDetails && (
-        <ChanelInfo
-          onClick={() => channelDetailsOnOpen()}
-          infoIconColor={channelDetailsIsOpen ? colors.primary : colors.borderColor2}
-          order={infoIconOrder}
-        >
-          {infoIcon || <InfoIcon />}
+        <ChanelInfo onClick={() => channelDetailsOnOpen()} infoIconColor={accentColor} order={infoIconOrder}>
+          {infoIcon || <DefaultInfoIcon color={iconPrimary} />}
         </ChanelInfo>
       )}
     </Container>
   )
 }
 
-const Container = styled.div<{ background?: string; borderColor?: string; borderBottom?: string }>`
+const Container = styled.div<{ background?: string; borderColor: string; borderBottom?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 16px;
   height: 64px;
   box-sizing: border-box;
-  border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor || colors.backgroundColor}`};
+  border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor}`};
   background-color: ${(props) => props.background};
 `
 
@@ -308,3 +317,6 @@ const MobileBackButtonWrapper = styled.span<{ hoverBackground?: string; order?: 
     background-color: ${(props) => props.hoverBackground || colors.primaryLight};
   }
 `
+
+const DefaultInfoIcon = styled(InfoIconD)``
+const WrapArrowLeftIcon = styled(ArrowLeftIcon)``

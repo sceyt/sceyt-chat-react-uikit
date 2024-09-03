@@ -9,9 +9,10 @@ import { themeSelector } from '../../store/theme/selector'
 // Assets
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
+import { useColor } from '../../hooks'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
@@ -47,6 +48,8 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountFontSize,
   unreadCountTextColor
 }) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
   const theme = useSelector(themeSelector)
@@ -64,7 +67,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
           height={buttonHeight}
           border={buttonBorder}
           borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor || colors.backgroundColor}
+          backgroundColor={buttonBackgroundColor || sectionBackground}
           hoverBackgroundColor={buttonHoverBackgroundColor}
           shadow={buttonShadow}
           onClick={handleScrollToBottom}
@@ -78,7 +81,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
               height={unreadCountHeight}
               textColor={unreadCountTextColor}
               fontSize={unreadCountFontSize}
-              backgroundColor={colors.primary}
+              backgroundColor={accentColor}
               isMuted={channel.muted}
             >
               {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
@@ -99,7 +102,7 @@ const BottomButton = styled.div<{
   height?: string
   border?: string
   borderRadius?: string
-  backgroundColor?: string
+  backgroundColor: string
   hoverBackgroundColor?: string
   shadow?: string
   bottomOffset: number
@@ -113,7 +116,7 @@ const BottomButton = styled.div<{
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border: 0.5px solid rgba(0, 0, 0, 0.1);
   border-radius: 50px;
   width: 48px;

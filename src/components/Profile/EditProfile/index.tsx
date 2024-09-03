@@ -12,19 +12,25 @@ import {
 } from '../../../UIHelper'
 import { ReactComponent as UploadImageIcon } from '../../../../assets/svg/uploadImage.svg'
 import { ReactComponent as DeleteUpload } from '../../../assets/svg/deleteUpload.svg'
-import { useStateComplex } from '../../../hooks'
+import { useColor, useStateComplex } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../Avatar'
 import PopupContainer from '../../../common/popups/popupContainer'
+import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 // import { updateUser } from '../../../../store/user/actions';
 // import { setErrorNotification } from '../../../../store/channel/actions';
 
 export default function EditProfile({ toggleEditPopup, user }: any) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   // const dispatch = useDispatch()
 
   const fileUploader: any = useRef(null)
-  const [firstNameValue, setFirstNameValue] = useState(user.firstName)
-  const [lastNameValue, setLastNameValue] = useState(user.lastName)
+  const [firstNameValue, setFirstNameValue] = useState<string>(user.firstName)
+  const [lastNameValue, setLastNameValue] = useState<string>(user.lastName)
   const [cropPopup, setCropPopup] = useState(false)
   const [newAvatar, setNewAvatar] = useStateComplex({
     src: {},
@@ -94,24 +100,48 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
       <Popup maxHeight='482px' width='433px' maxWidth='433px' height='calc(100vh - 50px)' padding='22px 24px 8px'>
         <CloseIcon onClick={toggleEditPopup} />
 
-        <PopupName>Edit Profile</PopupName>
+        <PopupName color={textPrimary}>Edit Profile</PopupName>
 
         <EditProfileContainer>
-          <Label>Username </Label>
-          <CustomInput type='text' value={user.id} disabled />
+          <Label color={textPrimary}>Username </Label>
+          <CustomInput
+            errorColor={errorColor}
+            placeholderColor={textFootnote}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
+            type='text'
+            color={textPrimary}
+            value={user.id}
+            disabled
+          />
 
-          <Label>First name </Label>
+          <Label color={textPrimary}>First name </Label>
           <CustomInput
             type='text'
+            color={textPrimary}
+            errorColor={errorColor}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
+            placeholderColor={textFootnote}
             value={firstNameValue}
             onChange={handleTypeFirstName}
             placeholder='Enter Firstname'
           />
 
-          <Label>Last name </Label>
-          <CustomInput type='text' value={lastNameValue} onChange={handleTypeLastName} placeholder='Enter Lastname' />
+          <Label color={textPrimary}>Last name </Label>
+          <CustomInput
+            type='text'
+            color={textPrimary}
+            errorColor={errorColor}
+            placeholderColor={textFootnote}
+            borderColor={borderColor}
+            backgroundColor={sectionBackground}
+            value={lastNameValue}
+            onChange={handleTypeLastName}
+            placeholder='Enter Lastname'
+          />
 
-          <Label>Avatar</Label>
+          <Label color={textPrimary}>Avatar</Label>
           <UploadChannelAvatar>
             {newAvatar.url ? (
               <AvatarBadge>
@@ -122,7 +152,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
               <UploadImageIcon />
             )}
 
-            <UploadAvatarHandler>
+            <UploadAvatarHandler color={textPrimary}>
               Format: JPEG, PNG ( max size 1MB )
               <UploadAvatarButton onClick={handleOpenFileUploader}>Upload Photo</UploadAvatarButton>
               <FileUploaderInput ref={fileUploader} type='file' accept='image/*' onChange={handleFileUpload} />

@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -12,7 +12,8 @@ import { ReactComponent as AddChannelIcon } from '../../../assets/svg/addChat.sv
 import UsersPopup from '../../../common/popups/users'
 import CreateChannel from '../../../common/popups/createChannel'
 import DropDown from '../../../common/dropdown'
-import { CHANNEL_TYPE } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE } from '../../../helpers/constants'
+import { useColor } from '../../../hooks'
 
 interface IChannelListProps {
   showSearch?: boolean
@@ -35,11 +36,11 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   newChatIcon,
   uploadPhotoIcon
 }) => {
-  // const dispatch = useDispatch()
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
-
   const handleOpenCreateChannel = (channelType: string) => {
     setCreatingChannelType(channelType)
     if (channelType === 'direct') {
@@ -58,7 +59,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch}>
+          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -66,7 +67,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         <DropdownOptionsUl>
           <DropdownOptionLi
             key={1}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
@@ -76,7 +77,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           </DropdownOptionLi>
           <DropdownOptionLi
             key={2}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
@@ -86,7 +87,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           </DropdownOptionLi>
           <DropdownOptionLi
             key={3}
-            textColor={colors.textColor1}
+            textColor={textPrimary}
             hoverBackground={colors.hoverBackgroundColor}
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
@@ -111,7 +112,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           channelType={creatingChannelType}
           uriPrefixOnCreateChannel={uriPrefixOnCreateChannel}
           uploadPhotoIcon={uploadPhotoIcon}
-          showUri={creatingChannelType !== CHANNEL_TYPE.GROUP}
+          showUri={creatingChannelType !== DEFAULT_CHANNEL_TYPE.GROUP}
         />
       )}
     </React.Fragment>

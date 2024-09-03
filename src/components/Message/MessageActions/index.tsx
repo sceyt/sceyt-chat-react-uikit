@@ -17,11 +17,12 @@ import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 // Helpers
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
-import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
 import { getClient } from '../../../common/client'
+import { useColor } from '../../../hooks'
 
 interface EditMessageContainerProps {
   isThreadMessage?: boolean
@@ -88,12 +89,17 @@ export default function MessageActions({
   messageActionIconsColor,
   handleOpenEmojis
 }: any) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const ChatClient = getClient()
   const { user } = ChatClient
   const [checkActionPermission] = usePermissions(myRole)
   const theme = useSelector(themeSelector)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const editMessagePermitted = isIncoming
     ? checkActionPermission('editAnyMessage')
@@ -129,7 +135,7 @@ export default function MessageActions({
   return (
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
       <EditMessageContainer
-        backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+        backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
         className='message_actions_cont '
       >
         {showMessageReaction &&
@@ -137,12 +143,14 @@ export default function MessageActions({
           checkActionPermission('addMessageReaction') && (
             <Action
               order={reactionIconOrder || 0}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-              hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+              hoverBackgroundColor={sectionBackground}
+              hoverIconColor={accentColor}
               onClick={handleOpenReaction}
             >
-              <ItemNote direction='top'>{reactionIconTooltipText || 'React'}</ItemNote>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+                {reactionIconTooltipText || 'React'}
+              </ItemNote>
               {reactionIcon || <ReactionIcon />}
             </Action>
           )}
@@ -155,23 +163,28 @@ export default function MessageActions({
             : true) && (
             <Action
               order={editIconOrder || 1}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-              hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+              hoverBackgroundColor={sectionBackground}
+              hoverIconColor={accentColor}
               onClick={() => editModeToggle()}
             >
-              <ItemNote direction='top'>{editIconTooltipText || 'Edit Message'}</ItemNote>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+                {editIconTooltipText || 'Edit Message'}
+              </ItemNote>
               {editIcon || <EditIcon />}
             </Action>
           )}
         {messageStatus === MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             onClick={() => handleResendMessage()}
           >
-            <ItemNote direction='top'> Resend Message </ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {' '}
+              Resend Message{' '}
+            </ItemNote>
             <ResendIcon />
           </Action>
         )}
@@ -182,12 +195,14 @@ export default function MessageActions({
               (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
                 <Action
                   order={replyIconOrder || 2}
-                  iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-                  hoverBackgroundColor={colors.hoverBackgroundColor}
-                  hoverIconColor={colors.primary}
+                  iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+                  hoverBackgroundColor={sectionBackground}
+                  hoverIconColor={accentColor}
                   onClick={() => handleReplyMessage()}
                 >
-                  <ItemNote direction='top'>{replyIconTooltipText || 'Reply'}</ItemNote>
+                  <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+                    {replyIconTooltipText || 'Reply'}
+                  </ItemNote>
                   {replyIcon || <ReplyIcon />}
                 </Action>
               )}
@@ -195,12 +210,14 @@ export default function MessageActions({
             {showReplyMessageInThread && replyMessagePermitted && (
               <Action
                 order={replyInThreadIconOrder || 3}
-                iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-                hoverBackgroundColor={colors.hoverBackgroundColor}
-                hoverIconColor={colors.primary}
+                iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+                hoverBackgroundColor={sectionBackground}
+                hoverIconColor={accentColor}
                 onClick={() => handleReplyMessage(true)}
               >
-                <ItemNote direction='top'>{replyInThreadIconTooltipText || 'Reply in thread'}</ItemNote>
+                <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+                  {replyInThreadIconTooltipText || 'Reply in thread'}
+                </ItemNote>
                 {replyInThreadIcon || <ReplyThreadIcon />}
               </Action>
             )}
@@ -209,12 +226,14 @@ export default function MessageActions({
         {showCopyMessage && (
           <Action
             order={copyIconOrder || 4}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             onClick={() => handleCopyMessage()}
           >
-            <ItemNote direction='top'>{copyIconTooltipText || 'Copy'}</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {copyIconTooltipText || 'Copy'}
+            </ItemNote>
             {copyIcon || <CopyIcon />}
           </Action>
         )}
@@ -222,51 +241,59 @@ export default function MessageActions({
         {showForwardMessage && forwardMessagePermitted && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={forwardIconOrder || 5}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             onClick={() => handleOpenForwardMessage()}
           >
-            <ItemNote direction='top'>{forwardIconTooltipText || 'Forward Message'}</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {forwardIconTooltipText || 'Forward Message'}
+            </ItemNote>
             {forwardIcon || <ForwardIcon />}
           </Action>
         )}
         {showSelectMessage && (
           <Action
             order={selectIconOrder || 6}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             onClick={() => handleSelectMessage()}
           >
-            <ItemNote direction='top'>{selectIconTooltipText || 'Select'}</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {selectIconTooltipText || 'Select'}
+            </ItemNote>
             {selectIcon || <SelectIcon />}
           </Action>
         )}
         {showDeleteMessage &&
-          (channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? myRole === 'owner' || myRole === 'admin'
             : true) && (
             <Action
               order={deleteIconOrder || 7}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+              iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
               hoverBackgroundColor={colors.hoverBackgroundColor}
-              hoverIconColor={colors.primary}
+              hoverIconColor={accentColor}
               onClick={() => handleOpenDeleteMessage()}
             >
-              <ItemNote direction='top'>{deleteIconTooltipText || 'Delete Message'}</ItemNote>
+              <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+                {deleteIconTooltipText || 'Delete Message'}
+              </ItemNote>
               {deleteIcon || <DeleteIcon />}
             </Action>
           )}
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
             order={reportIconOrder || 8}
-            iconColor={messageActionIconsColor || (theme === THEME.DARK ? colors.textColor3 : colors.textColor2)}
+            iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
             hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            hoverIconColor={accentColor}
             onClick={() => handleReportMessage()}
           >
-            <ItemNote direction='top'>{reportIconTooltipText || 'Report'}</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {reportIconTooltipText || 'Report'}
+            </ItemNote>
             {reportIcon || <ReportIcon />}
           </Action>
         )}
@@ -302,11 +329,10 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
 `
 
 const Action = styled.div<{
-  color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
-  hoverIconColor?: string
-  hoverBackgroundColor?: string
+  hoverIconColor: string
+  hoverBackgroundColor: string
 }>`
   position: relative;
   display: flex;
@@ -315,7 +341,7 @@ const Action = styled.div<{
   cursor: pointer;
   transition: all 0.2s;
   order: ${(props) => props.order || 1};
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
 
   &:first-child {
@@ -327,8 +353,8 @@ const Action = styled.div<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverIconColor || colors.primary};
-    background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    color: ${(props) => props.hoverIconColor};
+    background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {
       display: block;

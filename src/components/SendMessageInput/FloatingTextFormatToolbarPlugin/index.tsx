@@ -21,9 +21,9 @@ import {
 import { createPortal } from 'react-dom'
 
 import styled from 'styled-components'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
-import { useEventListener } from '../../../hooks'
+import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
 type Func = () => void
 export function mergeRegister(...func: Array<Func>): () => void {
@@ -117,6 +117,10 @@ function TextFormatFloatingToolbar({
   setShowMenu: (showMenu: boolean) => void
   showMenu: boolean
 }): JSX.Element {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -231,19 +235,21 @@ function TextFormatFloatingToolbar({
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'bold')
             }}
             aria-label='Format text as bold'
-            iconColor={colors.textColor2}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={textSecondary}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote direction='top'>Bold</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              Bold
+            </ItemNote>
             <BoldIcon />
           </Action>
 
           <Action
-            iconColor={colors.textColor2}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={textSecondary}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
             onClick={() => {
@@ -251,13 +257,15 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote direction='top'>Italic</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              Italic
+            </ItemNote>
             <ItalicIcon />
           </Action>
           <Action
-            iconColor={colors.textColor2}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={textSecondary}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
             onClick={() => {
@@ -265,35 +273,42 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote direction='top'> Strikethrough </ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              {' '}
+              Strikethrough{' '}
+            </ItemNote>
             <StrikethroughIcon />
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={textSecondary}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'code')
             }}
             aria-label='Insert code block'
           >
-            <ItemNote direction='top'>Monospace</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              Monospace
+            </ItemNote>
             <MonoIcon />
           </Action>
           <Action
             type='button'
-            iconColor={colors.textColor2}
-            hoverBackgroundColor={colors.hoverBackgroundColor}
-            hoverIconColor={colors.primary}
+            iconColor={textSecondary}
+            hoverBackgroundColor={sectionBackground}
+            hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
               editor.dispatchCommand(FORMAT_TEXT_COMMAND, 'underline')
             }}
             aria-label='Insert code block'
           >
-            <ItemNote direction='top'>Underline</ItemNote>
+            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+              Underline
+            </ItemNote>
             <UnderlineIcon />
           </Action>
         </React.Fragment>
@@ -580,10 +595,10 @@ const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
 `
 const Action = styled.button<{
   color?: string
-  iconColor?: string
+  iconColor: string
   order?: number
   hoverIconColor?: string
-  hoverBackgroundColor?: string
+  hoverBackgroundColor: string
   isActive?: boolean
 }>`
   border: 0;
@@ -596,13 +611,13 @@ const Action = styled.button<{
   //margin: 8px 6px;
   cursor: pointer;
   transition: all 0.2s;
-  color: ${(props) => props.iconColor || colors.textColor2};
+  color: ${(props) => props.iconColor};
   border-radius: 50%;
   ${(props) =>
     props.isActive &&
     `
     color: ${props.hoverIconColor || colors.primary};
-    background-color: ${props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${props.hoverBackgroundColor};
   `}
 
   &:last-child {
@@ -611,7 +626,7 @@ const Action = styled.button<{
 
   &:hover {
     color: ${(props) => props.hoverIconColor || colors.primary};
-    background-color: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {
       display: block;

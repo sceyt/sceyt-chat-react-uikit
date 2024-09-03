@@ -5,7 +5,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import { updateChannelAC } from '../../../store/channel/actions'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 // Hooks
-import { useDidUpdate, useStateComplex } from '../../../hooks'
+import { useDidUpdate, useStateComplex, useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as CameraIcon } from '../../../assets/svg/cameraIcon.svg'
 import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
@@ -25,8 +25,8 @@ import {
   UploadFileLabel
 } from '../../../UIHelper'
 import { getClient } from '../../../common/client'
-import { CHANNEL_TYPE, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel, IMember } from '../../../types'
 // Components
 import DropDown from '../../../common/dropdown'
@@ -100,6 +100,12 @@ const EditChannel = ({
   editChannelCancelButtonBackgroundColor,
   editChannelCancelButtonTextColor
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -119,7 +125,7 @@ const EditChannel = ({
 
   const editContainer = useRef<any>(null)
   const fileUploader = useRef<any>(null)
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
 
   const onOpenFileUploader = () => {
@@ -242,6 +248,7 @@ const EditChannel = ({
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
+                    textColor={textPrimary}
                     hoverBackground={colors.primaryLight}
                     onClick={() => onOpenFileUploader()}
                     iconWidth='20px'
@@ -254,7 +261,7 @@ const EditChannel = ({
                     <DropdownOptionLi
                       key={2}
                       hoverBackground={colors.primaryLight}
-                      textColor={colors.red1}
+                      textColor={errorColor}
                       onClick={handleToggleDeleteAvatarPopup}
                       iconWidth='20px'
                     >
@@ -274,38 +281,48 @@ const EditChannel = ({
           />
         </AvatarCont>
 
-        <Label> Name </Label>
+        <Label color={textPrimary}> Name </Label>
         <CustomInput
           error={subjectIsWrong}
           theme={theme}
-          color={colors.textColor1}
+          color={textPrimary}
+          borderColor={borderColor}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
+          backgroundColor={sectionBackground}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e) => setNewSubject(e.target.value)}
         />
         {subjectIsWrong && (
-          <InputErrorMessage>Channel name must be a minimum of 1 and a maximum of 250 symbols.</InputErrorMessage>
+          <InputErrorMessage color={errorColor}>
+            Channel name must be a minimum of 1 and a maximum of 250 symbols.
+          </InputErrorMessage>
         )}
 
-        <Label> Description </Label>
+        <Label color={textPrimary}> Description </Label>
         <CustomInput
           error={descriptionIsWrong}
           theme={theme}
-          color={colors.textColor1}
+          color={textPrimary}
+          errorColor={errorColor}
+          borderColor={borderColor}
+          backgroundColor={sectionBackground}
+          placeholderColor={textFootnote}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e) => setNewDescription(e.target.value)}
         />
         {descriptionIsWrong && (
-          <InputErrorMessage>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
+          <InputErrorMessage color={errorColor}>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
         )}
 
         <EditChannelFooter>
           <Button
             type='button'
             borderRadius='8px'
-            color={editChannelCancelButtonTextColor || colors.textColor1}
-            backgroundColor={editChannelCancelButtonBackgroundColor || colors.backgroundColor}
+            color={editChannelCancelButtonTextColor || textPrimary}
+            backgroundColor={editChannelCancelButtonBackgroundColor || sectionBackground}
             onClick={() => handleToggleEditMode(false)}
           >
             Cancel
@@ -313,8 +330,8 @@ const EditChannel = ({
           <Button
             disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
-            color={editChannelSaveButtonTextColor}
-            backgroundColor={editChannelSaveButtonBackgroundColor || colors.primary}
+            color={editChannelSaveButtonTextColor || colors.white}
+            backgroundColor={editChannelSaveButtonBackgroundColor || accentColor}
             onClick={handleSave}
           >
             Save

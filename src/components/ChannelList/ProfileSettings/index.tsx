@@ -10,11 +10,12 @@ import { ReactComponent as NotificationsIcon } from '../../../assets/svg/notific
 import { ReactComponent as LockIcon } from '../../../assets/svg/lock.svg'
 import { ReactComponent as LogoutIcon } from '../../../assets/svg/leave.svg'
 // Helpers
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { DropdownOptionLi, DropdownOptionsUl, SectionHeader } from '../../../UIHelper'
 // Components
 import Avatar from '../../Avatar'
 import EditProfile from './EditProfile'
+import { useColor } from '../../../hooks'
 
 interface IChannelTabsProps {
   handleCloseProfile: () => void
@@ -27,6 +28,9 @@ const settingsPages = {
 }
 
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
   const user = useSelector(userSelector)
@@ -43,21 +47,23 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         >
           <ArrowLeft />
         </ArrowLeftWrapper>
-        <SectionHeader>{activeSettingPage === settingsPages.profile ? 'Edit profile' : 'Settings'}</SectionHeader>
+        <SectionHeader color={textPrimary}>
+          {activeSettingPage === settingsPages.profile ? 'Edit profile' : 'Settings'}
+        </SectionHeader>
       </SettingsHeader>
 
       <ProfileInfo>
         <Avatar name={user.firstName || user.id} size={144} image={user.avatarUrl} setDefaultAvatar />
-        <Username>{`${user.firstName} ${user.lastName}`}</Username>
-        <UserNumber>{`+${user.id}`}</UserNumber>
+        <Username color={textPrimary}>{`${user.firstName} ${user.lastName}`}</Username>
+        <UserNumber color={textSecondary}>{`+${user.id}`}</UserNumber>
       </ProfileInfo>
 
       <DropdownOptionsUl>
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          textColor={textPrimary}
+          iconColor={textSecondary}
           margin='0 0 24px'
           onClick={handleOpenEditProfile}
         >
@@ -66,8 +72,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          textColor={textPrimary}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <NotificationsIcon /> Notifications
@@ -75,8 +81,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.textColor1}
-          iconColor={colors.textColor2}
+          textColor={textPrimary}
+          iconColor={textSecondary}
           margin='0 0 24px'
         >
           <LockIcon /> About
@@ -84,8 +90,8 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
         <DropdownOptionLi
           hoverBackground='none'
           iconWidth='20px'
-          textColor={colors.red1}
-          iconColor={colors.red1}
+          textColor={errorColor}
+          iconColor={errorColor}
           margin='0 0 24px'
         >
           <LogoutIcon /> Log Out
@@ -130,20 +136,20 @@ const ProfileInfo = styled.div`
   margin: 20px 0 24px;
 `
 
-const Username = styled.h3`
+const Username = styled.h3<{ color: string }>`
   margin: 16px 0 0;
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
 `
 
-const UserNumber = styled.h4`
+const UserNumber = styled.h4<{ color: string }>`
   margin: 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

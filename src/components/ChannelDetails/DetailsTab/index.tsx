@@ -5,8 +5,8 @@ import { useDispatch } from 'react-redux'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
-import { CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
 import Members from './Members'
@@ -14,6 +14,7 @@ import Media from './Media'
 import Files from './Files'
 import Links from './Links'
 import Voices from './Voices'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -106,14 +107,17 @@ const DetailsTab = ({
   tabItemsLineHeight,
   tabItemsMinWidth
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
   const dispatch = useDispatch()
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'subscribers'
         : 'members'
   const handleTabClick = (tabIndex: string) => {
@@ -133,9 +137,10 @@ const DetailsTab = ({
   return (
     <Container theme={theme}>
       <DetailsTabHeader
-        activeTabColor={colors.primary}
+        color={textSecondary}
+        activeTabColor={accentColor}
         backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
-        borderColor={borderColor}
+        borderColor={borderColor || borderThemeColor}
         fontSize={tabItemsFontSize}
         lineHeight={tabItemsLineHeight}
         minWidth={tabItemsMinWidth}
@@ -237,15 +242,16 @@ const Container = styled.div<{ theme?: string }>`
 
 const DetailsTabHeader = styled.div<{
   activeTabColor?: string
-  borderColor?: string
+  borderColor: string
   backgroundColor?: string
   fontSize?: string
   minWidth?: string
   lineHeight?: string
+  color: string
 }>`
   overflow: auto;
   padding: 0 20px;
-  border-bottom: 1px solid ${(props) => props.borderColor || colors.backgroundColor};
+  border-bottom: 1px solid ${(props) => props.borderColor};
   background-color: ${(props) => props.backgroundColor || colors.white};
   display: flex;
   justify-content: space-between;
@@ -283,7 +289,7 @@ const DetailsTabHeader = styled.div<{
     font-weight: 500;
     font-size: ${(props) => props.fontSize || '15px'};
     line-height: ${(props) => props.lineHeight || '20px'};
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
     min-width: ${(props) => props.minWidth || '70px'};
     cursor: pointer;
   }

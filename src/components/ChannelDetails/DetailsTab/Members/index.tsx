@@ -24,12 +24,12 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
 import { getClient } from '../../../../common/client'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 // Components
 import ConfirmPopup from '../../../../common/popups/delete'
@@ -37,6 +37,7 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   channel: IChannel
@@ -70,6 +71,10 @@ const Members = ({
   memberAvatarSize,
   memberPresenceFontSize
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)
@@ -89,7 +94,7 @@ const Members = ({
   const displayMemberText =
     memberDisplayText && memberDisplayText[channel.type]
       ? `${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'subscribers'
         : 'members'
   const noMemberEditPermissions =
@@ -187,7 +192,7 @@ const Members = ({
       const role =
         channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? 'subscriber'
             : 'participant'
       const updateMember: IMember = {
@@ -208,7 +213,7 @@ const Members = ({
         createChannelAC(
           {
             metadata: '',
-            type: CHANNEL_TYPE.DIRECT,
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
             members: [
               {
                 ...user,
@@ -236,11 +241,11 @@ const Members = ({
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
-              color={colors.textColor1}
+              color={textPrimary}
               hoverBackground={
                 hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
               }
-              addMemberIconColor={colors.primary}
+              addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
             >
               {addMemberIcon || <AddMemberIcon />}
@@ -252,7 +257,7 @@ const Members = ({
             members.map((member, index) => (
               <MemberItem
                 key={member.id + index}
-                color={colors.textColor1}
+                color={textPrimary}
                 hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
@@ -276,15 +281,15 @@ const Members = ({
                           )}
                     </MemberName>
                     {member.role === 'owner' ? (
-                      <RoleBadge color={colors.primary}>Owner</RoleBadge>
+                      <RoleBadge color={accentColor}>Owner</RoleBadge>
                     ) : member.role === 'admin' ? (
-                      <RoleBadge color={colors.purple}>Admin</RoleBadge>
+                      <RoleBadge color={accentColor}>Admin</RoleBadge>
                     ) : (
                       ''
                     )}
                   </MemberNameWrapper>
 
-                  <SubTitle margin='1px 0 0' fontSize={memberPresenceFontSize}>
+                  <SubTitle color={textSecondary} margin='1px 0 0' fontSize={memberPresenceFontSize}>
                     {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                       ? 'Online'
                       : member.presence &&
@@ -307,6 +312,7 @@ const Members = ({
                     <DropdownOptionsUl>
                       {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
                         <DropdownOptionLi
+                          textColor={textPrimary}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleChangeRolePopup(e)
@@ -325,7 +331,7 @@ const Members = ({
                             toggleMakeAdminPopup(e, member.role === 'admin')
                             setCloseMenu('1')
                           }}
-                          textColor={member.role === 'admin' ? colors.red1 : ''}
+                          textColor={member.role === 'admin' ? errorColor : ''}
                           key={2}
                           hoverBackground={colors.hoverBackgroundColor}
                         >
@@ -339,7 +345,7 @@ const Members = ({
                             toggleKickMemberPopup(e)
                             setCloseMenu('1')
                           }}
-                          textColor={colors.red1}
+                          textColor={errorColor}
                           key={3}
                           hoverBackground={colors.hoverBackgroundColor}
                         >
@@ -348,7 +354,7 @@ const Members = ({
                       )}
                       {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
                         <DropdownOptionLi
-                          textColor={colors.red1}
+                          textColor={errorColor}
                           key={4}
                           hoverBackground={colors.hoverBackgroundColor}
                           onClick={(e: any) => {
@@ -375,7 +381,7 @@ const Members = ({
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
           title={
-            channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
+            channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
               ? 'Remove member'
               : 'Remove subscriber'
           }
@@ -386,7 +392,10 @@ const Members = ({
                 <BoltText> {makeUsername(contactsMap[selectedMember.id], selectedMember, getFromContacts)} </BoltText>
               )}
               from this{' '}
-              {channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC ? 'channel' : 'group'}?
+              {channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+                ? 'channel'
+                : 'group'}
+              ?
             </span>
           }
         />
@@ -409,7 +418,7 @@ const Members = ({
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
-          buttonBackground={colors.primary}
+          buttonBackground={accentColor}
           title='Promote admin'
           description={
             <span>
@@ -512,7 +521,7 @@ const MembersList = styled.ul`
   transition: all 0.2s;
 `
 const MemberItem = styled.li<{
-  color?: string
+  color: string
   hoverBackground?: string
   addMemberIconColor?: string
   addMemberBackground?: string
@@ -524,7 +533,7 @@ const MemberItem = styled.li<{
   font-weight: 500;
   padding: 6px 16px;
   transition: all 0.2s;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   cursor: pointer;
 
   &:first-child {

@@ -3,7 +3,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
 import { LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
@@ -13,7 +13,7 @@ import { makeUsername } from '../../../helpers/message'
 import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { useDidUpdate } from '../../../hooks'
+import { useColor, useDidUpdate } from '../../../hooks'
 import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
@@ -33,6 +33,10 @@ export default function MentionMembersPopup({
   handleMentionsPopupClose,
   searchMention
 }: IMentionsPopupProps) {
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -178,8 +182,9 @@ export default function MentionMembersPopup({
       className='mention_member_popup'
       hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
-      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
       withBorder={theme !== THEME.DARK}
+      borderColor={borderColor}
     >
       <MembersList ref={membersListRef} onScroll={handleMembersListScroll}>
         {filteredMembers.map((member: IMember, index: number) => (
@@ -202,10 +207,10 @@ export default function MentionMembersPopup({
               />
             </AvatarWrapper>
             <UserNamePresence>
-              <MemberName color={colors.textColor1}>
+              <MemberName color={textPrimary}>
                 {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)}
               </MemberName>
-              <SubTitle>
+              <SubTitle color={textSecondary}>
                 {member.presence && member.presence.state === USER_PRESENCE_STATUS.ONLINE
                   ? 'Online'
                   : member.presence &&
@@ -220,13 +225,19 @@ export default function MentionMembersPopup({
   )
 }
 
-const Container = styled.div<{ height?: number; hidden?: boolean; backgroundColor?: string; withBorder?: boolean }>`
+const Container = styled.div<{
+  height?: number
+  hidden?: boolean
+  backgroundColor?: string
+  withBorder?: boolean
+  borderColor: string
+}>`
   width: 300px;
   height: ${(props) => props.height && props.height + 22}px;
   max-height: 240px;
   padding: 2px 0 0;
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};
+  border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;
@@ -248,7 +259,7 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const EditMemberIcon = styled.span`
@@ -266,7 +277,7 @@ export const MembersList = styled.ul<{ ref?: any }>`
   overflow-x: hidden;
   list-style: none;
   transition: all 0.2s;
-  height: calc(100% - 10px); ;
+  height: calc(100% - 10px);
 `
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
   display: flex;

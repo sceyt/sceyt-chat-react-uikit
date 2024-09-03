@@ -1,10 +1,11 @@
 import React, { useEffect, useState } from 'react'
 import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
 import usePermissions from '../../../hooks/usePermissions'
 import PopupContainer from '../popupContainer'
+import { useColor } from '../../../hooks'
 
 interface IProps {
   title: string
@@ -39,7 +40,12 @@ function ConfirmPopup({
   myRole = '',
   loading
 }: IProps) {
-  const [checkActionPermission] = usePermissions(myRole)
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const [checkActionPermission] = usePermissions(myRole ?? '')
   const [initialRender, setInitialRender] = useState(true)
   const deleteForEveryoneIsPermitted = isIncomingMessage
     ? allowDeleteIncoming && !isDirectChannel && checkActionPermission('deleteAnyMessage')
@@ -64,51 +70,55 @@ function ConfirmPopup({
     <PopupContainer>
       <Popup
         theme={theme}
-        backgroundColor={colors.backgroundColor}
+        backgroundColor={sectionBackground}
         maxWidth='520px'
         minWidth='520px'
         isLoading={loading}
         padding='0'
       >
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon color={colors.textColor1} onClick={() => togglePopup()} />
-          <PopupName color={colors.textColor1} isDelete marginBottom='20px'>
+          <CloseIcon color={textPrimary} onClick={() => togglePopup()} />
+          <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
-          <PopupDescription>{description}</PopupDescription>
+          <PopupDescription color={textSecondary}>{description}</PopupDescription>
           {isDeleteMessage && (
             <DeleteMessageOptions>
               {deleteForEveryoneIsPermitted && (
-                <DeleteOptionItem onClick={() => setDeleteMessageOption('forEveryone')}>
+                <DeleteOptionItem color={textSecondary} onClick={() => setDeleteMessageOption('forEveryone')}>
                   <CustomRadio
                     index='1'
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
                     onChange={(e) => handleChooseDeleteOption(e, 'forEveryone')}
+                    checkedBorderColor={accentColor}
+                    borderColor={textSecondary}
                   />
                   Delete for everyone
                 </DeleteOptionItem>
               )}
-              <DeleteOptionItem onClick={() => setDeleteMessageOption('forMe')}>
+              <DeleteOptionItem color={textSecondary} onClick={() => setDeleteMessageOption('forMe')}>
                 <CustomRadio
                   index='2'
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
                   onChange={(e) => handleChooseDeleteOption(e, 'forMe')}
+                  checkedBorderColor={accentColor}
+                  borderColor={textSecondary}
                 />
                 Delete for me
               </DeleteOptionItem>
             </DeleteMessageOptions>
           )}
         </PopupBody>
-        <PopupFooter backgroundColor={colors.backgroundColor}>
-          <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={() => togglePopup()}>
+        <PopupFooter backgroundColor={sectionBackground}>
+          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button
             type='button'
-            backgroundColor={buttonBackground || colors.red1}
-            color={buttonTextColor}
+            backgroundColor={buttonBackground || errorColor}
+            color={buttonTextColor || colors.white}
             borderRadius='8px'
             onClick={handleDelete}
             disabled={initialRender}
@@ -126,13 +136,13 @@ export default ConfirmPopup
 const DeleteMessageOptions = styled.div`
   margin-top: 14px;
 `
-const DeleteOptionItem = styled.div`
+const DeleteOptionItem = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   cursor: pointer;
   font-size: 15px;
   line-height: 160%;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   margin-bottom: 12px;
 
   & > label {

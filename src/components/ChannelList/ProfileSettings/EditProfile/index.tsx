@@ -1,11 +1,12 @@
 import React, { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { Button, CustomInput, Label, PopupFooter } from '../../../../UIHelper'
 import { IUser } from '../../../../types'
 import { updateProfileAC } from '../../../../store/user/actions'
 import Avatar from '../../../Avatar'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   user: IUser
@@ -14,6 +15,11 @@ interface IProps {
 
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const [firstName, setFirstName] = useState(user.firstName)
   const [lastName, setLastName] = useState(user.lastName)
@@ -45,26 +51,47 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
       </EditAvatarCont>
 
       <EditProfileBody>
-        <Label>Firstname</Label>
-        <CustomInput type='text' value={firstName} onChange={handleTypeFirstName} placeholder='Firstname' />
+        <Label color={textPrimary}>Firstname</Label>
+        <CustomInput
+          type='text'
+          color={textPrimary}
+          errorColor={errorColor}
+          placeholderColor={textFootnote}
+          borderColor={borderColor}
+          backgroundColor={sectionBackground}
+          value={firstName}
+          onChange={handleTypeFirstName}
+          placeholder='Firstname'
+        />
 
-        <Label>Lastname</Label>
-        <CustomInput type='text' value={lastName} onChange={handleTypeLastName} placeholder='Lastname' />
+        <Label color={textPrimary}>Lastname</Label>
+        <CustomInput
+          type='text'
+          color={textPrimary}
+          errorColor={errorColor}
+          borderColor={borderColor}
+          placeholderColor={textFootnote}
+          backgroundColor={sectionBackground}
+          value={lastName}
+          onChange={handleTypeLastName}
+          placeholder='Lastname'
+        />
 
         {/* <Label>About</Label> */}
         {/* <CustomInput type='text' value={presenceStatus} onChange={handlePresenceStatus} placeholder='About' /> */}
       </EditProfileBody>
 
       <PopupFooter>
-        <Button
-          onClick={handleCloseEditProfile}
-          backgroundColor={colors.gray0}
-          color={colors.textColor1}
-          borderRadius='8px'
-        >
+        <Button onClick={handleCloseEditProfile} backgroundColor={colors.gray0} color={textPrimary} borderRadius='8px'>
           Cancel
         </Button>
-        <Button onClick={handleEditProfile} backgroundColor={colors.primary} borderRadius='8px' margin='0 0 0 12px'>
+        <Button
+          onClick={handleEditProfile}
+          color={colors.white}
+          backgroundColor={colors.primary}
+          borderRadius='8px'
+          margin='0 0 0 12px'
+        >
           Save
         </Button>
       </PopupFooter>

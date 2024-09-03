@@ -1,3 +1,62 @@
+import { SceytChatUIKitTheme, ThemeMode } from '../components'
+
+export const THEME_COLOR_NAMES = {
+  ACCENT: 'accent',
+  BACKGROUND: 'background',
+  SECTION_BACKGROUND: 'sectionBackground',
+  TEXT_PRIMARY: 'textPrimary',
+  TEXT_SECONDARY: 'textSecondary',
+  TEXT_FOOTNOTE: 'textFootnote',
+  BORDER: 'border',
+  ICON_PRIMARY: 'iconPrimary',
+  ICON_INACTIVE: 'iconInactive',
+  ERROR: 'error'
+}
+export const defaultTheme: SceytChatUIKitTheme = {
+  colors: {
+    [THEME_COLOR_NAMES.ACCENT]: {
+      light: '#5159F6',
+      dark: '#6B72FF'
+    },
+    [THEME_COLOR_NAMES.BACKGROUND]: {
+      light: '#FFFFFF',
+      dark: '#19191B'
+    },
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: {
+      light: '#F1F2F6',
+      dark: '#232324'
+    },
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
+      light: '#111539',
+      dark: '#E1E3E6'
+    },
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: {
+      light: '#707388',
+      dark: '#969A9F'
+    },
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: {
+      light: '#A0A1B0',
+      dark: '#76787A'
+    },
+    [THEME_COLOR_NAMES.BORDER]: {
+      light: '#E4E6EE',
+      dark: '#303032'
+    },
+    [THEME_COLOR_NAMES.ICON_PRIMARY]: {
+      light: '#707388',
+      dark: '#969A9F'
+    },
+    [THEME_COLOR_NAMES.ICON_INACTIVE]: {
+      light: '#A0A1B0',
+      dark: '#64666A'
+    },
+    [THEME_COLOR_NAMES.ERROR]: {
+      light: '#FA4C56',
+      dark: '#FA4C56'
+    }
+  }
+}
+export const defaultThemeMode: ThemeMode = 'light'
 export const colors = {
   white: '#ffffff',
   black: '#000000',
@@ -33,13 +92,12 @@ export const colors = {
   incomingRepliedMessageBackground: '#fbfbfc',
   ownRepliedMessageBackground: '#f9fbfd',
 
-  red1: '#FA4C56',
-  red2: '#d7596c',
-
   purple: '#7A6EF6',
 
   defaultAvatarBackground: '#A0A1B0',
-  deleteUserIconBackground: '#D0D8E3'
+  deleteUserIconBackground: '#D0D8E3',
+
+  errorBlur: '#d7596c'
 }
 
 export const size = {

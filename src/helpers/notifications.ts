@@ -3,7 +3,7 @@ import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
-import { attachmentTypes, CHANNEL_TYPE } from './constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from './constants'
 
 let contactsMap = {}
 let logoSrc = ''
@@ -50,12 +50,12 @@ export const setNotification = (
       attType === attachmentTypes.voice
         ? 'Voice'
         : attType === attachmentTypes.image
-        ? 'Photo'
-        : attType === attachmentTypes.video
-        ? 'Video'
-        : 'File'
+          ? 'Photo'
+          : attType === attachmentTypes.video
+            ? 'Video'
+            : 'File'
   }
-  const isDirectChannel = channel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   let notification: any
   if (showNotifications) {
     if (reaction) {
@@ -63,7 +63,9 @@ export const setNotification = (
         `${isDirectChannel ? makeUsername(contactsMap[user.id], user, getFromContacts) : channel.subject}`,
         {
           body: `${
-            channel.type !== CHANNEL_TYPE.DIRECT ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': ' : ''
+            channel.type !== DEFAULT_CHANNEL_TYPE.DIRECT
+              ? makeUsername(contactsMap[user.id], user, getFromContacts) + ': '
+              : ''
           } reacted ${reaction} to "${attachmentType || ''}${attachmentType && body ? ': ' : ''}${body}"`,
           icon: logoSrc
           // silent: false

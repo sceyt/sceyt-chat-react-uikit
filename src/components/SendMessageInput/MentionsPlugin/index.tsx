@@ -10,7 +10,7 @@ import {
 import { $createMentionNode } from '../MentionNode'
 import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
 import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -18,6 +18,7 @@ import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
+import { useColor } from '../../../hooks'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -181,6 +182,8 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   let className = 'item'
   if (isSelected) {
     className += ' selected'
@@ -203,11 +206,11 @@ function MentionsTypeaheadMenuItem({
         <Avatar name={option.name} image={option.avatarUrl} size={32} textSize={14} setDefaultAvatar />
       </AvatarWrapper>
       <UserNamePresence>
-        <MemberName color={colors.textColor1}>
+        <MemberName color={textPrimary}>
           {option.name}
           {/* {makeUsername(member.id === user.id ? member : contactsMap[member.id], member, getFromContacts)} */}
         </MemberName>
-        <SubTitle>
+        <SubTitle color={textSecondary}>
           {/* @ts-ignore */}
           {option.presence && option.presence.state === USER_PRESENCE_STATUS.ONLINE
             ? 'Online'
@@ -227,6 +230,7 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
+  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
   optionObj.selectedIndex = selectedIndex
@@ -273,7 +277,7 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList>
+      <MentionsList borderColor={borderColor}>
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -408,6 +412,7 @@ const MentionsList = styled.ul<{
   hidden?: boolean
   backgroundColor?: string
   withBorder?: boolean
+  borderColor: string
 }>`
   position: absolute;
   bottom: 100%;
@@ -418,7 +423,7 @@ const MentionsList = styled.ul<{
   z-index: 200;
   padding: 2px 0 0;
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => props.withBorder && `1px solid ${colors.borderColor}`};
+  border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: 6px;
@@ -444,7 +449,7 @@ const UserNamePresence = styled.div`
   width: calc(100% - 44px);
   margin-left: 12px;
 `
-const MemberName = styled.h3<{ color?: string }>`
+const MemberName = styled.h3<{ color: string }>`
   margin: 0;
   max-width: calc(100% - 1px);
   font-weight: 500;
@@ -454,5 +459,5 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `

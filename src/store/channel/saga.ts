@@ -71,7 +71,7 @@ import {
   getChannelTypesFilter,
   addChannelToAllChannels
 } from '../../helpers/channelHalper'
-import { CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
 import { getClient } from '../../common/client'
 import {
@@ -112,18 +112,18 @@ function* createChannel(action: IAction): any {
       createChannelData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
     }
     let isSelfChannel = false
-    if (channelData.type === CHANNEL_TYPE.DIRECT && channelData.members[0].id === SceytChatClient.user.id) {
+    if (channelData.type === DEFAULT_CHANNEL_TYPE.DIRECT && channelData.members[0].id === SceytChatClient.user.id) {
       isSelfChannel = true
       createChannelData.metadata = { s: 1 }
     }
     delete createChannelData.avatarFile
     let channelIsExistOnAllChannels = false
     let createdChannel: IChannel
-    if (channelData.type === CHANNEL_TYPE.DIRECT && dontCreateIfNotExists) {
+    if (channelData.type === DEFAULT_CHANNEL_TYPE.DIRECT && dontCreateIfNotExists) {
       const allChannels = getAllChannels()
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
           if (isSelfChannel) {
             const meta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
             if (meta?.s) {
@@ -162,7 +162,7 @@ function* createChannel(action: IAction): any {
       createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
     }
     let checkChannelExist = false
-    if (createdChannel.type === CHANNEL_TYPE.DIRECT) {
+    if (createdChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
     }
     createdChannel.metadata = isJSON(createdChannel.metadata)
@@ -170,11 +170,14 @@ function* createChannel(action: IAction): any {
       : createdChannel.metadata
     if (!checkChannelExist) {
       yield call(setChannelInMap, createdChannel)
-      if (createdChannel.type !== CHANNEL_TYPE.DIRECT) {
+      if (createdChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT) {
         const messageToSend: any = {
           // metadata: mentionedMembersPositions,
           body:
-            createdChannel.type === CHANNEL_TYPE.BROADCAST || createdChannel.type === CHANNEL_TYPE.PUBLIC ? 'CC' : 'CG',
+            createdChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+            createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+              ? 'CC'
+              : 'CG',
           mentionedMembers: [],
           attachments: [],
           type: 'system'
@@ -197,7 +200,7 @@ function* createChannel(action: IAction): any {
       const allChannels = getAllChannels()
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
           if (isSelfChannel) {
             const meta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
             if (meta?.s) {
@@ -423,7 +426,7 @@ function* searchChannels(action: IAction): any {
       const lowerCaseSearchBy = searchBy.toLowerCase()
       // const publicChannelsMap: { [key: string]: boolean } = {}
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const isSelfChannel = channel.metadata?.s
           const directChannelUser = isSelfChannel
@@ -443,7 +446,7 @@ function* searchChannels(action: IAction): any {
           }
         } else {
           if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
-            if (channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST) {
+            if (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) {
               // publicChannelsMap[channel.id] = true
               publicChannels.push(channel)
             } else {
@@ -486,7 +489,8 @@ function* searchChannels(action: IAction): any {
         )
       }) */
       const channelsToAdd = channelsData.channels.filter(
-        (channel: IChannel) => channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST
+        (channel: IChannel) =>
+          channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST
       )
       yield put(
         setSearchedChannelsAC({
@@ -539,9 +543,9 @@ function* getChannelsForForward(): any {
     const channelsToAdd = channelsData.channels.filter((channel: IChannel) => {
       channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
       const isSelfChannel = channel.metadata?.s
-      return channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      return channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
-        : channel.type === CHANNEL_TYPE.DIRECT
+        : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
           ? isSelfChannel || channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
           : true
     })
@@ -586,7 +590,7 @@ function* searchChannelsForForward(action: IAction): any {
       const contactsWithChannelsMap: { [key: string]: boolean } = {}
       const lowerCaseSearchBy = searchBy.toLowerCase()
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
           channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
           const isSelfChannel = channel.metadata?.s
           const directChannelUser = isSelfChannel
@@ -606,7 +610,7 @@ function* searchChannelsForForward(action: IAction): any {
           }
         } else {
           if (channel.subject && channel.subject.toLowerCase().includes(lowerCaseSearchBy)) {
-            if (channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST) {
+            if (channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST) {
               publicChannels.push(channel)
             } else {
               chatsGroups.push(channel)
@@ -641,7 +645,8 @@ function* searchChannelsForForward(action: IAction): any {
       const channelQuery = yield call(channelQueryBuilder.build)
       const channelsData = yield call(channelQuery.loadNextPage)
       const channelsToAdd = channelsData.channels.filter(
-        (channel: IChannel) => channel.type === CHANNEL_TYPE.PUBLIC || channel.type === CHANNEL_TYPE.BROADCAST
+        (channel: IChannel) =>
+          channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC || channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST
       )
       yield put(
         setSearchedChannelsForForwardAC({
@@ -743,9 +748,9 @@ function* channelsForForwardLoadMore(action: IAction): any {
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
     const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
-      channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? channel.userRole === 'admin' || channel.userRole === 'owner'
-        : channel.type === CHANNEL_TYPE.DIRECT
+        : channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
           ? channel.members.find((member) => member.id && member.id !== SceytChatClient.user.id)
           : true
     )
@@ -1030,7 +1035,7 @@ function* leaveChannel(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)
     }
     if (channel) {
-      if (channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE) {
+      if (channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE) {
         const messageBuilder = channel.createMessageBuilder()
         messageBuilder.setBody('LG').setType('system').setDisplayCount(0).setSilent(true)
         const messageToSend = messageBuilder.create()

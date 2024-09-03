@@ -18,12 +18,11 @@ import {
 // Assets
 import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
-import { colors } from '../../UIHelper/constants'
-import { themeSelector } from '../../store/theme/selector'
+import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 
 interface IProps {
   hideChannelList?: boolean
@@ -46,10 +45,13 @@ export default function Chat({
   noChannelSelectedBackgroundColor,
   CustomNoChannelSelected
 }: IProps) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
+  const textPrimaryColor = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const theme = useSelector(themeSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -105,14 +107,14 @@ export default function Chat({
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
-        <SelectChatContainer
-          backgroundColor={noChannelSelectedBackgroundColor || (theme && theme.backgroundColor) || colors.white}
-        >
+        <SelectChatContainer backgroundColor={noChannelSelectedBackgroundColor || backgroundColor}>
           {CustomNoChannelSelected || (
-            <SelectChatContent iconColor={colors.primary}>
+            <SelectChatContent iconColor={accentColor}>
               <MessageIcon />
-              <SelectChatTitle>Select a chat</SelectChatTitle>
-              <SelectChatDescription>Please select a chat to start messaging.</SelectChatDescription>
+              <SelectChatTitle color={textPrimaryColor}> Select a chat</SelectChatTitle>
+              <SelectChatDescription color={textSecondary}>
+                Please select a chat to start messaging.
+              </SelectChatDescription>
             </SelectChatContent>
           )}
         </SelectChatContainer>
@@ -158,19 +160,19 @@ const SelectChatContent = styled.div<{ iconColor?: string }>`
   }
 `
 
-const SelectChatTitle = styled.h3`
+const SelectChatTitle = styled.h3<{ color?: string }>`
   font-size: 20px;
   font-style: normal;
   font-weight: 500;
   line-height: 24px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   margin: 24px 0 8px;
 `
-const SelectChatDescription = styled.p`
+const SelectChatDescription = styled.p<{ color: string }>`
   font-size: 16px;
   font-style: normal;
   font-weight: 400;
   line-height: 22px;
   margin: 0;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

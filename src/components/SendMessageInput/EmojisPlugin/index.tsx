@@ -9,15 +9,17 @@ import { ReactComponent as TravelingEmoji } from '../../../assets/svg/emojiTrave
 import { ReactComponent as ObjectEmoji } from '../../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.svg'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
 import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
+import { useColor } from '../../../hooks'
 
 interface EmojiCollectionProps {
   activeCollection: boolean
+  iconColor: string
 }
 
 const EmojiIcon = ({ collectionName }: any) => {
@@ -68,6 +70,10 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
@@ -139,7 +145,7 @@ function EmojisPopup({
 
   return (
     <Container
-      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
+      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
       noBorder={theme === THEME.DARK}
       relativePosition={relativePosition}
       borderRadius={emojisContainerBorderRadius}
@@ -160,6 +166,7 @@ function EmojisPopup({
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
+              iconColor={activeCollection === emoji.key ? accentColor : textFootnote}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
             >
               <EmojiIcon collectionName={emoji.key} />
@@ -168,7 +175,7 @@ function EmojisPopup({
         </EmojiFooter>
       )}
       {fixEmojiCategoriesTitleOnTop && (
-        <EmojiHeader padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
+        <EmojiHeader color={textSecondary} padding={emojisCategoryIconsPosition !== 'top' ? '10px 18px 6px' : ''}>
           {getEmojisCategoryTitle(activeCollection)}
         </EmojiHeader>
       )}
@@ -179,14 +186,16 @@ function EmojisPopup({
             return (
               <React.Fragment key={mainCollectionKey}>
                 {!fixEmojiCategoriesTitleOnTop && (
-                  <EmojiHeader padding='6px 8px 0'>{getEmojisCategoryTitle(mainCollectionKey)}</EmojiHeader>
+                  <EmojiHeader color={textSecondary} padding='6px 8px 0'>
+                    {getEmojisCategoryTitle(mainCollectionKey)}
+                  </EmojiHeader>
                 )}
                 {emojiBigCollection.array.map((emojiSmallCollection, bigIndex) => {
                   const label = emojiSmallCollection.key
                   const { array } = emojiSmallCollection
                   return array.map((emoji, i) => (
                     <Emoji
-                      hoverBackgroundColor={colors.hoverBackgroundColor}
+                      hoverBackgroundColor={sectionBackground}
                       key={`${emoji}`}
                       className='emoji-cont'
                       onClick={() => chooseEmoji(emoji)}
@@ -220,6 +229,7 @@ function EmojisPopup({
               activeCollection={activeCollection === emoji.key}
               key={`${emoji.key}`}
               onClick={() => handleEmojiCollectionClick(emoji.key)}
+              iconColor={activeCollection === emoji.key ? accentColor : textFootnote}
             >
               <EmojiIcon collectionName={emoji.key} />
             </EmojiCollection>
@@ -270,14 +280,14 @@ const Container = styled.div<{
     height: 225px;
   `};
 `
-const EmojiHeader = styled.div<{ padding?: string }>`
+const EmojiHeader = styled.div<{ color: string; padding?: string }>`
   align-items: flex-end;
   font-style: normal;
   font-weight: 500;
   font-size: 12px;
   line-height: 22px;
   text-transform: uppercase;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   display: flex;
   padding: ${(props) => props.padding || '6px 18px'};
 `
@@ -297,7 +307,7 @@ const EmojiCollection = styled.span<EmojiCollectionProps>`
   align-items: center;
 
   & > * {
-    color: ${(props) => (props.activeCollection ? colors.primary : colors.textColor3)};
+    color: ${(props) => props.iconColor};
   }
 `
 const CollectionPointer = styled.span``
@@ -323,7 +333,7 @@ const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom';
   }
 `
 
-const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
+const Emoji = styled.li<{ hoverBackgroundColor: string }>`
   cursor: pointer;
   width: 32px;
   height: 32px;
@@ -334,12 +344,19 @@ const Emoji = styled.li<{ hoverBackgroundColor?: string }>`
   padding-top: 2px;
   text-align: center;
   background: transparent;
-  font-family: apple color emoji, segoe ui emoji, noto color emoji, android emoji, emojisymbols, emojione mozilla,
-    twemoji mozilla, segoe ui symbol;
+  font-family:
+    apple color emoji,
+    segoe ui emoji,
+    noto color emoji,
+    android emoji,
+    emojisymbols,
+    emojione mozilla,
+    twemoji mozilla,
+    segoe ui symbol;
   & > * {
     font-size: 22px;
   }
   &:hover {
-    background: ${(props) => props.hoverBackgroundColor || colors.backgroundColor};
+    background: ${(props) => props.hoverBackgroundColor};
   }
 `

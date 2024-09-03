@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 // Hooks
-import { useDidUpdate } from '../../hooks'
+import { useColor, useDidUpdate } from '../../hooks'
 // Store
 import { playingAudioIdSelector } from '../../store/message/selector'
 import { setPlayingAudioIdAC } from '../../store/message/actions'
@@ -10,7 +10,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 // Helpers
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 
@@ -37,6 +37,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
@@ -142,9 +144,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
           const WaveSurfer = await import('wavesurfer.js')
           wavesurfer.current = WaveSurfer.default.create({
             container: wavesurferContainer.current,
-            waveColor: colors.textColor2,
+            waveColor: textSecondary,
             skipLength: 0,
-            progressColor: colors.primary,
+            progressColor: accentColor,
             // audioContext,
             // cursorColor: 'transparent',
             // splitChannels: true,
@@ -236,17 +238,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
 
   return (
     <Container>
-      <PlayPause onClick={handlePlayPause} iconColor={colors.primary}>
+      <PlayPause onClick={handlePlayPause} iconColor={accentColor}>
         {playAudio ? <PauseIcon /> : <PlayIcon />}
       </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
-        <AudioRate onClick={handleSetAudioRate}>
+        <AudioRate color={textSecondary} onClick={handleSetAudioRate}>
           {audioRate}
           <span>X</span>
         </AudioRate>
       </WaveContainer>
-      <Timer>{currentTime}</Timer>
+      <Timer color={textSecondary}>{currentTime}</Timer>
     </Container>
   )
 }
@@ -275,7 +277,7 @@ const PlayPause = styled.div<{ iconColor?: string }>`
 const AudioVisualization = styled.div`
   width: 100%;
 `
-const AudioRate = styled.div`
+const AudioRate = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -286,7 +288,7 @@ const AudioRate = styled.div`
   font-weight: 600;
   font-size: 12px;
   line-height: 14px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   height: 18px;
   box-sizing: border-box;
   margin-left: 14px;
@@ -305,7 +307,7 @@ const WaveContainer = styled.div`
   margin-left: 8px;
 `
 
-const Timer = styled.div`
+const Timer = styled.div<{ color: string }>`
   position: absolute;
   left: 59px;
   bottom: 12px;
@@ -313,5 +315,5 @@ const Timer = styled.div`
   font-weight: 400;
   font-size: 11px;
   line-height: 12px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `

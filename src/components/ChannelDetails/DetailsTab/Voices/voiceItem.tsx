@@ -7,7 +7,7 @@ import { contactsMapSelector, userSelector } from '../../../../store/user/select
 import { playingAudioIdSelector } from '../../../../store/message/selector'
 import { setPlayingAudioIdAC } from '../../../../store/message/actions'
 // Hooks
-import { useDidUpdate } from '../../../../hooks'
+import { useColor, useDidUpdate } from '../../../../hooks'
 // Assets
 import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePreview.svg'
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
@@ -18,7 +18,7 @@ import { getCustomDownloader } from '../../../../helpers/customUploader'
 import { formatAudioVideoTime } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
-import { colors } from '../../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
 
 interface IProps {
@@ -42,6 +42,8 @@ const VoiceItem = ({
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor
 }: IProps) => {
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -127,12 +129,14 @@ const VoiceItem = ({
         </React.Fragment>
       )}
       <AudioInfo>
-        <AudioTitle color={voicePreviewTitleColor}>
+        <AudioTitle color={voicePreviewTitleColor || textPrimary}>
           {file.user &&
             (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
-        <AudioDate color={voicePreviewDateAndTimeColor}>{moment(file.createdAt).format('DD MMMM, YYYY')}</AudioDate>
-        <AudioSendTime>
+        <AudioDate color={voicePreviewDateAndTimeColor || textSecondary}>
+          {moment(file.createdAt).format('DD MMMM, YYYY')}
+        </AudioDate>
+        <AudioSendTime color={textSecondary}>
           {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur) : '')}
         </AudioSendTime>
       </AudioInfo>
@@ -199,10 +203,10 @@ const AudioTitle = styled.span<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   max-width: calc(100% - 72px);
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
-const AudioDate = styled.span<{ color?: string }>`
+const AudioDate = styled.span<{ color: string }>`
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -212,14 +216,14 @@ const AudioDate = styled.span<{ color?: string }>`
   font-weight: normal;
   font-size: 12px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
-const AudioSendTime = styled.span<{ color?: string }>`
+const AudioSendTime = styled.span<{ color: string }>`
   position: absolute;
   right: 0;
   top: 11px;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
   font-size: 12px;
   line-height: 16px;
 `

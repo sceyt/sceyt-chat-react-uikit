@@ -13,11 +13,11 @@ import {
   SubTitle
 } from '../../../UIHelper'
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
-import { CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -31,7 +31,7 @@ import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate } from '../../../hooks'
+import { useDidUpdate, useColor } from '../../../hooks'
 import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
@@ -69,6 +69,10 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -95,7 +99,7 @@ const UsersPopup = ({
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
       ? `Add ${memberDisplayText[channel.type]}s`
-      : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+      : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'Subscribers'
         : 'Members')
   /* const handleGetUsers = (option) => {
@@ -137,7 +141,7 @@ const UsersPopup = ({
       const role = channel
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
-          : channel.type === CHANNEL_TYPE.BROADCAST || channel.type === CHANNEL_TYPE.PUBLIC
+          : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? 'subscriber'
             : 'participant'
         : 'participant'
@@ -193,7 +197,7 @@ const UsersPopup = ({
       const channelData = {
         metadata: '',
         label: '',
-        type: CHANNEL_TYPE.DIRECT,
+        type: DEFAULT_CHANNEL_TYPE.DIRECT,
         members: [
           {
             ...selectedUser,
@@ -311,9 +315,11 @@ const UsersPopup = ({
         boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
       >
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
-          <CloseIcon color={colors.textColor2} onClick={handleClosePopup} />
+          <CloseIcon color={textSecondary} onClick={handleClosePopup} />
 
-          <PopupName padding='0 12px'>{actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}</PopupName>
+          <PopupName color={textPrimary} padding='0 12px'>
+            {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
+          </PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg />
             <SearchUsersInput
@@ -323,16 +329,17 @@ const UsersPopup = ({
               placeholder='Search for users'
               type='text'
               widthBorder={theme !== THEME.DARK}
-              backgroundColor={colors.backgroundColor}
-              color={colors.textColor1}
+              backgroundColor={sectionBackground}
+              color={textPrimary}
+              placeholderColor={textSecondary}
             />
-            {userSearchValue && <ClearTypedText color={colors.textColor1} onClick={() => setUserSearchValue('')} />}
+            {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
           {actionType !== 'createChat' && selectedMembers.length !== 0 && (
             <SelectedMembersContainer ref={selectedMembersCont}>
               {selectedMembers.map((member) => {
                 return (
-                  <SelectedMemberBubble backgroundColor={colors.backgroundColor} key={`selected-${member.id}`}>
+                  <SelectedMemberBubble backgroundColor={sectionBackground} key={`selected-${member.id}`}>
                     <Avatar
                       image={member.avatarUrl}
                       name={member.displayName || member.id}
@@ -341,7 +348,7 @@ const UsersPopup = ({
                       setDefaultAvatar
                       border={'0.5px solid rgba(0, 0, 0, 0.1)'}
                     />
-                    <SelectedMemberName color={colors.textColor1}>{member.displayName}</SelectedMemberName>
+                    <SelectedMemberName color={textPrimary}>{member.displayName}</SelectedMemberName>
                     <StyledSubtractSvg onClick={() => removeMember(member)} />
                   </SelectedMemberBubble>
                 )
@@ -381,8 +388,8 @@ const UsersPopup = ({
                   />
 
                   <UserNamePresence>
-                    <MemberName color={colors.textColor1}>{memberDisplayName}</MemberName>
-                    <SubTitle>
+                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
+                    <SubTitle color={textSecondary}>
                       {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
                         ? 'Online'
                         : user.presence &&
@@ -422,8 +429,8 @@ const UsersPopup = ({
                     <CustomCheckbox
                       index={user.id}
                       state={isSelected}
-                      backgroundColor={theme === THEME.DARK ? colors.backgroundColor : colors.white}
-                      checkedBackgroundColor={colors.primary}
+                      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
+                      checkedBackgroundColor={accentColor}
                       onChange={(e) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
                       }
@@ -444,20 +451,20 @@ const UsersPopup = ({
         </PopupBody>
 
         {actionType !== 'createChat' && (
-          <PopupFooter backgroundColor={colors.backgroundColor} marginTop='auto'>
+          <PopupFooter backgroundColor={sectionBackground} marginTop='auto'>
             {actionType === 'selectUsers' ? (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={handleGoBack}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleGoBack}>
                 Back
               </Button>
             ) : (
-              <Button type='button' color={colors.textColor1} backgroundColor='transparent' onClick={toggleCreatePopup}>
+              <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={toggleCreatePopup}>
                 Cancel
               </Button>
             )}
             <Button
               type='button'
               color={colors.white}
-              backgroundColor={colors.primary}
+              backgroundColor={accentColor}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
               onClick={() => handleCreateChannel()}
@@ -547,7 +554,12 @@ const SelectMember = styled.input`
   cursor: pointer;
 ` */
 
-const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?: string; color?: string }>`
+const SearchUsersInput = styled.input<{
+  widthBorder?: boolean
+  backgroundColor?: string
+  color: string
+  placeholderColor: string
+}>`
   height: 40px;
   width: 100%;
   font-size: 14px;
@@ -555,11 +567,11 @@ const SearchUsersInput = styled.input<{ widthBorder?: boolean; backgroundColor?:
   box-sizing: border-box;
   border-radius: 8px;
   padding-left: 36px;
-  color: ${(props) => props.color || colors.textColor1};
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  color: ${(props) => props.color};
+  background-color: ${(props) => props.backgroundColor};
 
   &::placeholder {
-    color: ${colors.textColor2};
+    color: ${(props) => props.placeholderColor};
     font-size: 14px;
     opacity: 1;
   }
@@ -601,7 +613,7 @@ const MemberName = styled.h4<{ color?: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin: 0;
   max-width: calc(100% - 10px);
   text-overflow: ellipsis;
@@ -639,7 +651,7 @@ const SelectedMemberName = styled.span`
   font-size: 14px;
   line-height: 16px;
   margin-left: 8px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const StyledSubtractSvg = styled(CrossIcon)`

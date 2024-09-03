@@ -1,7 +1,7 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
 import { BLOCK_USERS, GET_CONTACTS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
-import { CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import {
   addUsersAC,
   setContactsAC,
@@ -37,7 +37,7 @@ function* blockUser(action: IAction): any {
 
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
     const directChannelUser =
       isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
     if (directChannelUser && directChannelUser.id === blockedUsers[0].id) {
@@ -76,7 +76,7 @@ function* unblockUser(action: IAction): any {
     const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
-    const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+    const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
     const directChannelUser =
       isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== SceytChatClient.user.id)
     if (directChannelUser && directChannelUser.id === unblockedUsers[0].id) {

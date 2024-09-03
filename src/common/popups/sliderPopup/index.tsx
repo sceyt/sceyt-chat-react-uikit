@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
 import Carousel from 'react-elastic-carousel'
-import { colors } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
@@ -17,9 +17,9 @@ import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
 import { attachmentsForPopupSelector } from '../../../store/message/selector'
 import { deleteMessageAC, forwardMessageAC, getAttachmentsAC, removeAttachmentAC } from '../../../store/message/actions'
-import { CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { queryDirection } from '../../../store/message/constants'
-import { useDidUpdate } from '../../../hooks'
+import { useColor, useDidUpdate } from '../../../hooks'
 import { Avatar } from '../../../components'
 import { connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { UploadingIcon } from '../../../UIHelper'
@@ -50,6 +50,8 @@ const SliderPopup = ({
   allowEditDeleteIncomingMessage
 }: IProps) => {
   const dispatch = useDispatch()
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const getFromContacts = getShowOnlyContactUsers()
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
@@ -320,7 +322,7 @@ const SliderPopup = ({
   }, [])
   return (
     <Container draggable={false}>
-      <SliderHeader backgroundColor={colors.textColor1}>
+      <SliderHeader backgroundColor={textPrimary}>
         <FileInfo>
           <Avatar
             name={attachmentUserName}
@@ -332,9 +334,9 @@ const SliderPopup = ({
             <UserName>{attachmentUserName}</UserName>
             {/* <FileName>{currentFile.name}</FileName> */}
             {/* <FileSize></FileSize> */}
-            <FileDateAndSize>
+            <FileDateAndSize color={textSecondary}>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
-              <FileSize>
+              <FileSize color={textSecondary}>
                 {currentFile && currentFile.size && currentFile.size > 0 ? bytesToSize(currentFile.size, 1) : ''}
               </FileSize>
             </FileDateAndSize>
@@ -343,7 +345,6 @@ const SliderPopup = ({
         <ActionsWrapper>
           <IconWrapper onClick={() => handleDownloadFile(currentFile)}>
             {currentFile && downloadingFilesMap[currentFile.id] ? (
-              // <UploadingIcon width='24px' height='24px' borderWidth='3px' color={colors.textColor2} />
               <ProgressWrapper>
                 <CircularProgressbar
                   minValue={0}
@@ -414,7 +415,7 @@ const SliderPopup = ({
                   className='custom_carousel_arrow'
                   leftButton={type === 'PREV'}
                   type='button'
-                  backgroundColor={colors.textColor1}
+                  backgroundColor={textPrimary}
                   onClick={(e) => {
                     setImageLoading(true)
                     e.preventDefault()
@@ -492,7 +493,7 @@ const SliderPopup = ({
           isIncomingMessage={messageToDelete.incoming}
           myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}
@@ -528,7 +529,7 @@ const ProgressWrapper = styled.span`
 `
 const SliderHeader = styled.div<{ backgroundColor?: string }>`
   height: 60px;
-  background: ${(props) => props.backgroundColor || colors.textColor1};
+  background: ${(props) => props.backgroundColor};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -586,15 +587,15 @@ const ClosePopupWrapper = styled.div`
   margin-bottom: 4px;
 ` */
 
-const FileDateAndSize = styled.span`
+const FileDateAndSize = styled.span<{ color: string }>`
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.078px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 
-const FileSize = styled.span`
+const FileSize = styled.span<{ color: string }>`
   position: relative;
   margin-left: 12px;
 
@@ -606,7 +607,7 @@ const FileSize = styled.span`
     width: 4px;
     height: 4px;
     border-radius: 50%;
-    background-color: ${colors.textColor2};
+    background-color: ${(props) => props.color};
   }
 `
 
@@ -679,7 +680,7 @@ const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; backgr
   height: 60px;
   margin-right: ${(props) => !props.leftButton && '24px'};
   margin-left: ${(props) => props.leftButton && '24px'};
-  background: ${(props) => props.backgroundColor || colors.textColor1};
+  background: ${(props) => props.backgroundColor};
   border: 1px solid rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
   border-radius: 50%;

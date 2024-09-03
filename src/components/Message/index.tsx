@@ -21,7 +21,7 @@ import {
 import { createChannelAC, markMessagesAsReadAC } from '../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
-import { useDidUpdate, useOnScreen } from '../../hooks'
+import { useDidUpdate, useOnScreen, useColor } from '../../hooks'
 // Assets
 import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
@@ -40,9 +40,9 @@ import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { attachmentTypes, CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
@@ -256,7 +256,7 @@ const Message = ({
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
   ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground = colors.backgroundColor,
+  incomingMessageBackground,
   ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
   incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   showOwnAvatar = true,
@@ -360,6 +360,10 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -386,7 +390,6 @@ const Message = ({
   const messageUserID = message.user ? message.user.id : 'deleted'
   const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
   const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null
-
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
@@ -431,7 +434,7 @@ const Message = ({
   // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+    !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
   const borderRadius =
@@ -453,7 +456,7 @@ const Message = ({
 
   const showMessageSenderName =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    (channel.type === CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
+    (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
     (message.incoming || showSenderNameOnOwnMessages)
 
   const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
@@ -666,7 +669,7 @@ const Message = ({
       {showMessageSenderName && (
         <MessageOwner
           className='message-owner'
-          color={colors.primary}
+          color={accentColor}
           rtlDirection={ownMessageOnRightSide && !message.incoming}
           clickable={messageOwnerIsNotCurrentUser}
           onClick={() => handleCreateChat(messageOwnerIsNotCurrentUser && message.user)}
@@ -704,7 +707,7 @@ const Message = ({
         createChannelAC(
           {
             metadata: '',
-            type: CHANNEL_TYPE.DIRECT,
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
             members: [
               {
                 ...user,
@@ -785,7 +788,7 @@ const Message = ({
       hoverBackground={
         hoverBackground
           ? message.incoming
-            ? incomingMessageBackground || 'rgb(238, 245, 255)'
+            ? incomingMessageBackground || sectionBackground
             : ownMessageBackground || 'rgb(238, 245, 255)'
           : ''
       }
@@ -806,7 +809,7 @@ const Message = ({
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
         <SelectMessageWrapper
-          activeColor={colors.primary}
+          activeColor={accentColor}
           disabled={tooManySelected && !isSelectedMessage}
           onClick={handleSelectMessage}
         >
@@ -829,7 +832,7 @@ const Message = ({
         messageWidthPercent={messageWidthPercent}
         rtl={ownMessageOnRightSide && !message.incoming}
         withAvatar={
-          !(channel.type === CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
+          !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
           !(!message.incoming && !showOwnAvatar)
         }
         className='messageContent'
@@ -915,7 +918,7 @@ const Message = ({
               message.parentMessage.attachments[0].type === attachmentTypes.voice
             }
             ownMessageBackground={ownMessageBackground}
-            incomingMessageBackground={incomingMessageBackground}
+            incomingMessageBackground={incomingMessageBackground || sectionBackground}
             borderRadius={borderRadius}
             withAttachments={notLinkAttachment}
             attachmentWidth={
@@ -1051,7 +1054,7 @@ const Message = ({
                 withSenderName={showMessageSenderName}
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
-                leftBorderColor={colors.primary}
+                leftBorderColor={accentColor}
                 backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
                 onClick={() =>
                   handleScrollToRepliedMessage &&
@@ -1068,7 +1071,9 @@ const Message = ({
                     (message.parentMessage.attachments as any[]).map((attachment, index) => (
                       <Attachment
                         key={attachment.tid || attachment.url}
-                        backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                        backgroundColor={
+                          message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                        }
                         attachment={{
                           ...attachment,
                           metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
@@ -1093,7 +1098,7 @@ const Message = ({
                 <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
                   <MessageOwner
                     className='reply-message-owner'
-                    color={colors.primary}
+                    color={accentColor}
                     fontSize='12px'
                     rtlDirection={ownMessageOnRightSide && !message.incoming}
                     // clickable={parentMessageOwnerIsNotCurrentUser}
@@ -1112,20 +1117,21 @@ const Message = ({
                         )}
                   </MessageOwner>
 
-                  <ReplyMessageText fontSize='14px' lineHeight='16px'>
+                  <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px'>
                     {!!message.parentMessage.attachments.length &&
                       message.parentMessage.attachments[0].type === attachmentTypes.voice && (
-                        <VoiceIconWrapper color={colors.primary} />
+                        <VoiceIconWrapper color={accentColor} />
                       )}
                     {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
-                      <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+                      <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
                     ) : message.parentMessage.body ? (
                       MessageTextFormat({
                         text: message.parentMessage.body,
                         message: message.parentMessage,
                         contactsMap,
                         getFromContacts,
-                        asSampleText: true
+                        asSampleText: true,
+                        accentColor
                       })
                     ) : (
                       parentNotLinkAttachment &&
@@ -1155,7 +1161,7 @@ const Message = ({
                   leftPadding={
                     message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
                   }
-                  color={colors.primary}
+                  color={accentColor}
                 >
                   <ForwardIcon />
                   Forwarded message
@@ -1180,7 +1186,7 @@ const Message = ({
             <MessageText
               theme={theme}
               draggable={false}
-              color={colors.textColor1}
+              color={textPrimary}
               fontSize={messageTextFontSize}
               lineHeight={messageTextLineHeight}
               showMessageSenderName={showMessageSenderName}
@@ -1197,12 +1203,13 @@ const Message = ({
                   text: message.body,
                   message,
                   contactsMap,
-                  getFromContacts
+                  getFromContacts,
+                  accentColor
                 })}
               </span>
               {/* <Linkify>{wrapTags(message.text, mentionRegex, 'mention')}</Linkify> */}
               {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
-                <MessageStatusDeleted> Message was deleted. </MessageStatusDeleted>
+                <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
               ) : (
                 ''
               )}
@@ -1216,16 +1223,17 @@ const Message = ({
                   isSelfMessage={!message.incoming}
                 >
                   {message.state === MESSAGE_STATUS.EDIT ? (
-                    <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+                    <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
                       edited
                     </MessageStatusUpdated>
                   ) : (
                     ''
                   )}
                   {messageTimeVisible && (
-                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                      message.createdAt
-                    ).format('HH:mm')}`}</HiddenMessageTime>
+                    <HiddenMessageTime
+                      color={messageTimeColor || textSecondary}
+                      fontSize={messageTimeFontSize}
+                    >{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
                   )}
                   {messageStatusVisible && (
                     <MessageStatus height={messageStatusAndTimeLineHeight}>
@@ -1234,7 +1242,8 @@ const Message = ({
                         messageStatusDisplayingType,
                         size: messageStatusSize,
                         iconColor: messageStatusColor,
-                        readIconColor: messageReadStatusColor
+                        readIconColor: messageReadStatusColor,
+                        accentColor
                       })}
                     </MessageStatus>
                   )}
@@ -1252,6 +1261,7 @@ const Message = ({
                   leftMargin
                   isSelfMessage={!message.incoming}
                   fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
+                  statusColor={textSecondary}
                 >
                   {message.state === MESSAGE_STATUS.EDIT ? (
                     <MessageStatusUpdated
@@ -1259,7 +1269,7 @@ const Message = ({
                       color={
                         message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                           ? colors.white
-                          : messageStateColor
+                          : messageStateColor || textSecondary
                       }
                     >
                       edited
@@ -1268,9 +1278,10 @@ const Message = ({
                     ''
                   )}
                   {messageTimeVisible && (
-                    <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
-                      message.createdAt
-                    ).format('HH:mm')}`}</HiddenMessageTime>
+                    <HiddenMessageTime
+                      color={messageTimeColor || textSecondary}
+                      fontSize={messageTimeFontSize}
+                    >{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
                   )}
                   {messageStatusVisible &&
                     MessageStatusIcon({
@@ -1281,7 +1292,8 @@ const Message = ({
                         message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
                           ? colors.white
                           : '',
-                      readIconColor: messageReadStatusColor
+                      readIconColor: messageReadStatusColor,
+                      accentColor
                     })}
                 </MessageStatusAndTime>
               )}
@@ -1317,7 +1329,9 @@ const Message = ({
                     }
                     borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
                     selectedFileAttachmentsIcon={fileAttachmentsIcon}
-                    backgroundColor={message.incoming ? incomingMessageBackground : ownMessageBackground}
+                    backgroundColor={
+                      message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                    }
                     selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                     selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
                     selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
@@ -1377,14 +1391,14 @@ const Message = ({
             bottomOfMessage
           >
             {message.state === MESSAGE_STATUS.EDIT ? (
-              <MessageStatusUpdated color={messageStateColor} fontSize={messageStateFontSize}>
+              <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
                 edited
               </MessageStatusUpdated>
             ) : (
               ''
             )}
             {messageTimeVisible && (
-              <HiddenMessageTime color={messageTimeColor} fontSize={messageTimeFontSize}>{`${moment(
+              <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
                 message.createdAt
               ).format('HH:mm')}`}</HiddenMessageTime>
             )}
@@ -1395,7 +1409,8 @@ const Message = ({
                   messageStatusDisplayingType,
                   size: messageStatusSize,
                   iconColor: messageStatusColor,
-                  readIconColor: messageReadStatusColor
+                  readIconColor: messageReadStatusColor,
+                  accentColor
                 })}
               </MessageStatus>
             )}
@@ -1403,7 +1418,7 @@ const Message = ({
         )}
         {/* ) : null} */}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
-          <ThreadMessageCountContainer onClick={() => handleReplyMessage(true)}>
+          <ThreadMessageCountContainer color={accentColor} onClick={() => handleReplyMessage(true)}>
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
@@ -1428,7 +1443,7 @@ const Message = ({
             borderRadius={reactionsContainerBorderRadius}
             topPosition={reactionsContainerTopPosition}
             padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground || colors.backgroundColor}
+            backgroundColor={reactionsContainerBackground || sectionBackground}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
           >
             {/* <ReactionEmojis>
@@ -1446,12 +1461,12 @@ const Message = ({
               {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
                 <MessageReaction
                   key={summery.key}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   // onClick={() => handleReactionAddDelete(key)}
                   self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground || colors.backgroundColor}
+                  backgroundColor={reactionItemBackground || sectionBackground}
                   padding={reactionItemPadding}
                   margin={reactionItemMargin}
                   isLastReaction={reactionsCount === 1}
@@ -1459,14 +1474,16 @@ const Message = ({
                 >
                   <MessageReactionKey>
                     {summery.key}
-                    {showEachReactionCount && <ReactionItemCount>{summery.count}</ReactionItemCount>}
+                    {showEachReactionCount && (
+                      <ReactionItemCount color={textPrimary}>{summery.count}</ReactionItemCount>
+                    )}
                   </MessageReactionKey>
                 </MessageReaction>
               ))}
               {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
                 <MessageReaction
                   border={reactionItemBorder}
-                  color={colors.textColor1}
+                  color={textPrimary}
                   borderRadius={reactionItemBorderRadius}
                   backgroundColor={reactionItemBackground}
                   padding={reactionItemPadding}
@@ -1490,7 +1507,7 @@ const Message = ({
           isIncomingMessage={message.incoming}
           myRole={channel.userRole}
           allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === CHANNEL_TYPE.DIRECT}
+          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
           title='Delete message'
         />
       )}
@@ -1551,13 +1568,13 @@ const MessageReactionKey = styled.span`
     segoe ui symbol;
 `
 
-const ReactionItemCount = styled.span<{ color?: string }>`
+const ReactionItemCount = styled.span<{ color: string }>`
   margin-left: 2px;
   font-family: Inter, sans-serif;
   font-weight: 400;
   font-size: 14px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 const MessageReaction = styled.span<{
@@ -1579,7 +1596,6 @@ const MessageReaction = styled.span<{
   margin: ${(props) => props.margin || '0 8px 0 0'};
   margin-right: ${(props) => props.isLastReaction && '0'};
   border: ${(props) => props.border};
-  border-color: ${(props) => props.self && colors.primary};
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: ${(props) => props.borderRadius || '16px'};
@@ -1594,9 +1610,9 @@ const MessageReaction = styled.span<{
   }
 `
 
-const ThreadMessageCountContainer = styled.div`
+const ThreadMessageCountContainer = styled.div<{ color: string }>`
   position: relative;
-  color: ${colors.primary};
+  color: ${(props) => props.color};
   font-weight: 500;
   font-size: 13px;
   line-height: 15px;
@@ -1644,7 +1660,7 @@ const SelectMessageWrapper = styled.div<{ activeColor?: string; disabled?: any }
   bottom: calc(50% - 22px);
   cursor: ${(props) => !props.disabled && 'pointer'};
   & > svg {
-    color: ${(props) => props.activeColor || colors.primary};
+    color: ${(props) => props.activeColor};
     width: 24px;
     height: 24px;
   }
@@ -1800,7 +1816,7 @@ const ForwardedTitle = styled.h3<{
   font-weight: 500;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
   //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
   padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
@@ -1821,7 +1837,7 @@ const ForwardedTitle = styled.h3<{
     margin-right: 4px;
     width: 16px;
     height: 16px;
-    color: ${(props) => props.color || colors.primary};
+    color: ${(props) => props.color};
   }
 `
 /*
@@ -1874,11 +1890,11 @@ const MessageStatus = styled.span<{ height?: string }>`
   }
 `
 
-const HiddenMessageTime = styled.span<{ hide?: boolean; color?: string; fontSize?: string }>`
+const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?: string }>`
   display: ${(props) => props.hide && 'none'};
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
 export const MessageStatusAndTime = styled.span<{
@@ -1892,6 +1908,7 @@ export const MessageStatusAndTime = styled.span<{
   bottomOfMessage?: boolean
   showOnlyOnHover?: boolean
   lineHeight?: string
+  statusColor?: string
 }>`
   visibility: ${(props) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
@@ -1916,7 +1933,7 @@ export const MessageStatusAndTime = styled.span<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? colors.textColor2 : props.withAttachment ? colors.white : '')};
+    color: ${(props) => (props.fileAttachment ? props.statusColor : props.withAttachment ? colors.white : '')};
   }
 
   ${(props) =>
@@ -1929,16 +1946,16 @@ export const MessageStatusAndTime = styled.span<{
   `}
 `
 
-const MessageStatusUpdated = styled.span<{ color?: string; fontSize?: string }>`
+const MessageStatusUpdated = styled.span<{ color: string; fontSize?: string }>`
   margin-right: 4px;
   font-style: italic;
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
 `
 
-const MessageStatusDeleted = styled.span<{ color?: string; fontSize?: string; withAttachment?: boolean }>`
-  color: ${(props) => props.color || colors.textColor2};
+const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; withAttachment?: boolean }>`
+  color: ${(props) => props.color};
   font-size: ${(props) => props.fontSize};
   font-style: italic;
 `
@@ -2013,7 +2030,7 @@ const MessageContent = styled.div<{
 
 const VoiceIconWrapper = styled(VoiceIcon)`
   transform: translate(0px, 3.5px);
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
 `
 
 const MessageItem = styled.div<{

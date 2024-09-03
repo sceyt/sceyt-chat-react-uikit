@@ -192,7 +192,7 @@ export const DropdownOptionsUl = styled.ul`
 `
 
 export const DropdownOptionLi = styled.li<{
-  textColor?: string
+  textColor: string
   hoverBackground?: string
   iconWidth?: string
   iconColor?: string
@@ -203,7 +203,7 @@ export const DropdownOptionLi = styled.li<{
   align-items: center;
   font-size: 14px;
   line-height: 20px;
-  color: ${(props: any) => props.textColor || colors.textColor1};
+  color: ${(props: any) => props.textColor};
   margin: ${(props: any) => props.margin};
   padding: 6px 6px 6px 16px;
 
@@ -226,7 +226,9 @@ export const CustomSelect = styled.div<{
   maxWidth?: string
   marginTop?: string
   backgroundColor?: string
-  color?: string
+  color: string
+  placeholderColor: string
+  errorColor: string
 }>`
   display: flex;
   height: 40px;
@@ -235,18 +237,18 @@ export const CustomSelect = styled.div<{
   min-width: ${(props) => props.minWidth};
   max-width: ${(props) => props.maxWidth};
   background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => (props.isError ? `1px solid ${colors.red1}` : `1px solid ${colors.gray1}`)};
+  border: ${(props) => (props.isError ? `1px solid ${props.errorColor}` : `1px solid ${colors.gray1}`)};
   box-sizing: border-box;
   border-radius: 4px;
   font-style: normal;
   font-weight: normal;
   font-size: 14px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin-top: ${(props) => props.marginTop};
 
   ::placeholder {
-    color: ${colors.textColor3};
+    color: ${(props) => props.placeholderColor};
   }
 
   &:disabled {
@@ -260,17 +262,9 @@ export const CustomSelect = styled.div<{
   .dropdown-body {
     width: 100%;
   }
-
-  .dropdown-trigger {
-    & .default-selection {
-      color: ${colors.textColor3};
-    }
-
-    //width: calc(100% - 20px);
-  }
 `
 
-export const CustomSelectTrigger = styled.span<{ color?: string }>`
+export const CustomSelectTrigger = styled.span<{ color: string }>`
   display: block;
   width: calc(100% - 22px);
   padding: 8px 10px 8px 15px;
@@ -279,11 +273,11 @@ export const CustomSelectTrigger = styled.span<{ color?: string }>`
   font-weight: normal;
   font-size: 14px;
   line-height: 23px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color?: string }>`
+export const Label = styled.label<{ color: string }>`
   display: inline-block;
   font-style: normal;
   font-weight: 500;
@@ -291,7 +285,7 @@ export const Label = styled.label<{ color?: string }>`
   line-height: 20px;
   margin-top: 20px;
   margin-bottom: 4px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 export const UploadFile = styled.input`
@@ -304,23 +298,27 @@ export const UploadFileLabel = styled.label`
   display: block;
 `
 
-export const InputErrorMessage = styled.p`
+export const InputErrorMessage = styled.p<{ color: string }>`
   font-size: 12px;
-  color: ${colors.red1};
+  color: ${(props) => props.color};
   margin: 4px 0 0;
 `
 
 export const CustomInput = styled.input<{
   error?: boolean
   theme?: string
-  color?: string
+  color: string
+  placeholderColor: string
+  backgroundColor: string
+  errorColor: string
+  borderColor: string
 }>`
   height: 40px;
   width: 100%;
-  background: ${(props) => (props.theme === THEME.DARK ? colors.backgroundColor : colors.white)};
+  background: ${(props) => (props.theme === THEME.DARK ? props.backgroundColor : colors.white)};
   border: ${(props) =>
-    props.error ? `1px solid ${colors.red1}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
-  color: ${(props) => props.color || colors.textColor1};
+    props.error ? `1px solid ${props.errorColor}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
+  color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
   padding: 11px 14px;
@@ -333,12 +331,12 @@ export const CustomInput = styled.input<{
   outline: none;
 
   &:focus {
-    border: 1px solid ${(props) => (props.error ? `1px solid ${colors.red1}` : colors.primary)};
+    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : colors.primary)};
     outline: ${(props) =>
       props.error
-        ? `1px solid ${colors.red2}`
+        ? `1px solid ${colors.errorBlur}`
         : props.theme !== THEME.DARK
-          ? `2px solid ${colors.backgroundColor}`
+          ? `2px solid ${props.borderColor}`
           : 'none'};
   }
   &:disabled {
@@ -348,7 +346,7 @@ export const CustomInput = styled.input<{
   }
   &::placeholder {
     opacity: 1;
-    color: ${colors.textColor3};
+    color: ${(props) => props.placeholderColor};
   }
 `
 
@@ -366,24 +364,6 @@ export const FilterFieldSpan = styled.span`
   text-align: left;
   font-size: 0.875rem;
   line-height: 1rem;
-`
-
-export const CustomRadioWrapper = styled.div`
-  display: flex;
-  align-items: center;
-  margin-top: 16px;
-  label {
-    font-size: 14px;
-    line-height: 16px;
-    color: ${colors.textColor1};
-  }
-`
-
-export const CustomRadio = styled.input`
-  height: 16px;
-  width: 16px;
-  margin: 0 10px 0 0;
-  cursor: pointer;
 `
 
 export const Row = styled.div<any>`
@@ -406,7 +386,7 @@ export const Row = styled.div<any>`
 `
 
 export const Button = styled.button<{
-  color?: string
+  color: string
   backgroundColor?: string
   borderRadius?: string
   disabled?: boolean
@@ -425,7 +405,7 @@ export const Button = styled.button<{
   line-height: 20px;
   padding: 8px 16px;
   background-color: ${(props) => props.backgroundColor || colors.white};
-  color: ${(props) => props.color || (props.backgroundColor ? colors.white : colors.textColor1)};
+  color: ${(props) => props.color};
   border: 1px solid ${(props) => props.backgroundColor || colors.gray1};
   margin: ${(props) => props.margin || '0'};
   user-select: none;
@@ -442,13 +422,13 @@ export const PopupName = styled.h3<{
   marginBottom?: string
   padding?: string
   isDelete?: boolean
-  color?: string
+  color: string
 }>`
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 23px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
   margin-bottom: ${(props: any) => props.marginBottom};
@@ -541,12 +521,12 @@ export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; p
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 
-export const PopupDescription = styled.span`
+export const PopupDescription = styled.span<{ color: string }>`
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
   line-height: 22px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
   cursor: default;
   white-space: pre-line;
   margin-top: ${(props: any) => props.marginTop || '10px'};
@@ -571,7 +551,7 @@ export const PopupFooter = styled(ButtonBlock)`
 `
 
 export const SectionHeader = styled.h4<{
-  color?: string
+  color: string
   margin?: string
   theme?: string
   uppercase?: boolean
@@ -581,17 +561,17 @@ export const SectionHeader = styled.h4<{
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
   line-height: ${(props) => props.lineHeight || '20px'};
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   margin: ${(props) => props.margin || 0};
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
-export const ItemNote = styled.div<{ direction: string }>`
+export const ItemNote = styled.div<{ disabledColor: string; bgColor: string; direction: string }>`
   display: none;
   position: absolute;
   z-index: 301;
   padding: 10px 12px;
-  background-color: ${colors.textColor1};
+  background-color: ${(props) => props.bgColor};
   border-radius: 12px;
   font-size: 0.75rem;
   white-space: nowrap;
@@ -604,7 +584,7 @@ export const ItemNote = styled.div<{ direction: string }>`
     content: '';
     position: absolute;
     z-index: -1;
-    background-color: ${colors.textColor1};
+    background-color: ${(props) => props.bgColor};
     border-radius: 3px;
     width: 14px;
     height: 14px;
@@ -640,11 +620,7 @@ export const ItemNote = styled.div<{ direction: string }>`
         bottom: calc(100% + 15px);
         left: 50%;
         transform: translateX(-50%);
-    `} ${(props: any) =>
-    props.disabled &&
-    `
-        color: ${colors.textColor2};
-    `}
+    `} ${(props: any) => props.disabled && `color: ${(props: any) => props.disabledColor};`}
 `
 export const CustomSwitcher = styled.div`
   display: inline-block;
@@ -705,10 +681,10 @@ export const UploadAvatarButton = styled.button`
   padding: 7px 12px;
   line-height: 10px;
 `
-export const UploadAvatarHandler = styled.div`
+export const UploadAvatarHandler = styled.div<{ color: string }>`
   margin-left: 18px;
   font-size: 13px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
 `
 
 export const StyledText = styled.span<{
@@ -727,7 +703,7 @@ export const StyledText = styled.span<{
   letter-spacing: ${(props) => props.letterSpacing};
 
   &.mention {
-    color: ${(props) => (props.isLastMessage ? colors.textColor2 : props.color || colors.primary)};
+    color: ${(props) => props.color || colors.textColor1};
     font-weight: ${(props) => props.isLastMessage && '500'};
   }
   &.bold {
@@ -770,7 +746,7 @@ export const MessageOwner = styled.h3<{
 
 export const MessageText = styled.pre<{
   fontFamily?: string
-  color?: string
+  color: string
   withAttachment?: boolean
   fontSize?: string
   lineHeight?: string
@@ -806,7 +782,7 @@ export const MessageText = styled.pre<{
   //white-space: normal;
   //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
   user-select: text;
   //overflow: hidden;
 
@@ -837,6 +813,7 @@ export const ReplyMessageText = styled.span<{
   fontSize?: string
   lineHeight?: string
   showMessageSenderName?: boolean
+  color: string
 }>`
   display: -webkit-box;
   position: relative;
@@ -847,7 +824,7 @@ export const ReplyMessageText = styled.span<{
   font-weight: 400;
   line-height: ${(props) => props.lineHeight || '20px'};
   letter-spacing: -0.2px;
-  color: ${colors.textColor1};
+  color: ${(props) => props.color};
   user-select: text;
   -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
@@ -883,11 +860,11 @@ export const StyledSearchSvg = styled(SearchSvg)`
   top: 12px;
   left: ${(props) => props.left || '14px'};
 `
-export const SubTitle = styled.span<{ color?: string; margin?: string; fontSize?: string; lineHeight?: string }>`
+export const SubTitle = styled.span<{ color: string; margin?: string; fontSize?: string; lineHeight?: string }>`
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: ${(props) => props.lineHeight || '16px'};
   letter-spacing: -0.078px;
-  color: ${(props) => props.color || colors.textColor2};
+  color: ${(props) => props.color};
   margin: ${(props) => props.margin};
 `
 
@@ -1040,7 +1017,7 @@ export const UploadProgress = styled.div<{
   `}
 `
 
-export const AttachmentPreviewTitle = styled.span<{ color?: string; fontSize?: string; lineHeight?: string }>`
+export const AttachmentPreviewTitle = styled.span<{ color: string; fontSize?: string; lineHeight?: string }>`
   display: block;
   overflow: hidden;
   white-space: nowrap;
@@ -1051,5 +1028,5 @@ export const AttachmentPreviewTitle = styled.span<{ color?: string; fontSize?: s
   font-size: ${(props) => props.fontSize || '15px'};
   line-height: ${(props) => props.lineHeight || '20px'};
   height: ${(props) => props.lineHeight || '20px'};
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 `

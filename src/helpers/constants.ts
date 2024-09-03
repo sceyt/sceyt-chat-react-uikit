@@ -31,7 +31,7 @@ export const LOADING_STATE = {
   LOADED: 2
 }
 
-export const CHANNEL_TYPE = {
+export const DEFAULT_CHANNEL_TYPE = {
   GROUP: 'group',
   BROADCAST: 'broadcast',
   DIRECT: 'direct',

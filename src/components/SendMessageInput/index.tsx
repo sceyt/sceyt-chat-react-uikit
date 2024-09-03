@@ -66,7 +66,7 @@ import {
   makeUsername
 } from '../../helpers/message'
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
 import { IMember, IMessage, IUser } from '../../types'
@@ -85,7 +85,7 @@ import {
 } from '../../helpers/messagesHalper'
 import {
   attachmentTypes,
-  CHANNEL_TYPE,
+  DEFAULT_CHANNEL_TYPE,
   DB_NAMES,
   DB_STORE_NAMES,
   MESSAGE_DELIVERY_STATUS,
@@ -99,7 +99,7 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
-import { useDidUpdate } from '../../hooks'
+import { useDidUpdate, useColor } from '../../hooks'
 
 // Icons
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
@@ -140,7 +140,6 @@ function AutoFocusPlugin({ messageForReply }: any) {
 
 function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
   const [editor] = useLexicalComposerContext()
-
   useDidUpdate(() => {
     if (shouldClearEditor.clear) {
       editor.update(() => {
@@ -319,6 +318,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderText,
   placeholderTextColor
 }) => {
+  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -331,14 +335,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
-  const isDirectChannel = activeChannel && activeChannel.type === CHANNEL_TYPE.DIRECT
+  const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
   const isDeletedUserChat = directChannelUser && directChannelUser.state === USER_STATE.DELETED
-
   const allowSetMention =
-    allowMentionUser && (activeChannel.type === CHANNEL_TYPE.PRIVATE || activeChannel.type === CHANNEL_TYPE.GROUP)
+    allowMentionUser &&
+    (activeChannel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || activeChannel.type === DEFAULT_CHANNEL_TYPE.GROUP)
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
@@ -1369,12 +1373,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         padding={padding}
         border={border}
         ref={messageContRef}
-        mentionColor={colors.primary}
+        mentionColor={accentColor}
         toolBarTop={selectedText && selectedText.current ? selectedText.current.top : ''}
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
         selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
       >
-        {uploadErrorMessage && <UploadErrorMessage>{uploadErrorMessage}</UploadErrorMessage>}
+        {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
             {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
@@ -1382,13 +1386,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               onClick={handleToggleForwardMessagePopup}
               backgroundColor={colors.primaryLight}
               marginLeft='32px'
+              color={textPrimary}
             >
               <ForwardIcon />
               Forward
             </CustomButton>
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
-              color={colors.red1}
+              color={errorColor}
               backgroundColor={colors.primaryLight}
               marginLeft='16px'
             >
@@ -1418,7 +1423,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 isIncomingMessage={isIncomingMessage}
                 myRole={activeChannel.userRole}
                 allowDeleteIncoming={getAllowEditDeleteIncomingMessage()}
-                isDirectChannel={activeChannel.type === CHANNEL_TYPE.DIRECT}
+                isDirectChannel={activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
                 title={`Delete message${selectedMessagesMap.size > 1 ? 's' : ''}`}
               />
             )}
@@ -1432,7 +1437,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 {disableInput && CustomDisabledInput ? (
                   <CustomDisabledInput />
                 ) : (
-                  <BlockedUserInfo color={colors.textColor1}>
+                  <BlockedUserInfo color={textPrimary}>
                     <BlockInfoIcon />{' '}
                     {isDeletedUserChat
                       ? 'This user has been deleted.'
@@ -1442,16 +1447,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </BlockedUserInfo>
                 )}
               </React.Fragment>
-            ) : !activeChannel.userRole && activeChannel.type !== CHANNEL_TYPE.DIRECT ? (
-              <JoinChannelCont onClick={handleJoinToChannel} color={colors.primary}>
+            ) : !activeChannel.userRole && activeChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT ? (
+              <JoinChannelCont backgroundColor={sectionBackground} onClick={handleJoinToChannel} color={accentColor}>
                 Join
               </JoinChannelCont>
             ) : (
-                activeChannel.type === CHANNEL_TYPE.BROADCAST || activeChannel.type === CHANNEL_TYPE.PUBLIC
+                activeChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                activeChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? !(activeChannel.userRole === 'admin' || activeChannel.userRole === 'owner')
-                  : activeChannel.type !== CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
+                  : activeChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT && !checkActionPermission('sendMessage')
               ) ? (
-              <ReadOnlyCont color={colors.textColor1} iconColor={colors.primary}>
+              <ReadOnlyCont color={textPrimary} iconColor={accentColor}>
                 <EyeIcon /> Read only
               </ReadOnlyCont>
             ) : (
@@ -1463,7 +1469,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
                     ) : (
                       <TypingIndicatorCont>
-                        <TypingFrom>
+                        <TypingFrom color={textSecondary}>
                           {makeUsername(
                             getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
                             typingIndicator.from,
@@ -1486,13 +1492,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     left={replyEditMessageContainerLeftPosition}
                     bottom={replyEditMessageContainerBottomPosition}
                     padding={replyEditMessageContainerPadding}
-                    color={editMessageTextColor || colors.textColor1}
-                    backgroundColor={editMessageBackgroundColor || colors.backgroundColor}
+                    color={editMessageTextColor || textPrimary}
+                    backgroundColor={editMessageBackgroundColor || sectionBackground}
                   >
-                    <CloseEditMode onClick={handleCloseEditMode}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
                     </CloseEditMode>
-                    <EditReplyMessageHeader color={colors.primary}>
+                    <EditReplyMessageHeader color={accentColor}>
                       {editMessageIcon || <EditIcon />}
                       Edit Message
                     </EditReplyMessageHeader>
@@ -1502,7 +1508,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         message: messageToEdit,
                         contactsMap,
                         getFromContacts,
-                        asSampleText: true
+                        asSampleText: true,
+                        accentColor
                       })}
                     </EditMessageText>
                   </EditReplyMessageCont>
@@ -1514,10 +1521,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     bottom={replyEditMessageContainerBottomPosition}
                     left={replyEditMessageContainerLeftPosition}
                     padding={replyEditMessageContainerPadding}
-                    color={replyMessageTextColor || colors.textColor1}
-                    backgroundColor={replyMessageBackgroundColor || colors.backgroundColor}
+                    color={replyMessageTextColor || textPrimary}
+                    backgroundColor={replyMessageBackgroundColor || sectionBackground}
                   >
-                    <CloseEditMode onClick={handleCloseReply}>
+                    <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
                     </CloseEditMode>
                     <ReplyMessageCont>
@@ -1531,13 +1538,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           />
                         ) : (
                           messageForReply.attachments[0].type === attachmentTypes.file && (
-                            <ReplyIconWrapper backgroundColor={colors.primary}>
+                            <ReplyIconWrapper backgroundColor={accentColor}>
                               <ChooseFileIcon />
                             </ReplyIconWrapper>
                           )
                         ))}
                       <div>
-                        <EditReplyMessageHeader color={colors.primary}>
+                        <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
                             {user.id === messageForReply.user.id
@@ -1566,7 +1573,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             text: messageForReply.body,
                             message: messageForReply,
                             contactsMap,
-                            getFromContacts
+                            getFromContacts,
+                            accentColor
                           })
                         )}
                       </div>
@@ -1586,7 +1594,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           setVideoIsReadyToSend={setVideoIsReadyToSend}
                           borderRadius={selectedAttachmentsBorderRadius}
                           selectedFileAttachmentsIcon={selectedFileAttachmentsIcon}
-                          backgroundColor={selectedFileAttachmentsBoxBackground || colors.backgroundColor}
+                          backgroundColor={selectedFileAttachmentsBoxBackground || sectionBackground}
                           selectedFileAttachmentsBoxBorder={selectedFileAttachmentsBoxBorder}
                           selectedFileAttachmentsTitleColor={selectedFileAttachmentsTitleColor}
                           selectedFileAttachmentsSizeColor={selectedFileAttachmentsSizeColor}
@@ -1595,7 +1603,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                   </ChosenAttachments>
                 )}
-                <SendMessageInputContainer iconColor={colors.primary} minHeight={minHeight}>
+                <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
                   {showRecording ? (
                     <AudioCont />
@@ -1606,7 +1614,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
                       }
                       ref={inputWrapperRef}
-                      backgroundColor={inputBackgroundColor || colors.backgroundColor}
+                      backgroundColor={inputBackgroundColor || sectionBackground}
                       channelDetailsIsOpen={channelDetailsIsOpen}
                       messageInputOrder={inputOrder}
                       messageInputPaddings={inputPaddings}
@@ -1616,7 +1624,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           order={emojiIcoOrder}
                           isEmojisOpened={isEmojisOpened}
                           ref={emojiBtnRef}
-                          hoverColor={colors.primary}
+                          hoverColor={accentColor}
                           height={inputContainerHeight || minHeight}
                           onClick={() => {
                             setIsEmojisOpened(!isEmojisOpened)
@@ -1635,7 +1643,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           trigger={
                             <AddAttachmentIcon
                               ref={addAttachmentsBtnRef}
-                              color={colors.primary}
+                              color={accentColor}
                               height={inputContainerHeight || minHeight}
                             >
                               {AddAttachmentsIcon || <AttachmentIcon />}
@@ -1646,11 +1654,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             {showChooseMediaAttachment && (
                               <DropdownOptionLi
                                 key={1}
-                                textColor={colors.textColor1}
+                                textColor={textPrimary}
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader(mediaExtensions)}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseMediaIcon />
                                 {chooseMediaAttachmentText ?? 'Photo or video'}
@@ -1659,11 +1667,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             {showChooseFileAttachment && (
                               <DropdownOptionLi
                                 key={2}
-                                textColor={colors.textColor1}
+                                textColor={textPrimary}
                                 hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader('')}
                                 iconWidth='20px'
-                                iconColor={colors.textColor2}
+                                iconColor={textSecondary}
                               >
                                 <ChooseFileIcon />
                                 {chooseFileAttachmentText ?? 'File'}
@@ -1675,7 +1683,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         (showChooseMediaAttachment || showChooseFileAttachment) && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
-                            color={colors.primary}
+                            color={accentColor}
                             height={inputContainerHeight || minHeight}
                             onClick={() => onOpenFileUploader(showChooseMediaAttachment ? mediaExtensions : '')}
                           >
@@ -1687,11 +1695,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         ref={messageInputRef}
                         order={inputOrder}
                         paddings={inputPaddings}
-                        mentionColor={colors.primary}
+                        mentionColor={accentColor}
                         className={inputCustomClassname}
                         selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
                         borderRadius={inputBorderRadius}
-                        color={colors.textColor1}
+                        color={textPrimary}
                       >
                         <LexicalComposer initialConfig={initialConfig}>
                           <AutoFocusPlugin messageForReply={messageForReply} />
@@ -1772,9 +1780,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
                       order={sendIconOrder}
-                      color={colors.backgroundColor}
+                      color={sectionBackground}
                       height={inputContainerHeight || minHeight}
                       onClick={sendMessageIsActive ? handleSendEditMessage : null}
+                      iconColor={accentColor}
                     >
                       {CustomSendMessageButton || <SendIcon />}
                     </SendMessageButton>
@@ -1783,7 +1792,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       isActive={true}
                       order={sendIconOrder}
                       height={inputContainerHeight || minHeight}
-                      color={colors.primary}
+                      color={accentColor}
+                      iconColor={accentColor}
                     >
                       <AudioRecord
                         sendRecordedFile={setRecordedFile}
@@ -1812,7 +1822,7 @@ const Container = styled.div<{
   borderRadius?: string
   ref?: any
   height?: number
-  mentionColor?: string
+  mentionColor: string
   toolBarTop: string
   toolBarLeft: string
   selectionBackgroundColor: string
@@ -1852,14 +1862,14 @@ const Container = styled.div<{
     cursor: text;
 
     & .rdw-mention-link {
-      color: ${(props) => props.mentionColor || colors.primary};
+      color: ${(props) => props.mentionColor};
     }
   }
 `
 
 const EditReplyMessageCont = styled.div<{
-  backgroundColor?: string
-  color?: string
+  backgroundColor: string
+  color: string
   width?: string
   borderRadius?: string
   left?: string
@@ -1876,8 +1886,8 @@ const EditReplyMessageCont = styled.div<{
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${(props) => props.color || colors.textColor1};
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  color: ${(props) => props.color};
+  background-color: ${(props) => props.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
 `
@@ -1890,14 +1900,14 @@ const EditMessageText = styled.p<any>`
   overflow: hidden;
   text-overflow: ellipsis;
 `
-const UploadErrorMessage = styled.p<any>`
+const UploadErrorMessage = styled.p<{ color: string }>`
   margin: 0;
   position: absolute;
   top: -30px;
-  color: ${colors.red1};
+  color: ${(props) => props.color};
 `
 
-const CloseEditMode = styled.span`
+const CloseEditMode = styled.span<{ color: string }>`
   position: absolute;
   top: 8px;
   right: 12px;
@@ -1908,7 +1918,7 @@ const CloseEditMode = styled.span`
   cursor: pointer;
 
   & > svg {
-    color: ${colors.textColor2};
+    color: ${(props) => props.color};
   }
 `
 
@@ -1917,13 +1927,13 @@ const UserName = styled.span<any>`
   margin-left: 4px;
 `
 
-const EditReplyMessageHeader = styled.h4<any>`
+const EditReplyMessageHeader = styled.h4<{ color: string }>`
   display: flex;
   margin: 0 0 2px;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
 
   > svg {
     margin-right: 4px;
@@ -1943,16 +1953,16 @@ const AddAttachmentIcon = styled.span<any>`
   order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
   > svg {
-    ${(props) => (props.isActive ? `color: ${props.color || colors.primary};` : 'color: #898B99;')};
+    ${(props) => (props.isActive ? `color: ${props.color};` : `color: ${props.color};`)};
     width: 24px;
   }
 
   &:hover > svg {
-    color: ${(props) => props.color || colors.primary};
+    color: ${(props) => props.color};
   }
 `
 
-const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: string; messageForReply?: string }>`
+const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor: string; messageForReply?: string }>`
   display: flex;
   align-items: flex-end;
   justify-content: space-between;
@@ -1966,7 +1976,7 @@ const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: s
 
     & ${AddAttachmentIcon} {
       & > svg {
-        color: ${(props) => props.iconColor || colors.primary};
+        color: ${(props) => props.iconColor};
       }
     ;
     }
@@ -1976,7 +1986,7 @@ const SendMessageInputContainer = styled.div<{ minHeight?: string; iconColor?: s
 
 const MessageInputWrapper = styled.div<{
   channelDetailsIsOpen?: boolean
-  backgroundColor?: string
+  backgroundColor: string
   borderRadius?: string
   messageInputOrder?: number
   messageInputPaddings?: string
@@ -1987,7 +1997,7 @@ const MessageInputWrapper = styled.div<{
   //max-width: ${(props) =>
     props.channelDetailsIsOpen ? `calc(100% - ${props.channelDetailsIsOpen ? 362 : 0}px)` : ''};
   //max-width: calc(100% - 110px);
-  background-color: ${(props) => props.backgroundColor || colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: ${(props) => props.borderRadius || '18px'};
   position: relative;
 `
@@ -1998,7 +2008,7 @@ const LexicalWrapper = styled.div<{
   borderRadius?: string
   backgroundColor?: string
   paddings?: string
-  mentionColor?: string
+  mentionColor: string
   isChrome?: boolean
   selectionBackgroundColor?: string
 }>`
@@ -2028,15 +2038,15 @@ const LexicalWrapper = styled.div<{
     }
 
     &::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     & *::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     & span::selection {
-      background-color: ${(props) => props.selectionBackgroundColor || colors.primary};
+      background-color: ${(props) => props.selectionBackgroundColor};
     }
 
     &:empty:before {
@@ -2049,7 +2059,7 @@ const LexicalWrapper = styled.div<{
     }
 
     & .mention {
-      color: ${(props) => props.mentionColor || colors.primary};
+      color: ${(props) => props.mentionColor};
       background-color: inherit !important;
       user-modify: read-only;
     }
@@ -2116,7 +2126,8 @@ const EmojiButton = styled.span<any>`
   -webkit-tap-highlight-color: transparent;
 
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : 'color: #898B99;')};
+    ${(props) =>
+      props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : `color: ${props.hoverColor};`};
     width: 24px;
     height: 24px;
   }
@@ -2132,6 +2143,7 @@ const SendMessageButton = styled.span<{
   order?: number
   isCustomButton?: any
   onClick?: any
+  iconColor: string
 }>`
   ${(props) =>
     !props.isCustomButton &&
@@ -2146,6 +2158,9 @@ const SendMessageButton = styled.span<{
   -webkit-tap-highlight-color: transparent;
 
   color: ${props.isActive ? colors.primary : props.color};
+  & > svg {
+    color: ${props.iconColor};
+  }
   `}
 `
 
@@ -2188,13 +2203,13 @@ const TypingIndicatorCont = styled.div`
   margin-bottom: 12px;
 `
 
-const TypingFrom = styled.h5`
+const TypingFrom = styled.h5<{ color: string }>`
   margin: 0 4px 0 0;
   font-weight: 400;
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.2px;
-  color: ${colors.textColor2};
+  color: ${(props) => props.color};
 `
 const sizeAnimation = keyframes`
   0% {
@@ -2264,7 +2279,7 @@ const TypingAnimation = styled.div`
 const Loading = styled.div`
   height: 36px;
 `
-const BlockedUserInfo = styled.div`
+const BlockedUserInfo = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2272,13 +2287,13 @@ const BlockedUserInfo = styled.div`
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 
   & > svg {
     margin-right: 12px;
   }
 `
-const JoinChannelCont = styled.div<{ color?: string }>`
+const JoinChannelCont = styled.div<{ backgroundColor: string; color?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2289,10 +2304,10 @@ const JoinChannelCont = styled.div<{ color?: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   color: ${(props) => props.color || colors.primary};
-  background-color: ${colors.backgroundColor};
+  background-color: ${(props) => props.backgroundColor};
   cursor: pointer;
 `
-const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
+const ReadOnlyCont = styled.div<{ color: string; iconColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2301,7 +2316,7 @@ const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
-  color: ${(props) => props.color || colors.textColor1};
+  color: ${(props) => props.color};
 
   & > svg {
     margin-right: 12px;
@@ -2311,14 +2326,14 @@ const ReadOnlyCont = styled.div<{ color?: string; iconColor?: string }>`
 const ReplyMessageCont = styled.div`
   display: flex;
 `
-const ReplyIconWrapper = styled.span<{ backgroundColor?: string }>`
+const ReplyIconWrapper = styled.span<{ backgroundColor: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
   margin-right: 12px;
   width: 40px;
   height: 40px;
-  background-color: ${(props) => props.backgroundColor || colors.primary};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
 
   & > svg {
@@ -2334,8 +2349,8 @@ const SelectedMessagesWrapper = styled.div`
   padding: 12px 16px;
 `
 
-const CustomButton = styled.span<{ color?: string; backgroundColor?: string; marginLeft?: string }>`
-  color: ${(props) => props.color || colors.textColor1};
+const CustomButton = styled.span<{ color: string; backgroundColor?: string; marginLeft?: string }>`
+  color: ${(props) => props.color};
   padding: 8px 16px;
   background-color: ${(props) => props.backgroundColor || colors.primaryLight};
   margin-left: ${(props) => props.marginLeft || '8px'};
