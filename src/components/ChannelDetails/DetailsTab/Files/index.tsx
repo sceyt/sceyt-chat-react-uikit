@@ -117,7 +117,7 @@ const Files = ({
                 <FileSizeAndDate
                   fontSize={fileSizeFontSize}
                   lineHeight={fileSizeLineHeight}
-                  color={filePreviewSizeColor || textPrimary}
+                  color={filePreviewSizeColor || textSecondary}
                 >
                   {file.size ? bytesToSize(file.size) : ''}
                 </FileSizeAndDate>
