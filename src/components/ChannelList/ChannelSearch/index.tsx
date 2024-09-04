@@ -1,7 +1,8 @@
 import styled from 'styled-components'
 import React from 'react'
 import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
-import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
 
 const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string }>`
@@ -10,7 +11,7 @@ const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string
   max-width: ${(props) => props.inline && 'calc(100% - 24px)'};
   box-sizing: border-box;
   padding: ${(props) => !props.inline && '0 12px 16px'};
-  //border-right: ${(props) => !props.inline && `1px solid ${props.borderColor}`};
+  border-right: ${(props) => !props.inline && `1px solid ${props.borderColor}`};
 
   & ${ClearTypedText} {
     ${(props) => !props.inline && 'right: 20px'};
@@ -61,6 +62,7 @@ interface IChannelSearchProps {
 
 const ChannelSearch: React.FC<IChannelSearchProps> = ({
   searchValue,
+  theme,
   handleSearchValueChange,
   getMyChannels,
   inline,
@@ -70,14 +72,16 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   fontSize
 }) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
+  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
 
   return (
-    <SearchInputContainer inline={inline} borderColor={surface1Background}>
+    <SearchInputContainer inline={inline} borderColor={sectionBackground}>
       <StyledSearchSvg left={!inline ? '22px' : ''} />
       <SearchInput
-        backgroundColor={searchInputBackgroundColor || surface1Background}
+        backgroundColor={
+          searchInputBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
+        }
         color={searchInputTextColor || textPrimary}
         placeholderColor={textSecondary}
         borderRadius={borderRadius}

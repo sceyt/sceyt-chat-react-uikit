@@ -320,11 +320,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const iconInactive = useColor(THEME_COLOR_NAMES.ICON_INACTIVE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -1496,7 +1493,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     bottom={replyEditMessageContainerBottomPosition}
                     padding={replyEditMessageContainerPadding}
                     color={editMessageTextColor || textPrimary}
-                    backgroundColor={editMessageBackgroundColor || surface1Background}
+                    backgroundColor={editMessageBackgroundColor || sectionBackground}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
@@ -1525,7 +1522,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     left={replyEditMessageContainerLeftPosition}
                     padding={replyEditMessageContainerPadding}
                     color={replyMessageTextColor || textPrimary}
-                    backgroundColor={replyMessageBackgroundColor || surface1Background}
+                    backgroundColor={replyMessageBackgroundColor || sectionBackground}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
@@ -1617,7 +1614,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
                       }
                       ref={inputWrapperRef}
-                      backgroundColor={inputBackgroundColor || surface1Background}
+                      backgroundColor={inputBackgroundColor || sectionBackground}
                       channelDetailsIsOpen={channelDetailsIsOpen}
                       messageInputOrder={inputOrder}
                       messageInputPaddings={inputPaddings}
@@ -1627,7 +1624,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           order={emojiIcoOrder}
                           isEmojisOpened={isEmojisOpened}
                           ref={emojiBtnRef}
-                          color={iconInactive}
                           hoverColor={accentColor}
                           height={inputContainerHeight || minHeight}
                           onClick={() => {
@@ -1647,8 +1643,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           trigger={
                             <AddAttachmentIcon
                               ref={addAttachmentsBtnRef}
-                              color={iconInactive}
-                              hoverColor={accentColor}
+                              color={accentColor}
                               height={inputContainerHeight || minHeight}
                             >
                               {AddAttachmentsIcon || <AttachmentIcon />}
@@ -1660,10 +1655,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               <DropdownOptionLi
                                 key={1}
                                 textColor={textPrimary}
-                                hoverBackground={focusBackground}
+                                hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader(mediaExtensions)}
                                 iconWidth='20px'
-                                iconColor={iconInactive}
+                                iconColor={textSecondary}
                               >
                                 <ChooseMediaIcon />
                                 {chooseMediaAttachmentText ?? 'Photo or video'}
@@ -1673,10 +1668,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               <DropdownOptionLi
                                 key={2}
                                 textColor={textPrimary}
-                                hoverBackground={focusBackground}
+                                hoverBackground={colors.hoverBackgroundColor}
                                 onClick={() => onOpenFileUploader('')}
                                 iconWidth='20px'
-                                iconColor={iconInactive}
+                                iconColor={textSecondary}
                               >
                                 <ChooseFileIcon />
                                 {chooseFileAttachmentText ?? 'File'}
@@ -1688,8 +1683,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         (showChooseMediaAttachment || showChooseFileAttachment) && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
-                            color={iconInactive}
-                            hoverColor={accentColor}
+                            color={accentColor}
                             height={inputContainerHeight || minHeight}
                             onClick={() => onOpenFileUploader(showChooseMediaAttachment ? mediaExtensions : '')}
                           >
@@ -1948,13 +1942,7 @@ const EditReplyMessageHeader = styled.h4<{ color: string }>`
   }
 `
 
-const AddAttachmentIcon = styled.span<{
-  color: string
-  hoverColor: string
-  height?: number
-  order?: number
-  isActive?: boolean
-}>`
+const AddAttachmentIcon = styled.span<any>`
   display: flex;
   height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
@@ -1965,12 +1953,12 @@ const AddAttachmentIcon = styled.span<{
   order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
   > svg {
-    ${(props) => (props.isActive ? `color: ${props.hoverColor};` : `color: ${props.color};`)};
+    ${(props) => (props.isActive ? `color: ${props.color};` : `color: ${props.color};`)};
     width: 24px;
   }
 
   &:hover > svg {
-    color: ${(props) => props.hoverColor};
+    color: ${(props) => props.color};
   }
 `
 
@@ -2125,13 +2113,7 @@ const Placeholder = styled.span<{ paddings?: string; color?: string }>`
   }
 `
 
-const EmojiButton = styled.span<{
-  color: string
-  hoverColor: string
-  height?: number
-  order?: number
-  isEmojisOpened?: boolean
-}>`
+const EmojiButton = styled.span<any>`
   display: flex;
   height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
@@ -2144,13 +2126,14 @@ const EmojiButton = styled.span<{
   -webkit-tap-highlight-color: transparent;
 
   > svg {
-    ${(props) => (props.isEmojisOpened ? `color: ${props.hoverColor};` : `color: ${props.color};`)};
+    ${(props) =>
+      props.isEmojisOpened ? `color: ${props.hoverColor || colors.primary};` : `color: ${props.hoverColor};`};
     width: 24px;
     height: 24px;
   }
 
   &:hover > svg {
-    color: ${(props) => props.hoverColor};
+    color: ${(props) => props.hoverColor || colors.primary};
   }
 `
 

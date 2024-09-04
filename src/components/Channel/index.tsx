@@ -100,7 +100,6 @@ const Channel: React.FC<IChannelProps> = ({
 }) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -179,7 +178,9 @@ const Channel: React.FC<IChannelProps> = ({
       theme={theme}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
-      selectedBackgroundColor={selectedChannelBackground || focusBackground}
+      selectedBackgroundColor={
+        selectedChannelBackground || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
+      }
       selectedChannelPaddings={selectedChannelPaddings}
       channelsPaddings={channelsPaddings}
       selectedChannelBorderRadius={selectedChannelBorderRadius}

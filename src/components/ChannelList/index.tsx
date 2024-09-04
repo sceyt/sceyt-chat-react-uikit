@@ -194,7 +194,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize
 }) => {
-  const themeBackgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
@@ -409,7 +408,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       withCustomList={!!List}
       ref={channelListRef}
       borderColor={borderColor}
-      backgroundColor={backgroundColor || themeBackgroundColor}
+      backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.darkModeSecondaryBackgroundColor : '')}
     >
       <ChannelListHeader
         withCustomList={!!List}

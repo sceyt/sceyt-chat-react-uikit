@@ -428,7 +428,6 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
-  const themeBackgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
@@ -1093,7 +1092,7 @@ const MessageList: React.FC<MessagesProps> = ({
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
           onDragEnter={handleDragIn}
-          backgroundColor={backgroundColor || themeBackgroundColor}
+          backgroundColor={backgroundColor}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1126,7 +1125,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerTextColor={dateDividerTextColor}
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
-                      chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                      chatBackgroundColor={backgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
                         prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
@@ -1294,7 +1293,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
                         marginTop={message.type === 'system' ? '0px' : ''}
                         marginBottom={message.type === 'system' ? '16px' : '0'}
-                        chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                        chatBackgroundColor={backgroundColor}
                         unread
                       />
                     ) : null}
