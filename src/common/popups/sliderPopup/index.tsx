@@ -51,7 +51,7 @@ const SliderPopup = ({
 }: IProps) => {
   const dispatch = useDispatch()
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textOnPrimary = useColor(THEME_COLOR_NAMES.TEXT_ON_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const getFromContacts = getShowOnlyContactUsers()
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
@@ -322,7 +322,7 @@ const SliderPopup = ({
   }, [])
   return (
     <Container draggable={false}>
-      <SliderHeader>
+      <SliderHeader backgroundColor={textPrimary}>
         <FileInfo>
           <Avatar
             name={attachmentUserName}
@@ -334,9 +334,9 @@ const SliderPopup = ({
             <UserName>{attachmentUserName}</UserName>
             {/* <FileName>{currentFile.name}</FileName> */}
             {/* <FileSize></FileSize> */}
-            <FileDateAndSize color={textOnPrimary}>
+            <FileDateAndSize color={textSecondary}>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
-              <FileSize color={textOnPrimary}>
+              <FileSize color={textSecondary}>
                 {currentFile && currentFile.size && currentFile.size > 0 ? bytesToSize(currentFile.size, 1) : ''}
               </FileSize>
             </FileDateAndSize>
@@ -527,9 +527,9 @@ const ProgressWrapper = styled.span`
     }
   }
 `
-const SliderHeader = styled.div`
+const SliderHeader = styled.div<{ backgroundColor?: string }>`
   height: 60px;
-  background: rgba(0, 0, 0, 0.8);
+  background: ${(props) => props.backgroundColor};
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -538,7 +538,7 @@ const SliderHeader = styled.div`
 const SliderBody = styled.div`
   width: 100%;
   height: calc(100% - 60px);
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.4);
   display: flex;
   align-items: center;
   justify-content: center;

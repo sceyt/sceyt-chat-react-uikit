@@ -257,8 +257,8 @@ const Message = ({
   messageStatusDisplayingType = 'ticks',
   ownMessageBackground = colors.primaryLight,
   incomingMessageBackground,
-  ownRepliedMessageBackground,
-  incomingRepliedMessageBackground,
+  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
+  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
   showOwnAvatar = true,
   showMessageStatus = true,
   showMessageTimeAndStatusOnlyOnHover,
@@ -362,10 +362,6 @@ const Message = ({
 }: IMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
-  const bubbleIncoming = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING)
-  const bubbleOutgoingX = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING_X)
-  const bubbleIncomingX = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING_X)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
@@ -792,8 +788,8 @@ const Message = ({
       hoverBackground={
         hoverBackground
           ? message.incoming
-            ? incomingMessageBackground || bubbleIncoming
-            : ownMessageBackground || bubbleOutgoing
+            ? incomingMessageBackground || sectionBackground
+            : ownMessageBackground || 'rgb(238, 245, 255)'
           : ''
       }
       topMargin={
@@ -921,8 +917,8 @@ const Message = ({
               message.parentMessage.attachments[0] &&
               message.parentMessage.attachments[0].type === attachmentTypes.voice
             }
-            ownMessageBackground={ownMessageBackground || bubbleOutgoing}
-            incomingMessageBackground={incomingMessageBackground || bubbleIncoming}
+            ownMessageBackground={ownMessageBackground}
+            incomingMessageBackground={incomingMessageBackground || sectionBackground}
             borderRadius={borderRadius}
             withAttachments={notLinkAttachment}
             attachmentWidth={
@@ -1059,11 +1055,7 @@ const Message = ({
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
                 leftBorderColor={accentColor}
-                backgroundColor={
-                  message.incoming
-                    ? incomingRepliedMessageBackground || bubbleIncomingX
-                    : ownRepliedMessageBackground || bubbleOutgoingX
-                }
+                backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
                 onClick={() =>
                   handleScrollToRepliedMessage &&
                   !selectionIsActive &&
@@ -1080,9 +1072,7 @@ const Message = ({
                       <Attachment
                         key={attachment.tid || attachment.url}
                         backgroundColor={
-                          message.incoming
-                            ? incomingMessageBackground || bubbleIncoming
-                            : ownMessageBackground || bubbleOutgoing
+                          message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
                         }
                         attachment={{
                           ...attachment,
@@ -1340,9 +1330,7 @@ const Message = ({
                     borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
                     selectedFileAttachmentsIcon={fileAttachmentsIcon}
                     backgroundColor={
-                      message.incoming
-                        ? incomingMessageBackground || bubbleIncoming
-                        : ownMessageBackground || bubbleOutgoing
+                      message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
                     }
                     selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                     selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
