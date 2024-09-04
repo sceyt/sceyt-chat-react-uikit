@@ -4,12 +4,19 @@ export const THEME_COLOR_NAMES = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
   SECTION_BACKGROUND: 'sectionBackground',
+  FOCUS_BACKGROUND: 'focusBackground',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
+  TEXT_ON_PRIMARY: 'textOnPrimary',
   BORDER: 'border',
   ICON_PRIMARY: 'iconPrimary',
   ICON_INACTIVE: 'iconInactive',
+  SURFACE_1: 'surface1',
+  BUBBLE_INCOMING: 'bubbleIncoming',
+  BUBBLE_OUTGOING: 'bubbleOutgoing',
+  BUBBLE_INCOMING_X: 'bubbleIncomingX',
+  BUBBLE_OUTGOING_X: 'bubbleOutgoingX',
   ERROR: 'error'
 }
 export const defaultTheme: SceytChatUIKitTheme = {
@@ -23,8 +30,12 @@ export const defaultTheme: SceytChatUIKitTheme = {
       dark: '#19191B'
     },
     [THEME_COLOR_NAMES.SECTION_BACKGROUND]: {
-      light: '#F1F2F6',
+      light: '#FFFFFF',
       dark: '#232324'
+    },
+    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: {
+      light: '#E3E7FF',
+      dark: '#212239'
     },
     [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
       light: '#111539',
@@ -38,6 +49,10 @@ export const defaultTheme: SceytChatUIKitTheme = {
       light: '#A0A1B0',
       dark: '#76787A'
     },
+    [THEME_COLOR_NAMES.TEXT_ON_PRIMARY]: {
+      light: '#fff',
+      dark: '#fff'
+    },
     [THEME_COLOR_NAMES.BORDER]: {
       light: '#E4E6EE',
       dark: '#303032'
@@ -49,6 +64,26 @@ export const defaultTheme: SceytChatUIKitTheme = {
     [THEME_COLOR_NAMES.ICON_INACTIVE]: {
       light: '#A0A1B0',
       dark: '#64666A'
+    },
+    [THEME_COLOR_NAMES.SURFACE_1]: {
+      light: '#F1F2F6',
+      dark: '#232324'
+    },
+    [THEME_COLOR_NAMES.BUBBLE_INCOMING]: {
+      light: '#F1F2F6',
+      dark: '#232324'
+    },
+    [THEME_COLOR_NAMES.BUBBLE_OUTGOING]: {
+      light: '#E3E7FF',
+      dark: '#212239'
+    },
+    [THEME_COLOR_NAMES.BUBBLE_INCOMING_X]: {
+      light: '#E4E6EE',
+      dark: '#303032'
+    },
+    [THEME_COLOR_NAMES.BUBBLE_OUTGOING_X]: {
+      light: '#D1D8FF',
+      dark: '#2E3052'
     },
     [THEME_COLOR_NAMES.ERROR]: {
       light: '#FA4C56',

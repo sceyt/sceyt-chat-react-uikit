@@ -93,6 +93,7 @@ const Attachment = ({
 }: AttachmentPops) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -843,7 +844,7 @@ const Attachment = ({
                   fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
-              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary} errorColor={errorColor}>
+              <AttachmentSize color={selectedFileAttachmentsSizeColor || textSecondary} errorColor={errorColor}>
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&

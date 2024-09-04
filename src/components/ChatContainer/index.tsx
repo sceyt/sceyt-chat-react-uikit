@@ -32,6 +32,8 @@ export interface ICustomUploader {
   cancelRequest: (requestPromise: any) => void
 }
 
+export type ThemeColorName = (typeof THEME_COLOR_NAMES)[keyof typeof THEME_COLOR_NAMES]
+
 interface IThemeColor {
   light: string
   dark?: string
@@ -40,11 +42,11 @@ interface IThemeColor {
 
 export interface SceytChatUIKitTheme {
   colors: {
-    [key in keyof typeof THEME_COLOR_NAMES]?: IThemeColor;
-  };
+    [key in ThemeColorName]: IThemeColor
+  }
 }
 
-export type ThemeMode = "light" | "dark" | string;
+export type ThemeMode = 'light' | 'dark' | string
 
 export interface IChatClientProps {
   client: any
