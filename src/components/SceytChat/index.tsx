@@ -176,7 +176,25 @@ const SceytChat = ({
         colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
       }
     }
+
     const updatedTheme = { ...defaultTheme }
+    console.log('gen pr light  light. . . ', moderateColor(updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].light, 0.3))
+    console.log(
+      'gen pr light  dark. . . ',
+      moderateColor(updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].dark || '', 0.4)
+    )
+    colors.outgoingMessageBackgroundDark = moderateColor(
+      updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].dark || '',
+      0.85,
+      true
+    )
+    colors.outgoingMessageBackgroundLight = moderateColor(updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].light, 0.85)
+    colors.outgoingMessageBackgroundXLight = moderateColor(updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].light, 0.75)
+    colors.outgoingMessageBackgroundXDark = moderateColor(
+      updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].dark || '',
+      0.75,
+      true
+    )
     updatedTheme.colors = updatedColors
     dispatch(setTheme(updatedTheme))
   }

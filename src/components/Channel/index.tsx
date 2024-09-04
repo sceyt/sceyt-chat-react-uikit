@@ -102,6 +102,7 @@ const Channel: React.FC<IChannelProps> = ({
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const surface2 = useColor(THEME_COLOR_NAMES.SURFACE_2)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
   const ChatClient = getClient()
@@ -467,7 +468,7 @@ const Channel: React.FC<IChannelProps> = ({
           </UnreadMentionIconWrapper>
         )}
         {!!(channel.newMessageCount || channel.unread) && (
-          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted}>
+          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted} mutedBackgroundColor={surface2}>
             {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
           </UnreadCount>
         )}
@@ -481,6 +482,7 @@ export default Channel
 export interface UnreadCountProps {
   readonly isMuted: boolean
   readonly backgroundColor?: string
+  readonly mutedBackgroundColor?: string
   width?: string
   height?: string
   textColor?: string
@@ -726,5 +728,5 @@ const UnreadCount = styled.span<UnreadCountProps>`
   border-radius: 10px;
   box-sizing: border-box;
 
-  ${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}
+  ${(props: any) => props.isMuted && `background-color: ${props.mutedBackgroundColor};`}
 `

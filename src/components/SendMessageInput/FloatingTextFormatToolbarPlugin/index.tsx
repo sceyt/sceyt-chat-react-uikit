@@ -118,9 +118,9 @@ function TextFormatFloatingToolbar({
   showMenu: boolean
 }): JSX.Element {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const hoverBackground = useColor(THEME_COLOR_NAMES.HOVER_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const surface2 = useColor(THEME_COLOR_NAMES.SURFACE_2)
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {
@@ -236,11 +236,11 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as bold'
             iconColor={textSecondary}
-            hoverBackgroundColor={sectionBackground}
+            hoverBackgroundColor={hoverBackground}
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
               Bold
             </ItemNote>
             <BoldIcon />
@@ -248,7 +248,7 @@ function TextFormatFloatingToolbar({
 
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={sectionBackground}
+            hoverBackgroundColor={hoverBackground}
             hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
@@ -257,14 +257,14 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
               Italic
             </ItemNote>
             <ItalicIcon />
           </Action>
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={sectionBackground}
+            hoverBackgroundColor={hoverBackground}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
@@ -273,7 +273,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
               {' '}
               Strikethrough{' '}
             </ItemNote>
@@ -282,7 +282,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={sectionBackground}
+            hoverBackgroundColor={hoverBackground}
             hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
@@ -290,7 +290,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
               Monospace
             </ItemNote>
             <MonoIcon />
@@ -298,7 +298,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={sectionBackground}
+            hoverBackgroundColor={hoverBackground}
             hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
@@ -306,7 +306,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={textPrimary} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
               Underline
             </ItemNote>
             <UnderlineIcon />

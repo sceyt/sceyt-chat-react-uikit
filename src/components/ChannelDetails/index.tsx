@@ -296,20 +296,32 @@ const Details = ({
               setDefaultAvatar={isDirectChannel}
             />
             <ChannelInfo direction={avatarAndNameDirection}>
-              <ChannelName
-                isDirect={isDirectChannel}
-                uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
-                fontSize={channelNameFontSize}
-                lineHeight={channelNameLineHeight}
-                color={textPrimary}
-              >
-                {(activeChannel && activeChannel.subject) ||
-                  (isDirectChannel && directChannelUser
-                    ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                    : isSelfChannel
-                      ? 'Me'
-                      : '')}
-              </ChannelName>
+              <ChannelNameWrapper>
+                <ChannelName
+                  isDirect={isDirectChannel}
+                  uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+                  fontSize={channelNameFontSize}
+                  lineHeight={channelNameLineHeight}
+                  color={textPrimary}
+                >
+                  {(activeChannel && activeChannel.subject) ||
+                    (isDirectChannel && directChannelUser
+                      ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                      : isSelfChannel
+                        ? 'Me'
+                        : '')}
+                </ChannelName>
+                {!isDirectChannel && checkActionPermission('updateChannel') && (
+                  <EditButton
+                    topPosition={channelEditIconTopPosition}
+                    rightPosition={channelEditIconRightPosition}
+                    onClick={() => setEditMode(true)}
+                  >
+                    {channelEditIcon || <EditIcon />}
+                  </EditButton>
+                )}
+              </ChannelNameWrapper>
+
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
@@ -325,15 +337,6 @@ const Details = ({
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {activeChannel && activeChannel.memberCount} {displayMemberText}
                 </SubTitle>
-              )}
-              {!isDirectChannel && checkActionPermission('updateChannel') && (
-                <EditButton
-                  topPosition={channelEditIconTopPosition}
-                  rightPosition={channelEditIconRightPosition}
-                  onClick={() => setEditMode(true)}
-                >
-                  {channelEditIcon || <EditIcon />}
-                </EditButton>
               )}
             </ChannelInfo>
           </ChannelAvatarAndName>
@@ -567,11 +570,13 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
+const ChannelNameWrapper = styled.div`
+  display: flex;
+  justify-content: center;
+`
+
 const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>`
-  position: absolute;
-  right: ${(props) => props.rightPosition || '-28px'};
-  top: ${(props) => props.topPosition || '8px'};
-  margin-left: 8px;
+  margin-left: 6px;
   cursor: pointer;
   color: #b2b6be;
 `

@@ -17,6 +17,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
 
   const [state, setState] = useStateComplex({
@@ -86,7 +87,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
             </Controls>
           </div>
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>

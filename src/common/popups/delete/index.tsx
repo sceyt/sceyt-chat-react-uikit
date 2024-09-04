@@ -44,6 +44,7 @@ function ConfirmPopup({
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const [checkActionPermission] = usePermissions(myRole ?? '')
   const [initialRender, setInitialRender] = useState(true)
@@ -111,7 +112,7 @@ function ConfirmPopup({
             </DeleteMessageOptions>
           )}
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>

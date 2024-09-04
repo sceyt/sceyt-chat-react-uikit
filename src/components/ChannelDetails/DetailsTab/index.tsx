@@ -155,7 +155,11 @@ const DetailsTab = ({
                   onClick={() => handleTabClick(channelDetailsTabs[key])}
                   key={key}
                 >
-                  {channelDetailsTabs[key] === channelDetailsTabs.member ? displayMemberText : channelDetailsTabs[key]}
+                  <span>
+                    {channelDetailsTabs[key] === channelDetailsTabs.member
+                      ? displayMemberText
+                      : channelDetailsTabs[key]}
+                  </span>
                 </button>
               )
             } else {
@@ -169,7 +173,7 @@ const DetailsTab = ({
               onClick={() => handleTabClick(channelDetailsTabs[key])}
               key={key}
             >
-              {channelDetailsTabs[key]}
+              <span>{channelDetailsTabs[key]}</span>
             </button>
           )
         })}
@@ -249,7 +253,8 @@ const DetailsTabHeader = styled.div<{
   lineHeight?: string
   color: string
 }>`
-  overflow: auto;
+  overflow-x: auto;
+  overflow-y: hidden;
   padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor};
   background-color: ${(props) => props.backgroundColor || colors.white};
@@ -283,7 +288,7 @@ const DetailsTabHeader = styled.div<{
     border: none;
     background: transparent;
     outline: none;
-    padding: 13px 0 11px;
+    height: 44px;
     text-transform: capitalize;
     font-style: normal;
     font-weight: 500;
@@ -293,7 +298,15 @@ const DetailsTabHeader = styled.div<{
     min-width: ${(props) => props.minWidth || '70px'};
     cursor: pointer;
   }
-  & .active {
+
+  & span {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+  }
+
+  & .active span {
     color: ${(props) => props.activeTabColor || colors.primary};
 
     &:after {

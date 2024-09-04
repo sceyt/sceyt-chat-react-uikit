@@ -314,10 +314,10 @@ const MessageList: React.FC<MessagesProps> = ({
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
-  ownMessageBackground = colors.primaryLight,
+  ownMessageBackground,
   incomingMessageBackground,
-  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
-  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
+  ownRepliedMessageBackground,
+  incomingRepliedMessageBackground,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -431,7 +431,9 @@ const MessageList: React.FC<MessagesProps> = ({
   const themeBackgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const overlayBackground = useColor(THEME_COLOR_NAMES.OVERLAY_BG)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const textOnPrimary = useColor(THEME_COLOR_NAMES.TEXT_ON_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
@@ -1077,9 +1079,9 @@ const MessageList: React.FC<MessagesProps> = ({
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor || textPrimary}
+            dateDividerTextColor={dateDividerTextColor || textOnPrimary}
             dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor || sectionBackground}
+            dateDividerBackgroundColor={dateDividerBackgroundColor || overlayBackground}
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >

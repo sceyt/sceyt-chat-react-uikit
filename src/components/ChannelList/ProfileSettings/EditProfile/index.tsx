@@ -18,6 +18,7 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -81,7 +82,7 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
         {/* <CustomInput type='text' value={presenceStatus} onChange={handlePresenceStatus} placeholder='About' /> */}
       </EditProfileBody>
 
-      <PopupFooter>
+      <PopupFooter backgroundColor={surface1Background}>
         <Button onClick={handleCloseEditProfile} backgroundColor={colors.gray0} color={textPrimary} borderRadius='8px'>
           Cancel
         </Button>

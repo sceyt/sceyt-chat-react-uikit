@@ -57,7 +57,7 @@ export default function CreateChannel({
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
@@ -333,7 +333,11 @@ export default function CreateChannel({
                       ) : (
                         <UploadAvatarLabel
                           iconColor={accentColor}
-                          backgroundColor={bubbleOutgoing}
+                          backgroundColor={
+                            theme === THEME.DARK
+                              ? colors.outgoingMessageBackgroundDark
+                              : colors.outgoingMessageBackgroundLight
+                          }
                           htmlFor='uploadImage'
                         >
                           {uploadPhotoIcon || <UploadImageIcon />}
@@ -419,7 +423,7 @@ export default function CreateChannel({
                     </React.Fragment>
                   )}
                 </PopupBody>
-                <PopupFooter backgroundColor={sectionBackground}>
+                <PopupFooter backgroundColor={surface1Background}>
                   <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClose()}>
                     Cancel
                   </Button>

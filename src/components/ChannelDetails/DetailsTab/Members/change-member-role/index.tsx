@@ -35,6 +35,7 @@ interface IProps {
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
@@ -108,7 +109,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             </CustomSelect>
           </RolesSelect>
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
