@@ -379,8 +379,6 @@ const Message = ({
   const bubbleIncomingX =
     theme === THEME.DARK ? colors.incomingMessageBackgroundXDark : colors.incomingMessageBackgroundXLight
 
-  console.log('bubbleOutgoing: ', bubbleOutgoing)
-  console.log('ownMessageBackground: ', ownMessageBackground)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
