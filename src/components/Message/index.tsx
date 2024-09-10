@@ -54,6 +54,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
+import ReplyMessage from './ReplyMessage'
 
 interface IMessageProps {
   message: IMessage
@@ -878,6 +879,7 @@ const Message = ({
 
         {CustomMessageItem ? (
           <CustomMessageItem
+            key={message.id}
             channel={channel}
             message={message}
             prevMessage={prevMessage}
@@ -1054,7 +1056,8 @@ const Message = ({
                 />
               ))}
             {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
-              <ReplyMessageContainer
+              <ReplyMessage />
+              /* <ReplyMessageContainer
                 withSenderName={showMessageSenderName}
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
@@ -1112,11 +1115,11 @@ const Message = ({
                     fontSize='12px'
                     rtlDirection={ownMessageOnRightSide && !message.incoming}
                     // clickable={parentMessageOwnerIsNotCurrentUser}
-                    /* onClick={() =>
+                    /!* onClick={() =>
                     handleCreateChat(
                       parentMessageOwnerIsNotCurrentUser && message.parentMessage && message.parentMessage.user.id
                     )
-                  } */
+                  } *!/
                   >
                     {message.parentMessage.user.id === user.id
                       ? 'You'
@@ -1155,7 +1158,7 @@ const Message = ({
                     )}
                   </ReplyMessageText>
                 </ReplyMessageBody>
-              </ReplyMessageContainer>
+              </ReplyMessageContainer> */
             )}
             {message.state !== MESSAGE_STATUS.DELETE &&
               message.forwardingDetails &&

@@ -116,7 +116,7 @@ export interface IMessage {
   attachments: IAttachment[] | []
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
-  parentMessage?: IMessage | null
+  parentMessage: IMessage | null
   bodyAttributes: IBodyAttribute[] | []
   parentId?: string
   repliedInThread?: boolean

@@ -53,7 +53,8 @@ import {
   ADD_SELECTED_MESSAGE,
   REMOVE_SELECTED_MESSAGE,
   CLEAR_SELECTED_MESSAGES,
-  REMOVE_ATTACHMENT
+  REMOVE_ATTACHMENT,
+  ADD_PENDING_MESSAGE
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -289,6 +290,13 @@ export function addMessageAC(message: IMessage) {
   return {
     type: ADD_MESSAGE,
     payload: { message }
+  }
+}
+
+export function addPendingMessageAC(pendingMessage: IMessage, channel: IChannel) {
+  return {
+    type: ADD_PENDING_MESSAGE,
+    payload: { pendingMessage, channel }
   }
 }
 
