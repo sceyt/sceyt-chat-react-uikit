@@ -15,8 +15,8 @@ export const THEME_COLOR_NAMES = {
   ICON_INACTIVE: 'iconInactive',
   SURFACE_1: 'surface1',
   SURFACE_2: 'surface2',
-  OVERLAY_BG: 'overlayBG',
-  OVERLAY_BG_2: 'overlayBG2',
+  OVERLAY_BACKGROUND: 'overlayBackground',
+  OVERLAY_BACKGROUND_2: 'overlayBackground2',
   ERROR: 'error'
 }
 export const defaultTheme: SceytChatUIKitTheme = {
@@ -77,11 +77,11 @@ export const defaultTheme: SceytChatUIKitTheme = {
       light: '#A0A1B0',
       dark: '#3B3B3D'
     },
-    [THEME_COLOR_NAMES.OVERLAY_BG]: {
+    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND]: {
       light: 'rgba(0, 0, 0, 0.5)',
       dark: 'rgba(0, 0, 0, 0.5)'
     },
-    [THEME_COLOR_NAMES.OVERLAY_BG_2]: {
+    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND_2]: {
       light: 'rgba(17, 21, 57, 0.4)',
       dark: 'rgba(17, 21, 57, 0.4)'
     },

@@ -129,7 +129,7 @@ export default function MessageDivider({
   chatBackgroundColor
 }: IProps) {
   const textOnPrimary = useColor(THEME_COLOR_NAMES.TEXT_ON_PRIMARY)
-  const overlayBackground = useColor(THEME_COLOR_NAMES.OVERLAY_BG)
+  const overlayBackground = useColor(THEME_COLOR_NAMES.OVERLAY_BACKGROUND)
   const textRef = React.useRef<HTMLSpanElement | null>(null)
   const [textHeight, setTextHeight] = React.useState<number>(0)
 
