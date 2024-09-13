@@ -5,8 +5,8 @@ import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { themeSelector } from '../../../store/theme/selector'
-import { THEME } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
+import { THEME } from '../../../helpers/constants'
 
 function FrequentlyEmojis({
   handleAddEmoji,
@@ -21,6 +21,7 @@ function FrequentlyEmojis({
 }) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const hoverBackground = useColor(THEME_COLOR_NAMES.HOVER_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
@@ -82,7 +83,7 @@ function FrequentlyEmojis({
     <Container id='emojisContainer' backgroundColor={sectionBackground} rendered={rendered} rightSide={rtlDirection}>
       {emojis.map((emoji: any) => (
         <EmojiItem
-          activeBackground={sectionBackground}
+          activeBackground={hoverBackground}
           active={emoji.reacted}
           key={emoji.key}
           onClick={() => chooseEmoji(emoji.key)}
@@ -93,7 +94,7 @@ function FrequentlyEmojis({
       <OpenMoreEmojis
         onClick={() => handleEmojiPopupToggle(true)}
         iconBackgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
-        hoverBackground={sectionBackground}
+        hoverBackground={hoverBackground}
         iconHoverColor={accentColor}
         iconColor={textSecondary}
       >

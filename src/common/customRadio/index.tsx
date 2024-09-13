@@ -62,8 +62,21 @@ const CustomLabel = styled.label<{
   height: ${(props) => props.size || '12px'};
   cursor: pointer;
   border: ${(props) =>
-    props.isChecked ? `6px solid ${props.checkedBorderColor}` : props.border || `1px solid ${props.borderColor}`};
+    props.isChecked ? `2px solid ${props.checkedBorderColor}` : props.border || `1px solid ${props.borderColor}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
+
+  ${(props) =>
+    props.isChecked &&
+    `
+    &::after {
+    content: '';
+    position: absolute;
+    width: calc(100% - 3px);
+    height: calc(100% - 3px);
+    border-radius: 50%;
+    background-color: ${props.checkedBorderColor};
+  }
+  `}
 `
 
 const Radio = styled.input`

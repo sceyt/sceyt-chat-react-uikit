@@ -47,6 +47,7 @@ interface IProps {
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const ChatClient = getClient()
@@ -358,7 +359,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             )}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>

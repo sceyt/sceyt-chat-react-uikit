@@ -33,8 +33,8 @@ function blendColors(color1: IRGB, color2: IRGB, opacity: number) {
   return rgbToHex(blended.r, blended.g, blended.b)
 }
 
-export const moderateColor = (hexColor: string, transparency: number) => {
+export const moderateColor = (hexColor: string, transparency: number, dark?: boolean) => {
   const originalColor = hexToRgb(hexColor)
-  const whiteColor = { r: 255, g: 255, b: 255 } // Using white as the background
+  const whiteColor = dark ? { r: 0, g: 0, b: 0 } : { r: 255, g: 255, b: 255 } // Using white as the background
   return blendColors(originalColor, whiteColor, transparency)
 }

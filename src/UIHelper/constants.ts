@@ -5,6 +5,7 @@ export const THEME_COLOR_NAMES = {
   BACKGROUND: 'background',
   SECTION_BACKGROUND: 'sectionBackground',
   FOCUS_BACKGROUND: 'focusBackground',
+  HOVER_BACKGROUND: 'hoverBackground',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
@@ -13,10 +14,9 @@ export const THEME_COLOR_NAMES = {
   ICON_PRIMARY: 'iconPrimary',
   ICON_INACTIVE: 'iconInactive',
   SURFACE_1: 'surface1',
-  BUBBLE_INCOMING: 'bubbleIncoming',
-  BUBBLE_OUTGOING: 'bubbleOutgoing',
-  BUBBLE_INCOMING_X: 'bubbleIncomingX',
-  BUBBLE_OUTGOING_X: 'bubbleOutgoingX',
+  SURFACE_2: 'surface2',
+  OVERLAY_BACKGROUND: 'overlayBackground',
+  OVERLAY_BACKGROUND_2: 'overlayBackground2',
   ERROR: 'error'
 }
 export const defaultTheme: SceytChatUIKitTheme = {
@@ -36,6 +36,10 @@ export const defaultTheme: SceytChatUIKitTheme = {
     [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: {
       light: '#E3E7FF',
       dark: '#212239'
+    },
+    [THEME_COLOR_NAMES.HOVER_BACKGROUND]: {
+      light: '#F9FAFB',
+      dark: '#1D1D1F'
     },
     [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
       light: '#111539',
@@ -69,21 +73,17 @@ export const defaultTheme: SceytChatUIKitTheme = {
       light: '#F1F2F6',
       dark: '#232324'
     },
-    [THEME_COLOR_NAMES.BUBBLE_INCOMING]: {
-      light: '#F1F2F6',
-      dark: '#232324'
+    [THEME_COLOR_NAMES.SURFACE_2]: {
+      light: '#A0A1B0',
+      dark: '#3B3B3D'
     },
-    [THEME_COLOR_NAMES.BUBBLE_OUTGOING]: {
-      light: '#E3E7FF',
-      dark: '#212239'
+    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND]: {
+      light: 'rgba(0, 0, 0, 0.5)',
+      dark: 'rgba(0, 0, 0, 0.5)'
     },
-    [THEME_COLOR_NAMES.BUBBLE_INCOMING_X]: {
-      light: '#E4E6EE',
-      dark: '#303032'
-    },
-    [THEME_COLOR_NAMES.BUBBLE_OUTGOING_X]: {
-      light: '#D1D8FF',
-      dark: '#2E3052'
+    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND_2]: {
+      light: 'rgba(17, 21, 57, 0.4)',
+      dark: 'rgba(17, 21, 57, 0.4)'
     },
     [THEME_COLOR_NAMES.ERROR]: {
       light: '#FA4C56',
@@ -123,6 +123,15 @@ export const colors = {
   lightModePrimary: '#5159F6',
   darkModePrimaryLight: '#1c1f47',
   lightModePrimaryLight: '#E3E7FF',
+
+  incomingMessageBackgroundLight: '#dfe0eb',
+  incomingMessageBackgroundDark: '#1c1f47',
+  incomingMessageBackgroundXLight: '#E4E6EE',
+  incomingMessageBackgroundXDark: '#303032',
+  outgoingMessageBackgroundLight: '',
+  outgoingMessageBackgroundDark: '',
+  outgoingMessageBackgroundXLight: '',
+  outgoingMessageBackgroundXDark: '',
 
   incomingRepliedMessageBackground: '#fbfbfc',
   ownRepliedMessageBackground: '#f9fbfd',

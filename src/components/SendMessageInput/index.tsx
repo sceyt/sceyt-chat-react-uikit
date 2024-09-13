@@ -1139,7 +1139,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           ],
           type: 'text'
         }
-        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus, true))
+        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus))
       }
 
       reader.onerror = (e: any) => {
