@@ -107,13 +107,13 @@ export interface IMessage {
   incoming: boolean
   metadata: any
   state: string
-  userReactions: IReaction[] | []
+  userReactions: IReaction[]
   reactionTotals: {
     key: string
     count: number
     score: number
   }[]
-  attachments: IAttachment[] | []
+  attachments: IAttachment[]
   mentionedUsers: IUser[]
   requestedMentionUserIds: string[] | null
   parentMessage: IMessage | null

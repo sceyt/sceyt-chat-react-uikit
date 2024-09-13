@@ -49,7 +49,7 @@ const MessageStatusIcon = ({
   accentColor
 }: {
   messageStatus: string
-  messageStatusDisplayingType: string
+  messageStatusDisplayingType?: string
   size?: string
   iconColor?: string
   readIconColor?: string

@@ -1,6 +1,5 @@
 import styled from 'styled-components'
 import React from 'react'
-import moment from 'moment'
 // Hooks
 import { useColor } from '../../../hooks'
 // Assets
@@ -9,27 +8,21 @@ import { ReactComponent as VoiceIcon } from '../../../assets/svg/voiceIcon.svg'
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { getClient } from '../../../common/client'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
 import { MessageOwner, ReplyMessageText } from '../../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
-import { IAttachment, IChannel, IMessage } from '../../../types'
+import { IAttachment, IMessage } from '../../../types'
 import { MessageTextFormat } from '../../../messageUtils'
-import Attachment from '../../Attachment'
 // Components
+import Attachment from '../../Attachment'
 
-interface IMessageProps {
+interface IRepliedMessageProps {
   message: IMessage
-  channel: IChannel
   isPendingMessage?: boolean
-  prevMessage?: IMessage
-  nextMessage: IMessage
   handleScrollToRepliedMessage: (msgId: string) => void
-  unreadMessageId: string
-  isUnreadMessage: boolean
+  showMessageSenderName?: boolean
   ownMessageOnRightSide?: boolean
-  showSenderNameOnDirectChannel?: boolean
-  showSenderNameOnGroupChannel?: boolean
-  showSenderNameOnOwnMessages?: boolean
+  borderRadius?: string
   ownMessageBackground?: string
   incomingMessageBackground?: string
   ownRepliedMessageBackground?: string
@@ -43,27 +36,22 @@ interface IMessageProps {
   imageAttachmentMaxHeight?: number
   videoAttachmentMaxWidth?: number
   videoAttachmentMaxHeight?: number
+  selectionIsActive?: boolean
+  notLinkAttachment?: boolean
   selectedMessagesMap?: Map<string, IMessage>
   contactsMap: { [key: string]: any }
 }
 
-const ReplyMessage = ({
+const RepliedMessage = ({
   message,
-  channel,
   handleScrollToRepliedMessage,
-  prevMessage,
-  nextMessage,
-  isUnreadMessage,
-  unreadMessageId,
   ownMessageOnRightSide,
-  showSenderNameOnDirectChannel = false,
-  showSenderNameOnGroupChannel = true,
-  showSenderNameOnOwnMessages = true,
   ownMessageBackground = colors.primaryLight,
   incomingMessageBackground,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
-
+  showMessageSenderName,
+  borderRadius,
   fileAttachmentsIcon,
   fileAttachmentsBoxWidth,
   fileAttachmentsBoxBorder,
@@ -73,9 +61,10 @@ const ReplyMessage = ({
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight,
-  selectedMessagesMap,
+  selectionIsActive,
+  notLinkAttachment,
   contactsMap
-}: IMessageProps) => {
+}: IRepliedMessageProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
   const bubbleIncoming = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING)
@@ -86,48 +75,13 @@ const ReplyMessage = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  const messageUserID = message.user ? message.user.id : 'deleted'
-  const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
-  const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null
-  const current = moment(message.createdAt).startOf('day')
-  const firstMessageInInterval =
-    !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system' ||
-    unreadMessageId === prevMessage.id
-  const lastMessageInInterval =
-    !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-    nextMessage.type === 'system'
+
   const withAttachments = message.attachments && message.attachments.length > 0
-  const notLinkAttachment =
-    withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
+
   const parentNotLinkAttachment =
     message.parentMessage &&
     message.parentMessage.attachments &&
     message.parentMessage.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
-
-  const borderRadius =
-    message.incoming && incomingMessageBackground === 'inherit'
-      ? '0px'
-      : !message.incoming && ownMessageBackground === 'inherit'
-        ? '0px'
-        : !message.incoming && ownMessageOnRightSide
-          ? prevMessageUserID !== messageUserID || firstMessageInInterval
-            ? '16px 16px 4px 16px'
-            : nextMessageUserID !== messageUserID || lastMessageInInterval
-              ? '16px 4px 16px 16px'
-              : '16px 4px 4px 16px'
-          : prevMessageUserID !== messageUserID || firstMessageInInterval
-            ? '16px 16px 16px 4px'
-            : nextMessageUserID !== messageUserID || lastMessageInInterval
-              ? '4px 16px 16px 16px'
-              : '4px 16px 16px 4px'
-
-  const showMessageSenderName =
-    (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
-    (message.incoming || showSenderNameOnOwnMessages)
-
-  const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
 
   return (
     <ReplyMessageContainer
@@ -216,7 +170,7 @@ const ReplyMessage = ({
   )
 }
 
-export default React.memo(ReplyMessage, (prevProps, nextProps) => {
+export default React.memo(RepliedMessage, (prevProps, nextProps) => {
   // Custom comparison function to check if only 'messages' prop has changed
   return (
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
@@ -226,9 +180,8 @@ export default React.memo(ReplyMessage, (prevProps, nextProps) => {
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
-    prevProps.prevMessage === nextProps.prevMessage &&
-    prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&
+    prevProps.selectionIsActive === nextProps.selectionIsActive &&
     prevProps.contactsMap === nextProps.contactsMap
   )
 })

@@ -23,7 +23,6 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
 import { useDidUpdate, useOnScreen, useColor } from '../../hooks'
 // Assets
-import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.svg'
@@ -41,7 +40,7 @@ import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
-import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
+import { MessageOwner, MessageText } from '../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
@@ -54,7 +53,7 @@ import ReactionsPopup from '../../common/popups/reactions'
 import EmojisPopup from '../Emojis'
 import FrequentlyEmojis from '../Emojis/frequentlyEmojis'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
-import ReplyMessage from './ReplyMessage'
+import RepliedMessage from './RepliedMessage'
 
 interface IMessageProps {
   message: IMessage
@@ -69,10 +68,8 @@ interface IMessageProps {
     handleCopyMessage?: () => void
     handleReportMessage?: () => void
     handleOpenEmojis?: () => void
-    // eslint-disable-next-line no-unused-vars
     handleSelectMessage?: (event?: any) => void
     handleReplyMessage?: () => void
-
     isThreadMessage?: boolean
     rtlDirection?: boolean
   }>
@@ -241,7 +238,7 @@ const Message = ({
   handleScrollToRepliedMessage,
   handleMediaItemClick,
   stopScrolling,
-  // isPendingMessage,
+  isPendingMessage,
   prevMessage,
   nextMessage,
   setLastVisibleMessageId,
@@ -365,15 +362,12 @@ const Message = ({
   const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
   const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
   const bubbleIncoming = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING)
-  const bubbleOutgoingX = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING_X)
-  const bubbleIncomingX = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING_X)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  // const [editMode, setEditMode] = useState(false)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
@@ -389,7 +383,6 @@ const Message = ({
   const reactionsCount =
     message.reactionTotals &&
     message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
-  // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const messageTextRef = useRef<any>(null)
   const messageActionsTimeout = useRef<any>(null)
   const messageUserID = message.user ? message.user.id : 'deleted'
@@ -409,22 +402,11 @@ const Message = ({
     showMessageStatus &&
     message.state !== MESSAGE_STATUS.DELETE &&
     (showMessageStatusForEachMessage || !nextMessage)
-  /* const firstMessageInInterval = prevMessage
-    ? (message.createdAt as number) - (prevMessage.createdAt as number) > 300000
-    : false
-  const lastMessageInInterval = nextMessage
-    ? (nextMessage.createdAt as number) - (message.createdAt as number) > 300000
-    : false */
+
   const withAttachments = message.attachments && message.attachments.length > 0
   const notLinkAttachment =
     withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
-  const parentNotLinkAttachment =
-    message.parentMessage &&
-    message.parentMessage.attachments &&
-    message.parentMessage.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
-  /* const parentMessageOwnerIsNotCurrentUser = !!(
-    message.parentMessage && (message.parentMessage.user.id === user.id ? '' : message.parentMessage.user.id)
-  ) */
+
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment =
     withAttachments &&
@@ -436,7 +418,7 @@ const Message = ({
   const attachmentMetas =
     mediaAttachment &&
     (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata)
-  // (message.attachments[0].type === attachmentTypes.video || message.attachments[0].type === attachmentTypes.image)
+
   const renderAvatar =
     (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
@@ -470,7 +452,6 @@ const Message = ({
   const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= 30
 
   const toggleEditMode = () => {
-    // setEditMode(!editMode)
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
   }
@@ -535,16 +516,6 @@ const Message = ({
     // dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
   } */
 
-  // TODO implement message action
-  /* const handleReportMessage = (reportData) => {
-    dispatch(reportMessageAC({
-      channelId,
-      messageId: message.id,
-      reportReason: reportData.reportReason,
-      reportDescription: reportData.reportDescription,
-    }));
-  };
-*/
   const handleResendMessage = () => {
     const messageToResend = { ...message }
     if (message.attachments && message.attachments.length) {
@@ -664,11 +635,7 @@ const Message = ({
       withPadding={
         withAttachments &&
         notLinkAttachment &&
-        (message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit') /* ||
-            (message.parent &&
-              message.parent.attachments &&
-              !!message.parent.attachments.length &&
-              parentNotLinkAttachment) */
+        (message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit')
       }
     >
       {showMessageSenderName && (
@@ -756,7 +723,6 @@ const Message = ({
 
   useEffect(() => {
     if (emojisPopupOpen) {
-      // const emojisContainer = document.getElementById(`${message.id}_emoji_popup_container`)
       const bottomPos = messageItemRef.current ? messageItemRef.current.getBoundingClientRect().bottom : 0
       const offsetBottom = window.innerHeight - bottomPos
       setEmojisPopupPosition(offsetBottom < 300 ? 'top' : 'bottom')
@@ -771,11 +737,6 @@ const Message = ({
       setMessageActionsShow(false)
     }
   }, [openedMessageMenuId])
-  /*
-  useDidUpdate(() => {
-    console.log('message  ............................................................... ', message)
-  }, [message])
-*/
 
   useEffect(() => {
     document.addEventListener('mousedown', handleClick)
@@ -875,8 +836,6 @@ const Message = ({
             </DropDown> */}
           </FailedMessageIcon>
         )}
-        {/* {withAttachments && !message.body && <MessageHeader />} */}
-
         {CustomMessageItem ? (
           <CustomMessageItem
             key={message.id}
@@ -960,7 +919,6 @@ const Message = ({
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
           >
-            {/* {withAttachments && !!message.body && <MessageHeader />} */}
             {showMessageSenderName && <MessageHeader />}
             {!isThreadMessage &&
               messageActionsShow &&
@@ -1056,109 +1014,31 @@ const Message = ({
                 />
               ))}
             {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
-              <ReplyMessage />
-              /* <ReplyMessageContainer
-                withSenderName={showMessageSenderName}
-                withBody={!!message.body}
-                withAttachments={withAttachments && notLinkAttachment}
-                leftBorderColor={accentColor}
-                backgroundColor={
-                  message.incoming
-                    ? incomingRepliedMessageBackground || bubbleIncomingX
-                    : ownRepliedMessageBackground || bubbleOutgoingX
-                }
-                onClick={() =>
-                  handleScrollToRepliedMessage &&
-                  !selectionIsActive &&
-                  handleScrollToRepliedMessage(message!.parentMessage!.id)
-                }
-              >
-                {
-                  message.parentMessage.attachments &&
-                    !!message.parentMessage.attachments.length &&
-                    message.parentMessage.attachments[0].type !== attachmentTypes.voice &&
-                    parentNotLinkAttachment &&
-                    // <MessageAttachments>
-                    (message.parentMessage.attachments as any[]).map((attachment, index) => (
-                      <Attachment
-                        key={attachment.tid || attachment.url}
-                        backgroundColor={
-                          message.incoming
-                            ? incomingMessageBackground || bubbleIncoming
-                            : ownMessageBackground || bubbleOutgoing
-                        }
-                        attachment={{
-                          ...attachment,
-                          metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-                        }}
-                        removeSelected={handleRemoveFailedAttachment}
-                        selectedFileAttachmentsIcon={fileAttachmentsIcon}
-                        isRepliedMessage
-                        borderRadius={index === message.parentMessage!.attachments.length - 1 ? borderRadius : '16px'}
-                        selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-                        selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
-                        selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                        fileAttachmentWidth={fileAttachmentsBoxWidth}
-                        imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-                        imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-                        videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-                        videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-                        // fileNameMaxLength={}
-                      />
-                    ))
-                  // </MessageAttachments>
-                }
-                <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
-                  <MessageOwner
-                    className='reply-message-owner'
-                    color={accentColor}
-                    fontSize='12px'
-                    rtlDirection={ownMessageOnRightSide && !message.incoming}
-                    // clickable={parentMessageOwnerIsNotCurrentUser}
-                    /!* onClick={() =>
-                    handleCreateChat(
-                      parentMessageOwnerIsNotCurrentUser && message.parentMessage && message.parentMessage.user.id
-                    )
-                  } *!/
-                  >
-                    {message.parentMessage.user.id === user.id
-                      ? 'You'
-                      : makeUsername(
-                          contactsMap[message.parentMessage.user.id],
-                          message.parentMessage.user,
-                          getFromContacts
-                        )}
-                  </MessageOwner>
-
-                  <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px'>
-                    {!!message.parentMessage.attachments.length &&
-                      message.parentMessage.attachments[0].type === attachmentTypes.voice && (
-                        <VoiceIconWrapper color={accentColor} />
-                      )}
-                    {message.parentMessage.state === MESSAGE_STATUS.DELETE ? (
-                      <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
-                    ) : message.parentMessage.body ? (
-                      MessageTextFormat({
-                        text: message.parentMessage.body,
-                        message: message.parentMessage,
-                        contactsMap,
-                        getFromContacts,
-                        asSampleText: true,
-                        accentColor
-                      })
-                    ) : (
-                      parentNotLinkAttachment &&
-                      (message.parentMessage.attachments[0].type === attachmentTypes.image
-                        ? 'Photo'
-                        : message.parentMessage.attachments[0].type === attachmentTypes.video
-                          ? 'Video'
-                          : message.parentMessage.attachments[0].type === attachmentTypes.voice
-                            ? ' Voice'
-                            : 'File')
-                    )}
-                  </ReplyMessageText>
-                </ReplyMessageBody>
-              </ReplyMessageContainer> */
+              <RepliedMessage
+                message={message}
+                isPendingMessage={isPendingMessage}
+                handleScrollToRepliedMessage={handleScrollToRepliedMessage}
+                ownMessageOnRightSide={ownMessageOnRightSide}
+                ownMessageBackground={ownMessageBackground}
+                incomingMessageBackground={incomingMessageBackground}
+                ownRepliedMessageBackground={ownRepliedMessageBackground}
+                incomingRepliedMessageBackground={incomingRepliedMessageBackground}
+                fileAttachmentsBoxWidth={fileAttachmentsBoxWidth}
+                fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+                fileAttachmentsTitleColor={fileAttachmentsTitleColor}
+                fileAttachmentsSizeColor={fileAttachmentsSizeColor}
+                fileAttachmentsIcon={fileAttachmentsIcon}
+                imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+                imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+                videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+                videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+                selectedMessagesMap={selectedMessagesMap}
+                contactsMap={contactsMap}
+                selectionIsActive={selectionIsActive}
+                borderRadius={borderRadius}
+                showMessageSenderName={showMessageSenderName}
+                notLinkAttachment={notLinkAttachment}
+              />
             )}
             {message.state !== MESSAGE_STATUS.DELETE &&
               message.forwardingDetails &&
@@ -1178,24 +1058,8 @@ const Message = ({
                 >
                   <ForwardIcon />
                   Forwarded message
-                  {/* {message.forwardingDetails.user.id === user.id
-                ? ' You'
-                : ` ${makeUsername(forwardSenderFromContact, message.forwardingDetails.user, getFromContacts)}`} */}
                 </ForwardedTitle>
               )}
-            {/* {message.type === 'voice' && message.attachments[0] ? (
-            <React.Fragment>
-              <AudioPlayer url={message.attachments[0].url} />
-              <AudioMessageTime>
-                <HiddenMessageTime>{`${moment(message.createdAt).format('HH:mm')}`}</HiddenMessageTime>
-                {!message.incoming && showMessageStatus && (
-                  <MessageStatus iconColor={statusIconColor} lastMessage>
-                    {messageStatusIcon(message.deliveryStatus)}
-                  </MessageStatus>
-                )}
-              </AudioMessageTime>
-            </React.Fragment>
-          ) : ( */}
             <MessageText
               theme={theme}
               draggable={false}
@@ -1263,7 +1127,6 @@ const Message = ({
                 </MessageStatusAndTime>
               ) : null}
             </MessageText>
-            {/* )} */}
             {notLinkAttachment &&
               messageStatusAndTimePosition === 'onMessage' &&
               (messageStatusVisible || messageTimeVisible) && (
@@ -1312,17 +1175,6 @@ const Message = ({
               )}
             {
               withAttachments &&
-                /* <MessageAttachments
-            prefixBackground={
-              showMessageSenderName || message.body
-                ? message.incoming
-                  ? incomingMessageBackground
-                  : ownMessageBackground
-                : ''
-            }
-            directionLeft={ownMessageOnRightSide && !message.incoming}
-            className='message_attachments'
-          > */
                 (message.attachments as any[]).map((attachment: any) => (
                   <Attachment
                     key={attachment.tid || attachment.url}
@@ -1396,7 +1248,6 @@ const Message = ({
           </MessageBody>
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
-          // (!withAttachments || (withAttachments && message.attachments[0].type === attachmentTypes.link)) ? (
           <MessageStatusAndTime
             lineHeight={messageStatusAndTimeLineHeight}
             showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
@@ -1431,7 +1282,6 @@ const Message = ({
             )}
           </MessageStatusAndTime>
         )}
-        {/* ) : null} */}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
           <ThreadMessageCountContainer color={accentColor} onClick={() => handleReplyMessage(true)}>
             {`${message.replyCount} replies`}
@@ -1461,14 +1311,6 @@ const Message = ({
             backgroundColor={reactionsContainerBackground || sectionBackground}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
           >
-            {/* <ReactionEmojis>
-              <span onClick={() => setReactionIsOpen(true)}>{inlineReactionIcon || <ReactionIcon />}</span>
-              <EmojiContainer ref={emojisRef} rtl={!!(ownMessageOnRightSide && !message.incoming)}>
-                {reactionIsOpen && (
-                  <EmojisPopup handleEmojiPopupToggle={setReactionIsOpen} handleAddReaction={handleReactionAddDelete} />
-                )}
-              </EmojiContainer>
-            </ReactionEmojis> */}
             <MessageReactionsCont
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               onClick={handleToggleReactionsPopup}
@@ -1608,7 +1450,7 @@ const MessageReaction = styled.span<{
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  margin: ${(props) => props.margin || '0 8px 0 0'};
+  margin: ${(props: any) => props.margin || '0 8px 0 0'};
   margin-right: ${(props) => props.isLastReaction && '0'};
   border: ${(props) => props.border};
   color: ${(props) => props.color};
@@ -1647,18 +1489,10 @@ const ThreadMessageCountContainer = styled.div<{ color: string }>`
   }
 `
 
-/* const ReactionEmojis = styled.div`
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  margin-right: 6px;
-  cursor: pointer;
-  position: relative;
-` */
 const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   position: absolute;
   top: -6px;
-  left: ${(props) => !props.rtl && '-24px'};
+  left: ${(props: any) => !props.rtl && '-24px'};
   right: ${(props) => props.rtl && '-24px'};
   width: 20px;
   height: 20px;
@@ -1673,7 +1507,7 @@ const SelectMessageWrapper = styled.div<{ activeColor?: string; disabled?: any }
   position: absolute;
   left: 4%;
   bottom: calc(50% - 22px);
-  cursor: ${(props) => !props.disabled && 'pointer'};
+  cursor: ${(props: any) => !props.disabled && 'pointer'};
   & > svg {
     color: ${(props) => props.activeColor};
     width: 24px;
@@ -1701,7 +1535,7 @@ const ReactionsContainer = styled.div<{
   rtlDirection?: boolean
 }>`
   display: inline-flex;
-  margin-left: ${(props) => props.rtlDirection && 'auto'};
+  margin-left: ${(props: any) => props.rtlDirection && 'auto'};
   margin-right: ${(props) => !props.rtlDirection && 'auto'};
 
   margin-top: 4px;
@@ -1724,39 +1558,9 @@ const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`
   position: relative;
   display: inline-flex;
   max-width: 300px;
-  //overflow-x: auto;
-  direction: ${(props) => props.rtlDirection && 'ltr'};
+  direction: ${(props: any) => props.rtlDirection && 'ltr'};
   cursor: pointer;
 `
-/*
-const EmojiContainer = styled.div<{ rtl: boolean }>`
-  position: absolute;
-  left: ${(props) => (props.rtl ? '' : '-9px')};
-  right: ${(props) => (props.rtl ? '-9px' : '')};
-  bottom: 30px;
-  z-index: 9998;
-`
-*/
-
-/* const MessageInput = styled.textarea`
-  resize: none;
-  padding: 8px 12px;
-  width: calc(100% - 26px);
-  font: inherit;
-  border: 1px solid #dfe0eb;
-  border-radius: 4px;
-
-  &::placeholder {
-    font-size: 15px;
-    color: ${colors.gray7};
-  }
- ` */
-
-/* const DeleteIconWrapper = styled(DeleteIcon)`
-  color: ${colors.red3};
-  width: 20px;
-  height: 20px;
-` */
 
 const MessageHeaderCont = styled.div<{
   withPadding?: boolean
@@ -1767,7 +1571,7 @@ const MessageHeaderCont = styled.div<{
 }>`
   display: flex;
   align-items: center;
-  padding: ${(props) =>
+  padding: ${(props: any) =>
     props.withPadding &&
     (props.isForwarded
       ? '8px 0 2px 12px'
@@ -1778,45 +1582,6 @@ const MessageHeaderCont = styled.div<{
         : '8px 0 0 12px')};
 `
 
-/* const MessageTime = styled.span`
-  font-weight: 400;
-  font-size: 12px;
-  margin-right: 4px;
-  margin-bottom: 2px;
-  color: ${colors.gray6};
-` */
-
-const ReplyMessageContainer = styled.div<{
-  leftBorderColor?: string
-  withAttachments?: boolean
-  withSenderName?: boolean
-  withBody?: boolean
-  backgroundColor?: string
-}>`
-  display: flex;
-  border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
-  padding: 4px 6px;
-  position: relative;
-  //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
-  margin: ${(props) =>
-    props.withAttachments
-      ? props.withBody
-        ? '6px 12px 0'
-        : '6px 12px 8px'
-      : props.withSenderName
-        ? '6px 0 8px'
-        : '0 0 8px'};
-  background-color: ${(props) => props.backgroundColor || colors.primaryLight};
-  border-radius: 0 4px 4px 0;
-  margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
-  cursor: pointer;
-`
-const ReplyMessageBody = styled.div<{ rtlDirection?: boolean }>`
-  margin-top: auto;
-  margin-bottom: auto;
-  direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
-  max-width: 100%;
-`
 const ForwardedTitle = styled.h3<{
   withAttachments?: boolean
   withBody?: boolean
@@ -1855,50 +1620,12 @@ const ForwardedTitle = styled.h3<{
     color: ${(props) => props.color};
   }
 `
-/*
-const MessageAttachments = styled.div<{ directionLeft?: boolean; prefixBackground?: string }>`
-  display: flex;
-  flex-direction: column;
-  background-color: ${colors.white};
-  align-items: ${(props) => (props.directionLeft ? 'flex-end' : 'flex-start')};
-
-  & > div:first-child {
-    margin-top: 0;
-
-    ${(props) =>
-      props.prefixBackground &&
-      `
-        &:before {
-      content: '';
-      position: absolute;
-      right: 0px;
-      top: -3px;
-      height: 22px;
-      width: 22px;
-      background-color: ${props.prefixBackground || '#fff'};
-      z-index: 0;
-    }
-
-    &:after {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: -3px;
-      height: 22px;
-      width: 22px;
-      background-color: ${props.prefixBackground || '#fff'};
-      z-index: 0;
-    }
-    `}
-  }
-` */
-
 const MessageStatus = styled.span<{ height?: string }>`
   display: inline-flex;
   align-items: center;
   margin-left: 4px;
   text-align: right;
-  height: ${(props) => props.height || '14px'};
+  height: ${(props: any) => props.height || '14px'};
   & > svg {
     height: 16px;
     width: 16px;
@@ -1906,7 +1633,7 @@ const MessageStatus = styled.span<{ height?: string }>`
 `
 
 const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?: string }>`
-  display: ${(props) => props.hide && 'none'};
+  display: ${(props: any) => props.hide && 'none'};
   font-weight: 400;
   font-size: ${(props) => props.fontSize || '12px'};
   color: ${(props) => props.color};
@@ -1925,7 +1652,7 @@ export const MessageStatusAndTime = styled.span<{
   lineHeight?: string
   statusColor?: string
 }>`
-  visibility: ${(props) => props.showOnlyOnHover && 'hidden'};
+  visibility: ${(props: any) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
   align-items: flex-end;
   border-radius: 16px;
@@ -1965,7 +1692,7 @@ const MessageStatusUpdated = styled.span<{ color: string; fontSize?: string }>`
   margin-right: 4px;
   font-style: italic;
   font-weight: 400;
-  font-size: ${(props) => props.fontSize || '12px'};
+  font-size: ${(props: any) => props.fontSize || '12px'};
   color: ${(props) => props.color};
 `
 
@@ -1988,7 +1715,8 @@ const MessageBody = styled.div<{
   attachmentWidth?: number
 }>`
   position: relative;
-  background-color: ${(props) => (props.isSelfMessage ? props.ownMessageBackground : props.incomingMessageBackground)};
+  background-color: ${(props: any) =>
+    props.isSelfMessage ? props.ownMessageBackground : props.incomingMessageBackground};
   //display: inline-block;
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
@@ -2027,7 +1755,7 @@ const MessageContent = styled.div<{
   selectionIsActive?: boolean
 }>`
   position: relative;
-  margin-left: ${(props) => props.withAvatar && '13px'};
+  margin-left: ${(props: any) => props.withAvatar && '13px'};
   margin-right: ${(props) => props.withAvatar && '13px'};
   //transform: ${(props) => !props.withAvatar && (props.rtl ? 'translate(-32px,0)  ' : 'translate(32px,0)')};
   max-width: ${(props) => (props.messageWidthPercent ? `${props.messageWidthPercent}%` : '100%')};
@@ -2035,17 +1763,6 @@ const MessageContent = styled.div<{
   display: flex;
   flex-direction: column;
   pointer-events: ${(props) => props.selectionIsActive && 'none'};
-`
-
-/* const AudioMessageTime = styled.div`
-  position: absolute;
-  right: 12px;
-  bottom: 8px;
-` */
-
-const VoiceIconWrapper = styled(VoiceIcon)`
-  transform: translate(0px, 3.5px);
-  color: ${(props) => props.color};
 `
 
 const MessageItem = styled.div<{
@@ -2059,7 +1776,7 @@ const MessageItem = styled.div<{
 }>`
   display: flex;
   position: relative;
-  margin-top: ${(props) => props.topMargin || '12px'};
+  margin-top: ${(props: any) => props.topMargin || '12px'};
   margin-bottom: ${(props) => props.bottomMargin};
   padding: ${(props) => (props.selectMessagesIsActive ? '0 calc(4% + 52px)' : '0 4%')};
   padding-left: ${(props) =>
@@ -2091,16 +1808,17 @@ const MessageItem = styled.div<{
 
 const EmojiContainer = styled.div<any>`
   position: absolute;
-  left: ${(props) => (props.rtlDirection ? '' : '0')};
+  left: ${(props: any) => (props.rtlDirection ? '' : '0')};
   right: ${(props) => props.rtlDirection && '0'};
   //top: ${(props) => (props.position === 'top' ? '-250px' : 'calc(100% + 6px)')};
   top: ${(props) => props.position === 'bottom' && 'calc(100% + 4px)'};
   bottom: ${(props) => props.position === 'top' && 'calc(100% + 4px)'};
   z-index: 99;
 `
+
 const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   position: absolute;
-  left: ${(props) => (props.rtlDirection ? '' : '0')};
+  left: ${(props: any) => (props.rtlDirection ? '' : '0')};
   right: ${(props) => props.rtlDirection && '0'};
   top: -50px;
   z-index: 99;
