@@ -177,7 +177,7 @@ const SceytChat = ({
       }
     }
 
-    const updatedTheme = { ...defaultTheme }
+    const updatedTheme = { ...defaultTheme, colors: updatedColors }
     colors.outgoingMessageBackgroundDark = moderateColor(
       updatedTheme.colors[THEME_COLOR_NAMES.ACCENT].dark || '',
       0.85,

@@ -49,7 +49,6 @@ function App() {
     setMobileActiveView(MOBILE_ACTIVE_VIEW.CHANNELS)
   }
 
-
   function getRandomNumber() {
     // Generate a random number between 0 and 1.
     const randomNumber = Math.random();
