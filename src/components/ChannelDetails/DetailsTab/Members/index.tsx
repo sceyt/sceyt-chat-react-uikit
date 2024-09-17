@@ -24,7 +24,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -73,6 +73,7 @@ const Members = ({
 }: IProps) => {
   const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
   const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
   const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
   const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
   const dispatch = useDispatch()
@@ -242,9 +243,7 @@ const Members = ({
               key={1}
               onClick={handleAddMemberPopup}
               color={textPrimary}
-              hoverBackground={
-                hoverBackgroundColor || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
-              }
+              hoverBackground={hoverBackgroundColor || focusBackground}
               addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
             >
@@ -258,7 +257,7 @@ const Members = ({
               <MemberItem
                 key={member.id + index}
                 color={textPrimary}
-                hoverBackground={hoverBackgroundColor || colors.hoverBackgroundColor}
+                hoverBackground={hoverBackgroundColor || focusBackground}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
               >
@@ -319,7 +318,7 @@ const Members = ({
                             setCloseMenu('1')
                           }}
                           key={1}
-                          hoverBackground={colors.hoverBackgroundColor}
+                          hoverBackground={focusBackground}
                         >
                           Change role
                         </DropdownOptionLi>
@@ -333,7 +332,7 @@ const Members = ({
                           }}
                           textColor={member.role === 'admin' ? errorColor : ''}
                           key={2}
-                          hoverBackground={colors.hoverBackgroundColor}
+                          hoverBackground={focusBackground}
                         >
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
@@ -347,7 +346,7 @@ const Members = ({
                           }}
                           textColor={errorColor}
                           key={3}
-                          hoverBackground={colors.hoverBackgroundColor}
+                          hoverBackground={focusBackground}
                         >
                           Remove
                         </DropdownOptionLi>
@@ -356,7 +355,7 @@ const Members = ({
                         <DropdownOptionLi
                           textColor={errorColor}
                           key={4}
-                          hoverBackground={colors.hoverBackgroundColor}
+                          hoverBackground={focusBackground}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup(e)

@@ -105,15 +105,6 @@ function App() {
           (
             <SceytChat
               client={client}
-              // themeMode='dark'
-             /* theme={{
-                colors: {
-                  accent: {
-                    light: '#00ff0f',
-                    dark: '#00ff0f'
-                  }
-                }
-              }}*/
             >
               <ChannelList />
               <Chat>
