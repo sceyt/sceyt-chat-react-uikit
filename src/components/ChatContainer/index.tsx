@@ -34,7 +34,7 @@ export interface ICustomUploader {
 
 export type ThemeColorName = (typeof THEME_COLOR_NAMES)[keyof typeof THEME_COLOR_NAMES]
 
-interface IThemeColor {
+export interface IThemeColor {
   light: string
   dark?: string
   [key: string]: string | undefined

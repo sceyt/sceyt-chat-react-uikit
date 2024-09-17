@@ -274,7 +274,7 @@ export default function MessageActions({
             <Action
               order={deleteIconOrder || 7}
               iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
-              hoverBackgroundColor={colors.hoverBackgroundColor}
+              hoverBackgroundColor={hoverBackground}
               hoverIconColor={accentColor}
               onClick={() => handleOpenDeleteMessage()}
             >
