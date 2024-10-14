@@ -24,8 +24,12 @@ let shouldDraw = false
 let WaveSurfer: any
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording }) => {
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground
+  } = useColor()
+
   const [recording, setStartRecording] = useState<any>(null)
   const [recorder, setRecorder] = useState<any>(null)
   const [recordedFile, setRecordedFile] = useState<any>(null)
@@ -37,7 +41,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
+
   async function startRecording() {
     const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
     if (permissionStatus.state === 'granted') {

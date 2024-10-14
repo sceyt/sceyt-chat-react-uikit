@@ -44,8 +44,9 @@ const Message = ({
   borderRadius,
   contactsMap
 }: ISystemMessageProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground } =
+    useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient

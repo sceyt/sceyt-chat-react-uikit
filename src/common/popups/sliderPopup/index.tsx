@@ -49,9 +49,11 @@ const SliderPopup = ({
   currentMediaFile,
   allowEditDeleteIncomingMessage
 }: IProps) => {
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.TEXT_ON_PRIMARY]: textOnPrimary } =
+    useColor()
+
   const dispatch = useDispatch()
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textOnPrimary = useColor(THEME_COLOR_NAMES.TEXT_ON_PRIMARY)
+
   const getFromContacts = getShowOnlyContactUsers()
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()

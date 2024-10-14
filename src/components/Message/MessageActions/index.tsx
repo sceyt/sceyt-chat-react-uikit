@@ -89,12 +89,15 @@ export default function MessageActions({
   messageActionIconsColor,
   handleOpenEmojis
 }: any) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const hoverBackground = useColor(THEME_COLOR_NAMES.HOVER_BACKGROUND)
-  const surface2 = useColor(THEME_COLOR_NAMES.SURFACE_2)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLOR_NAMES.SURFACE_2]: surface2,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   const ChatClient = getClient()
   const { user } = ChatClient

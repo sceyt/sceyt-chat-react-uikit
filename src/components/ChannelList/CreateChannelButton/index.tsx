@@ -36,9 +36,12 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   newChatIcon,
   uploadPhotoIcon
 }) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary
+  } = useColor()
+
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')

@@ -49,9 +49,12 @@ export default function ReactionsPopup({
   reactionsDetailsPopupHeaderItemsStyle,
   rtlDirection
 }: IReactionsPopupProps) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const popupRef = useRef<HTMLDivElement>(null)
   const scoresRef = useRef<HTMLDivElement>(null)
   const reactions = useSelector(reactionsListSelector, shallowEqual)

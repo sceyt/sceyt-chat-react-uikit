@@ -182,8 +182,9 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary } =
+    useColor()
+
   let className = 'item'
   if (isSelected) {
     className += ' selected'
@@ -230,7 +231,8 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const { [THEME_COLOR_NAMES.BORDER]: borderColor } = useColor()
+
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
   optionObj.selectedIndex = selectedIndex

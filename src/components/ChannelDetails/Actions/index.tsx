@@ -189,12 +189,15 @@ const Actions = ({
   actionItemsFontSize,
   borderColor
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLOR_NAMES.BORDER]: borderThemeColor,
+    [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)

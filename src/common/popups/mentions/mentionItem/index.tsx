@@ -16,8 +16,8 @@ interface IMentionsPopupProps {
 }
 
 export default function MentionMember({ mention, isFocused, ...parentProps }: IMentionsPopupProps) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary } =
+    useColor()
   return (
     <MemberItem
       key={mention.id}
