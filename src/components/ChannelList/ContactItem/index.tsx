@@ -48,7 +48,8 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary } = useColor()
+
   const getFromContacts = getShowOnlyContactUsers()
 
   const contactUserName = makeUsername(contact, undefined, getFromContacts)

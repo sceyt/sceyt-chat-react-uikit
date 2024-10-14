@@ -100,12 +100,15 @@ const EditChannel = ({
   editChannelCancelButtonBackgroundColor,
   editChannelCancelButtonTextColor
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.BORDER]: borderColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()

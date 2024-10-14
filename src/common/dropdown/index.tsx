@@ -150,8 +150,9 @@ const DropDown = ({
   order,
   zIndex
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground } =
+    useColor()
+
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)

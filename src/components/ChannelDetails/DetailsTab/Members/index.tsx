@@ -71,11 +71,14 @@ const Members = ({
   memberAvatarSize,
   memberPresenceFontSize
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const focusBackground = useColor(THEME_COLOR_NAMES.FOCUS_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const [selectedMember, setSelectedMember] = useState<IMember | null>(null)

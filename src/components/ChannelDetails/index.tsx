@@ -150,11 +150,14 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.BORDER]: borderThemeColor,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient

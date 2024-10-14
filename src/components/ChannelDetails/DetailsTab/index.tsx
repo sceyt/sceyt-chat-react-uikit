@@ -107,9 +107,12 @@ const DetailsTab = ({
   tabItemsLineHeight,
   tabItemsMinWidth
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.BORDER]: borderThemeColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')

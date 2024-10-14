@@ -69,11 +69,14 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient

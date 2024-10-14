@@ -44,10 +44,13 @@ export default function TextFormat({
   theme?: string
   editorProps: any
 }) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {

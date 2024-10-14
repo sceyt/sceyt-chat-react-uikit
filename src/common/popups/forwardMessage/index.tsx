@@ -45,11 +45,14 @@ interface IProps {
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()

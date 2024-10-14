@@ -33,10 +33,13 @@ export default function MentionMembersPopup({
   handleMentionsPopupClose,
   searchMention
 }: IMentionsPopupProps) {
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const {
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.BORDER]: borderColor
+  } = useColor()
+
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()

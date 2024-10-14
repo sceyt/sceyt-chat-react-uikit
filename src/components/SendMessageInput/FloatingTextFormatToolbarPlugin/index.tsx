@@ -117,10 +117,13 @@ function TextFormatFloatingToolbar({
   setShowMenu: (showMenu: boolean) => void
   showMenu: boolean
 }): JSX.Element {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const hoverBackground = useColor(THEME_COLOR_NAMES.HOVER_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const surface2 = useColor(THEME_COLOR_NAMES.SURFACE_2)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.SURFACE_2]: surface2
+  } = useColor()
+
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
   function mouseMoveListener(e: MouseEvent) {
     if (popupCharStylesEditorRef?.current && (e.buttons === 1 || e.buttons === 3)) {

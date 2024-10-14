@@ -47,9 +47,12 @@ const Files = ({
   fileSizeFontSize,
   fileSizeLineHeight
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const dispatch = useDispatch()
   const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []

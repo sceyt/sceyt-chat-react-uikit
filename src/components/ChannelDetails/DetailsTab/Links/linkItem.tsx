@@ -21,8 +21,8 @@ const LinkItem = ({
   linkPreviewColor,
   linkPreviewHoverBackgroundColor
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const { [THEME_COLOR_NAMES.ACCENT]: accentColor, [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary } = useColor()
+
   // const [title, setTitle] = useState('')
   // const [imageSrc, setImageSrc] = useState('')
   // const [loading, setLoading] = useState(true)

@@ -70,10 +70,13 @@ function EmojisPopup({
   emojisPopupPosition?: string
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')

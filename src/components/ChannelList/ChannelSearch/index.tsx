@@ -69,9 +69,11 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   searchInputTextColor,
   fontSize
 }) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
 
   return (
     <SearchInputContainer inline={inline} borderColor={surface1Background}>

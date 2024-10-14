@@ -15,10 +15,12 @@ interface IProps {
 }
 const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const surface1Background = useColor(THEME_COLOR_NAMES.SURFACE_1)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary
+  } = useColor()
 
   const [state, setState] = useStateComplex({
     image: image.url,

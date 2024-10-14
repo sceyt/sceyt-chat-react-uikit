@@ -48,8 +48,9 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountFontSize,
   unreadCountTextColor
 }) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const { [THEME_COLOR_NAMES.ACCENT]: accentColor, [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground } =
+    useColor()
+
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
   const theme = useSelector(themeSelector)

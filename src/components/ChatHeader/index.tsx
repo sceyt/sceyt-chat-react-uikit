@@ -73,11 +73,14 @@ export default function ChatHeader({
   infoIconOrder,
   customActionsOrder
 }: IProps) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLOR_NAMES.BORDER]: borderColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
