@@ -194,12 +194,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize
 }) => {
-  const themeBackgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const {
+    [THEME_COLOR_NAMES.BACKGROUND]: themeBackgroundColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.BORDER]: borderColor
+  } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)

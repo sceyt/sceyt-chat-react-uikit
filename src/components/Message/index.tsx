@@ -39,7 +39,13 @@ import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  DEFAULT_CHANNEL_TYPE,
+  MESSAGE_DELIVERY_STATUS,
+  MESSAGE_STATUS,
+  THEME
+} from '../../helpers/constants'
 import { MessageOwner, MessageText } from '../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
@@ -253,7 +259,7 @@ const Message = ({
   showSenderNameOnOwnMessages = true,
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
-  ownMessageBackground = colors.primaryLight,
+  ownMessageBackground,
   incomingMessageBackground,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
@@ -358,12 +364,22 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
-  const bubbleIncoming = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
+  const bubbleOutgoing =
+    theme === THEME.DARK ? colors.outgoingMessageBackgroundDark : colors.outgoingMessageBackgroundLight
+  const bubbleOutgoingX =
+    theme === THEME.DARK ? colors.outgoingMessageBackgroundXDark : colors.outgoingMessageBackgroundXLight
+  const bubbleIncoming =
+    theme === THEME.DARK ? colors.incomingMessageBackgroundDark : colors.incomingMessageBackgroundLight
+  const bubbleIncomingX =
+    theme === THEME.DARK ? colors.incomingMessageBackgroundXDark : colors.incomingMessageBackgroundXLight
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient

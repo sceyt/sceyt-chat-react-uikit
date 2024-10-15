@@ -27,7 +27,7 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps } from '../ChatContainer'
+import { IChatClientProps, IThemeColor } from '../ChatContainer'
 import { colors, defaultTheme, THEME_COLOR_NAMES } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
@@ -54,7 +54,7 @@ const SceytChat = ({
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false
 }: IChatClientProps) => {
-  const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
+  const { [THEME_COLOR_NAMES.BACKGROUND]: backgroundColor } = useColor()
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
@@ -105,6 +105,14 @@ const SceytChat = ({
       dispatch(browserTabIsActiveAC(false))
     }
   }
+
+  const generateBubbleColors = (themeColors: { [key: string]: IThemeColor }) => {
+    colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].dark || '', 0.85, true)
+    colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].light, 0.85)
+    colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].light, 0.75)
+    colors.outgoingMessageBackgroundXDark = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].dark || '', 0.75, true)
+  }
+
   useEffect(() => {
     console.log('client is changed.... ', client)
     if (client) {
@@ -176,8 +184,11 @@ const SceytChat = ({
         colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
       }
     }
-    const updatedTheme = { ...defaultTheme }
-    updatedTheme.colors = updatedColors
+
+    const updatedTheme = { ...defaultTheme, colors: updatedColors }
+
+    generateBubbleColors(updatedColors)
+
     dispatch(setTheme(updatedTheme))
   }
 
@@ -260,6 +271,7 @@ const SceytChat = ({
     if (theme) {
       handleChangedTheme(theme)
     } else {
+      generateBubbleColors(defaultTheme.colors)
       dispatch(setTheme(defaultTheme))
     }
   }, [theme])

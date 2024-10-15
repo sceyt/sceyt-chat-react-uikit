@@ -102,7 +102,9 @@ function ReplyMessage(
           {!!message.parentMessage?.attachments.length &&
             message.parentMessage?.attachments[0].type ===
             attachmentTypes.voice && (
-              <VoiceIconWrapper color={'#5159F6'}><VoiceIcon/> </VoiceIconWrapper>
+              <VoiceIconWrapper >
+                <VoiceIcon/>
+              </VoiceIconWrapper>
             )}
           {message.parentMessage?.state === MESSAGE_STATUS.DELETE ? (
             <MessageStatusDeleted>
@@ -111,10 +113,10 @@ function ReplyMessage(
             </MessageStatusDeleted>
           ) : message.parentMessage?.body ? (
             MessageTextFormat({
-              text: message.parentMessage?.body || '',
+              text: message.parentMessage?.body,
               message: message.parentMessage,
               getFromContacts: true,
-              asSampleText: true,
+              asSampleText: true
             })
           ) : (
             parentNotLinkAttachment &&
@@ -145,7 +147,7 @@ const ReplyMessageContainer = styled.div<{
   backgroundColor?: string;
 }>`
   display: flex;
-  border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
+  border-left: 2px solid ${(props: any) => props.leftBorderColor || '#b8b9c2'};
   padding: 4px 6px;
   position: relative;
     //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
@@ -166,7 +168,7 @@ const ReplyMessageContainer = styled.div<{
 const ReplyMessageBody = styled.div<{ rtlDirection?: boolean }>`
   margin-top: auto;
   margin-bottom: auto;
-  direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
+  direction: ${(props: any) => (props.rtlDirection ? 'initial' : '')};
   max-width: 100%;
 `
 
@@ -197,7 +199,7 @@ export const ReplyMessageText = styled.span<{
   display: -webkit-box;
   position: relative;
   margin: 0;
-  padding: ${(props) =>
+  padding: ${(props: any) =>
   props.withAttachment && props.showMessageSenderName
     ? '0 12px 10px'
     : props.withAttachment

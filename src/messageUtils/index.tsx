@@ -55,7 +55,8 @@ const MessageStatusIcon = ({
   readIconColor?: string
   accentColor?: string
 }) => {
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
+  const { [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary } = useColor()
+
   const color = iconColor || iconPrimary
 
   switch (messageStatus) {

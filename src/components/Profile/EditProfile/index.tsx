@@ -21,11 +21,14 @@ import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 // import { setErrorNotification } from '../../../../store/channel/actions';
 
 export default function EditProfile({ toggleEditPopup, user }: any) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.BORDER]: borderColor,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   // const dispatch = useDispatch()
 
   const fileUploader: any = useRef(null)

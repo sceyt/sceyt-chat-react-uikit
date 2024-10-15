@@ -54,14 +54,17 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.BORDER]: borderColor,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -333,7 +336,11 @@ export default function CreateChannel({
                       ) : (
                         <UploadAvatarLabel
                           iconColor={accentColor}
-                          backgroundColor={bubbleOutgoing}
+                          backgroundColor={
+                            theme === THEME.DARK
+                              ? colors.outgoingMessageBackgroundDark
+                              : colors.outgoingMessageBackgroundLight
+                          }
                           htmlFor='uploadImage'
                         >
                           {uploadPhotoIcon || <UploadImageIcon />}
@@ -419,7 +426,7 @@ export default function CreateChannel({
                     </React.Fragment>
                   )}
                 </PopupBody>
-                <PopupFooter backgroundColor={sectionBackground}>
+                <PopupFooter backgroundColor={surface1Background}>
                   <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClose()}>
                     Cancel
                   </Button>

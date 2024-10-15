@@ -15,11 +15,15 @@ interface IProps {
 
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.BORDER]: borderColor,
+    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
+    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const [firstName, setFirstName] = useState(user.firstName)
   const [lastName, setLastName] = useState(user.lastName)
@@ -81,7 +85,7 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
         {/* <CustomInput type='text' value={presenceStatus} onChange={handlePresenceStatus} placeholder='About' /> */}
       </EditProfileBody>
 
-      <PopupFooter>
+      <PopupFooter backgroundColor={surface1Background}>
         <Button onClick={handleCloseEditProfile} backgroundColor={colors.gray0} color={textPrimary} borderRadius='8px'>
           Cancel
         </Button>

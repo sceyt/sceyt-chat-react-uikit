@@ -128,8 +128,11 @@ export default function MessageDivider({
   marginBottom,
   chatBackgroundColor
 }: IProps) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const {
+    [THEME_COLOR_NAMES.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND]: overlayBackground
+  } = useColor()
+
   const textRef = React.useRef<HTMLSpanElement | null>(null)
   const [textHeight, setTextHeight] = React.useState<number>(0)
 
@@ -145,9 +148,9 @@ export default function MessageDivider({
       marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}
-      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor || textPrimary}
+      dateDividerTextColor={dateDividerTextColor || newMessagesSeparatorTextColor || textOnPrimary}
       dateDividerBorder={dateDividerBorder || newMessagesSeparatorBorder}
-      dateDividerBackgroundColor={dateDividerBackgroundColor || newMessagesSeparatorBackground || sectionBackground}
+      dateDividerBackgroundColor={dateDividerBackgroundColor || newMessagesSeparatorBackground || overlayBackground}
       chatBackgroundColor={chatBackgroundColor}
       dateDividerBorderRadius={dateDividerBorderRadius || newMessagesSeparatorBorderRadius}
       width={newMessagesSeparatorWidth}

@@ -189,11 +189,15 @@ const Actions = ({
   actionItemsFontSize,
   borderColor
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLOR_NAMES.BORDER]: borderThemeColor,
+    [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLOR_NAMES.ERROR]: errorColor
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
@@ -416,7 +420,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={1}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(oneHour)}
                     >
                       Mute for 1 hour
@@ -424,7 +428,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={2}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(twoHours)}
                     >
                       Mute for 2 hours
@@ -432,7 +436,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={3}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(oneDay)}
                     >
                       Mute for 1 day
@@ -443,7 +447,7 @@ const Actions = ({
                 <DropdownOptionLi
                   textColor={textPrimary}
                   key={4}
-                  hoverBackground={colors.primaryLight}
+                  hoverBackground={focusBackground}
                   onClick={() => handleNotificationOnOff()}
                 >
                   Mute forever
