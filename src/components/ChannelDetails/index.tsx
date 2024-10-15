@@ -459,7 +459,6 @@ const Details = ({
             memberNameFontSize={memberNameFontSize}
             memberAvatarSize={memberAvatarSize}
             memberPresenceFontSize={memberPresenceFontSize}
-            backgroundColor={backgroundColor}
             borderColor={bordersColor}
             tabItemsFontSize={tabItemsFontSize}
             tabItemsLineHeight={tabItemsLineHeight}

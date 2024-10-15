@@ -5,7 +5,7 @@ import { useDispatch } from 'react-redux'
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, THEME } from '../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs } from '../../../helpers/constants'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
@@ -56,7 +56,6 @@ interface IProps {
   memberNameFontSize?: string
   memberAvatarSize?: number
   memberPresenceFontSize?: string
-  backgroundColor?: string
   borderColor?: string
   tabItemsFontSize?: string
   tabItemsLineHeight?: string
@@ -101,7 +100,6 @@ const DetailsTab = ({
   memberNameFontSize,
   memberAvatarSize,
   memberPresenceFontSize,
-  backgroundColor,
   borderColor,
   tabItemsFontSize,
   tabItemsLineHeight,
@@ -142,7 +140,6 @@ const DetailsTab = ({
       <DetailsTabHeader
         color={textSecondary}
         activeTabColor={accentColor}
-        backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.dark : colors.white)}
         borderColor={borderColor || borderThemeColor}
         fontSize={tabItemsFontSize}
         lineHeight={tabItemsLineHeight}
@@ -260,7 +257,6 @@ const DetailsTabHeader = styled.div<{
   overflow-y: hidden;
   padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor};
-  background-color: ${(props) => props.backgroundColor || colors.white};
   display: flex;
   justify-content: space-between;
   position: sticky;

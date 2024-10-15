@@ -992,13 +992,11 @@ export default function* watchForEvents(): any {
       }
 
       case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
-        const { channel, unreadChannels, totalUnread } = args
+        const { channel } = args
         // const { channel, channelUnreadCount } = args
         // console.log('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
         // console.log('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
         // console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
-        console.log(', unreadChannels ....... >>>>>  .. .  ', unreadChannels)
-        console.log(', totalUnread ....... >>>>>  .. .  ', totalUnread)
         // yield put(setChannelUnreadCount(0, channel.id));
         if (channel) {
           const updatedChannel = JSON.parse(JSON.stringify(channel))
