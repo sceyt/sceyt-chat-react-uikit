@@ -8,7 +8,7 @@ import { ReactComponent as VoiceIcon } from '../../../assets/svg/voiceIcon.svg'
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { getClient } from '../../../common/client'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS, THEME } from '../../../helpers/constants'
 import { MessageOwner, ReplyMessageText } from '../../../UIHelper'
 import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
 import { IAttachment, IMessage } from '../../../types'
@@ -17,14 +17,13 @@ import { MessageTextFormat } from '../../../messageUtils'
 import Attachment from '../../Attachment'
 
 interface IRepliedMessageProps {
+  theme: string
   message: IMessage
   isPendingMessage?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
   showMessageSenderName?: boolean
   ownMessageOnRightSide?: boolean
   borderRadius?: string
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
   ownRepliedMessageBackground?: string
   incomingRepliedMessageBackground?: string
   fileAttachmentsBoxWidth?: number
@@ -44,10 +43,9 @@ interface IRepliedMessageProps {
 
 const RepliedMessage = ({
   message,
+  theme,
   handleScrollToRepliedMessage,
   ownMessageOnRightSide,
-  ownMessageBackground = colors.primaryLight,
-  incomingMessageBackground,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   showMessageSenderName,
@@ -65,13 +63,17 @@ const RepliedMessage = ({
   notLinkAttachment,
   contactsMap
 }: IRepliedMessageProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const bubbleOutgoing = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING)
-  const bubbleIncoming = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING)
-  const bubbleOutgoingX = useColor(THEME_COLOR_NAMES.BUBBLE_INCOMING_X)
-  const bubbleIncomingX = useColor(THEME_COLOR_NAMES.BUBBLE_OUTGOING_X)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLOR_NAMES.ACCENT]: accentColor,
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
+  const bubbleOutgoingX =
+    theme === THEME.DARK ? colors.outgoingMessageBackgroundXDark : colors.outgoingMessageBackgroundXLight
+  const bubbleIncomingX =
+    theme === THEME.DARK ? colors.incomingMessageBackgroundXDark : colors.incomingMessageBackgroundXLight
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
@@ -107,7 +109,9 @@ const RepliedMessage = ({
           <Attachment
             key={attachment.tid || attachment.url}
             backgroundColor={
-              message.incoming ? incomingMessageBackground || bubbleIncoming : ownMessageBackground || bubbleOutgoing
+              message.incoming
+                ? incomingRepliedMessageBackground || bubbleIncomingX
+                : ownRepliedMessageBackground || bubbleOutgoingX
             }
             attachment={{
               ...attachment,
@@ -173,6 +177,7 @@ const RepliedMessage = ({
 export default React.memo(RepliedMessage, (prevProps, nextProps) => {
   // Custom comparison function to check if only 'messages' prop has changed
   return (
+    prevProps.theme === nextProps.theme &&
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
     prevProps.message.userReactions === nextProps.message.userReactions &&
