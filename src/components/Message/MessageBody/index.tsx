@@ -28,8 +28,9 @@ import MessageHeader from '../MessageHeader'
 import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
-import { MessageStatusIcon, MessageTextFormat } from 'messageUtils'
+import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions } from '../Message.types'
+import MessageStatusAndTime from '../MessageStatusAndTime'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -580,80 +581,50 @@ const MessageBody = ({
         !notLinkAttachment &&
         (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
-            lineHeight={messageStatusAndTimeLineHeight}
-            showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+            message={message}
+            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+            messageStatusDisplayingType={messageStatusDisplayingType}
+            messageStatusSize={messageStatusSize}
+            messageStatusColor={messageStatusColor}
+            messageReadStatusColor={messageReadStatusColor}
+            messageStateFontSize={messageStateFontSize}
+            messageStateColor={messageStateColor}
+            messageTimeFontSize={messageTimeFontSize}
+            messageTimeColor={messageTimeColor}
+            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+            messageTimeVisible={!!messageTimeVisible}
+            messageStatusVisible={!!messageStatusVisible}
             leftMargin
-            isSelfMessage={!message.incoming}
-          >
-            {message.state === MESSAGE_STATUS.EDIT ? (
-              <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
-                edited
-              </MessageStatusUpdated>
-            ) : (
-              ''
-            )}
-            {messageTimeVisible && (
-              <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
-                message.createdAt
-              ).format('HH:mm')}`}</HiddenMessageTime>
-            )}
-            {messageStatusVisible && (
-              <MessageStatus height={messageStatusAndTimeLineHeight}>
-                {MessageStatusIcon({
-                  messageStatus: message.deliveryStatus,
-                  messageStatusDisplayingType,
-                  size: messageStatusSize,
-                  iconColor: messageStatusColor,
-                  readIconColor: messageReadStatusColor,
-                  accentColor
-                })}
-              </MessageStatus>
-            )}
-          </MessageStatusAndTime>
+          />
         ) : null}
       </MessageText>
       {notLinkAttachment &&
         messageStatusAndTimePosition === 'onMessage' &&
         (messageStatusVisible || messageTimeVisible) && (
           <MessageStatusAndTime
-            lineHeight={messageStatusAndTimeLineHeight}
-            showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-            withAttachment
+            message={message}
+            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+            messageStatusDisplayingType={messageStatusDisplayingType}
+            messageStatusSize={messageStatusSize}
+            messageStatusColor={
+              message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
+                ? colors.white
+                : messageStateColor || textSecondary
+            }
+            messageReadStatusColor={messageReadStatusColor}
+            messageStateFontSize={messageStateFontSize}
+            messageStateColor={messageStateColor}
+            messageTimeFontSize={messageTimeFontSize}
+            messageTimeColor={messageTimeColor}
+            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+            messageTimeVisible={!!messageTimeVisible}
+            messageStatusVisible={!!messageStatusVisible}
+            withAttachment={withAttachments}
             leftMargin
-            isSelfMessage={!message.incoming}
-            fileAttachment={message.attachments[0].type === 'file' || message.attachments[0].type === 'voice'}
-            statusColor={textSecondary}
-          >
-            {message.state === MESSAGE_STATUS.EDIT ? (
-              <MessageStatusUpdated
-                fontSize={messageStateFontSize}
-                color={
-                  message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                    ? colors.white
-                    : messageStateColor || textSecondary
-                }
-              >
-                edited
-              </MessageStatusUpdated>
-            ) : (
-              ''
-            )}
-            {messageTimeVisible && (
-              <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
-                message.createdAt
-              ).format('HH:mm')}`}</HiddenMessageTime>
-            )}
-            {messageStatusVisible &&
-              MessageStatusIcon({
-                messageStatus: message.deliveryStatus,
-                messageStatusDisplayingType,
-                size: messageStatusSize,
-                iconColor:
-                  message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file' ? colors.white : '',
-                readIconColor: messageReadStatusColor,
-                accentColor
-              })}
-          </MessageStatusAndTime>
+            fileAttachment={
+              withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
+            }
+          />
         )}
       {
         withAttachments &&
@@ -786,83 +757,6 @@ const ForwardedTitle = styled.h3<{
     height: 16px;
     color: ${(props) => props.color};
   }
-`
-const MessageStatus = styled.span<{ height?: string }>`
-  display: inline-flex;
-  align-items: center;
-  margin-left: 4px;
-  text-align: right;
-  height: ${(props: any) => props.height || '14px'};
-
-  & > svg {
-    height: 16px;
-    width: 16px;
-  }
-`
-
-const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?: string }>`
-  display: ${(props: any) => props.hide && 'none'};
-  font-weight: 400;
-  font-size: ${(props) => props.fontSize || '12px'};
-  color: ${(props) => props.color};
-`
-
-const MessageStatusAndTime = styled.span<{
-  withAttachment?: boolean
-  fileAttachment?: boolean
-  hide?: boolean
-  isSelfMessage?: boolean
-  marginBottom?: string
-  leftMargin?: boolean
-  rtlDirection?: boolean
-  bottomOfMessage?: boolean
-  showOnlyOnHover?: boolean
-  lineHeight?: string
-  statusColor?: string
-}>`
-  visibility: ${(props: any) => props.showOnlyOnHover && 'hidden'};
-  display: ${(props) => (props.hide ? 'none' : 'flex')};
-  align-items: flex-end;
-  border-radius: 16px;
-  padding: ${(props) => props.withAttachment && '4px 6px'};
-  background-color: ${(props) => props.withAttachment && !props.fileAttachment && 'rgba(1, 1, 1, 0.3)'};
-  float: right;
-  line-height: ${(props) => props.lineHeight || '14px'};
-  margin-right: ${(props) => props.rtlDirection && 'auto'};
-  margin-left: ${(props) => props.leftMargin && '12px'};
-  margin-bottom: ${(props) => props.marginBottom && '8px'};
-  direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  transform: translate(0px, 4px);
-  white-space: nowrap;
-  width: ${(props) => props.bottomOfMessage && '100%'};
-  justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
-
-  & > svg {
-    margin-left: 4px;
-    height: 14px;
-    width: 16px;
-  }
-
-  & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? props.statusColor : props.withAttachment ? colors.white : '')};
-  }
-
-  ${(props) =>
-    props.withAttachment &&
-    `
-    position: absolute;
-    z-index: 3;
-    right: ${props.fileAttachment ? '6px' : '10px'};
-    bottom: ${props.fileAttachment ? '9px' : '14px'};
-  `}
-`
-
-const MessageStatusUpdated = styled.span<{ color: string; fontSize?: string }>`
-  margin-right: 4px;
-  font-style: italic;
-  font-weight: 400;
-  font-size: ${(props: any) => props.fontSize || '12px'};
-  color: ${(props) => props.color};
 `
 
 const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; withAttachment?: boolean }>`

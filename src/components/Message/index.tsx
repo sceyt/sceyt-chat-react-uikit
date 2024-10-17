@@ -41,9 +41,9 @@ import Avatar from '../Avatar'
 import ConfirmPopup from 'common/popups/delete'
 import ForwardMessagePopup from 'common/popups/forwardMessage'
 import ReactionsPopup from 'common/popups/reactions'
-import { MessageStatusIcon } from 'messageUtils'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
+import MessageStatusAndTime from './MessageStatusAndTime'
 
 const Message = ({
   message,
@@ -177,8 +177,7 @@ const Message = ({
   const {
     [THEME_COLOR_NAMES.ACCENT]: accentColor,
     [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary
   } = useColor()
 
   const bubbleOutgoing =
@@ -733,38 +732,23 @@ const Message = ({
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
           <MessageStatusAndTime
-            lineHeight={messageStatusAndTimeLineHeight}
-            showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-            isSelfMessage={!message.incoming}
-            marginBottom={sameUserMessageSpacing}
-            rtlDirection={ownMessageOnRightSide && !message.incoming}
+            message={message}
+            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+            messageStatusDisplayingType={messageStatusDisplayingType}
+            messageStatusSize={messageStatusSize}
+            messageStatusColor={messageStatusColor}
+            messageReadStatusColor={messageReadStatusColor}
+            messageStateFontSize={messageStateFontSize}
+            messageStateColor={messageStateColor}
+            messageTimeFontSize={messageTimeFontSize}
+            messageTimeColor={messageTimeColor}
+            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+            messageTimeVisible={!!messageTimeVisible}
+            messageStatusVisible={!!messageStatusVisible}
             bottomOfMessage
-          >
-            {message.state === MESSAGE_STATUS.EDIT ? (
-              <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
-                edited
-              </MessageStatusUpdated>
-            ) : (
-              ''
-            )}
-            {messageTimeVisible && (
-              <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
-                message.createdAt
-              ).format('HH:mm')}`}</HiddenMessageTime>
-            )}
-            {messageStatusVisible && (
-              <MessageStatus height={messageStatusAndTimeLineHeight}>
-                {MessageStatusIcon({
-                  messageStatus: message.deliveryStatus,
-                  messageStatusDisplayingType,
-                  size: messageStatusSize,
-                  iconColor: messageStatusColor,
-                  readIconColor: messageReadStatusColor,
-                  accentColor
-                })}
-              </MessageStatus>
-            )}
-          </MessageStatusAndTime>
+            marginBottom={sameUserMessageSpacing}
+            ownMessageOnRightSide={ownMessageOnRightSide}
+          />
         )}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
           <ThreadMessageCountContainer color={accentColor} onClick={() => handleReplyMessage(true)}>
@@ -1065,63 +1049,6 @@ const HiddenMessageTime = styled.span<{ hide?: boolean; color: string; fontSize?
   color: ${(props) => props.color};
 `
 
-export const MessageStatusAndTime = styled.span<{
-  withAttachment?: boolean
-  fileAttachment?: boolean
-  hide?: boolean
-  isSelfMessage?: boolean
-  marginBottom?: string
-  leftMargin?: boolean
-  rtlDirection?: boolean
-  bottomOfMessage?: boolean
-  showOnlyOnHover?: boolean
-  lineHeight?: string
-  statusColor?: string
-}>`
-  visibility: ${(props: any) => props.showOnlyOnHover && 'hidden'};
-  display: ${(props) => (props.hide ? 'none' : 'flex')};
-  align-items: flex-end;
-  border-radius: 16px;
-  padding: ${(props) => props.withAttachment && '4px 6px'};
-  background-color: ${(props) => props.withAttachment && !props.fileAttachment && 'rgba(1, 1, 1, 0.3)'};
-  float: right;
-  line-height: ${(props) => props.lineHeight || '14px'};
-  margin-right: ${(props) => props.rtlDirection && 'auto'};
-  margin-left: ${(props) => props.leftMargin && '12px'};
-  margin-bottom: ${(props) => props.marginBottom && '8px'};
-  direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  transform: translate(0px, 4px);
-  white-space: nowrap;
-  width: ${(props) => props.bottomOfMessage && '100%'};
-  justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
-  & > svg {
-    margin-left: 4px;
-    height: 14px;
-    width: 16px;
-  }
-
-  & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? props.statusColor : props.withAttachment ? colors.white : '')};
-  }
-
-  ${(props) =>
-    props.withAttachment &&
-    `
-    position: absolute;
-    z-index: 3;
-    right: ${props.fileAttachment ? '6px' : '10px'};
-    bottom: ${props.fileAttachment ? '9px' : '14px'};
-  `}
-`
-
-const MessageStatusUpdated = styled.span<{ color: string; fontSize?: string }>`
-  margin-right: 4px;
-  font-style: italic;
-  font-weight: 400;
-  font-size: ${(props: any) => props.fontSize || '12px'};
-  color: ${(props) => props.color};
-`
-
 const MessageContent = styled.div<{
   messageWidthPercent?: string | number
   withAvatar?: boolean
@@ -1170,7 +1097,7 @@ const MessageItem = styled.div<{
   &:hover ${HiddenMessageTime} {
     display: inline-block;
   }
-  &:hover ${MessageStatusAndTime} {
+  &:hover .message_status_time {
     display: flex;
     visibility: visible;
   }
