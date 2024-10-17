@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
@@ -45,10 +45,14 @@ interface IProps {
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const dispatch = useDispatch()
@@ -358,7 +362,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             )}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>

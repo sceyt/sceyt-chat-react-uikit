@@ -46,7 +46,7 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -314,10 +314,10 @@ const MessageList: React.FC<MessagesProps> = ({
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
-  ownMessageBackground = colors.primaryLight,
+  ownMessageBackground,
   incomingMessageBackground,
-  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
-  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
+  ownRepliedMessageBackground,
+  incomingRepliedMessageBackground,
   hoverBackground = false,
   showSenderNameOnDirectChannel = false,
   showSenderNameOnOwnMessages = false,
@@ -428,10 +428,16 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight
 }) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -1076,9 +1082,9 @@ const MessageList: React.FC<MessagesProps> = ({
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor || textPrimary}
+            dateDividerTextColor={dateDividerTextColor || textOnPrimary}
             dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor || sectionBackground}
+            dateDividerBackgroundColor={dateDividerBackgroundColor || overlayBackground}
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >
@@ -1092,7 +1098,7 @@ const MessageList: React.FC<MessagesProps> = ({
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
           onDragEnter={handleDragIn}
-          backgroundColor={backgroundColor}
+          backgroundColor={backgroundColor || themeBackgroundColor}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1125,7 +1131,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       dateDividerTextColor={dateDividerTextColor}
                       dateDividerBorder={dateDividerBorder}
                       dateDividerBackgroundColor={dateDividerBackgroundColor}
-                      chatBackgroundColor={backgroundColor}
+                      chatBackgroundColor={backgroundColor || themeBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
                         prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
@@ -1293,7 +1299,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
                         marginTop={message.type === 'system' ? '0px' : ''}
                         marginBottom={message.type === 'system' ? '16px' : '0'}
-                        chatBackgroundColor={backgroundColor}
+                        chatBackgroundColor={backgroundColor || themeBackgroundColor}
                         unread
                       />
                     ) : null}

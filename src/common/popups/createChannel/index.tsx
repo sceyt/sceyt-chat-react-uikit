@@ -20,7 +20,7 @@ import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
 import { createChannelAC } from '../../../store/channel/actions'
 import UsersPopup from '../users'
 import { IAddMember } from '../../../types'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
@@ -54,13 +54,17 @@ export default function CreateChannel({
   showUploadAvatar = true,
   withoutConfig
 }: ICreateChannelPopup) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
@@ -332,7 +336,11 @@ export default function CreateChannel({
                       ) : (
                         <UploadAvatarLabel
                           iconColor={accentColor}
-                          backgroundColor={colors.primaryLight}
+                          backgroundColor={
+                            theme === THEME.DARK
+                              ? colors.outgoingMessageBackgroundDark
+                              : colors.outgoingMessageBackgroundLight
+                          }
                           htmlFor='uploadImage'
                         >
                           {uploadPhotoIcon || <UploadImageIcon />}
@@ -418,7 +426,7 @@ export default function CreateChannel({
                     </React.Fragment>
                   )}
                 </PopupBody>
-                <PopupFooter backgroundColor={sectionBackground}>
+                <PopupFooter backgroundColor={surface1Background}>
                   <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClose()}>
                     Cancel
                   </Button>

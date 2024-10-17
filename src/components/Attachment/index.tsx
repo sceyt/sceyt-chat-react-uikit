@@ -30,7 +30,7 @@ import {
   setDownloadFilePromise
 } from '../../helpers'
 import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
@@ -91,10 +91,14 @@ const Attachment = ({
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight
 }: AttachmentPops) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const attachmentCompilationState = useSelector(attachmentCompilationStateSelector) || {}
   const attachmentsUploadProgress = useSelector(attachmentsUploadProgressSelector) || {}
@@ -843,7 +847,7 @@ const Attachment = ({
                   fileAttachmentWidth ? fileAttachmentWidth / 12.5 : isPreview ? 18 : 30
                 )}
               </AttachmentName>
-              <AttachmentSize color={selectedFileAttachmentsSizeColor || textPrimary} errorColor={errorColor}>
+              <AttachmentSize color={selectedFileAttachmentsSizeColor || textSecondary} errorColor={errorColor}>
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&

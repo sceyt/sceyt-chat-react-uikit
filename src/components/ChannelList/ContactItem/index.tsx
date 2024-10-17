@@ -2,7 +2,7 @@ import React from 'react'
 import styled from 'styled-components'
 import { makeUsername } from '../../../helpers/message'
 import { USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { IContact } from '../../../types'
@@ -48,7 +48,8 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
+
   const getFromContacts = getShowOnlyContactUsers()
 
   const contactUserName = makeUsername(contact, undefined, getFromContacts)

@@ -22,7 +22,7 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
@@ -150,11 +150,14 @@ const Details = ({
   backgroundColor,
   bordersColor
 }: IDetailsProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BORDER]: borderThemeColor,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -296,20 +299,32 @@ const Details = ({
               setDefaultAvatar={isDirectChannel}
             />
             <ChannelInfo direction={avatarAndNameDirection}>
-              <ChannelName
-                isDirect={isDirectChannel}
-                uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
-                fontSize={channelNameFontSize}
-                lineHeight={channelNameLineHeight}
-                color={textPrimary}
-              >
-                {(activeChannel && activeChannel.subject) ||
-                  (isDirectChannel && directChannelUser
-                    ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                    : isSelfChannel
-                      ? 'Me'
-                      : '')}
-              </ChannelName>
+              <ChannelNameWrapper>
+                <ChannelName
+                  isDirect={isDirectChannel}
+                  uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
+                  fontSize={channelNameFontSize}
+                  lineHeight={channelNameLineHeight}
+                  color={textPrimary}
+                >
+                  {(activeChannel && activeChannel.subject) ||
+                    (isDirectChannel && directChannelUser
+                      ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                      : isSelfChannel
+                        ? 'Me'
+                        : '')}
+                </ChannelName>
+                {!isDirectChannel && checkActionPermission('updateChannel') && (
+                  <EditButton
+                    topPosition={channelEditIconTopPosition}
+                    rightPosition={channelEditIconRightPosition}
+                    onClick={() => setEditMode(true)}
+                  >
+                    {channelEditIcon || <EditIcon />}
+                  </EditButton>
+                )}
+              </ChannelNameWrapper>
+
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
@@ -325,15 +340,6 @@ const Details = ({
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {activeChannel && activeChannel.memberCount} {displayMemberText}
                 </SubTitle>
-              )}
-              {!isDirectChannel && checkActionPermission('updateChannel') && (
-                <EditButton
-                  topPosition={channelEditIconTopPosition}
-                  rightPosition={channelEditIconRightPosition}
-                  onClick={() => setEditMode(true)}
-                >
-                  {channelEditIcon || <EditIcon />}
-                </EditButton>
               )}
             </ChannelInfo>
           </ChannelAvatarAndName>
@@ -453,7 +459,6 @@ const Details = ({
             memberNameFontSize={memberNameFontSize}
             memberAvatarSize={memberAvatarSize}
             memberPresenceFontSize={memberPresenceFontSize}
-            backgroundColor={backgroundColor}
             borderColor={bordersColor}
             tabItemsFontSize={tabItemsFontSize}
             tabItemsLineHeight={tabItemsLineHeight}
@@ -567,11 +572,13 @@ const ChannelName = styled(SectionHeader)<{ isDirect?: boolean; uppercase?: bool
   text-transform: ${(props) => props.uppercase && 'uppercase'};
 `
 
+const ChannelNameWrapper = styled.div`
+  display: flex;
+  justify-content: center;
+`
+
 const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>`
-  position: absolute;
-  right: ${(props) => props.rightPosition || '-28px'};
-  top: ${(props) => props.topPosition || '8px'};
-  margin-left: 8px;
+  margin-left: 6px;
   cursor: pointer;
   color: #b2b6be;
 `

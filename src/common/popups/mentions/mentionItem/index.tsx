@@ -1,7 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import { USER_PRESENCE_STATUS } from '../../../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { AvatarWrapper, UserStatus } from '../../../../components/Channel'
 import { Avatar } from '../../../../components'
 import { userLastActiveDateFormat } from '../../../../helpers'
@@ -16,8 +16,7 @@ interface IMentionsPopupProps {
 }
 
 export default function MentionMember({ mention, isFocused, ...parentProps }: IMentionsPopupProps) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
   return (
     <MemberItem
       key={mention.id}

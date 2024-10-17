@@ -40,9 +40,15 @@ import { getOpenChatOnUserInteraction } from '../../helpers/channelHalper'
 import { getClient } from '../../common/client'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import {
+  attachmentTypes,
+  DEFAULT_CHANNEL_TYPE,
+  MESSAGE_DELIVERY_STATUS,
+  MESSAGE_STATUS,
+  THEME
+} from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
@@ -255,10 +261,10 @@ const Message = ({
   showSenderNameOnOwnMessages = true,
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
-  ownMessageBackground = colors.primaryLight,
+  ownMessageBackground,
   incomingMessageBackground,
-  ownRepliedMessageBackground = colors.ownRepliedMessageBackground,
-  incomingRepliedMessageBackground = colors.incomingRepliedMessageBackground,
+  ownRepliedMessageBackground,
+  incomingRepliedMessageBackground,
   showOwnAvatar = true,
   showMessageStatus = true,
   showMessageTimeAndStatusOnlyOnHover,
@@ -360,10 +366,22 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight
 }: IMessageProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
+  const bubbleOutgoing =
+    theme === THEME.DARK ? colors.outgoingMessageBackgroundDark : colors.outgoingMessageBackgroundLight
+  const bubbleOutgoingX =
+    theme === THEME.DARK ? colors.outgoingMessageBackgroundXDark : colors.outgoingMessageBackgroundXLight
+  const bubbleIncoming =
+    theme === THEME.DARK ? colors.incomingMessageBackgroundDark : colors.incomingMessageBackgroundLight
+  const bubbleIncomingX =
+    theme === THEME.DARK ? colors.incomingMessageBackgroundXDark : colors.incomingMessageBackgroundXLight
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -788,8 +806,8 @@ const Message = ({
       hoverBackground={
         hoverBackground
           ? message.incoming
-            ? incomingMessageBackground || sectionBackground
-            : ownMessageBackground || 'rgb(238, 245, 255)'
+            ? incomingMessageBackground || bubbleIncoming
+            : ownMessageBackground || bubbleOutgoing
           : ''
       }
       topMargin={
@@ -917,8 +935,8 @@ const Message = ({
               message.parentMessage.attachments[0] &&
               message.parentMessage.attachments[0].type === attachmentTypes.voice
             }
-            ownMessageBackground={ownMessageBackground}
-            incomingMessageBackground={incomingMessageBackground || sectionBackground}
+            ownMessageBackground={ownMessageBackground || bubbleOutgoing}
+            incomingMessageBackground={incomingMessageBackground || bubbleIncoming}
             borderRadius={borderRadius}
             withAttachments={notLinkAttachment}
             attachmentWidth={
@@ -1055,7 +1073,11 @@ const Message = ({
                 withBody={!!message.body}
                 withAttachments={withAttachments && notLinkAttachment}
                 leftBorderColor={accentColor}
-                backgroundColor={message.incoming ? incomingRepliedMessageBackground : ownRepliedMessageBackground}
+                backgroundColor={
+                  message.incoming
+                    ? incomingRepliedMessageBackground || bubbleIncomingX
+                    : ownRepliedMessageBackground || bubbleOutgoingX
+                }
                 onClick={() =>
                   handleScrollToRepliedMessage &&
                   !selectionIsActive &&
@@ -1072,7 +1094,9 @@ const Message = ({
                       <Attachment
                         key={attachment.tid || attachment.url}
                         backgroundColor={
-                          message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                          message.incoming
+                            ? incomingMessageBackground || bubbleIncoming
+                            : ownMessageBackground || bubbleOutgoing
                         }
                         attachment={{
                           ...attachment,
@@ -1330,7 +1354,9 @@ const Message = ({
                     borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
                     selectedFileAttachmentsIcon={fileAttachmentsIcon}
                     backgroundColor={
-                      message.incoming ? incomingMessageBackground || sectionBackground : ownMessageBackground
+                      message.incoming
+                        ? incomingMessageBackground || bubbleIncoming
+                        : ownMessageBackground || bubbleOutgoing
                     }
                     selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
                     selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}

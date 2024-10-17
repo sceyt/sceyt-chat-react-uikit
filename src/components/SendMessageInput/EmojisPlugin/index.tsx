@@ -9,7 +9,7 @@ import { ReactComponent as TravelingEmoji } from '../../../assets/svg/emojiTrave
 import { ReactComponent as ObjectEmoji } from '../../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.svg'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
 import { useSelector } from 'react-redux'
 import { themeSelector } from '../../../store/theme/selector'
@@ -70,10 +70,13 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
   leftPosition?: string
 }) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
-import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { Button, CustomInput, Label, PopupFooter } from '../../../../UIHelper'
 import { IUser } from '../../../../types'
 import { updateProfileAC } from '../../../../store/user/actions'
@@ -15,11 +15,15 @@ interface IProps {
 
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const [firstName, setFirstName] = useState(user.firstName)
   const [lastName, setLastName] = useState(user.lastName)
@@ -81,7 +85,7 @@ const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
         {/* <CustomInput type='text' value={presenceStatus} onChange={handlePresenceStatus} placeholder='About' /> */}
       </EditProfileBody>
 
-      <PopupFooter>
+      <PopupFooter backgroundColor={surface1Background}>
         <Button onClick={handleCloseEditProfile} backgroundColor={colors.gray0} color={textPrimary} borderRadius='8px'>
           Cancel
         </Button>

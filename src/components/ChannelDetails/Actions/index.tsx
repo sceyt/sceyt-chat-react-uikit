@@ -38,7 +38,7 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
 import { getClient } from '../../../common/client'
 // Components
@@ -189,11 +189,15 @@ const Actions = ({
   actionItemsFontSize,
   borderColor
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const borderThemeColor = useColor(THEME_COLOR_NAMES.BORDER)
-  const iconPrimary = useColor(THEME_COLOR_NAMES.ICON_PRIMARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.BORDER]: borderThemeColor,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const ChatClient = getClient()
   const { user } = ChatClient
   const [clearHistoryPopupOpen, setClearHistoryPopupOpen] = useState(false)
@@ -416,7 +420,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={1}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(oneHour)}
                     >
                       Mute for 1 hour
@@ -424,7 +428,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={2}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(twoHours)}
                     >
                       Mute for 2 hours
@@ -432,7 +436,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={3}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={focusBackground}
                       onClick={() => handleNotificationOnOff(oneDay)}
                     >
                       Mute for 1 day
@@ -443,7 +447,7 @@ const Actions = ({
                 <DropdownOptionLi
                   textColor={textPrimary}
                   key={4}
-                  hoverBackground={colors.primaryLight}
+                  hoverBackground={focusBackground}
                   onClick={() => handleNotificationOnOff()}
                 >
                   Mute forever

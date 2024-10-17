@@ -5,8 +5,6 @@ import { Attachment, MessageTextFormat } from 'sceyt-chat-react-uikit'
 import { isJSON, makeUsername } from '../../helpers'
 import { ReactComponent as VoiceIcon } from '../../svg/voiceIcon.svg'
 import { attachmentTypes, MESSAGE_STATUS, messagesCustomColor } from '../../helpers/constants'
-import { useColor } from '../../../../../src/hooks'
-import { THEME_COLOR_NAMES } from '../../../../../src'
 
 function ReplyMessage(
   {
@@ -30,8 +28,6 @@ function ReplyMessage(
     borderRadius?: string;
     handleScrollToRepliedMessage: (messageId: string) => void;
   }) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
 
   return (
     <ReplyMessageContainer
@@ -106,7 +102,9 @@ function ReplyMessage(
           {!!message.parentMessage?.attachments.length &&
             message.parentMessage?.attachments[0].type ===
             attachmentTypes.voice && (
-              <VoiceIconWrapper color={'#5159F6'} />
+              <VoiceIconWrapper >
+                <VoiceIcon/>
+              </VoiceIconWrapper>
             )}
           {message.parentMessage?.state === MESSAGE_STATUS.DELETE ? (
             <MessageStatusDeleted>
@@ -115,12 +113,10 @@ function ReplyMessage(
             </MessageStatusDeleted>
           ) : message.parentMessage?.body ? (
             MessageTextFormat({
-              accentColor,
-              textSecondary,
               text: message.parentMessage?.body,
               message: message.parentMessage,
               getFromContacts: true,
-              asSampleText: true,
+              asSampleText: true
             })
           ) : (
             parentNotLinkAttachment &&
@@ -224,9 +220,9 @@ export const ReplyMessageText = styled.span<{
     color: ${'#438CED'};
   }
 `
-const VoiceIconWrapper = styled(VoiceIcon)`
+const VoiceIconWrapper = styled.span`
   transform: translate(0px, 3.5px);
-  color: ${(props) => props.color || '#5159F6'};
+  color: '#5159F6';
 `
 
 const MessageStatusDeleted = styled.span<{

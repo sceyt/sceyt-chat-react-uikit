@@ -3,7 +3,6 @@ import { Provider } from 'react-redux'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
-import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 export interface IProgress {
   loaded: number
   total: number
@@ -32,9 +31,26 @@ export interface ICustomUploader {
   cancelRequest: (requestPromise: any) => void
 }
 
-export type ThemeColorName = (typeof THEME_COLOR_NAMES)[keyof typeof THEME_COLOR_NAMES]
+export type ThemeColors =
+  | 'accent'
+  | 'background'
+  | 'sectionBackground'
+  | 'focusBackground'
+  | 'hoverBackground'
+  | 'textPrimary'
+  | 'textSecondary'
+  | 'textFootnote'
+  | 'textOnPrimary'
+  | 'border'
+  | 'iconPrimary'
+  | 'iconInactive'
+  | 'surface1'
+  | 'surface2'
+  | 'overlayBackground'
+  | 'overlayBackground2'
+  | 'error'
 
-interface IThemeColor {
+export interface ThemeColor {
   light: string
   dark?: string
   [key: string]: string | undefined
@@ -42,7 +58,7 @@ interface IThemeColor {
 
 export interface SceytChatUIKitTheme {
   colors: {
-    [key in ThemeColorName]: IThemeColor
+    [key in ThemeColors]?: ThemeColor
   }
 }
 
@@ -71,15 +87,6 @@ export interface IChatClientProps {
   defaultRolesByChannelTypesMap?: {
     [key: string]: string
   }
-  customColors?: {
-    primaryColor?: string
-    primaryLight?: string
-    textColor1?: string
-    textColor2?: string
-    textColor3?: string
-    deletedUserAvatarBackground?: string
-    defaultAvatarBackground?: string
-  }
   openChatOnUserInteraction?: boolean
 }
 
@@ -97,7 +104,6 @@ const SceytChatContainer = ({
   channelTypeFilter,
   logoSrc,
   CustomUploader,
-  customColors,
   showNotifications = true,
   hideUserPresence,
   openChatOnUserInteraction,
@@ -118,7 +124,6 @@ const SceytChatContainer = ({
         sendAttachmentsAsSeparateMessages={sendAttachmentsAsSeparateMessages}
         membersDisplayTextByChannelTypesMap={membersDisplayTextByChannelTypesMap}
         defaultRolesByChannelTypesMap={defaultRolesByChannelTypesMap}
-        customColors={customColors}
         showNotifications={showNotifications}
         hideUserPresence={hideUserPresence}
         openChatOnUserInteraction={openChatOnUserInteraction}

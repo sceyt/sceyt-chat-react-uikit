@@ -27,8 +27,8 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps } from '../ChatContainer'
-import { colors, defaultTheme, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { IChatClientProps, ThemeColor } from '../ChatContainer'
+import { colors, defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
@@ -48,13 +48,12 @@ const SceytChat = ({
   membersDisplayTextByChannelTypesMap,
   channelTypeFilter,
   defaultRolesByChannelTypesMap,
-  customColors,
   hideUserPresence,
   showNotifications,
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false
 }: IChatClientProps) => {
-  const backgroundColor = useColor(THEME_COLOR_NAMES.BACKGROUND)
+  const { [THEME_COLORS.BACKGROUND]: backgroundColor } = useColor()
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
@@ -105,6 +104,14 @@ const SceytChat = ({
       dispatch(browserTabIsActiveAC(false))
     }
   }
+
+  const generateBubbleColors = (themeColors: { [key: string]: ThemeColor }) => {
+    colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.85, true)
+    colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.85)
+    colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.75)
+    colors.outgoingMessageBackgroundXDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.75, true)
+  }
+
   useEffect(() => {
     console.log('client is changed.... ', client)
     if (client) {
@@ -137,32 +144,6 @@ const SceytChat = ({
     }
   }, [client])
 
-  useEffect(() => {
-    if (customColors) {
-      if (customColors.primaryColor) {
-        colors.primary = customColors.primaryColor
-      }
-      if (customColors.primaryLight) {
-        colors.primaryLight = customColors.primaryLight
-      }
-      if (customColors.textColor1) {
-        colors.textColor1 = customColors.textColor1
-      }
-      if (customColors.textColor2) {
-        colors.textColor2 = customColors.textColor2
-      }
-      if (customColors.textColor3) {
-        colors.textColor3 = customColors.textColor3
-      }
-      if (customColors.defaultAvatarBackground) {
-        colors.defaultAvatarBackground = customColors.defaultAvatarBackground
-      }
-      if (customColors.deletedUserAvatarBackground) {
-        colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
-      }
-    }
-  }, [customColors])
-
   const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
@@ -172,12 +153,15 @@ const SceytChat = ({
           ...theme.colors[key]
         } as any
       }
-      if (key === THEME_COLOR_NAMES.ERROR) {
-        colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
+      if (key === THEME_COLORS.ERROR) {
+        colors.errorBlur = moderateColor(updatedColors[key].light, 0.2)
       }
     }
-    const updatedTheme = { ...defaultTheme }
-    updatedTheme.colors = updatedColors
+
+    const updatedTheme = { ...defaultTheme, colors: updatedColors }
+
+    generateBubbleColors(updatedColors)
+
     dispatch(setTheme(updatedTheme))
   }
 
@@ -260,6 +244,7 @@ const SceytChat = ({
     if (theme) {
       handleChangedTheme(theme)
     } else {
+      generateBubbleColors(defaultTheme.colors)
       dispatch(setTheme(defaultTheme))
     }
   }, [theme])

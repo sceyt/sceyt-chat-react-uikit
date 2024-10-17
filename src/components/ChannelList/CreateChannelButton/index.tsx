@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -36,8 +36,12 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   newChatIcon,
   uploadPhotoIcon
 }) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
+  } = useColor()
+
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
   const [showCreateChannel, setShowCreateChannel] = useState(false)
   const [creatingChannelType, setCreatingChannelType] = useState<string>('group')
@@ -59,7 +63,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={colors.primaryLight} leftAuto={!showSearch} iconColor={accentColor}>
+          <CreateDropdownButton hoverBackground={focusBackground} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -68,7 +72,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={1}
             textColor={textPrimary}
-            hoverBackground={colors.hoverBackgroundColor}
+            hoverBackground={focusBackground}
             onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
           >
@@ -78,7 +82,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={2}
             textColor={textPrimary}
-            hoverBackground={colors.hoverBackgroundColor}
+            hoverBackground={focusBackground}
             onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
           >
@@ -88,7 +92,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={3}
             textColor={textPrimary}
-            hoverBackground={colors.hoverBackgroundColor}
+            hoverBackground={focusBackground}
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
           >
@@ -135,9 +139,9 @@ const CreateDropdownButton = styled.div<{ leftAuto: boolean; hoverBackground?: s
   border-radius: 50%;
   transition: all 0.2s;
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
+    background-color: ${(props) => props.hoverBackground};
   }
   & > svg {
-    color: ${(props) => props.iconColor || colors.primary};
+    color: ${(props) => props.iconColor};
   }
 `

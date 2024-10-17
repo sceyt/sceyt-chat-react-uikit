@@ -1,56 +1,91 @@
-import { SceytChatUIKitTheme, ThemeMode } from '../components'
+import { ThemeMode } from '../components'
 
-export const THEME_COLOR_NAMES = {
+export const THEME_COLORS = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
   SECTION_BACKGROUND: 'sectionBackground',
+  FOCUS_BACKGROUND: 'focusBackground',
+  HOVER_BACKGROUND: 'hoverBackground',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
+  TEXT_ON_PRIMARY: 'textOnPrimary',
   BORDER: 'border',
   ICON_PRIMARY: 'iconPrimary',
   ICON_INACTIVE: 'iconInactive',
+  SURFACE_1: 'surface1',
+  SURFACE_2: 'surface2',
+  OVERLAY_BACKGROUND: 'overlayBackground',
+  OVERLAY_BACKGROUND_2: 'overlayBackground2',
   ERROR: 'error'
-}
-export const defaultTheme: SceytChatUIKitTheme = {
+} as const
+export const defaultTheme = {
   colors: {
-    [THEME_COLOR_NAMES.ACCENT]: {
+    [THEME_COLORS.ACCENT]: {
       light: '#5159F6',
       dark: '#6B72FF'
     },
-    [THEME_COLOR_NAMES.BACKGROUND]: {
+    [THEME_COLORS.BACKGROUND]: {
       light: '#FFFFFF',
       dark: '#19191B'
     },
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: {
-      light: '#F1F2F6',
+    [THEME_COLORS.SECTION_BACKGROUND]: {
+      light: '#FFFFFF',
       dark: '#232324'
     },
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: {
+    [THEME_COLORS.FOCUS_BACKGROUND]: {
+      light: '#E3E7FF',
+      dark: '#212239'
+    },
+    [THEME_COLORS.HOVER_BACKGROUND]: {
+      light: '#F9FAFB',
+      dark: '#1D1D1F'
+    },
+    [THEME_COLORS.TEXT_PRIMARY]: {
       light: '#111539',
       dark: '#E1E3E6'
     },
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: {
+    [THEME_COLORS.TEXT_SECONDARY]: {
       light: '#707388',
       dark: '#969A9F'
     },
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: {
+    [THEME_COLORS.TEXT_FOOTNOTE]: {
       light: '#A0A1B0',
       dark: '#76787A'
     },
-    [THEME_COLOR_NAMES.BORDER]: {
+    [THEME_COLORS.TEXT_ON_PRIMARY]: {
+      light: '#fff',
+      dark: '#fff'
+    },
+    [THEME_COLORS.BORDER]: {
       light: '#E4E6EE',
       dark: '#303032'
     },
-    [THEME_COLOR_NAMES.ICON_PRIMARY]: {
+    [THEME_COLORS.ICON_PRIMARY]: {
       light: '#707388',
       dark: '#969A9F'
     },
-    [THEME_COLOR_NAMES.ICON_INACTIVE]: {
+    [THEME_COLORS.ICON_INACTIVE]: {
       light: '#A0A1B0',
       dark: '#64666A'
     },
-    [THEME_COLOR_NAMES.ERROR]: {
+    [THEME_COLORS.SURFACE_1]: {
+      light: '#F1F2F6',
+      dark: '#232324'
+    },
+    [THEME_COLORS.SURFACE_2]: {
+      light: '#A0A1B0',
+      dark: '#3B3B3D'
+    },
+    [THEME_COLORS.OVERLAY_BACKGROUND]: {
+      light: 'rgba(0, 0, 0, 0.5)',
+      dark: 'rgba(0, 0, 0, 0.5)'
+    },
+    [THEME_COLORS.OVERLAY_BACKGROUND_2]: {
+      light: 'rgba(17, 21, 57, 0.4)',
+      dark: 'rgba(17, 21, 57, 0.4)'
+    },
+    [THEME_COLORS.ERROR]: {
       light: '#FA4C56',
       dark: '#FA4C56'
     }
@@ -88,6 +123,15 @@ export const colors = {
   lightModePrimary: '#5159F6',
   darkModePrimaryLight: '#1c1f47',
   lightModePrimaryLight: '#E3E7FF',
+
+  incomingMessageBackgroundLight: '#dfe0eb',
+  incomingMessageBackgroundDark: '#1c1f47',
+  incomingMessageBackgroundXLight: '#E4E6EE',
+  incomingMessageBackgroundXDark: '#303032',
+  outgoingMessageBackgroundLight: '',
+  outgoingMessageBackgroundDark: '',
+  outgoingMessageBackgroundXLight: '',
+  outgoingMessageBackgroundXDark: '',
 
   incomingRepliedMessageBackground: '#fbfbfc',
   ownRepliedMessageBackground: '#f9fbfd',

@@ -4,7 +4,7 @@ import { ReactComponent as ItalicIcon } from '../../../assets/svg/italic.svg'
 import { ReactComponent as StrikethroughIcon } from '../../../assets/svg/strikethrough.svg'
 import { ReactComponent as MonoIcon } from '../../../assets/svg/mono.svg'
 import { ReactComponent as BoldIcon } from '../../../assets/svg/bold.svg'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { THEME } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
@@ -44,10 +44,13 @@ export default function TextFormat({
   theme?: string
   editorProps: any
 }) {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const ref: any = React.useRef(null)
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
   useEffect(() => {

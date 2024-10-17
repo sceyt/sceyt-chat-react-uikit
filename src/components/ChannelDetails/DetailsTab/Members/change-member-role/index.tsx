@@ -19,7 +19,7 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors, THEME_COLOR_NAMES } from '../../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
@@ -33,11 +33,15 @@ interface IProps {
 }
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const [isChanged, setIsChanged] = useState(false)
   const [selectedRole, setSelectedRole] = useState<string>()
@@ -108,7 +112,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             </CustomSelect>
           </RolesSelect>
         </PopupBody>
-        <PopupFooter backgroundColor={sectionBackground}>
+        <PopupFooter backgroundColor={surface1Background}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>

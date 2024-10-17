@@ -18,7 +18,7 @@ import { getCustomDownloader } from '../../../../helpers/customUploader'
 import { formatAudioVideoTime } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
-import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
 
 interface IProps {
@@ -42,8 +42,8 @@ const VoiceItem = ({
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const getFromContacts = getShowOnlyContactUsers()

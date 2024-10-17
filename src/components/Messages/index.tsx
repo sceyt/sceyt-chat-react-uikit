@@ -2,7 +2,6 @@ import React, { FC } from 'react'
 import { useSelector } from 'react-redux'
 import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
-import { colors } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IUser } from '../../types'
 interface MessagesProps {
   fontFamily?: string
@@ -187,7 +186,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
-  ownMessageBackground = colors.primaryLight,
+  ownMessageBackground,
   incomingMessageBackground,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,

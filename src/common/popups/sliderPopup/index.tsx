@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
 import Carousel from 'react-elastic-carousel'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
@@ -49,9 +49,10 @@ const SliderPopup = ({
   currentMediaFile,
   allowEditDeleteIncomingMessage
 }: IProps) => {
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
+
   const dispatch = useDispatch()
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+
   const getFromContacts = getShowOnlyContactUsers()
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
@@ -322,7 +323,7 @@ const SliderPopup = ({
   }, [])
   return (
     <Container draggable={false}>
-      <SliderHeader backgroundColor={textPrimary}>
+      <SliderHeader>
         <FileInfo>
           <Avatar
             name={attachmentUserName}
@@ -334,9 +335,9 @@ const SliderPopup = ({
             <UserName>{attachmentUserName}</UserName>
             {/* <FileName>{currentFile.name}</FileName> */}
             {/* <FileSize></FileSize> */}
-            <FileDateAndSize color={textSecondary}>
+            <FileDateAndSize color={textOnPrimary}>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
-              <FileSize color={textSecondary}>
+              <FileSize color={textOnPrimary}>
                 {currentFile && currentFile.size && currentFile.size > 0 ? bytesToSize(currentFile.size, 1) : ''}
               </FileSize>
             </FileDateAndSize>
@@ -527,9 +528,9 @@ const ProgressWrapper = styled.span`
     }
   }
 `
-const SliderHeader = styled.div<{ backgroundColor?: string }>`
+const SliderHeader = styled.div`
   height: 60px;
-  background: ${(props) => props.backgroundColor};
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -538,7 +539,7 @@ const SliderHeader = styled.div<{ backgroundColor?: string }>`
 const SliderBody = styled.div`
   width: 100%;
   height: calc(100% - 60px);
-  background: rgba(0, 0, 0, 0.4);
+  background: rgba(0, 0, 0, 0.8);
   display: flex;
   align-items: center;
   justify-content: center;

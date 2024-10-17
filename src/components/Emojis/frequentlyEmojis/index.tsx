@@ -3,10 +3,10 @@ import { useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { themeSelector } from '../../../store/theme/selector'
-import { THEME } from '../../../helpers/constants'
 import { useColor } from '../../../hooks'
+import { THEME } from '../../../helpers/constants'
 
 function FrequentlyEmojis({
   handleAddEmoji,
@@ -19,9 +19,13 @@ function FrequentlyEmojis({
   frequentlyEmojis?: IReaction[]
   rtlDirection?: boolean
 }) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const defaultEmojisMap = {
     '👍': { key: '👍', reacted: false },
     '😍': { key: '😍', reacted: false },
@@ -82,7 +86,7 @@ function FrequentlyEmojis({
     <Container id='emojisContainer' backgroundColor={sectionBackground} rendered={rendered} rightSide={rtlDirection}>
       {emojis.map((emoji: any) => (
         <EmojiItem
-          activeBackground={sectionBackground}
+          activeBackground={hoverBackground}
           active={emoji.reacted}
           key={emoji.key}
           onClick={() => chooseEmoji(emoji.key)}
@@ -93,7 +97,7 @@ function FrequentlyEmojis({
       <OpenMoreEmojis
         onClick={() => handleEmojiPopupToggle(true)}
         iconBackgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
-        hoverBackground={sectionBackground}
+        hoverBackground={hoverBackground}
         iconHoverColor={accentColor}
         iconColor={textSecondary}
       >

@@ -10,7 +10,7 @@ import { ReactComponent as NotificationsIcon } from '../../../assets/svg/notific
 import { ReactComponent as LockIcon } from '../../../assets/svg/lock.svg'
 import { ReactComponent as LogoutIcon } from '../../../assets/svg/leave.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { DropdownOptionLi, DropdownOptionsUl, SectionHeader } from '../../../UIHelper'
 // Components
 import Avatar from '../../Avatar'
@@ -28,9 +28,12 @@ const settingsPages = {
 }
 
 const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)
   const [activeSettingPage, setActiveSettingPage] = useState('')
   const user = useSelector(userSelector)

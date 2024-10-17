@@ -12,7 +12,7 @@ import { ReactComponent as ObjectEmoji } from '../../assets/svg/emojiObjectIcon.
 import { ReactComponent as SymbolEmoji } from '../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
 import { THEME } from '../../helpers/constants'
@@ -70,10 +70,13 @@ function EmojisPopup({
   emojisPopupPosition?: string
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+  } = useColor()
+
   const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')

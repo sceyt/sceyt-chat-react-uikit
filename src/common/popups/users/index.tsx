@@ -17,7 +17,7 @@ import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -69,10 +69,14 @@ const UsersPopup = ({
   selectIsRequired,
   popupWidth
 }: IProps) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user: selfUser } = ChatClient
@@ -451,7 +455,7 @@ const UsersPopup = ({
         </PopupBody>
 
         {actionType !== 'createChat' && (
-          <PopupFooter backgroundColor={sectionBackground} marginTop='auto'>
+          <PopupFooter backgroundColor={surface1Background} marginTop='auto'>
             {actionType === 'selectUsers' ? (
               <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleGoBack}>
                 Back

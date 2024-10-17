@@ -40,7 +40,7 @@ import {
   USER_PRESENCE_STATUS,
   THEME
 } from '../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
@@ -98,10 +98,15 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const accentColor = useColor(THEME_COLOR_NAMES.ACCENT)
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const errorColor = useColor(THEME_COLOR_NAMES.ERROR)
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.ERROR]: errorColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const getFromContacts = getShowOnlyContactUsers()
@@ -178,9 +183,7 @@ const Channel: React.FC<IChannelProps> = ({
       theme={theme}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
-      selectedBackgroundColor={
-        selectedChannelBackground || (theme === THEME.DARK ? colors.hoverBackgroundColor : colors.primaryLight)
-      }
+      selectedBackgroundColor={selectedChannelBackground || focusBackground}
       selectedChannelPaddings={selectedChannelPaddings}
       channelsPaddings={channelsPaddings}
       selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -468,7 +471,7 @@ const Channel: React.FC<IChannelProps> = ({
           </UnreadMentionIconWrapper>
         )}
         {!!(channel.newMessageCount || channel.unread) && (
-          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted}>
+          <UnreadCount backgroundColor={accentColor} isMuted={channel.muted} mutedBackgroundColor={surface2}>
             {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
           </UnreadCount>
         )}
@@ -482,6 +485,7 @@ export default Channel
 export interface UnreadCountProps {
   readonly isMuted: boolean
   readonly backgroundColor?: string
+  readonly mutedBackgroundColor?: string
   width?: string
   height?: string
   textColor?: string
@@ -727,5 +731,5 @@ const UnreadCount = styled.span<UnreadCountProps>`
   border-radius: 10px;
   box-sizing: border-box;
 
-  ${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}
+  ${(props: any) => props.isMuted && `background-color: ${props.mutedBackgroundColor};`}
 `

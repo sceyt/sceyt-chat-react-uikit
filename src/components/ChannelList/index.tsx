@@ -42,7 +42,7 @@ import { useColor, useDidUpdate } from '../../hooks'
 import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-import { colors, device, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, device, THEME_COLORS } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
 // Components
@@ -194,11 +194,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize
 }) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const textSecondary = useColor(THEME_COLOR_NAMES.TEXT_SECONDARY)
-  const textFootnote = useColor(THEME_COLOR_NAMES.TEXT_FOOTNOTE)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
-  const borderColor = useColor(THEME_COLOR_NAMES.BORDER)
+  const {
+    [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BORDER]: borderColor
+  } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
   const theme = useSelector(themeSelector)
@@ -408,7 +411,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       withCustomList={!!List}
       ref={channelListRef}
       borderColor={borderColor}
-      backgroundColor={backgroundColor || (theme === THEME.DARK ? colors.darkModeSecondaryBackgroundColor : '')}
+      backgroundColor={backgroundColor || themeBackgroundColor}
     >
       <ChannelListHeader
         withCustomList={!!List}

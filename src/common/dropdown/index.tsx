@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import { useColor, useDidUpdate, useEventListener } from '../../hooks'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
 
 const DropDownContainer = styled.div<{
@@ -150,8 +150,8 @@ const DropDown = ({
   order,
   zIndex
 }: IProps) => {
-  const textPrimary = useColor(THEME_COLOR_NAMES.TEXT_PRIMARY)
-  const sectionBackground = useColor(THEME_COLOR_NAMES.SECTION_BACKGROUND)
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground } = useColor()
+
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
   const dropDownBodyRef = useRef<any>(null)
