@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { THEME_COLOR_NAMES } from '../UIHelper/constants'
+import { THEME_COLORS } from '../UIHelper/constants'
 import { MESSAGE_DELIVERY_STATUS } from '../helpers/constants'
 
 import { ReactComponent as ReadIcon } from '../assets/svg/ticks_read.svg'
@@ -55,7 +55,7 @@ const MessageStatusIcon = ({
   readIconColor?: string
   accentColor?: string
 }) => {
-  const { [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary } = useColor()
+  const { [THEME_COLORS.ICON_PRIMARY]: iconPrimary } = useColor()
 
   const color = iconColor || iconPrimary
 

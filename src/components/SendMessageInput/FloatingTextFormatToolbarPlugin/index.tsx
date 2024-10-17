@@ -21,7 +21,7 @@ import {
 import { createPortal } from 'react-dom'
 
 import styled from 'styled-components'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
@@ -118,10 +118,10 @@ function TextFormatFloatingToolbar({
   showMenu: boolean
 }): JSX.Element {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.HOVER_BACKGROUND]: hoverBackground,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.SURFACE_2]: surface2
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)

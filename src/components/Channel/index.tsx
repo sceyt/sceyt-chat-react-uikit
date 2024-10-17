@@ -40,7 +40,7 @@ import {
   USER_PRESENCE_STATUS,
   THEME
 } from '../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getClient } from '../../common/client'
 import { IChannel, IContact } from '../../types'
@@ -99,12 +99,12 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarTextSize
 }) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.SURFACE_2]: surface2,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

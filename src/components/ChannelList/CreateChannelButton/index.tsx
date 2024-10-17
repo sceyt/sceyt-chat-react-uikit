@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import styled from 'styled-components'
 // Helpers
 import { DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
-import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 // Assets
 import { ReactComponent as CreateChannelIcon } from '../../../assets/svg/createChannel.svg'
 import { ReactComponent as CreateGrouplIcon } from '../../../assets/svg/createGroup.svg'
@@ -37,9 +37,9 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
   uploadPhotoIcon
 }) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
   } = useColor()
 
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)

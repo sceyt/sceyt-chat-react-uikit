@@ -38,7 +38,7 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
 import { getClient } from '../../../common/client'
 // Components
@@ -190,12 +190,12 @@ const Actions = ({
   borderColor
 }: IProps) => {
   const {
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.FOCUS_BACKGROUND]: focusBackground,
-    [THEME_COLOR_NAMES.BORDER]: borderThemeColor,
-    [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.BORDER]: borderThemeColor,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const ChatClient = getClient()

@@ -34,7 +34,7 @@ import {
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME } from 'helpers/constants'
-import { colors, THEME_COLOR_NAMES } from 'UIHelper/constants'
+import { colors, THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction } from 'types'
 // Components
 import Avatar from '../Avatar'
@@ -175,9 +175,10 @@ const Message = ({
   messageTextLineHeight
 }: IMessageProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
   const bubbleOutgoing =

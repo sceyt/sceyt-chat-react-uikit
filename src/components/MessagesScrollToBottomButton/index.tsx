@@ -9,7 +9,7 @@ import { themeSelector } from '../../store/theme/selector'
 // Assets
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
@@ -48,8 +48,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountFontSize,
   unreadCountTextColor
 }) => {
-  const { [THEME_COLOR_NAMES.ACCENT]: accentColor, [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground } =
-    useColor()
+  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground } = useColor()
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)

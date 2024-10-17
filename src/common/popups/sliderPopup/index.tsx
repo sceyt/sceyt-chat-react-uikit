@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
 import Carousel from 'react-elastic-carousel'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
@@ -49,8 +49,7 @@ const SliderPopup = ({
   currentMediaFile,
   allowEditDeleteIncomingMessage
 }: IProps) => {
-  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.TEXT_ON_PRIMARY]: textOnPrimary } =
-    useColor()
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
 
   const dispatch = useDispatch()
 
