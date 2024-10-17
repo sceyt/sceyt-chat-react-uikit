@@ -1,7 +1,7 @@
 import styled from 'styled-components'
 import React from 'react'
 import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
-import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 
 const SearchInputContainer = styled.div<{ inline?: boolean; borderColor?: string }>`
@@ -70,9 +70,9 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   fontSize
 }) => {
   const {
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
   return (

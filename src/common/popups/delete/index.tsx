@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import CustomRadio from '../../customRadio'
 import usePermissions from '../../../hooks/usePermissions'
@@ -41,12 +41,12 @@ function ConfirmPopup({
   loading
 }: IProps) {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const [checkActionPermission] = usePermissions(myRole ?? '')

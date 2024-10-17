@@ -28,7 +28,7 @@ import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '..
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps, IThemeColor } from '../ChatContainer'
-import { colors, defaultTheme, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
@@ -54,7 +54,7 @@ const SceytChat = ({
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false
 }: IChatClientProps) => {
-  const { [THEME_COLOR_NAMES.BACKGROUND]: backgroundColor } = useColor()
+  const { [THEME_COLORS.BACKGROUND]: backgroundColor } = useColor()
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
@@ -107,10 +107,10 @@ const SceytChat = ({
   }
 
   const generateBubbleColors = (themeColors: { [key: string]: IThemeColor }) => {
-    colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].dark || '', 0.85, true)
-    colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].light, 0.85)
-    colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].light, 0.75)
-    colors.outgoingMessageBackgroundXDark = moderateColor(themeColors[THEME_COLOR_NAMES.ACCENT].dark || '', 0.75, true)
+    colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.85, true)
+    colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.85)
+    colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.75)
+    colors.outgoingMessageBackgroundXDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.75, true)
   }
 
   useEffect(() => {
@@ -180,7 +180,7 @@ const SceytChat = ({
           ...theme.colors[key]
         } as any
       }
-      if (key === THEME_COLOR_NAMES.ERROR) {
+      if (key === THEME_COLORS.ERROR) {
         colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
       }
     }

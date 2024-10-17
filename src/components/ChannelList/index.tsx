@@ -42,7 +42,7 @@ import { useColor, useDidUpdate } from '../../hooks'
 import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-import { colors, device, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, device, THEME_COLORS } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
 // Components
@@ -195,12 +195,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchedChannelsTitleFontSize
 }) => {
   const {
-    [THEME_COLOR_NAMES.BACKGROUND]: themeBackgroundColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.BORDER]: borderColor
+    [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BORDER]: borderColor
   } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()

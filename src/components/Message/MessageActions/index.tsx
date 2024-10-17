@@ -17,7 +17,7 @@ import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, THEME, USER_STATE } from '../../../helpers/constants'
 import { IMember } from '../../../types'
@@ -90,12 +90,12 @@ export default function MessageActions({
   handleOpenEmojis
 }: any) {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.HOVER_BACKGROUND]: hoverBackground,
-    [THEME_COLOR_NAMES.SURFACE_2]: surface2,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
   } = useColor()
 
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)

@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
-import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { Button, CustomInput, Label, PopupFooter } from '../../../../UIHelper'
 import { IUser } from '../../../../types'
 import { updateProfileAC } from '../../../../store/user/actions'
@@ -16,12 +16,12 @@ interface IProps {
 // eslint-disable-next-line no-empty-pattern
 const EditProfile = ({ handleCloseEditProfile, user }: IProps) => {
   const {
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.BORDER]: borderColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

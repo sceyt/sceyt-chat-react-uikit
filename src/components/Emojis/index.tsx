@@ -12,7 +12,7 @@ import { ReactComponent as ObjectEmoji } from '../../assets/svg/emojiObjectIcon.
 import { ReactComponent as SymbolEmoji } from '../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../assets/svg/emojiFlagicon.svg'
 // Helpers
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import EMOJIS from './emojis'
 import { getEmojisCategoryTitle } from '../../helpers'
 import { THEME } from '../../helpers/constants'
@@ -71,10 +71,10 @@ function EmojisPopup({
   fixEmojiCategoriesTitleOnTop?: boolean
 }) {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
   } = useColor()
 
   const theme = useSelector(themeSelector)

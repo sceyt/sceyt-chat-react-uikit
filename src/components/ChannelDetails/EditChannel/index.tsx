@@ -26,7 +26,7 @@ import {
 } from '../../../UIHelper'
 import { getClient } from '../../../common/client'
 import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember } from '../../../types'
 // Components
 import DropDown from '../../../common/dropdown'
@@ -101,12 +101,12 @@ const EditChannel = ({
   editChannelCancelButtonTextColor
 }: IProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.BORDER]: borderColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const ChatClient = getClient()

@@ -12,7 +12,7 @@ import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
-import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 
 interface ISystemMessageProps {
@@ -44,7 +44,7 @@ const Message = ({
   borderRadius,
   contactsMap
 }: ISystemMessageProps) => {
-  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.OVERLAY_BACKGROUND]: overlayBackground } =
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
 
   const dispatch = useDispatch()
@@ -94,7 +94,7 @@ const Message = ({
       marginTop={differentUserMessageSpacing || '16px'}
       marginBottom={nextMessage && nextMessage.type !== 'system' ? differentUserMessageSpacing || '16px' : ''}
       fontSize={fontSize}
-      textColor={textColor || textPrimary}
+      textColor={textColor || textOnPrimary}
       border={border}
       backgroundColor={backgroundColor || overlayBackground}
       borderRadius={borderRadius}

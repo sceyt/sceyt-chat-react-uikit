@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../../assets/svg/linkIcon.svg'
-import { colors, THEME_COLOR_NAMES } from '../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
@@ -21,7 +21,7 @@ const LinkItem = ({
   linkPreviewColor,
   linkPreviewHoverBackgroundColor
 }: IProps) => {
-  const { [THEME_COLOR_NAMES.ACCENT]: accentColor, [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary } = useColor()
+  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
 
   // const [title, setTitle] = useState('')
   // const [imageSrc, setImageSrc] = useState('')

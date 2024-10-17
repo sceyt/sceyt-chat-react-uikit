@@ -10,7 +10,7 @@ import {
 import { $createMentionNode } from '../MentionNode'
 import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
 import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -182,8 +182,7 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
-  const { [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary, [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary } =
-    useColor()
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
 
   let className = 'item'
   if (isSelected) {
@@ -231,7 +230,7 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
-  const { [THEME_COLOR_NAMES.BORDER]: borderColor } = useColor()
+  const { [THEME_COLORS.BORDER]: borderColor } = useColor()
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()

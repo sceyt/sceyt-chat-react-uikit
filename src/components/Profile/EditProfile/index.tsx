@@ -16,17 +16,17 @@ import { useColor, useStateComplex } from '../../../hooks'
 import ImageCrop from '../../../common/imageCrop'
 import Avatar from '../../Avatar'
 import PopupContainer from '../../../common/popups/popupContainer'
-import { THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 // import { updateUser } from '../../../../store/user/actions';
 // import { setErrorNotification } from '../../../../store/channel/actions';
 
 export default function EditProfile({ toggleEditPopup, user }: any) {
   const {
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.BORDER]: borderColor,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   // const dispatch = useDispatch()

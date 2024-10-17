@@ -17,7 +17,7 @@ import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -70,11 +70,11 @@ const UsersPopup = ({
   popupWidth
 }: IProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
   const dispatch = useDispatch()

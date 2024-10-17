@@ -22,7 +22,7 @@ import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
-import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
@@ -151,11 +151,11 @@ const Details = ({
   bordersColor
 }: IDetailsProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.BORDER]: borderThemeColor,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BORDER]: borderThemeColor,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
   } = useColor()
 
   const dispatch = useDispatch()

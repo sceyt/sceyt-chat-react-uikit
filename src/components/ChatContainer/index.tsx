@@ -3,7 +3,6 @@ import { Provider } from 'react-redux'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
-import { THEME_COLOR_NAMES } from '../../UIHelper/constants'
 export interface IProgress {
   loaded: number
   total: number
@@ -32,7 +31,25 @@ export interface ICustomUploader {
   cancelRequest: (requestPromise: any) => void
 }
 
-export type ThemeColorName = (typeof THEME_COLOR_NAMES)[keyof typeof THEME_COLOR_NAMES]
+export interface IThemeColorNames {
+  ACCENT: 'accent'
+  BACKGROUND: 'background'
+  SECTION_BACKGROUND: 'sectionBackground'
+  FOCUS_BACKGROUND: 'focusBackground'
+  HOVER_BACKGROUND: 'hoverBackground'
+  TEXT_PRIMARY: 'textPrimary'
+  TEXT_SECONDARY: 'textSecondary'
+  TEXT_FOOTNOTE: 'textFootnote'
+  TEXT_ON_PRIMARY: 'textOnPrimary'
+  BORDER: 'border'
+  ICON_PRIMARY: 'iconPrimary'
+  ICON_INACTIVE: 'iconInactive'
+  SURFACE_1: 'surface1'
+  SURFACE_2: 'surface2'
+  OVERLAY_BACKGROUND: 'overlayBackground'
+  OVERLAY_BACKGROUND_2: 'overlayBackground2'
+  ERROR: 'error'
+}
 
 export interface IThemeColor {
   light: string
@@ -42,7 +59,7 @@ export interface IThemeColor {
 
 export interface SceytChatUIKitTheme {
   colors: {
-    [key in ThemeColorName]: IThemeColor
+    [key in IThemeColorNames[keyof IThemeColorNames]]: IThemeColor
   }
 }
 

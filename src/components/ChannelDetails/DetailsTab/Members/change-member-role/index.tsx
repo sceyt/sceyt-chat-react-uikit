@@ -19,7 +19,7 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors, THEME_COLOR_NAMES } from '../../../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
@@ -34,12 +34,12 @@ interface IProps {
 
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.SURFACE_1]: surface1Background,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

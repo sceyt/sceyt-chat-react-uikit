@@ -48,7 +48,7 @@ import {
   THEME
 } from '../../helpers/constants'
 import { MessageOwner, MessageText, ReplyMessageText } from '../../UIHelper'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IReaction, IUser } from '../../types'
 // Components
 import MessageActions from './MessageActions'
@@ -367,10 +367,10 @@ const Message = ({
   messageTextLineHeight
 }: IMessageProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
   const bubbleOutgoing =

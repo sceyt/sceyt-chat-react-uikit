@@ -30,7 +30,7 @@ import {
   setDownloadFilePromise
 } from '../../helpers'
 import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
@@ -92,11 +92,11 @@ const Attachment = ({
   videoAttachmentMaxHeight
 }: AttachmentPops) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLOR_NAMES.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLOR_NAMES.ERROR]: errorColor
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ERROR]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

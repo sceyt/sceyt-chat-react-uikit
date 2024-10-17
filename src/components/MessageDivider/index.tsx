@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { colors, THEME_COLOR_NAMES } from '../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
 import { useColor } from '../../hooks'
 
@@ -128,10 +128,8 @@ export default function MessageDivider({
   marginBottom,
   chatBackgroundColor
 }: IProps) {
-  const {
-    [THEME_COLOR_NAMES.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLOR_NAMES.OVERLAY_BACKGROUND]: overlayBackground
-  } = useColor()
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
+    useColor()
 
   const textRef = React.useRef<HTMLSpanElement | null>(null)
   const [textHeight, setTextHeight] = React.useState<number>(0)
