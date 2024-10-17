@@ -19,7 +19,7 @@ import {
   THEME
 } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
-import { colors, THEME_COLOR_NAMES } from 'UIHelper/constants'
+import { colors, THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IUser } from 'types'
 // Components
 import MessageActions from '../MessageActions'
@@ -272,9 +272,9 @@ const MessageBody = ({
   handleCreateChat
 }: IMessageBodyProps) => {
   const {
-    [THEME_COLOR_NAMES.ACCENT]: accentColor,
-    [THEME_COLOR_NAMES.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
   const bubbleOutgoing =

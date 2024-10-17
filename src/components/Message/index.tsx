@@ -177,8 +177,7 @@ const Message = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
   } = useColor()
 
   const bubbleOutgoing =

@@ -3,7 +3,7 @@ import styled from 'styled-components'
 // Helpers
 import { makeUsername } from 'helpers/message'
 import { MessageOwner } from 'UIHelper'
-import { THEME_COLOR_NAMES } from 'UIHelper/constants'
+import { THEME_COLORS } from 'UIHelper/constants'
 import { IMessage, IUser } from 'types'
 import { useColor } from 'hooks'
 import { getClient } from 'common/client'
@@ -39,7 +39,7 @@ const MessageHeader = ({
 }: IMessageHeaderProps) => {
   const ChatClient = getClient()
   const { user } = ChatClient
-  const { [THEME_COLOR_NAMES.ACCENT]: accentColor } = useColor()
+  const { [THEME_COLORS.ACCENT]: accentColor } = useColor()
 
   return (
     <MessageHeaderCont

@@ -5,7 +5,7 @@ import moment from 'moment'
 import { useColor } from '../../../hooks'
 // Helpers
 import { MESSAGE_STATUS } from '../../../helpers/constants'
-import { colors, THEME_COLOR_NAMES } from '../../../UIHelper/constants'
+import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { IMessage } from '../../../types'
 // Components
 import { MessageStatusIcon } from '../../../messageUtils'
@@ -53,7 +53,7 @@ const MessageStatusAndTime = ({
   bottomOfMessage,
   marginBottom
 }: IMessageStatusAndTime) => {
-  const { [THEME_COLOR_NAMES.ACCENT]: accentColor, [THEME_COLOR_NAMES.TEXT_SECONDARY]: textSecondary } = useColor()
+  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
 
   return (
     <MessageStatusAndTimeContainer
