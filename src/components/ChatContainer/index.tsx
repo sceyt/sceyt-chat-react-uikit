@@ -31,7 +31,7 @@ export interface ICustomUploader {
   cancelRequest: (requestPromise: any) => void
 }
 
-export interface IThemeColorNames {
+export interface ThemeColors {
   ACCENT: 'accent'
   BACKGROUND: 'background'
   SECTION_BACKGROUND: 'sectionBackground'
@@ -51,7 +51,7 @@ export interface IThemeColorNames {
   ERROR: 'error'
 }
 
-export interface IThemeColor {
+export interface ThemeColor {
   light: string
   dark?: string
   [key: string]: string | undefined
@@ -59,7 +59,7 @@ export interface IThemeColor {
 
 export interface SceytChatUIKitTheme {
   colors: {
-    [key in IThemeColorNames[keyof IThemeColorNames]]: IThemeColor
+    [key in ThemeColors[keyof ThemeColors]]?: ThemeColor
   }
 }
 

@@ -1,7 +1,7 @@
 import { SceytChatUIKitTheme, ThemeMode } from '../components'
-import { IThemeColorNames } from '../components/ChatContainer'
+import { ThemeColors } from '../components/ChatContainer'
 
-export const THEME_COLORS: IThemeColorNames = {
+export const THEME_COLORS: ThemeColors = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
   SECTION_BACKGROUND: 'sectionBackground',

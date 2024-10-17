@@ -27,7 +27,7 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps, IThemeColor } from '../ChatContainer'
+import { IChatClientProps, ThemeColor } from '../ChatContainer'
 import { colors, defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
@@ -106,7 +106,7 @@ const SceytChat = ({
     }
   }
 
-  const generateBubbleColors = (themeColors: { [key: string]: IThemeColor }) => {
+  const generateBubbleColors = (themeColors: { [key: string]: ThemeColor }) => {
     colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.85, true)
     colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.85)
     colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.75)
