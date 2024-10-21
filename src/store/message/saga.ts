@@ -569,55 +569,8 @@ function* sendMessage(action: IAction): any {
         const messageToSend = messageBuilder.create()
         const messageCopy = JSON.parse(JSON.stringify(messageToSend))
         if (customUploader) {
-          /*  const attachmentsLocalPaths = {}
-          let receivedPaths = 1
-          const uploadAllAttachments = async () => {
-            return await Promise.all(
-              attachmentsToSend.map((attachment) => {
-                return customUpload(
-                  attachment,
-                  ({ loaded, total }) => {
-                    console.log('progress  ... ', loaded / total)
-                  },
-                  (updatedLink: string) => {
-                    if (attachment.tid) {
-                      receivedPaths++
-                      attachmentsLocalPaths[attachment.tid] = updatedLink
-                      if (receivedPaths === attachmentsToSend.length) {
-                        const messageCopy = {
-                          ...messageToSend,
-                          attachments: message.attachments.map((att: any) => ({
-                            tid: att.tid,
-                            name: att.name,
-                            data: {},
-                            type: att.type,
-                            attachmentUrl: attachmentsLocalPaths[attachment.tid!]
-                          }))
-                        }
-                        // console.log('put  message for all attachment.... ... . ')
-                        store.dispatch({
-                          type: ADD_MESSAGE,
-                          payload: {
-                            message: JSON.parse(
-                              JSON.stringify({
-                                ...messageCopy,
-                                createdAt: new Date(Date.now()),
-                                parentMessage: message.parentMessage
-                              })
-                            )
-                          }
-                        })
-                      }
-                    }
-                  }
-                )
-              })
-            )
-          } */
-          console.log('add pending message .>>>>>>>>>.........')
           yield call(addPendingMessage, message, messageCopy, channel)
 
-          // const uploadedAttachments = yield call(uploadAllAttachments)
           attachmentsToSend = yield call(handleUploadAttachments, attachmentsToSend, messageCopy, channel)
         } else {
           const messageCopy = {
@@ -630,17 +583,6 @@ function* sendMessage(action: IAction): any {
               attachmentUrl: att.attachmentUrl
             }))
           }
-          /* yield put(
-            addMessageAC(
-              JSON.parse(
-                JSON.stringify({
-                  ...messageCopy,
-                  createdAt: new Date(Date.now()),
-                  parent: message.parent
-                })
-              )
-            )
-          ) */
           const hasNextMessages = yield select(messagesHasNextSelector)
           if (!getHasNextCached()) {
             if (hasNextMessages) {
