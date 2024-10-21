@@ -1,7 +1,6 @@
-import { SceytChatUIKitTheme, ThemeMode } from '../components'
-import { IThemeColorNames } from '../components/ChatContainer'
+import { ThemeMode } from '../components'
 
-export const THEME_COLORS: IThemeColorNames = {
+export const THEME_COLORS = {
   ACCENT: 'accent',
   BACKGROUND: 'background',
   SECTION_BACKGROUND: 'sectionBackground',
@@ -19,8 +18,8 @@ export const THEME_COLORS: IThemeColorNames = {
   OVERLAY_BACKGROUND: 'overlayBackground',
   OVERLAY_BACKGROUND_2: 'overlayBackground2',
   ERROR: 'error'
-}
-export const defaultTheme: SceytChatUIKitTheme = {
+} as const
+export const defaultTheme = {
   colors: {
     [THEME_COLORS.ACCENT]: {
       light: '#5159F6',

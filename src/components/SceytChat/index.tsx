@@ -27,7 +27,7 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps, IThemeColor } from '../ChatContainer'
+import { IChatClientProps, ThemeColor } from '../ChatContainer'
 import { colors, defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
@@ -48,7 +48,6 @@ const SceytChat = ({
   membersDisplayTextByChannelTypesMap,
   channelTypeFilter,
   defaultRolesByChannelTypesMap,
-  customColors,
   hideUserPresence,
   showNotifications,
   openChatOnUserInteraction = true,
@@ -106,7 +105,7 @@ const SceytChat = ({
     }
   }
 
-  const generateBubbleColors = (themeColors: { [key: string]: IThemeColor }) => {
+  const generateBubbleColors = (themeColors: { [key: string]: ThemeColor }) => {
     colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.85, true)
     colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.85)
     colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.75)
@@ -145,32 +144,6 @@ const SceytChat = ({
     }
   }, [client])
 
-  useEffect(() => {
-    if (customColors) {
-      if (customColors.primaryColor) {
-        colors.primary = customColors.primaryColor
-      }
-      if (customColors.primaryLight) {
-        colors.primaryLight = customColors.primaryLight
-      }
-      if (customColors.textColor1) {
-        colors.textColor1 = customColors.textColor1
-      }
-      if (customColors.textColor2) {
-        colors.textColor2 = customColors.textColor2
-      }
-      if (customColors.textColor3) {
-        colors.textColor3 = customColors.textColor3
-      }
-      if (customColors.defaultAvatarBackground) {
-        colors.defaultAvatarBackground = customColors.defaultAvatarBackground
-      }
-      if (customColors.deletedUserAvatarBackground) {
-        colors.deleteUserIconBackground = customColors.deletedUserAvatarBackground
-      }
-    }
-  }, [customColors])
-
   const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
@@ -181,7 +154,7 @@ const SceytChat = ({
         } as any
       }
       if (key === THEME_COLORS.ERROR) {
-        colors.errorBlur = moderateColor(theme.colors[key].light, 0.2)
+        colors.errorBlur = moderateColor(updatedColors[key].light, 0.2)
       }
     }
 
