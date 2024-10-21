@@ -701,7 +701,7 @@ const MessageBody = ({
 }
 
 export default React.memo(MessageBody, (prevProps, nextProps) => {
-  return (
+  return !!(
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
     prevProps.message.userReactions === nextProps.message.userReactions &&
@@ -715,7 +715,92 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
     prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.theme === nextProps.theme
+    prevProps.ownMessageOnRightSide === nextProps.ownMessageOnRightSide &&
+    prevProps.showSenderNameOnDirectChannel === nextProps.showSenderNameOnDirectChannel &&
+    prevProps.showSenderNameOnGroupChannel === nextProps.showSenderNameOnGroupChannel &&
+    prevProps.showSenderNameOnOwnMessages === nextProps.showSenderNameOnOwnMessages &&
+    prevProps.messageStatusAndTimePosition === nextProps.messageStatusAndTimePosition &&
+    prevProps.messageStatusDisplayingType === nextProps.messageStatusDisplayingType &&
+    prevProps.ownMessageBackground === nextProps.ownMessageBackground &&
+    prevProps.incomingMessageBackground === nextProps.incomingMessageBackground &&
+    prevProps.ownRepliedMessageBackground === nextProps.ownRepliedMessageBackground &&
+    prevProps.incomingRepliedMessageBackground === nextProps.incomingRepliedMessageBackground &&
+    prevProps.showMessageStatus === nextProps.showMessageStatus &&
+    prevProps.showMessageTimeAndStatusOnlyOnHover === nextProps.showMessageTimeAndStatusOnlyOnHover &&
+    prevProps.showMessageTime === nextProps.showMessageTime &&
+    prevProps.showMessageStatusForEachMessage === nextProps.showMessageStatusForEachMessage &&
+    prevProps.showMessageTimeForEachMessage === nextProps.showMessageTimeForEachMessage &&
+    prevProps.messageReaction === nextProps.messageReaction &&
+    prevProps.editMessage === nextProps.editMessage &&
+    prevProps.copyMessage === nextProps.copyMessage &&
+    prevProps.replyMessage === nextProps.replyMessage &&
+    prevProps.replyMessageInThread === nextProps.replyMessageInThread &&
+    prevProps.forwardMessage === nextProps.forwardMessage &&
+    prevProps.deleteMessage === nextProps.deleteMessage &&
+    prevProps.selectMessage === nextProps.selectMessage &&
+    prevProps.allowEditDeleteIncomingMessage === nextProps.allowEditDeleteIncomingMessage &&
+    prevProps.reportMessage === nextProps.reportMessage &&
+    prevProps.reactionIcon === nextProps.reactionIcon &&
+    prevProps.editIcon === nextProps.editIcon &&
+    prevProps.copyIcon === nextProps.copyIcon &&
+    prevProps.replyIcon === nextProps.replyIcon &&
+    prevProps.replyInThreadIcon === nextProps.replyInThreadIcon &&
+    prevProps.forwardIcon === nextProps.forwardIcon &&
+    prevProps.deleteIcon === nextProps.deleteIcon &&
+    prevProps.selectIcon === nextProps.selectIcon &&
+    prevProps.starIcon === nextProps.starIcon &&
+    prevProps.staredIcon === nextProps.staredIcon &&
+    prevProps.reportIcon === nextProps.reportIcon &&
+    prevProps.fixEmojiCategoriesTitleOnTop === nextProps.fixEmojiCategoriesTitleOnTop &&
+    prevProps.emojisCategoryIconsPosition === nextProps.emojisCategoryIconsPosition &&
+    prevProps.emojisContainerBorderRadius === nextProps.emojisContainerBorderRadius &&
+    prevProps.reactionIconOrder === nextProps.reactionIconOrder &&
+    prevProps.editIconOrder === nextProps.editIconOrder &&
+    prevProps.copyIconOrder === nextProps.copyIconOrder &&
+    prevProps.replyIconOrder === nextProps.replyIconOrder &&
+    prevProps.replyInThreadIconOrder === nextProps.replyInThreadIconOrder &&
+    prevProps.forwardIconOrder === nextProps.forwardIconOrder &&
+    prevProps.deleteIconOrder === nextProps.deleteIconOrder &&
+    prevProps.selectIconOrder === nextProps.selectIconOrder &&
+    prevProps.starIconOrder === nextProps.starIconOrder &&
+    prevProps.reportIconOrder === nextProps.reportIconOrder &&
+    prevProps.reactionIconTooltipText === nextProps.reactionIconTooltipText &&
+    prevProps.editIconTooltipText === nextProps.editIconTooltipText &&
+    prevProps.copyIconTooltipText === nextProps.copyIconTooltipText &&
+    prevProps.replyIconTooltipText === nextProps.replyIconTooltipText &&
+    prevProps.replyInThreadIconTooltipText === nextProps.replyInThreadIconTooltipText &&
+    prevProps.forwardIconTooltipText === nextProps.forwardIconTooltipText &&
+    prevProps.deleteIconTooltipText === nextProps.deleteIconTooltipText &&
+    prevProps.selectIconTooltipText === nextProps.selectIconTooltipText &&
+    prevProps.starIconTooltipText === nextProps.starIconTooltipText &&
+    prevProps.reportIconTooltipText === nextProps.reportIconTooltipText &&
+    prevProps.messageActionIconsColor === nextProps.messageActionIconsColor &&
+    prevProps.inlineReactionIcon === nextProps.inlineReactionIcon &&
+    prevProps.messageStatusSize === nextProps.messageStatusSize &&
+    prevProps.messageStatusColor === nextProps.messageStatusColor &&
+    prevProps.messageReadStatusColor === nextProps.messageReadStatusColor &&
+    prevProps.messageStateFontSize === nextProps.messageStateFontSize &&
+    prevProps.messageStateColor === nextProps.messageStateColor &&
+    prevProps.messageTimeFontSize === nextProps.messageTimeFontSize &&
+    prevProps.messageTimeColor === nextProps.messageTimeColor &&
+    prevProps.messageStatusAndTimeLineHeight === nextProps.messageStatusAndTimeLineHeight &&
+    prevProps.fileAttachmentsBoxWidth === nextProps.fileAttachmentsBoxWidth &&
+    prevProps.fileAttachmentsBoxBackground === nextProps.fileAttachmentsBoxBackground &&
+    prevProps.fileAttachmentsBoxBorder === nextProps.fileAttachmentsBoxBorder &&
+    prevProps.fileAttachmentsTitleColor === nextProps.fileAttachmentsTitleColor &&
+    prevProps.fileAttachmentsSizeColor === nextProps.fileAttachmentsSizeColor &&
+    prevProps.fileAttachmentsIcon === nextProps.fileAttachmentsIcon &&
+    prevProps.imageAttachmentMaxWidth === nextProps.imageAttachmentMaxWidth &&
+    prevProps.imageAttachmentMaxHeight === nextProps.imageAttachmentMaxHeight &&
+    prevProps.videoAttachmentMaxWidth === nextProps.videoAttachmentMaxWidth &&
+    prevProps.videoAttachmentMaxHeight === nextProps.videoAttachmentMaxHeight &&
+    prevProps.theme === nextProps.theme &&
+    prevProps.messageTextFontSize === nextProps.messageTextFontSize &&
+    prevProps.messageTextLineHeight === nextProps.messageTextLineHeight &&
+    prevProps.messageActionsShow === nextProps.messageActionsShow &&
+    prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
+    prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
+    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen
   )
 })
 
