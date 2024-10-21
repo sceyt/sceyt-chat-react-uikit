@@ -196,7 +196,7 @@ const EditChannel = ({
       } else {
         handleUpdateChannel({
           ...(newSubject !== channel.subject && { subject: newSubject }),
-          ...(newDescription !== (channel.metadata.d || channel.metadata) && { metadata: { d: newDescription } }),
+          ...(newDescription !== channel.metadata.d && { metadata: { ...channel.metadata, d: newDescription } }),
           ...(newAvatar.url !== channel.avatarUrl && { avatar: newAvatar.src.file })
         })
       }

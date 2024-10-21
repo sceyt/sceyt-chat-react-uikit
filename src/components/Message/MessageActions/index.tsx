@@ -374,7 +374,7 @@ const EditMessage = styled(Action)<any>`
   order: ${(props) => props.order || 2};
 `
 
-const ReplyMessage = styled(Action)<any>`
+const RepliedMessage = styled(Action)<any>`
   order: ${(props) => props.order || 3};
 `
 

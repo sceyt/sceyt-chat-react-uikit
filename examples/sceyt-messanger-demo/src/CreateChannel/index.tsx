@@ -1,11 +1,11 @@
 import React, {useContext, useEffect, useState} from 'react'
 import {SceytContext} from "../sceytContext";
 import {CreateChannel, DropDown} from "sceyt-chat-react-uikit";
-import newChannelButtonIcon from '../svg/newChannelButtonIcon.svg';
-import createChannelIcon from '../svg/createChannel.svg';
-import createGroupIcon from '../svg/createGroup.svg';
-import createChatIcon from '../svg/createChat.svg';
-import darkModeIcon from "../svg/darkModeIcon.svg";
+import newChannelButtonIcon from '../assets/svg/newChannelButtonIcon.svg';
+import createChannelIcon from '../assets/svg/createChannel.svg';
+import createGroupIcon from '../assets/svg/createGroup.svg';
+import createChatIcon from '../assets/svg/createChat.svg';
+import darkModeIcon from "../assets/svg/darkModeIcon.svg";
 
 function CreateChannelButton() {
 

@@ -1,14 +1,14 @@
 import React from 'react';
 import styled from 'styled-components';
 import moment from 'moment';
-import { ReactComponent as ReactionIcon } from '../../svg/emojiSmileIcon.svg';
-import { ReactComponent as EditMessageIcon } from '../../svg/edit.svg';
-import { ReactComponent as CheckIcon } from '../../svg/checkCircle.svg';
-import { ReactComponent as ResendMessageIcon } from '../../svg/resend.svg';
-import { ReactComponent as ReplyMessageIcon } from '../../svg/reply.svg';
-import { ReactComponent as CopyMessageIcon } from '../../svg/copy.svg';
-import { ReactComponent as ForwardMessageIcon } from '../../svg/forward.svg';
-import { ReactComponent as DeleteMessageIcon } from '../../svg/trash.svg';
+import { ReactComponent as ReactionIcon } from '../../assets/svg/emojiSmileIcon.svg';
+import { ReactComponent as EditMessageIcon } from '../../assets/svg/edit.svg';
+import { ReactComponent as CheckIcon } from '../../assets/svg/checkCircle.svg';
+import { ReactComponent as ResendMessageIcon } from '../../assets/svg/resend.svg';
+import { ReactComponent as ReplyMessageIcon } from '../../assets/svg/reply.svg';
+import { ReactComponent as CopyMessageIcon } from '../../assets/svg/copy.svg';
+import { ReactComponent as ForwardMessageIcon } from '../../assets/svg/forward.svg';
+import { ReactComponent as DeleteMessageIcon } from '../../assets/svg/trash.svg';
 import { CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 
 function CustomMessageActionsMenu({

@@ -11,9 +11,9 @@ import {
   SceytChat,
   SendMessage,
 } from 'sceyt-chat-react-uikit';
-import lightModeIcon from './svg/lightModeIcon.svg';
-import darkModeIcon from './svg/darkModeIcon.svg';
-import sceytIcon from './img/sceyt_rounded.png';
+import lightModeIcon from './assets/svg/lightModeIcon.svg';
+import darkModeIcon from './assets/svg/darkModeIcon.svg';
+import sceytIcon from './assets/img/sceyt_rounded.png';
 import './App.css';
 import {genToken} from "./api";
 import {SceytContext} from './sceytContext';

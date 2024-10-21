@@ -8,7 +8,7 @@ import {
   MessageStatusIcon
 } from 'sceyt-chat-react-uikit'
 import { IChannel, IAttachment, IMessage } from 'sceyt-chat-react-uikit/types'
-import { ReactComponent as ForwardIcon } from '../svg/forward.svg'
+import { ReactComponent as ForwardIcon } from '../assets/svg/forward.svg'
 import moment from 'moment'
 import MessageHeader from './MessageHeader'
 import {

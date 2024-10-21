@@ -11,7 +11,7 @@ import { IContactsMap } from '../types'
 import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
-import { combineMessageAttributes, makeUsername } from '../helpers/message'
+import { combineMessageAttributes, isJSON, makeUsername } from '../helpers/message'
 import { useColor } from '../hooks'
 
 const StatusText = styled.span<{ color: string; fontSize?: string }>`
@@ -49,7 +49,7 @@ const MessageStatusIcon = ({
   accentColor
 }: {
   messageStatus: string
-  messageStatusDisplayingType: string
+  messageStatusDisplayingType?: string
   size?: string
   iconColor?: string
   readIconColor?: string
@@ -135,152 +135,159 @@ const MessageTextFormat = ({
   accentColor?: string
   textSecondary?: string
 }) => {
-  let messageText: any = []
-  const linkify = new LinkifyIt()
-  const messageBodyAttributes = JSON.parse(JSON.stringify(message.bodyAttributes))
-  if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
-    const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
-    const textPart = text
-    let nextPartIndex: any
+  try {
+    let messageText: any = []
+    const linkify = new LinkifyIt()
+    const messageBodyAttributes =
+      message.bodyAttributes && isJSON(message.bodyAttributes) && JSON.parse(JSON.stringify(message.bodyAttributes))
+    if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
+      const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
+      const textPart = text
+      let nextPartIndex: any
 
-    combinedAttributesList.forEach((attribute: any, index: number) => {
-      const attributeOffset = attribute.offset
+      combinedAttributesList.forEach((attribute: any, index: number) => {
+        const attributeOffset = attribute.offset
 
-      try {
-        let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
+        try {
+          let firstPart = `${textPart ? textPart?.substring(nextPartIndex || 0, attributeOffset) : ''}`
 
-        const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
+          const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
-        if (!isLastMessage && !asSampleText && firstPartMatch) {
-          firstPart = linkifyTextPart(firstPart, firstPartMatch)
-        }
-        let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
-        const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
-        if (!isLastMessage && !asSampleText && secondPartMatch) {
-          secondPart = linkifyTextPart(secondPart, secondPartMatch)
-        }
-
-        if (attribute.type.includes('mention')) {
-          const mentionDisplay =
-            message.mentionedUsers && message.mentionedUsers.find((men: any) => men.id === attribute.metadata)
-          // const idLength = attribute.metadata.length
-
-          const user = getClient().user
-          let mentionDisplayName = text.slice(attributeOffset, attributeOffset + attribute.length)
-          if (mentionDisplay) {
-            mentionDisplayName = `@${makeUsername(
-              user.id === mentionDisplay.id ? mentionDisplay : contactsMap && contactsMap[mentionDisplay.id],
-              mentionDisplay,
-              getFromContacts
-            ).trim()}`
+          if (!isLastMessage && !asSampleText && firstPartMatch) {
+            firstPart = linkifyTextPart(firstPart, firstPartMatch)
           }
-          if (nextPartIndex > attributeOffset) {
-            messageText = messageText.slice(0, -2)
-            const prevAtt = combinedAttributesList[index - 1]
-            const start = nextPartIndex - prevAtt.length
-            const currentTextPart = `${textPart ? textPart?.substring(start || 0, start + prevAtt.length) : ''}`
-            const currentMentionIndex = currentTextPart.indexOf(`@${attribute.metadata}`)
-            const firsTextPart = `${currentTextPart.substring(0, currentMentionIndex)}`
-            const secondTextPart = `${currentTextPart.substring(
-              currentMentionIndex + attribute.length,
-              prevAtt.length
-            )}`
-            secondPart = `${textPart ? textPart?.substring(prevAtt.offset + prevAtt.length) : ''}`
-            nextPartIndex = prevAtt.offset + prevAtt.length
-            messageText.push(
-              // @ts-ignore
-              asSampleText ? (
-                currentTextPart
-              ) : (
-                <StyledText
-                  className={`${combinedAttributesList[index - 1].type}`}
-                  isLastMessage={isLastMessage}
-                  key={attributeOffset + index}
-                  color={isLastMessage ? textSecondary : accentColor}
-                >
-                  {firsTextPart}
+          let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
+          const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
+          if (!isLastMessage && !asSampleText && secondPartMatch) {
+            secondPart = linkifyTextPart(secondPart, secondPartMatch)
+          }
+
+          if (attribute.type.includes('mention')) {
+            const mentionDisplay =
+              message.mentionedUsers && message.mentionedUsers.find((men: any) => men.id === attribute.metadata)
+            // const idLength = attribute.metadata.length
+
+            const user = getClient().user
+            let mentionDisplayName = text.slice(attributeOffset, attributeOffset + attribute.length)
+            if (mentionDisplay) {
+              mentionDisplayName = `@${makeUsername(
+                user.id === mentionDisplay.id ? mentionDisplay : contactsMap && contactsMap[mentionDisplay.id],
+                mentionDisplay,
+                getFromContacts
+              ).trim()}`
+            }
+            if (nextPartIndex > attributeOffset) {
+              messageText = messageText.slice(0, -2)
+              const prevAtt = combinedAttributesList[index - 1]
+              const start = nextPartIndex - prevAtt.length
+              const currentTextPart = `${textPart ? textPart?.substring(start || 0, start + prevAtt.length) : ''}`
+              const currentMentionIndex = currentTextPart.indexOf(`@${attribute.metadata}`)
+              const firsTextPart = `${currentTextPart.substring(0, currentMentionIndex)}`
+              const secondTextPart = `${currentTextPart.substring(
+                currentMentionIndex + attribute.length,
+                prevAtt.length
+              )}`
+              secondPart = `${textPart ? textPart?.substring(prevAtt.offset + prevAtt.length) : ''}`
+              nextPartIndex = prevAtt.offset + prevAtt.length
+              messageText.push(
+                // @ts-ignore
+                asSampleText ? (
+                  currentTextPart
+                ) : (
                   <StyledText
-                    className='mention'
+                    className={`${combinedAttributesList[index - 1].type}`}
+                    isLastMessage={isLastMessage}
+                    key={attributeOffset + index}
+                    color={isLastMessage ? textSecondary : accentColor}
+                  >
+                    {firsTextPart}
+                    <StyledText
+                      className='mention'
+                      isLastMessage={isLastMessage}
+                      color={isLastMessage ? textSecondary : accentColor}
+                      key={attributeOffset + index}
+                    >
+                      {mentionDisplayName}
+                    </StyledText>
+                    {secondTextPart}
+                  </StyledText>
+                ),
+                index === combinedAttributesList.length - 1 ? secondPart : ''
+              )
+            } else {
+              nextPartIndex = attribute.offset + attribute.length
+              messageText.push(
+                firstPart,
+                // @ts-ignore
+                asSampleText ? (
+                  mentionDisplayName
+                ) : (
+                  <StyledText
+                    className={attribute.type}
                     isLastMessage={isLastMessage}
                     color={isLastMessage ? textSecondary : accentColor}
-                    key={attributeOffset + index}
+                    key={attributeOffset}
                   >
                     {mentionDisplayName}
                   </StyledText>
-                  {secondTextPart}
-                </StyledText>
-              ),
-              index === combinedAttributesList.length - 1 ? secondPart : ''
-            )
+                ),
+                index === combinedAttributesList.length - 1 ? secondPart : ''
+              )
+            }
           } else {
-            nextPartIndex = attribute.offset + attribute.length
+            nextPartIndex = attributeOffset + attribute.length
+
             messageText.push(
               firstPart,
               // @ts-ignore
               asSampleText ? (
-                mentionDisplayName
+                `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
               ) : (
                 <StyledText
-                  className={attribute.type}
                   isLastMessage={isLastMessage}
+                  className={attribute.type}
+                  key={`${attributeOffset}-${attribute.type}`}
                   color={isLastMessage ? textSecondary : accentColor}
-                  key={attributeOffset}
                 >
-                  {mentionDisplayName}
+                  {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
                 </StyledText>
               ),
               index === combinedAttributesList.length - 1 ? secondPart : ''
             )
           }
-        } else {
-          nextPartIndex = attributeOffset + attribute.length
-
-          messageText.push(
-            firstPart,
-            // @ts-ignore
-            asSampleText ? (
-              `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
-            ) : (
-              <StyledText
-                isLastMessage={isLastMessage}
-                className={attribute.type}
-                key={`${attributeOffset}-${attribute.type}`}
-                color={isLastMessage ? textSecondary : accentColor}
-              >
-                {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
-              </StyledText>
-            ),
-            index === combinedAttributesList.length - 1 ? secondPart : ''
-          )
+        } catch (e) {
+          console.log('Error on format message text, message: ', message, 'error: ', e)
         }
-      } catch (e) {
-        console.log('Error on format message text, message: ', message, 'error: ', e)
+      })
+    } else {
+      const match = linkify.match(text)
+      if (!isLastMessage && !asSampleText && match) {
+        // console.log('newMessageText ... . ', newMessageText)
+        messageText = linkifyTextPart(text, match)
       }
-    })
-  } else {
-    const match = linkify.match(text)
-    if (!isLastMessage && !asSampleText && match) {
-      // console.log('newMessageText ... . ', newMessageText)
-      messageText = linkifyTextPart(text, match)
     }
-  }
 
-  /* messageText.forEach((textPart, index) => {
-    // if (urlRegex.test(textPart)) {
-     messageText.forEach((textPart, index) => {
-    if (urlRegex.test(textPart)) {
-      const textArray = textPart.split(urlRegex)
-      const urlArray = textArray.map((part) => {
-        if (urlRegex.test(part)) {
-          return <a key={part} href={part} target='_blank' rel='noreferrer'>{`${part} `}</a>
-        }
-        return `${part} `
-      }) *!/
-      // @ts-ignore
-      messageText.splice(index, 1, ...urlArray)
-    }
-  }) */
-  return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
+    /* messageText.forEach((textPart, index) => {
+      // if (urlRegex.test(textPart)) {
+       messageText.forEach((textPart, index) => {
+      if (urlRegex.test(textPart)) {
+        const textArray = textPart.split(urlRegex)
+        const urlArray = textArray.map((part) => {
+          if (urlRegex.test(part)) {
+            return <a key={part} href={part} target='_blank' rel='noreferrer'>{`${part} `}</a>
+          }
+          return `${part} `
+        }) *!/
+        // @ts-ignore
+        messageText.splice(index, 1, ...urlArray)
+      }
+    }) */
+    return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
+  } catch (e) {
+    console.log(' failed to format message .>>> ', e)
+    console.log('message: ', message)
+    return text
+  }
 }
 
 export { MessageStatusIcon, MessageTextFormat }

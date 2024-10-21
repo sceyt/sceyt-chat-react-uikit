@@ -3,7 +3,7 @@ import { IMessage } from 'sceyt-chat-react-uikit/types'
 import styled from 'styled-components'
 import { Attachment, MessageTextFormat } from 'sceyt-chat-react-uikit'
 import { isJSON, makeUsername } from '../../helpers'
-import { ReactComponent as VoiceIcon } from '../../svg/voiceIcon.svg'
+import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { attachmentTypes, MESSAGE_STATUS, messagesCustomColor } from '../../helpers/constants'
 
 function ReplyMessage(
@@ -147,7 +147,7 @@ const ReplyMessageContainer = styled.div<{
   backgroundColor?: string;
 }>`
   display: flex;
-  border-left: 2px solid ${(props) => props.leftBorderColor || '#b8b9c2'};
+  border-left: 2px solid ${(props: any) => props.leftBorderColor || '#b8b9c2'};
   padding: 4px 6px;
   position: relative;
     //margin: ${(props) => (props.withAttachments ? '8px 8px' : '0 0 8px')};
@@ -168,7 +168,7 @@ const ReplyMessageContainer = styled.div<{
 const ReplyMessageBody = styled.div<{ rtlDirection?: boolean }>`
   margin-top: auto;
   margin-bottom: auto;
-  direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
+  direction: ${(props: any) => (props.rtlDirection ? 'initial' : '')};
   max-width: 100%;
 `
 
@@ -199,7 +199,7 @@ export const ReplyMessageText = styled.span<{
   display: -webkit-box;
   position: relative;
   margin: 0;
-  padding: ${(props) =>
+  padding: ${(props: any) =>
   props.withAttachment && props.showMessageSenderName
     ? '0 12px 10px'
     : props.withAttachment
@@ -221,8 +221,9 @@ export const ReplyMessageText = styled.span<{
   }
 `
 const VoiceIconWrapper = styled.span`
+  display: inline-block;
   transform: translate(0px, 3.5px);
-  color: '#5159F6';
+  color: ${(props) => props.color || '#5159F6'};
 `
 
 const MessageStatusDeleted = styled.span<{
