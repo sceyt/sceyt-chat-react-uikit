@@ -46,7 +46,7 @@ function ConfirmPopup({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_1]: surface1Background,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const [checkActionPermission] = usePermissions(myRole ?? '')

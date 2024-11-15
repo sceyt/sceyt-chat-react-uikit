@@ -26,7 +26,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
     [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   // const dispatch = useDispatch()

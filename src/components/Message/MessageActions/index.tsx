@@ -95,7 +95,8 @@ export default function MessageActions({
     [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.WARNING]: warningColor
   } = useColor()
 
   // const [reactionIsOpen, setReactionIsOpen] = useState(false)
@@ -276,7 +277,7 @@ export default function MessageActions({
             : true) && (
             <Action
               order={deleteIconOrder || 7}
-              iconColor={messageActionIconsColor || (theme === THEME.DARK ? textFootnote : textSecondary)}
+              iconColor={messageActionIconsColor || warningColor}
               hoverBackgroundColor={hoverBackground}
               hoverIconColor={accentColor}
               onClick={() => handleOpenDeleteMessage()}

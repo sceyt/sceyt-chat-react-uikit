@@ -76,7 +76,7 @@ const Members = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

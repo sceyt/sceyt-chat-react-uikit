@@ -104,7 +104,7 @@ const Channel: React.FC<IChannelProps> = ({
     [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
-    [THEME_COLORS.ERROR]: errorColor,
+    [THEME_COLORS.WARNING]: errorColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary
   } = useColor()
 

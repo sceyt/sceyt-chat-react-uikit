@@ -326,7 +326,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

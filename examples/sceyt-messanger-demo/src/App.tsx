@@ -211,12 +211,19 @@ function App() {
             {client ? (
               <SceytChat
                 // autoSelectFirstChannel={true}
+                themeMode={theme}
                 theme={
                   {
-                    name: theme,
-                    primaryColor: theme === 'dark' ? '#6B72FF' : '#5159F6',
-                    primaryLight: theme === 'dark' ? '#1c1f47' : '#E3E7FF',
-                    textColor1: theme === 'dark' ? '#ffffffcc' : '#111539'
+                    colors: {
+                      accent: {
+                        dark: '#6B72FF',
+                        light: '#5159F6'
+                      },
+                      textPrimary: {
+                        dark: '#ffffffcc',
+                        light: '#111539'
+                      }
+                    },
                   }
                 }
                 showNotifications={false}

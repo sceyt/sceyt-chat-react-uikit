@@ -195,7 +195,7 @@ const Actions = ({
     [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
     [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -372,9 +372,7 @@ const Actions = ({
               hoverColor={muteUnmuteNotificationTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>
-                {muteNotificationIcon || <DefaultMutedIcon color={iconPrimary} />} Unmute notifications
-              </React.Fragment>
+              <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
               {/* <ToggleSwitch backgroundColor={muteUnmuteNotificationSwitcherColor} state={channel.muted} /> */}
             </ActionItem>
           ) : (
@@ -393,9 +391,7 @@ const Actions = ({
                   hoverColor={muteUnmuteNotificationTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
                 >
-                  <React.Fragment>
-                    {unmuteNotificationIcon || <DefaultMuteIcon color={iconPrimary} />} Mute notifications
-                  </React.Fragment>
+                  <React.Fragment>{unmuteNotificationIcon || <DefaultMuteIcon />} Mute notifications</React.Fragment>
                   {/* <ToggleSwitch state={channel.muted} /> */}
                 </ActionItem>
               }
@@ -466,9 +462,7 @@ const Actions = ({
             hoverColor={staredMessagesTextColor || textPrimary}
             fontSize={actionItemsFontSize}
           >
-            <React.Fragment>
-              {staredMessagesIcon || <DefaultStarIcon color={iconPrimary} />} Starred messages{' '}
-            </React.Fragment>
+            <React.Fragment>{staredMessagesIcon || <DefaultStarIcon />} Starred messages </React.Fragment>
           </ActionItem>
         )}
         {showPinChannel &&
@@ -484,9 +478,7 @@ const Actions = ({
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>
-                {channel.pinnedAt
-                  ? unpinChannelIcon || <DefaultUnpinIcon color={iconPrimary} />
-                  : pinChannelIcon || <DefaultPinIcon color={iconPrimary} />}
+                {channel.pinnedAt ? unpinChannelIcon || <DefaultUnpinIcon /> : pinChannelIcon || <DefaultPinIcon />}
                 {channel.pinnedAt ? 'Unpin' : 'Pin'}
               </React.Fragment>
             </ActionItem>
@@ -505,9 +497,7 @@ const Actions = ({
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>
-                {markAsReadIcon || <DefaultMarkAsRead color={iconPrimary} />} Mark as read
-              </React.Fragment>
+              <React.Fragment>{markAsReadIcon || <DefaultMarkAsRead />} Mark as read</React.Fragment>
             </ActionItem>
           ) : (
             <ActionItem
@@ -519,9 +509,7 @@ const Actions = ({
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
-              <React.Fragment>
-                {markAsUnreadIcon || <DefaultMarkAsUnRead color={iconPrimary} />} Mark as unread
-              </React.Fragment>
+              <React.Fragment>{markAsUnreadIcon || <DefaultMarkAsUnRead />} Mark as unread</React.Fragment>
             </ActionItem>
           ))}
 
@@ -547,7 +535,7 @@ const Actions = ({
               handleToggleLeaveChannelPopupOpen()
             }}
           >
-            {leaveChannelIcon || <DefaultMarkAsReadIcon color={iconPrimary} />}
+            {leaveChannelIcon || <DefaultMarkAsReadIcon />}
             {` Leave ${
               channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                 ? 'group'
@@ -573,7 +561,7 @@ const Actions = ({
                     handleUnblockUser()
                   }}
                 >
-                  {unblockUserIcon || <DefaultBlockIcon color={iconPrimary} />} Unblock user
+                  {unblockUserIcon || <DefaultBlockIcon />} Unblock user
                 </ActionItem>
               ) : (
                 <ActionItem
@@ -588,7 +576,7 @@ const Actions = ({
                     handleToggleBlockUserPopupOpen()
                   }}
                 >
-                  {blockAndLeaveChannelIcon || <DefaultBlockIcon color={iconPrimary} />} Block user
+                  {blockAndLeaveChannelIcon || <DefaultBlockIcon />} Block user
                 </ActionItem>
               ))}
 
@@ -601,7 +589,7 @@ const Actions = ({
                 key={7}
                 onClick={() => toggleReportUserPopup()}
               >
-                <DefaultReportIcon color={iconPrimary} />
+                <DefaultReportIcon />
                 Report user
               </ActionItem>
             )}
@@ -632,7 +620,7 @@ const Actions = ({
                   handleToggleBlockChannelPopupOpen()
                 }}
               >
-                {blockAndLeaveChannelIcon || <DefaultBlockIcon color={iconPrimary} />}
+                {blockAndLeaveChannelIcon || <DefaultBlockIcon />}
                 {`Block and Leave ${
                   channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
                     ? 'group'
@@ -660,7 +648,7 @@ const Actions = ({
                   console.log('Report channel')
                 }}
               >
-                {reportChannelIcon || <DefaultReportIcon color={iconPrimary} />} Report{' '}
+                {reportChannelIcon || <DefaultReportIcon />} Report{' '}
                 {channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
                   ? 'channel'
                   : channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE
@@ -688,7 +676,7 @@ const Actions = ({
                 handleToggleClearHistoryPopup()
               }}
             >
-              {clearHistoryIcon || <DefaultClearIcon color={iconPrimary} />} Clear history
+              {clearHistoryIcon || <DefaultClearIcon />} Clear history
             </ActionItem>
           )}
         {showClearHistory &&
@@ -708,7 +696,7 @@ const Actions = ({
                 handleToggleDeleteAllMessagesPopup()
               }}
             >
-              {deleteAllMessagesIcon || <DefaultClearIcon color={iconPrimary} />} Clear history
+              {deleteAllMessagesIcon || <DefaultClearIcon />} Clear history
             </ActionItem>
           )}
 
@@ -736,7 +724,7 @@ const Actions = ({
               handleToggleDeleteChannelPopupOpen()
             }}
           >
-            {deleteChannelIcon || <DefaultDeleteChannelIcon color={iconPrimary} />}
+            {deleteChannelIcon || <DefaultDeleteChannelIcon />}
             {` Delete ${
               channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE || channel.type === DEFAULT_CHANNEL_TYPE.GROUP
                 ? 'group'

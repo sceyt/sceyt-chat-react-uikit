@@ -96,7 +96,7 @@ const Attachment = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()

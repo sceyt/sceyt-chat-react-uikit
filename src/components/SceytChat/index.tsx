@@ -153,7 +153,7 @@ const SceytChat = ({
           ...theme.colors[key]
         } as any
       }
-      if (key === THEME_COLORS.ERROR) {
+      if (key === THEME_COLORS.WARNING) {
         colors.errorBlur = moderateColor(updatedColors[key].light, 0.2)
       }
     }

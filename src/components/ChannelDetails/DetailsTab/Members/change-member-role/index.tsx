@@ -39,7 +39,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const dispatch = useDispatch()
