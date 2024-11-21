@@ -17,7 +17,7 @@ export const THEME_COLORS = {
   SURFACE_2: 'surface2',
   OVERLAY_BACKGROUND: 'overlayBackground',
   OVERLAY_BACKGROUND_2: 'overlayBackground2',
-  ERROR: 'error'
+  WARNING: 'warning'
 } as const
 export const defaultTheme = {
   colors: {
@@ -85,7 +85,7 @@ export const defaultTheme = {
       light: 'rgba(17, 21, 57, 0.4)',
       dark: 'rgba(17, 21, 57, 0.4)'
     },
-    [THEME_COLORS.ERROR]: {
+    [THEME_COLORS.WARNING]: {
       light: '#FA4C56',
       dark: '#FA4C56'
     }

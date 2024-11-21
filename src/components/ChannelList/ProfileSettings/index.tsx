@@ -31,7 +31,7 @@ const ProfileSettings = ({ handleCloseProfile }: IChannelTabsProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.ERROR]: errorColor
+    [THEME_COLORS.WARNING]: errorColor
   } = useColor()
 
   const [editProfileIsOpen, setEditProfileIsOpen] = useState(false)

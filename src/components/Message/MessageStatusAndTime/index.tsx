@@ -53,7 +53,11 @@ const MessageStatusAndTime = ({
   bottomOfMessage,
   marginBottom
 }: IMessageStatusAndTime) => {
-  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+  } = useColor()
 
   return (
     <MessageStatusAndTimeContainer
@@ -86,7 +90,7 @@ const MessageStatusAndTime = ({
             messageStatus: message.deliveryStatus,
             messageStatusDisplayingType,
             size: messageStatusSize,
-            iconColor: messageStatusColor,
+            color: messageStatusColor || iconPrimary,
             readIconColor: messageReadStatusColor,
             accentColor
           })}
