@@ -724,8 +724,8 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.showSenderNameOnOwnMessages === nextProps.showSenderNameOnOwnMessages &&
     prevProps.messageStatusAndTimePosition === nextProps.messageStatusAndTimePosition &&
     prevProps.messageStatusDisplayingType === nextProps.messageStatusDisplayingType &&
-    prevProps.ownMessageBackground === nextProps.ownMessageBackground &&
-    prevProps.incomingMessageBackground === nextProps.incomingMessageBackground &&
+    prevProps.outgoingMessageStyles === nextProps.outgoingMessageStyles &&
+    prevProps.incomingMessageStyles === nextProps.incomingMessageStyles &&
     prevProps.ownRepliedMessageBackground === nextProps.ownRepliedMessageBackground &&
     prevProps.incomingRepliedMessageBackground === nextProps.incomingRepliedMessageBackground &&
     prevProps.showMessageStatus === nextProps.showMessageStatus &&
