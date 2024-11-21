@@ -7,12 +7,13 @@ import { THEME_COLORS } from 'UIHelper/constants'
 import { IMessage, IUser } from 'types'
 import { useColor } from 'hooks'
 import { getClient } from 'common/client'
+import { IMessageStyles } from '../Message.types'
 
 interface IMessageHeaderProps {
   message: IMessage
   ownMessageOnRightSide?: boolean
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
   showMessageSenderName?: boolean
   withAttachments?: boolean
   withMediaAttachment?: boolean
@@ -26,8 +27,8 @@ interface IMessageHeaderProps {
 const MessageHeader = ({
   message,
   ownMessageOnRightSide,
-  ownMessageBackground,
-  incomingMessageBackground,
+  outgoingMessageStyles,
+  incomingMessageStyles,
   contactsMap,
   withMediaAttachment,
   withAttachments,
@@ -50,7 +51,7 @@ const MessageHeader = ({
       withPadding={
         withAttachments &&
         notLinkAttachment &&
-        (message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit')
+        (message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit')
       }
     >
       {showMessageSenderName && (
@@ -76,8 +77,8 @@ export default React.memo(MessageHeader, (prevProps, nextProps) => {
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.ownMessageOnRightSide === nextProps.ownMessageOnRightSide &&
-    prevProps.ownMessageBackground === nextProps.ownMessageBackground &&
-    prevProps.incomingMessageBackground === nextProps.incomingMessageBackground &&
+    prevProps.outgoingMessageStyles === nextProps.outgoingMessageStyles &&
+    prevProps.incomingMessageStyles === nextProps.incomingMessageStyles &&
     prevProps.showMessageSenderName === nextProps.showMessageSenderName &&
     prevProps.getFromContacts === nextProps.getFromContacts
   )

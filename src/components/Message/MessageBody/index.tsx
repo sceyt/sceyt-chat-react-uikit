@@ -29,7 +29,7 @@ import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
 import { MessageTextFormat } from 'messageUtils'
-import { IMessageActions } from '../Message.types'
+import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 
 interface IMessageBodyProps {
@@ -52,8 +52,8 @@ interface IMessageBodyProps {
   showSenderNameOnOwnMessages?: boolean
   messageStatusAndTimePosition?: 'bottomOfMessage' | 'onMessage'
   messageStatusDisplayingType?: 'ticks' | 'text'
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
   ownRepliedMessageBackground?: string
   incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
@@ -174,8 +174,8 @@ const MessageBody = ({
   showSenderNameOnOwnMessages = true,
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
-  ownMessageBackground,
-  incomingMessageBackground,
+  outgoingMessageStyles,
+  incomingMessageStyles,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   showMessageStatus = true,
@@ -321,9 +321,9 @@ const MessageBody = ({
     (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata)
 
   const borderRadius =
-    message.incoming && incomingMessageBackground === 'inherit'
+    message.incoming && incomingMessageStyles?.background === 'inherit'
       ? '0px'
-      : !message.incoming && ownMessageBackground === 'inherit'
+      : !message.incoming && outgoingMessageStyles?.background === 'inherit'
         ? '0px'
         : !message.incoming && ownMessageOnRightSide
           ? prevMessageUserID !== messageUserID || firstMessageInInterval
@@ -362,29 +362,29 @@ const MessageBody = ({
         message.parentMessage.attachments[0] &&
         message.parentMessage.attachments[0].type === attachmentTypes.voice
       }
-      ownMessageBackground={ownMessageBackground || bubbleOutgoing}
-      incomingMessageBackground={incomingMessageBackground || bubbleIncoming}
+      outgoingMessageStyles={outgoingMessageStyles || { background: bubbleOutgoing }}
+      incomingMessageStyles={incomingMessageStyles || { background: bubbleIncoming }}
       borderRadius={borderRadius}
       withAttachments={notLinkAttachment}
       attachmentWidth={
         withAttachments
           ? mediaAttachment
             ? (attachmentMetas &&
-                getSendAttachmentsAsSeparateMessages() &&
-                attachmentMetas.szw &&
-                calculateRenderedImageWidth(
-                  attachmentMetas.szw,
-                  attachmentMetas.szh,
+              getSendAttachmentsAsSeparateMessages() &&
+              attachmentMetas.szw &&
+              calculateRenderedImageWidth(
+                attachmentMetas.szw,
+                attachmentMetas.szh,
 
-                  mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-                  mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
-                  // imageAttachmentMaxWidth,
-                  // imageAttachmentMaxHeight
-                )[0]) ||
-              420
+                mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+                mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
+                // imageAttachmentMaxWidth,
+                // imageAttachmentMaxHeight
+              )[0]) ||
+            420
             : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
-              message.attachments[0].type === attachmentTypes.voice
+            message.attachments[0].type === attachmentTypes.voice
               ? 254
               : message.attachments[0].type === attachmentTypes.file
                 ? fileAttachmentsBoxWidth
@@ -399,8 +399,8 @@ const MessageBody = ({
         <MessageHeader
           message={message}
           ownMessageOnRightSide={ownMessageOnRightSide}
-          ownMessageBackground={ownMessageBackground}
-          incomingMessageBackground={incomingMessageBackground}
+          outgoingMessageStyles={outgoingMessageStyles}
+          incomingMessageStyles={incomingMessageStyles}
           contactsMap={contactsMap}
           withMediaAttachment={withMediaAttachment}
           withAttachments={withAttachments}
@@ -542,7 +542,7 @@ const MessageBody = ({
             withBody={!!message.body}
             showSenderName={showMessageSenderName}
             leftPadding={
-              message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'
+              message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit'
             }
             color={accentColor}
           >
@@ -557,11 +557,14 @@ const MessageBody = ({
         fontSize={messageTextFontSize}
         lineHeight={messageTextLineHeight}
         showMessageSenderName={showMessageSenderName}
-        withPaddings={message.incoming ? incomingMessageBackground !== 'inherit' : ownMessageBackground !== 'inherit'}
+        withPaddings={message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit'}
         withAttachment={notLinkAttachment && !!message.body}
         withMediaAttachment={withMediaAttachment}
         fontFamily={fontFamily}
         isForwarded={!!message.forwardingDetails}
+        outgoingMessageStyles={outgoingMessageStyles}
+        incomingMessageStyles={incomingMessageStyles}
+        incoming={message.incoming}
       >
         <span ref={messageTextRef}>
           {MessageTextFormat({
@@ -578,8 +581,8 @@ const MessageBody = ({
           ''
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
-        !notLinkAttachment &&
-        (messageStatusVisible || messageTimeVisible) ? (
+          !notLinkAttachment &&
+          (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
             message={message}
             showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
@@ -628,39 +631,39 @@ const MessageBody = ({
         )}
       {
         withAttachments &&
-          (message.attachments as any[]).map((attachment: any) => (
-            <Attachment
-              key={attachment.tid || attachment.url}
-              handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
-              attachment={{
-                ...attachment,
-                metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-              }}
-              removeSelected={handleRemoveFailedAttachment}
-              imageMinWidth={
-                message.parentMessage &&
+        (message.attachments as any[]).map((attachment: any) => (
+          <Attachment
+            key={attachment.tid || attachment.url}
+            handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
+            attachment={{
+              ...attachment,
+              metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+            }}
+            removeSelected={handleRemoveFailedAttachment}
+            imageMinWidth={
+              message.parentMessage &&
                 message.parentMessage.attachments &&
                 message.parentMessage.attachments[0] &&
                 message.parentMessage.attachments[0].type === attachmentTypes.voice
-                  ? '210px'
-                  : undefined
-              }
-              borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
-              selectedFileAttachmentsIcon={fileAttachmentsIcon}
-              backgroundColor={
-                message.incoming ? incomingMessageBackground || bubbleIncoming : ownMessageBackground || bubbleOutgoing
-              }
-              selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-              selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
-              selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-              closeMessageActions={closeMessageActions}
-              fileAttachmentWidth={fileAttachmentsBoxWidth}
-              imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-              imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-              videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-              videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-            />
-          ))
+                ? '210px'
+                : undefined
+            }
+            borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
+            selectedFileAttachmentsIcon={fileAttachmentsIcon}
+            backgroundColor={
+              message.incoming ? incomingMessageStyles?.background || bubbleIncoming : outgoingMessageStyles?.background || bubbleOutgoing
+            }
+            selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+            selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
+            selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
+            closeMessageActions={closeMessageActions}
+            fileAttachmentWidth={fileAttachmentsBoxWidth}
+            imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+            imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+            videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+            videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+          />
+        ))
         // </MessageAttachments>
       }
       {emojisPopupOpen && emojisPopupPosition && (
@@ -767,8 +770,12 @@ const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; wit
 
 const MessageBodyContainer = styled.div<{
   isSelfMessage?: boolean
-  incomingMessageBackground?: string
-  ownMessageBackground?: string
+  outgoingMessageStyles?: {
+    background?: string
+  }
+  incomingMessageStyles?: {
+    background?: string
+  }
   borderRadius?: string
   withAttachments?: boolean
   noBody?: boolean
@@ -779,7 +786,7 @@ const MessageBodyContainer = styled.div<{
 }>`
   position: relative;
   background-color: ${(props: any) =>
-    props.isSelfMessage ? props.ownMessageBackground : props.incomingMessageBackground};
+    props.isSelfMessage ? props.outgoingMessageStyles?.background : props.incomingMessageStyles?.background};
   //display: inline-block;
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
@@ -799,10 +806,10 @@ const MessageBodyContainer = styled.div<{
         ? '1px 0 0 '
         : '0'
       : props.isSelfMessage
-        ? props.ownMessageBackground === 'inherit'
+        ? props.outgoingMessageStyles?.background === 'inherit'
           ? '0'
           : '8px 12px'
-        : props.incomingMessageBackground === 'inherit'
+        : props.incomingMessageStyles?.background === 'inherit'
           ? ' 0'
           : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};

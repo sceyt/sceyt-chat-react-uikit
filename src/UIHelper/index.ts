@@ -4,6 +4,7 @@ import { getAvatarColors } from './avatarColors'
 import { ReactComponent as CloseSvg } from '../assets/svg/close.svg'
 import { ReactComponent as SearchSvg } from '../assets/svg/search.svg'
 import { THEME } from '../helpers/constants'
+import { IMessageStyles } from 'components/Message/Message.types'
 export function md5(inputString: string) {
   const hc = '0123456789abcdef'
   function rh(n: any) {
@@ -756,6 +757,9 @@ export const MessageText = styled.pre<{
   isForwarded?: boolean
   withPaddings?: boolean
   theme: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
+  incoming: boolean
 }>`
   display: flow-root;
   position: relative;
@@ -782,7 +786,7 @@ export const MessageText = styled.pre<{
   //white-space: normal;
   //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
-  color: ${(props) => props.color};
+  color: ${(props) => (props.incoming ? props?.incomingMessageStyles?.textColor : props?.outgoingMessageStyles?.textColor) || props.color};
   user-select: text;
   //overflow: hidden;
 
