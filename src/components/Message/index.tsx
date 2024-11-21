@@ -69,8 +69,8 @@ const Message = ({
   showSenderNameOnOwnMessages = true,
   messageStatusAndTimePosition = 'onMessage',
   messageStatusDisplayingType = 'ticks',
-  ownMessageBackground,
-  incomingMessageBackground,
+  outgoingMessageStyles,
+  incomingMessageStyles,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   showOwnAvatar = true,
@@ -493,8 +493,8 @@ const Message = ({
       hoverBackground={
         hoverBackground
           ? message.incoming
-            ? incomingMessageBackground || bubbleIncoming
-            : ownMessageBackground || bubbleOutgoing
+            ? incomingMessageStyles?.background || bubbleIncoming
+            : outgoingMessageStyles?.background || bubbleOutgoing
           : ''
       }
       topMargin={
@@ -629,8 +629,8 @@ const Message = ({
             showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
             messageStatusAndTimePosition={messageStatusAndTimePosition}
             messageStatusDisplayingType={messageStatusDisplayingType}
-            ownMessageBackground={ownMessageBackground}
-            incomingMessageBackground={incomingMessageBackground}
+            outgoingMessageStyles={outgoingMessageStyles}
+            incomingMessageStyles={incomingMessageStyles}
             ownRepliedMessageBackground={ownRepliedMessageBackground}
             incomingRepliedMessageBackground={incomingRepliedMessageBackground}
             showMessageStatus={showMessageStatus}

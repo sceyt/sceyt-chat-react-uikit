@@ -54,6 +54,7 @@ import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
+import { IMessageStyles } from 'components/Message/Message.types'
 
 let loading = false
 let loadFromServer = false
@@ -137,8 +138,8 @@ interface MessagesProps {
   messageWidthPercent?: string | number
   messageStatusAndTimePosition?: 'onMessage' | 'bottomOfMessage'
   messageStatusDisplayingType?: 'ticks' | 'text'
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
   ownRepliedMessageBackground?: string
   incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
@@ -314,8 +315,8 @@ const MessageList: React.FC<MessagesProps> = ({
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
-  ownMessageBackground,
-  incomingMessageBackground,
+  outgoingMessageStyles,
+  incomingMessageStyles,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   hoverBackground = false,
@@ -1154,7 +1155,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         borderRadius={dateDividerBorderRadius}
                       />
                     ) : (
-                      <MessageWrapper id={message.id}>
+                      <MessageWrapper id={message.id} className={(message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''}>
                         <Message
                           message={{
                             ...message,
@@ -1176,9 +1177,9 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageWidthPercent={messageWidthPercent}
                           messageStatusAndTimePosition={messageStatusAndTimePosition}
                           messageStatusDisplayingType={messageStatusDisplayingType}
-                          ownMessageBackground={ownMessageBackground}
+                          outgoingMessageStyles={outgoingMessageStyles}
                           ownRepliedMessageBackground={ownRepliedMessageBackground}
-                          incomingMessageBackground={incomingMessageBackground}
+                          incomingMessageStyles={incomingMessageStyles}
                           incomingRepliedMessageBackground={incomingRepliedMessageBackground}
                           showMessageStatus={showMessageStatus}
                           showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}

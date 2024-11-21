@@ -17,6 +17,12 @@ export interface IMessageActions {
   rtlDirection?: boolean
 }
 
+export interface IMessageStyles {
+  textColor?: string
+  background?: string
+  classname?: string
+}
+
 interface ICustomMessageItem {
   channel: IChannel
   message: IMessage
@@ -73,8 +79,8 @@ export interface IMessageProps {
   showSenderNameOnOwnMessages?: boolean
   messageStatusAndTimePosition?: 'bottomOfMessage' | 'onMessage'
   messageStatusDisplayingType?: 'ticks' | 'text'
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
   ownRepliedMessageBackground?: string
   incomingRepliedMessageBackground?: string
   showOwnAvatar?: boolean

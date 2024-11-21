@@ -3,14 +3,16 @@ import { useSelector } from 'react-redux'
 import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { IAttachment, IChannel, IMessage, IUser } from '../../types'
+import { IMessageStyles } from 'components/Message/Message.types'
+
 interface MessagesProps {
   fontFamily?: string
   ownMessageOnRightSide?: boolean
   messageWidthPercent?: string | number
   messageStatusAndTimePosition?: 'onMessage' | 'bottomOfMessage'
   messageStatusDisplayingType?: 'ticks' | 'text'
-  ownMessageBackground?: string
-  incomingMessageBackground?: string
+  outgoingMessageStyles?: IMessageStyles
+  incomingMessageStyles?: IMessageStyles
   ownRepliedMessageBackground?: string
   incomingRepliedMessageBackground?: string
   showMessageStatus?: boolean
@@ -186,8 +188,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   showMessageTime,
   showMessageStatusForEachMessage,
   showMessageTimeForEachMessage,
-  ownMessageBackground,
-  incomingMessageBackground,
+  outgoingMessageStyles,
+  incomingMessageStyles,
   ownRepliedMessageBackground,
   incomingRepliedMessageBackground,
   hoverBackground = false,
@@ -315,8 +317,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         showMessageTime={showMessageTime}
         showMessageStatusForEachMessage={showMessageStatusForEachMessage}
         showMessageTimeForEachMessage={showMessageTimeForEachMessage}
-        ownMessageBackground={ownMessageBackground}
-        incomingMessageBackground={incomingMessageBackground}
+        outgoingMessageStyles={outgoingMessageStyles}
+        incomingMessageStyles={incomingMessageStyles}
         ownRepliedMessageBackground={ownRepliedMessageBackground}
         incomingRepliedMessageBackground={incomingRepliedMessageBackground}
         hoverBackground={hoverBackground}
