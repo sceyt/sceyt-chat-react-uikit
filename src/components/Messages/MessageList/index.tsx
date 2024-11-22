@@ -54,7 +54,7 @@ import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
-import { IMessageStyles } from 'components/Message/Message.types'
+import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 
 let loading = false
 let loadFromServer = false
@@ -295,7 +295,7 @@ interface MessagesProps {
   imageAttachmentMaxHeight?: number
   videoAttachmentMaxWidth?: number
   videoAttachmentMaxHeight?: number
-  attachmentsPreview?: boolean
+  attachmentsPreview?: IAttachmentProperties
   sameUserMessageSpacing?: string
   differentUserMessageSpacing?: string
   backgroundColor?: string
@@ -414,7 +414,12 @@ const MessageList: React.FC<MessagesProps> = ({
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight,
-  attachmentsPreview = true,
+  attachmentsPreview = {
+    show: true,
+    canDelete: true,
+    canDownload: true,
+    canForward: true
+  },
   sameUserMessageSpacing,
   differentUserMessageSpacing,
   backgroundColor,
@@ -1035,7 +1040,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   return (
     <React.Fragment>
-      {isDragging && !(attachmentsPreview && mediaFile) && (
+      {isDragging && !(attachmentsPreview?.show && mediaFile) && (
         <DragAndDropContainer
           id='draggingContainer'
           draggable
@@ -1322,8 +1327,8 @@ const MessageList: React.FC<MessagesProps> = ({
               </NoMessagesContainer>
             )
           )}
-          {attachmentsPreview && mediaFile && (
-            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />
+          {attachmentsPreview?.show && mediaFile && (
+            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} attachmentsPreview={attachmentsPreview}/>
           )}
         </Container>
       </React.Fragment>
