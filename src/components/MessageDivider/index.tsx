@@ -61,8 +61,8 @@ export const Container = styled.div<{
         height: 100%;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
-        background-color: ${(props) =>
-          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
+        background-color: '${(props) =>
+          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};'
       }
 
       &::after {

@@ -4,6 +4,7 @@ import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { IAttachment, IChannel, IMessage, IUser } from '../../types'
 import { IAttachmentProperties, IMessageStyles } from '../Message/Message.types'
+import { HiddenMessageProperty } from 'types/enum'
 
 interface MessagesProps {
   fontFamily?: string
@@ -175,6 +176,7 @@ interface MessagesProps {
   messageTimeFontSize?: string
   messageTimeColor?: string
   messageStatusAndTimeLineHeight?: string
+  hiddenMessagesProperties?: HiddenMessageProperty[];
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -305,7 +307,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   messageStateColor,
   messageTimeFontSize,
   messageTimeColor,
-  messageStatusAndTimeLineHeight
+  messageStatusAndTimeLineHeight,
+  hiddenMessagesProperties = []
 }) => {
   const messages = useSelector(activeChannelMessagesSelector) || []
   return (
@@ -435,6 +438,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         messageTimeFontSize={messageTimeFontSize}
         messageTimeColor={messageTimeColor}
         messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+        hiddenMessagesProperties={hiddenMessagesProperties}
       />
     </React.Fragment>
   )

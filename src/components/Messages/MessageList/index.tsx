@@ -55,6 +55,8 @@ import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
+import { HiddenMessageProperty } from 'types/enum'
+import { getClient } from 'common/client'
 
 let loading = false
 let loadFromServer = false
@@ -301,6 +303,7 @@ interface MessagesProps {
   backgroundColor?: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
+  hiddenMessagesProperties?: HiddenMessageProperty[];
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -432,7 +435,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStateColor,
   messageTimeFontSize,
   messageTimeColor,
-  messageStatusAndTimeLineHeight
+  messageStatusAndTimeLineHeight,
+  hiddenMessagesProperties
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
@@ -443,6 +447,10 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
+
+
+  const ChatClient = getClient()
+  const { user } = ChatClient
 
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
@@ -873,7 +881,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
-          setUnreadMessageId(channel.lastDisplayedMsgId)
+          setUnreadMessageId(channel.lastDisplayedMessageId)
         } else {
           setUnreadMessageId('')
         }
@@ -902,6 +910,15 @@ const MessageList: React.FC<MessagesProps> = ({
       renderTopDate()
     }
   }, [isDragging])
+
+  useEffect(() => {
+    if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage) ) {
+      const lastMessage = messages[messages.length - 1]
+      if (lastMessage.user.id === user.id) {
+        setUnreadMessageId('')
+      }
+    }
+  }, [messages])
 
   /* useEffect(() => {
     if (channel.id !== activeChannelId) {
@@ -1020,7 +1037,7 @@ const MessageList: React.FC<MessagesProps> = ({
       if (scrollRef.current) {
         scrollRef.current.style.scrollBehavior = 'inherit'
       }
-      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMsgId)
+      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
       if (lastReadMessageNode) {
         scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
         if (scrollRef.current) {
@@ -1037,6 +1054,7 @@ const MessageList: React.FC<MessagesProps> = ({
       } */
     }
   })
+
 
   return (
     <React.Fragment>
@@ -1328,7 +1346,7 @@ const MessageList: React.FC<MessagesProps> = ({
             )
           )}
           {attachmentsPreview?.show && mediaFile && (
-            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} attachmentsPreview={attachmentsPreview}/>
+            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} attachmentsPreview={attachmentsPreview} />
           )}
         </Container>
       </React.Fragment>
