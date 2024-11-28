@@ -490,6 +490,7 @@ const Message = ({
       className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
+      showOwnAvatar={showOwnAvatar}
       hoverBackground={
         hoverBackground
           ? message.incoming
@@ -1074,6 +1075,7 @@ const MessageItem = styled.div<{
   ref?: any
   withAvatar?: boolean
   selectMessagesIsActive?: boolean
+  showOwnAvatar?: boolean
 }>`
   display: flex;
   position: relative;
@@ -1082,7 +1084,7 @@ const MessageItem = styled.div<{
   padding: ${(props) => (props.selectMessagesIsActive ? '0 calc(4% + 52px)' : '0 4%')};
   padding-left: ${(props) =>
     !props.withAvatar && !props.rtl && `calc(4% + ${props.selectMessagesIsActive ? '84px' : '32px'})`};
-  padding-right: ${(props) => !props.withAvatar && props.rtl && 'calc(4% + 32px)'};
+  padding-right: ${(props) => !props.withAvatar && props.rtl && `calc(4% + ${props.showOwnAvatar ? '32px' : '0'})`};
   //transition: all 0.2s;
   width: 100%;
   box-sizing: border-box;
