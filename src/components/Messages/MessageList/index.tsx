@@ -287,6 +287,7 @@ interface MessagesProps {
   newMessagesSeparatorBorderRadius?: string
   newMessagesSeparatorBackground?: string
   newMessagesSeparatorTextLeftRightSpacesWidth?: string
+  newMessagesSeparatorSpaceColor?: string,
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
   fileAttachmentsBoxBorder?: string
@@ -407,6 +408,7 @@ const MessageList: React.FC<MessagesProps> = ({
   newMessagesSeparatorBorderRadius,
   newMessagesSeparatorBackground,
   newMessagesSeparatorTextLeftRightSpacesWidth,
+  newMessagesSeparatorSpaceColor,
   fileAttachmentsIcon,
   fileAttachmentsBoxWidth,
   fileAttachmentsBoxBackground,
@@ -1320,6 +1322,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
                         newMessagesSeparatorBackground={newMessagesSeparatorBackground}
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
+                        newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
                         marginTop={message.type === 'system' ? '0px' : ''}
                         marginBottom={message.type === 'system' ? '16px' : '0'}
