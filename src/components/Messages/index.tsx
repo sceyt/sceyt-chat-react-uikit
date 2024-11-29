@@ -3,7 +3,7 @@ import { useSelector } from 'react-redux'
 import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { IAttachment, IChannel, IMessage, IUser } from '../../types'
-import { IMessageStyles } from 'components/Message/Message.types'
+import { IAttachmentProperties, IMessageStyles } from '../Message/Message.types'
 
 interface MessagesProps {
   fontFamily?: string
@@ -161,7 +161,7 @@ interface MessagesProps {
   imageAttachmentMaxHeight?: number
   videoAttachmentMaxWidth?: number
   videoAttachmentMaxHeight?: number
-  attachmentsPreview?: boolean
+  attachmentsPreview?: IAttachmentProperties
   sameUserMessageSpacing?: string
   differentUserMessageSpacing?: string
   backgroundColor?: string
@@ -287,7 +287,12 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight,
-  attachmentsPreview = true,
+  attachmentsPreview = {
+    show: true,
+    canDelete: true,
+    canDownload: true,
+    canForward: true
+  },
   sameUserMessageSpacing,
   differentUserMessageSpacing,
   backgroundColor,

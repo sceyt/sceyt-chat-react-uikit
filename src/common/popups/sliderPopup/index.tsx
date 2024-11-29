@@ -32,6 +32,7 @@ import ForwardMessagePopup from '../forwardMessage'
 import { deletePendingMessage, getAllMessages } from '../../../helpers/messagesHalper'
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
+import { IAttachmentProperties } from '../../../components/Message/Message.types'
 
 interface IProps {
   channel: IChannel
@@ -39,7 +40,8 @@ interface IProps {
   setIsSliderOpen: (state: any) => void
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
-  allowEditDeleteIncomingMessage?: boolean
+  allowEditDeleteIncomingMessage?: boolean,
+  attachmentsPreview: IAttachmentProperties
 }
 
 const SliderPopup = ({
@@ -47,7 +49,8 @@ const SliderPopup = ({
   setIsSliderOpen,
   mediaFiles,
   currentMediaFile,
-  allowEditDeleteIncomingMessage
+  allowEditDeleteIncomingMessage,
+  attachmentsPreview
 }: IProps) => {
   const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
 
@@ -77,11 +80,11 @@ const SliderPopup = ({
   // const attachmentsHasNext = useSelector(attachmentsForPopupHasNextSelector, shallowEqual) || []
   const attachmentUserName = currentFile
     ? currentFile.user &&
-      makeUsername(
-        contactsMap[currentFile.user.id],
-        currentFile.user,
-        getFromContacts && user.id !== currentFile.user.id
-      )
+    makeUsername(
+      contactsMap[currentFile.user.id],
+      currentFile.user,
+      getFromContacts && user.id !== currentFile.user.id
+    )
     : ''
   const handleClosePopup = () => {
     setAttachmentsList([])
@@ -373,12 +376,16 @@ const SliderPopup = ({
               <DownloadIcon />
             )}
           </IconWrapper>
-          <IconWrapper hideInMobile margin='0 32px' onClick={handleToggleForwardMessagePopup}>
-            <ForwardIcon />
-          </IconWrapper>
-          <IconWrapper hideInMobile onClick={handleToggleDeleteMessagePopup}>
-            <DeleteIcon />
-          </IconWrapper>
+          {attachmentsPreview?.canForward &&
+            <IconWrapper hideInMobile margin='0 32px' onClick={handleToggleForwardMessagePopup}>
+              <ForwardIcon />
+            </IconWrapper>
+          }
+          {attachmentsPreview?.canDelete &&
+            <IconWrapper hideInMobile onClick={handleToggleDeleteMessagePopup}>
+              <DeleteIcon />
+            </IconWrapper>
+          }
         </ActionsWrapper>
         <ClosePopupWrapper>
           <IconWrapper onClick={handleClosePopup}>
