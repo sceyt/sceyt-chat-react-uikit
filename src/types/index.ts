@@ -160,7 +160,7 @@ export interface IChannel {
   mutedTill: Date | null
   pinnedAt: Date | null
   lastReceivedMsgId: string
-  lastDisplayedMsgId: string
+  lastDisplayedMessageId: string
   messageRetentionPeriod?: number
   isMockChannel?: boolean
   isLinkedChannel?: boolean

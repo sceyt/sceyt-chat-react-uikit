@@ -885,6 +885,7 @@ const MessageBodyContainer = styled.div<{
           : `${props.attachmentWidth}px`
         : '420px'
       : '100%'};
+  width: max-content;
   padding: ${(props) =>
     props.withAttachments
       ? props.isReplyMessage

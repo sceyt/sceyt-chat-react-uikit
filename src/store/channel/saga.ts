@@ -783,11 +783,11 @@ function* markMessagesRead(action: IAction): any {
       // yield put(setChannelUnreadCount(0, channel.id));
       yield put(
         updateChannelDataAC(channel.id, {
-          lastReadMessageId: channel.lastDisplayedMsgId
+          lastReadMessageId: channel.lastDisplayedMessageId
         })
       )
       updateChannelOnAllChannels(channel.id, {
-        lastReadMessageId: channel.lastDisplayedMsgId
+        lastReadMessageId: channel.lastDisplayedMessageId
       })
       for (const messageId of messageListMarker.messageIds) {
         const updateParams = {
@@ -810,7 +810,7 @@ function* markMessagesRead(action: IAction): any {
         yield put(
           updateChannelDataAC(channel.id, {
             markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMsgId,
+            lastReadMessageId: channel.lastDisplayedMessageId,
             unreadMessageCount: channel.newMessageCount
           })
         )
@@ -818,7 +818,7 @@ function* markMessagesRead(action: IAction): any {
         yield put(
           updateChannelDataAC(channel.id, {
             markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMsgId
+            lastReadMessageId: channel.lastDisplayedMessageId
           })
         )
       } */

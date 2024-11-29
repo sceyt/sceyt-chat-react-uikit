@@ -1382,12 +1382,12 @@ function* getMessagesQuery(action: IAction): any {
           setHasNextCached(false)
         }
         yield put(setScrollToMessagesAC(messageId))
-      } else if (channel.newMessageCount && channel.lastDisplayedMsgId) {
+      } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
         // dispatch(setMessagesPrevCompleteAC(true))
         setAllMessages([])
         messageQuery.limit = MESSAGES_MAX_LENGTH
-        if (Number(channel.lastDisplayedMsgId)) {
-          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMsgId)
+        if (Number(channel.lastDisplayedMessageId)) {
+          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
           if (result.messages.length === 50) {
             messageQuery.limit =
               channel.newMessageCount > 25 ? (MESSAGES_MAX_LENGTH - 50) / 2 : MESSAGES_MAX_LENGTH - 50
@@ -1444,7 +1444,7 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesPrevCompleteAC(true))
           messageQuery.limit = 30
           // result = yield call(messageQuery.loadPreviousMessageId, '0')
-          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMsgId)
+          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
         } else {
           messageQuery.limit = 20
           result = yield call(messageQuery.loadNext)

@@ -15,6 +15,7 @@ export const Container = styled.div<{
   dateDividerFontSize?: string
   dateDividerTextColor?: string
   dateDividerBackgroundColor?: string
+  newMessagesSeparatorSpaceColor?: string
   dateDividerBorderRadius?: string
   newMessagesSeparatorLeftRightSpaceWidth?: string
   height?: number
@@ -57,12 +58,12 @@ export const Container = styled.div<{
           props.newMessagesSeparatorLeftRightSpaceWidth
             ? `-${props.newMessagesSeparatorLeftRightSpaceWidth}`
             : '-12px'};
-        top: 0;
-        height: 100%;
+        top: 50%;
+        height: 2px;
         width: ${(props) =>
-          props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
+          props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '0'};
         background-color: ${(props) =>
-          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
+          props.newMessagesSeparatorSpaceColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
 
       &::after {
@@ -72,12 +73,12 @@ export const Container = styled.div<{
           props.newMessagesSeparatorLeftRightSpaceWidth
             ? `-${props.newMessagesSeparatorLeftRightSpaceWidth}`
             : '-12px'};
-        top: 0;
-        height: 100%;
+        top: 50%;
+        height: 2px;
         width: ${(props) =>
-          props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '12px'};
+          props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '0'};
         background-color: ${(props) =>
-          props.chatBackgroundColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
+          props.newMessagesSeparatorSpaceColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
       }
     }
   }
@@ -100,6 +101,7 @@ interface IProps {
   newMessagesSeparatorBorderRadius?: string
   newMessagesSeparatorBackground?: string
   newMessagesSeparatorLeftRightSpaceWidth?: string
+  newMessagesSeparatorSpaceColor?: string
   noMargin?: boolean
   marginBottom?: string
   marginTop?: string
@@ -122,6 +124,7 @@ export default function MessageDivider({
   newMessagesSeparatorBorderRadius,
   newMessagesSeparatorBackground,
   newMessagesSeparatorLeftRightSpaceWidth,
+  newMessagesSeparatorSpaceColor,
   noMargin,
   marginTop,
   theme,
@@ -153,6 +156,7 @@ export default function MessageDivider({
       dateDividerBorderRadius={dateDividerBorderRadius || newMessagesSeparatorBorderRadius}
       width={newMessagesSeparatorWidth}
       newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorLeftRightSpaceWidth}
+      newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
       noMargin={noMargin}
       marginBottom={marginBottom}
       height={textHeight}

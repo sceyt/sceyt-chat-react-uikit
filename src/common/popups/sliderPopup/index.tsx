@@ -41,7 +41,7 @@ interface IProps {
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
   allowEditDeleteIncomingMessage?: boolean,
-  attachmentsPreview: IAttachmentProperties
+  attachmentsPreview?: IAttachmentProperties
 }
 
 const SliderPopup = ({
