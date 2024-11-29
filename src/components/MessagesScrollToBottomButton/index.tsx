@@ -110,8 +110,8 @@ const BottomButton = styled.div<{
   rightPosition?: number
 }>`
   position: absolute;
-  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition || 45)}px`};
-  right: ${(props) => `${props.rightPosition || 16}px`};
+  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition == undefined ? 45 : props.bottomPosition)}px`};
+  right: ${(props) => `${props.rightPosition == undefined ? 16 : props.rightPosition}px`};
   margin-right: 16px;
   display: flex;
   align-items: center;
