@@ -139,25 +139,24 @@ function App() {
             <div className='livechat_wrapper'>
                 <div className='open_live_chat_button' onClick={() => handleOpenLiveChat(true)}>
                     {!!(unreadCount && unreadCount > 0 && !liveChatOpen) && (<span className='unread_count'>{unreadCount}</span>)}
-                    <img src={openLivechatIcon} alt="livechat trigger"/>
+                    <img src={openLivechatIcon} alt="livechat trigger" />
                 </div>
                 <div
                     className={`live_chat_container ${liveChatOpen && 'live_chat_container_opened'} ${isMobile ? 'mobile_livechat' : ''}`}>
                     <div className='livechat_header'>
-                        <img src={supportIcon} alt="sceyt logo"/>
+                        <img src={supportIcon} alt="sceyt logo" />
                         <h3 className='livechat_title'>Support Team</h3>
 
                         <span className='close_live_chat_button' onClick={() => handleOpenLiveChat(false)}>
-                          <img src={closeLivechatIcon} alt="livechat trigger"/>
+                            <img src={closeLivechatIcon} alt="livechat trigger" />
                         </span>
                     </div>
                     <div className='sceyt_livechat'>
                         {client ? (
                             <SceytChat
-                              showNotifications={false}
-                              customColors={{primaryColor: '#5159F6'}}
-                              client={client}
-                              autoSelectFirstChannel={true}
+                                showNotifications={false}
+                                client={client}
+                                autoSelectFirstChannel={true}
                             >
                                 <Chat onSelectedChannelUpdated={handleUpdateUnreadCount} hideChannelList={true}>
                                     <MessageList
@@ -168,8 +167,8 @@ function App() {
                                         showMessageStatusForEachMessage={false}
                                         showSenderNameOnGroupChannel={false}
                                         showMessageTimeForEachMessage={false}
-                                        ownMessageBackground={'#E3E7FF'}
-                                        incomingMessageBackground={'#F1F2F6'}
+                                        outgoingMessageStyles={{ background: '#E3E7FF' }}
+                                        incomingMessageStyles={{ background: '#F1F2F6' }}
                                         dateDividerTextColor={'#707388'}
                                         dateDividerBorder="none"
                                         dateDividerFontSize='13px'
@@ -190,7 +189,6 @@ function App() {
                                         imageAttachmentMaxHeight={200}
                                         videoAttachmentMaxWidth={220}
                                         videoAttachmentMaxHeight={200}
-                                        attachmentsPreview={false}
                                         sameUserMessageSpacing='6px'
                                         differentUserMessageSpacing='12px'
                                         editMessage={false}
@@ -203,7 +201,7 @@ function App() {
                                         reportMessage={false}
                                         selectMessage={false}
                                     />
-                                    <MessagesScrollToBottomButton/>
+                                    <MessagesScrollToBottomButton />
                                     <SendMessage
                                         voiceMessage={false}
                                         allowMentionUser={false}
@@ -213,7 +211,7 @@ function App() {
                             </SceytChat>
                         ) : (
                             <div className='livechat_loading'>
-                                <img src={sceytRounded} alt="loading"/>
+                                <img src={sceytRounded} alt="loading" />
                             </div>
                         )}
                     </div>

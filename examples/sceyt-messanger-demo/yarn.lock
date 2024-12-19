@@ -8655,10 +8655,10 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.6.0:
-  version "1.6.0"
-  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.0.tgz#1ead3ade33717b4100a6a03ebd6cdecc3610b379"
-  integrity sha512-8V+tPKTb7W//NEkixmEK0gOd8kf1Qta3CiSlCWBss2U9cwPjlnJbDad8agQBT/PoDgxgxU/toMTerThSflAZXg==
+sceyt-chat-react-uikit@^1.6.2:
+  version "1.6.2"
+  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.2.tgz#3b695db497c7cba8526ccda4a7c7e7e27621e50c"
+  integrity sha512-dZ0L50J3P40/jMHuwVRhVVW61m8rXT8gm40juPPgj6hjYZA1ZABHx0GICErG+j/v6UGzBVYxTJycy8qXAzLIrQ==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
