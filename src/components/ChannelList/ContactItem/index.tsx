@@ -48,7 +48,10 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
+  const { 
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.ONLINE]: online
+  } = useColor()
 
   const getFromContacts = getShowOnlyContactUsers()
 
@@ -77,7 +80,7 @@ const ContactItem: React.FC<IChannelProps> = ({
             (hideUserPresence(contact.user)
               ? ''
               : contact.user.presence && contact.user.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={colors.primary} />
+              <UserStatus backgroundColor={online} />
             )}
         </AvatarWrapper>
       )}

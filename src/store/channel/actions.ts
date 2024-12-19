@@ -250,7 +250,7 @@ export function setChannelsAC(channels: IChannel[]) {
   }
 }
 
-export function setActiveChannelAC(channel: IChannel) {
+export function setActiveChannelAC(channel: IChannel | {}) {
   return {
     type: SET_ACTIVE_CHANNEL,
     payload: { channel }

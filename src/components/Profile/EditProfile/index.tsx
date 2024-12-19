@@ -55,7 +55,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
   }
 
   function handleSelectImage(image: File) {
-    setNewAvatar({
+      setNewAvatar({
       url: URL.createObjectURL(image),
       name: image.name
     })

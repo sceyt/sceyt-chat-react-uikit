@@ -2031,7 +2031,6 @@ const LexicalWrapper = styled.div<{
   width: 100%;
 
   & .rich_text_editor {
-    margin: 8px 6px;
     width: 100%;
     max-height: 80px;
     min-height: 20px;
@@ -2042,7 +2041,7 @@ const LexicalWrapper = styled.div<{
     overflow: auto;
     border-radius: ${(props) => props.borderRadius};
     background-color: ${(props) => props.backgroundColor};
-    padding: ${(props) => props.paddings};
+    padding: ${(props) => props.paddings || '8px 6px'};
     color: ${(props) => props.color};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
 
@@ -2116,15 +2115,15 @@ const LexicalWrapper = styled.div<{
 
 const Placeholder = styled.span<{ paddings?: string; color?: string }>`
   position: absolute;
-  top: calc(50% - 10px);
+  top: 0;
   left: 0;
   pointer-events: none;
   color: ${(props) => props.color || colors.placeholderTextColor};
-  margin-left: 6px;
+  padding: ${(props) => props.paddings || '8px 6px'};
+  line-height: 20px;
 
   @media (max-width: 768px) {
     font-size: 13px;
-    top: calc(50% - 8px);
   }
 `
 
