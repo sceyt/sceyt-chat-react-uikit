@@ -82,7 +82,14 @@ export default function* watchForEvents(): any {
   const connectionListener = new (SceytChatClient.ConnectionListener as any)()
   const typingUsersTimeout: { [key: string]: any } = {}
   const chan = eventChannel((emitter) => {
+    const shouldSkip = (channel: IChannel) => {
+      const channelTypesFilter = getChannelTypesFilter()
+      return !(!channelTypesFilter || !channelTypesFilter?.length || channelTypesFilter?.find(type => channel.type === type));
+    }
+
     channelListener.onCreated = (createdChannel: IChannel) => {
+
+      if (shouldSkip(createdChannel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CREATE,
         args: {
@@ -90,7 +97,8 @@ export default function* watchForEvents(): any {
         }
       })
     }
-    channelListener.onMemberJoined = (channel: IChannel, joinedMember: IUser) =>
+    channelListener.onMemberJoined = (channel: IChannel, joinedMember: IUser) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.JOIN,
         args: {
@@ -98,7 +106,9 @@ export default function* watchForEvents(): any {
           joinedMember
         }
       })
-    channelListener.onMemberLeft = (channel: IChannel, member: IUser) =>
+    }
+    channelListener.onMemberLeft = (channel: IChannel, member: IUser) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.LEAVE,
         args: {
@@ -106,21 +116,27 @@ export default function* watchForEvents(): any {
           member
         }
       })
-    channelListener.onBlocked = (channel: IChannel) =>
+    }
+    channelListener.onBlocked = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.BLOCK,
         args: {
           channel
         }
       })
-    channelListener.onUnblocked = (channel: IChannel) =>
+    }
+    channelListener.onUnblocked = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNBLOCK,
         args: {
           channel
         }
       })
-    channelListener.onMembersAdded = ({ channel, addedMembers }: { channel: IChannel; addedMembers: IUser[] }) =>
+    }
+    channelListener.onMembersAdded = ({ channel, addedMembers }: { channel: IChannel; addedMembers: IUser[] }) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.ADD_MEMBERS,
         args: {
@@ -128,7 +144,9 @@ export default function* watchForEvents(): any {
           addedMembers
         }
       })
-    channelListener.onMembersKicked = ({ channel, removedMembers }: { channel: IChannel; removedMembers: IUser[] }) =>
+    }
+    channelListener.onMembersKicked = ({ channel, removedMembers }: { channel: IChannel; removedMembers: IUser[] }) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.KICK_MEMBERS,
         args: {
@@ -136,14 +154,18 @@ export default function* watchForEvents(): any {
           removedMembers
         }
       })
-    channelListener.onUpdated = (updatedChannel: IChannel) =>
+    }
+    channelListener.onUpdated = (updatedChannel: IChannel) => {
+      if (shouldSkip(updatedChannel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UPDATE_CHANNEL,
         args: {
           updatedChannel
         }
       })
-    channelListener.onMessage = (channel: IChannel, message: IMessage) =>
+    }
+    channelListener.onMessage = (channel: IChannel, message: IMessage) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.MESSAGE,
         args: {
@@ -151,6 +173,7 @@ export default function* watchForEvents(): any {
           message
         }
       })
+    }
     channelListener.onDeleted = (channelId: string) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.DELETE,
@@ -158,7 +181,8 @@ export default function* watchForEvents(): any {
           channelId
         }
       })
-    channelListener.onMessageEdited = (channel: IChannel, user: IUser, message: IMessage) =>
+    channelListener.onMessageEdited = (channel: IChannel, user: IUser, message: IMessage) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.EDIT_MESSAGE,
         args: {
@@ -167,7 +191,9 @@ export default function* watchForEvents(): any {
           message
         }
       })
-    channelListener.onMessageDeleted = (channel: IChannel, user: IUser, deletedMessage: IMessage) =>
+    }
+    channelListener.onMessageDeleted = (channel: IChannel, user: IUser, deletedMessage: IMessage) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.DELETE_MESSAGE,
         args: {
@@ -176,7 +202,9 @@ export default function* watchForEvents(): any {
           deletedMessage
         }
       })
-    channelListener.onReactionAdded = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) =>
+    }
+    channelListener.onReactionAdded = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.REACTION_ADDED,
         args: {
@@ -186,7 +214,9 @@ export default function* watchForEvents(): any {
           reaction
         }
       })
-    channelListener.onReactionDeleted = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) =>
+    }
+    channelListener.onReactionDeleted = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.REACTION_DELETED,
         args: {
@@ -196,7 +226,9 @@ export default function* watchForEvents(): any {
           reaction
         }
       })
-    channelListener.onMemberStartedTyping = (channel: IChannel, from: IUser) =>
+    }
+    channelListener.onMemberStartedTyping = (channel: IChannel, from: IUser) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.START_TYPING,
         args: {
@@ -204,7 +236,9 @@ export default function* watchForEvents(): any {
           from
         }
       })
-    channelListener.onMemberStoppedTyping = (channel: IChannel, from: IUser) =>
+    }
+    channelListener.onMemberStoppedTyping = (channel: IChannel, from: IUser) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.STOP_TYPING,
         args: {
@@ -212,6 +246,7 @@ export default function* watchForEvents(): any {
           from
         }
       })
+    }
     channelListener.onReceivedMessageListMarker = (channelId: string, markerList: IMarker[]) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED,
@@ -227,7 +262,8 @@ export default function* watchForEvents(): any {
       channelUnreadCount: number,
       channelUnreadMentions: number,
       channelUnreadReactions: number
-    ) =>
+    ) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO,
         args: {
@@ -239,48 +275,61 @@ export default function* watchForEvents(): any {
           channelUnreadReactions
         }
       })
-    channelListener.onHidden = (channel: IChannel) =>
+    }
+    channelListener.onHidden = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.HIDE,
         args: {
           channel
         }
       })
-    channelListener.onMuted = (channel: IChannel) =>
+    }
+    channelListener.onMuted = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.MUTE,
         args: {
           channel
         }
       })
-    channelListener.onUnmuted = (channel: IChannel) =>
+    }
+    channelListener.onUnmuted = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNMUTE,
         args: {
           channel
         }
       })
-    channelListener.onPined = (channel: IChannel) =>
+    }
+    channelListener.onPined = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.PINED,
         args: {
           channel
         }
       })
-    channelListener.onUnpined = (channel: IChannel) =>
+    }
+    channelListener.onUnpined = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNPINED,
         args: {
           channel
         }
       })
-    channelListener.onShown = (channel: IChannel) =>
+    }
+    channelListener.onShown = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNHIDE,
         args: {
           channel
         }
       })
+    }
     /* connectionListener.onTokenWillExpire = (expireTime: number) =>
       emitter({
         type: CONNECTION_EVENT_TYPES.TOKEN_WILL_EXPIRE,
@@ -302,35 +351,44 @@ export default function* watchForEvents(): any {
           status
         }
       })
-    channelListener.onMarkedAsUnread = (channel: IChannel) =>
+    channelListener.onMarkedAsUnread = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD,
         args: {
           channel
         }
       })
-    channelListener.onMarkedAsRead = (channel: IChannel) =>
+    }
+    channelListener.onMarkedAsRead = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ,
         args: {
           channel
         }
       })
-    channelListener.onHistoryCleared = (channel: IChannel) =>
+    }
+    channelListener.onHistoryCleared = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CLEAR_HISTORY,
         args: {
           channel
         }
       })
-    channelListener.onDeletedAllMessages = (channel: IChannel) =>
+    }
+    channelListener.onDeletedAllMessages = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CLEAR_HISTORY,
         args: {
           channel
         }
       })
-    channelListener.onMembersRoleChanged = (channel: IChannel, members: IUser[]) =>
+    }
+    channelListener.onMembersRoleChanged = (channel: IChannel, members: IUser[]) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANGE_ROLE,
         args: {
@@ -338,7 +396,9 @@ export default function* watchForEvents(): any {
           members
         }
       })
-    channelListener.onOwnerChanged = (channel: IChannel, newOwner: IUser, oldOwner: IUser) =>
+    }
+    channelListener.onOwnerChanged = (channel: IChannel, newOwner: IUser, oldOwner: IUser) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANGE_OWNER,
         args: {
@@ -347,7 +407,9 @@ export default function* watchForEvents(): any {
           oldOwner
         }
       })
-    channelListener.onMembersBlocked = (channel: IChannel, removedMembers: IUser[]) =>
+    }
+    channelListener.onMembersBlocked = (channel: IChannel, removedMembers: IUser[]) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.MEMBER_BLOCKED,
         args: {
@@ -355,7 +417,9 @@ export default function* watchForEvents(): any {
           removedMembers
         }
       })
-    channelListener.onMembersUnblocked = (channel: IChannel, unblockedMembers: IUser[]) =>
+    }
+    channelListener.onMembersUnblocked = (channel: IChannel, unblockedMembers: IUser[]) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.MEMBER_UNBLOCKED,
         args: {
@@ -363,20 +427,25 @@ export default function* watchForEvents(): any {
           unblockedMembers
         }
       })
-    channelListener.onChannelFrozen = (channel: IChannel) =>
+    }
+    channelListener.onChannelFrozen = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.FROZEN,
         args: {
           channel
         }
       })
-    channelListener.onChannelUnfrozen = (channel: IChannel) =>
+    }
+    channelListener.onChannelUnfrozen = (channel: IChannel) => {
+      if (shouldSkip(channel)) return;
       emitter({
         type: CHANNEL_EVENT_TYPES.UNFROZEN,
         args: {
           channel
         }
       })
+    }
     channelListener.onReceivedChannelEvent = (channelId: string, user: IUser, eventName: string) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_EVENT,

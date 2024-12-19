@@ -44,7 +44,7 @@ const SceytChat = ({
   logoSrc,
   CustomUploader,
   handleNewMessages,
-  sendAttachmentsAsSeparateMessages,
+  sendAttachmentsAsSeparateMessages = true,
   membersDisplayTextByChannelTypesMap,
   channelTypeFilter,
   defaultRolesByChannelTypesMap,

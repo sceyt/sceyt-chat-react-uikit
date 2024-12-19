@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
@@ -120,15 +120,25 @@ const Attachment = ({
   const fileNameRef: any = useRef(null)
   const customDownloader = getCustomDownloader()
   const previewFileType = isPreview && attachment.data.type.split('/')[0]
-  const [renderWidth, renderHeight] =
-    attachment.metadata && attachment.metadata.szw && attachment.metadata.szh
+
+  const [renderWidth, renderHeight] = useMemo(() => {
+    let attachmentData = null;
+    if (attachment.metadata && typeof attachment.metadata === 'string') {
+      attachmentData = JSON.parse(attachment.metadata.replace('\"{', '\'{').replace('}\"', '}\''));
+    } else if (attachment.metadata && attachment.metadata.szw && attachment.metadata.szh) {
+      attachmentData = attachment.metadata;
+    }
+
+    return attachmentData && attachmentData.szw && attachmentData.szh
       ? calculateRenderedImageWidth(
-          attachment.metadata.szw,
-          attachment.metadata.szh,
-          attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
-        )
+        attachmentData.szw,
+        attachmentData.szh,
+        attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+        attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
+      )
       : []
+  }, [])
+
   const isInUploadingState =
     attachmentCompilationState[attachment.tid!] &&
     (attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
@@ -554,7 +564,7 @@ const Attachment = ({
                 !isInUploadingState &&
                 (attachmentCompilationState[attachment.tid!]
                   ? attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL ||
-                    attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING
+                  attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING
                   : true) &&
                 handleMediaItemClick(attachment)
               }
@@ -588,37 +598,37 @@ const Attachment = ({
                     )}
                     {(attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
                       (downloadingFile && !downloadIsCancelled)) && (
-                      <React.Fragment>
-                        <ProgressWrapper>
-                          <CircularProgressbar
-                            minValue={0}
-                            maxValue={100}
-                            value={progress}
-                            backgroundPadding={3}
-                            background={true}
-                            text=''
-                            styles={{
-                              background: {
-                                fill: 'rgba(23, 25, 28, 0)'
-                              },
-                              path: {
-                                stroke: colors.white,
-                                strokeLinecap: 'butt',
-                                strokeWidth: '4px',
-                                transition: 'stroke-dashoffset 0.5s ease 0s',
-                                transform: 'rotate(0turn)',
-                                transformOrigin: 'center center'
-                              }
-                            }}
-                          />
-                        </ProgressWrapper>
-                        {sizeProgress && !isRepliedMessage && (
-                          <SizeProgress>
-                            {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
-                          </SizeProgress>
-                        )}
-                      </React.Fragment>
-                    )}
+                        <React.Fragment>
+                          <ProgressWrapper>
+                            <CircularProgressbar
+                              minValue={0}
+                              maxValue={100}
+                              value={progress}
+                              backgroundPadding={3}
+                              background={true}
+                              text=''
+                              styles={{
+                                background: {
+                                  fill: 'rgba(23, 25, 28, 0)'
+                                },
+                                path: {
+                                  stroke: colors.white,
+                                  strokeLinecap: 'butt',
+                                  strokeWidth: '4px',
+                                  transition: 'stroke-dashoffset 0.5s ease 0s',
+                                  transform: 'rotate(0turn)',
+                                  transformOrigin: 'center center'
+                                }
+                              }}
+                            />
+                          </ProgressWrapper>
+                          {sizeProgress && !isRepliedMessage && (
+                            <SizeProgress>
+                              {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                            </SizeProgress>
+                          )}
+                        </React.Fragment>
+                      )}
                   </UploadPercent>
                 </UploadProgress>
               ) : /* <UploadProgress
@@ -640,14 +650,14 @@ const Attachment = ({
                     )}
                   </React.Fragment>
                 </UploadProgress> */
-              /* : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
-                <React.Fragment>
-                  <UploadProgress isFailedAttachment>
-                    <ErrorIcon />
-                  </UploadProgress>
-                </React.Fragment>
-              ) */
-              null}
+                /* : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
+                  <React.Fragment>
+                    <UploadProgress isFailedAttachment>
+                      <ErrorIcon />
+                    </UploadProgress>
+                  </React.Fragment>
+                ) */
+                null}
               <VideoPreview
                 theme={theme}
                 width={
@@ -830,14 +840,14 @@ const Attachment = ({
               </UploadPercent>
               <UploadingIcon fileAttachment className='rotate_cont' />
             </UploadProgress> */
-          /*: attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
-            <React.Fragment>
-              <UploadProgress isFailedAttachment>
-                <FailedFileIcon onClick={() => removeSelected && removeSelected(attachment.tid!)} />
-              </UploadProgress>
-            </React.Fragment>
-          ) */
-          null}
+            /*: attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
+              <React.Fragment>
+                <UploadProgress isFailedAttachment>
+                  <FailedFileIcon onClick={() => removeSelected && removeSelected(attachment.tid!)} />
+                </UploadProgress>
+              </React.Fragment>
+            ) */
+            null}
           {!isRepliedMessage && (
             <AttachmentFileInfo isPreview={isPreview}>
               {/* @ts-ignore */}
@@ -851,7 +861,7 @@ const Attachment = ({
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
-                    bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
+                  bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
                 {/* <span>
                   {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL && 'Upload error'}
                 </span> */}

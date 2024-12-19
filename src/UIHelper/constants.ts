@@ -17,8 +17,10 @@ export const THEME_COLORS = {
   SURFACE_2: 'surface2',
   OVERLAY_BACKGROUND: 'overlayBackground',
   OVERLAY_BACKGROUND_2: 'overlayBackground2',
-  WARNING: 'warning'
+  WARNING: 'warning',
+  ONLINE: 'online'
 } as const
+
 export const defaultTheme = {
   colors: {
     [THEME_COLORS.ACCENT]: {
@@ -88,6 +90,10 @@ export const defaultTheme = {
     [THEME_COLORS.WARNING]: {
       light: '#FA4C56',
       dark: '#FA4C56'
+    },
+    [THEME_COLORS.ONLINE]: {
+      light: '#0DBD8B',
+      dark: '#0DBD8B'
     }
   }
 }

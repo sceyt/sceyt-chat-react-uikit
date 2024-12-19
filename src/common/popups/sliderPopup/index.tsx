@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import moment from 'moment'
@@ -253,7 +253,7 @@ const SliderPopup = ({
             }
           }
         }
-      })
+      }).catch((e) => console.log(e))
     }
   }, [currentFile])
 
@@ -324,6 +324,11 @@ const SliderPopup = ({
       setAttachmentsList([])
     }
   }, [])
+
+  const activeFileIndex = useMemo(() => {
+    return attachmentsList.findIndex((item) => item.id === currentFile.id)
+  }, [attachmentsList, currentFile]);
+
   return (
     <Container draggable={false}>
       <SliderHeader>
@@ -394,13 +399,13 @@ const SliderPopup = ({
         </ClosePopupWrapper>
       </SliderHeader>
       <SliderBody onClick={handleClicks}>
-        {attachmentsList && attachmentsList.length ? (
+        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
           // @ts-ignore
           <Carousel
             draggable={false}
             pagination={false}
             className='custom_carousel'
-            initialActiveIndex={currentFile && attachmentsList.findIndex((item) => item.id === currentFile.id)}
+            initialActiveIndex={currentFile && activeFileIndex}
             onChange={(_currentItem: any, pageIndex: any) => {
               setImageLoading(true)
               setCurrentFile(attachmentsList[pageIndex])

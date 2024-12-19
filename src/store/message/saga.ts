@@ -186,14 +186,14 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...attachment.metadata,
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight
-              })
+          ...attachment.metadata,
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+            tmb: thumbnailMetas.thumbnail,
+            szw: thumbnailMetas.imageWidth,
+            szh: thumbnailMetas.imageHeight
           })
+        })
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -279,204 +279,29 @@ function* sendMessage(action: IAction): any {
       setChannelInMap(channel)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    console.log('send message . . . ', message)
     const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
 
     if (message.attachments && message.attachments.length) {
-      // const attachmentsCopy = [...message.attachments]
-      if (sendAttachmentsAsSeparateMessage) {
-        const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
-        const messagesToSend: IMessage[] = []
-        const mediaAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
-        if (mediaAttachments && mediaAttachments.length) {
-          for (let i = 0; i < mediaAttachments.length; i++) {
-            let thumbnailMetas: IAttachmentMeta = {}
-            const messageAttachment = { ...mediaAttachments[i], url: mediaAttachments[i].data }
-            console.log('messageAttachment..............', messageAttachment)
-            const fileType = messageAttachment.url.type.split('/')[0]
-            if (!messageAttachment.cachedUrl) {
-              if (fileType === 'video') {
-                thumbnailMetas = getVideoThumb(messageAttachment.tid)
-              } else if (fileType === 'image') {
-                thumbnailMetas = yield call(
-                  createImageThumbnail,
-                  messageAttachment.data,
-                  undefined,
-                  messageAttachment.type === 'file' ? 50 : undefined,
-                  messageAttachment.type === 'file' ? 50 : undefined
-                )
-              } else if (messageAttachment.type === attachmentTypes.voice) {
-                thumbnailMetas = {
-                  duration: messageAttachment.metadata.dur,
-                  thumbnail: messageAttachment.metadata.tmb
-                }
-              }
-              messageAttachment.metadata = {
-                ...messageAttachment.metadata,
-                ...(thumbnailMetas && {
-                  tmb: thumbnailMetas.thumbnail,
-                  szw: thumbnailMetas.imageWidth,
-                  szh: thumbnailMetas.imageHeight,
-                  dur: thumbnailMetas.duration && Math.floor(thumbnailMetas.duration)
-                })
-              }
-            }
+      let linkAttachment = null;
+      const attachmentsToSend: any = []
+      const messagesToSend: IMessage[] = []
 
-            // messageAttachment.size = message.attachments[0].data.size
+      linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
 
-            const messageBuilder = channel.createMessageBuilder()
-            messageBuilder
-              .setBody(i === 0 ? message.body : '')
-              .setAttachments([])
-              .setBodyAttributes(i === 0 ? message.bodyAttributes : {})
-              .setMentionUserIds(i === 0 ? mentionedUserIds : [])
-              .setType(message.type)
-              .setDisplayCount(message.type === 'system' ? 0 : 1)
-              .setSilent(message.type === 'system')
-              .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
-            if (message.parentMessage) {
-              messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
-            }
-            if (message.repliedInThread) {
-              messageBuilder.setReplyInThread()
-            }
-            const messageToSend = messageBuilder.create()
-            setPendingAttachment(messageAttachment.tid, {
-              ...messageAttachment.data,
-              messageTid: messageToSend.tid,
-              channelId: channel.id
-            })
-            const messageCopy = {
-              ...messageToSend,
-              attachments: [...messageAttachment]
-            }
-            messagesToSend.push(messageCopy)
-            yield call(addPendingMessage, message, messageCopy, channel)
+      const mediaAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
+      if (mediaAttachments && mediaAttachments.length) {
+        for (let i = 0; i < mediaAttachments.length; i++) {
+          const attachment = mediaAttachments[i]
 
-            if (!messageAttachment.cachedUrl) {
-              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
-            }
-          }
-        }
-        for (let i = 0; i < messagesToSend.length; i++) {
-          const messageAttachment = messagesToSend[i].attachments[0]
-          const messageToSend = messagesToSend[i]
-          const fileType = messageAttachment.url.type.split('/')[0]
-          const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
-          if (customUploader) {
-            try {
-              if (connectionState === CONNECTION_STATUS.CONNECTED) {
-                const attachmentsToSend = yield call(handleUploadAttachments, [messageAttachment], messageCopy, channel)
-                const attachmentToSend = attachmentsToSend[0]
-                console.log('attachmentToSend. ..  ', attachmentToSend)
-                let linkAttachmentToSend: IAttachment | null = null
-                if (i === 0 && linkAttachment) {
-                  const linkAttachmentBuilder = channel.createAttachmentBuilder(
-                    linkAttachment.data,
-                    linkAttachment.type
-                  )
-                  linkAttachmentToSend = linkAttachmentBuilder
-                    .setName(linkAttachment.name)
-                    .setUpload(linkAttachment.upload)
-                    .create()
-                }
-                /* let linkAttachmentToSend
-                 if (linkAttachment) {
-                   const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
-                   linkAttachmentToSend = linkAttachmentBuilder
-                     .setName(linkAttachment.name)
-                     .setUpload(linkAttachment.upload)
-                     .create()
-                 } */
-                // not for SDK, for displaying attachments and their progress
-                if (linkAttachmentToSend) {
-                  messageToSend.attachments = [attachmentToSend, linkAttachmentToSend]
-                } else {
-                  messageToSend.attachments = [attachmentToSend]
-                }
-                const messageResponse = yield call(channel.sendMessage, messageToSend)
-                messageResponse.attachments[0] = {
-                  ...messageResponse.attachments[0],
-                  user: JSON.parse(JSON.stringify(messageResponse.user)),
-                  tid: messageAttachment.tid,
-                  attachmentUrl: messageAttachment.attachmentUrl
-                }
-                const pendingAttachment = getPendingAttachment(messageAttachment.tid!)
-                if (!messageAttachment.cachedUrl) {
-                  setDataToDB(
-                    DB_NAMES.FILES_STORAGE,
-                    DB_STORE_NAMES.ATTACHMENTS,
-                    [{ ...messageResponse.attachments[0], checksum: pendingAttachment.checksum }],
-                    'checksum'
-                  )
-                }
-                yield put(removeAttachmentProgressAC(messageAttachment.tid))
-                deletePendingAttachment(messageAttachment.tid!)
-                const messageUpdateData = {
-                  id: messageResponse.id,
-                  body: messageResponse.body,
-                  type: messageResponse.type,
-                  state: messageResponse.state,
-                  displayCount: messageResponse.displayCount,
-                  deliveryStatus: messageResponse.deliveryStatus,
-                  attachments: messageResponse.attachments,
-                  mentionedUsers: messageResponse.mentionedUsers,
-                  bodyAttributes: messageResponse.bodyAttributes,
-                  metadata: messageResponse.metadata,
-                  parentMessage: messageResponse.parentMessage,
-                  repliedInThread: messageResponse.repliedInThread,
-                  createdAt: messageResponse.createdAt
-                }
-                yield put(updateMessageAC(messageToSend.tid!, JSON.parse(JSON.stringify(messageUpdateData))))
-
-                if (fileType === 'video') {
-                  deleteVideoThumb(messageAttachment.tid!)
-                }
-                updateMessageOnMap(channel.id, {
-                  messageId: messageToSend.tid!,
-                  params: messageUpdateData
-                })
-                updateMessageOnAllMessages(messageToSend.tid!, messageUpdateData)
-
-                const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-                updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-                const channelUpdateParam = {
-                  lastMessage: messageToUpdate,
-                  lastReactedMessage: null
-                }
-                if (channel.unread) {
-                  yield put(markChannelAsReadAC(channel.id))
-                }
-                yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
-              } else {
-                // eslint-disable-next-line
-                throw Error('Network error')
-              }
-            } catch (e) {
-              console.log('Error on uploading attachment', messageAttachment.tid)
-              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageAttachment.tid))
-
-              updateMessageOnMap(channel.id, {
-                messageId: messageToSend.tid!,
-                params: { state: MESSAGE_STATUS.FAILED }
-              })
-              updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
-              yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
-            }
-          }
-        }
-      } else {
-        let attachmentsToSend: IAttachment[] = message.attachments.map((attachment: any) => {
           let uri
           if (attachment.cachedUrl) {
             uri = attachment.cachedUrl
           }
+          let attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
 
-          const attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
-
-          const att = attachmentBuilder
+          const messageAttachment = attachmentBuilder
             .setName(attachment.name)
             .setMetadata(attachment.metadata)
             .setUpload(customUploader ? false : attachment.upload)
@@ -504,11 +329,11 @@ function* sendMessage(action: IAction): any {
                 }
               })
             }
-            att.progress = (progressPercent: any) => {
+            messageAttachment.progress = (progressPercent: any) => {
               handleUpdateUploadProgress(progressPercent)
               // attachmentsListeners.progress(progressPercent, attachment.tid);
             }
-            att.completion = (updatedAttachment: any, error: any) => {
+            messageAttachment.completion = (updatedAttachment: any, error: any) => {
               if (error) {
                 console.log('fail to upload attachment ... ', error)
                 store.dispatch({
@@ -544,122 +369,214 @@ function* sendMessage(action: IAction): any {
                 })
               }
             }
+          } else if (customUploader && attachment) {
+            attachment.url = attachment.data;
           }
+
           // not for SDK, for displaying attachments and their progress
-          att.tid = attachment.tid
-          att.attachmentUrl = attachment.attachmentUrl
-          return att
-        })
-        const messageBuilder = channel.createMessageBuilder()
-        messageBuilder
-          .setBody(message.body)
-          .setBodyAttributes(message.bodyAttributes)
-          .setAttachments(message.attachments)
-          .setMentionUserIds(mentionedUserIds)
-          .setType(message.type)
-          .setDisplayCount(message.type === 'system' ? 0 : 1)
-          .setSilent(message.type === 'system')
-          .setMetadata(JSON.stringify(message.metadata))
-        if (message.parentMessage) {
-          messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
-        }
-        if (message.repliedInThread) {
-          messageBuilder.setReplyInThread()
-        }
-        const messageToSend = messageBuilder.create()
-        const messageCopy = JSON.parse(JSON.stringify(messageToSend))
-        if (customUploader) {
-          yield call(addPendingMessage, message, messageCopy, channel)
+          messageAttachment.tid = attachment.tid
+          messageAttachment.attachmentUrl = attachment.attachmentUrl
 
-          attachmentsToSend = yield call(handleUploadAttachments, attachmentsToSend, messageCopy, channel)
-        } else {
-          const messageCopy = {
-            ...messageToSend,
-            attachments: message.attachments.map((att: any) => ({
-              tid: att.tid,
-              name: att.name,
-              data: {},
-              type: att.type,
-              attachmentUrl: att.attachmentUrl
-            }))
-          }
-          const hasNextMessages = yield select(messagesHasNextSelector)
-          if (!getHasNextCached()) {
-            if (hasNextMessages) {
-              yield put(getMessagesAC(channel))
-            } else {
-              yield put(addMessageAC(JSON.parse(JSON.stringify(messageCopy))))
+          if (sendAttachmentsAsSeparateMessage) {
+            const messageBuilder = channel.createMessageBuilder()
+            messageBuilder
+              .setBody(i === 0 ? message.body : '')
+              .setAttachments([])
+              .setBodyAttributes(i === 0 ? message.bodyAttributes : {})
+              .setMentionUserIds(i === 0 ? mentionedUserIds : [])
+              .setType(message.type)
+              .setDisplayCount(message.type === 'system' ? 0 : 1)
+              .setSilent(message.type === 'system')
+              .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
+            if (message.parentMessage) {
+              messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
             }
-          }
-          addMessageToMap(channel.id, messageCopy)
-          addAllMessages([messageCopy], MESSAGE_LOAD_DIRECTION.NEXT)
-
-          const messagesToAdd = getFromAllMessagesByMessageId('', '', true)
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
-          yield put(scrollToNewMessageAC(true))
-        }
-
-        messageToSend.attachments = attachmentsToSend
-
-        if (connectionState === CONNECTION_STATUS.CONNECTED) {
-          const messageResponse = yield call(channel.sendMessage, messageToSend)
-          /* if (msgCount <= 200) {
-            const messageToSend: any = {
-              // metadata: mentionedMembersPositions,
-              body: `${msgCount}`,
-              mentionedMembers: [],
-              attachments: [],
-              type: 'text'
+            if (message.repliedInThread) {
+              messageBuilder.setReplyInThread()
             }
-            yield put(sendMessageAC(messageToSend, channel.id, 'Connected'))
-            msgCount++
-          } */
-          let attachmentsToUpdate = []
-          if (messageResponse.attachments && messageResponse.attachments.length > 0) {
-            const currentAttachmentsMap = {}
-            attachmentsToSend.forEach((attachment: IAttachment) => {
-              currentAttachmentsMap[attachment.tid!] = attachment
+            const messageToSend = messageBuilder.create()
+            setPendingAttachment(messageAttachment.tid as string, {
+              ...messageAttachment.data,
+              messageTid: messageToSend.tid,
+              channelId: channel.id
             })
-            attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
-              if (currentAttachmentsMap[attachment.tid!]) {
-                console.log('set at')
-                return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+            const messageCopy = {
+              ...messageToSend,
+              attachments: [messageAttachment]
+            }
+
+            messagesToSend.push(messageCopy)
+            yield call(addPendingMessage, message, messageCopy, channel)
+          } else {
+            attachmentsToSend.push(messageAttachment)
+          }
+          if (customUploader) {
+            messageAttachment.url = attachment.data
+          }
+          if (!messageAttachment.cachedUrl && customUploader) {
+            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
+          }
+        }
+
+
+        if (!sendAttachmentsAsSeparateMessage) {
+          const messageBuilder = channel.createMessageBuilder()
+          messageBuilder
+            .setBody(message.body)
+            .setBodyAttributes(message.bodyAttributes)
+            .setAttachments(message.attachments)
+            .setMentionUserIds(mentionedUserIds)
+            .setType(message.type)
+            .setDisplayCount(message.type === 'system' ? 0 : 1)
+            .setSilent(message.type === 'system')
+            .setMetadata(JSON.stringify(message.metadata))
+
+          if (message.parentMessage) {
+            messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
+          }
+
+          if (message.repliedInThread) {
+            messageBuilder.setReplyInThread()
+          }
+
+          const messageToSend = messageBuilder.create()
+          const messageCopy = JSON.parse(JSON.stringify(messageToSend))
+
+          if (customUploader) {
+            if (!sendAttachmentsAsSeparateMessage) {
+              yield call(addPendingMessage, message, messageCopy, channel)
+            }
+          } else {
+            const hasNextMessages = yield select(messagesHasNextSelector)
+            if (!getHasNextCached()) {
+              if (hasNextMessages) {
+                yield put(getMessagesAC(channel))
+              } else {
+                yield put(addMessageAC(JSON.parse(JSON.stringify(messageCopy))))
               }
-              return attachment
+            }
+            addMessageToMap(channel.id, messageCopy)
+            addAllMessages([messageCopy], MESSAGE_LOAD_DIRECTION.NEXT)
+
+            const messagesToAdd = getFromAllMessagesByMessageId('', '', true)
+            yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
+            yield put(scrollToNewMessageAC(true))
+          }
+          messageToSend.attachments = attachmentsToSend
+          messagesToSend.push(messageToSend)
+        }
+      }
+
+      for (let i = 0; i < messagesToSend.length; i++) {
+        const messageAttachment = messagesToSend[i].attachments
+        const messageToSend = messagesToSend[i]
+
+        try {
+          const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
+          if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            let attachmentsToSend = messageAttachment;
+            if (customUploader) {
+              attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
+            }
+            let linkAttachmentToSend: IAttachment | null = null
+            if (i === 0 && linkAttachment) {
+              const linkAttachmentBuilder = channel.createAttachmentBuilder(
+                linkAttachment.data,
+                linkAttachment.type
+              )
+              linkAttachmentToSend = linkAttachmentBuilder
+                .setName(linkAttachment.name)
+                .setUpload(linkAttachment.upload)
+                .create()
+            }
+            if (linkAttachmentToSend) {
+              messageToSend.attachments = [...attachmentsToSend, linkAttachmentToSend]
+            } else {
+              messageToSend.attachments = [...attachmentsToSend]
+            }
+
+            const messageResponse = yield call(channel.sendMessage, messageToSend)
+            if (customUploader) {
+              for (let k = 0; k < messageAttachment.length; k++) {
+                messageResponse.attachments[k] = {
+                  ...messageResponse.attachments[k],
+                  user: JSON.parse(JSON.stringify(messageResponse.user)),
+                  tid: messageAttachment[k].tid as string,
+                  attachmentUrl: messageAttachment[k].attachmentUrl
+                }
+                const pendingAttachment = getPendingAttachment(messageAttachment[k].tid as string)
+                if (!messageAttachment[k].cachedUrl) {
+                  setDataToDB(
+                    DB_NAMES.FILES_STORAGE,
+                    DB_STORE_NAMES.ATTACHMENTS,
+                    [{ ...messageResponse.attachments[k], checksum: pendingAttachment.checksum || pendingAttachment?.file }],
+                    'checksum'
+                  )
+                }
+                yield put(removeAttachmentProgressAC(messageAttachment[k].tid))
+                deletePendingAttachment(messageAttachment[k].tid!)
+              }
+            }
+            let attachmentsToUpdate = []
+            if (messageResponse.attachments && messageResponse.attachments.length > 0) {
+              const currentAttachmentsMap: { [key: string]: IAttachment } = {}
+              attachmentsToSend.forEach((attachment: IAttachment) => {
+                currentAttachmentsMap[attachment.tid!] = attachment
+              })
+              attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
+                if (currentAttachmentsMap[attachment.tid!]) {
+                  console.log('set at')
+                  return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+                }
+                return attachment
+              })
+            }
+            const messageUpdateData = {
+              id: messageResponse.id,
+              body: messageResponse.body,
+              type: messageResponse.type,
+              state: messageResponse.state,
+              displayCount: messageResponse.displayCount,
+              deliveryStatus: messageResponse.deliveryStatus,
+              attachments: attachmentsToUpdate,
+              mentionedUsers: messageResponse.mentionedUsers,
+              bodyAttributes: messageResponse.bodyAttributes,
+              metadata: messageResponse.metadata,
+              parentMessage: messageResponse.parentMessage,
+              repliedInThread: messageResponse.repliedInThread,
+              createdAt: messageResponse.createdAt
+            }
+            yield put(updateMessageAC(messageToSend.tid as string, JSON.parse(JSON.stringify(messageUpdateData))))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid as string,
+              params: messageUpdateData
             })
+            updateMessageOnAllMessages(messageToSend.tid as string, messageUpdateData)
+            const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+            updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
+            const channelUpdateParam = {
+              lastMessage: messageToUpdate,
+              lastReactedMessage: null
+            }
+            if (channel.unread) {
+              yield put(markChannelAsReadAC(channel.id))
+            }
+            yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+            updateChannelOnAllChannels(channel.id, channelUpdateParam)
+          } else {
+            // eslint-disable-next-line
+            throw Error('Network error')
           }
-          const messageUpdateData = {
-            id: messageResponse.id,
-            body: messageResponse.body,
-            type: messageResponse.type,
-            state: messageResponse.state,
-            displayCount: messageResponse.displayCount,
-            deliveryStatus: messageResponse.deliveryStatus,
-            attachments: attachmentsToUpdate,
-            mentionedUsers: messageResponse.mentionedUsers,
-            bodyAttributes: messageResponse.bodyAttributes,
-            metadata: messageResponse.metadata,
-            parentMessage: messageResponse.parentMessage,
-            repliedInThread: messageResponse.repliedInThread,
-            createdAt: messageResponse.createdAt
-          }
-          yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData))))
+        } catch (e) {
+          console.log('Error on uploading attachment', message.tid, e)
+          yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, message.tid))
+
           updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid,
-            params: messageUpdateData
+            messageId: messageToSend.tid!,
+            params: { state: MESSAGE_STATUS.FAILED }
           })
-          updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
-          const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-          updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-          const channelUpdateParam = {
-            lastMessage: messageToUpdate,
-            lastReactedMessage: null
-          }
-          if (channel.unread) {
-            yield put(markChannelAsReadAC(channel.id))
-          }
-          yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
-          updateChannelOnAllChannels(channel.id, channelUpdateParam)
+          updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
+          yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
         }
       }
     }
@@ -735,7 +652,6 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    // console.log('getHasNextCached .. . .', getHasNextCached())
     const hasNextMessages = yield select(messagesHasNextSelector)
     if (!getHasNextCached()) {
       if (hasNextMessages) {
@@ -750,7 +666,6 @@ function* sendTextMessage(action: IAction): any {
     yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
-      console.log('send message messageToSend ... ', messageToSend)
       if (sendMessageHandler) {
         messageResponse = yield call(sendMessageHandler, messageToSend, channel.id)
       } else {
@@ -1059,10 +974,10 @@ function* resendMessage(action: IAction): any {
                 ...messageAttachment.metadata,
                 ...(thumbnailMetas &&
                   thumbnailMetas.thumbnail && {
-                    tmb: thumbnailMetas.thumbnail,
-                    szw: thumbnailMetas.imageWidth,
-                    szh: thumbnailMetas.imageHeight
-                  })
+                  tmb: thumbnailMetas.thumbnail,
+                  szw: thumbnailMetas.imageWidth,
+                  szh: thumbnailMetas.imageHeight
+                })
               })
             }
             console.log('attachmentMeta ... ', attachmentMeta)
@@ -1366,7 +1281,7 @@ function* getMessagesQuery(action: IAction): any {
           // TO DO - pending messages are repeated in the list, fix after uncommenting.
           const pendingMessages = getPendingMessages(channel.id)
           if (pendingMessages && pendingMessages.length) {
-            const messagesMap = {}
+            const messagesMap: { [key: string]: IMessage } = {}
             result.messages.forEach((msg) => {
               messagesMap[msg.tid || ''] = msg
             })
@@ -1420,15 +1335,15 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-              result.messages.length > 0 &&
-              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+            result.messages.length > 0 &&
+            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
 
         // TO DO - pending messages are repeated in the list, fix after uncommenting.
         const pendingMessages = getPendingMessages(channel.id)
         if (pendingMessages && pendingMessages.length) {
-          const messagesMap = {}
+          const messagesMap: { [key: string]: IMessage } = {}
           result.messages.forEach((msg) => {
             messagesMap[msg.tid || ''] = msg
           })
@@ -1478,7 +1393,7 @@ function* getMessagesQuery(action: IAction): any {
         // TO DO - pending messages are repeated in the list, fix after uncommenting.
         const pendingMessages = getPendingMessages(channel.id)
         if (pendingMessages && pendingMessages.length) {
-          const messagesMap = {}
+          const messagesMap: { [key: string]: IMessage } = {}
           result.messages.forEach((msg) => {
             messagesMap[msg.tid || ''] = msg
           })

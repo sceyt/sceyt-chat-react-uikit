@@ -37,20 +37,19 @@ export const removeAttachmentFromCache = (attachmentId: string) => {
   // downloadedAttachments[attachmentId] = attachmentUrl
 }
 
-export const getAttachmentUrlFromCache = (attachmentUrl: string) => {
-  if (cacheAvailable) {
-    return caches.match(attachmentUrl).then(async (response) => {
-      if (response) {
-        // Use the cached response
-        return URL.createObjectURL(await response.blob())
-      } else {
-        // The image or video is not cached
-        console.log('The image or video is not cached', attachmentUrl)
-        return false
-      }
-    })
-  } else {
-    console.error('Cache is not available')
-    return new Promise((_resolve, reject) => reject(new Error('Cache not available')))
+export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
+  if (!cacheAvailable) {
+    console.error('Cache is not available');
+    return Promise.reject(new Error('Cache not available'));
   }
-}
+
+  const response = await caches.match(attachmentUrl);
+  if (response) {
+    // Use the cached response
+    return URL.createObjectURL(await response.blob());
+  } else {
+    // The image or video is not cached
+    console.log('The image or video is not cached', attachmentUrl);
+    return false;
+  }
+};

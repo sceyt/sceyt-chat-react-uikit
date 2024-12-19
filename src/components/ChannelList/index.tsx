@@ -31,7 +31,8 @@ import {
   setChannelToUnHideAC,
   setCloseSearchChannelsAC,
   setSearchedChannelsAC,
-  switchChannelActionAC
+  switchChannelActionAC,
+  switchChannelInfoAC
 } from '../../store/channel/actions'
 import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
@@ -298,7 +299,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
         dispatch(removeChannelAC(deletedChannel.id))
         if (activeChannel.id === deletedChannel.id) {
           const activeChannel = getLastChannelFromMap()
-          dispatch(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
+          dispatch(switchChannelActionAC(activeChannel ? JSON.parse(JSON.stringify(activeChannel)) : {}))
+          if (!activeChannel) {
+            dispatch(switchChannelInfoAC(false));
+          }
         }
       }
       dispatch(setChannelToRemoveAC(null))
@@ -516,8 +520,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
             <React.Fragment>
               {searchedChannels?.chats_groups?.length ||
-              searchedChannels?.channels?.length ||
-              searchedChannels?.contacts?.length ? (
+                searchedChannels?.channels?.length ||
+                searchedChannels?.contacts?.length ? (
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
@@ -692,8 +696,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
               !searchedChannels.chats_groups?.length &&
-              !searchedChannels.chats_groups?.length &&
-              !searchedChannels.channels?.length ? (
+                !searchedChannels.chats_groups?.length &&
+                !searchedChannels.channels?.length ? (
                 <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
@@ -813,6 +817,7 @@ const Container = styled.div<{ borderColor: string; withCustomList?: boolean; re
   min-width: ${(props) => (props.withCustomList ? '' : '400px')};
   border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${props.borderColor}`)};
   background-color: ${(props) => props.backgroundColor};
+  height: 100%;
   ${(props) =>
     props.withCustomList
       ? ''

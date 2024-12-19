@@ -175,7 +175,7 @@ function* createChannel(action: IAction): any {
           // metadata: mentionedMembersPositions,
           body:
             createdChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
-            createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+              createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
               ? 'CC'
               : 'CG',
           mentionedMembers: [],
@@ -853,8 +853,13 @@ function* switchChannel(action: IAction): any {
   try {
     const { payload } = action
     const { channel } = payload
-    const existingChannel = checkChannelExists(channel.id)
     let channelToSwitch = channel
+    if (!channel?.id) {
+      yield call(setActiveChannelId, '')
+      yield put(setActiveChannelAC({}))
+      return
+    }
+    const existingChannel = checkChannelExists(channel.id)
     if (!existingChannel) {
       const addChannel = getChannelFromAllChannels(channel.id)
       if (addChannel) {
@@ -1171,7 +1176,7 @@ function* checkUsersStatus(/* action: IAction */): any {
           updatedUser.presence.status !== usersMap[updatedUser.id].presence.status ||
           (updatedUser.presence.lastActiveAt &&
             new Date(updatedUser.presence.lastActiveAt).getTime() !==
-              new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
+            new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
           updatedUser.avatarUrl !== usersMap[updatedUser.id].avatarUrl ||
           updatedUser.firstName !== usersMap[updatedUser.id].firstName ||
           updatedUser.lastName !== usersMap[updatedUser.id].lastName)

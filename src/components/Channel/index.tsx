@@ -105,7 +105,8 @@ const Channel: React.FC<IChannelProps> = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.WARNING]: errorColor,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ONLINE]: online
   } = useColor()
 
   const dispatch = useDispatch()
@@ -212,7 +213,7 @@ const Channel: React.FC<IChannelProps> = ({
             (hideUserPresence(directChannelUser)
               ? ''
               : directChannelUser.presence && directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={colors.primary} />
+              <UserStatus backgroundColor={online} />
             )}
         </AvatarWrapper>
       )}
