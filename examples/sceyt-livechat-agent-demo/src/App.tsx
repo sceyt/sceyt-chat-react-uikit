@@ -19,8 +19,8 @@ function App() {
   const [client, setClient] = useState<SceytChatClient>()
 
   const getToken = async () => {
-    const userId = 'owner-user-timeshareexit'
-    fetch(`https://s74jcl67y4.execute-api.us-east-2.amazonaws.com/token?user=${userId}`).then(async (tokenData) => {
+    const userId = 'sarah-tom'
+    fetch(`https://icf2b3q9dd.execute-api.us-east-2.amazonaws.com/api/token?user=${userId}`).then(async (tokenData) => {
       const data = await tokenData.json()
       setChatToken(data.chat_token)
     })
@@ -30,7 +30,7 @@ function App() {
   }
 
   const connectClient = (token: string) => {
-    const sceytClient = new SceytChatClient('https://us-ohio-api.sceyt.com', '364dkpzjr9', Math.random()
+    const sceytClient = new SceytChatClient('https://us-ohio-api.sceyt.com', 'ldpz9kvzol', Math.random()
       .toString(36)
       .substr(2, 11))
 
