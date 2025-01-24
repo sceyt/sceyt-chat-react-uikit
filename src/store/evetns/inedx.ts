@@ -23,6 +23,7 @@ import {
   addChannelAC,
   markMessagesAsDeliveredAC,
   removeChannelAC,
+  setActiveChannelAC,
   setAddedToChannelAC,
   setChannelToAddAC,
   setChannelToHideAC,
@@ -84,12 +85,15 @@ export default function* watchForEvents(): any {
   const chan = eventChannel((emitter) => {
     const shouldSkip = (channel: IChannel) => {
       const channelTypesFilter = getChannelTypesFilter()
-      return !(!channelTypesFilter || !channelTypesFilter?.length || channelTypesFilter?.find(type => channel.type === type));
+      return !(
+        !channelTypesFilter ||
+        !channelTypesFilter?.length ||
+        channelTypesFilter?.find((type) => channel.type === type)
+      )
     }
 
     channelListener.onCreated = (createdChannel: IChannel) => {
-
-      if (shouldSkip(createdChannel)) return;
+      if (shouldSkip(createdChannel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CREATE,
         args: {
@@ -98,7 +102,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMemberJoined = (channel: IChannel, joinedMember: IUser) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.JOIN,
         args: {
@@ -108,7 +112,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMemberLeft = (channel: IChannel, member: IUser) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.LEAVE,
         args: {
@@ -118,7 +122,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onBlocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.BLOCK,
         args: {
@@ -127,7 +131,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onUnblocked = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNBLOCK,
         args: {
@@ -136,7 +140,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMembersAdded = ({ channel, addedMembers }: { channel: IChannel; addedMembers: IUser[] }) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.ADD_MEMBERS,
         args: {
@@ -146,7 +150,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMembersKicked = ({ channel, removedMembers }: { channel: IChannel; removedMembers: IUser[] }) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.KICK_MEMBERS,
         args: {
@@ -156,7 +160,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onUpdated = (updatedChannel: IChannel) => {
-      if (shouldSkip(updatedChannel)) return;
+      if (shouldSkip(updatedChannel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UPDATE_CHANNEL,
         args: {
@@ -165,7 +169,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMessage = (channel: IChannel, message: IMessage) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.MESSAGE,
         args: {
@@ -182,7 +186,7 @@ export default function* watchForEvents(): any {
         }
       })
     channelListener.onMessageEdited = (channel: IChannel, user: IUser, message: IMessage) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.EDIT_MESSAGE,
         args: {
@@ -193,7 +197,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMessageDeleted = (channel: IChannel, user: IUser, deletedMessage: IMessage) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.DELETE_MESSAGE,
         args: {
@@ -204,7 +208,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onReactionAdded = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.REACTION_ADDED,
         args: {
@@ -216,7 +220,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onReactionDeleted = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.REACTION_DELETED,
         args: {
@@ -228,7 +232,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMemberStartedTyping = (channel: IChannel, from: IUser) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.START_TYPING,
         args: {
@@ -238,7 +242,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMemberStoppedTyping = (channel: IChannel, from: IUser) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.STOP_TYPING,
         args: {
@@ -263,7 +267,7 @@ export default function* watchForEvents(): any {
       channelUnreadMentions: number,
       channelUnreadReactions: number
     ) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO,
         args: {
@@ -277,7 +281,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onHidden = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.HIDE,
         args: {
@@ -286,7 +290,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMuted = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.MUTE,
         args: {
@@ -295,7 +299,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onUnmuted = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNMUTE,
         args: {
@@ -304,7 +308,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onPined = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.PINED,
         args: {
@@ -313,7 +317,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onUnpined = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNPINED,
         args: {
@@ -322,7 +326,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onShown = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNHIDE,
         args: {
@@ -352,7 +356,7 @@ export default function* watchForEvents(): any {
         }
       })
     channelListener.onMarkedAsUnread = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD,
         args: {
@@ -361,7 +365,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMarkedAsRead = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ,
         args: {
@@ -370,7 +374,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onHistoryCleared = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CLEAR_HISTORY,
         args: {
@@ -379,7 +383,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onDeletedAllMessages = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CLEAR_HISTORY,
         args: {
@@ -388,7 +392,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMembersRoleChanged = (channel: IChannel, members: IUser[]) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANGE_ROLE,
         args: {
@@ -398,7 +402,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onOwnerChanged = (channel: IChannel, newOwner: IUser, oldOwner: IUser) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANGE_OWNER,
         args: {
@@ -409,7 +413,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMembersBlocked = (channel: IChannel, removedMembers: IUser[]) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.MEMBER_BLOCKED,
         args: {
@@ -419,7 +423,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onMembersUnblocked = (channel: IChannel, unblockedMembers: IUser[]) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.MEMBER_UNBLOCKED,
         args: {
@@ -429,7 +433,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onChannelFrozen = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.FROZEN,
         args: {
@@ -438,7 +442,7 @@ export default function* watchForEvents(): any {
       })
     }
     channelListener.onChannelUnfrozen = (channel: IChannel) => {
-      if (shouldSkip(channel)) return;
+      if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNFROZEN,
         args: {
@@ -654,7 +658,7 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
         const { updatedChannel } = args
         const channelExists = checkChannelExists(updatedChannel.id)
-        const { subject, avatarUrl, muted, mutedTill } = updatedChannel
+        const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
         if (channelExists) {
           yield put(
             updateChannelDataAC(updatedChannel.id, {
@@ -664,11 +668,24 @@ export default function* watchForEvents(): any {
               mutedTill
             })
           )
+
+          const activeChannelId = yield call(getActiveChannelId)
+          if (activeChannelId === updatedChannel.id) {
+            yield put(
+              setActiveChannelAC({ ...updatedChannel, metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata })
+            )
+          }
         }
 
         const groupName = getChannelGroupName(updatedChannel)
         yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl, muted, mutedTill }, groupName))
-        updateChannelOnAllChannels(updatedChannel.id, { subject, avatarUrl, muted, mutedTill })
+        updateChannelOnAllChannels(updatedChannel.id, {
+          subject,
+          avatarUrl,
+          muted,
+          mutedTill,
+          metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
+        })
         break
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {

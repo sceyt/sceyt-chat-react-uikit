@@ -196,7 +196,12 @@ const EditChannel = ({
       } else {
         handleUpdateChannel({
           ...(newSubject !== channel.subject && { subject: newSubject }),
-          ...(newDescription !== channel.metadata.d && { metadata: { ...channel.metadata, d: newDescription } }),
+          ...{
+            metadata: {
+              ...(channel?.metadata || {}),
+              ...(newDescription !== channel.metadata.d ? { d: newDescription } : {})
+            }
+          },
           ...(newAvatar.url !== channel.avatarUrl && { avatar: newAvatar.src.file })
         })
       }
