@@ -6806,6 +6806,11 @@ loglevel@^1.8.0:
   resolved "https://registry.yarnpkg.com/loglevel/-/loglevel-1.8.1.tgz#5c621f83d5b48c54ae93b6156353f555963377b4"
   integrity sha512-tCRIJM51SHjAayKwC+QAg8hT8vg6z7GSgLJKGvzuPb1Wc+hLzqtuVLxp6/HzSPOozuK+8ErAhy7U/sVzw8Dgfg==
 
+loglevel@^1.9.2:
+  version "1.9.2"
+  resolved "https://registry.npmjs.org/loglevel/-/loglevel-1.9.2.tgz#c2e028d6c757720107df4e64508530db6621ba08"
+  integrity sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==
+
 long@^4.0.0:
   version "4.0.0"
   resolved "https://registry.yarnpkg.com/long/-/long-4.0.0.tgz#9a7b71cfb7d361a194ea555241c92f7468d5bf28"
@@ -6907,9 +6912,9 @@ methods@~1.1.2:
   resolved "https://registry.yarnpkg.com/methods/-/methods-1.1.2.tgz#5529a4d67654134edcc5266656835b0f851afcee"
   integrity sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==
 
-"mic-recorder-to-mp3@https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
+"mic-recorder-to-mp3@git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
   version "2.2.2"
-  resolved "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
+  resolved "git+https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
   dependencies:
     lamejs "^1.2.0"
 
@@ -8660,16 +8665,17 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.6.2:
-  version "1.6.2"
-  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.2.tgz#3b695db497c7cba8526ccda4a7c7e7e27621e50c"
-  integrity sha512-dZ0L50J3P40/jMHuwVRhVVW61m8rXT8gm40juPPgj6hjYZA1ZABHx0GICErG+j/v6UGzBVYxTJycy8qXAzLIrQ==
+sceyt-chat-react-uikit@^1.6.3:
+  version "1.6.3"
+  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.3.tgz#3f5a27d69afe870d6b9d32e7b252dd84cc6eafdd"
+  integrity sha512-znEiKoXBKrC3SstEBTYnDsEULwA46Fic/7o7rh2emAuEBXkPF0UOhP9jHE6SHf3PDOz5vdCMDJuPuvrVOTwQWg==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
     file-saver "^2.0.5"
     lexical "^0.12.2"
     linkify-it "^4.0.1"
+    loglevel "^1.9.2"
     mic-recorder-to-mp3 "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git"
     react-circular-progressbar "^2.1.0"
     react-easy-crop "^4.6.2"
