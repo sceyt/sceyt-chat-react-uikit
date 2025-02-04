@@ -6859,7 +6859,7 @@ loglevel-plugin-prefix@^0.8.4:
   resolved "https://registry.npmjs.org/loglevel-plugin-prefix/-/loglevel-plugin-prefix-0.8.4.tgz#2fe0e05f1a820317d98d8c123e634c1bd84ff644"
   integrity sha512-WpG9CcFAOjz/FtNht+QJeGpvVl/cdR6P0z6OcXSkr8wFJOsV2GRj2j10JLfjuA4aYkcKCNIEqRGCyTife9R8/g==
 
-loglevel@^1.8.0:
+loglevel@^1.8.0, loglevel@^1.9.2:
   version "1.9.2"
   resolved "https://registry.npmjs.org/loglevel/-/loglevel-1.9.2.tgz#c2e028d6c757720107df4e64508530db6621ba08"
   integrity sha512-HgMmCqIJSAKqo68l0rS2AanEWfkxaZ5wNiEFb5ggm08lDs9Xl2KxBlX3PTcaD2chBM1gXAYf491/M2Rv8Jwayg==
@@ -8792,16 +8792,17 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.6.2:
-  version "1.6.2"
-  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.2.tgz#3b695db497c7cba8526ccda4a7c7e7e27621e50c"
-  integrity sha512-dZ0L50J3P40/jMHuwVRhVVW61m8rXT8gm40juPPgj6hjYZA1ZABHx0GICErG+j/v6UGzBVYxTJycy8qXAzLIrQ==
+sceyt-chat-react-uikit@^1.6.3:
+  version "1.6.3"
+  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.3.tgz#3f5a27d69afe870d6b9d32e7b252dd84cc6eafdd"
+  integrity sha512-znEiKoXBKrC3SstEBTYnDsEULwA46Fic/7o7rh2emAuEBXkPF0UOhP9jHE6SHf3PDOz5vdCMDJuPuvrVOTwQWg==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
     file-saver "^2.0.5"
     lexical "^0.12.2"
     linkify-it "^4.0.1"
+    loglevel "^1.9.2"
     mic-recorder-to-mp3 "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git"
     react-circular-progressbar "^2.1.0"
     react-easy-crop "^4.6.2"
