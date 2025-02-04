@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { useColor, useDidUpdate, useEventListener } from '../../hooks'
 import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { THEME } from '../../helpers/constants'
+import log from 'loglevel'
 
 const DropDownContainer = styled.div<{
   height?: string
@@ -171,7 +172,7 @@ const DropDown = ({
 
         // Click outside dropdown
         if (dropDownElem && !dropDownElem.contains(e.target)) {
-          console.log('call toggle dropdown. .. ')
+          log.info('call toggle dropdown. .. ')
           toggleDropdown()
         }
 
@@ -186,7 +187,7 @@ const DropDown = ({
         if (isSelect && dropDownBodyElem && dropDownBodyElem.contains(e.target)) {
           const listElement = dropDownBodyElem.getElementsByTagName('ul')[0]
           if (listElement && listElement.contains(e.target)) {
-            console.log('call toggle dropdown. .. !!')
+            log.info('call toggle dropdown. .. !!')
             toggleDropdown()
           }
         }

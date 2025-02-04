@@ -11,6 +11,7 @@ import {
 } from './constants'
 import { DESTROY_SESSION } from '../channel/constants'
 import { IAction, IMember, IRole } from '../../types'
+import log from 'loglevel'
 
 export interface IMembersStore {
   membersLoadingState: boolean
@@ -46,7 +47,7 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
     case UPDATE_MEMBERS: {
       const { members } = payload
-      console.log('UPDATE_MEMBERS . ... .. ', members)
+      log.info('UPDATE_MEMBERS . ... .. ', members)
       let updateMembers: any = []
       const membersCopy = [...newState.activeChannelMembers]
       if (members.length) {
@@ -66,7 +67,7 @@ export default (state = initialState, { type, payload }: IAction) => {
     }
     case UPDATE_MEMBERS_PRESENCE: {
       const { usersMap } = payload
-      console.log('UPDATE_MEMBERS_PRESENCE . ... .. ', usersMap)
+      log.info('UPDATE_MEMBERS_PRESENCE . ... .. ', usersMap)
       let updateMembers: any = []
       if (newState.activeChannelMembers.length) {
         const membersCopy = [...newState.activeChannelMembers]

@@ -17,6 +17,7 @@ import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
+import log from 'loglevel'
 
 interface IProps {
   channelId: string
@@ -77,7 +78,7 @@ const Files = ({
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
   }, [channelId])
-  console.log('attachments. .. . ', attachments)
+  log.info('attachments. .. . ', attachments)
   return (
     <Container theme={theme}>
       {attachments.map(

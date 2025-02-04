@@ -132,7 +132,7 @@ export default function EditMessagePlugin({
                       styleNumber = Number(style)
                     }
                   } */
-                  // console.log('styleNumber >>>>>>>>>>>>> ', styleNumber)
+                  // log.info('styleNumber >>>>>>>>>>>>> ', styleNumber)
                   // mentionNode.setFormat(styleNumber)
                 }
                 // const typeArray = attribute.type.split(' ').reverse()

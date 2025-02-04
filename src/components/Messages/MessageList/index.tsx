@@ -57,6 +57,7 @@ import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty } from 'types/enum'
 import { getClient } from 'common/client'
+import log from 'loglevel'
 
 let loading = false
 let loadFromServer = false
@@ -594,12 +595,12 @@ const MessageList: React.FC<MessagesProps> = ({
         messages.length
       ) {
         loadDirection = 'prev'
-        // console.log('load prev messages........ ')
+        // log.info('load prev messages........ ')
         prevMessageId = messages[0].id
-        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.PREV)
+        // log.info('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.PREV)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
         if (!getHasPrevCached()) {
-          // console.log('load from server ..... ', true)
+          // log.info('load from server ..... ', true)
           loadFromServer = true
         }
         /!*   if (cachedMessages.prev) {
@@ -630,7 +631,7 @@ const MessageList: React.FC<MessagesProps> = ({
       ) {
         loadDirection = 'next'
 
-        // console.log('load next......... ')
+        // log.info('load next......... ')
         /!* if (lastVisibleMessage) {
           target.scrollTop = lastVisibleMessage.offsetTop - 10
         } *!/
@@ -638,7 +639,7 @@ const MessageList: React.FC<MessagesProps> = ({
         // if (hasNextMessages && lastVisibleMessage) {
         prevDisable = true
         // }
-        // console.log('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.NEXT)
+        // log.info('MESSAGE_LOAD_DIRECTION.PREV _-------------------', MESSAGE_LOAD_DIRECTION.NEXT)
         handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
         /!* if (cachedMessages.next) {
           loading = true
@@ -1019,7 +1020,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }, [messages])
   useDidUpdate(() => {
-    console.log('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
+    log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       loading = false
       prevDisable = false

@@ -136,9 +136,9 @@ const VideoPreview = memo(function VideoPreview({
   }, [src])
 
   /* useEffect(() => {
-    console.log('render video *********************************************')
+    log.info('render video *********************************************')
   }) */
-  // console.log('!isPreview && loading && !uploading &&. . . .  . . . . . .. ', !isPreview && loading && !uploading)
+  // log.info('!isPreview && loading && !uploading &&. . . .  . . . . . .. ', !isPreview && loading && !uploading)
   return (
     <Component
       width={width}

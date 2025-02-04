@@ -1,5 +1,6 @@
 import { IAttachmentMeta } from './messagesHalper'
 import { thumbHashToDataURL, rgbaToThumbHash } from './thumbhash'
+import log from 'loglevel'
 
 const MAX_WIDTH = 1280
 const MAX_HEIGHT = 1080
@@ -25,7 +26,7 @@ export function resizeImage(
     img.onerror = function () {
       URL.revokeObjectURL(this.src)
       // Handle the failure properly
-      console.log('Cannot load image')
+      log.info('Cannot load image')
     }
     img.onload = function () {
       // @ts-ignore
@@ -70,7 +71,7 @@ export function createFileImageThumbnail(file: any) {
     img.onerror = function () {
       URL.revokeObjectURL(this.src)
       // Handle the failure properly
-      console.log('Cannot load image')
+      log.info('Cannot load image')
     }
     img.onload = function () {
       // @ts-ignore
@@ -137,7 +138,7 @@ export function createImageThumbnail(
     img.onerror = function () {
       URL.revokeObjectURL(this.src)
       // Handle the failure properly
-      console.log('Cannot load image')
+      log.info('Cannot load image')
     }
     img.onload = function () {
       if (blobURL) {
@@ -164,7 +165,7 @@ export function createImageThumbnail(
       // ThumbHash to data URL
       // Simulate setting the placeholder first, then the full image loading later on
 
-      // console.log('binaryThumbHash. . . . . . ', binaryThumbHash)
+      // log.info('binaryThumbHash. . . . . . ', binaryThumbHash)
       const thumbHashToBase64 = binaryToBase64(binaryThumbHash)
       resolve({
         // thumbnail: base64String.replace('data:image/jpeg;base64,', ''),

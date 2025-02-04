@@ -34,6 +34,8 @@ import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalpe
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import { moderateColor } from '../../UIHelper/moderateColor'
+import log from 'loglevel'
+
 const SceytChat = ({
   client,
   theme,
@@ -113,7 +115,7 @@ const SceytChat = ({
   }
 
   useEffect(() => {
-    console.log('client is changed.... ', client)
+    log.info('client is changed.... ', client)
     if (client) {
       setClient(client)
       setSceytChatClient(client)
@@ -206,7 +208,7 @@ const SceytChat = ({
         if (window.Notification && Notification.permission === 'default') {
           // Notification.requestPermission().then(console.log).catch(console.error)
           Promise.resolve(Notification.requestPermission()).then(function (permission) {
-            console.log('permission:', permission)
+            log.info('permission:', permission)
           })
         }
       } catch (e) {
@@ -265,7 +267,7 @@ const SceytChat = ({
 
   useDidUpdate(() => {
     if (getRolesFail) {
-      console.log('getRolesFail ... ', getRolesFail)
+      log.info('getRolesFail ... ', getRolesFail)
     }
     if (getRolesFail && getRolesFail.attempts <= 5) {
       setTimeout(() => {

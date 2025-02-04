@@ -46,6 +46,7 @@ import { getClient } from '../../../common/client'
 import ConfirmPopup from '../../../common/popups/delete'
 import DropDown from '../../../common/dropdown'
 import { useColor } from '../../../hooks'
+import log from 'loglevel'
 
 interface IProps {
   channel: IChannel
@@ -305,24 +306,24 @@ const Actions = ({
   }
 
   const handleReportUser = (reportData: any) => {
-    console.log('report data . ', reportData)
+    log.info('report data . ', reportData)
     directChannelUser
     dispatch(reportUserAC({ ...reportData, userId: directChannelUser.id }))
   } */
 
   /* const handleNotificationSwitch = () => {
-    console.log('clocked ,,,', channel.muted)
+    log.info('clocked ,,,', channel.muted)
     if (channel.muted) {
       // dispatch(turnOnNotifications())
     } else {
       // dispatch(turnOffNotifications(expTime))
-      console.log('show dropdown -- ')
+      log.info('show dropdown -- ')
       // setShowMuteDropdown(true)
     }
   } */
 
   const handleNotificationOnOff = (expTime?: number) => {
-    console.log('exp time ... ', expTime)
+    log.info('exp time ... ', expTime)
     if (channel.muted) {
       dispatch(turnOnNotificationsAC())
     } else {
@@ -331,7 +332,7 @@ const Actions = ({
   }
 
   const handleToggleChannelMarkAs = () => {
-    console.log('handle action mark read ', channel.unread)
+    log.info('handle action mark read ', channel.unread)
     if (channel.unread) {
       dispatch(markChannelAsReadAC(channel.id))
     } else {
@@ -455,7 +456,7 @@ const Actions = ({
         {showStarredMessages && !channel.isMockChannel && (
           <ActionItem
             key={1}
-            onClick={() => console.log('stared messages')}
+            onClick={() => log.info('stared messages')}
             order={starredMessagesOrder}
             iconColor={staredMessagesIconColor || textSecondary}
             color={staredMessagesTextColor || textPrimary}
@@ -645,7 +646,7 @@ const Actions = ({
                   setPopupButtonText('Report')
                   setPopupTitle('Report channel')
                   // handleToggleReportPopupOpen()
-                  console.log('Report channel')
+                  log.info('Report channel')
                 }}
               >
                 {reportChannelIcon || <DefaultReportIcon />} Report{' '}

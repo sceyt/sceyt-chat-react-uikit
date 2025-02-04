@@ -10,6 +10,7 @@ import supportIcon from './svg/supportIcon.svg';
 import sceytRounded from './svg/sceyt-rounded.svg';
 import './App.css';
 import {genToken} from "./api";
+import log from 'loglevel'
 
 function App() {
     const [client, setClient] = useState<SceytChatClient>();
@@ -41,7 +42,7 @@ function App() {
             setChatToken(data.chat_token)
         })
             .catch((e) => {
-                console.log('error on gen token. .. ', e)
+                log.info('error on gen token. .. ', e)
             })
     }
 

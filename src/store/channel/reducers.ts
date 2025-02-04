@@ -301,7 +301,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_USER_STATUS_ON_CHANNEL: {
       const usersMap = payload.usersMap
-      // console.log('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
+      // log.info('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
       const ChatClient = getClient()
       const { user } = ChatClient
       const updatedChannels = newState.channels.map((channel) => {

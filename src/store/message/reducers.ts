@@ -49,6 +49,7 @@ import {
   setHasPrevCached
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import log from 'loglevel'
 
 export interface IMessageStore {
   messagesLoadingState: number | null
@@ -126,7 +127,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
   switch (type) {
     case ADD_MESSAGE: {
       /* if (payload.message.tid) {
-        console.log('add pending on reducer .... ', payload.message)
+        log.info('add pending on reducer .... ', payload.message)
         newState.pendingMessages = { ...newState.pendingMessages, [payload.message.tid]: payload.message }
         newState.scrollToNewMessage = {
           scrollToBottom: true,
@@ -146,7 +147,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           updateMessageList: true
         }
       } */
-      // console.log('add new message on reducer .... ', payload.message)
+      // log.info('add new message on reducer .... ', payload.message)
       // newState.activeChannelNewMessage = { ...payload.message }
       // }
       // newState.activeChannelMessages = [...payload.message, ...newState.activeChannelMessages]
@@ -274,7 +275,7 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         return message
       })
       if (!messageFound && addIfNotExists) {
-        console.log('message not found on update message, add message to list .. ...', params)
+        log.info('message not found on update message, add message to list .. ...', params)
         newState.activeChannelMessages = [...newState.activeChannelMessages, params]
       }
       return newState

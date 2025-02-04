@@ -12,6 +12,7 @@ import {
   ChannelDetails,
   MessagesScrollToBottomButton
 } from 'sceyt-chat-react-uikit'
+import log from 'loglevel'
 
 function App() {
   const [chatToken, setChatToken] = useState()
@@ -25,7 +26,7 @@ function App() {
       setChatToken(data.chat_token)
     })
       .catch((e) => {
-        console.log('error on gen token. .. ', e)
+        log.info('error on gen token. .. ', e)
       })
   }
 
@@ -73,6 +74,9 @@ function App() {
   }, [])
 
   useEffect(() => {
+    log.info('clientState', clientState)
+  }, [clientState])
+  useEffect(() => {
     if (chatToken) {
       if (clientState === 'Connected' && client) {
         client.updateToken(chatToken)
@@ -105,6 +109,7 @@ function App() {
           (
             <SceytChat
               client={client}
+              logLevel='silent'
             >
               <ChannelList />
               <Chat>

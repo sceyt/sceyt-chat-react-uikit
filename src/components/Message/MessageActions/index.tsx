@@ -114,22 +114,22 @@ export default function MessageActions({
 
   const forwardMessagePermitted = checkActionPermission('forwardMessage')
 
-  // console.log('reactionPermitted .. . ', reactionPermitted)
+  // log.info('reactionPermitted .. . ', reactionPermitted)
   const handleOpenReaction = (e: any) => {
     e.stopPropagation()
     e.preventDefault()
     handleOpenEmojis()
   }
-  // console.log('reactionPermitted .. . ', reactionPermitted)
+  // log.info('reactionPermitted .. . ', reactionPermitted)
   /* const handleClick = (e: any) => {
-    console.log('e.target.  ..  .', e.target)
+    log.info('e.target.  ..  .', e.target)
     if (emojisRef.current && !emojisRef.current.contains(e.target)) {
-      console.log('set reaction close................ close.... ')
+      log.info('set reaction close................ close.... ')
       setReactionIsOpen(false)
     }
   } */
   /* useEffect(() => {
-    console.log('message actions useEffect . .. reactionIsOpen --- ', reactionIsOpen)
+    log.info('message actions useEffect . .. reactionIsOpen --- ', reactionIsOpen)
     document.addEventListener('mousedown', handleClick)
 
     return () => {

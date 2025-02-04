@@ -36,6 +36,7 @@ import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap }
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
+import log from 'loglevel'
 
 interface ISelectedUserData {
   id: string
@@ -218,7 +219,7 @@ const UsersPopup = ({
       if (actionType === 'selectUsers' && getSelectedUsers) {
         getSelectedUsers(selectedMembersList, 'create')
       } else {
-        console.log('call add members ... ', selectedMembersList)
+        log.info('call add members ... ', selectedMembersList)
         dispatch(addMembersAC(channel!.id, selectedMembersList))
       }
     }

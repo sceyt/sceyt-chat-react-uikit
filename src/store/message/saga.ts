@@ -126,6 +126,7 @@ import { IProgress } from '../../components/ChatContainer'
 import { attachmentCompilationStateSelector, messagesHasNextSelector } from './selector'
 import { isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
+import log from 'loglevel'
 
 const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -335,7 +336,7 @@ function* sendMessage(action: IAction): any {
             }
             messageAttachment.completion = (updatedAttachment: any, error: any) => {
               if (error) {
-                console.log('fail to upload attachment ... ', error)
+                log.info('fail to upload attachment ... ', error)
                 store.dispatch({
                   type: UPLOAD_ATTACHMENT_COMPILATION,
                   payload: {
@@ -525,7 +526,7 @@ function* sendMessage(action: IAction): any {
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 if (currentAttachmentsMap[attachment.tid!]) {
-                  console.log('set at')
+                  log.info('set at')
                   return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
                 }
                 return attachment
@@ -568,7 +569,7 @@ function* sendMessage(action: IAction): any {
             throw Error('Network error')
           }
         } catch (e) {
-          console.log('Error on uploading attachment', message.tid, e)
+          log.info('Error on uploading attachment', message.tid, e)
           yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, message.tid))
 
           updateMessageOnMap(channel.id, {
@@ -581,7 +582,7 @@ function* sendMessage(action: IAction): any {
       }
     }
   } catch (e) {
-    console.log('error on send message ... ', e)
+    log.info('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
 }
@@ -725,7 +726,7 @@ function* sendTextMessage(action: IAction): any {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
-    console.log('error on send text message ... ', e)
+    log.info('error on send text message ... ', e)
     updateMessageOnMap(channel.id, {
       messageId: sendMessageTid,
       params: { state: MESSAGE_STATUS.FAILED }
@@ -863,7 +864,7 @@ function* forwardMessage(action: IAction): any {
     }
     // messageForCatch = messageToSend
   } catch (e) {
-    console.log('error on forward message ... ', e)
+    log.info('error on forward message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
@@ -875,7 +876,7 @@ function* resendMessage(action: IAction): any {
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
   let channel = yield call(getChannelFromMap, channelId)
   try {
-    console.log('resend message .... ', message)
+    log.info('resend message .... ', message)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
       if (channel) {
@@ -905,7 +906,7 @@ function* resendMessage(action: IAction): any {
         ...message,
         attachments: [messageAttachment]
       }
-      console.log('attachmentCompilation. .. . .', attachmentCompilation)
+      log.info('attachmentCompilation. .. . .', attachmentCompilation)
       if (
         connectionState === CONNECTION_STATUS.CONNECTED &&
         attachmentCompilation[messageAttachment.tid] &&
@@ -914,7 +915,7 @@ function* resendMessage(action: IAction): any {
         yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
         if (customUploader) {
           const handleUploadProgress = ({ loaded, total }: IProgress) => {
-            console.log('progress ... ', loaded / total)
+            log.info('progress ... ', loaded / total)
           }
 
           let uri
@@ -939,7 +940,7 @@ function* resendMessage(action: IAction): any {
               })
             }
             const pendingAttachment = getPendingAttachment(message.attachments[0].tid)
-            console.log('pendingAttachment ... ', pendingAttachment)
+            log.info('pendingAttachment ... ', pendingAttachment)
             if (messageAttachment.cachedUrl) {
               uri = pendingAttachment.file
             } else {
@@ -947,7 +948,7 @@ function* resendMessage(action: IAction): any {
               messageAttachment.url = pendingAttachment.file
               uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
             }
-            console.log('messageAttachment ... ', messageAttachment)
+            log.info('messageAttachment ... ', messageAttachment)
 
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment.tid))
 
@@ -955,7 +956,7 @@ function* resendMessage(action: IAction): any {
             let thumbnailMetas: IAttachmentMeta = {}
             let fileSize = messageAttachment.cachedUrl ? messageAttachment.size : pendingAttachment.file.size
 
-            console.log('uri ... ', uri)
+            log.info('uri ... ', uri)
             if (!messageAttachment.cachedUrl && messageAttachment.url.type.split('/')[0] === 'image') {
               fileSize = yield call(getImageSize, filePath)
               thumbnailMetas = yield call(
@@ -980,7 +981,7 @@ function* resendMessage(action: IAction): any {
                 })
               })
             }
-            console.log('attachmentMeta ... ', attachmentMeta)
+            log.info('attachmentMeta ... ', attachmentMeta)
             const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
 
             /* const attachmentToSend = { ...messageAttachment, url: uri, upload: false } */
@@ -990,7 +991,7 @@ function* resendMessage(action: IAction): any {
               .setFileSize(fileSize)
               .setUpload(false)
               .create()
-            console.log('attachmentToSend ... ', attachmentToSend)
+            log.info('attachmentToSend ... ', attachmentToSend)
             // not for SDK, for displaying attachments and their progress
             attachmentToSend.tid = messageAttachment.tid
             attachmentToSend.attachmentUrl = messageAttachment.attachmentUrl
@@ -1047,7 +1048,7 @@ function* resendMessage(action: IAction): any {
               yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
             }
           } catch (e) {
-            console.log('fail upload attachment on resend message ... ', e)
+            log.info('fail upload attachment on resend message ... ', e)
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageAttachment.tid))
 
             updateMessageOnMap(channel.id, {
@@ -1060,13 +1061,13 @@ function* resendMessage(action: IAction): any {
         }
       }
     } else if (message.state === MESSAGE_STATUS.FAILED) {
-      console.log('send failed message ...')
+      log.info('send failed message ...')
       const messageCopy = { ...message }
       delete messageCopy.createdAt
 
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageCopy)
-        console.log('resend message response ... ', messageResponse)
+        log.info('resend message response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           body: messageResponse.body,
@@ -1113,7 +1114,7 @@ function* resendMessage(action: IAction): any {
     const messageResponse = yield call(channel.reSendMessage, messageToResend)
     yield put(updateMessageAC(message.id || message.tid, messageResponse)) */
   } catch (e) {
-    console.log('ERROR in resend message', e.message, 'channel.. . ', channel)
+    log.info('ERROR in resend message', e.message, 'channel.. . ', channel)
 
     yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.FAILED }))
 
@@ -1141,7 +1142,7 @@ function* deleteMessage(action: IAction): any {
     }
 
     const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-    console.log('deletedMessage . .. . .', deletedMessage)
+    log.info('deletedMessage . .. . .', deletedMessage)
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
     updateMessageOnMap(channel.id, {
       messageId: deletedMessage.id,
@@ -1156,7 +1157,7 @@ function* deleteMessage(action: IAction): any {
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {
-    console.log('ERROR in delete message', e.message)
+    log.info('ERROR in delete message', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1192,7 +1193,7 @@ function* editMessage(action: IAction): any {
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {
-    console.log('ERROR in edit message', e.message)
+    log.info('ERROR in edit message', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1208,7 +1209,7 @@ function* getMessagesQuery(action: IAction): any {
       const attachmentQuery = yield call(attachmentQueryBuilder.build)
 
       const attachmentResult = yield call(attachmentQuery.loadPrevious)
-      console.log('attachmentResult ... ', attachmentResult) */
+      log.info('attachmentResult ... ', attachmentResult) */
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(limit || MESSAGES_MAX_LENGTH)
       messageQueryBuilder.reverse(true)
@@ -1262,7 +1263,7 @@ function* getMessagesQuery(action: IAction): any {
           setHasNextCached(allMessages.length > maxLengthPart)
         } else {
           messageQuery.limit = MESSAGES_MAX_LENGTH
-          console.log('load by message id from server ...............', messageId)
+          log.info('load by message id from server ...............', messageId)
           result = yield call(messageQuery.loadNearMessageId, messageId)
           if (result.messages.length === 50) {
             messageQuery.limit = (MESSAGES_MAX_LENGTH - 50) / 2
@@ -1276,7 +1277,7 @@ function* getMessagesQuery(action: IAction): any {
             result.hasNext = secondResult.hasNext
             messageQuery.reverse = true
           }
-          console.log('result from server ....... ', result)
+          log.info('result from server ....... ', result)
           yield put(setMessagesHasNextAC(true))
           // TO DO - pending messages are repeated in the list, fix after uncommenting.
           const pendingMessages = getPendingMessages(channel.id)
@@ -1372,7 +1373,7 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
         }
         // yield put(setMessagesNextCompleteAC(false))
-        console.log('load message from server')
+        log.info('load message from server')
         result = yield call(messageQuery.loadPrevious)
         if (result.messages.length === 50) {
           messageQuery.limit = MESSAGES_MAX_LENGTH - 50
@@ -1414,7 +1415,7 @@ function* getMessagesQuery(action: IAction): any {
       yield put(setMessagesAC([]))
     }
   } catch (e) {
-    console.log('error in message query', e)
+    log.info('error in message query', e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -1425,7 +1426,7 @@ function* loadMoreMessages(action: IAction): any {
   try {
     const { payload } = action
     const { limit, direction, channelId, messageId, hasNext } = payload
-    console.log('loadMoreMessages .. .. ', payload)
+    log.info('loadMoreMessages .. .. ', payload)
     const SceytChatClient = getClient()
     const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
     messageQueryBuilder.reverse(true)
@@ -1441,23 +1442,23 @@ function* loadMoreMessages(action: IAction): any {
       } else if (hasNext) {
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
         if (result.messages.length) {
-          // console.log('add to all messages result.messages', result.messages)
+          // log.info('add to all messages result.messages', result.messages)
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.PREV)
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
     } else {
-      // console.log('load next saga ,,,,  getHasNextCached() , , , ', getHasNextCached())
+      // log.info('load next saga ,,,,  getHasNextCached() , , , ', getHasNextCached())
       if (getHasNextCached()) {
         result.messages = getFromAllMessagesByMessageId(messageId, MESSAGE_LOAD_DIRECTION.NEXT)
-        // console.log('res. next cached messages ... ', result.messages)
+        // log.info('res. next cached messages ... ', result.messages)
       } else if (hasNext) {
-        console.log('saga load next from server ... ', messageId)
+        log.info('saga load next from server ... ', messageId)
         messageQuery.reverse = false
         result = yield call(messageQuery.loadNextMessageId, messageId)
-        console.log('result from server next ... ', result)
+        log.info('result from server next ... ', result)
         if (result.messages.length) {
-          // console.log('add to all messages result.messages', result.messages)
+          // log.info('add to all messages result.messages', result.messages)
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.NEXT)
         }
         yield put(setMessagesHasNextAC(result.hasNext))
@@ -1474,7 +1475,7 @@ function* loadMoreMessages(action: IAction): any {
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('error in load more messages', e)
+    log.info('error in load more messages', e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -1510,7 +1511,7 @@ function* addReaction(action: IAction): any {
     addReactionToMessageOnMap(channelId, message, reaction, true)
     addReactionOnAllMessages(message, reaction, true)
   } catch (e) {
-    console.log('ERROR in add reaction', e.message)
+    log.info('ERROR in add reaction', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1535,13 +1536,13 @@ function* deleteReaction(action: IAction): any {
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
       updateChannelOnAllChannels(channel.id, channelUpdateParam)
     }
-    console.log('message received. ... ', message)
+    log.info('message received. ... ', message)
     yield put(deleteReactionFromListAC(reaction))
     yield put(deleteReactionFromMessageAC(message, reaction, true))
     removeReactionToMessageOnMap(channelId, message, reaction, true)
     removeReactionOnAllMessages(message, reaction, true)
   } catch (e) {
-    console.log('ERROR in delete reaction', e.message)
+    log.info('ERROR in delete reaction', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1564,7 +1565,7 @@ function* getReactions(action: IAction): any {
     yield put(setReactionsListAC(result.reactions, result.hasNext))
     yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR in get reactions', e.message)
+    log.info('ERROR in get reactions', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1582,7 +1583,7 @@ function* loadMoreReactions(action: IAction): any {
     yield put(addReactionsToListAC(result.reactions, result.hasNext))
     yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR in load more reactions', e.message)
+    log.info('ERROR in load more reactions', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1633,7 +1634,7 @@ function* getMessageAttachments(action: IAction): any {
       yield put(setAttachmentsAC(JSON.parse(JSON.stringify(result.attachments))))
     }
   } catch (e) {
-    console.log('error in message attachment query')
+    log.info('error in message attachment query')
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1658,7 +1659,7 @@ function* loadMoreMessageAttachments(action: any) {
       yield put(addAttachmentsAC(attachments))
     }
   } catch (e) {
-    console.log('error in message attachment query', e)
+    log.info('error in message attachment query', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -1675,7 +1676,7 @@ function* pauseAttachmentUploading(action: any) {
       }
     }
   } catch (e) {
-    console.log('error in pause attachment uploading', e)
+    log.info('error in pause attachment uploading', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -1685,7 +1686,7 @@ function* pauseAttachmentUploading(action: any) {
 function* resumeAttachmentUploading(action: any) {
   try {
     const { attachmentId } = action.payload
-    console.log('resume for attachment ... ', attachmentId)
+    log.info('resume for attachment ... ', attachmentId)
     if (getCustomUploader()) {
       const isResumed = resumeUpload(attachmentId)
       if (isResumed) {
@@ -1693,7 +1694,7 @@ function* resumeAttachmentUploading(action: any) {
       }
     }
   } catch (e) {
-    console.log('error in resume attachment uploading', e)
+    log.info('error in resume attachment uploading', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }

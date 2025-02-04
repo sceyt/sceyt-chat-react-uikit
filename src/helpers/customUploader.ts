@@ -1,5 +1,6 @@
 import { ICustomUploader, IProgress, IUploadTask } from '../components/ChatContainer'
 import { IAttachment } from '../types'
+import log from 'loglevel'
 
 let CustomUploader: ICustomUploader
 let sendAttachmentsAsSeparateMessages: boolean = false
@@ -45,9 +46,9 @@ export const customUpload = (
         filePath: string,
         error?: Error
       ) => {
-        console.log('upload  success ... ', success)
+        log.info('upload  success ... ', success)
         if (success) {
-          console.log('resolve for attachment ... ', { attachment, uri, filePath })
+          log.info('resolve for attachment ... ', { attachment, uri, filePath })
           uploadTask.success(uri)
         } else if (error) {
         }
@@ -64,7 +65,7 @@ export const pauseUpload = (attachmentId: string) => {
   if (pendingUploaders[attachmentId]) {
     return pendingUploaders[attachmentId].stop()
   } else {
-    console.log('Unknown uploading task')
+    log.info('Unknown uploading task')
     return false
   }
 }
@@ -73,7 +74,7 @@ export const resumeUpload = (attachmentId: string) => {
   if (pendingUploaders[attachmentId]) {
     return pendingUploaders[attachmentId].resume()
   } else {
-    console.log('Unknown uploading task')
+    log.info('Unknown uploading task')
     return false
   }
 }

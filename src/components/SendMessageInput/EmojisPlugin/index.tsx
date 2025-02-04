@@ -16,6 +16,7 @@ import { themeSelector } from '../../../store/theme/selector'
 import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
 import { useColor } from '../../../hooks'
+import log from 'loglevel'
 
 interface EmojiCollectionProps {
   activeCollection: boolean
@@ -83,7 +84,7 @@ function EmojisPopup({
     const [editor] = useLexicalComposerContext()
     richTextEditor = editor
   } catch (e) {
-    console.log('error getting editor', e)
+    log.info('error getting editor', e)
   }
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')

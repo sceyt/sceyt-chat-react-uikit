@@ -12,24 +12,24 @@ let showNotifications: boolean | undefined = true
 let previousURL: any /!* global variable that will store the
                     url currently in the secondary window *!/
 function openRequestedSingleTab(url: any) {
-  console.log('previousURL ... ', previousURL)
-  console.log('url ... ', url)
+  log.info('previousURL ... ', previousURL)
+  log.info('url ... ', url)
   if (windowObjectReference === null || windowObjectReference.closed) {
-    console.log('case 1')
+    log.info('case 1')
     windowObjectReference = window.open(url, 'SingleSecondaryWindowName')
   } else if (previousURL !== url) {
-    console.log('case 2')
+    log.info('case 2')
     windowObjectReference = window.open(url, 'SingleSecondaryWindowName')
     /!* if the resource to load is different,
        then we load it in the already opened secondary window and then
        we bring such window back on top/in front of its parent window. *!/
     windowObjectReference.focus()
   } else {
-    console.log('case 3')
+    log.info('case 3')
     windowObjectReference.focus()
   }
-  console.log('case 4')
-  console.log('set prev url .. ', url)
+  log.info('case 4')
+  log.info('set prev url .. ', url)
   previousURL = url
   return false
   /!* explanation: we store the current url in order to compare url

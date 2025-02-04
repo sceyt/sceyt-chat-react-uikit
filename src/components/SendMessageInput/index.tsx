@@ -18,6 +18,7 @@ import { MentionNode } from './MentionNode'
 import EditMessagePlugin from './EditMessagePlugin'
 import FormatMessagePlugin from './FormatMessagePlugin'
 import EmojisPopup from './EmojisPlugin'
+import log from 'loglevel'
 
 // Action creators
 import {
@@ -484,7 +485,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         handleEditMessage()
       } else if (messageText.trim() || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-        console.log('messageTexToSend . . . . .', messageTexToSend)
+        log.info('messageTexToSend . . . . .', messageTexToSend)
         const messageToSend: any = {
           // metadata: mentionedMembersPositions,
           body: messageTexToSend,
@@ -510,7 +511,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         }
         messageToSend.mentionedMembers = mentionMembersToSend
-        console.log('message to send ..........................................', messageToSend)
+        log.info('message to send ..........................................', messageToSend)
 
         if (messageForReply) {
           messageToSend.parentMessage = messageForReply
@@ -849,7 +850,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       try {
         dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
       } catch (e) {
-        console.log('error in get data from db . . . . ', e)
+        log.info('error in get data from db . . . . ', e)
       }
       if (dataFromDb) {
         cachedUrl = dataFromDb.url
@@ -1042,7 +1043,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
     reader.onerror = (e: any) => {
-      console.log(' error on read file onError', e)
+      log.info(' error on read file onError', e)
     }
     reader.readAsBinaryString(file)
   }
@@ -1146,7 +1147,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
 
       reader.onerror = (e: any) => {
-        console.log(' error on read file onError', e)
+        log.info(' error on read file onError', e)
       }
       reader.readAsBinaryString(recordedFile.file)
     }

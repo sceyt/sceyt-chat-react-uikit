@@ -13,6 +13,7 @@ import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
+import log from 'loglevel'
 
 interface Recording {
   recordingSeconds: number
@@ -184,7 +185,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             setCurrentTime(formatAudioVideoTime(audioDuration))
 
             wavesurfer.current.drawBuffer = (d: any) => {
-              console.log('filters --- ', d)
+              log.info('filters --- ', d)
             }
           })
           /* wavesurfer.current.drawBuffer = () => {
@@ -219,7 +220,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             setIsRendered(true)
           }
         } catch (e) {
-          console.log('Failed to init wavesurfer')
+          log.info('Failed to init wavesurfer')
         }
       }
       initWaveSurfer()

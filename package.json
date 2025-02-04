@@ -96,11 +96,12 @@
     "webpack-cli": "^5.1.1"
   },
   "dependencies": {
-    "lexical": "0.12.2",
     "@lexical/offset": "0.12.2",
     "@lexical/react": "0.12.2",
     "file-saver": "^2.0.5",
+    "lexical": "0.12.2",
     "linkify-it": "^4.0.1",
+    "loglevel": "^1.9.2",
     "mic-recorder-to-mp3": "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git",
     "react-circular-progressbar": "^2.1.0",
     "react-easy-crop": "^4.6.2",
