@@ -1,8 +1,9 @@
+import log from 'loglevel'
 let currentVersion = 1
 
 export const setDataToDB = (dbName: string, storeName: string, data: any[], keyPath: string) => {
   if (!('indexedDB' in window)) {
-    console.log("This browser doesn't support IndexedDB")
+    log.info("This browser doesn't support IndexedDB")
   } else {
     const openRequest = indexedDB.open(dbName, currentVersion)
     openRequest.onupgradeneeded = function () {
@@ -75,7 +76,7 @@ export const getDataFromDB = (
             db.close()
             resolve(result)
           } else {
-            console.log('No data found for the specified keyPathValue.')
+            log.info('No data found for the specified keyPathValue.')
             db.close()
             resolve('')
           }
@@ -104,7 +105,7 @@ const addData = (db: any, storeName: string, keyPath: string, data: any[]) => {
         request.onsuccess = function () {}
 
         request.onerror = function () {
-          console.log('Error on put channel to db .. ', request.error)
+          log.info('Error on put channel to db .. ', request.error)
         }
       })
     }
@@ -114,11 +115,11 @@ const addData = (db: any, storeName: string, keyPath: string, data: any[]) => {
     data.forEach((value: any) => {
       const request = store.put(value)
       request.onsuccess = function () {
-        console.log('data added to db.. ', request.result)
+        log.info('data added to db.. ', request.result)
       }
 
       request.onerror = function () {
-        console.log('Error on put channel to db .. ', request.error)
+        log.info('Error on put channel to db .. ', request.error)
       }
     })
   }

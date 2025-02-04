@@ -41,6 +41,7 @@ import { IAttachment } from '../../types'
 // Components
 import VideoPreview from '../VideoPreview'
 import AudioPlayer from '../AudioPlayer'
+import log from 'loglevel'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -161,7 +162,7 @@ const Attachment = ({
         attachmentThumb = attachment.metadata && attachment.metadata.tmb
       }
     } catch (e) {
-      console.log('error on get attachmentThumb', e)
+      log.info('error on get attachmentThumb', e)
     }
   }
 
@@ -358,7 +359,7 @@ const Attachment = ({
           }
         })
         .catch((e: any) => {
-          console.log('error on get attachment url from cache. .. ', e)
+          log.info('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
             setDownloadingFile(true)
             customDownloader(attachment.url, false).then(async (url) => {

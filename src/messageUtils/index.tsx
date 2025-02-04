@@ -10,7 +10,8 @@ import { IContactsMap } from '../types'
 import LinkifyIt from 'linkify-it'
 import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
-import { combineMessageAttributes, isJSON, makeUsername } from '../helpers/message'
+import { combineMessageAttributes, makeUsername } from '../helpers/message'
+import log from 'loglevel'
 
 const StatusText = styled.span<{ color: string; fontSize?: string }>`
   color: ${(props) => props.color};
@@ -132,8 +133,7 @@ const MessageTextFormat = ({
   try {
     let messageText: any = []
     const linkify = new LinkifyIt()
-    const messageBodyAttributes =
-      message.bodyAttributes && isJSON(message.bodyAttributes) && JSON.parse(JSON.stringify(message.bodyAttributes))
+    const messageBodyAttributes = message.bodyAttributes && JSON.parse(JSON.stringify(message.bodyAttributes))
     if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
       const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
       const textPart = text
@@ -250,13 +250,13 @@ const MessageTextFormat = ({
             )
           }
         } catch (e) {
-          console.log('Error on format message text, message: ', message, 'error: ', e)
+          log.info('Error on format message text, message: ', message, 'error: ', e)
         }
       })
     } else {
       const match = linkify.match(text)
       if (!isLastMessage && !asSampleText && match) {
-        // console.log('newMessageText ... . ', newMessageText)
+        // log.info('newMessageText ... . ', newMessageText)
         messageText = linkifyTextPart(text, match)
       }
     }
@@ -278,8 +278,8 @@ const MessageTextFormat = ({
     }) */
     return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
   } catch (e) {
-    console.log(' failed to format message .>>> ', e)
-    console.log('message: ', message)
+    log.info(' failed to format message .>>> ', e)
+    log.info('message: ', message)
     return text
   }
 }

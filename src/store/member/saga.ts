@@ -26,6 +26,7 @@ import { IAction, IMember } from '../../types'
 import { getClient } from '../../common/client'
 import { sendTextMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
+import log from 'loglevel'
 
 function* getMembers(action: IAction): any {
   try {
@@ -43,7 +44,7 @@ function* getMembers(action: IAction): any {
     yield put(setMembersToListAC(members))
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR in get members - ', e.message)
+    log.info('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -106,7 +107,7 @@ function* addMembers(action: IAction): any {
       yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount + addedMembers.length }))
     }
   } catch (e) {
-    console.log('error on add members... ', e)
+    log.info('error on add members... ', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -165,7 +166,7 @@ function* changeMemberRole(action: IAction): any {
     const updatedMembers = yield call(channel.changeMembersRole, members)
     yield put(updateMembersAC(updatedMembers))
   } catch (e) {
-    console.log('error in change member role')
+    log.info('error in change member role')
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -184,7 +185,7 @@ function* reportMember(action: IAction): any {
       reportData.reportDescription
     )
   } catch (e) {
-    console.log('ERROR report user', e.message)
+    log.info('ERROR report user', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -199,7 +200,7 @@ function* getRoles(action: IAction): any {
     yield put(getRolesSuccess(roles))
     yield put(getRolesFailAC())
   } catch (e) {
-    console.log('ERROR get roles', e)
+    log.info('ERROR get roles', e)
     yield put(getRolesFailAC((timeout || 0) + 300, (attempts || 0) + 1))
     // yield put(setErrorNotification(e.message));
   }

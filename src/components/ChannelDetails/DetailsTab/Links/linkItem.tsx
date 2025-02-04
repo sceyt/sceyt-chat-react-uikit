@@ -32,11 +32,11 @@ const LinkItem = ({
     /*    urlMetadata(link).then(
       function (metadata) {
         // success handler
-        console.log('metadata for url ... ', link, 'metadata ---- ', metadata)
+        log.info('metadata for url ... ', link, 'metadata ---- ', metadata)
       },
       function (error) {
         // failure handler
-        console.log('error on get metadata ... ', error)
+        log.info('error on get metadata ... ', error)
       }
     ) */
   }, [])

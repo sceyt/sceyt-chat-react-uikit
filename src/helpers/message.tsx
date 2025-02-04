@@ -25,9 +25,9 @@ export const typingTextFormat = ({
   // let textLine = separateLines[currentLine]
   let addedMembers = 0
   let textLengthInCurrentIteration = 0
-  // console.log('separateLines. . .. ', separateLines)
+  // log.info('separateLines. . .. ', separateLines)
   for (let i = 0; i < separateLines.length; i++) {
-    // console.log('i - - - ---- ', i)
+    // log.info('i - - - ---- ', i)
     let nextTextPart = ''
     const currentLine = separateLines[i]
     let lastFoundIndexOnTheLine = 0

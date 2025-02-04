@@ -2,6 +2,7 @@ import { IAttachment, IContact, IUser } from '../types'
 import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
+import log from 'loglevel'
 
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
@@ -96,7 +97,7 @@ export const downloadFile = async (
       FileSaver.saveAs(data, attachment.name)
     }
   } catch (e) {
-    console.log('error on download... ', e)
+    log.info('error on download... ', e)
     if (done) {
       done(attachment.id || '', true)
     }
@@ -213,7 +214,7 @@ export const getMetadataFromUrl = (url: string): Promise<any> => {
       }
       return { title, description, image }
     })
-    .catch((error) => console.log(error))
+    .catch((error) => log.info(error))
 }
 
 export const formatAudioVideoTime = (currentTime: number) => {
@@ -237,16 +238,16 @@ export const formatLargeText = (text: string, maxLength: number): any => {
   }
   /*  const containerWidth = maxWidth
   const textWidth = container && container.querySelector('span').getBoundingClientRect().width
-  console.log('text width . ', textWidth)
-  console.log('containerWidth . ', containerWidth)
+  log.info('text width . ', textWidth)
+  log.info('containerWidth . ', containerWidth)
   if (textWidth > containerWidth) {
     const diff = containerWidth / textWidth
     const symbolsRes = text.length * diff
-    console.log('text.length ... ', text.length)
-    console.log('symbolsRes ... ', symbolsRes)
+    log.info('text.length ... ', text.length)
+    log.info('symbolsRes ... ', symbolsRes)
     const firstHalf = text.slice(0, text.length / 2 - 3)
     const secondHalf = text.slice(-(symbolsRes / 2))
-    console.log('result .... ', firstHalf + '...' + secondHalf)
+    log.info('result .... ', firstHalf + '...' + secondHalf)
     return firstHalf + '...' + secondHalf
   }
   return text */
@@ -269,16 +270,16 @@ export const getCaretPosition = (element: any) => {
   const doc = element.ownerDocument || element.document
   const win = doc.defaultView || doc.parentWindow
   const selection = win.getSelection()
-  // console.log('get pos .>>> >> >selection', selection)
+  // log.info('get pos .>>> >> >selection', selection)
   const focusOffset = selection.focusOffset
   const focusNode = selection.focusNode
   // const text = element.innerText
-  // console.log('focusOffset. . . . .', focusOffset)
-  // console.log('focusNode. . . . .', focusNode)
+  // log.info('focusOffset. . . . .', focusOffset)
+  // log.info('focusNode. . . . .', focusNode)
   // const separateLines = text.split(/\r?\n|\r|\n/g)
-  // console.log('setperate lines .... ', separateLines)
+  // log.info('setperate lines .... ', separateLines)
   // let textNodesAdded = false
-  // console.log('element.childNodes. . . ', element.childNodes)
+  // log.info('element.childNodes. . . ', element.childNodes)
   for (let i = 0; i < element.childNodes.length; i++) {
     const node = element.childNodes[i]
     if (node.nodeType === Node.TEXT_NODE) {
@@ -307,7 +308,7 @@ export const getCaretPosition = (element: any) => {
       // textNodes += 1
     }
     if (element.childNodes[i + 1] && element.childNodes[i + 1].nodeName === 'BR') {
-      // console.log('add line. ...   1 .. ', 1)
+      // log.info('add line. ...   1 .. ', 1)
       caretOffset += 1
     }
     /* if (element.childNodes.length === i + 1 && !textNodesAdded) {
@@ -324,7 +325,7 @@ export const setCursorPosition = (
   attempt: number | undefined = 0
 ) => {
   try {
-    console.log('set pos ... ', position)
+    log.info('set pos ... ', position)
     const range = document.createRange()
     const sel = window.getSelection()
     let currentNode = element.childNodes[0]
@@ -332,34 +333,34 @@ export const setCursorPosition = (
     // let textNodes = 0
     let textNodesAdded = false
     let currentNodeIsFind = false
-    // console.log('element.childNodes. . . .', element.childNodes)
+    // log.info('element.childNodes. . . .', element.childNodes)
     element.childNodes.forEach((node: any, index: number) => {
       if (!currentNodeIsFind && node.nodeType === Node.TEXT_NODE) {
         currentNode = node
         const textLength = node.nodeValue.length
-        // console.log('currentNode .. .. . 1 .. ', currentNode)
-        // console.log('node.nodeValue .. .. . 1 .. ', node.nodeValue)
-        // console.log('textLength .. .. . 1 .. ', textLength)
-        // console.log('caretOffset + textLength .. .. . 1 .. caretOffset ', caretOffset)
-        // console.log('caretOffset + textLength .. .. . 1 .. textLength ', textLength)
-        // console.log('caretOffset + textLength .. .. . 1 .. res ', caretOffset + textLength)
+        // log.info('currentNode .. .. . 1 .. ', currentNode)
+        // log.info('node.nodeValue .. .. . 1 .. ', node.nodeValue)
+        // log.info('textLength .. .. . 1 .. ', textLength)
+        // log.info('caretOffset + textLength .. .. . 1 .. caretOffset ', caretOffset)
+        // log.info('caretOffset + textLength .. .. . 1 .. textLength ', textLength)
+        // log.info('caretOffset + textLength .. .. . 1 .. res ', caretOffset + textLength)
         caretOffset = caretOffset + textLength
-        // console.log('caretOffset .. .. . 1 .. ', caretOffset)
+        // log.info('caretOffset .. .. . 1 .. ', caretOffset)
         if (element.childNodes.length === index + 1) {
           textNodesAdded = true
-          // console.log('add text nodes. ...   1 .. ', textNodes)
+          // log.info('add text nodes. ...   1 .. ', textNodes)
           // caretOffset += textNodes
         }
         if (caretOffset >= position) {
           currentNodeIsFind = true
           currentNode = node
           if (!textNodesAdded) {
-            // console.log('add text nodes. ...   2 .. ', textNodes)
+            // log.info('add text nodes. ...   2 .. ', textNodes)
             // caretOffset += textNodes
           }
-          // console.log('position - (caretOffset - textLength) .. .. . 2 .. caretOffset ', caretOffset)
-          // console.log('position - (caretOffset - textLength) .. .. . 2 .. textLength ', textLength)
-          // console.log('position - (caretOffset - textLength) .. .. . 2 .. res ', position - (caretOffset - textLength))
+          // log.info('position - (caretOffset - textLength) .. .. . 2 .. caretOffset ', caretOffset)
+          // log.info('position - (caretOffset - textLength) .. .. . 2 .. textLength ', textLength)
+          // log.info('position - (caretOffset - textLength) .. .. . 2 .. res ', position - (caretOffset - textLength))
           caretOffset = position - (caretOffset - textLength)
           return
         }
@@ -368,25 +369,25 @@ export const setCursorPosition = (
         if (node.nodeName === 'SPAN') {
           caretOffset += node.innerText.length
 
-          // console.log('caretOffset +. 2  - 1 .. caretOffset ', caretOffset)
-          // console.log('node.innerText.length +. 2  - 1 ..  ', node.innerText.length)
-          // console.log('caretOffset +innerText.length. 2  - 1 .. caretOffset ', caretOffset + node.innerText.length)
+          // log.info('caretOffset +. 2  - 1 .. caretOffset ', caretOffset)
+          // log.info('node.innerText.length +. 2  - 1 ..  ', node.innerText.length)
+          // log.info('caretOffset +innerText.length. 2  - 1 .. caretOffset ', caretOffset + node.innerText.length)
           if (caretOffset >= position) {
             currentNodeIsFind = true
             currentNode = element.childNodes[index + 1]
             /* if (!mentionFound && isAddMention) {
-              console.log('!mentionFound && isAddMention . . . . . . .', !mentionFound && isAddMention)
+              log.info('!mentionFound && isAddMention . . . . . . .', !mentionFound && isAddMention)
               caretOffset += 1
             } */
-            // console.log('set current node .... ', currentNode)
-            // console.log('caretOffset .... ', caretOffset)
+            // log.info('set current node .... ', currentNode)
+            // log.info('caretOffset .... ', caretOffset)
             // caretOffset = position - (caretOffset - node.innerText.length)
             if (isAddMention) {
               caretOffset = 1
             } else {
               caretOffset = position - caretOffset
             }
-            // console.log('set caretOffset 2  - 1 .... ', caretOffset)
+            // log.info('set caretOffset 2  - 1 .... ', caretOffset)
             return
           }
         } else {
@@ -394,29 +395,29 @@ export const setCursorPosition = (
         }
       }
       if (element.childNodes[index + 1] && !currentNodeIsFind && element.childNodes[index + 1].nodeName === 'BR') {
-        // console.log('add line. ...   1 .. ', 1)
+        // log.info('add line. ...   1 .. ', 1)
         caretOffset += 1
       }
       if (element.childNodes.length === index + 1 && !currentNodeIsFind) {
         if (!textNodesAdded) {
-          // console.log('add text nodes. ...   3 .. ', textNodes)
+          // log.info('add text nodes. ...   3 .. ', textNodes)
           // caretOffset += textNodes
         }
         currentNodeIsFind = true
         if (position > caretOffset) {
-          // console.log('add line. ...   2 .. ', 1)
+          // log.info('add line. ...   2 .. ', 1)
           caretOffset++
         }
         currentNode = node
-        // console.log('caretOffset - position .. .. . 3 .. caretOffset ', caretOffset)
-        // console.log('caretOffset - position .. .. . 3 .. position ', position)
-        // console.log('caretOffset - position .. .. . 3 .. res ', caretOffset - position)
+        // log.info('caretOffset - position .. .. . 3 .. caretOffset ', caretOffset)
+        // log.info('caretOffset - position .. .. . 3 .. position ', position)
+        // log.info('caretOffset - position .. .. . 3 .. res ', caretOffset - position)
         caretOffset = caretOffset - position
       }
     })
 
-    // console.log('caretOffset. . . . .', caretOffset)
-    // console.log('currentNode. . . . .', currentNode)
+    // log.info('caretOffset. . . . .', caretOffset)
+    // log.info('currentNode. . . . .', currentNode)
     range.setStart(currentNode, caretOffset)
     range.collapse(true)
     if (sel) {
@@ -424,7 +425,7 @@ export const setCursorPosition = (
       sel.addRange(range)
     }
   } catch (e) {
-    // console.log('position not exist attempt', attempt, 'e.', e)
+    // log.info('position not exist attempt', attempt, 'e.', e)
     if (attempt <= 5) {
       setCursorPosition(element, position - 1, isAddMention, ++attempt)
     }
@@ -497,11 +498,11 @@ export const setSelectionRange = (element: any, start: number, end: number, atte
       }
       if (element.childNodes[index + 1] && element.childNodes[index + 1].nodeName === 'BR') {
         if (!currentNodeStartIsFind) {
-          console.log('start +=1')
+          log.info('start +=1')
           caretOffsetStart += 1
         }
         if (!currentNodeEndIsFind) {
-          console.log('+=1')
+          log.info('+=1')
           caretOffsetEnd += 1
         }
       }
@@ -529,7 +530,7 @@ export const setSelectionRange = (element: any, start: number, end: number, atte
       sel.addRange(range)
     }
   } catch (e) {
-    console.log('position not exist attempt', attempt, 'e.', e)
+    log.info('position not exist attempt', attempt, 'e.', e)
     if (attempt <= 5) {
       setSelectionRange(element, start - 1, end - 1, ++attempt)
     }

@@ -22,6 +22,7 @@ import CreateChannelButton from "./CreateChannel";
 import useDidUpdate from "./hooks/useDidUpdate";
 import useMobileView from "./hooks/useMobileView";
 import CustomMessageItem from './CustomMessageItem'
+import log from 'loglevel'
 
 const MOBILE_ACTIVE_VIEW = {
   CHANNELS: 'channels',
@@ -60,11 +61,11 @@ function App() {
   const getToken = () => {
     genToken(userId).then(async (tokenData) => {
       const {token} = await tokenData.json()
-      console.log('token ... ', token)
+      log.info('token ... ', token)
       setChatToken(token)
     })
       .catch((e) => {
-        console.log('error on gen token. .. ', e)
+        log.info('error on gen token. .. ', e)
       })
   }
 
@@ -80,11 +81,11 @@ function App() {
       if (status === 'Failed') {
         await getToken()
       } else if (status === 'Connected') {
-        console.log('client user.. .. ', sceytClient.user)
+        log.info('client user.. .. ', sceytClient.user)
         try {
           sceytClient.setPresence('online')
         } catch (e) {
-          console.log('error on setPresence. .. ', e)
+          log.info('error on setPresence. .. ', e)
         }
       }
     }
@@ -179,7 +180,7 @@ function App() {
           setRolesMap(rolesMap);
         })
         .catch((e: any) => {
-          console.log('error on get roles', e);
+          log.info('error on get roles', e);
         });
     }
   }, [client]);

@@ -76,6 +76,7 @@ import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constant
 import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
+import log from 'loglevel'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -473,7 +474,7 @@ export default function* watchForEvents(): any {
     switch (type) {
       case CHANNEL_EVENT_TYPES.CREATE: {
         const { createdChannel } = args
-        console.log('CHANNEL_EVENT_CREATE ... ', createdChannel)
+        log.info('CHANNEL_EVENT_CREATE ... ', createdChannel)
         const channelFilterTypes = getChannelTypesFilter()
         if (channelFilterTypes?.length ? channelFilterTypes.includes(createdChannel.type) : true) {
           const getFromContacts = getShowOnlyContactUsers()
@@ -495,7 +496,7 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.JOIN: {
         // const { channel, joinedMember } = args
         const { channel } = args
-        console.log('channel JOIN ... . ', channel)
+        log.info('channel JOIN ... . ', channel)
         const activeChannelId = yield call(getActiveChannelId)
         if (activeChannelId === channel.id) {
           // yield put(addMembersToListAC([joinedMember]));
@@ -517,7 +518,7 @@ export default function* watchForEvents(): any {
         // const { channel, member } = args
         const { channel, member } = args
 
-        console.log('channel LEAVE ... ', channel, member)
+        log.info('channel LEAVE ... ', channel, member)
         const channelExists = checkChannelExists(channel.id)
         const activeChannelId = yield call(getActiveChannelId)
 
@@ -562,7 +563,7 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.BLOCK: {
-        console.log('channel BLOCK ... ')
+        log.info('channel BLOCK ... ')
         const { channel } = args
         const channelExists = checkChannelExists(channel.id)
         if (channelExists) {
@@ -571,12 +572,12 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.UNBLOCK: {
-        console.log('channel UNBLOCK ... ')
+        log.info('channel UNBLOCK ... ')
         break
       }
       case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
         const { channel, removedMembers } = args
-        console.log('channel KICK_MEMBERS ... ', removedMembers)
+        log.info('channel KICK_MEMBERS ... ', removedMembers)
         const activeChannelId = yield call(getActiveChannelId)
 
         const channelExists = checkChannelExists(channel.id)
@@ -621,7 +622,7 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.ADD_MEMBERS: {
         // const { channel, addedMembers } = args
         const { channel, addedMembers } = args
-        console.log('channel ADD_MEMBERS ... ', addedMembers)
+        log.info('channel ADD_MEMBERS ... ', addedMembers)
         const activeChannelId = yield call(getActiveChannelId)
         const channelExists = checkChannelExists(channel.id)
         if (channelExists) {
@@ -690,7 +691,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
-        console.log('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
+        log.info('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
         const channelFilterTypes = getChannelTypesFilter()
         if (
@@ -791,7 +792,7 @@ export default function* watchForEvents(): any {
               }
             }
           }
-          console.log('send delivered for message . .. . ', message)
+          log.info('send delivered for message . .. . ', message)
           if (message.repliedInThread && message.parentMessage.id) {
             yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
           } else {
@@ -810,7 +811,7 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
         const { channelId, markerList } = args
         const channel = yield call(getChannelFromMap, channelId)
-        console.log('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
+        log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
 
         if (channel) {
           const activeChannelId = yield call(getActiveChannelId)
@@ -890,7 +891,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.DELETE: {
         const { channelId } = args
-        console.log('channel DELETE ... ')
+        log.info('channel DELETE ... ')
         // const activeChannelId = yield call(getActiveChannelId)
         const channel = getChannelFromMap(channelId)
 
@@ -910,7 +911,7 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
         const { channel, /* user, */ deletedMessage } = args
         const activeChannelId = getActiveChannelId()
-        console.log('channel DELETE_MESSAGE ... ')
+        log.info('channel DELETE_MESSAGE ... ')
         const channelExists = checkChannelExists(channel.id)
 
         if (channel.id === activeChannelId) {
@@ -946,7 +947,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
         const { channel, /* user, */ message } = args
-        console.log('channel EDIT_MESSAGE ... ', message)
+        log.info('channel EDIT_MESSAGE ... ', message)
         const activeChannelId = getActiveChannelId()
         const channelExists = checkChannelExists(channel.id)
         if (channel.id === activeChannelId) {
@@ -985,7 +986,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
         const { channel, user, message, reaction } = args
-        console.log('channel REACTION_ADDED ... ', args)
+        log.info('channel REACTION_ADDED ... ', args)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 
@@ -1044,7 +1045,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
         const { channel, user, message, reaction } = args
-        console.log('channel REACTION_DELETED ... ', channel)
+        log.info('channel REACTION_DELETED ... ', channel)
         const channelFromMap = getChannelFromMap(channel.id)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
@@ -1080,9 +1081,9 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
         const { channel } = args
         // const { channel, channelUnreadCount } = args
-        // console.log('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
-        // console.log('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
-        // console.log('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
+        // log.info('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
+        // log.info('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
+        // log.info('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
         // yield put(setChannelUnreadCount(0, channel.id));
         if (channel) {
           const updatedChannel = JSON.parse(JSON.stringify(channel))
@@ -1094,7 +1095,7 @@ export default function* watchForEvents(): any {
 
       case CHANNEL_EVENT_TYPES.CLEAR_HISTORY: {
         const { channel } = args
-        console.log('CLEAR_HISTORY: ', channel)
+        log.info('CLEAR_HISTORY: ', channel)
         const activeChannelId = yield call(getActiveChannelId)
         const channelExist = yield call(checkChannelExists, channel.id)
         if (channel.id === activeChannelId) {
@@ -1124,7 +1125,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MUTE: {
         const { channel } = args
-        console.log('channel MUTE ... ')
+        log.info('channel MUTE ... ')
 
         yield put(
           updateChannelDataAC(channel.id, {
@@ -1140,7 +1141,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.UNMUTE: {
         const { channel } = args
-        console.log('channel UNMUTE ... ')
+        log.info('channel UNMUTE ... ')
 
         yield put(
           updateChannelDataAC(channel.id, {
@@ -1157,7 +1158,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.PINED: {
         const { channel } = args
-        console.log('channel PINED ... ')
+        log.info('channel PINED ... ')
 
         yield put(
           updateChannelDataAC(
@@ -1175,7 +1176,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.UNPINED: {
         const { channel } = args
-        console.log('channel UNPINED ... ')
+        log.info('channel UNPINED ... ')
 
         yield put(
           updateChannelDataAC(
@@ -1195,19 +1196,19 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.HIDE: {
         const { channel } = args
-        console.log('channel HIDE ... ')
+        log.info('channel HIDE ... ')
         yield put(setChannelToHideAC(channel))
         break
       }
       case CHANNEL_EVENT_TYPES.UNHIDE: {
         const { channel } = args
-        console.log('channel UNHIDE ... ')
+        log.info('channel UNHIDE ... ')
         yield put(setChannelToUnHideAC(channel))
         break
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
         const { channel } = args
-        // console.log('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
+        // log.info('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
         yield put(
           updateChannelDataAC(channel.id, {
             unread: channel.unread,
@@ -1223,7 +1224,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
         const { channel } = args
-        // console.log('channel CHANNEL_MARKED_AS_READ ... ', channel)
+        // log.info('channel CHANNEL_MARKED_AS_READ ... ', channel)
         yield put(
           updateChannelDataAC(channel.id, {
             unread: channel.unread,
@@ -1255,8 +1256,8 @@ export default function* watchForEvents(): any {
       } */
       case CHANNEL_EVENT_TYPES.CHANGE_ROLE: {
         const { channel, members } = args
-        console.log('channel CHANGE_ROLE  channel ... ', channel)
-        console.log('channel CHANGE_ROLE  member ... ', members)
+        log.info('channel CHANGE_ROLE  channel ... ', channel)
+        log.info('channel CHANGE_ROLE  member ... ', members)
         const activeChannelId = yield call(getActiveChannelId)
         if (channel.id === activeChannelId) {
           yield put(updateMembersAC(members))
@@ -1281,12 +1282,12 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.FROZEN: {
         const { channel } = args
-        console.log('channel frozen  channel ... ', channel)
+        log.info('channel frozen  channel ... ', channel)
         break
       }
       case CHANNEL_EVENT_TYPES.UNFROZEN: {
         const { channel } = args
-        console.log('channel unfrozen  channel ... ', channel)
+        log.info('channel unfrozen  channel ... ', channel)
         break
       }
       /* case CHANNEL_EVENT_TYPES.MEMBER_BLOCKED: {
@@ -1321,18 +1322,18 @@ export default function* watchForEvents(): any {
             } */
       /* case CONNECTION_EVENT_TYPES.TOKEN_WILL_EXPIRE: {
         const { expireTime } = args
-        console.log('user TOKEN_WILL_EXPIRE ... ', expireTime)
+        log.info('user TOKEN_WILL_EXPIRE ... ', expireTime)
         break
       } */
 
       case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
         // const { user, channelId, name } = args
-        console.log('channel event received >>>... . . . . . ', args)
+        log.info('channel event received >>>... . . . . . ', args)
         break
       }
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
         const { status } = args
-        console.log('connection status changed . . . . . ', status)
+        log.info('connection status changed . . . . . ', status)
         yield put(setConnectionStatusAC(status))
         if (status === CONNECTION_STATUS.CONNECTED) {
           yield put(getRolesAC())

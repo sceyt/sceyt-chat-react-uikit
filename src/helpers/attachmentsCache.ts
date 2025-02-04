@@ -1,3 +1,4 @@
+import log from 'loglevel'
 // const downloadedAttachments: { [key: string]: string } = {}
 // Create a new cache
 
@@ -20,10 +21,10 @@ export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: 
       cache
         .put(attachmentUrl, attachmentResponse)
         .then(() => {
-          console.log('Cache success')
+          log.info('Cache success')
         })
         .catch((e) => {
-          console.log('Error on cache attachment ... ', e)
+          log.info('Error on cache attachment ... ', e)
           caches.delete(attachmentUrl)
         })
     })
@@ -49,7 +50,7 @@ export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<
     return URL.createObjectURL(await response.blob());
   } else {
     // The image or video is not cached
-    console.log('The image or video is not cached', attachmentUrl);
+    log.info('The image or video is not cached', attachmentUrl);
     return false;
   }
 };

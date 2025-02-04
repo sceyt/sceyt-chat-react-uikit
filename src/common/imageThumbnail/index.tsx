@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react'
 import styled from 'styled-components'
+import log from 'loglevel'
 
 interface IProps {
   src: string
@@ -30,7 +31,7 @@ const ImageThumbnail = ({ src, width, height, borderRadius, isLoaded, isRepliedM
     }
     image.onerror = (e) => {
       // setLoaded(true);
-      console.log('error in load image .. ', e)
+      log.info('error in load image .. ', e)
     }
   }, [])
   return (

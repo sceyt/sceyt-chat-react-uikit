@@ -13,6 +13,7 @@ import {
 import { IAction, IMember } from '../../types'
 import { getActiveChannelId, getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { updateChannelDataAC } from '../channel/actions'
+import log from 'loglevel'
 
 function* getContacts(): any {
   try {
@@ -21,7 +22,7 @@ function* getContacts(): any {
     yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
     yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR in get contacts - :', e.message)
+    log.info('ERROR in get contacts - :', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -63,7 +64,7 @@ function* blockUser(action: IAction): any {
       })
     }
   } catch (error) {
-    console.log('error in block users', error.message)
+    log.info('error in block users', error.message)
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -102,7 +103,7 @@ function* unblockUser(action: IAction): any {
       })
     }
   } catch (error) {
-    console.log('error in unblock users', error.message)
+    log.info('error in unblock users', error.message)
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -118,7 +119,7 @@ function* updateProfile(action: IAction): any {
       const fileToUpload = {
         data: avatarFile,
         progress: (progressPercent: number) => {
-          console.log('upload percent - ', progressPercent)
+          log.info('upload percent - ', progressPercent)
         }
       }
       updateUserProfileData.avatarUrl = yield call(SceytChatClient.uploadFile, fileToUpload)
@@ -141,7 +142,7 @@ function* updateProfile(action: IAction): any {
     const updatedUser = yield call(SceytChatClient.setProfile, updateUserProfileData)
     yield put(updateUserProfileAC({ ...updatedUser }))
   } catch (error) {
-    console.log(error, 'Error on update user')
+    log.info(error, 'Error on update user')
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -188,7 +189,7 @@ function* getUsers(action: IAction): any {
     if (params.filter === 'username') {
       usersQueryBuilder.filterByUsername()
     }
-    console.log('user query params ..... ', params)
+    log.info('user query params ..... ', params)
     const usersQuery = yield call(usersQueryBuilder.build)
 
     query.usersQuery = usersQuery
@@ -201,7 +202,7 @@ function* getUsers(action: IAction): any {
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR on get users', e.message)
+    log.info('ERROR on get users', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -225,7 +226,7 @@ function* loadMoreUsers(action: IAction): any {
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    console.log('ERROR load more users', e.message)
+    log.info('ERROR load more users', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }

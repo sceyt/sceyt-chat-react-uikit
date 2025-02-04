@@ -170,12 +170,12 @@ export default function CreateChannel({
     }
 
     /* if (createGroupChannel && members.length > 0) {
-      console.log('data for create group ,,,... ', createChannelParams)
+      log.info('data for create group ,,,... ', createChannelParams)
       dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()
     } else if (!createGroupChannel) {
       // const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
-      console.log('data for create channel ... ', createChannelParams)
+      log.info('data for create channel ... ', createChannelParams)
       // dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
       dispatch(createChannelAC(createChannelParams))
       toggleCreateGroupChannelPopup()

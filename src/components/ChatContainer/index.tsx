@@ -1,5 +1,6 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { Provider } from 'react-redux'
+import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
@@ -88,6 +89,7 @@ export interface IChatClientProps {
     [key: string]: string
   }
   openChatOnUserInteraction?: boolean
+  logLevel?: 'silent' | 'trace' | 'debug' | 'info' | 'warn' | 'error'
 }
 
 const SceytChatContainer = ({
@@ -107,8 +109,13 @@ const SceytChatContainer = ({
   showNotifications = true,
   hideUserPresence,
   openChatOnUserInteraction,
-  autoSelectFirstChannel
+  autoSelectFirstChannel,
+  logLevel = 'silent'
 }: IChatClientProps) => {
+  useEffect(() => {
+    log.setLevel(logLevel)
+  }, [])
+
   return (
     <Provider store={store}>
       <SceytChat

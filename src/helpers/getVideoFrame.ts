@@ -2,6 +2,7 @@
 
 import { binaryToBase64, calculateSize, createImageThumbnail } from './resizeImage'
 import { rgbaToThumbHash } from './thumbhash'
+import log from 'loglevel'
 
 export async function getFrame(
   videoSrc: any,
@@ -31,7 +32,7 @@ export async function getFrame(
           const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
           const thumb = binaryToBase64(binaryThumbHash)
-          console.log('generated thumb hash ... ', thumb)
+          log.info('generated thumb hash ... ', thumb)
 
           clearInterval(b)
           resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
@@ -46,11 +47,11 @@ export async function getFrame(
 export async function getFrame2(videoSrc: any, time: number) {
   const video = document.createElement('video')
   video.src = videoSrc
-  console.log('video.. ', video)
+  log.info('video.. ', video)
   return new Promise((resolve) => {
     // if (videoSrc) {
     const b = setInterval(async () => {
-      console.log('video.readyState. . ', video.readyState)
+      log.info('video.readyState. . ', video.readyState)
       if (video.readyState >= 3) {
         if (time) {
           video.currentTime = time
@@ -67,9 +68,9 @@ export async function getFrame2(videoSrc: any, time: number) {
         // @ts-ignore
         ctx.drawImage(video, 0, 0)
         // @ts-ignore
-        console.log('canvas.toDataURL() new version .... ', canvas.toDataURL())
+        log.info('canvas.toDataURL() new version .... ', canvas.toDataURL())
         const thumb = await createImageThumbnail(null, canvas.toDataURL(), 200, 100)
-        console.log('thumb new version .... ', thumb)
+        log.info('thumb new version .... ', thumb)
         clearInterval(b)
         resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
       }
@@ -90,13 +91,13 @@ export async function getFrame2(videoSrc: any, time: number) {
   ctx.drawImage(video, 0, 0)
   // @ts-ignore
 
-  console.log('canvas.toDataURL()  3 ... ', canvas.toDataURL())
+  log.info('canvas.toDataURL()  3 ... ', canvas.toDataURL())
   const thumb = await createImageThumbnail(null, canvas.toDataURL())
-  console.log('thumb ---- ', thumb) */
+  log.info('thumb ---- ', thumb) */
   /* const image = new Image()
   image.onload = async function () {
     const thumb = await createImageThumbnail(image)
-    console.log('thumb ---- ', thumb)
+    log.info('thumb ---- ', thumb)
   }
   image.src = canvas.toDataURL() */
 }
@@ -118,7 +119,7 @@ export async function getFrame3(video: any, time: number) {
   /* const image = new Image()
   image.onload = async function () {
     const thumb = await createImageThumbnail(image)
-    console.log('thumb ---- ', thumb)
+    log.info('thumb ---- ', thumb)
   }
   image.src = canvas.toDataURL() */
 }

@@ -12,6 +12,7 @@ import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
+import log from 'loglevel'
 
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
@@ -181,7 +182,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       .getMp3()
       .then(([buffer, blob]: any) => {
         setCurrentTime(0)
-        console.log(buffer, blob)
+        log.info(buffer, blob)
         const file = new File(buffer, 'record.mp3', {
           type: blob.type,
           lastModified: Date.now()
@@ -231,7 +232,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
             },
             function (e: any) {
               // Handle decoding error
-              console.log('Error decoding audio data: ' + e.err)
+              log.info('Error decoding audio data: ' + e.err)
             }
           )
         }
@@ -330,7 +331,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
             setCurrentTime(currentTime)
           })
         } catch (e) {
-          console.log('Failed to init wavesurfer')
+          log.info('Failed to init wavesurfer')
         }
       }
       initWaveSurfer()
@@ -356,7 +357,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           })
           setRecorder(recorder)
         } catch (e) {
-          console.log('Failed to init mic-recorder-to-mp3')
+          log.info('Failed to init mic-recorder-to-mp3')
         }
       }
     })()

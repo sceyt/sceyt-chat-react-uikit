@@ -401,12 +401,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
     } else {
       setListWidthIsSet(false)
     }
-    // console.log('channels. ...........................', channels)
+    // log.info('channels. ...........................', channels)
   }, [channels])
 
   /* useEffect(() => {
     if (contactsMap) {
-      console.log('contactsMap.>>>...', contactsMap)
+      log.info('contactsMap.>>>...', contactsMap)
     }
   }, [contactsMap]) */
   return (

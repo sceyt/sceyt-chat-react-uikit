@@ -33,6 +33,7 @@ import { deletePendingMessage, getAllMessages } from '../../../helpers/messagesH
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
+import log from 'loglevel'
 
 interface IProps {
   channel: IChannel
@@ -108,7 +109,7 @@ const SliderPopup = ({
   }
   const handleCompleteDownload = (attachmentId: string, failed?: boolean) => {
     if (failed) {
-      console.log('file download failed!')
+      log.info('file download failed!')
     }
     const stateCopy = { ...downloadingFilesMap }
     delete stateCopy[attachmentId]
@@ -229,7 +230,7 @@ const SliderPopup = ({
                 }
               })
               .catch((e) => {
-                console.log('fail to download image...... ', e)
+                log.info('fail to download image...... ', e)
               })
           } else {
             if (!downloadedFiles[currentFile.id]) {
@@ -253,7 +254,7 @@ const SliderPopup = ({
             }
           }
         }
-      }).catch((e) => console.log(e))
+      }).catch((e) => log.info(e))
     }
   }, [currentFile])
 

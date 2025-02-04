@@ -44,6 +44,7 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
+import log from 'loglevel'
 
 const Message = ({
   message,
@@ -380,7 +381,7 @@ const Message = ({
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
-      console.log('send displayed marker for message ... ', message)
+      log.info('send displayed marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }

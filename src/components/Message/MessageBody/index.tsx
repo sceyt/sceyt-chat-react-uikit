@@ -31,6 +31,7 @@ import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
 import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
+import log from 'loglevel'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -345,7 +346,7 @@ const MessageBody = ({
   const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
 
   const handleRemoveFailedAttachment = (attachmentId: string) => {
-    console.log('remove attachment .. ', attachmentId)
+    log.info('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
     // dispatch(removeFailedAttachment(message.tid, attachmentId));
   }

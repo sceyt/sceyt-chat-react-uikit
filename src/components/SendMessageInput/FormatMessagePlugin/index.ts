@@ -80,12 +80,12 @@ function useFormatMessage(
       editor.registerCommand(KEY_DELETE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
       editor.registerCommand(KEY_BACKSPACE_COMMAND, onDelete, COMMAND_PRIORITY_LOW)
     )
-    // console.log('selectedIndex. .> > >> > . . ', selectedIndex)
+    // log.info('selectedIndex. .> > >> > . . ', selectedIndex)
     /* editor.registerCommand(
       KEY_ENTER_COMMAND,
       (event: KeyboardEvent | null) => {
         if (event !== null) {
-          console.log('...>>>> preventDefault ...>>>>>')
+          log.info('...>>>> preventDefault ...>>>>>')
           event.preventDefault()
           event.stopImmediatePropagation()
         }
@@ -126,8 +126,8 @@ function useFormatMessage(
           ) {
             return
           } */
-          // console.log('parsedEditorState.root.children[0].children >>> ', parsedEditorState.root.children[0].children)
-          // console.log('offsetList >>> ', offsetList)
+          // log.info('parsedEditorState.root.children[0].children >>> ', parsedEditorState.root.children[0].children)
+          // log.info('offsetList >>> ', offsetList)
           let currentOffsetDiff = 0
           let newMessageText = messageText
           parsedEditorState.root.children[0].children.forEach((child: any, index: number) => {
