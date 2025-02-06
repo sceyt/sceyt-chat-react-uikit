@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC, useRef } from 'react'
+import React, { FC } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -154,6 +154,7 @@ interface IMessageBodyProps {
   handleDeletePendingMessage: () => void
   handleReactionAddDelete: (emoji: any) => void
   handleCreateChat: (user?: IUser) => void
+  messageTextRef: React.RefObject<HTMLSpanElement>
 }
 
 const MessageBody = ({
@@ -270,7 +271,8 @@ const MessageBody = ({
   handleMouseEnter,
   handleMouseLeave,
   handleReactionAddDelete,
-  handleCreateChat
+  handleCreateChat,
+  messageTextRef
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -286,7 +288,6 @@ const MessageBody = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  const messageTextRef = useRef<any>(null)
   const messageUserID = message.user ? message.user.id : 'deleted'
   const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
   const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null

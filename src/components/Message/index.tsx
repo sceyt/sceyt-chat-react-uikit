@@ -730,6 +730,7 @@ const Message = ({
             handleMouseLeave={handleMouseLeave}
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleCreateChat={handleCreateChat}
+            messageTextRef={messageTextRef}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
