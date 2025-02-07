@@ -1550,7 +1550,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             </ReplyIconWrapper>
                           )
                         ))}
-                      <div>
+                      <ReplyMessageBody>
                         <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
@@ -1584,7 +1584,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             accentColor
                           })
                         )}
-                      </div>
+                      </ReplyMessageBody>
                     </ReplyMessageCont>
                   </EditReplyMessageCont>
                 )}
@@ -1909,6 +1909,7 @@ const EditMessageText = styled.p<any>`
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  word-break: break-word;
 `
 const UploadErrorMessage = styled.p<{ color: string }>`
   margin: 0;
@@ -1935,6 +1936,15 @@ const CloseEditMode = styled.span<{ color: string }>`
 const UserName = styled.span<any>`
   font-weight: 500;
   margin-left: 4px;
+`
+
+const ReplyMessageBody = styled.div`
+  word-break: break-word;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
 `
 
 const EditReplyMessageHeader = styled.h4<{ color: string }>`
