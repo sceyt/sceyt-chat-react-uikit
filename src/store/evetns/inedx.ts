@@ -268,7 +268,7 @@ export default function* watchForEvents(): any {
       channelUnreadMentions: number,
       channelUnreadReactions: number
     ) => {
-      if (shouldSkip(channel)) return
+      if (channel && shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO,
         args: {
