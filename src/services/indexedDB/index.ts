@@ -12,7 +12,7 @@ export const setDataToDB = (dbName: string, storeName: string, data: any[], keyP
     }
 
     openRequest.onerror = function () {
-      console.error('Indexeddb Error ', openRequest.error)
+      log.error('Indexeddb Error ', openRequest.error)
     }
 
     openRequest.onsuccess = function (event: any) {
@@ -84,7 +84,7 @@ export const getDataFromDB = (
 
         request.onerror = (event: any) => {
           db.close()
-          console.error('Error retrieving data: ', event.target.error)
+          log.error('Error retrieving data: ', event.target.error)
         }
       } else {
         db.close()

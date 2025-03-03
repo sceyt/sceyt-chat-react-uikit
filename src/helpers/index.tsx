@@ -97,7 +97,7 @@ export const downloadFile = async (
       FileSaver.saveAs(data, attachment.name)
     }
   } catch (e) {
-    log.info('error on download... ', e)
+    log.error('error on download... ', e)
     if (done) {
       done(attachment.id || '', true)
     }
@@ -214,7 +214,7 @@ export const getMetadataFromUrl = (url: string): Promise<any> => {
       }
       return { title, description, image }
     })
-    .catch((error) => log.info(error))
+    .catch((error) => log.error(error))
 }
 
 export const formatAudioVideoTime = (currentTime: number) => {
@@ -530,7 +530,7 @@ export const setSelectionRange = (element: any, start: number, end: number, atte
       sel.addRange(range)
     }
   } catch (e) {
-    log.info('position not exist attempt', attempt, 'e.', e)
+    log.error('position not exist attempt', attempt, 'e.', e)
     if (attempt <= 5) {
       setSelectionRange(element, start - 1, end - 1, ++attempt)
     }

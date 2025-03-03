@@ -44,7 +44,7 @@ function* getMembers(action: IAction): any {
     yield put(setMembersToListAC(members))
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR in get members - ', e.message)
+    log.error('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -107,7 +107,7 @@ function* addMembers(action: IAction): any {
       yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount + addedMembers.length }))
     }
   } catch (e) {
-    log.info('error on add members... ', e)
+    log.error('error on add members... ', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -166,7 +166,7 @@ function* changeMemberRole(action: IAction): any {
     const updatedMembers = yield call(channel.changeMembersRole, members)
     yield put(updateMembersAC(updatedMembers))
   } catch (e) {
-    log.info('error in change member role')
+    log.error('error in change member role', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -185,7 +185,7 @@ function* reportMember(action: IAction): any {
       reportData.reportDescription
     )
   } catch (e) {
-    log.info('ERROR report user', e.message)
+    log.error('ERROR report user', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -200,7 +200,7 @@ function* getRoles(action: IAction): any {
     yield put(getRolesSuccess(roles))
     yield put(getRolesFailAC())
   } catch (e) {
-    log.info('ERROR get roles', e)
+    log.error('ERROR get roles', e)
     yield put(getRolesFailAC((timeout || 0) + 300, (attempts || 0) + 1))
     // yield put(setErrorNotification(e.message));
   }

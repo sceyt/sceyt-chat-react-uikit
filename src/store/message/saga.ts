@@ -569,7 +569,7 @@ function* sendMessage(action: IAction): any {
             throw Error('Network error')
           }
         } catch (e) {
-          log.info('Error on uploading attachment', message.tid, e)
+          log.error('Error on uploading attachment', message.tid, e)
           yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, message.tid))
 
           updateMessageOnMap(channel.id, {
@@ -582,7 +582,7 @@ function* sendMessage(action: IAction): any {
       }
     }
   } catch (e) {
-    log.info('error on send message ... ', e)
+    log.error('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
 }
@@ -726,7 +726,7 @@ function* sendTextMessage(action: IAction): any {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
-    log.info('error on send text message ... ', e)
+    log.error('error on send text message ... ', e)
     updateMessageOnMap(channel.id, {
       messageId: sendMessageTid,
       params: { state: MESSAGE_STATUS.FAILED }
@@ -864,7 +864,7 @@ function* forwardMessage(action: IAction): any {
     }
     // messageForCatch = messageToSend
   } catch (e) {
-    log.info('error on forward message ... ', e)
+    log.error('error on forward message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
@@ -1048,7 +1048,7 @@ function* resendMessage(action: IAction): any {
               yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
             }
           } catch (e) {
-            log.info('fail upload attachment on resend message ... ', e)
+            log.error('fail upload attachment on resend message ... ', e)
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageAttachment.tid))
 
             updateMessageOnMap(channel.id, {
@@ -1114,7 +1114,7 @@ function* resendMessage(action: IAction): any {
     const messageResponse = yield call(channel.reSendMessage, messageToResend)
     yield put(updateMessageAC(message.id || message.tid, messageResponse)) */
   } catch (e) {
-    log.info('ERROR in resend message', e.message, 'channel.. . ', channel)
+    log.error('ERROR in resend message', e.message, 'channel.. . ', channel)
 
     yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.FAILED }))
 
@@ -1157,7 +1157,7 @@ function* deleteMessage(action: IAction): any {
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {
-    log.info('ERROR in delete message', e.message)
+    log.error('ERROR in delete message', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1193,7 +1193,7 @@ function* editMessage(action: IAction): any {
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {
-    log.info('ERROR in edit message', e.message)
+    log.error('ERROR in edit message', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1415,7 +1415,7 @@ function* getMessagesQuery(action: IAction): any {
       yield put(setMessagesAC([]))
     }
   } catch (e) {
-    log.info('error in message query', e)
+    log.error('error in message query', e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -1475,7 +1475,7 @@ function* loadMoreMessages(action: IAction): any {
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('error in load more messages', e)
+    log.error('error in load more messages', e)
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
@@ -1511,7 +1511,7 @@ function* addReaction(action: IAction): any {
     addReactionToMessageOnMap(channelId, message, reaction, true)
     addReactionOnAllMessages(message, reaction, true)
   } catch (e) {
-    log.info('ERROR in add reaction', e.message)
+    log.error('ERROR in add reaction', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1542,7 +1542,7 @@ function* deleteReaction(action: IAction): any {
     removeReactionToMessageOnMap(channelId, message, reaction, true)
     removeReactionOnAllMessages(message, reaction, true)
   } catch (e) {
-    log.info('ERROR in delete reaction', e.message)
+    log.error('ERROR in delete reaction', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1565,7 +1565,7 @@ function* getReactions(action: IAction): any {
     yield put(setReactionsListAC(result.reactions, result.hasNext))
     yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR in get reactions', e.message)
+    log.error('ERROR in get reactions', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1583,7 +1583,7 @@ function* loadMoreReactions(action: IAction): any {
     yield put(addReactionsToListAC(result.reactions, result.hasNext))
     yield put(setReactionsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR in load more reactions', e.message)
+    log.error('ERROR in load more reactions', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1634,7 +1634,7 @@ function* getMessageAttachments(action: IAction): any {
       yield put(setAttachmentsAC(JSON.parse(JSON.stringify(result.attachments))))
     }
   } catch (e) {
-    log.info('error in message attachment query')
+    log.error('error in message attachment query', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1659,7 +1659,7 @@ function* loadMoreMessageAttachments(action: any) {
       yield put(addAttachmentsAC(attachments))
     }
   } catch (e) {
-    log.info('error in message attachment query', e)
+    log.error('error in message attachment query', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -1676,7 +1676,7 @@ function* pauseAttachmentUploading(action: any) {
       }
     }
   } catch (e) {
-    log.info('error in pause attachment uploading', e)
+    log.error('error in pause attachment uploading', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -1694,7 +1694,7 @@ function* resumeAttachmentUploading(action: any) {
       }
     }
   } catch (e) {
-    log.info('error in resume attachment uploading', e)
+    log.error('error in resume attachment uploading', e)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }

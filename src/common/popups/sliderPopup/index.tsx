@@ -254,7 +254,7 @@ const SliderPopup = ({
             }
           }
         }
-      }).catch((e) => log.info(e))
+      }).catch((e) => log.error(e))
     }
   }, [currentFile])
 

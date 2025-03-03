@@ -82,7 +82,7 @@ function App() {
             })
             .catch((e) => {
                 const date = new Date()
-                console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
+                log.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
                 getToken()
             });
     }
@@ -114,7 +114,7 @@ function App() {
                         })
                         .catch((e) => {
                             const date = new Date()
-                            console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect after updating the token ... `, e);
+                            log.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect after updating the token ... `, e);
                             if (e.code === 10005 && client && client && client.connectionState === 'Connected') {
                                 setClientState('Connected')
                             } else {

@@ -220,7 +220,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             setIsRendered(true)
           }
         } catch (e) {
-          log.info('Failed to init wavesurfer')
+          log.error('Failed to init wavesurfer', e)
         }
       }
       initWaveSurfer()

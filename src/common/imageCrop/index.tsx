@@ -6,6 +6,7 @@ import getCroppedImg from './crop-image'
 import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { Popup, PopupName, Row, CloseIcon, Button, PopupBody, PopupFooter } from '../../UIHelper'
 import PopupContainer from '../popups/popupContainer'
+import log from 'loglevel'
 
 interface IProps {
   image: any
@@ -48,7 +49,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
       onAccept(imageFile)
       handleClosePopup(true)
     } catch (e) {
-      console.error(e)
+      log.error(e)
     }
   }, [area])
   return (

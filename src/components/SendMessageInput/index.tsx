@@ -189,7 +189,7 @@ function ClearEditorPlugin({ shouldClearEditor, setEditorCleared }: any) {
 // or throw them as needed. If you don't throw them, Lexical will
 // try to recover gracefully without losing user data.
 function onError(error: any) {
-  console.error(error)
+  log.error(error)
 }
 
 let prevActiveChannelId: any
@@ -850,7 +850,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       try {
         dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
       } catch (e) {
-        log.info('error in get data from db . . . . ', e)
+        log.error('error in get data from db . . . . ', e)
       }
       if (dataFromDb) {
         cachedUrl = dataFromDb.url

@@ -85,7 +85,7 @@ function App() {
         try {
           sceytClient.setPresence('online')
         } catch (e) {
-          log.info('error on setPresence. .. ', e)
+          log.error('error on setPresence. .. ', e)
         }
       }
     }
@@ -112,14 +112,14 @@ function App() {
       })
       .catch((e) => {
         const date = new Date()
-        console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
+        log.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
         getToken()
       });
   }
 
   const onlineStatusChanged = (event: any, client: SceytChatClient) => {
     const date = new Date()
-    console.info(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Online status changed : `, event.type)
+    log.info(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Online status changed : `, event.type)
     if (event.type === 'online') {
       setTimeout(() => {
         if (client && (!client.accessToken || client.connectionState === 'Disconnected')) {
@@ -141,7 +141,7 @@ function App() {
             })
             .catch((e: any) => {
               const date = new Date()
-              console.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect after updating the token ... `, e);
+              log.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect after updating the token ... `, e);
               if (e.code === 10005 && client && client && client.connectionState === 'Connected') {
                 setClientState('Connected')
               } else {
