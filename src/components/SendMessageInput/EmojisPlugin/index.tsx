@@ -84,7 +84,7 @@ function EmojisPopup({
     const [editor] = useLexicalComposerContext()
     richTextEditor = editor
   } catch (e) {
-    log.info('error getting editor', e)
+    log.error('error getting editor', e)
   }
   const [rendered, setRendered] = useState<any>(false)
   const [activeCollection, setActiveCollection] = useState('People')

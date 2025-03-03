@@ -250,7 +250,7 @@ const MessageTextFormat = ({
             )
           }
         } catch (e) {
-          log.info('Error on format message text, message: ', message, 'error: ', e)
+          log.error('Error on format message text, message: ', message, 'error: ', e)
         }
       })
     } else {
@@ -278,7 +278,7 @@ const MessageTextFormat = ({
     }) */
     return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
   } catch (e) {
-    log.info(' failed to format message .>>> ', e)
+    log.error(' failed to format message .>>> ', e)
     log.info('message: ', message)
     return text
   }

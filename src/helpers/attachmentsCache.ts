@@ -40,7 +40,7 @@ export const removeAttachmentFromCache = (attachmentId: string) => {
 
 export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
   if (!cacheAvailable) {
-    console.error('Cache is not available');
+    log.error('Cache is not available');
     return Promise.reject(new Error('Cache not available'));
   }
 

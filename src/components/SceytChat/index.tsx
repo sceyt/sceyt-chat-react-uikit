@@ -206,13 +206,13 @@ const SceytChat = ({
     if (showNotifications) {
       try {
         if (window.Notification && Notification.permission === 'default') {
-          // Notification.requestPermission().then(console.log).catch(console.error)
+          // Notification.requestPermission().then(log.log).catch(log.error)
           Promise.resolve(Notification.requestPermission()).then(function (permission) {
             log.info('permission:', permission)
           })
         }
       } catch (e) {
-        console.error('safari Notification request permission', e)
+        log.error('safari Notification request permission', e)
       }
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href

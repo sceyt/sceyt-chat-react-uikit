@@ -1341,7 +1341,7 @@ export default function* watchForEvents(): any {
         break
       }
       default:
-        console.warn('UNHANDLED EVENT FROM REDUX-SAGA EVENT-CHANNEL')
+        log.warn('UNHANDLED EVENT FROM REDUX-SAGA EVENT-CHANNEL')
     }
   }
 }

@@ -154,7 +154,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           soundAllowed(stream)
         })
         .catch((e: any) => {
-          console.error(e)
+          log.error(e)
         })
     }
   }
@@ -239,7 +239,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         reader.readAsArrayBuffer(blob)
       })
       .catch((e: any) => {
-        console.error(e)
+        log.error(e)
       })
   }
 
@@ -331,7 +331,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
             setCurrentTime(currentTime)
           })
         } catch (e) {
-          log.info('Failed to init wavesurfer')
+          log.error('Failed to init wavesurfer', e)
         }
       }
       initWaveSurfer()
@@ -357,7 +357,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           })
           setRecorder(recorder)
         } catch (e) {
-          log.info('Failed to init mic-recorder-to-mp3')
+          log.error('Failed to init mic-recorder-to-mp3', e)
         }
       }
     })()

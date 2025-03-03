@@ -221,7 +221,7 @@ function* createChannel(action: IAction): any {
     }
     yield call(setActiveChannelId, createdChannel.id)
   } catch (e) {
-    log.info(e, 'Error on create channel')
+    log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -269,7 +269,7 @@ function* getChannels(action: IAction): any {
                   resolve(true)
                 })
                 .catch((e) => {
-                  log.info(e, 'Error on getMessagesById')
+                  log.error(e, 'Error on getMessagesById')
                   resolve(true)
                 })
             })
@@ -283,79 +283,6 @@ function* getChannels(action: IAction): any {
         return channel
       })
     }
-    /* if (!('indexedDB' in window)) {
-        log.info("This browser doesn't support IndexedDB")
-      } else {
-        log.info('should open db with name ... . ', DB_NAME)
-        const openRequest = indexedDB.open(DB_NAME, 1)
-        openRequest.onupgradeneeded = function (event) {
-          // срабатывает, если на клиенте нет базы данных
-          // ...выполнить инициализацию...
-          // версия существующей базы данных меньше 2 (или база данных не существует)
-          const db = openRequest.result
-          log.info('onupgradeneeded --  db. . . . ', db)
-          log.info('onupgradeneeded ---  event.oldVersion. . . . ', event.oldVersion)
-          if (!db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS)) {
-            const objectStore = db.createObjectStore(DB_STORE_NAMES.CHANNELS, { keyPath: 'id' })
-            // Create the 'channels' object store with the appropriate keyPath
-            objectStore.transaction.oncomplete = () => {
-              const channelObjectStore = db
-                .transaction(DB_STORE_NAMES.CHANNELS, 'readwrite')
-                .objectStore(DB_STORE_NAMES.CHANNELS)
-              mappedChannels.forEach((channel: IChannel) => {
-                const request = channelObjectStore.put(channel)
-                request.onsuccess = function () {
-                  log.info('channel added to db.. ', request.result)
-                }
-
-                request.onerror = function () {
-                  log.info('Error on put channel to db .. ', request.error)
-                }
-              })
-            }
-            // если хранилище "books" не существует
-          } else {
-            log.info('channels object is exist ... ')
-            const transaction = db.transaction(DB_STORE_NAMES.CHANNELS, 'readwrite')
-            const channelsStore = transaction.objectStore(DB_STORE_NAMES.CHANNELS)
-
-            mappedChannels.forEach((channel: IChannel) => {
-              const request = channelsStore.put(channel)
-              request.onsuccess = function () {
-                log.info('channel added to db.. ', request.result)
-              }
-
-              request.onerror = function () {
-                log.info('Error on put channel to db .. ', request.error)
-              }
-            })
-          }
-        }
-
-        openRequest.onerror = function () {
-          console.error('Error', openRequest.error)
-        }
-
-        openRequest.onsuccess = function () {
-          const db = openRequest.result
-
-          log.info('db  open is success.... .. ', db)
-          db.onversionchange = function () {
-            db.close()
-            alert('The database is out of date, please reload the page.')
-          }
-          log.info(
-            'db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS). ..  ',
-            db.objectStoreNames.contains(DB_STORE_NAMES.CHANNELS)
-          )
-        }
-        openRequest.onblocked = function () {
-          // это событие не должно срабатывать, если мы правильно обрабатываем onversionchange
-          // это означает, что есть ещё одно открытое соединение с той же базой данных
-          // и он не был закрыт после того, как для него сработал db.onversionchange
-        }
-        log.info('openRequest.  . . .', openRequest)
-      } */
     yield put(setChannelsAC(mappedChannels))
     if (!channelId) {
       ;[activeChannel] = channelList
@@ -383,13 +310,13 @@ function* getChannels(action: IAction): any {
             const allChannelList = allChannelsData.channels
             addChannelsToAllChannels(allChannelList)
           } catch (e) {
-            log.info(e, 'Error on get all channels')
+            log.error(e, 'Error on get all channels')
           }
         }
       }
     }
   } catch (e) {
-    log.info(e, 'Error on get channels')
+    log.error(e, 'Error on get channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -519,7 +446,7 @@ function* searchChannels(action: IAction): any {
       ) */
     }
   } catch (e) {
-    log.info(e, 'Error on get channels')
+    log.error(e, 'Error on get channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -555,7 +482,7 @@ function* getChannelsForForward(): any {
     query.channelQueryForward = channelQuery
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
   } catch (e) {
-    log.info(e, 'Error on get for forward channels')
+    log.error(e, 'Error on get for forward channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -675,7 +602,7 @@ function* searchChannelsForForward(action: IAction): any {
       ) */
     }
   } catch (e) {
-    log.info(e, 'Error on get channels')
+    log.error(e, 'Error on get channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -712,7 +639,7 @@ function* channelsLoadMore(action: IAction): any {
                   resolve(true)
                 })
                 .catch((e) => {
-                  log.info(e, 'Error on getMessagesById')
+                  log.error(e, 'Error on getMessagesById')
                   resolve(true)
                 })
             })
@@ -729,7 +656,7 @@ function* channelsLoadMore(action: IAction): any {
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (error) {
-    log.info(error, 'Error in load more channels')
+    log.error(error, 'Error in load more channels')
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */
@@ -759,7 +686,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
     yield put(addChannelsForForwardAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (error) {
-    log.info(error, 'Error in load more channels for forward')
+    log.error(error, 'Error in load more channels for forward')
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */
@@ -825,7 +752,7 @@ function* markMessagesRead(action: IAction): any {
       } */
     }
   } catch (e) {
-    log.info(e, 'Error on mark messages read')
+    log.error(e, 'Error on mark messages read')
   }
 }
 
@@ -846,7 +773,7 @@ function* markMessagesDelivered(action: IAction): any {
       yield call(channel.markMessagesAsReceived, messageIds)
     }
   } catch (e) {
-    log.info(e, 'Error on mark messages delivered')
+    log.error(e, 'Error on mark messages delivered')
   }
 }
 
@@ -894,7 +821,7 @@ function* switchChannel(action: IAction): any {
       // yield put(getMessagesAC(channel))
     }
   } catch (e) {
-    log.info('error in switch channel')
+    log.error('error in switch channel', e)
     // yield put(setErrorNotification(e.message));
   }
 }
@@ -919,7 +846,7 @@ function* notificationsTurnOff(action: IAction): any {
       })
     )
   } catch (e) {
-    log.info('ERROR turn off notifications', e.message)
+    log.error('ERROR turn off notifications', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -941,7 +868,7 @@ function* notificationsTurnOn(): any {
       })
     )
   } catch (e) {
-    log.info('ERROR turn on notifications: ', e.message)
+    log.error('ERROR turn on notifications: ', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -963,7 +890,7 @@ function* markChannelAsRead(action: IAction): any {
     updateChannelOnAllChannels(channel.id, updateData)
     yield put(updateChannelDataAC(channel.id, updateData))
   } catch (error) {
-    log.info(error, 'Error in set channel unread')
+    log.error(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
   }
 }
@@ -981,7 +908,7 @@ function* markChannelAsUnRead(action: IAction): any {
     updateChannelOnAllChannels(channel.id, { unread: true })
     yield put(updateChannelDataAC(channel.id, { unread: true }))
   } catch (error) {
-    log.info(error, 'Error in set channel unread')
+    log.error(error, 'Error in set channel unread')
     // yield put(setErrorNotification(error.message));
   }
 }
@@ -997,7 +924,7 @@ function* pinChannel(action: IAction): any {
     updateChannelOnAllChannels(channel.id, { pinnedAt: updatedChannel.pinnedAt })
     yield put(updateChannelDataAC(updatedChannel.id, { pinnedAt: updatedChannel.pinnedAt }, true))
   } catch (error) {
-    log.info(error, 'Error in pinChannel')
+    log.error(error, 'Error in pinChannel')
   }
 }
 
@@ -1013,7 +940,7 @@ function* unpinChannel(action: IAction): any {
     updateChannelOnAllChannels(channel.id, { pinnedAt: updatedChannel.pinnedAt })
     yield put(updateChannelDataAC(updatedChannel.id, { pinnedAt: updatedChannel.pinnedAt }, false, true))
   } catch (error) {
-    log.info(error, 'Error in unpinChannel')
+    log.error(error, 'Error in unpinChannel')
   }
 }
 
@@ -1060,7 +987,7 @@ function* leaveChannel(action: IAction): any {
       yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
-    log.info('ERROR in leave channel - ', e.message)
+    log.error('ERROR in leave channel - ', e.message)
     // yield put(setErrorNotification(e.message));
   }
 }
@@ -1083,7 +1010,7 @@ function* deleteChannel(action: IAction): any {
       yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
-    log.info('ERROR in delete channel')
+    log.error('ERROR in delete channel', e)
     // yield put(setErrorNotification(e.message));
   }
 }
@@ -1104,7 +1031,7 @@ function* blockChannel(action: IAction): any {
       yield put(removeChannelCachesAC(channelId))
     }
   } catch (e) {
-    log.info('ERROR in block channel - ', e.message)
+    log.error('ERROR in block channel - ', e.message)
     // yield put(setErrorNotification(e.message));
   }
 }
@@ -1156,7 +1083,7 @@ function* updateChannel(action: IAction): any {
       metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
     })
   } catch (e) {
-    log.info('ERROR in update channel', e.message)
+    log.error('ERROR in update channel', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1194,7 +1121,7 @@ function* checkUsersStatus(/* action: IAction */): any {
       yield put(updateUserStatusOnChannelAC(updateData))
     }
   } catch (e) {
-    log.info('ERROR in check user status : ', e.message)
+    log.error('ERROR in check user status : ', e.message)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1215,7 +1142,7 @@ function* sendTyping(action: IAction): any {
       }
     }
   } catch (e) {
-    log.info('ERROR in send typing', e)
+    log.error('ERROR in send typing', e)
   }
 }
 
@@ -1249,7 +1176,7 @@ function* clearHistory(action: IAction): any {
       )
     }
   } catch (e) {
-    log.info('ERROR in clear history')
+    log.error('ERROR in clear history', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1284,7 +1211,7 @@ function* deleteAllMessages(action: IAction): any {
       )
     }
   } catch (e) {
-    log.info('ERROR in clear history')
+    log.error('ERROR in clear history', e)
     // yield put(setErrorNotification(e.message))
   }
 }
@@ -1311,7 +1238,7 @@ function* joinChannel(action: IAction): any {
     yield call(setActiveChannelId, joinedChannel.id)
     // yield put(switchChannelAction({ ...JSON.parse(JSON.stringify(channel)), myRole: updatedChannel.myRole }));
   } catch (error) {
-    log.info(error, 'Error in join to channel')
+    log.error(error, 'Error in join to channel')
     // yield put(setErrorNotification(error.message))
   }
 }

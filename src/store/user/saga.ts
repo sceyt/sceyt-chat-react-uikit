@@ -22,7 +22,7 @@ function* getContacts(): any {
     yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
     yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR in get contacts - :', e.message)
+    log.error('ERROR in get contacts - :', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -64,7 +64,7 @@ function* blockUser(action: IAction): any {
       })
     }
   } catch (error) {
-    log.info('error in block users', error.message)
+    log.error('error in block users', error.message)
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -103,7 +103,7 @@ function* unblockUser(action: IAction): any {
       })
     }
   } catch (error) {
-    log.info('error in unblock users', error.message)
+    log.error('error in unblock users', error.message)
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -142,7 +142,7 @@ function* updateProfile(action: IAction): any {
     const updatedUser = yield call(SceytChatClient.setProfile, updateUserProfileData)
     yield put(updateUserProfileAC({ ...updatedUser }))
   } catch (error) {
-    log.info(error, 'Error on update user')
+    log.error(error, 'Error on update user')
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -202,7 +202,7 @@ function* getUsers(action: IAction): any {
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR on get users', e.message)
+    log.error('ERROR on get users', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
@@ -226,7 +226,7 @@ function* loadMoreUsers(action: IAction): any {
 
     yield put(setUsersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
-    log.info('ERROR load more users', e.message)
+    log.error('ERROR load more users', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }

@@ -162,7 +162,7 @@ const Attachment = ({
         attachmentThumb = attachment.metadata && attachment.metadata.tmb
       }
     } catch (e) {
-      log.info('error on get attachmentThumb', e)
+      log.error('error on get attachmentThumb', e)
     }
   }
 
@@ -174,7 +174,7 @@ const Attachment = ({
       setDownloadingFile(false)
     }
     image.onerror = () => {
-      console.error('Error on download image', url)
+      log.error('Error on download image', url)
     }
   }
   const handlePauseResumeDownload = (e: Event) => {
