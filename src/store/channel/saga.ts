@@ -370,7 +370,7 @@ function* getChannels(action: IAction): any {
       const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       allChannelsQueryBuilder.order('lastMessage')
       if (channelTypesFilter?.length) {
-        channelQueryBuilder.types(channelTypesFilter)
+        allChannelsQueryBuilder.types(channelTypesFilter)
       }
       allChannelsQueryBuilder.limit(50)
       const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
