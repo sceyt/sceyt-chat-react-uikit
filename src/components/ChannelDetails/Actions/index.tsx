@@ -193,7 +193,7 @@ const Actions = ({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.WARNING]: errorColor
@@ -405,7 +405,7 @@ const Actions = ({
                       <DropdownOptionLi
                         textColor={textPrimary}
                         key={value + index}
-                        hoverBackground={colors.primaryLight}
+                        hoverBackground={hoverBackground}
                         onClick={() => handleNotificationOnOff(value * oneHour)}
                       >
                         Mute for {value < 24 ? `${value} ${value > 1 ? 'hours' : 'hour'} ` : '1 day'}
@@ -417,7 +417,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={1}
-                      hoverBackground={focusBackground}
+                      hoverBackground={hoverBackground}
                       onClick={() => handleNotificationOnOff(oneHour)}
                     >
                       Mute for 1 hour
@@ -425,7 +425,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={2}
-                      hoverBackground={focusBackground}
+                      hoverBackground={hoverBackground}
                       onClick={() => handleNotificationOnOff(twoHours)}
                     >
                       Mute for 2 hours
@@ -433,7 +433,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={3}
-                      hoverBackground={focusBackground}
+                      hoverBackground={hoverBackground}
                       onClick={() => handleNotificationOnOff(oneDay)}
                     >
                       Mute for 1 day
@@ -444,7 +444,7 @@ const Actions = ({
                 <DropdownOptionLi
                   textColor={textPrimary}
                   key={4}
-                  hoverBackground={focusBackground}
+                  hoverBackground={hoverBackground}
                   onClick={() => handleNotificationOnOff()}
                 >
                   Mute forever

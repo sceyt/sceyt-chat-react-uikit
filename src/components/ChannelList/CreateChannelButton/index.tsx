@@ -38,7 +38,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary
   } = useColor()
 
@@ -63,7 +63,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={focusBackground} leftAuto={!showSearch} iconColor={accentColor}>
+          <CreateDropdownButton hoverBackground={hoverBackground} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -72,7 +72,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={1}
             textColor={textPrimary}
-            hoverBackground={focusBackground}
+            hoverBackground={hoverBackground}
             onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
           >
@@ -82,7 +82,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={2}
             textColor={textPrimary}
-            hoverBackground={focusBackground}
+            hoverBackground={hoverBackground}
             onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
           >
@@ -92,7 +92,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={3}
             textColor={textPrimary}
-            hoverBackground={focusBackground}
+            hoverBackground={hoverBackground}
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
           >

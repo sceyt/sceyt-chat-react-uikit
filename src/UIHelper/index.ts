@@ -332,7 +332,7 @@ export const CustomInput = styled.input<{
   outline: none;
 
   &:focus {
-    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : colors.primary)};
+    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : 'transparent')};
     outline: ${(props) =>
       props.error
         ? `1px solid ${colors.errorBlur}`

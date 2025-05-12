@@ -106,7 +106,8 @@ const EditChannel = ({
     [THEME_COLORS.BORDER]: borderColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.WARNING]: errorColor,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
   } = useColor()
 
   const ChatClient = getClient()
@@ -257,7 +258,7 @@ const EditChannel = ({
                   <DropdownOptionLi
                     key={1}
                     textColor={textPrimary}
-                    hoverBackground={colors.primaryLight}
+                    hoverBackground={hoverBackground}
                     onClick={() => onOpenFileUploader()}
                     iconWidth='20px'
                   >
@@ -268,7 +269,7 @@ const EditChannel = ({
                   {newAvatar.url && (
                     <DropdownOptionLi
                       key={2}
-                      hoverBackground={colors.primaryLight}
+                      hoverBackground={hoverBackground}
                       textColor={errorColor}
                       onClick={handleToggleDeleteAvatarPopup}
                       iconWidth='20px'

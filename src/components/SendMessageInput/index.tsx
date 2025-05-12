@@ -322,12 +322,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.WARNING]: errorColor,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -1391,7 +1391,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             <CustomButton
               onClick={handleToggleForwardMessagePopup}
-              backgroundColor={colors.primaryLight}
+              backgroundColor={hoverBackground}
               marginLeft='32px'
               color={textPrimary}
             >
@@ -1401,7 +1401,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
               color={errorColor}
-              backgroundColor={colors.primaryLight}
+              backgroundColor={hoverBackground}
               marginLeft='16px'
             >
               <DeleteIcon />
@@ -1664,7 +1664,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               <DropdownOptionLi
                                 key={1}
                                 textColor={textPrimary}
-                                hoverBackground={focusBackground}
+                                hoverBackground={hoverBackground}
                                 onClick={() => onOpenFileUploader(mediaExtensions)}
                                 iconWidth='20px'
                                 iconColor={iconInactive}
@@ -1677,7 +1677,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               <DropdownOptionLi
                                 key={2}
                                 textColor={textPrimary}
-                                hoverBackground={focusBackground}
+                                hoverBackground={hoverBackground}
                                 onClick={() => onOpenFileUploader('')}
                                 iconWidth='20px'
                                 iconColor={iconInactive}

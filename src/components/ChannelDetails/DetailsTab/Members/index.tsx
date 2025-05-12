@@ -74,7 +74,7 @@ const Members = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.FOCUS_BACKGROUND]: focusBackground,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.WARNING]: errorColor
   } = useColor()
@@ -246,7 +246,7 @@ const Members = ({
               key={1}
               onClick={handleAddMemberPopup}
               color={textPrimary}
-              hoverBackground={hoverBackgroundColor || focusBackground}
+              hoverBackground={hoverBackgroundColor || hoverBackground}
               addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
             >
@@ -260,7 +260,7 @@ const Members = ({
               <MemberItem
                 key={member.id + index}
                 color={textPrimary}
-                hoverBackground={hoverBackgroundColor || focusBackground}
+                hoverBackground={hoverBackgroundColor || hoverBackground}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
               >
@@ -321,7 +321,7 @@ const Members = ({
                             setCloseMenu('1')
                           }}
                           key={1}
-                          hoverBackground={focusBackground}
+                          hoverBackground={hoverBackground}
                         >
                           Change role
                         </DropdownOptionLi>
@@ -335,7 +335,7 @@ const Members = ({
                           }}
                           textColor={member.role === 'admin' ? errorColor : ''}
                           key={2}
-                          hoverBackground={focusBackground}
+                          hoverBackground={hoverBackground}
                         >
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
@@ -349,7 +349,7 @@ const Members = ({
                           }}
                           textColor={errorColor}
                           key={3}
-                          hoverBackground={focusBackground}
+                          hoverBackground={hoverBackground}
                         >
                           Remove
                         </DropdownOptionLi>
@@ -358,7 +358,7 @@ const Members = ({
                         <DropdownOptionLi
                           textColor={errorColor}
                           key={4}
-                          hoverBackground={focusBackground}
+                          hoverBackground={hoverBackground}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup(e)
