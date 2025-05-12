@@ -108,7 +108,8 @@ const DetailsTab = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BORDER]: borderThemeColor
+    [THEME_COLORS.BORDER]: borderThemeColor,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
   } = useColor()
 
   const dispatch = useDispatch()
@@ -144,6 +145,7 @@ const DetailsTab = ({
         fontSize={tabItemsFontSize}
         lineHeight={tabItemsLineHeight}
         minWidth={tabItemsMinWidth}
+        backgroundColor={backgroundColor}
       >
         {Object.keys(channelDetailsTabs).map((key) => {
           if (key === 'member') {
@@ -257,6 +259,7 @@ const DetailsTabHeader = styled.div<{
   overflow-y: hidden;
   padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor};
+  background-color: ${(props) => props.backgroundColor || 'transparent'};
   display: flex;
   justify-content: space-between;
   position: sticky;
