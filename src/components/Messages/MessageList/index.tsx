@@ -847,12 +847,6 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [scrollToNewMessage])
 
   useDidUpdate(() => {
-    if (isDragging) {
-      setIsDragging(false)
-    }
-  }, [browserTabIsActive])
-
-  useDidUpdate(() => {
     if (!mediaFile && isDragging) {
       setIsDragging(false)
     }
