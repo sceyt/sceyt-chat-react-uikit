@@ -193,8 +193,6 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
         }
       }
 
-      console.log('UIKIT thumbnailMetas', thumbnailMetas)
-      console.log('UIKIT attachment', attachment)
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
@@ -994,7 +992,6 @@ function* resendMessage(action: IAction): any {
                 }
               }
             }
-            console.log('UIKIT thumbnailMetas', thumbnailMetas)
             let attachmentMeta: string
             if (messageAttachment.cachedUrl) {
               attachmentMeta = messageAttachment.metadata
