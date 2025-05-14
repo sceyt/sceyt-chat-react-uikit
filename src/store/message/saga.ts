@@ -127,6 +127,7 @@ import { attachmentCompilationStateSelector, messagesHasNextSelector } from './s
 import { isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
+import { getFrame } from 'helpers/getVideoFrame'
 
 const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -146,7 +147,7 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
       const fileType = attachment.url.type.split('/')[0]
       let filePath: any
       const handleUpdateLocalPath = (updatedLink: string) => {
-        if (fileType === 'image') {
+        if (fileType === 'image' || fileType === 'video') {
           filePath = updatedLink
           message.attachments[0] = { ...message.attachments[0], attachmentUrl: updatedLink }
         }
@@ -182,19 +183,34 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
           attachment.type === 'file' ? 50 : undefined,
           attachment.type === 'file' ? 50 : undefined
         )
+      } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
+        const meta = await getFrame(filePath)
+        thumbnailMetas = {
+          thumbnail: meta.thumb,
+          imageWidth: meta.width,
+          imageHeight: meta.height,
+          duration: meta.duration
+        }
       }
 
+      console.log('UIKIT thumbnailMetas', thumbnailMetas)
+      console.log('UIKIT attachment', attachment)
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-          ...attachment.metadata,
-          ...(thumbnailMetas &&
-            thumbnailMetas.thumbnail && {
-            tmb: thumbnailMetas.thumbnail,
-            szw: thumbnailMetas.imageWidth,
-            szh: thumbnailMetas.imageHeight
+            ...(attachment.metadata
+              ? typeof attachment.metadata === 'string'
+                ? JSON.parse(attachment.metadata)
+                : attachment.metadata
+              : {}),
+            ...(thumbnailMetas &&
+              thumbnailMetas.thumbnail && {
+                tmb: thumbnailMetas.thumbnail,
+                szw: thumbnailMetas.imageWidth,
+                szh: thumbnailMetas.imageHeight,
+                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+              })
           })
-        })
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -285,7 +301,7 @@ function* sendMessage(action: IAction): any {
     const customUploader = getCustomUploader()
 
     if (message.attachments && message.attachments.length) {
-      let linkAttachment = null;
+      let linkAttachment = null
       const attachmentsToSend: any = []
       const messagesToSend: IMessage[] = []
 
@@ -300,7 +316,7 @@ function* sendMessage(action: IAction): any {
           if (attachment.cachedUrl) {
             uri = attachment.cachedUrl
           }
-          let attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
+          const attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
 
           const messageAttachment = attachmentBuilder
             .setName(attachment.name)
@@ -371,7 +387,7 @@ function* sendMessage(action: IAction): any {
               }
             }
           } else if (customUploader && attachment) {
-            attachment.url = attachment.data;
+            attachment.url = attachment.data
           }
 
           // not for SDK, for displaying attachments and their progress
@@ -418,7 +434,6 @@ function* sendMessage(action: IAction): any {
             yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
           }
         }
-
 
         if (!sendAttachmentsAsSeparateMessage) {
           const messageBuilder = channel.createMessageBuilder()
@@ -475,16 +490,13 @@ function* sendMessage(action: IAction): any {
         try {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
-            let attachmentsToSend = messageAttachment;
+            let attachmentsToSend = messageAttachment
             if (customUploader) {
               attachmentsToSend = yield call(handleUploadAttachments, messageAttachment || [], messageCopy, channel)
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
-              const linkAttachmentBuilder = channel.createAttachmentBuilder(
-                linkAttachment.data,
-                linkAttachment.type
-              )
+              const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
               linkAttachmentToSend = linkAttachmentBuilder
                 .setName(linkAttachment.name)
                 .setUpload(linkAttachment.upload)
@@ -510,7 +522,12 @@ function* sendMessage(action: IAction): any {
                   setDataToDB(
                     DB_NAMES.FILES_STORAGE,
                     DB_STORE_NAMES.ATTACHMENTS,
-                    [{ ...messageResponse.attachments[k], checksum: pendingAttachment.checksum || pendingAttachment?.file }],
+                    [
+                      {
+                        ...messageResponse.attachments[k],
+                        checksum: pendingAttachment.checksum || pendingAttachment?.file
+                      }
+                    ],
                     'checksum'
                   )
                 }
@@ -966,19 +983,35 @@ function* resendMessage(action: IAction): any {
                 messageAttachment.type === 'file' ? 50 : undefined,
                 messageAttachment.type === 'file' ? 50 : undefined
               )
+            } else if (!messageAttachment.cachedUrl && messageAttachment.url.type.split('/')[0] === 'video') {
+              if (filePath) {
+                const meta = yield call(getFrame, filePath)
+                thumbnailMetas = {
+                  thumbnail: meta.thumb,
+                  imageWidth: meta.width,
+                  imageHeight: meta.height,
+                  duration: meta.duration
+                }
+              }
             }
+            console.log('UIKIT thumbnailMetas', thumbnailMetas)
             let attachmentMeta: string
             if (messageAttachment.cachedUrl) {
               attachmentMeta = messageAttachment.metadata
             } else {
               attachmentMeta = JSON.stringify({
-                ...messageAttachment.metadata,
+                ...(messageAttachment.metadata
+                  ? typeof messageAttachment.metadata === 'string'
+                    ? JSON.parse(messageAttachment.metadata)
+                    : messageAttachment.metadata
+                  : {}),
                 ...(thumbnailMetas &&
                   thumbnailMetas.thumbnail && {
-                  tmb: thumbnailMetas.thumbnail,
-                  szw: thumbnailMetas.imageWidth,
-                  szh: thumbnailMetas.imageHeight
-                })
+                    tmb: thumbnailMetas.thumbnail,
+                    szw: thumbnailMetas.imageWidth,
+                    szh: thumbnailMetas.imageHeight,
+                    ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+                  })
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
@@ -1336,8 +1369,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-            result.messages.length > 0 &&
-            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+              result.messages.length > 0 &&
+              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
 

@@ -7,37 +7,47 @@ import log from 'loglevel'
 export async function getFrame(
   videoSrc: any,
   time?: number
-): Promise<{ thumb: string; width: number; height: number }> {
+): Promise<{ thumb: string; width: number; height: number; duration: number }> {
   const video = document.createElement('video')
   video.src = videoSrc
+  video.crossOrigin = 'anonymous'
+  video.preload = 'auto'
+  video.muted = true
   return new Promise((resolve, reject) => {
     if (videoSrc) {
-      const b = setInterval(() => {
-        if (video.readyState >= 3) {
-          if (time) {
-            video.currentTime = time
-          }
-          // const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 200, 100)
-          const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 50, 50)
+      video.onloadedmetadata = () => {
+        // Set the time before drawing
+        video.currentTime = time || 0
+
+        video.onseeked = () => {
+          const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 100, 100)
           const canvas = document.createElement('canvas')
           canvas.width = newWidth
           canvas.height = newHeight
 
-          // @ts-ignore
           const ctx = canvas.getContext('2d')
-          video.currentTime = 10
-          // @ts-ignore
+          if (!ctx) {
+            reject(new Error('Failed to get canvas context'))
+            return
+          }
+
           ctx.drawImage(video, 0, 0, newWidth, newHeight)
-          // @ts-ignore
           const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
           const thumb = binaryToBase64(binaryThumbHash)
-          log.info('generated thumb hash ... ', thumb)
+          const duration = Number(video.duration?.toFixed(0))
 
-          clearInterval(b)
-          resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
+          resolve({ thumb, width: video.videoWidth, height: video.videoHeight, duration })
         }
-      }, 500)
+
+        video.onerror = () => {
+          reject(new Error('Failed to seek video'))
+        }
+      }
+
+      video.onerror = () => {
+        reject(new Error('Failed to load video'))
+      }
     } else {
       reject(new Error('src not found'))
     }
