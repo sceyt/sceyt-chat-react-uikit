@@ -39,7 +39,8 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.WARNING]: errorColor,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -99,7 +100,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
                   {!!roles.length &&
                     roles.map((role: IRole) => (
                       <DropdownOptionLi
-                        hoverBackground={colors.primaryLight}
+                        hoverBackground={hoverBackground}
                         key={role.name}
                         onClick={() => onChangeFunction(role.name)}
                         textColor={textPrimary}

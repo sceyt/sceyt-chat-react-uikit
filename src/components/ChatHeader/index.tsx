@@ -78,7 +78,8 @@ export default function ChatHeader({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.BORDER]: borderColor
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -141,14 +142,14 @@ export default function ChatHeader({
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
-          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={colors.primaryLight}>
+          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={hoverBackground}>
             <WrapArrowLeftIcon color={iconPrimary} />
           </MobileBackButtonWrapper>
         )}
       </MobileButtonWrapper>
 
       {activeChannel.isLinkedChannel && (
-        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={colors.primaryLight} order={backButtonOrder}>
+        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={hoverBackground} order={backButtonOrder}>
           <WrapArrowLeftIcon color={iconPrimary} />
         </BackButtonWrapper>
       )}

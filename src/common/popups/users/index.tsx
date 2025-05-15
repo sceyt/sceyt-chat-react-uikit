@@ -75,7 +75,8 @@ const UsersPopup = ({
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -380,7 +381,7 @@ const UsersPopup = ({
               return (
                 <ListRow
                   isAdd={actionType !== 'createChat'}
-                  hoverBackground={colors.hoverBackgroundColor}
+                  hoverBackground={hoverBackground}
                   key={user.id}
                   onClick={() => actionType === 'createChat' && handleAddMember(user)}
                 >
