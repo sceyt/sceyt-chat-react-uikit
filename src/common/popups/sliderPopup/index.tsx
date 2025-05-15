@@ -53,7 +53,7 @@ const SliderPopup = ({
   allowEditDeleteIncomingMessage,
   attachmentsPreview
 }: IProps) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
 
   const dispatch = useDispatch()
 
@@ -429,8 +429,7 @@ const SliderPopup = ({
                   className='custom_carousel_arrow'
                   leftButton={type === 'PREV'}
                   type='button'
-                  backgroundColor={textPrimary}
-                  onClick={(e) => {
+                  onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
                     setImageLoading(true)
                     e.preventDefault()
                     onClick()
