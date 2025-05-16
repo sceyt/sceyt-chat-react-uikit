@@ -78,6 +78,7 @@ const SliderPopup = ({
   const contactsMap = useSelector(contactsMapSelector)
   const attachments = useSelector(attachmentsForPopupSelector, shallowEqual) || []
   const visibilityTimeout = useRef<any>()
+  const carouselRef = useRef<any>(null)
   // const attachmentsHasNext = useSelector(attachmentsForPopupHasNextSelector, shallowEqual) || []
   const attachmentUserName = currentFile
     ? currentFile.user &&
@@ -328,7 +329,19 @@ const SliderPopup = ({
 
   const activeFileIndex = useMemo(() => {
     return attachmentsList.findIndex((item) => item.id === currentFile.id)
-  }, [attachmentsList, currentFile]);
+  }, [attachmentsList, currentFile])
+
+  useEffect(() => {
+    const handleContextMenu = (event: MouseEvent) => {
+      event.preventDefault() // Optional: prevent browser menu
+    }
+
+    window.addEventListener('contextmenu', handleContextMenu)
+
+    return () => {
+      window.removeEventListener('contextmenu', handleContextMenu)
+    }
+  }, [])
 
   return (
     <Container draggable={false}>
@@ -403,7 +416,7 @@ const SliderPopup = ({
         {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
           // @ts-ignore
           <Carousel
-            draggable={false}
+            ref={carouselRef}
             pagination={false}
             className='custom_carousel'
             initialActiveIndex={currentFile && activeFileIndex}
@@ -687,14 +700,14 @@ const UploadCont = styled.div`
   align-items: center;
   justify-content: center;
 `
-const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; backgroundColor?: string }>`
+const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
   min-width: 60px;
   max-width: 60px;
   height: 60px;
   margin-right: ${(props) => !props.leftButton && '24px'};
   margin-left: ${(props) => props.leftButton && '24px'};
-  background: ${(props) => props.backgroundColor};
-  border: 1px solid rgba(0, 0, 0, 0.1);
+  border: none;
+  background: transparent;
   box-sizing: border-box;
   border-radius: 50%;
   line-height: 1px;
