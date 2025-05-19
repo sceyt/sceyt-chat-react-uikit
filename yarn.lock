@@ -2290,11 +2290,6 @@
   dependencies:
     "@types/node" "*"
 
-"@types/debounce@*":
-  version "1.2.4"
-  resolved "https://registry.yarnpkg.com/@types/debounce/-/debounce-1.2.4.tgz#cb7e85d9ad5ababfac2f27183e8ac8b576b2abb3"
-  integrity sha512-jBqiORIzKDOToaF63Fm//haOCHuwQuLa2202RK4MozpA6lh93eCBc+/8+wZn5OzjJt3ySdc+74SXWXB55Ewtyw==
-
 "@types/dom-mediacapture-record@^1.0.11":
   version "1.0.19"
   resolved "https://registry.yarnpkg.com/@types/dom-mediacapture-record/-/dom-mediacapture-record-1.0.19.tgz#27ade00734877fc83323b9b0550f259b08903841"
@@ -2631,13 +2626,6 @@
   version "9.0.8"
   resolved "https://registry.yarnpkg.com/@types/uuid/-/uuid-9.0.8.tgz#7545ba4fc3c003d6c756f651f3bf163d8f0f29ba"
   integrity sha512-jg+97EGIcY9AGHJJRaaPVgetKDsrTgbRjQ5Msgjh/DQKEFl0DtyRr/VCOyD1T2R1MNeWPK/u7JoGhlDZnKBAfA==
-
-"@types/wavesurfer.js@^6.0.6":
-  version "6.0.12"
-  resolved "https://registry.yarnpkg.com/@types/wavesurfer.js/-/wavesurfer.js-6.0.12.tgz#3cbec05cb70fa8c9a79a8da70cc9be10166f9d83"
-  integrity sha512-oM9hYlPIVms4uwwoaGs9d0qp7Xk7IjSGkdwgmhUymVUIIilRfjtSQvoOgv4dpKiW0UozWRSyXfQqTobi0qWyCw==
-  dependencies:
-    "@types/debounce" "*"
 
 "@types/ws@^8.5.5":
   version "8.5.12"
@@ -11802,10 +11790,10 @@ watchpack@^2.4.1:
     glob-to-regexp "^0.4.1"
     graceful-fs "^4.1.2"
 
-wavesurfer.js@^6.6.3:
-  version "6.6.4"
-  resolved "https://registry.yarnpkg.com/wavesurfer.js/-/wavesurfer.js-6.6.4.tgz#45e2d613fbfd60d906362ed6e11b649f481e4485"
-  integrity sha512-nBbc0pD/3FdClxKUKL1UW2V9AJPL+JOjC8T6/YF9/FCAn4uo+H6Y8VBkXo9UJXIHoBewoc7iXj3tPeL0UCJhjA==
+wavesurfer.js@^7.9.5:
+  version "7.9.5"
+  resolved "https://registry.npmjs.org/wavesurfer.js/-/wavesurfer.js-7.9.5.tgz#e06707cc28e59283556df0ea16bb5503fe3a9243"
+  integrity sha512-ioOG9chuAn0bF2NYYKkZtaxjcQK/hFskLg8ViLYbJHhWPk1N5wWtuqVhqeh2ZWT2SK3t0E8UkD7lLDLuZQQaSA==
 
 wbuf@^1.1.0, wbuf@^1.7.3:
   version "1.7.3"
