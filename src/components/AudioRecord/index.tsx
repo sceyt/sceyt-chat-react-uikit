@@ -13,7 +13,7 @@ import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
-
+import WaveSurfer from 'wavesurfer.js'
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   sendRecordedFile: (data: { file: File; objectUrl: string; thumb: number[]; dur: number }) => void
@@ -22,7 +22,6 @@ interface AudioPlayerProps {
   showRecording: boolean
 }
 let shouldDraw = false
-let WaveSurfer: any
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording }) => {
   const {
@@ -283,16 +282,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     if (recordedFile) {
       const initWaveSurfer = async () => {
         try {
-          if (!WaveSurfer) {
-            WaveSurfer = await import('wavesurfer.js')
-          }
           if (wavesurfer.current) {
             wavesurfer.current.destroy()
           }
-          wavesurfer.current = WaveSurfer.default.create({
+          wavesurfer.current = WaveSurfer.create({
             container: wavesurferContainer.current,
             waveColor: textSecondary,
-            skipLength: 0,
             progressColor: accentColor,
             barWidth: 1,
             barHeight: 2,
@@ -301,7 +296,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
             barRadius: 1.5,
             cursorWidth: 0,
             barGap: 2.5,
-            barMinHeight: 1.5,
             height: 28
           })
 
