@@ -700,6 +700,7 @@ const UploadCont = styled.div`
   align-items: center;
   justify-content: center;
 `
+
 const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
   min-width: 60px;
   max-width: 60px;
