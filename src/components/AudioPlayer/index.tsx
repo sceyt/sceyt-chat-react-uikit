@@ -14,6 +14,7 @@ import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
+import WaveSurfer from 'wavesurfer.js'
 
 interface Recording {
   recordingSeconds: number
@@ -141,11 +142,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       }
       const initWaveSurfer = async () => {
         try {
-          const WaveSurfer = await import('wavesurfer.js')
-          wavesurfer.current = WaveSurfer.default.create({
+          wavesurfer.current = WaveSurfer.create({
             container: wavesurferContainer.current,
             waveColor: textSecondary,
-            skipLength: 0,
             progressColor: accentColor,
             // audioContext,
             // cursorColor: 'transparent',
@@ -161,7 +160,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
             barRadius: 1.5,
             cursorWidth: 0,
             barGap: 2,
-            barMinHeight: 2,
             height: 20
           })
           let peaks
