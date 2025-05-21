@@ -163,7 +163,7 @@ const DropDown = ({
     }
   }
 
-  const handleDropdownClicks = (e: Event) => {
+  const handleDropdownClicks = (e: React.MouseEvent<HTMLDivElement>) => {
     e.stopPropagation()
     if (isOpen) {
       if (!isStatic) {
@@ -223,7 +223,7 @@ const DropDown = ({
       height={height}
     >
       <DropDownTriggerContainer
-        onClick={(e) => {
+        onClick={(e: React.MouseEvent<HTMLDivElement>) => {
           e.stopPropagation()
           toggleDropdown()
         }}

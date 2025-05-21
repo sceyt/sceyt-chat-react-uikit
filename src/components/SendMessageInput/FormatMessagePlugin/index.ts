@@ -6,7 +6,6 @@ import {
   $isRangeSelection,
   COMMAND_PRIORITY_LOW,
   COMMAND_PRIORITY_NORMAL,
-  GridSelection,
   KEY_BACKSPACE_COMMAND,
   KEY_DELETE_COMMAND,
   LexicalEditor,
@@ -30,10 +29,7 @@ function useFormatMessage(
   setMessageText: (newMessageText: string) => void,
   messageToEdit?: IMessage
 ): void {
-  function $insertDataTransferForPlainText(
-    dataTransfer: DataTransfer,
-    selection: RangeSelection | GridSelection
-  ): void {
+  function $insertDataTransferForPlainText(dataTransfer: DataTransfer, selection: RangeSelection): void {
     const text = dataTransfer.getData('text/plain') || dataTransfer.getData('text/uri-list')
 
     if (text != null) {

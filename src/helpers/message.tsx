@@ -123,7 +123,7 @@ export const isJSON = (str: any) => {
 
 export const combineMessageAttributes = (attributes: IBodyAttribute[]): IBodyAttribute[] => {
   const sortedAttributes: any = attributes.sort((a: any, b: any) => a.offset - b.offset)
-  const combinedAttributes = {}
+  const combinedAttributes: { [key: string]: IBodyAttribute } = {}
   sortedAttributes.forEach((attribute: any) => {
     const offset = attribute.offset
     const typeValue = attribute.type
@@ -235,7 +235,7 @@ export const compareMessageBodyAttributes = (attributes1: IBodyAttribute[], attr
   return JSON.stringify(attributes1) === JSON.stringify(attributes2)
 }
 
-export const bodyAttributesMapByType = {
+export const bodyAttributesMapByType: { [key: number]: string[] } = {
   1: ['bold'],
   2: ['italic'],
   3: ['bold', 'italic'],

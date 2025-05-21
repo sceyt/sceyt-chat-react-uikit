@@ -15,9 +15,10 @@ interface IVideoPlayerProps {
   src: string
   videoFileId?: string
   activeFileId?: string
+  onMouseDown?: (e: React.MouseEvent) => void
 }
 let timerInterval: any
-const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
+const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
   const containerRef = useRef<HTMLVideoElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const progressRef = useRef<HTMLVideoElement>(null)
@@ -166,7 +167,13 @@ const VideoPlayer = ({ src, videoFileId, activeFileId }: IVideoPlayerProps) => {
     }
   }, [])
   return (
-    <Component ref={containerRef} loaded={isLoaded} fullScreen={isFullScreen} className='custom_video_player'>
+    <Component
+      ref={containerRef}
+      loaded={isLoaded}
+      fullScreen={isFullScreen}
+      className='custom_video_player'
+      onMouseDown={onMouseDown}
+    >
       <video
         onClick={() => videoHandler(playing ? 'pause' : 'play')}
         id='video1'

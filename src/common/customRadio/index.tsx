@@ -37,7 +37,13 @@ const CustomRadio = ({
         htmlFor={`radio-${index}`}
       />
 
-      <Radio disabled={disabled} type='radio' id={`radio-${index}`} checked={state} onChange={(e) => onChange(e)} />
+      <Radio
+        disabled={disabled}
+        type='radio'
+        id={`radio-${index}`}
+        checked={state}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e)}
+      />
     </React.Fragment>
   )
 }

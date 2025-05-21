@@ -65,7 +65,7 @@ const SUGGESTION_LIST_LENGTH_LIMIT = 50
 
 const mentionsCache = new Map()
 
-let membersMap = {}
+let membersMap: { [key: string]: IMember } = {}
 
 function useMentionLookupService(
   mentionString: string | null,
@@ -347,7 +347,7 @@ export default function MentionsPlugin({
           if (nodeToReplace) {
             const replacedNode = nodeToReplace.replace(mentionNode)
             const appendedNode = replacedNode.insertAfter($createTextNode(' '))
-            appendedNode.select()
+            appendedNode.selectStart()
           }
           closeMenu()
         })
