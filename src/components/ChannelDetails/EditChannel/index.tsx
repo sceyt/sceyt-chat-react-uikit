@@ -301,7 +301,7 @@ const EditChannel = ({
           backgroundColor={sectionBackground}
           placeholder='Channel Subject'
           value={newSubject}
-          onChange={(e) => setNewSubject(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSubject(e.target.value)}
         />
         {subjectIsWrong && (
           <InputErrorMessage color={errorColor}>
@@ -320,7 +320,7 @@ const EditChannel = ({
           placeholderColor={textFootnote}
           placeholder='Channel description'
           value={newDescription}
-          onChange={(e) => setNewDescription(e.target.value)}
+          onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDescription(e.target.value)}
         />
         {descriptionIsWrong && (
           <InputErrorMessage color={errorColor}>Channel description must be maximum of 2000 symbols.</InputErrorMessage>

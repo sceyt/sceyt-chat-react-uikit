@@ -364,7 +364,7 @@ function useFloatingTextFormatToolbar(editor: LexicalEditor, anchorElem: HTMLEle
         if (!nextSibling) {
           editor.update(() => {
             const appendedNode = node.insertAfter($createTextNode(' '))
-            appendedNode.select(0, 0)
+            appendedNode.selectStart()
           })
         }
       }

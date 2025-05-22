@@ -511,7 +511,7 @@ const Message = ({
       bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}
       selectMessagesIsActive={selectionIsActive}
-      onClick={(e) => selectionIsActive && handleSelectMessage(e)}
+      onClick={(e: React.MouseEvent<HTMLDivElement>) => selectionIsActive && handleSelectMessage(e)}
       // id={message.id}
     >
       {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (

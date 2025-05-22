@@ -82,7 +82,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
                 max={3}
                 step={0.1}
                 aria-labelledby='Zoom'
-                onChange={(e) => {
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
                   onZoomChange(e.target.value)
                 }}
                 className='zoom-range'

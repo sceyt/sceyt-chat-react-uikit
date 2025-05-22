@@ -47,7 +47,7 @@ const CustomCheckbox = ({
         disabled={disabled}
         id={`checkbox-${index}`}
         checked={state}
-        onChange={(e) => onChange(e)}
+        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e)}
       />
     </React.Fragment>
   )

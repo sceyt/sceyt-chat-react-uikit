@@ -437,7 +437,7 @@ const UsersPopup = ({
                       state={isSelected}
                       backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
                       checkedBackgroundColor={accentColor}
-                      onChange={(e) =>
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
                         handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
                       }
                       size='18px'
@@ -446,7 +446,9 @@ const UsersPopup = ({
                         name='member-username'
                         type='checkbox'
                         checked={isSelected}
-                        onChange={(e) => handleUserSelect(e, { id: contact.user.id, displayName: memberDisplayName })}
+                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
+                          handleUserSelect(e, { id: contact.user.id, displayName: memberDisplayName })
+                        }
                       /> */
                   )}
                 </ListRow>

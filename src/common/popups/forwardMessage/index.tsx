@@ -237,7 +237,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
-                            onChange={(e) => handleChannelSelect(e, channel)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
                             size='18px'
                             tickColor={accentColor}
                           />
@@ -279,7 +279,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
-                            onChange={(e) => handleChannelSelect(e, channel)}
+                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
                             size='18px'
                             tickColor={accentColor}
                           />
@@ -352,7 +352,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       index={channel.id}
                       disabled={selectedChannels.length >= 5 && !isSelected}
                       state={isSelected}
-                      onChange={(e) => handleChannelSelect(e, channel)}
+                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
                       size='18px'
                       tickColor={accentColor}
                     />

@@ -62,10 +62,10 @@ const SliderPopup = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const [currentFile, setCurrentFile] = useState<any>({ ...currentMediaFile })
-  const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
+  const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
   const [attachmentsList, setAttachmentsList] = useState<IMedia[]>([])
   const [imageLoading, setImageLoading] = useState(true)
-  const [downloadedFiles, setDownloadedFiles] = useState<{ [key: number]: any }>({})
+  const [downloadedFiles, setDownloadedFiles] = useState<{ [key: string]: string }>({})
   const [playedVideo, setPlayedVideo] = useState<string | undefined>()
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
@@ -331,17 +331,12 @@ const SliderPopup = ({
     return attachmentsList.findIndex((item) => item.id === currentFile.id)
   }, [attachmentsList, currentFile])
 
-  useEffect(() => {
-    const handleContextMenu = (event: MouseEvent) => {
-      event.preventDefault() // Optional: prevent browser menu
-    }
 
-    window.addEventListener('contextmenu', handleContextMenu)
-
-    return () => {
-      window.removeEventListener('contextmenu', handleContextMenu)
+  const handleCarouselItemMouseDown = (e: React.MouseEvent) => {
+    if (e.button === 2) {
+      e.stopPropagation();
     }
-  }, [])
+  }
 
   return (
     <Container draggable={false}>
@@ -412,7 +407,15 @@ const SliderPopup = ({
           </IconWrapper>
         </ClosePopupWrapper>
       </SliderHeader>
-      <SliderBody onClick={handleClicks}>
+      <SliderBody onClick={handleClicks} 
+      onMouseDown={(e: React.MouseEvent) => {
+        if (e.button === 2) {
+          e.stopPropagation();
+          e.preventDefault();
+          return false;
+        }
+        return true;
+      }}>
         {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
           // @ts-ignore
           <Carousel
@@ -462,6 +465,10 @@ const SliderPopup = ({
                 key={file.id}
                 draggable={false}
                 visibleSlide={visibleSlide}
+                onMouseDown={handleCarouselItemMouseDown}
+                onContextMenu={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                }}
               >
                 {/* {downloadedFiles[file.id!] ? ( */}
                 <React.Fragment>
@@ -472,7 +479,16 @@ const SliderPopup = ({
                           <UploadingIcon />
                         </UploadCont>
                       ) : (
-                        <img draggable={false} src={downloadedFiles[file.id!]} alt={file.name} />
+                        <img
+                          draggable={false}
+                          src={downloadedFiles[file.id!]}
+                          alt={file.name}
+                          onMouseDown={(e) => {
+                            if (e.button === 2) {
+                              e.stopPropagation();
+                            }
+                          }}
+                        />
                       )}
                     </React.Fragment>
                   ) : (
@@ -481,6 +497,11 @@ const SliderPopup = ({
                         activeFileId={currentFile?.id || ''}
                         videoFileId={file.id}
                         src={downloadedFiles[file.id!]}
+                        onMouseDown={(e: React.MouseEvent) => {
+                          if (e.button === 2) {
+                            e.stopPropagation();
+                          }
+                        }}
                       />
                       {/* <video controls autoPlay id={file.url} src={downloadedFiles[file.url]}>
                           <source src={downloadedFiles[file.url]} type={`video/${getFileExtension(file.name)}`} />

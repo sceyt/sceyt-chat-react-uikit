@@ -94,7 +94,7 @@ function ConfirmPopup({
                     index='1'
                     size='18px'
                     state={deleteMessageOption === 'forEveryone'}
-                    onChange={(e) => handleChooseDeleteOption(e, 'forEveryone')}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChooseDeleteOption(e, 'forEveryone')}
                     checkedBorderColor={accentColor}
                     borderColor={textSecondary}
                   />
@@ -106,7 +106,7 @@ function ConfirmPopup({
                   index='2'
                   size='18px'
                   state={deleteMessageOption === 'forMe'}
-                  onChange={(e) => handleChooseDeleteOption(e, 'forMe')}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChooseDeleteOption(e, 'forMe')}
                   checkedBorderColor={accentColor}
                   borderColor={textSecondary}
                 />
