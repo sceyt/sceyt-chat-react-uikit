@@ -14,6 +14,7 @@ import {
   destroyChannelsMap,
   setActiveChannelId,
   setAutoSelectFitsChannel,
+  setChannelMembersCount,
   setChannelTypesFilter,
   setChannelTypesMemberDisplayTextMap,
   setDefaultRolesByChannelTypesMap,
@@ -53,7 +54,8 @@ const SceytChat = ({
   hideUserPresence,
   showNotifications,
   openChatOnUserInteraction = true,
-  autoSelectFirstChannel = false
+  autoSelectFirstChannel = false,
+  memberCount
 }: IChatClientProps) => {
   const { [THEME_COLORS.BACKGROUND]: backgroundColor } = useColor()
   const dispatch = useDispatch()
@@ -283,6 +285,11 @@ const SceytChat = ({
       setContactsMap(contactsMap)
     }
   }, [contactsMap])
+
+  useEffect(() => {
+    setChannelMembersCount(memberCount || 0)
+  }, [memberCount])
+
   return (
     <React.Fragment>
       {SceytChatClient ? (

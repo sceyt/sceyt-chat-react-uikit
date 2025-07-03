@@ -21,7 +21,7 @@ import { ReactComponent as MessageIcon } from '../../assets/svg/message.svg'
 import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
 import { IChannel } from '../../types'
-import { getAutoSelectFitsChannel, setActiveChannelId } from '../../helpers/channelHalper'
+import { getAutoSelectFitsChannel, getChannelMembersCount, setActiveChannelId } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 
 interface IProps {
@@ -64,7 +64,12 @@ export default function Chat({
   useEffect(() => {
     if (hideChannelList && !channelListWidth) {
       dispatch(setHideChannelListAC(true))
-      dispatch(getChannelsAC({ filter: {}, limit: 1, sort: 'byLastMessage', search: '' }, false))
+      dispatch(
+        getChannelsAC(
+          { filter: {}, limit: 1, sort: 'byLastMessage', search: '', memberCount: getChannelMembersCount() },
+          false
+        )
+      )
     }
   }, [channelListWidth])
 

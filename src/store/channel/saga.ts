@@ -176,7 +176,7 @@ function* createChannel(action: IAction): any {
           // metadata: mentionedMembersPositions,
           body:
             createdChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
-              createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+            createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
               ? 'CC'
               : 'CG',
           mentionedMembers: [],
@@ -244,6 +244,9 @@ function* getChannels(action: IAction): any {
     if (types?.length) {
       channelQueryBuilder.types(types)
     }
+    if (params.memberCount) {
+      channelQueryBuilder.memberCount(params.memberCount)
+    }
     channelQueryBuilder.order('lastMessage')
     channelQueryBuilder.limit(params.limit || 50)
     const channelQuery = yield call(channelQueryBuilder.build)
@@ -299,6 +302,9 @@ function* getChannels(action: IAction): any {
       if (channelTypesFilter?.length) {
         allChannelsQueryBuilder.types(channelTypesFilter)
       }
+      if (params?.memberCount) {
+        allChannelsQueryBuilder.memberCount(params.memberCount)
+      }
       allChannelsQueryBuilder.limit(50)
       const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
       let hasNext = true
@@ -345,7 +351,9 @@ function* searchChannels(action: IAction): any {
       if (types?.length) {
         channelQueryBuilder.types(types)
       }
-
+      if (params?.memberCount) {
+        channelQueryBuilder.memberCount(params.memberCount)
+      }
       const allChannels = getAllChannels()
       const publicChannels: IChannel[] = []
       const chatsGroups: IChannel[] = []
@@ -1104,7 +1112,7 @@ function* checkUsersStatus(/* action: IAction */): any {
           updatedUser.presence.status !== usersMap[updatedUser.id].presence.status ||
           (updatedUser.presence.lastActiveAt &&
             new Date(updatedUser.presence.lastActiveAt).getTime() !==
-            new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
+              new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
           updatedUser.avatarUrl !== usersMap[updatedUser.id].avatarUrl ||
           updatedUser.firstName !== usersMap[updatedUser.id].firstName ||
           updatedUser.lastName !== usersMap[updatedUser.id].lastName)

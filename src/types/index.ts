@@ -261,4 +261,5 @@ export interface ChannelQueryParams {
   limit?: number
   sort?: 'byLastMessage' | 'byCreationDate'
   search: string
+  memberCount?: number
 }
