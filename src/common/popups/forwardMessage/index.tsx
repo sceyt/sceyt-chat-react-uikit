@@ -191,9 +191,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                         <ChannelItem key={channel.id}>
                           <Avatar
                             name={
-                              directChannelUser
+                              channel.subject ||
+                              (isDirectChannel && directChannelUser
                                 ? directChannelUser.firstName || directChannelUser.id
-                                : channel.subject || ''
+                                : '')
                             }
                             image={
                               channel.avatarUrl ||
