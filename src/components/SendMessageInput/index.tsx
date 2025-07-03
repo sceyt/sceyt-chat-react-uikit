@@ -1388,7 +1388,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
-            {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
+            <MessageCountWrapper>
+              {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
+            </MessageCountWrapper>
             <CustomButton
               onClick={handleToggleForwardMessagePopup}
               backgroundColor={hoverBackground}
@@ -2377,6 +2379,12 @@ const SelectedMessagesWrapper = styled.div`
   display: flex;
   align-items: center;
   padding: 12px 16px;
+`
+
+const MessageCountWrapper = styled.div`
+  display: flex;
+  justify-content: flex-start;
+  min-width: 170.5px;
 `
 
 const CustomButton = styled.span<{ color: string; backgroundColor?: string; marginLeft?: string }>`
