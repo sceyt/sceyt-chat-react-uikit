@@ -109,17 +109,50 @@ export function createFileImageThumbnail(file: any) {
 } */
 // If you want to use base64 instead of binary...
 export const binaryToBase64 = (binary: any) => btoa(String.fromCharCode(...binary))
-export const base64ToBinary = (base64: any) =>
-  new Uint8Array(
-    atob(base64)
-      .split('')
-      .map((x) => x.charCodeAt(0))
-  )
-const binaryThumbHashToDataURL = (binaryThumbHash: Uint8Array) => thumbHashToDataURL(binaryThumbHash)
-export const base64ToToDataURL = (base64: any) => {
-  const thumbHashFromBase64 = base64ToBinary(base64)
-  return binaryThumbHashToDataURL(thumbHashFromBase64)
+
+export const base64ToBinary = (base64: any) => {
+  try {
+    // Validate that the input is a valid base64 string
+    if (typeof base64 !== 'string' || !base64) {
+      throw new Error('Invalid base64 input')
+    }
+
+    // Check if the string contains only valid base64 characters
+    const base64Regex = /^[A-Za-z0-9+/]*={0,2}$/
+    if (!base64Regex.test(base64)) {
+      throw new Error('Invalid base64 characters')
+    }
+
+    return new Uint8Array(
+      atob(base64)
+        .split('')
+        .map((x) => x.charCodeAt(0))
+    )
+  } catch (error) {
+    log.warn('Invalid base64 string provided to base64ToBinary:', base64, error)
+    // Return an empty Uint8Array as fallback
+    return new Uint8Array(0)
+  }
 }
+
+const binaryThumbHashToDataURL = (binaryThumbHash: Uint8Array) => thumbHashToDataURL(binaryThumbHash)
+
+export const base64ToToDataURL = (base64: any) => {
+  try {
+    const thumbHashFromBase64 = base64ToBinary(base64)
+
+    // If we got an empty array, return a fallback
+    if (thumbHashFromBase64.length === 0) {
+      return ''
+    }
+
+    return binaryThumbHashToDataURL(thumbHashFromBase64)
+  } catch (error) {
+    log.warn('Error converting base64 to data URL:', error)
+    return ''
+  }
+}
+
 export function createImageThumbnail(
   file: any,
   path?: string,
