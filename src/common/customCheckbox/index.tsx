@@ -5,7 +5,8 @@ import { ReactComponent as TickIcon } from '../../assets/svg/tick.svg'
 
 interface IProps {
   // eslint-disable-next-line no-unused-vars
-  onChange: (e: any) => void
+  onChange?: (e: any) => void
+  onClick?: (e: any) => void
   state: boolean
   index: any
   backgroundColor?: string
@@ -20,6 +21,7 @@ const CustomCheckbox = ({
   index,
   state,
   onChange,
+  onClick,
   checkedBackgroundColor,
   backgroundColor,
   tickColor,
@@ -27,6 +29,18 @@ const CustomCheckbox = ({
   disabled,
   size
 }: IProps) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (onChange) {
+      onChange(e)
+    }
+  }
+
+  const handleClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (onClick) {
+      onClick(e)
+    }
+  }
+
   return (
     <React.Fragment>
       <CustomLabel
@@ -47,7 +61,8 @@ const CustomCheckbox = ({
         disabled={disabled}
         id={`checkbox-${index}`}
         checked={state}
-        onChange={(e: React.ChangeEvent<HTMLInputElement>) => onChange(e)}
+        onChange={handleChange}
+        onClick={handleClick}
       />
     </React.Fragment>
   )
