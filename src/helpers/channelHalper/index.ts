@@ -22,6 +22,7 @@ let activeChannelId = ''
 let UploadImageIcon: JSX.Element
 let showChannelDetails: boolean = false
 let channelTypesFilter: string[] = []
+let memberCount: number = 10
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
@@ -79,6 +80,7 @@ export function destroyChannelsMap() {
   allChannels = []
   defaultRolesByChannelTypesMap = {}
   channelTypesMemberDisplayTextMap = {}
+  memberCount = 0
 }
 
 export const query: any = {
@@ -138,6 +140,14 @@ export function getDefaultRolesByChannelTypesMap() {
 
 export function setDefaultRolesByChannelTypesMap(map: channelTypesMemberDisplayTextMap) {
   defaultRolesByChannelTypesMap = map
+}
+
+export function getChannelMembersCount() {
+  return memberCount
+}
+
+export function setChannelMembersCount(count: number) {
+  memberCount = count
 }
 
 // eslint-disable-next-line no-unused-vars

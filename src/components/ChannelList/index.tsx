@@ -40,7 +40,12 @@ import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
 import { useColor, useDidUpdate } from '../../hooks'
 // Helpers
-import { getLastChannelFromMap, removeChannelFromMap, setUploadImageIcon } from '../../helpers/channelHalper'
+import {
+  getChannelMembersCount,
+  getLastChannelFromMap,
+  removeChannelFromMap,
+  setUploadImageIcon
+} from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
 import { colors, device, THEME_COLORS } from '../../UIHelper/constants'
@@ -301,7 +306,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
           const activeChannel = getLastChannelFromMap()
           dispatch(switchChannelActionAC(activeChannel ? JSON.parse(JSON.stringify(activeChannel)) : {}))
           if (!activeChannel) {
-            dispatch(switchChannelInfoAC(false));
+            dispatch(switchChannelInfoAC(false))
           }
         }
       }
@@ -312,9 +317,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [deletedChannel])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
+      dispatch(getChannelsAC({ filter, limit, sort, search: '', memberCount: getChannelMembersCount() }, false))
     }
   }, [connectionStatus])
 
@@ -364,7 +369,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (searchValue) {
-      dispatch(searchChannelsAC({ filter, limit, sort, search: searchValue }, contactsMap))
+      dispatch(
+        searchChannelsAC(
+          { filter, limit, sort, search: searchValue, memberCount: getChannelMembersCount() },
+          contactsMap
+        )
+      )
     } else {
       dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
     }
@@ -386,7 +396,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     if (uploadPhotoIcon) {
       setUploadImageIcon(uploadPhotoIcon)
     }
-    dispatch(getChannelsAC({ filter, limit, sort, search: '' }, false))
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
@@ -520,8 +529,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
             <React.Fragment>
               {searchedChannels?.chats_groups?.length ||
-                searchedChannels?.channels?.length ||
-                searchedChannels?.contacts?.length ? (
+              searchedChannels?.channels?.length ||
+              searchedChannels?.contacts?.length ? (
                 <React.Fragment>
                   {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
                     <DirectChannels>
@@ -696,8 +705,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
           {!!searchValue &&
             (channelsLoading === LOADING_STATE.LOADED ? (
               !searchedChannels.chats_groups?.length &&
-                !searchedChannels.chats_groups?.length &&
-                !searchedChannels.channels?.length ? (
+              !searchedChannels.chats_groups?.length &&
+              !searchedChannels.channels?.length ? (
                 <NoData color={textSecondary} fontSize={searchedChannelsTitleFontSize}>
                   Nothing found for <b>{searchValue}</b>
                 </NoData>
