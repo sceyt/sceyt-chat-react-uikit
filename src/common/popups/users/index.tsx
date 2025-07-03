@@ -141,9 +141,9 @@ const UsersPopup = ({
     }
   } */
 
-  const handleUserSelect = (event: any, contact: { id: string; displayName: string; avatarUrl?: string }) => {
+  const handleUserSelect = (isSelected: boolean, contact: { id: string; displayName: string; avatarUrl?: string }) => {
     const newSelectedMembers = [...selectedMembers]
-    if (event.target.checked) {
+    if (isSelected) {
       const role = channel
         ? channelTypeRoleMap && channelTypeRoleMap[channel.type]
           ? channelTypeRoleMap[channel.type]
@@ -380,10 +380,16 @@ const UsersPopup = ({
 
               return (
                 <ListRow
-                  isAdd={actionType !== 'createChat'}
                   hoverBackground={hoverBackground}
                   key={user.id}
-                  onClick={() => actionType === 'createChat' && handleAddMember(user)}
+                  onClick={() => {
+                    actionType === 'createChat' && handleAddMember(user)
+                    handleUserSelect(!isSelected, {
+                      id: user.id,
+                      displayName: memberDisplayName,
+                      avatarUrl: user.avatarUrl
+                    })
+                  }}
                 >
                   <Avatar
                     image={user.avatarUrl}
@@ -437,9 +443,9 @@ const UsersPopup = ({
                       state={isSelected}
                       backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
                       checkedBackgroundColor={accentColor}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                        handleUserSelect(e, { id: user.id, displayName: memberDisplayName, avatarUrl: user.avatarUrl })
-                      }
+                      onClick={(e) => {
+                        e.stopPropagation()
+                      }}
                       size='18px'
                     />
                     /* <SelectMember
@@ -589,18 +595,18 @@ const SearchUsersInput = styled.input<{
   }
 `
 
-const ListRow = styled.div<{ isAdd: boolean; hoverBackground?: string }>`
+const ListRow = styled.div<{ hoverBackground?: string }>`
   display: flex;
   justify-content: space-between;
   flex-direction: row;
   align-items: center;
   padding: 7px 12px;
-  cursor: ${(props) => !props.isAdd && 'pointer'};
+  cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
 
   &:hover {
-    background-color: ${(props) => !props.isAdd && (props.hoverBackground || colors.gray0)};
+    background-color: ${(props) => props.hoverBackground || colors.gray0};
   }
 
   & ${UserStatus} {
