@@ -89,12 +89,12 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     setSearchValue('')
   }
 
-  const handleChannelSelect = (event: any, channel: IChannel) => {
+  const handleChannelSelect = (isSelected: boolean, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
     const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
     const isSelfChannel = isDirectChannel && channel.metadata?.s
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-    if (event.target.checked && selectedChannels.length < 5) {
+    if (isSelected && selectedChannels.length < 5) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
@@ -191,9 +191,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                         <ChannelItem key={channel.id}>
                           <Avatar
                             name={
-                              directChannelUser
+                              channel.subject ||
+                              (isDirectChannel && directChannelUser
                                 ? directChannelUser.firstName || directChannelUser.id
-                                : channel.subject || ''
+                                : '')
                             }
                             image={
                               channel.avatarUrl ||
@@ -201,7 +202,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             }
                             size={40}
                             textSize={12}
-                            setDefaultAvatar={true}
+                            setDefaultAvatar={isDirectChannel}
                           />
                           <ChannelInfo>
                             <ChannelTitle color={textPrimary}>
@@ -218,7 +219,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                 : channel.subject}
                             </ChannelTitle>
                             <ChannelMembers color={textSecondary}>
-                              {directChannelUser
+                              {isDirectChannel && directChannelUser
                                 ? (
                                     hideUserPresence && hideUserPresence(directChannelUser)
                                       ? ''
@@ -230,14 +231,25 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     directChannelUser.presence &&
                                     directChannelUser.presence.lastActiveAt &&
                                     userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
-                                : ''}
+                                : `${channel.memberCount} ${
+                                    channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
+                                    channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+                                      ? channel.memberCount > 1
+                                        ? 'subscribers'
+                                        : 'subscriber'
+                                      : directChannelUser.memberCount > 1
+                                        ? 'members'
+                                        : 'member'
+                                  } `}
                             </ChannelMembers>
                           </ChannelInfo>
                           <CustomCheckbox
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                            }}
                             size='18px'
                             tickColor={accentColor}
                           />
@@ -252,7 +264,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     {searchedChannels.channels.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       return (
-                        <ChannelItem key={channel.id}>
+                        <ChannelItem
+                          key={channel.id}
+                          onClick={() => handleChannelSelect(!isSelected, channel)}
+                          disabled={selectedChannels.length >= 5 && !isSelected}
+                        >
                           <Avatar
                             name={channel.subject || ''}
                             image={channel.avatarUrl}
@@ -279,7 +295,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
-                            onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
+                            onClick={(e) => {
+                              e.stopPropagation()
+                            }}
                             size='18px'
                             tickColor={accentColor}
                           />
@@ -299,7 +317,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     : channel.members.find((member: IMember) => member.id !== user.id)
                 const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                 return (
-                  <ChannelItem key={channel.id}>
+                  <ChannelItem
+                    key={channel.id}
+                    onClick={() => handleChannelSelect(!isSelected, channel)}
+                    disabled={selectedChannels.length >= 5 && !isSelected}
+                  >
                     <Avatar
                       name={
                         channel.subject ||
@@ -352,7 +374,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       index={channel.id}
                       disabled={selectedChannels.length >= 5 && !isSelected}
                       state={isSelected}
-                      onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleChannelSelect(e, channel)}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                      }}
                       size='18px'
                       tickColor={accentColor}
                     />
@@ -394,6 +418,7 @@ const ChannelItem = styled.div<any>`
   display: flex;
   align-items: center;
   margin-bottom: 8px;
+  cursor: pointer;
 `
 
 const ChannelInfo = styled.div<any>`
