@@ -1,6 +1,7 @@
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import { $createOffsetView } from '@lexical/offset'
 import {
+  $createTextNode,
   $getRoot,
   $getSelection,
   $isRangeSelection,
@@ -54,11 +55,22 @@ function useFormatMessage(
   const onDelete = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault()
-      const selection = $getSelection()
-      const node = getSelectedNode(selection as any)
-      if ($isMentionNode(node)) {
-        node.remove()
-      }
+      editor.update(() => {
+        const selection = $getSelection()
+        if ($isRangeSelection(selection)) {
+          const node = getSelectedNode(selection)
+          if ($isMentionNode(node)) {
+            const parent = node.getParent()
+            if (parent) {
+              const space = $createTextNode(' ')
+              node.replace(space)
+              space.select() // Move the selection to the new space node
+            } else {
+              node.remove()
+            }
+          }
+        }
+      })
       return false
     },
     [editor]
