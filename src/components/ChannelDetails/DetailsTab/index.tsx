@@ -244,6 +244,7 @@ export default DetailsTab
 
 const Container = styled.div<{ theme?: string }>`
   //border-top: 1px solid ${colors.gray1};
+  min-height: calc(100vh - 64px);
 `
 
 const DetailsTabHeader = styled.div<{
