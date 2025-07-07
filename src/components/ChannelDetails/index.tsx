@@ -236,6 +236,13 @@ const Details = ({
       setChannelDetailsHeight(detailsContainer.offsetHeight)
     }
   }, [])
+
+  const handleTabChange = () => {
+    if (detailsRef.current) {
+      detailsRef.current.scrollTo({ top: 350, behavior: 'smooth' })
+    }
+  }
+
   return (
     <Container
       backgroundColor={backgroundColor}
@@ -463,6 +470,7 @@ const Details = ({
             tabItemsFontSize={tabItemsFontSize}
             tabItemsLineHeight={tabItemsLineHeight}
             tabItemsMinWidth={tabItemsMinWidth}
+            onTabChange={handleTabChange}
           />
         )}
         {/* </div> */}
