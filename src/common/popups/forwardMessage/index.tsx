@@ -188,7 +188,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           ? user
                           : channel.members.find((member: IMember) => member.id !== user.id)
                       return (
-                        <ChannelItem key={channel.id}>
+                        <ChannelItem
+                          key={channel.id}
+                          onClick={() => handleChannelSelect(!isSelected, channel)}
+                          disabled={selectedChannels.length >= 5 && !isSelected}
+                        >
                           <Avatar
                             name={
                               channel.subject ||
