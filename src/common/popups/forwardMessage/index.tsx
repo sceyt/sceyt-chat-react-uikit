@@ -235,13 +235,13 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     directChannelUser.presence &&
                                     directChannelUser.presence.lastActiveAt &&
                                     userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
-                                : `${channel.memberCount} ${
+                                : `${channel?.memberCount} ${
                                     channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
                                     channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
-                                      ? channel.memberCount > 1
+                                      ? channel?.memberCount > 1
                                         ? 'subscribers'
                                         : 'subscriber'
-                                      : directChannelUser.memberCount > 1
+                                      : directChannelUser?.memberCount > 1
                                         ? 'members'
                                         : 'member'
                                   } `}
