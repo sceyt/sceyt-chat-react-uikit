@@ -9,7 +9,6 @@ import { ReactComponent as FullScreenExitIcon } from '../../assets/svg/fullscree
 import { colors } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { formatAudioVideoTime } from '../../helpers'
-import log from 'loglevel'
 
 interface IVideoPlayerProps {
   src: string
@@ -151,7 +150,6 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
     let checkVideoInterval: any
     if (videoRef.current) {
       checkVideoInterval = setInterval(() => {
-        log.info('videoRef.current.readyState . . . . ', videoRef && videoRef.current && videoRef.current.readyState)
         if (videoRef.current && videoRef.current.readyState > 0) {
           setVideoTime(videoRef.current.duration)
           setVolume(videoRef.current.volume)

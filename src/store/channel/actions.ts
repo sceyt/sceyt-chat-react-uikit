@@ -28,6 +28,7 @@ import {
   SEARCH_CHANNELS,
   SEARCH_CHANNELS_FOR_FORWARD,
   SEND_TYPING,
+  SEND_RECORDING,
   SET_ACTIVE_CHANNEL,
   SET_ADDED_TO_CHANNEL,
   SET_CHANNEL_LIST_WIDTH,
@@ -56,7 +57,8 @@ import {
   UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL,
-  WATCH_FOR_EVENTS
+  WATCH_FOR_EVENTS,
+  SWITCH_RECORDING_INDICATOR
 } from './constants'
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
@@ -338,10 +340,24 @@ export function sendTypingAC(state: boolean) {
   }
 }
 
+export function sendRecordingAC(state: boolean) {
+  return {
+    type: SEND_RECORDING,
+    payload: { state }
+  }
+}
+
 export function switchTypingIndicatorAC(typingState: boolean, channelId: string, from?: IUser) {
   return {
     type: SWITCH_TYPING_INDICATOR,
     payload: { typingState, from, channelId }
+  }
+}
+
+export function switchRecordingIndicatorAC(recordingState: boolean, channelId: string, from?: IUser) {
+  return {
+    type: SWITCH_RECORDING_INDICATOR,
+    payload: { recordingState, from, channelId }
   }
 }
 

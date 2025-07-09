@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 import moment from 'moment'
@@ -8,7 +8,7 @@ import useUpdatePresence from '../../hooks/useUpdatePresence'
 import {
   activeChannelSelector,
   channelMessageDraftIsRemovedSelector,
-  typingIndicatorSelector
+  typingOrRecordingIndicatorArraySelector
 } from '../../store/channel/selector'
 import {
   sendTypingAC,
@@ -118,7 +118,7 @@ const Channel: React.FC<IChannelProps> = ({
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel = isDirectChannel && channel.metadata?.s
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
-  const typingIndicator = useSelector(typingIndicatorSelector(channel.id))
+  const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
@@ -178,7 +178,19 @@ const Channel: React.FC<IChannelProps> = ({
         updateChannelOnAllChannels(channel.id, { muted: false, mutedTill: null })
       }
     }
-  })
+  }, [channel.muted])
+
+  const filteredTypingOrRecordingIndicator = useMemo(() => {
+    return typingOrRecordingIndicator
+      ? Object.values(typingOrRecordingIndicator).filter((item: any) => item.typingState || item.recordingState)
+      : []
+  }, [typingOrRecordingIndicator])
+
+  const isTyping = useMemo(
+    () => !!filteredTypingOrRecordingIndicator.find((item: any) => item.typingState),
+    [filteredTypingOrRecordingIndicator]
+  )
+
   return (
     <Container
       // ref={channelItemRef}
@@ -241,7 +253,7 @@ const Channel: React.FC<IChannelProps> = ({
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {(lastMessage || !!typingIndicator || draftMessageText) && (
+        {(lastMessage || filteredTypingOrRecordingIndicator.length > 0 || draftMessageText) && (
           <LastMessage
             color={textPrimary}
             markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
@@ -249,16 +261,20 @@ const Channel: React.FC<IChannelProps> = ({
             fontSize={channelLastMessageFontSize}
             height={channelLastMessageHeight}
           >
-            {typingIndicator ? (
+            {filteredTypingOrRecordingIndicator.length > 0 ? (
               !isDirectChannel ? (
-                <LastMessageAuthor color={theme === THEME.DARK ? colors.darkModeTextColor1 : textPrimary}>
+                <LastMessageAuthor
+                  typing={isTyping}
+                  recording={!isTyping}
+                  color={theme === THEME.DARK ? colors.darkModeTextColor1 : textSecondary}
+                >
                   <span ref={messageAuthorRef}>
-                    {makeUsername(
-                      contactsMap && contactsMap[typingIndicator.from.id],
-                      typingIndicator.from,
-                      getFromContacts,
-                      true
-                    )}
+                    {filteredTypingOrRecordingIndicator.map((item: any, index: number) => (
+                      <React.Fragment key={item.from.id}>
+                        {makeUsername(contactsMap && contactsMap[item.from.id], item.from, getFromContacts, true)}
+                        {index < filteredTypingOrRecordingIndicator.length - 1 && ', '}
+                      </React.Fragment>
+                    ))}
                   </span>
                 </LastMessageAuthor>
               ) : null
@@ -301,15 +317,14 @@ const Channel: React.FC<IChannelProps> = ({
               )
             )}
             {(isDirectChannel
-              ? !typingIndicator &&
+              ? filteredTypingOrRecordingIndicator.length === 0 &&
                 (draftMessageText ||
                   (lastMessage.user &&
                     lastMessage.state !== MESSAGE_STATUS.DELETE &&
                     (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                       ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
                       : lastMessage.user.id === user.id)))
-              : typingIndicator ||
-                draftMessageText ||
+              : (filteredTypingOrRecordingIndicator.length > 0 && draftMessageText) ||
                 (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
               <Points color={draftMessageText && errorColor}>: </Points>
             )}
@@ -321,13 +336,16 @@ const Channel: React.FC<IChannelProps> = ({
                   lastMessage.attachments &&
                   lastMessage.attachments.length &&
                   lastMessage.attachments[0].type !== attachmentTypes.link
-                ) && !typingIndicator
+                ) && filteredTypingOrRecordingIndicator.length === 0
               }
               noBody={lastMessage && !lastMessage.body}
               deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}
             >
-              {typingIndicator ? (
-                <TypingIndicator>typing...</TypingIndicator>
+              {filteredTypingOrRecordingIndicator.length > 0 ? (
+                <TypingIndicator>
+                  {isTyping ? 'typing' : 'recording'}
+                  ...
+                </TypingIndicator>
               ) : draftMessageText ? (
                 <DraftMessageText color={textSecondary}>{draftMessageText}</DraftMessageText>
               ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
@@ -467,7 +485,9 @@ const Channel: React.FC<IChannelProps> = ({
             moment(lastMessage.createdAt).format('HH:mm')} */}
         </LastMessageDate>
       </ChannelStatus>
-      <UnreadInfo bottom={!(lastMessage || !!typingIndicator || draftMessageText) ? '5px' : ''}>
+      <UnreadInfo
+        bottom={!(lastMessage || filteredTypingOrRecordingIndicator.length > 0 || draftMessageText) ? '5px' : ''}
+      >
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
           <UnreadMentionIconWrapper iconColor={accentColor} rightMargin={!!(channel.newMessageCount || channel.unread)}>
             <MentionIcon />
@@ -613,11 +633,20 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
 `
-export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean }>`
+export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;
   font-weight: 500;
   color: ${(props) => props.color};
 
+  ${({ typing, recording }) =>
+    (typing || recording) &&
+    `
+    font-weight: 400;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: calc(100% - 62px);
+  `}
   & > span {
     display: block;
     overflow: hidden;
