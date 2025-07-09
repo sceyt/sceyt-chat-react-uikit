@@ -645,7 +645,7 @@ export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; r
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    max-width: calc(100% - ${typing ? 62 : 75})px;
+    max-width: calc(100% - ${typing ? 62 : 76})px;
   `}
   & > span {
     display: block;
