@@ -1292,7 +1292,7 @@ export default function* watchForEvents(): any {
         // const { user, channelId, name } = args
         log.info('channel event received >>>... . . . . . ', args)
         if (from.id === SceytChatClient.user.id) {
-          return
+          break
         }
         if (name === 'start_typing') {
           if (!usersTimeout[channelId]) {

@@ -127,6 +127,7 @@ import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
+import RecordingAnimation from './RecordingAnimation'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -366,7 +367,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [editMessageText, setEditMessageText] = useState('')
-  const [readyVideoAttachments, setReadyVideoAttachments] = useState({})
+  const [readyVideoAttachments, setReadyVideoAttachments] = useState<{ [key: string]: boolean }>({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
   const [emojisInRightSide, setEmojisInRightSide] = useState(false)
@@ -1400,20 +1401,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         user.from,
         getFromContacts
       )
-      return `${userName} is ${isTyping ? 'typing' : 'recording'}`
+      return `${userName}${
+        isTyping
+          ? activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+            ? ' is typing'
+            : ''
+          : activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+            ? ' is recording'
+            : ''
+      }`
     }
 
     if (users.length <= maxShownUsers) {
       const userNames = users.map((user) =>
         makeUsername(getFromContacts && user.from && contactsMap[user.from.id], user.from, getFromContacts)
       )
-      const action = isTyping ? 'are typing' : 'are recording'
-
-      if (users.length === 2) {
-        return `${userNames[0]} and ${userNames[1]} ${action}`
-      } else {
-        return `${userNames[0]}, ${userNames[1]} and ${userNames[2]} ${action}`
-      }
+      return userNames.join(', ')
     } else {
       const firstNames = users
         .slice(0, maxShownUsers)
@@ -1421,11 +1424,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           makeUsername(getFromContacts && user.from && contactsMap[user.from.id], user.from, getFromContacts)
         )
       const othersCount = users.length - maxShownUsers
-      const action = isTyping ? 'are typing' : 'are recording'
 
       return `${firstNames
         .map((name, index) => `${name}${index < firstNames.length - 1 ? ', ' : ''}`)
-        .join('')} and ${othersCount} other${othersCount > 1 ? 's' : ''} ${action}`
+        .join('')} and ${othersCount} other${othersCount > 1 ? 's' : ''}`
     }
   }
 
@@ -1543,11 +1545,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         <TypingFrom color={textSecondary}>
                           {formatTypingIndicatorText(filteredTypingOrRecordingIndicator, 3)}
                         </TypingFrom>
-                        <TypingAnimation>
-                          <DotOne />
-                          <DotTwo />
-                          <DotThree />
-                        </TypingAnimation>
+                        {isTyping ? (
+                          <TypingAnimation>
+                            <DotOne />
+                            <DotTwo />
+                            <DotThree />
+                          </TypingAnimation>
+                        ) : (
+                          <RecordingAnimation />
+                        )}
                       </TypingIndicatorCont>
                     ))}
                 </TypingIndicator>
