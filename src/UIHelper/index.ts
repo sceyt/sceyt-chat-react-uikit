@@ -786,7 +786,9 @@ export const MessageText = styled.pre<{
   //white-space: normal;
   //letter-spacing: -0.2px;
   letter-spacing: 0.3px;
-  color: ${(props) => (props.incoming ? props?.incomingMessageStyles?.textColor : props?.outgoingMessageStyles?.textColor) || props.color};
+  color: ${(props) =>
+    (props.incoming ? props?.incomingMessageStyles?.textColor : props?.outgoingMessageStyles?.textColor) ||
+    props.color};
   user-select: text;
   //overflow: hidden;
 

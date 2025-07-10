@@ -30,6 +30,7 @@ import {
   setChannelToRemoveAC,
   setChannelToUnHideAC,
   switchChannelActionAC,
+  switchRecordingIndicatorAC,
   switchTypingIndicatorAC,
   updateChannelDataAC,
   updateChannelLastMessageAC,
@@ -82,7 +83,7 @@ export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
   const channelListener = new (SceytChatClient.ChannelListener as any)()
   const connectionListener = new (SceytChatClient.ConnectionListener as any)()
-  const typingUsersTimeout: { [key: string]: any } = {}
+  const usersTimeout: { [key: string]: any } = {}
   const chan = eventChannel((emitter) => {
     const shouldSkip = (channel: IChannel) => {
       const channelTypesFilter = getChannelTypesFilter()
@@ -229,26 +230,6 @@ export default function* watchForEvents(): any {
           user,
           message,
           reaction
-        }
-      })
-    }
-    channelListener.onMemberStartedTyping = (channel: IChannel, from: IUser) => {
-      if (shouldSkip(channel)) return
-      emitter({
-        type: CHANNEL_EVENT_TYPES.START_TYPING,
-        args: {
-          channel,
-          from
-        }
-      })
-    }
-    channelListener.onMemberStoppedTyping = (channel: IChannel, from: IUser) => {
-      if (shouldSkip(channel)) return
-      emitter({
-        type: CHANNEL_EVENT_TYPES.STOP_TYPING,
-        args: {
-          channel,
-          from
         }
       })
     }
@@ -451,13 +432,13 @@ export default function* watchForEvents(): any {
         }
       })
     }
-    channelListener.onReceivedChannelEvent = (channelId: string, user: IUser, eventName: string) =>
+    channelListener.onReceivedChannelEvent = (channelId: string, from: IUser, name: string) =>
       emitter({
         type: CHANNEL_EVENT_TYPES.CHANNEL_EVENT,
         args: {
           channelId,
-          user,
-          eventName
+          from,
+          name
         }
       })
     SceytChatClient.addChannelListener('CHANNEL_EVENTS', channelListener)
@@ -869,26 +850,6 @@ export default function* watchForEvents(): any {
         }
         break;
       } */
-      case CHANNEL_EVENT_TYPES.START_TYPING: {
-        const { channel, from } = args
-        if (typingUsersTimeout[from.id]) {
-          clearTimeout(typingUsersTimeout[from.id])
-        }
-        typingUsersTimeout[from.id] = setTimeout(() => {
-          channelListener.onMemberStoppedTyping(channel, from)
-        }, 4000)
-        yield put(switchTypingIndicatorAC(true, channel.id, from))
-        // }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.STOP_TYPING: {
-        const { channel, from } = args
-        if (typingUsersTimeout[from.id]) {
-          clearTimeout(typingUsersTimeout[from.id])
-        }
-        yield put(switchTypingIndicatorAC(false, channel.id, from))
-        break
-      }
       case CHANNEL_EVENT_TYPES.DELETE: {
         const { channelId } = args
         log.info('channel DELETE ... ')
@@ -1327,8 +1288,45 @@ export default function* watchForEvents(): any {
       } */
 
       case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
+        const { channelId, from, name } = args
         // const { user, channelId, name } = args
         log.info('channel event received >>>... . . . . . ', args)
+        if (from.id === SceytChatClient.user.id) {
+          break
+        }
+        if (name === 'start_typing') {
+          if (!usersTimeout[channelId]) {
+            usersTimeout[channelId] = {}
+          }
+          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+            clearTimeout(usersTimeout[channelId][from.id])
+          }
+          usersTimeout[channelId][from.id] = setTimeout(() => {
+            channelListener.onReceivedChannelEvent(channelId, from, 'stop_typing')
+          }, 5000)
+          yield put(switchTypingIndicatorAC(true, channelId, from))
+        } else if (name === 'stop_typing') {
+          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+            clearTimeout(usersTimeout[channelId][from.id])
+          }
+          yield put(switchTypingIndicatorAC(false, channelId, from))
+        } else if (name === 'start_recording') {
+          if (!usersTimeout[channelId]) {
+            usersTimeout[channelId] = {}
+          }
+          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+            clearTimeout(usersTimeout[channelId][from.id])
+          }
+          usersTimeout[channelId][from.id] = setTimeout(() => {
+            channelListener.onReceivedChannelEvent(channelId, from, 'stop_recording')
+          }, 5000)
+          yield put(switchRecordingIndicatorAC(true, channelId, from))
+        } else if (name === 'stop_recording') {
+          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+            clearTimeout(usersTimeout[channelId][from.id])
+          }
+          yield put(switchRecordingIndicatorAC(false, channelId, from))
+        }
         break
       }
       case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {

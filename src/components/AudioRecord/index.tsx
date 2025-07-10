@@ -14,6 +14,8 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
+import { useDispatch } from 'react-redux'
+import { sendRecordingAC } from '../../store/channel/actions'
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   sendRecordedFile: (data: { file: File; objectUrl: string; thumb: number[]; dur: number }) => void
@@ -35,6 +37,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const [recordedFile, setRecordedFile] = useState<any>(null)
   const [recordingIsReadyToPlay, setRecordingIsReadyToPlay] = useState<any>(false)
   const [currentTime, setCurrentTime] = useState<any>(0)
+  const [sendingInterval, setSendingInterval] = useState<any>(null)
 
   const [playAudio, setPlayAudio] = useState<any>(false)
   const wavesurfer = useRef<any>(null)
@@ -42,123 +45,154 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const intervalRef = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
 
-  async function startRecording() {
-    const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
-    if (permissionStatus.state === 'granted') {
-      setShowRecording(true)
-    } else {
-      recordButtonRef.current.style.pointerEvents = 'none'
+  const dispatch = useDispatch()
+
+  const handleStartRecording = () => {
+    dispatch(sendRecordingAC(true))
+    if (sendingInterval) {
+      clearInterval(sendingInterval)
+      setSendingInterval(null)
+      return
     }
-    if (recording) {
-      stopRecording(true)
-    } else if (recordedFile) {
-      sendRecordedFile(recordedFile)
-      setRecordedFile(null)
-      setPlayAudio(false)
-      if (wavesurfer.current) {
-        wavesurfer.current.destroy()
+    const interval = setInterval(() => {
+      dispatch(sendRecordingAC(true))
+    }, 1000)
+    setSendingInterval(interval)
+  }
+
+  const handleStopRecording = () => {
+    dispatch(sendRecordingAC(false))
+    if (sendingInterval) {
+      clearInterval(sendingInterval)
+      setSendingInterval(null)
+    }
+  }
+
+  async function startRecording() {
+    handleStartRecording()
+    try {
+      const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
+      if (permissionStatus.state === 'granted') {
+        setShowRecording(true)
+      } else {
+        recordButtonRef.current.style.pointerEvents = 'none'
       }
-      setStartRecording(false)
-      setShowRecording(false)
-    } else {
-      recorder
-        .start()
-        .then(() => {
-          recordButtonRef.current.style.pointerEvents = 'initial'
-          setShowRecording(true)
-          setStartRecording(true)
-          shouldDraw = true
-          const stream = recorder.activeStream
+      if (recording) {
+        stopRecording(true)
+      } else if (recordedFile) {
+        sendRecordedFile(recordedFile)
+        setRecordedFile(null)
+        setPlayAudio(false)
+        if (wavesurfer.current) {
+          wavesurfer.current.destroy()
+        }
+        setStartRecording(false)
+        setShowRecording(false)
+      } else {
+        recorder
+          .start()
+          .then(() => {
+            recordButtonRef.current.style.pointerEvents = 'initial'
+            setShowRecording(true)
+            setStartRecording(true)
+            shouldDraw = true
+            const stream = recorder.activeStream
 
-          const obj: any = {}
-          function init() {
-            obj.canvas = document.getElementById('waveform')
-            obj.ctx = obj.canvas.getContext('2d')
-            obj.width = 360
-            obj.height = 28
-            obj.canvas.width = obj.width
-            obj.canvas.height = obj.height
-            obj.canvas.style.width = obj.width + 'px'
-            obj.canvas.style.height = obj.height + 'px'
-          }
-
-          const timeOffset = 100
-          // @ts-ignore
-          let now = parseInt(performance.now()) / timeOffset
-
-          function loop() {
-            if (!shouldDraw) {
-              obj.x = 0 // reset x to start drawing from the start again
-              // @ts-ignore
-              obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height) // clear the canvas
-
-              return
+            const obj: any = {}
+            function init() {
+              obj.canvas = document.getElementById('waveform')
+              obj.ctx = obj.canvas.getContext('2d')
+              obj.width = 360
+              obj.height = 28
+              obj.canvas.width = obj.width
+              obj.canvas.height = obj.height
+              obj.canvas.style.width = obj.width + 'px'
+              obj.canvas.style.height = obj.height + 'px'
             }
-            obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
-            let max = 0
 
+            const timeOffset = 100
             // @ts-ignore
-            if (parseInt(performance.now() / timeOffset) > now) {
+            let now = parseInt(performance.now()) / timeOffset
+
+            function loop() {
+              if (!shouldDraw) {
+                obj.x = 0 // reset x to start drawing from the start again
+                // @ts-ignore
+                obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height) // clear the canvas
+
+                return
+              }
+              obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
+              let max = 0
+
               // @ts-ignore
-              now = parseInt(performance.now() / timeOffset)
-              obj.analyser.getFloatTimeDomainData(obj.frequencyArray)
-              for (let i = 0; i < obj.frequencyArray.length; i++) {
-                if (obj.frequencyArray[i] > max) {
-                  max = obj.frequencyArray[i]
+              if (parseInt(performance.now() / timeOffset) > now) {
+                // @ts-ignore
+                now = parseInt(performance.now() / timeOffset)
+                obj.analyser.getFloatTimeDomainData(obj.frequencyArray)
+                for (let i = 0; i < obj.frequencyArray.length; i++) {
+                  if (obj.frequencyArray[i] > max) {
+                    max = obj.frequencyArray[i]
+                  }
+                }
+                let freq = Math.floor(max * 90)
+                if (freq === 0) {
+                  freq = 1
+                }
+                obj.bars.push({
+                  x: obj.width,
+                  y: obj.height / 2 - freq / 2,
+                  height: freq,
+                  width: 3
+                })
+              }
+              draw()
+              requestAnimationFrame(loop)
+            }
+            obj.bars = []
+
+            function draw() {
+              for (let i = 0; i < obj.bars.length; i++) {
+                const bar = obj.bars[i]
+                obj.ctx.fillStyle = textSecondary
+                obj.ctx.fillRect(bar.x, bar.y, bar.width, bar.height)
+                bar.x = bar.x - 1 // spacing between bars
+
+                if (bar.x < 1) {
+                  obj.bars.splice(i, 1)
                 }
               }
-              let freq = Math.floor(max * 90)
-              if (freq === 0) {
-                freq = 1
-              }
-              obj.bars.push({
-                x: obj.width,
-                y: obj.height / 2 - freq / 2,
-                height: freq,
-                width: 3
-              })
             }
-            draw()
-            requestAnimationFrame(loop)
-          }
-          obj.bars = []
 
-          function draw() {
-            for (let i = 0; i < obj.bars.length; i++) {
-              const bar = obj.bars[i]
-              obj.ctx.fillStyle = textSecondary
-              obj.ctx.fillRect(bar.x, bar.y, bar.width, bar.height)
-              bar.x = bar.x - 1 // spacing between bars
+            function soundAllowed(stream: any) {
+              // @ts-ignore
+              const AudioContext = window.AudioContext || window.webkitAudioContext
+              const audioContent = new AudioContext()
+              const streamSource = audioContent.createMediaStreamSource(stream)
 
-              if (bar.x < 1) {
-                obj.bars.splice(i, 1)
-              }
+              obj.analyser = audioContent.createAnalyser()
+              streamSource.connect(obj.analyser)
+              obj.analyser.fftSize = 512
+              obj.frequencyArray = new Float32Array(obj.analyser.fftSize)
+              init()
+              loop()
             }
-          }
 
-          function soundAllowed(stream: any) {
-            // @ts-ignore
-            const AudioContext = window.AudioContext || window.webkitAudioContext
-            const audioContent = new AudioContext()
-            const streamSource = audioContent.createMediaStreamSource(stream)
-
-            obj.analyser = audioContent.createAnalyser()
-            streamSource.connect(obj.analyser)
-            obj.analyser.fftSize = 512
-            obj.frequencyArray = new Float32Array(obj.analyser.fftSize)
-            init()
-            loop()
-          }
-
-          soundAllowed(stream)
-        })
-        .catch((e: any) => {
-          log.error(e)
-        })
+            soundAllowed(stream)
+          })
+          .catch((e: any) => {
+            handleStopRecording()
+            log.error(e)
+          })
+      }
+    } catch (e) {
+      handleStopRecording()
+      log.error(e)
     }
   }
 
   function cancelRecording() {
+    handleStopRecording()
     if (recordedFile) {
       setRecordedFile(null)
       setPlayAudio(false)
@@ -175,6 +209,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     setShowRecording(false)
   }
   function stopRecording(send?: boolean) {
+    handleStopRecording()
     shouldDraw = false
     recorder
       .stop()
@@ -238,6 +273,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         reader.readAsArrayBuffer(blob)
       })
       .catch((e: any) => {
+        handleStopRecording()
         log.error(e)
       })
   }
@@ -276,7 +312,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       }, 150)
     } else clearInterval(recordingInterval)
 
-    return () => clearInterval(recordingInterval)
+    return () => {
+      if (sendingInterval) {
+        clearInterval(sendingInterval)
+      }
+      clearInterval(recordingInterval)
+    }
   }, [recording])
   useDidUpdate(() => {
     if (recordedFile) {
