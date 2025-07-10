@@ -2296,6 +2296,7 @@ const TypingIndicatorCont = styled.div`
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  gap: 4px;
 `
 
 const TypingFrom = styled.h5<{ color: string }>`
