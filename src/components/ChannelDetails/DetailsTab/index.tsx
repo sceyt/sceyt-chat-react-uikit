@@ -60,6 +60,7 @@ interface IProps {
   tabItemsFontSize?: string
   tabItemsLineHeight?: string
   tabItemsMinWidth?: string
+  onTabChange?: () => void
 }
 
 const DetailsTab = ({
@@ -103,7 +104,8 @@ const DetailsTab = ({
   borderColor,
   tabItemsFontSize,
   tabItemsLineHeight,
-  tabItemsMinWidth
+  tabItemsMinWidth,
+  onTabChange
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -124,6 +126,7 @@ const DetailsTab = ({
         : 'members'
   const handleTabClick = (tabIndex: string) => {
     if (activeTab !== tabIndex) {
+      onTabChange?.()
       dispatch(emptyChannelAttachmentsAC())
       setActiveTab(tabIndex)
     }
