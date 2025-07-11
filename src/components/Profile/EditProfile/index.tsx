@@ -39,6 +39,8 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
     src: {},
     url: user.avatarUrl // channelDetails.avatar
   })
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
 
   const handleTypeFirstName = (e: any) => {
     setFirstNameValue(e.currentTarget.value)
@@ -55,7 +57,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
   }
 
   function handleSelectImage(image: File) {
-      setNewAvatar({
+    setNewAvatar({
       url: URL.createObjectURL(image),
       name: image.name
     })
@@ -98,6 +100,12 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
     toggleEditPopup()
   }
 
+  const handleScroll = (e: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
+  }
+
   return (
     <PopupContainer>
       <Popup maxHeight='482px' width='433px' maxWidth='433px' height='calc(100vh - 50px)' padding='22px 24px 8px'>
@@ -105,7 +113,7 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
 
         <PopupName color={textPrimary}>Edit Profile</PopupName>
 
-        <EditProfileContainer>
+        <EditProfileContainer className={isScrolling ? 'show-scrollbar' : ''} onScroll={handleScroll}>
           <Label color={textPrimary}>Username </Label>
           <CustomInput
             errorColor={errorColor}
@@ -197,6 +205,22 @@ const EditProfileContainer = styled.div`
   overflow-y: auto;
   margin-right: -25px;
   padding-right: 25px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const UploadChannelAvatar = styled.div`

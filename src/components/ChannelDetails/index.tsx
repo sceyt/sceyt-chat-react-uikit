@@ -175,7 +175,8 @@ const Details = ({
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
-  // const tabsRef = useRef<any>(null)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
@@ -198,6 +199,9 @@ const Details = ({
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     // setCloseMenu(true)
     /* if (tabsRef.current.getBoundingClientRect().top <= detailsRef.current.offsetTop) {
       if (!tabFixed) {
@@ -282,6 +286,7 @@ const Details = ({
       )}
 
       <ChatDetails
+        className={isScrolling ? 'show-scrollbar' : ''}
         size={size}
         onScroll={handleMembersListScroll}
         heightOffset={detailsRef && detailsRef.current && detailsRef.current.offsetTop}
@@ -518,6 +523,22 @@ const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: '
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 const AboutChannel = styled.div`
   margin-top: 20px;

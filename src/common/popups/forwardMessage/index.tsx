@@ -67,6 +67,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -74,6 +76,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   }
 
   const handleChannelListScroll = (event: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext) {
         dispatch(loadMoreChannelsForForward(15))
@@ -179,7 +184,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
               )
             })}
           </SelectedChannelsContainer>
-          <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
+          <ForwardChannelsCont
+            onScroll={handleChannelListScroll}
+            selectedChannelsHeight={selectedChannelsContHeight}
+            className={isScrolling ? 'show-scrollbar' : ''}
+          >
             {searchValue ? (
               <React.Fragment>
                 {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
@@ -427,6 +436,22 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
   margin-top: 16px;
   max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 64}px)`};
   padding-right: 22px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const ChannelItem = styled.div<any>`

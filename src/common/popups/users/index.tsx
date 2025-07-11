@@ -100,7 +100,8 @@ const UsersPopup = ({
   const [filteredUsers, setFilteredUsers] = useState<IUser[]>([])
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
-
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -122,6 +123,9 @@ const UsersPopup = ({
   }, [channel]) */
 
   const handleMembersListScroll = (event: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (!userSearchValue && event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
       if (!getFromContacts && usersLoadingState === LOADING_STATE.LOADED) {
         dispatch(loadMoreUsersAC(20))
@@ -364,6 +368,7 @@ const UsersPopup = ({
 
           {/* <MembersContainer > */}
           <MembersContainer
+            className={isScrolling ? 'show-scrollbar' : ''}
             isAdd={actionType !== 'createChat'}
             selectedMembersHeight={usersContHeight}
             onScroll={handleMembersListScroll}
@@ -532,25 +537,20 @@ const MembersContainer = styled(List)<{
   //width: calc(100% + 16px);
   padding-right: 16px;
 
-  /* width */
   &::-webkit-scrollbar {
     width: 8px;
+    background: transparent;
   }
-
-  /* Track */
-  &::-webkit-scrollbar-track {
+  &::-webkit-scrollbar-thumb {
     background: transparent;
   }
 
-  /* Handle */
-  &::-webkit-scrollbar-thumb {
-    background: #b6b6b6;
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
     border-radius: 4px;
   }
-
-  /* Handle on hover */
-  &::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
   }
 `
 

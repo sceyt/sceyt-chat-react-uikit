@@ -82,7 +82,13 @@ export default function ReactionsPopup({
 
   const user = getClient().user
   const dispatch = useDispatch()
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
+
   const handleReactionsListScroll = (event: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100 && reactionsHasNext) {
       if (reactionsLoadingState === LOADING_STATE.LOADED) {
         dispatch(loadMoreReactionsAC(15))
@@ -167,7 +173,7 @@ export default function ReactionsPopup({
       borderRadius={reactionsDetailsPopupBorderRadius}
       backgroundColor={sectionBackgroundColor}
     >
-      <ReactionScoresCont ref={scoresRef}>
+      <ReactionScoresCont ref={scoresRef} className={isScrolling ? 'show-scrollbar' : ''}>
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
@@ -326,6 +332,24 @@ const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
 const ReactionScoresCont = styled.div`
   max-width: 100%;
   overflow-y: auto;
+  &.show-scrollbar {
+    overflow-x: hidden;
+  }
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const ReactionScoresList = styled.div<{ borderBottom: boolean }>`

@@ -475,7 +475,8 @@ const MessageList: React.FC<MessagesProps> = ({
   const [isDragging, setIsDragging] = useState<any>(null)
   const [showTopDate, setShowTopDate] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
-
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const scrollTimeout = useRef<any>(null)
   const hideTopDateTimeout = useRef<any>(null)
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
@@ -517,6 +518,9 @@ const MessageList: React.FC<MessagesProps> = ({
   }
   // @ts-ignore
   const handleMessagesListScroll = async (event: any) => {
+    setIsScrolling(true)
+    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
+    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     setShowTopDate(true)
     clearTimeout(hideTopDateTimeout.current)
     hideTopDateTimeout.current = setTimeout(() => {
@@ -1113,6 +1117,7 @@ const MessageList: React.FC<MessagesProps> = ({
         {/* {!hideMessages && ( */}
         <Container
           id='scrollableDiv'
+          className={isScrolling ? 'show-scrollbar' : ''}
           ref={scrollRef}
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
@@ -1380,6 +1385,22 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   scroll-behavior: smooth;
   will-change: left, top;
   background-color: ${(props) => props.backgroundColor};
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 export const EmptyDiv = styled.div`
   height: 300px;
