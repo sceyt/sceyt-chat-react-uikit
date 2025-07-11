@@ -254,7 +254,7 @@ const Details = ({
       <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
         {editMode ? (
           <React.Fragment>
-            <ArrowLeft onClick={() => setEditMode(false)} />
+            <ArrowLeft onClick={() => setEditMode(false)} color={textPrimary} />
             <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimary}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>

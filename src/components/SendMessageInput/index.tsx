@@ -1467,7 +1467,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <DeleteIcon />
               Delete
             </CustomButton>
-            <CloseIconWrapper onClick={handleCloseSelectMessages}>
+            <CloseIconWrapper onClick={handleCloseSelectMessages} color={textPrimary}>
               <CloseIcon />
             </CloseIconWrapper>
             {forwardPopupOpen && (
@@ -2478,6 +2478,7 @@ const CloseIconWrapper = styled.span`
   cursor: pointer;
   margin-left: auto;
   padding: 10px;
+  color: ${(props) => props.color || colors.primary};
 `
 
 export default SendMessageInput

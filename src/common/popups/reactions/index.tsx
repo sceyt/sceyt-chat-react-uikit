@@ -52,7 +52,8 @@ export default function ReactionsPopup({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackgroundColor
   } = useColor()
 
   const popupRef = useRef<HTMLDivElement>(null)
@@ -147,7 +148,7 @@ export default function ReactionsPopup({
           setPopupHorizontalPosition(horizontalPositions.left - channelListWidth > popupPos?.width! ? 'left' : 'right')
         } */
         const botPost = bottomPosition - messageInputHeight - 40
-        const reactionsHeight = reactions.length * 44 + 45
+        const reactionsHeight = reactions.length * 50 + 45
         setPopupHeight(reactionsHeight)
         setPopupVerticalPosition(botPost >= (reactionsHeight > 320 ? 320 : reactionsHeight) ? 'bottom' : 'top')
         setCalculateSizes(false)
@@ -164,6 +165,7 @@ export default function ReactionsPopup({
       visible={!calculateSizes}
       rtlDirection={rtlDirection}
       borderRadius={reactionsDetailsPopupBorderRadius}
+      backgroundColor={sectionBackgroundColor}
     >
       <ReactionScoresCont ref={scoresRef}>
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
@@ -208,7 +210,7 @@ export default function ReactionsPopup({
               />
             </AvatarWrapper>
             <UserNamePresence>
-              <MemberName>
+              <MemberName color={textPrimary}>
                 {makeUsername(
                   reaction.user.id === user.id ? reaction.user : contactsMap[reaction.user.id],
                   reaction.user,
@@ -238,6 +240,7 @@ const Container = styled.div<{
   height: number
   visible?: any
   rtlDirection?: boolean
+  backgroundColor?: string
 }>`
   position: absolute;
   /*right: ${(props) => props.popupHorizontalPosition === 'left' && (props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
@@ -251,7 +254,7 @@ const Container = styled.div<{
   //overflow: ${(props) => !props.height && 'hidden'};
   overflow: hidden;
   max-height: 320px;
-  background: #ffffff;
+  background: ${(props) => props.backgroundColor || colors.white};
   //border: 1px solid #dfe0eb;
   box-shadow:
     0 6px 24px -6px rgba(15, 34, 67, 0.12),
@@ -284,7 +287,7 @@ const Container = styled.div<{
     transition-delay: 150ms;
     transition-property: visibility;
 
-    background: ${colors.white};
+    background: ${(props) => props.backgroundColor || colors.white};
   }
 `
 
@@ -293,9 +296,9 @@ const UserNamePresence = styled.div`
   margin-left: 12px;
 `
 
-const MemberName = styled.h3`
+const MemberName = styled.h3<{ color?: string }>`
   margin: 0;
-  max-width: calc(100% - 1px);
+  max-width: calc(100% - 47px);
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
@@ -303,9 +306,9 @@ const MemberName = styled.h3`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-
+  color: ${(props) => props.color || colors.gray0};
   & > span {
-    color: #abadb7;
+    color: ${(props) => props.color || colors.gray0};
   }
 `
 
