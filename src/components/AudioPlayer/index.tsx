@@ -39,7 +39,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
     mediaRecorder: null,
     audio: undefined
   }
-  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
+  } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
   const [recording, setRecording] = useState<Recording>(recordingInitialState)
@@ -241,7 +245,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
-        <AudioRate color={textSecondary} onClick={handleSetAudioRate}>
+        <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundColor}>
           {audioRate}
           <span>X</span>
         </AudioRate>
@@ -275,11 +279,11 @@ const PlayPause = styled.div<{ iconColor?: string }>`
 const AudioVisualization = styled.div`
   width: 100%;
 `
-const AudioRate = styled.div<{ color: string }>`
+const AudioRate = styled.div<{ color: string; backgroundColor?: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${colors.white};
+  background-color: ${(props) => props.backgroundColor || colors.white};
   width: 30px;
   min-width: 30px;
   border-radius: 12px;

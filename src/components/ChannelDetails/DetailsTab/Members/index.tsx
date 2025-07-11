@@ -249,6 +249,7 @@ const Members = ({
               hoverBackground={hoverBackgroundColor || hoverBackground}
               addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
+              addMemberBackground={hoverBackground}
             >
               {addMemberIcon || <AddMemberIcon />}
               {`Add ${displayMemberText}`}
@@ -544,6 +545,7 @@ const MemberItem = styled.li<{
     > svg {
       color: ${(props) => props.addMemberIconColor || colors.primary};
       margin-right: 12px;
+      fill: ${(props) => props.addMemberBackground || 'transparent'};
     }
   }
 

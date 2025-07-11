@@ -26,6 +26,7 @@ import {
   SET_SEARCHED_CHANNELS_FOR_FORWARD,
   SET_TAB_IS_ACTIVE,
   SWITCH_TYPING_INDICATOR,
+  SWITCH_RECORDING_INDICATOR,
   TOGGLE_EDIT_CHANNEL,
   UPDATE_CHANNEL_DATA,
   UPDATE_CHANNEL_LAST_MESSAGE,
@@ -33,7 +34,7 @@ import {
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL
 } from './constants'
-import { IAction, IChannel, IContact, IMember } from '../../types'
+import { IAction, IChannel, IContact, IMember, IUser } from '../../types'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
@@ -63,11 +64,8 @@ const initialState: {
   users: []
   errorNotification: string
   notifications: []
-  typingIndicator: {
-    [key: string]: {
-      typingState: boolean
-      from: {}
-    }
+  typingOrRecordingIndicator: {
+    [key: string]: { [key: string]: { typingState?: boolean; from: IUser; recordingState?: boolean } }
   }
   searchValue: string
   addedChannel: IChannel | null
@@ -99,7 +97,7 @@ const initialState: {
   users: [],
   errorNotification: '',
   notifications: [],
-  typingIndicator: {},
+  typingOrRecordingIndicator: {},
   searchValue: '',
   addedChannel: null,
   addedToChannel: null,
@@ -392,14 +390,38 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case SWITCH_TYPING_INDICATOR: {
       const { typingState, channelId, from } = payload
-      if (typingState) {
-        newState.typingIndicator = { ...newState.typingIndicator, ...{ [channelId]: { from, typingState } } }
-      } else {
-        if (newState.typingIndicator[channelId]) {
-          const copyData = { ...newState.typingIndicator }
-          delete copyData[channelId]
-          newState.typingIndicator = copyData
+      const currentChannelIndicators = newState.typingOrRecordingIndicator[channelId] || {}
+      const updatedChannelIndicators = {
+        ...currentChannelIndicators,
+        [from.id]: {
+          ...currentChannelIndicators[from.id],
+          from,
+          typingState
         }
+      }
+
+      newState.typingOrRecordingIndicator = {
+        ...newState.typingOrRecordingIndicator,
+        [channelId]: updatedChannelIndicators
+      }
+      return newState
+    }
+
+    case SWITCH_RECORDING_INDICATOR: {
+      const { recordingState, channelId, from } = payload
+      const currentChannelIndicators = newState.typingOrRecordingIndicator[channelId] || {}
+      const updatedChannelIndicators = {
+        ...currentChannelIndicators,
+        [from.id]: {
+          ...currentChannelIndicators[from.id],
+          from,
+          recordingState
+        }
+      }
+
+      newState.typingOrRecordingIndicator = {
+        ...newState.typingOrRecordingIndicator,
+        [channelId]: updatedChannelIndicators
       }
       return newState
     }

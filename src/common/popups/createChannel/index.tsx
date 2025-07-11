@@ -306,7 +306,7 @@ export default function CreateChannel({
             <PopupContainer>
               <Popup
                 backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
-                boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
+                boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(71, 71, 71, 0.42)' : ''}
                 maxHeight='600px'
                 width='520px'
                 maxWidth='520px'
@@ -395,7 +395,9 @@ export default function CreateChannel({
                       <Label color={textPrimary}>URL</Label>
                       <UriInputWrapper uriPrefixWidth={uriPrefixWidth}>
                         {uriPrefixOnCreateChannel && (
-                          <UriPrefix ref={uriPrefixRef}>{uriPrefixOnCreateChannel}</UriPrefix>
+                          <UriPrefix ref={uriPrefixRef} color={textPrimary}>
+                            {uriPrefixOnCreateChannel}
+                          </UriPrefix>
                         )}
                         <CustomInput
                           type='text'
@@ -554,4 +556,5 @@ const UriPrefix = styled.span`
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
+  color: ${(props) => props.color || colors.primary};
 `

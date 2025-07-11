@@ -100,7 +100,7 @@ const UsersPopup = ({
   const [filteredUsers, setFilteredUsers] = useState<IUser[]>([])
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
-
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -318,7 +318,7 @@ const UsersPopup = ({
         padding='0'
         display='flex'
         backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
-        boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(255,255,255,0.1)' : ''}
+        boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(71, 71, 71, 0.42)' : ''}
       >
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
           <CloseIcon color={textSecondary} onClick={handleClosePopup} />
@@ -364,9 +364,12 @@ const UsersPopup = ({
 
           {/* <MembersContainer > */}
           <MembersContainer
+            className={isScrolling ? 'show-scrollbar' : ''}
             isAdd={actionType !== 'createChat'}
             selectedMembersHeight={usersContHeight}
             onScroll={handleMembersListScroll}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
           >
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
@@ -532,25 +535,20 @@ const MembersContainer = styled(List)<{
   //width: calc(100% + 16px);
   padding-right: 16px;
 
-  /* width */
   &::-webkit-scrollbar {
     width: 8px;
+    background: transparent;
   }
-
-  /* Track */
-  &::-webkit-scrollbar-track {
+  &::-webkit-scrollbar-thumb {
     background: transparent;
   }
 
-  /* Handle */
-  &::-webkit-scrollbar-thumb {
-    background: #b6b6b6;
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
     border-radius: 4px;
   }
-
-  /* Handle on hover */
-  &::-webkit-scrollbar-thumb:hover {
-    background: #555;
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
   }
 `
 

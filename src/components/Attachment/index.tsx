@@ -123,20 +123,20 @@ const Attachment = ({
   const previewFileType = isPreview && attachment.data.type.split('/')[0]
 
   const [renderWidth, renderHeight] = useMemo(() => {
-    let attachmentData = null;
+    let attachmentData = null
     if (attachment.metadata && typeof attachment.metadata === 'string') {
-      attachmentData = JSON.parse(attachment.metadata.replace('\"{', '\'{').replace('}\"', '}\''));
+      attachmentData = JSON.parse(attachment.metadata.replace('"{', "'{").replace('}"', "}'"))
     } else if (attachment.metadata && attachment.metadata.szw && attachment.metadata.szh) {
-      attachmentData = attachment.metadata;
+      attachmentData = attachment.metadata
     }
 
     return attachmentData && attachmentData.szw && attachmentData.szh
       ? calculateRenderedImageWidth(
-        attachmentData.szw,
-        attachmentData.szh,
-        attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-        attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
-      )
+          attachmentData.szw,
+          attachmentData.szh,
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+          attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
+        )
       : []
   }, [])
 
@@ -531,26 +531,7 @@ const Attachment = ({
                 )}
               </UploadPercent>
             </UploadProgress>
-          ) : /*  <UploadProgress onClick={handlePauseResumeUpload}>
-              <UploadPercent>
-                {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
-                  <CancelIcon />
-                ) : (
-                  <UploadIcon />
-                )}
-              </UploadPercent>
-              {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING && (
-                <UploadingIcon className='rotate_cont' />
-              )}
-            </UploadProgress> */
-          /* attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
-            <React.Fragment>
-              <RemoveChosenFile onClick={() => removeSelected(attachment.tid!)} />
-              <UploadProgress isFailedAttachment>
-                <ErrorIcon />
-              </UploadProgress>
-            </React.Fragment>
-          ) : */ null}
+          ) : null}
           {isPreview && (
             <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
           )}
@@ -565,7 +546,7 @@ const Attachment = ({
                 !isInUploadingState &&
                 (attachmentCompilationState[attachment.tid!]
                   ? attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL ||
-                  attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING
+                    attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING
                   : true) &&
                 handleMediaItemClick(attachment)
               }
@@ -599,66 +580,40 @@ const Attachment = ({
                     )}
                     {(attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
                       (downloadingFile && !downloadIsCancelled)) && (
-                        <React.Fragment>
-                          <ProgressWrapper>
-                            <CircularProgressbar
-                              minValue={0}
-                              maxValue={100}
-                              value={progress}
-                              backgroundPadding={3}
-                              background={true}
-                              text=''
-                              styles={{
-                                background: {
-                                  fill: 'rgba(23, 25, 28, 0)'
-                                },
-                                path: {
-                                  stroke: colors.white,
-                                  strokeLinecap: 'butt',
-                                  strokeWidth: '4px',
-                                  transition: 'stroke-dashoffset 0.5s ease 0s',
-                                  transform: 'rotate(0turn)',
-                                  transformOrigin: 'center center'
-                                }
-                              }}
-                            />
-                          </ProgressWrapper>
-                          {sizeProgress && !isRepliedMessage && (
-                            <SizeProgress>
-                              {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
-                            </SizeProgress>
-                          )}
-                        </React.Fragment>
-                      )}
+                      <React.Fragment>
+                        <ProgressWrapper>
+                          <CircularProgressbar
+                            minValue={0}
+                            maxValue={100}
+                            value={progress}
+                            backgroundPadding={3}
+                            background={true}
+                            text=''
+                            styles={{
+                              background: {
+                                fill: 'rgba(23, 25, 28, 0)'
+                              },
+                              path: {
+                                stroke: colors.white,
+                                strokeLinecap: 'butt',
+                                strokeWidth: '4px',
+                                transition: 'stroke-dashoffset 0.5s ease 0s',
+                                transform: 'rotate(0turn)',
+                                transformOrigin: 'center center'
+                              }
+                            }}
+                          />
+                        </ProgressWrapper>
+                        {sizeProgress && !isRepliedMessage && (
+                          <SizeProgress>
+                            {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                          </SizeProgress>
+                        )}
+                      </React.Fragment>
+                    )}
                   </UploadPercent>
                 </UploadProgress>
-              ) : /* <UploadProgress
-                  isDetailsView={isDetailsView}
-                  isRepliedMessage={isRepliedMessage}
-                  onClick={handlePauseResumeUpload}
-                  backgroundImage={attachmentThumb ? attachment.metadata.tmb : ''}
-                >
-                  <React.Fragment>
-                    <UploadPercent isRepliedMessage={isRepliedMessage}>
-                      {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
-                        <CancelIcon />
-                      ) : (
-                        <UploadIcon />
-                      )}
-                    </UploadPercent>
-                    {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING && (
-                      <UploadingIcon isRepliedMessage={isRepliedMessage} className='rotate_cont' />
-                    )}
-                  </React.Fragment>
-                </UploadProgress> */
-                /* : attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
-                  <React.Fragment>
-                    <UploadProgress isFailedAttachment>
-                      <ErrorIcon />
-                    </UploadProgress>
-                  </React.Fragment>
-                ) */
-                null}
+              ) : null}
               <VideoPreview
                 theme={theme}
                 width={
@@ -828,27 +783,7 @@ const Attachment = ({
                 )}
               </UploadPercent>
             </UploadProgress>
-          ) : /* <UploadProgress fileAttachment onClick={handlePauseResumeUpload}>
-              <UploadPercent
-                fileAttachment
-                borderRadius={attachment.metadata && attachment.metadata.tmb ? undefined : '50%'}
-              >
-                {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
-                  <CancelIcon />
-                ) : (
-                  <UploadIcon />
-                )}
-              </UploadPercent>
-              <UploadingIcon fileAttachment className='rotate_cont' />
-            </UploadProgress> */
-            /*: attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL ? (
-              <React.Fragment>
-                <UploadProgress isFailedAttachment>
-                  <FailedFileIcon onClick={() => removeSelected && removeSelected(attachment.tid!)} />
-                </UploadProgress>
-              </React.Fragment>
-            ) */
-            null}
+          ) : null}
           {!isRepliedMessage && (
             <AttachmentFileInfo isPreview={isPreview}>
               {/* @ts-ignore */}
@@ -862,25 +797,13 @@ const Attachment = ({
                 {(isInUploadingState || downloadingFile) && sizeProgress
                   ? `${bytesToSize(sizeProgress.loaded, 1)} • ${bytesToSize(sizeProgress.total, 1)}`
                   : ((attachment.data && attachment.data.size) || attachment.size) &&
-                  bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
-                {/* <span>
-                  {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.FAIL && 'Upload error'}
-                </span> */}
+                    bytesToSize(isPreview ? attachment.data.size : +attachment.size)}
               </AttachmentSize>
             </AttachmentFileInfo>
           )}
-          {
-            isPreview && (
-              <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
-            ) /*: attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.FAIL &&
-            attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING ? (
-            <DownloadFile download={attachment.name} onClick={() => downloadFile(attachment)}>
-              <DownloadFileIcon />
-            </DownloadFile>
-          ) : (
-            ''
-          ) */
-          }
+          {isPreview && (
+            <RemoveChosenFile color={iconPrimary} onClick={() => handleDeleteSelectedAttachment(attachment.tid!)} />
+          )}
         </AttachmentFile>
       )}
     </React.Fragment>

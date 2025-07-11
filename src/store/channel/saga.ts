@@ -47,7 +47,8 @@ import {
   TURN_OFF_NOTIFICATION,
   TURN_ON_NOTIFICATION,
   UPDATE_CHANNEL,
-  WATCH_FOR_EVENTS
+  WATCH_FOR_EVENTS,
+  SEND_RECORDING
 } from './constants'
 import {
   destroyChannelsMap,
@@ -1154,6 +1155,26 @@ function* sendTyping(action: IAction): any {
   }
 }
 
+function* sendRecording(action: IAction): any {
+  const {
+    payload: { state }
+  } = action
+  const activeChannelId = yield call(getActiveChannelId)
+  const channel = yield call(getChannelFromMap, activeChannelId)
+
+  try {
+    if (channel) {
+      if (state) {
+        yield call(channel.startRecording)
+      } else {
+        yield call(channel.stopRecording)
+      }
+    }
+  } catch (e) {
+    log.error('ERROR in send recording', e)
+  }
+}
+
 function* clearHistory(action: IAction): any {
   try {
     const { payload } = action
@@ -1277,6 +1298,7 @@ export default function* ChannelsSaga() {
   yield takeLatest(MARK_CHANNEL_AS_UNREAD, markChannelAsUnRead)
   yield takeLatest(CHECK_USER_STATUS, checkUsersStatus)
   yield takeLatest(SEND_TYPING, sendTyping)
+  yield takeLatest(SEND_RECORDING, sendRecording)
   yield takeLatest(PIN_CHANNEL, pinChannel)
   yield takeLatest(UNPIN_CHANNEL, unpinChannel)
   yield takeLatest(CLEAR_HISTORY, clearHistory)
