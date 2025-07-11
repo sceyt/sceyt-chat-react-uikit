@@ -50,7 +50,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -150,9 +151,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   }, [searchValue])
   return (
     <PopupContainer>
-      <Popup maxWidth='522px' minWidth='522px' height='540px' isLoading={loading} padding='0'>
+      <Popup
+        maxWidth='522px'
+        minWidth='522px'
+        height='540px'
+        isLoading={loading}
+        padding='0'
+        backgroundColor={backgroundColor}
+      >
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
-          <CloseIcon onClick={() => togglePopup()} />
+          <CloseIcon onClick={() => togglePopup()} color={textPrimary} />
           <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
@@ -256,6 +264,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             }}
                             size='18px'
                             tickColor={accentColor}
+                            backgroundColor={surface1Background}
                           />
                         </ChannelItem>
                       )
@@ -304,6 +313,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             }}
                             size='18px'
                             tickColor={accentColor}
+                            backgroundColor={surface1Background}
                           />
                         </ChannelItem>
                       )
@@ -383,6 +393,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       }}
                       size='18px'
                       tickColor={accentColor}
+                      backgroundColor={surface1Background}
                     />
                   </ChannelItem>
                 )

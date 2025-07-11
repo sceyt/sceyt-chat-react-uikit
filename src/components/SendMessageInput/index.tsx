@@ -1388,7 +1388,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
-            <MessageCountWrapper>
+            <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
             <CustomButton
@@ -2381,10 +2381,11 @@ const SelectedMessagesWrapper = styled.div`
   padding: 12px 16px;
 `
 
-const MessageCountWrapper = styled.div`
+const MessageCountWrapper = styled.div<{ color: string }>`
   display: flex;
   justify-content: flex-start;
   min-width: 170.5px;
+  color: ${(props) => props.color || colors.primary};
 `
 
 const CustomButton = styled.span<{ color: string; backgroundColor?: string; marginLeft?: string }>`

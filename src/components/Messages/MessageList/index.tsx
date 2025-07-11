@@ -288,7 +288,7 @@ interface MessagesProps {
   newMessagesSeparatorBorderRadius?: string
   newMessagesSeparatorBackground?: string
   newMessagesSeparatorTextLeftRightSpacesWidth?: string
-  newMessagesSeparatorSpaceColor?: string,
+  newMessagesSeparatorSpaceColor?: string
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
   fileAttachmentsBoxBorder?: string
@@ -305,7 +305,7 @@ interface MessagesProps {
   backgroundColor?: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
-  hiddenMessagesProperties?: HiddenMessageProperty[];
+  hiddenMessagesProperties?: HiddenMessageProperty[]
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -450,7 +450,6 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
-
 
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -909,7 +908,7 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [isDragging])
 
   useEffect(() => {
-    if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage) ) {
+    if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage)) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage.user.id === user.id) {
         setUnreadMessageId('')
@@ -1052,7 +1051,6 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   })
 
-
   return (
     <React.Fragment>
       {isDragging && !(attachmentsPreview?.show && mediaFile) && (
@@ -1175,7 +1173,12 @@ const MessageList: React.FC<MessagesProps> = ({
                         borderRadius={dateDividerBorderRadius}
                       />
                     ) : (
-                      <MessageWrapper id={message.id} className={(message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''}>
+                      <MessageWrapper
+                        id={message.id}
+                        className={
+                          (message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''
+                        }
+                      >
                         <Message
                           message={{
                             ...message,
@@ -1344,7 +1347,12 @@ const MessageList: React.FC<MessagesProps> = ({
             )
           )}
           {attachmentsPreview?.show && mediaFile && (
-            <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} attachmentsPreview={attachmentsPreview} />
+            <SliderPopup
+              channel={channel}
+              setIsSliderOpen={setMediaFile}
+              currentMediaFile={mediaFile}
+              attachmentsPreview={attachmentsPreview}
+            />
           )}
         </Container>
       </React.Fragment>
