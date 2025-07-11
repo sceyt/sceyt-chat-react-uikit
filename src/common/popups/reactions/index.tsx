@@ -203,7 +203,12 @@ export default function ReactionsPopup({
           ))}
         </ReactionScoresList>
       </ReactionScoresCont>
-      <ReactionsList scoresHeight={scoresHeight} onScroll={handleReactionsListScroll} popupHeight={popupHeight}>
+      <ReactionsList
+        className={isScrolling ? 'show-scrollbar' : ''}
+        scoresHeight={scoresHeight}
+        onScroll={handleReactionsListScroll}
+        popupHeight={popupHeight}
+      >
         {reactions.map((reaction: IReaction) => (
           <ReactionItem key={reaction.id}>
             <AvatarWrapper>
@@ -327,6 +332,25 @@ const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
   transition: all 0.2s;
   height: ${(props) => `calc(100% - ${props.scoresHeight || 57}px)`};
     calc(100% - 57px);
+
+  &.show-scrollbar {
+    overflow-x: hidden;
+  }
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const ReactionScoresCont = styled.div`
