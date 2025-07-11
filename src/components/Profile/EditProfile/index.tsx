@@ -40,7 +40,6 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
     url: user.avatarUrl // channelDetails.avatar
   })
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
 
   const handleTypeFirstName = (e: any) => {
     setFirstNameValue(e.currentTarget.value)
@@ -100,12 +99,6 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
     toggleEditPopup()
   }
 
-  const handleScroll = (e: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
-  }
-
   return (
     <PopupContainer>
       <Popup maxHeight='482px' width='433px' maxWidth='433px' height='calc(100vh - 50px)' padding='22px 24px 8px'>
@@ -113,7 +106,11 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
 
         <PopupName color={textPrimary}>Edit Profile</PopupName>
 
-        <EditProfileContainer className={isScrolling ? 'show-scrollbar' : ''} onScroll={handleScroll}>
+        <EditProfileContainer
+          className={isScrolling ? 'show-scrollbar' : ''}
+          onMouseEnter={() => setIsScrolling(true)}
+          onMouseLeave={() => setIsScrolling(false)}
+        >
           <Label color={textPrimary}>Username </Label>
           <CustomInput
             errorColor={errorColor}

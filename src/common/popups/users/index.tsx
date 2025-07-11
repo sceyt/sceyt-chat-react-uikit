@@ -101,7 +101,6 @@ const UsersPopup = ({
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -123,9 +122,6 @@ const UsersPopup = ({
   }, [channel]) */
 
   const handleMembersListScroll = (event: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (!userSearchValue && event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
       if (!getFromContacts && usersLoadingState === LOADING_STATE.LOADED) {
         dispatch(loadMoreUsersAC(20))
@@ -372,6 +368,8 @@ const UsersPopup = ({
             isAdd={actionType !== 'createChat'}
             selectedMembersHeight={usersContHeight}
             onScroll={handleMembersListScroll}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
           >
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {

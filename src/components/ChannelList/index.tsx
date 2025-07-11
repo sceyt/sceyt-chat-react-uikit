@@ -230,7 +230,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -257,9 +256,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }
 
   const handleAllChannelsListScroll = (e: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (!searchValue && channelsHasNext && e.target.scrollTop >= e.target.scrollHeight - e.target.offsetHeight - 200) {
       handleLoadMoreChannels()
     }
@@ -675,6 +671,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
             <ChannelsList
               ref={channelsScrollRef}
               onScroll={handleAllChannelsListScroll}
+              onMouseEnter={() => setIsScrolling(true)}
+              onMouseLeave={() => setIsScrolling(false)}
               className={isScrolling ? 'show-scrollbar' : ''}
             >
               {channels.map((channel: IChannel) =>

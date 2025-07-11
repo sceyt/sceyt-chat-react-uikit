@@ -68,7 +68,6 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -76,9 +75,6 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   }
 
   const handleChannelListScroll = (event: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext) {
         dispatch(loadMoreChannelsForForward(15))
@@ -188,6 +184,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             onScroll={handleChannelListScroll}
             selectedChannelsHeight={selectedChannelsContHeight}
             className={isScrolling ? 'show-scrollbar' : ''}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
           >
             {searchValue ? (
               <React.Fragment>

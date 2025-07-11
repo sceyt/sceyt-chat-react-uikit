@@ -476,7 +476,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const [showTopDate, setShowTopDate] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
   const hideTopDateTimeout = useRef<any>(null)
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
@@ -518,9 +517,6 @@ const MessageList: React.FC<MessagesProps> = ({
   }
   // @ts-ignore
   const handleMessagesListScroll = async (event: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     setShowTopDate(true)
     clearTimeout(hideTopDateTimeout.current)
     hideTopDateTimeout.current = setTimeout(() => {
@@ -1121,6 +1117,8 @@ const MessageList: React.FC<MessagesProps> = ({
           ref={scrollRef}
           stopScrolling={stopScrolling}
           onScroll={handleMessagesListScroll}
+          onMouseEnter={() => setIsScrolling(true)}
+          onMouseLeave={() => setIsScrolling(false)}
           onDragEnter={handleDragIn}
           backgroundColor={backgroundColor || themeBackgroundColor}
         >

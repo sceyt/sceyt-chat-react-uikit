@@ -83,12 +83,8 @@ export default function ReactionsPopup({
   const user = getClient().user
   const dispatch = useDispatch()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
 
   const handleReactionsListScroll = (event: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100 && reactionsHasNext) {
       if (reactionsLoadingState === LOADING_STATE.LOADED) {
         dispatch(loadMoreReactionsAC(15))
@@ -173,7 +169,12 @@ export default function ReactionsPopup({
       borderRadius={reactionsDetailsPopupBorderRadius}
       backgroundColor={sectionBackgroundColor}
     >
-      <ReactionScoresCont ref={scoresRef} className={isScrolling ? 'show-scrollbar' : ''}>
+      <ReactionScoresCont
+        ref={scoresRef}
+        className={isScrolling ? 'show-scrollbar' : ''}
+        onMouseEnter={() => setIsScrolling(true)}
+        onMouseLeave={() => setIsScrolling(false)}
+      >
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
           <ReactionScoreItem
             bubbleStyle={reactionsDetailsPopupHeaderItemsStyle === 'bubbles'}
@@ -208,6 +209,8 @@ export default function ReactionsPopup({
         scoresHeight={scoresHeight}
         onScroll={handleReactionsListScroll}
         popupHeight={popupHeight}
+        onMouseEnter={() => setIsScrolling(true)}
+        onMouseLeave={() => setIsScrolling(false)}
       >
         {reactions.map((reaction: IReaction) => (
           <ReactionItem key={reaction.id}>

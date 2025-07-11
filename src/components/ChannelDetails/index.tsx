@@ -176,7 +176,6 @@ const Details = ({
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const scrollTimeout = useRef<any>(null)
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
@@ -199,9 +198,6 @@ const Details = ({
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
-    setIsScrolling(true)
-    if (scrollTimeout.current) clearTimeout(scrollTimeout.current)
-    scrollTimeout.current = setTimeout(() => setIsScrolling(false), 400)
     // setCloseMenu(true)
     /* if (tabsRef.current.getBoundingClientRect().top <= detailsRef.current.offsetTop) {
       if (!tabFixed) {
@@ -292,6 +288,8 @@ const Details = ({
         heightOffset={detailsRef && detailsRef.current && detailsRef.current.offsetTop}
         height={channelDetailsHeight}
         ref={detailsRef}
+        onMouseEnter={() => setIsScrolling(true)}
+        onMouseLeave={() => setIsScrolling(false)}
       >
         <DetailsHeader borderColor={bordersColor || borderThemeColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
