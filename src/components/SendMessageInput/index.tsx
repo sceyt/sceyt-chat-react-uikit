@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from 'react'
+import React, { FC, useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
@@ -53,7 +53,7 @@ import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
   draggedAttachmentsSelector,
-  typingIndicatorSelector
+  typingOrRecordingIndicatorArraySelector
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { activeChannelMembersSelector } from '../../store/member/selector'
@@ -70,7 +70,7 @@ import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '
 import { colors, THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
-import { IMember, IMessage, IUser } from '../../types'
+import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
@@ -127,6 +127,7 @@ import { getClient } from '../../common/client'
 import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
+import RecordingAnimation from './RecordingAnimation'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -222,7 +223,14 @@ interface SendMessageProps {
   attachmentIcoOrder?: number
   sendIconOrder?: number
   inputOrder?: number
-  CustomTypingIndicator?: FC<{ from: IUser; typingState: boolean }>
+  CustomTypingIndicator?: FC<{
+    from: {
+      id: string
+      name: string
+      typingState?: boolean
+      recordingState?: boolean
+    }[]
+  }>
   backgroundColor?: string
   margin?: string
   padding?: string
@@ -359,7 +367,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
   const [editMessageText, setEditMessageText] = useState('')
-  const [readyVideoAttachments, setReadyVideoAttachments] = useState({})
+  const [readyVideoAttachments, setReadyVideoAttachments] = useState<{ [key: string]: boolean }>({})
   const [showChooseAttachmentType, setShowChooseAttachmentType] = useState(false)
   const [isEmojisOpened, setIsEmojisOpened] = useState(false)
   const [emojisInRightSide, setEmojisInRightSide] = useState(false)
@@ -389,7 +397,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
 
-  const typingIndicator = useSelector(typingIndicatorSelector(activeChannel.id))
+  const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
 
@@ -1373,6 +1381,56 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [])
 
+  const filteredTypingOrRecordingIndicator = useMemo(() => {
+    return typingOrRecordingIndicator
+      ? Object.values(typingOrRecordingIndicator).filter((item: any) => item.typingState || item.recordingState)
+      : []
+  }, [typingOrRecordingIndicator])
+
+  const isTyping = useMemo(
+    () => !!filteredTypingOrRecordingIndicator.find((item: any) => item.typingState),
+    [filteredTypingOrRecordingIndicator]
+  )
+
+  const formatTypingIndicatorText = (users: any[], maxShownUsers: number = 3) => {
+    if (users.length === 0) return ''
+    if (users.length === 1) {
+      const user = users[0]
+      const userName = makeUsername(
+        getFromContacts && user.from && contactsMap[user.from.id],
+        user.from,
+        getFromContacts
+      )
+      return `${userName}${
+        isTyping
+          ? activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+            ? ' is typing'
+            : ''
+          : activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+            ? ' is recording'
+            : ''
+      }`
+    }
+
+    if (users.length <= maxShownUsers) {
+      const userNames = users.map((user) =>
+        makeUsername(getFromContacts && user.from && contactsMap[user.from.id], user.from, getFromContacts)
+      )
+      return userNames.join(', ')
+    } else {
+      const firstNames = users
+        .slice(0, maxShownUsers)
+        .map((user) =>
+          makeUsername(getFromContacts && user.from && contactsMap[user.from.id], user.from, getFromContacts)
+        )
+      const othersCount = users.length - maxShownUsers
+
+      return `${firstNames
+        .map((name, index) => `${name}${index < firstNames.length - 1 ? ', ' : ''}`)
+        .join('')} and ${othersCount} other${othersCount > 1 ? 's' : ''}`
+    }
+  }
+
   return (
     <SendMessageWrapper backgroundColor={backgroundColor}>
       <Container
@@ -1472,25 +1530,30 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ) : (
               <React.Fragment>
                 <TypingIndicator>
-                  {typingIndicator &&
-                    typingIndicator.typingState &&
+                  {filteredTypingOrRecordingIndicator.length > 0 &&
                     (CustomTypingIndicator ? (
-                      <CustomTypingIndicator from={typingIndicator.from} typingState={typingIndicator.typingState} />
+                      <CustomTypingIndicator
+                        from={filteredTypingOrRecordingIndicator.map((item: any) => ({
+                          id: item.from.id,
+                          name: item.from.name,
+                          typingState: item.typingState,
+                          recordingState: item.recordingState
+                        }))}
+                      />
                     ) : (
                       <TypingIndicatorCont>
                         <TypingFrom color={textSecondary}>
-                          {makeUsername(
-                            getFromContacts && typingIndicator.from && contactsMap[typingIndicator.from.id],
-                            typingIndicator.from,
-                            getFromContacts
-                          )}{' '}
-                          is typing
+                          {formatTypingIndicatorText(filteredTypingOrRecordingIndicator, 3)}
                         </TypingFrom>
-                        <TypingAnimation>
-                          <DotOne />
-                          <DotTwo />
-                          <DotThree />
-                        </TypingAnimation>
+                        {isTyping ? (
+                          <TypingAnimation>
+                            <DotOne />
+                            <DotTwo />
+                            <DotThree />
+                          </TypingAnimation>
+                        ) : (
+                          <RecordingAnimation />
+                        )}
                       </TypingIndicatorCont>
                     ))}
                 </TypingIndicator>
@@ -2233,6 +2296,7 @@ const TypingIndicatorCont = styled.div`
   display: flex;
   align-items: center;
   margin-bottom: 12px;
+  gap: 4px;
 `
 
 const TypingFrom = styled.h5<{ color: string }>`

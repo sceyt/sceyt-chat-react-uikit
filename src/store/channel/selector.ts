@@ -17,8 +17,9 @@ export const channelsForForwardHasNextSelector = (store: any) => store.ChannelRe
 export const searchValueSelector = (store: any) => store.ChannelReducer.searchValue
 export const channelInfoIsOpenSelector = (store: any) => store.ChannelReducer.channelInfoIsOpen
 export const channelEditModeSelector = (store: any) => store.ChannelReducer.channelEditMode
-export const typingIndicatorSelector = (channelId: string) => (store: any) =>
-  store.ChannelReducer.typingIndicator[channelId]
+export const typingOrRecordingIndicatorArraySelector = (channelId: string) => (store: any) =>
+  store.ChannelReducer.typingOrRecordingIndicator[channelId]
+
 export const channelListWidthSelector = (store: any) => store.ChannelReducer.channelListWidth
 export const channelListHiddenSelector = (store: any) => store.ChannelReducer.hideChannelList
 export const isDraggingSelector = (store: any) => store.ChannelReducer.isDragging
