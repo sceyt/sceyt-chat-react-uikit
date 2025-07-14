@@ -229,6 +229,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const activeChannel = useSelector(activeChannelSelector) || {}
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -667,7 +668,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
       ) : (
         <React.Fragment>
           {!searchValue && (
-            <ChannelsList ref={channelsScrollRef} onScroll={handleAllChannelsListScroll}>
+            <ChannelsList
+              ref={channelsScrollRef}
+              onScroll={handleAllChannelsListScroll}
+              onMouseEnter={() => setIsScrolling(true)}
+              onMouseLeave={() => setIsScrolling(false)}
+              className={isScrolling ? 'show-scrollbar' : ''}
+            >
               {channels.map((channel: IChannel) =>
                 ListItem ? (
                   <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
@@ -842,6 +849,22 @@ const ChannelsList = styled.div`
   overflow-y: auto;
   width: 400px;
   height: 100%;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 const SearchedChannels = styled.div`
   height: calc(100vh - 123px);

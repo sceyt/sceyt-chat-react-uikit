@@ -175,7 +175,7 @@ const Details = ({
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
-  // const tabsRef = useRef<any>(null)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const detailsRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
@@ -254,7 +254,7 @@ const Details = ({
       <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
         {editMode ? (
           <React.Fragment>
-            <ArrowLeft onClick={() => setEditMode(false)} />
+            <ArrowLeft onClick={() => setEditMode(false)} color={textPrimary} />
             <SectionHeader fontSize={detailsTitleFontSize} margin='0 0 0 12px' color={textPrimary}>
               {editDetailsTitleText || 'Edit details'}
             </SectionHeader>
@@ -282,11 +282,14 @@ const Details = ({
       )}
 
       <ChatDetails
+        className={isScrolling ? 'show-scrollbar' : ''}
         size={size}
         onScroll={handleMembersListScroll}
         heightOffset={detailsRef && detailsRef.current && detailsRef.current.offsetTop}
         height={channelDetailsHeight}
         ref={detailsRef}
+        onMouseEnter={() => setIsScrolling(true)}
+        onMouseLeave={() => setIsScrolling(false)}
       >
         <DetailsHeader borderColor={bordersColor || borderThemeColor}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
@@ -518,6 +521,22 @@ const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: '
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
   height: ${(props) => props.height && `${props.height - (props.heightOffset ? props.heightOffset + 2 : 0)}px`};
   overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 const AboutChannel = styled.div`
   margin-top: 20px;

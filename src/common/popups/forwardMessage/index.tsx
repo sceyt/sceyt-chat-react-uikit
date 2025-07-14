@@ -50,7 +50,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -66,6 +67,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannelsContHeight, setSelectedChannelsHeight] = useState(0)
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -150,9 +152,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   }, [searchValue])
   return (
     <PopupContainer>
-      <Popup maxWidth='522px' minWidth='522px' height='540px' isLoading={loading} padding='0'>
+      <Popup
+        maxWidth='522px'
+        minWidth='522px'
+        height='540px'
+        isLoading={loading}
+        padding='0'
+        backgroundColor={backgroundColor}
+      >
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
-          <CloseIcon onClick={() => togglePopup()} />
+          <CloseIcon onClick={() => togglePopup()} color={textPrimary} />
           <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
@@ -171,7 +180,13 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
               )
             })}
           </SelectedChannelsContainer>
-          <ForwardChannelsCont onScroll={handleChannelListScroll} selectedChannelsHeight={selectedChannelsContHeight}>
+          <ForwardChannelsCont
+            onScroll={handleChannelListScroll}
+            selectedChannelsHeight={selectedChannelsContHeight}
+            className={isScrolling ? 'show-scrollbar' : ''}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
+          >
             {searchValue ? (
               <React.Fragment>
                 {!!(searchedChannels.chats_groups && searchedChannels.chats_groups.length) && (
@@ -256,6 +271,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             }}
                             size='18px'
                             tickColor={accentColor}
+                            backgroundColor={surface1Background}
                           />
                         </ChannelItem>
                       )
@@ -304,6 +320,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             }}
                             size='18px'
                             tickColor={accentColor}
+                            backgroundColor={surface1Background}
                           />
                         </ChannelItem>
                       )
@@ -383,6 +400,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       }}
                       size='18px'
                       tickColor={accentColor}
+                      backgroundColor={surface1Background}
                     />
                   </ChannelItem>
                 )
@@ -416,6 +434,22 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
   margin-top: 16px;
   max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 64}px)`};
   padding-right: 22px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: #818c99;
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const ChannelItem = styled.div<any>`

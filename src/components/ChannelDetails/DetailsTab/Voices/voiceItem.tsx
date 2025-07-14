@@ -42,7 +42,12 @@ const VoiceItem = ({
   voicePreviewDateAndTimeColor,
   voicePreviewHoverBackgroundColor
 }: IProps) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
+  } = useColor()
 
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
@@ -111,19 +116,23 @@ const VoiceItem = ({
     <FileItem
       onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
       onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-      hoverBackgroundColor={voicePreviewHoverBackgroundColor}
+      hoverBackgroundColor={voicePreviewHoverBackgroundColor || hoverBackground}
     >
       {audioIsPlaying ? (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause}>{voicePreviewPauseIcon || <VoicePauseIcon />}</FileIconCont>
-          <FileHoverIconCont onClick={handlePlayPause}>
+          <FileIconCont onClick={handlePlayPause} fill={hoverBackground}>
+            {voicePreviewPauseIcon || <VoicePauseIcon />}
+          </FileIconCont>
+          <FileHoverIconCont onClick={handlePlayPause} fill={backgroundColor}>
             {voicePreviewPauseHoverIcon || <VoicePauseHoverIcon />}
           </FileHoverIconCont>
         </React.Fragment>
       ) : (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause}>{voicePreviewPlayIcon || <VoicePlayIcon />}</FileIconCont>
-          <FileHoverIconCont onClick={handlePlayPause}>
+          <FileIconCont onClick={handlePlayPause} fill={hoverBackground}>
+            {voicePreviewPlayIcon || <VoicePlayIcon />}
+          </FileIconCont>
+          <FileHoverIconCont onClick={handlePlayPause} fill={backgroundColor}>
             {voicePreviewPlayHoverIcon || <VoicePlayHoverIcon />}
           </FileHoverIconCont>
         </React.Fragment>
@@ -151,13 +160,21 @@ const VoiceItem = ({
 
 export default VoiceItem
 
-const FileIconCont = styled.span`
+const FileIconCont = styled.span<{ fill?: string }>`
   cursor: pointer;
   display: inline-flex;
+  fill: ${(props) => props.fill || 'transparent'};
+  rect {
+    fill: ${(props) => props.fill || 'transparent'};
+  }
 `
-const FileHoverIconCont = styled.span`
+const FileHoverIconCont = styled.span<{ fill?: string }>`
   cursor: pointer;
   display: none;
+  fill: ${(props) => props.fill || 'transparent'};
+  rect {
+    fill: ${(props) => props.fill || 'transparent'};
+  }
 `
 const FileItem = styled.li<any>`
   padding: 9px 16px;

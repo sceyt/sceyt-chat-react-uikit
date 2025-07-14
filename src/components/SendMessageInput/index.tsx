@@ -1446,7 +1446,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
-            <MessageCountWrapper>
+            <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
             <CustomButton
@@ -1467,7 +1467,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               <DeleteIcon />
               Delete
             </CustomButton>
-            <CloseIconWrapper onClick={handleCloseSelectMessages}>
+            <CloseIconWrapper onClick={handleCloseSelectMessages} color={textPrimary}>
               <CloseIcon />
             </CloseIconWrapper>
             {forwardPopupOpen && (
@@ -2445,10 +2445,11 @@ const SelectedMessagesWrapper = styled.div`
   padding: 12px 16px;
 `
 
-const MessageCountWrapper = styled.div`
+const MessageCountWrapper = styled.div<{ color: string }>`
   display: flex;
   justify-content: flex-start;
   min-width: 170.5px;
+  color: ${(props) => props.color || colors.primary};
 `
 
 const CustomButton = styled.span<{ color: string; backgroundColor?: string; marginLeft?: string }>`
@@ -2477,6 +2478,7 @@ const CloseIconWrapper = styled.span`
   cursor: pointer;
   margin-left: auto;
   padding: 10px;
+  color: ${(props) => props.color || colors.primary};
 `
 
 export default SendMessageInput
