@@ -178,6 +178,7 @@ const Details = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const detailsRef = useRef<any>(null)
+  const detailsHeaderRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
@@ -239,8 +240,11 @@ const Details = ({
   }, [])
 
   const handleTabChange = () => {
-    if (detailsRef.current) {
-      detailsRef.current.scrollTo({ top: 118 + actionsHeight, behavior: 'smooth' })
+    if (detailsRef.current && detailsHeaderRef.current) {
+      detailsRef.current.scrollTo({
+        top: actionsHeight + detailsHeaderRef.current.offsetHeight,
+        behavior: 'smooth'
+      })
     }
   }
 
@@ -292,7 +296,7 @@ const Details = ({
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
       >
-        <DetailsHeader borderColor={bordersColor || borderThemeColor}>
+        <DetailsHeader borderColor={bordersColor || borderThemeColor} ref={detailsHeaderRef}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
               image={
