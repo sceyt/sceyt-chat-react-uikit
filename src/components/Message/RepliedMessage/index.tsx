@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React from 'react'
+import React, { useMemo } from 'react'
 // Hooks
 import { useColor } from '../../../hooks'
 // Assets
@@ -85,6 +85,23 @@ const RepliedMessage = ({
     message.parentMessage.attachments &&
     message.parentMessage.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
 
+  const attachementsLength = useMemo(() => {
+    if (
+      message.parentMessage!.attachments &&
+      !!message.parentMessage!.attachments.length &&
+      message.parentMessage!.attachments[0].type !== attachmentTypes.voice &&
+      parentNotLinkAttachment
+    ) {
+      return message.parentMessage!.attachments.length
+    }
+    return 0
+  }, [
+    message.parentMessage!.attachments,
+    parentNotLinkAttachment,
+    message.parentMessage!.attachments[0]?.type,
+    message.parentMessage!.attachments.length
+  ])
+
   return (
     <ReplyMessageContainer
       withSenderName={showMessageSenderName}
@@ -100,10 +117,7 @@ const RepliedMessage = ({
         handleScrollToRepliedMessage && !selectionIsActive && handleScrollToRepliedMessage(message!.parentMessage!.id)
       }
     >
-      {message.parentMessage!.attachments &&
-        !!message.parentMessage!.attachments.length &&
-        message.parentMessage!.attachments[0].type !== attachmentTypes.voice &&
-        parentNotLinkAttachment &&
+      {attachementsLength > 0 &&
         // <MessageAttachments>
         (message.parentMessage!.attachments as any[]).map((attachment, index) => (
           <Attachment
@@ -130,7 +144,10 @@ const RepliedMessage = ({
             videoAttachmentMaxHeight={videoAttachmentMaxHeight}
           />
         ))}
-      <ReplyMessageBody rtlDirection={ownMessageOnRightSide && !message.incoming}>
+      <ReplyMessageBody
+        rtlDirection={ownMessageOnRightSide && !message.incoming}
+        maxWidth={`calc(100% - ${attachementsLength * 40 + 10}px)`}
+      >
         <MessageOwner
           className='reply-message-owner'
           color={accentColor}
@@ -216,11 +233,11 @@ const ReplyMessageContainer = styled.div<{
   margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;
 `
-const ReplyMessageBody = styled.div<{ rtlDirection?: boolean }>`
+const ReplyMessageBody = styled.div<{ rtlDirection?: boolean; maxWidth?: string }>`
   margin-top: auto;
   margin-bottom: auto;
   direction: ${(props: any) => (props.rtlDirection ? 'initial' : '')};
-  max-width: 100%;
+  max-width: ${(props) => props.maxWidth || '100%'};
 `
 
 const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; withAttachment?: boolean }>`
