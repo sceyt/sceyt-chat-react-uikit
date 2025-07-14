@@ -72,7 +72,8 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.SURFACE_1]: surface1Background,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
   } = useColor()
 
   return (
@@ -89,7 +90,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
         placeholder='Search for channels'
         fontSize={fontSize}
       />
-      {searchValue && <ClearTypedText onClick={getMyChannels} />}
+      {searchValue && <ClearTypedText onClick={getMyChannels} color={iconPrimary} />}
     </SearchInputContainer>
   )
 }
