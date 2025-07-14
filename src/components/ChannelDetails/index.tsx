@@ -166,6 +166,7 @@ const Details = ({
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
   const [channelDetailsHeight, setChannelDetailsHeight] = useState<number>(0)
+  const [actionsHeight, setActionsHeight] = useState<number>(0)
   // const [tabFixed, setTabFixed] = useState(false)
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
@@ -239,7 +240,7 @@ const Details = ({
 
   const handleTabChange = () => {
     if (detailsRef.current) {
-      detailsRef.current.scrollTo({ top: 350, behavior: 'smooth' })
+      detailsRef.current.scrollTo({ top: 118 + actionsHeight, behavior: 'smooth' })
     }
   }
 
@@ -366,6 +367,7 @@ const Details = ({
         </DetailsHeader>
         {activeChannel && activeChannel.userRole && (
           <Actions
+            setActionsHeight={setActionsHeight}
             theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}

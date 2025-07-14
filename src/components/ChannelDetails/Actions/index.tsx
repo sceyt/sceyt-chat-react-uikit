@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch } from 'react-redux'
 import styled from 'styled-components'
 // Hooks
@@ -49,6 +49,7 @@ import { useColor } from '../../../hooks'
 import log from 'loglevel'
 
 interface IProps {
+  setActionsHeight?: (height: number) => void
   channel: IChannel
   theme?: string
   actionMenuOpen?: () => void
@@ -126,6 +127,7 @@ interface IProps {
 }
 
 const Actions = ({
+  setActionsHeight,
   channel,
   actionMenuOpen,
   theme,
@@ -348,8 +350,32 @@ const Actions = ({
     }
   }
 
+  const containerRef = useRef<any>(null)
+  useEffect(() => {
+    if (containerRef.current) {
+      setActionsHeight && setActionsHeight(containerRef.current.offsetHeight)
+    }
+  }, [
+    containerRef.current,
+    showMuteUnmuteNotifications,
+    showStarredMessages,
+    showPinChannel,
+    showMarkAsReadUnread,
+    showLeaveChannel,
+    showBlockAndLeaveChannel,
+    showBlockUser,
+    showReportChannel,
+    showDeleteChannel,
+    showClearHistory
+  ])
+
   return (
-    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || borderThemeColor}>
+    <Container
+      isDirect={isDirectChannel}
+      theme={theme}
+      borderColor={borderColor || borderThemeColor}
+      ref={containerRef}
+    >
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
