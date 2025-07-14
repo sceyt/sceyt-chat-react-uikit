@@ -166,6 +166,7 @@ const Details = ({
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
   const [channelDetailsHeight, setChannelDetailsHeight] = useState<number>(0)
+  const [actionsHeight, setActionsHeight] = useState<number>(0)
   // const [tabFixed, setTabFixed] = useState(false)
   // const [editMode, setEditMode] = useState(false)
   const editMode = useSelector(channelEditModeSelector)
@@ -177,6 +178,7 @@ const Details = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const detailsRef = useRef<any>(null)
+  const detailsHeaderRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
@@ -238,8 +240,11 @@ const Details = ({
   }, [])
 
   const handleTabChange = () => {
-    if (detailsRef.current) {
-      detailsRef.current.scrollTo({ top: 350, behavior: 'smooth' })
+    if (detailsRef.current && detailsHeaderRef.current) {
+      detailsRef.current.scrollTo({
+        top: actionsHeight + detailsHeaderRef.current.offsetHeight,
+        behavior: 'smooth'
+      })
     }
   }
 
@@ -291,7 +296,7 @@ const Details = ({
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
       >
-        <DetailsHeader borderColor={bordersColor || borderThemeColor}>
+        <DetailsHeader borderColor={bordersColor || borderThemeColor} ref={detailsHeaderRef}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
               image={
@@ -366,6 +371,7 @@ const Details = ({
         </DetailsHeader>
         {activeChannel && activeChannel.userRole && (
           <Actions
+            setActionsHeight={setActionsHeight}
             theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}

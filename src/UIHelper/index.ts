@@ -852,12 +852,13 @@ export const CloseIcon = styled(CloseSvg)`
   color: ${(props) => props.color};
 `
 
-export const ClearTypedText = styled(CloseIcon)`
+export const ClearTypedText = styled(CloseIcon)<{ color?: string }>`
   position: absolute;
   top: 8px;
   right: 10px;
   cursor: pointer;
   padding: 4px;
+  color: ${(props) => props.color};
 `
 
 export const StyledSearchSvg = styled(SearchSvg)`
