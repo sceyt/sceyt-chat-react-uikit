@@ -119,9 +119,10 @@ function TextFormatFloatingToolbar({
 }): JSX.Element {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.SECTION_BACKGROUND]: backgroundSections,
+    [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
 
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
@@ -229,7 +230,12 @@ function TextFormatFloatingToolbar({
   }, [editor, updateTextFormatFloatingToolbar])
 
   return (
-    <FloatingTextFormatPopup showMenu={showMenu} ref={popupCharStylesEditorRef} className='floating-text-format-popup'>
+    <FloatingTextFormatPopup
+      showMenu={showMenu}
+      ref={popupCharStylesEditorRef}
+      className='floating-text-format-popup'
+      popupColor={backgroundSections}
+    >
       {editor.isEditable() && (
         <React.Fragment>
           <Action
@@ -239,7 +245,7 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as bold'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isBold}
           >
@@ -251,7 +257,7 @@ function TextFormatFloatingToolbar({
 
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
@@ -267,7 +273,7 @@ function TextFormatFloatingToolbar({
           </Action>
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
@@ -285,7 +291,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
@@ -301,7 +307,7 @@ function TextFormatFloatingToolbar({
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
@@ -476,9 +482,9 @@ export default function FloatingTextFormatToolbarPlugin({
   return useFloatingTextFormatToolbar(editor, anchorElem)
 }
 
-const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
+const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean; popupColor?: string }>`
   display: flex;
-  background: #fff;
+  background: ${(props) => props.popupColor};
   vertical-align: middle;
   position: absolute;
   top: 0;

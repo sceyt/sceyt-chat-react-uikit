@@ -1060,6 +1060,7 @@ const MessageList: React.FC<MessagesProps> = ({
           onDragLeave={handleDragOut}
           topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
+          backgroundColor={backgroundColor || themeBackgroundColor}
         >
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
@@ -1458,7 +1459,7 @@ export const MessageTopDate = styled.div<{
   }
 `
 
-export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: number }>`
+export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: number; backgroundColor?: string }>`
   display: flex;
   flex-direction: column;
   flex-grow: 1;
@@ -1470,7 +1471,7 @@ export const DragAndDropContainer = styled.div<{ topOffset?: number; height?: nu
   top: ${(props) => (props.topOffset ? `${props.topOffset + 2}px` : 0)};
   width: 100%;
   height: ${(props) => (props.height ? `${props.height + 30}px` : '100%')};
-  background-color: ${colors.white};
+  background-color: ${(props) => props.backgroundColor};
   z-index: 999;
 `
 
