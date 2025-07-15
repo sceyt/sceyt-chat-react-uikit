@@ -69,7 +69,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }
 
   async function startRecording() {
-    handleStartRecording()
     try {
       const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
       if (permissionStatus.state === 'granted') {
@@ -89,6 +88,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         setStartRecording(false)
         setShowRecording(false)
       } else {
+        handleStartRecording()
         recorder
           .start()
           .then(() => {
@@ -282,12 +282,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
+        handleStartRecording()
         intervalRef.current = setInterval(() => {
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(currentTime)
           }
         }, 10)
+      } else {
+        handleStopRecording()
       }
       wavesurfer.current.playPause()
     }
@@ -397,6 +400,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       }
     })()
   }, [])
+
+  useEffect(() => {
+    return () => {
+      handleStopRecording()
+    }
+  }, [showRecording])
 
   return (
     <Container recording={showRecording}>
