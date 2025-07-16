@@ -316,18 +316,19 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               )
             )}
-            {(isDirectChannel
-              ? filteredTypingOrRecordingIndicator.length === 0 &&
-                (draftMessageText ||
-                  (lastMessage.user &&
-                    lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                    (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
-                      ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
-                      : lastMessage.user.id === user.id)))
-              : (filteredTypingOrRecordingIndicator.length > 0 && draftMessageText) ||
-                (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
-              <Points color={draftMessageText && errorColor}>: </Points>
-            )}
+            {filteredTypingOrRecordingIndicator.length === 0 &&
+              (isDirectChannel
+                ? filteredTypingOrRecordingIndicator.length === 0 &&
+                  (draftMessageText ||
+                    (lastMessage.user &&
+                      lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                      (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
+                        ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
+                        : lastMessage.user.id === user.id)))
+                : (filteredTypingOrRecordingIndicator.length > 0 && draftMessageText) ||
+                  (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
+                <Points color={draftMessageText && errorColor}>: </Points>
+              )}
             <LastMessageText
               color={textSecondary}
               withAttachments={
@@ -343,6 +344,7 @@ const Channel: React.FC<IChannelProps> = ({
             >
               {filteredTypingOrRecordingIndicator.length > 0 ? (
                 <TypingIndicator>
+                  <Points color={draftMessageText && errorColor}>: </Points>
                   {isTyping ? 'typing' : 'recording'}
                   ...
                 </TypingIndicator>
