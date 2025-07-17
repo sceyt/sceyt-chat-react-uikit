@@ -2,153 +2,198 @@ import { ThemeMode } from '../components'
 
 export const THEME_COLORS = {
   ACCENT: 'accent',
-  BACKGROUND: 'background',
-  SECTION_BACKGROUND: 'sectionBackground',
-  FOCUS_BACKGROUND: 'focusBackground',
-  HOVER_BACKGROUND: 'hoverBackground',
+  AVATAR_BRAND_1: 'avatarBrand1',
+  AVATAR_BRAND_2: 'avatarBrand2',
+  AVATAR_BRAND_3: 'avatarBrand3',
+  AVATAR_BRAND_4: 'avatarBrand4',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
   TEXT_ON_PRIMARY: 'textOnPrimary',
   BORDER: 'border',
-  ICON_PRIMARY: 'iconPrimary',
   ICON_INACTIVE: 'iconInactive',
-  SURFACE_1: 'surface1',
-  SURFACE_2: 'surface2',
+  ICON_PRIMARY: 'iconPrimary',
+  BACKGROUND: 'background',
+  BACKGROUND_SECTIONS: 'backgroundSections',
+  BACKGROUND_FOCUSED: 'backgroundFocused',
+  BACKGROUND_HOVERED: 'backgroundHovered',
   OVERLAY_BACKGROUND: 'overlayBackground',
   OVERLAY_BACKGROUND_2: 'overlayBackground2',
+  SURFACE_1: 'surface1',
+  SURFACE_2: 'surface2',
+  SURFACE_X: 'surfaceX',
   WARNING: 'warning',
-  ONLINE: 'online'
+  ATTENTION: 'attention',
+  ONLINE_STATUS: 'onlineStatus',
+  SUCCESS: 'success',
+  OUTGOING_MESSAGE_BACKGROUND: 'outgoingMessageBackground',
+  OUTGOING_MESSAGE_BACKGROUND_X: 'outgoingMessageBackgroundX',
+  INCOMING_MESSAGE_BACKGROUND: 'incomingMessageBackground',
+  INCOMING_MESSAGE_BACKGROUND_X: 'incomingMessageBackgroundX',
+  LINK_COLOR: 'linkColor',
+  HIGHLIGHTED_BACKGROUND: 'highlightedBackground'
 } as const
 
 export const defaultTheme = {
   colors: {
+    // 1. accent color
     [THEME_COLORS.ACCENT]: {
       light: '#5159F6',
       dark: '#6B72FF'
     },
+    // 2. avatar brand 1 colors
+    [THEME_COLORS.AVATAR_BRAND_1]: {
+      light: '#FBB019',
+      dark: '#FBB019'
+    },
+    // 3. avatar brand 2 colors
+    [THEME_COLORS.AVATAR_BRAND_2]: {
+      light: '#B463E7',
+      dark: '#B463E7'
+    },
+    // 4. avatar brand 2 colors
+    [THEME_COLORS.AVATAR_BRAND_3]: {
+      light: '#63AFFF',
+      dark: '#63AFFF'
+    },
+    // 5. avatar brand 1 colors
+    [THEME_COLORS.AVATAR_BRAND_4]: {
+      light: '#67D292',
+      dark: '#67D292'
+    },
+    // 6. background colors
     [THEME_COLORS.BACKGROUND]: {
       light: '#FFFFFF',
       dark: '#19191B'
     },
-    [THEME_COLORS.SECTION_BACKGROUND]: {
+    // 7. background sections colors
+    [THEME_COLORS.BACKGROUND_SECTIONS]: {
       light: '#FFFFFF',
-      dark: '#232324'
+      dark: '#2D2D2F'
     },
-    [THEME_COLORS.FOCUS_BACKGROUND]: {
+    // 8. background focused colors
+    [THEME_COLORS.BACKGROUND_FOCUSED]: {
       light: '#E3E7FF',
       dark: '#212239'
     },
-    [THEME_COLORS.HOVER_BACKGROUND]: {
+    // 9. background hovered colors
+    [THEME_COLORS.BACKGROUND_HOVERED]: {
       light: '#F9FAFB',
       dark: '#1D1D1F'
     },
+    // 10. text primary colors
     [THEME_COLORS.TEXT_PRIMARY]: {
       light: '#111539',
       dark: '#E1E3E6'
     },
+    // 11. text secondary colors
     [THEME_COLORS.TEXT_SECONDARY]: {
       light: '#707388',
       dark: '#969A9F'
     },
+    // 12. text footnote colors
     [THEME_COLORS.TEXT_FOOTNOTE]: {
       light: '#A0A1B0',
       dark: '#76787A'
     },
+    // 13. text on primary colors
     [THEME_COLORS.TEXT_ON_PRIMARY]: {
-      light: '#fff',
-      dark: '#fff'
+      light: '#ffffff',
+      dark: '#ffffff'
     },
+    // 14. border colors
     [THEME_COLORS.BORDER]: {
       light: '#E4E6EE',
       dark: '#303032'
     },
+    // 15. icon primary colors
     [THEME_COLORS.ICON_PRIMARY]: {
       light: '#707388',
       dark: '#969A9F'
     },
+    // 16. icon inactive colors
     [THEME_COLORS.ICON_INACTIVE]: {
       light: '#A0A1B0',
-      dark: '#64666A'
+      dark: '#76787A'
     },
+    // 17. surface 1 colors
     [THEME_COLORS.SURFACE_1]: {
       light: '#F1F2F6',
       dark: '#232324'
     },
+    // 18. surface 2 colors
     [THEME_COLORS.SURFACE_2]: {
       light: '#A0A1B0',
       dark: '#3B3B3D'
     },
+    // 19. surface x colors
+    [THEME_COLORS.SURFACE_X]: {
+      light: '#D9D9DF',
+      dark: '#303032'
+    },
+    // 20. overlay background colors
     [THEME_COLORS.OVERLAY_BACKGROUND]: {
       light: 'rgba(0, 0, 0, 0.5)',
       dark: 'rgba(0, 0, 0, 0.5)'
     },
+    // 21. overlay background 2 colors
     [THEME_COLORS.OVERLAY_BACKGROUND_2]: {
       light: 'rgba(17, 21, 57, 0.4)',
       dark: 'rgba(17, 21, 57, 0.4)'
     },
+    // 22. warning colors
     [THEME_COLORS.WARNING]: {
       light: '#FA4C56',
       dark: '#FA4C56'
     },
-    [THEME_COLORS.ONLINE]: {
-      light: '#0DBD8B',
-      dark: '#0DBD8B'
+    // 23. attention colors
+    [THEME_COLORS.ATTENTION]: {
+      light: '#FBB019',
+      dark: '#FBB019'
+    },
+    // 24. success colors
+    [THEME_COLORS.SUCCESS]: {
+      light: '#24C383',
+      dark: '#24C383'
+    },
+    // 25. online status colors
+    [THEME_COLORS.ONLINE_STATUS]: {
+      light: '#4BB34B',
+      dark: '#4BB34B'
+    },
+    // 26. outgoing message background colors
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: {
+      light: '#E3E7FF',
+      dark: '#212239'
+    },
+    // 27. outgoing message background x colors
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: {
+      light: '#D1D8FF',
+      dark: '#2E3052'
+    },
+    // 28. incoming message background colors
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: {
+      light: '#F1F2F6',
+      dark: '#232324'
+    },
+    // 29. incoming message background x colors
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: {
+      light: '#E4E6EE',
+      dark: '#303032'
+    },
+    // 30. link color colors
+    [THEME_COLORS.LINK_COLOR]: {
+      light: '#5159F6',
+      dark: '#6B72FF'
+    },
+    // 31. highlighted background colors
+    [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: {
+      light: '#C8D0FF',
+      dark: '#3B3D68'
     }
   }
 }
 export const defaultThemeMode: ThemeMode = 'light'
-export const colors = {
-  white: '#ffffff',
-  black: '#000000',
-  // dark: '#050610',
-  dark: '#161616',
-  blue: '#438CED',
-  backgroundColor: '#f1f2f6',
-  darkModeBackgroundColor: '#1e1f28',
-  darkModeSecondaryBackgroundColor: '#1B1C25',
-  lightModeBackgroundColor: '#f1f2f6',
-  hoverBackgroundColor: '#f1f2f6',
-  darkModeHoverBackgroundColor: '#25262E',
-  lightModeHoverBackgroundColor: '#f1f2f6',
-  textColor1: '#111539',
-  darkModeTextColor1: '#ffffffcc',
-  lightModeTextColor1: '#111539',
-  textColor2: '#707388',
-  textColor3: '#A0A1B0',
-  placeholderTextColor: '#acacad',
-
-  gray0: '#F3F5F8',
-  gray1: '#EDEDED',
-  borderColor: '#dfe0eb',
-  borderColor2: '#818C99',
-
-  primary: '#5159F6',
-  primaryLight: '#E3E7FF',
-  darkModePrimary: '#6B72FF',
-  lightModePrimary: '#5159F6',
-  darkModePrimaryLight: '#1c1f47',
-  lightModePrimaryLight: '#E3E7FF',
-
-  incomingMessageBackgroundLight: '#dfe0eb',
-  incomingMessageBackgroundDark: '#1c1f47',
-  incomingMessageBackgroundXLight: '#E4E6EE',
-  incomingMessageBackgroundXDark: '#303032',
-  outgoingMessageBackgroundLight: '',
-  outgoingMessageBackgroundDark: '',
-  outgoingMessageBackgroundXLight: '',
-  outgoingMessageBackgroundXDark: '',
-
-  incomingRepliedMessageBackground: '#fbfbfc',
-  ownRepliedMessageBackground: '#f9fbfd',
-
-  purple: '#7A6EF6',
-
-  defaultAvatarBackground: '#A0A1B0',
-  deleteUserIconBackground: '#D0D8E3',
-
-  errorBlur: '#d7596c'
-}
 
 export const size = {
   mobileS: '320px',

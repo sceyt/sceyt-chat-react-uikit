@@ -6,7 +6,7 @@ import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
 import { getChannelTypesMemberDisplayTextMap } from '../../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
 import Members from './Members'
@@ -110,8 +110,8 @@ const DetailsTab = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BORDER]: borderThemeColor,
-    [THEME_COLORS.BACKGROUND]: backgroundColor
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const dispatch = useDispatch()
@@ -144,26 +144,27 @@ const DetailsTab = ({
       <DetailsTabHeader
         color={textSecondary}
         activeTabColor={accentColor}
-        borderColor={borderColor || borderThemeColor}
+        borderColor={borderColor || border}
         fontSize={tabItemsFontSize}
         lineHeight={tabItemsLineHeight}
         minWidth={tabItemsMinWidth}
-        backgroundColor={backgroundColor}
+        backgroundColor={background}
       >
         {Object.keys(channelDetailsTabs).map((key) => {
+          const tabKey = key as keyof typeof channelDetailsTabs
           if (key === 'member') {
             if (showMembers) {
               return (
                 <button
-                  className={activeTab === channelDetailsTabs[key] ? 'active' : ''}
+                  className={activeTab === channelDetailsTabs[tabKey] ? 'active' : ''}
                   type='button'
-                  onClick={() => handleTabClick(channelDetailsTabs[key])}
+                  onClick={() => handleTabClick(channelDetailsTabs[tabKey])}
                   key={key}
                 >
                   <span>
-                    {channelDetailsTabs[key] === channelDetailsTabs.member
+                    {channelDetailsTabs[tabKey] === channelDetailsTabs.member
                       ? displayMemberText
-                      : channelDetailsTabs[key]}
+                      : channelDetailsTabs[tabKey]}
                   </span>
                 </button>
               )
@@ -173,12 +174,12 @@ const DetailsTab = ({
           }
           return (
             <button
-              className={activeTab === channelDetailsTabs[key] ? 'active' : ''}
+              className={activeTab === channelDetailsTabs[tabKey] ? 'active' : ''}
               type='button'
-              onClick={() => handleTabClick(channelDetailsTabs[key])}
+              onClick={() => handleTabClick(channelDetailsTabs[tabKey])}
               key={key}
             >
-              <span>{channelDetailsTabs[key]}</span>
+              <span>{channelDetailsTabs[tabKey]}</span>
             </button>
           )
         })}
@@ -246,12 +247,11 @@ const DetailsTab = ({
 export default DetailsTab
 
 const Container = styled.div<{ theme?: string }>`
-  //border-top: 1px solid ${colors.gray1};
   min-height: calc(100vh - 64px);
 `
 
 const DetailsTabHeader = styled.div<{
-  activeTabColor?: string
+  activeTabColor: string
   borderColor: string
   backgroundColor?: string
   fontSize?: string
@@ -261,11 +261,10 @@ const DetailsTabHeader = styled.div<{
 }>`
   overflow-x: auto;
   overflow-y: hidden;
-  padding: 0 20px;
   border-bottom: 1px solid ${(props) => props.borderColor};
   background-color: ${(props) => props.backgroundColor || 'transparent'};
   display: flex;
-  justify-content: space-between;
+  justify-content: center;
   position: sticky;
   top: 0;
   z-index: 12;
@@ -313,14 +312,14 @@ const DetailsTabHeader = styled.div<{
   }
 
   & .active span {
-    color: ${(props) => props.activeTabColor || colors.primary};
+    color: ${(props) => props.activeTabColor};
 
     &:after {
       content: '';
       width: 100%;
       border-radius: 2px;
       height: 2px;
-      background-color: ${(props) => props.activeTabColor || colors.primary};
+      background-color: ${(props) => props.activeTabColor};
       position: absolute;
       top: calc(100% - 1px);
       left: 0;

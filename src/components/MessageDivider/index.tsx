@@ -1,7 +1,6 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { colors, THEME_COLORS } from '../../UIHelper/constants'
-import { THEME } from '../../helpers/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
 
 export const Container = styled.div<{
@@ -15,7 +14,7 @@ export const Container = styled.div<{
   dateDividerFontSize?: string
   dateDividerTextColor?: string
   dateDividerBackgroundColor?: string
-  newMessagesSeparatorSpaceColor?: string
+  newMessagesSeparatorSpaceColor: string
   dateDividerBorderRadius?: string
   newMessagesSeparatorLeftRightSpaceWidth?: string
   height?: number
@@ -30,6 +29,7 @@ export const Container = styled.div<{
   z-index: 5;
   top: 0;
   background: transparent;
+  max-width: calc(100% - 8px);
 
   div {
     position: relative;
@@ -45,8 +45,7 @@ export const Container = styled.div<{
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};
       color: ${(props) => props.dateDividerTextColor};
-      background: ${(props) => props.dateDividerBackgroundColor};
-      //border: ${(props) => props.dateDividerBorder || `1px solid ${colors.gray1}`};
+      background-color: ${(props) => `${props.dateDividerBackgroundColor}40`};
       box-sizing: border-box;
       border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
       padding: 5px 16px;
@@ -62,8 +61,7 @@ export const Container = styled.div<{
         height: 2px;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '0'};
-        background-color: ${(props) =>
-          props.newMessagesSeparatorSpaceColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
+        background-color: ${(props) => props.newMessagesSeparatorSpaceColor};
       }
 
       &::after {
@@ -77,8 +75,7 @@ export const Container = styled.div<{
         height: 2px;
         width: ${(props) =>
           props.newMessagesSeparatorLeftRightSpaceWidth ? `${props.newMessagesSeparatorLeftRightSpaceWidth}` : '0'};
-        background-color: ${(props) =>
-          props.newMessagesSeparatorSpaceColor || (props.theme === THEME.DARK ? colors.dark : colors.white)};
+        background-color: ${(props) => props.newMessagesSeparatorSpaceColor};
       }
     }
   }
@@ -131,8 +128,11 @@ export default function MessageDivider({
   marginBottom,
   chatBackgroundColor
 }: IProps) {
-  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
-    useColor()
+  const {
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground,
+    [THEME_COLORS.BORDER]: border
+  } = useColor()
 
   const textRef = React.useRef<HTMLSpanElement | null>(null)
   const [textHeight, setTextHeight] = React.useState<number>(0)
@@ -156,7 +156,7 @@ export default function MessageDivider({
       dateDividerBorderRadius={dateDividerBorderRadius || newMessagesSeparatorBorderRadius}
       width={newMessagesSeparatorWidth}
       newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorLeftRightSpaceWidth}
-      newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
+      newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor || border}
       noMargin={noMargin}
       marginBottom={marginBottom}
       height={textHeight}

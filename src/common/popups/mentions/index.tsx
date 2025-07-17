@@ -2,8 +2,8 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
-import { LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
 import { getMembersAC, loadMoreMembersAC } from '../../../store/member/actions'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
@@ -18,7 +18,6 @@ import { SubTitle } from '../../../UIHelper'
 
 interface IMentionsPopupProps {
   channelId: string
-  theme?: string
   // eslint-disable-next-line no-unused-vars
   addMentionMember: (member: IMember) => void
   // eslint-disable-next-line no-unused-vars
@@ -28,16 +27,16 @@ interface IMentionsPopupProps {
 
 export default function MentionMembersPopup({
   channelId,
-  theme,
   addMentionMember,
   handleMentionsPopupClose,
   searchMention
 }: IMentionsPopupProps) {
   const {
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BORDER]: borderColor
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections
   } = useColor()
 
   const members = useSelector(activeChannelMembersSelector, shallowEqual)
@@ -185,8 +184,7 @@ export default function MentionMembersPopup({
       className='mention_member_popup'
       hidden={hideMenu}
       height={filteredMembers && filteredMembers.length * 44}
-      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
-      withBorder={theme !== THEME.DARK}
+      backgroundColor={backgroundSections}
       borderColor={borderColor}
     >
       <MembersList ref={membersListRef} onScroll={handleMembersListScroll}>
@@ -198,7 +196,7 @@ export default function MentionMembersPopup({
             }}
             isActiveItem={activeIndex === index}
             onMouseEnter={() => setActiveIndex(index)}
-            activeBackgroundColor={colors.hoverBackgroundColor}
+            activeBackgroundColor={surface1}
           >
             <AvatarWrapper>
               <Avatar
@@ -231,20 +229,19 @@ export default function MentionMembersPopup({
 const Container = styled.div<{
   height?: number
   hidden?: boolean
-  backgroundColor?: string
-  withBorder?: boolean
-  borderColor: string
+  backgroundColor: string
+  borderColor?: string
 }>`
   width: 300px;
   height: ${(props) => props.height && props.height + 22}px;
   max-height: 240px;
   padding: 2px 0 0;
-  background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
+  background: ${(props) => props.backgroundColor};
   box-sizing: border-box;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  box-shadow: 0px 0px 24px 0px #11153929;
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+  border: ${(props) => props.borderColor && `0.5px solid ${props.borderColor}`};
 `
 
 const UserNamePresence = styled.div`
@@ -282,14 +279,14 @@ export const MembersList = styled.ul<{ ref?: any }>`
   transition: all 0.2s;
   height: calc(100% - 10px);
 `
-export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
+export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
   cursor: pointer;
-  background-color: ${(props) => props.isActiveItem && (props.activeBackgroundColor || colors.hoverBackgroundColor)};
+  background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
 
   &:hover ${EditMemberIcon} {
     opacity: 1;

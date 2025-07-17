@@ -155,7 +155,8 @@ const Details = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: borderThemeColor,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const dispatch = useDispatch()
@@ -295,6 +296,7 @@ const Details = ({
         ref={detailsRef}
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
+        thumbColor={surface2}
       >
         <DetailsHeader borderColor={bordersColor || borderThemeColor} ref={detailsHeaderRef}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
@@ -521,7 +523,12 @@ const ChannelDetailsHeader = styled.div<{ borderColor?: string }>`
   }
 `
 
-const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: 'small' | 'medium' | 'large' }>`
+const ChatDetails = styled.div<{
+  height: number
+  heightOffset?: number
+  size?: 'small' | 'medium' | 'large'
+  thumbColor: string
+}>`
   //position: relative;
   width: ${(props) => (props.size === 'small' ? '300px' : props.size === 'medium' ? '350px' : '400px')};
   //height: ${(props) => (props.height ? `calc(100vh - ${props.heightOffset}px)` : '100vh')};
@@ -537,7 +544,7 @@ const ChatDetails = styled.div<{ height: number; heightOffset?: number; size?: '
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -561,18 +568,6 @@ const AboutChannelText = styled.h3<{ color: string }>`
   line-height: 20px;
   color: ${(props) => props.color};
 `
-
-/* const DetailsBody = styled.div`
-  padding: 6.5px 0 0;
-  height: 100%;
-  border-top: 6px solid #f3f5f8;
-` */
-
-/* const ChannelAvatar = styled.img`
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-` */
 
 const ChannelInfo = styled.div<{ direction?: 'column' | 'row' }>`
   position: relative;

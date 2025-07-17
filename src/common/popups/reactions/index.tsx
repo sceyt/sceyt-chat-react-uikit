@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IReaction } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
@@ -53,7 +53,11 @@ export default function ReactionsPopup({
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackgroundColor
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const popupRef = useRef<HTMLDivElement>(null)
@@ -167,13 +171,14 @@ export default function ReactionsPopup({
       visible={!calculateSizes}
       rtlDirection={rtlDirection}
       borderRadius={reactionsDetailsPopupBorderRadius}
-      backgroundColor={sectionBackgroundColor}
+      backgroundColor={backgroundSections}
     >
       <ReactionScoresCont
         ref={scoresRef}
         className={isScrolling ? 'show-scrollbar' : ''}
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
+        thumbColor={surface2}
       >
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
           <ReactionScoreItem
@@ -181,7 +186,8 @@ export default function ReactionsPopup({
             active={activeTabKey === 'all'}
             color={textSecondary}
             activeBackgroundColor={accentColor}
-            activeColor={textPrimary}
+            activeColor={textOnPrimary}
+            backgroundColor={surface1}
             onClick={() => handleGetReactions()}
           >
             <span>{`All ${totalReactions}`}</span>
@@ -194,7 +200,8 @@ export default function ReactionsPopup({
               active={activeTabKey === reaction.key}
               color={textSecondary}
               activeBackgroundColor={accentColor}
-              activeColor={textPrimary}
+              activeColor={textOnPrimary}
+              backgroundColor={surface1}
             >
               <span>
                 <TabKey>{reaction.key}</TabKey>
@@ -211,9 +218,10 @@ export default function ReactionsPopup({
         popupHeight={popupHeight}
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
+        thumbColor={surface2}
       >
         {reactions.map((reaction: IReaction) => (
-          <ReactionItem key={reaction.id}>
+          <ReactionItem key={reaction.id} hoverBackgroundColor={backgroundHovered}>
             <AvatarWrapper>
               <Avatar
                 name={reaction.user.firstName || reaction.user.id}
@@ -254,7 +262,7 @@ const Container = styled.div<{
   height: number
   visible?: any
   rtlDirection?: boolean
-  backgroundColor?: string
+  backgroundColor: string
 }>`
   position: absolute;
   /*right: ${(props) => props.popupHorizontalPosition === 'left' && (props.rtlDirection ? 'calc(100% - 80px)' : 0)};*/
@@ -268,7 +276,7 @@ const Container = styled.div<{
   //overflow: ${(props) => !props.height && 'hidden'};
   overflow: hidden;
   max-height: 320px;
-  background: ${(props) => props.backgroundColor || colors.white};
+  background: ${(props) => props.backgroundColor};
   //border: 1px solid #dfe0eb;
   box-shadow:
     0 6px 24px -6px rgba(15, 34, 67, 0.12),
@@ -301,7 +309,7 @@ const Container = styled.div<{
     transition-delay: 150ms;
     transition-property: visibility;
 
-    background: ${(props) => props.backgroundColor || colors.white};
+    background: ${(props) => props.backgroundColor};
   }
 `
 
@@ -310,7 +318,7 @@ const UserNamePresence = styled.div`
   margin-left: 12px;
 `
 
-const MemberName = styled.h3<{ color?: string }>`
+const MemberName = styled.h3<{ color: string }>`
   margin: 0;
   max-width: calc(100% - 47px);
   font-weight: 500;
@@ -320,13 +328,13 @@ const MemberName = styled.h3<{ color?: string }>`
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
-  color: ${(props) => props.color || colors.gray0};
+  color: ${(props) => props.color};
   & > span {
-    color: ${(props) => props.color || colors.gray0};
+    color: ${(props) => props.color};
   }
 `
 
-const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
+const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number; thumbColor: string }>`
   margin: 0;
   padding: 0;
   overflow: ${(props) => !props.popupHeight && 'hidden'};
@@ -348,7 +356,7 @@ const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -356,7 +364,7 @@ const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
   }
 `
 
-const ReactionScoresCont = styled.div`
+const ReactionScoresCont = styled.div<{ thumbColor: string }>`
   max-width: 100%;
   overflow-y: auto;
   &.show-scrollbar {
@@ -371,7 +379,7 @@ const ReactionScoresCont = styled.div`
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -381,7 +389,6 @@ const ReactionScoresCont = styled.div`
 
 const ReactionScoresList = styled.div<{ borderBottom: boolean }>`
   display: flex;
-  border-bottom: ${(props) => props.borderBottom && `1px solid ${colors.gray1}`};
   padding: 2px 8px 0;
 `
 
@@ -393,6 +400,7 @@ const ReactionScoreItem = styled.div<{
   activeColor: string
   activeBackgroundColor: string
   active?: boolean
+  backgroundColor: string
 }>`
   position: relative;
   display: flex;
@@ -400,13 +408,11 @@ const ReactionScoreItem = styled.div<{
   padding: ${(props) => (props.bubbleStyle ? '12px 4px' : '12px')};
   font-weight: 500;
   font-size: 13px;
-  border-bottom: ${(props) => !props.bubbleStyle && `1px solid ${colors.gray1}`};
   color: ${(props) => (props.active ? props.activeColor : props.color)};
   margin-bottom: -1px;
   cursor: pointer;
   & > span {
     position: relative;
-    border: ${(props) => props.bubbleStyle && !props.active && `1px solid ${colors.gray1}`};
     padding: ${(props) => props.bubbleStyle && '6px 12px'};
     border-radius: 16px;
     height: 30px;
@@ -416,8 +422,9 @@ const ReactionScoreItem = styled.div<{
     font-weight: 600;
     font-size: 14px;
     line-height: ${(props) => (props.bubbleStyle ? '18px' : '30px')};
-    background-color: ${(props) => props.active && props.bubbleStyle && props.activeBackgroundColor};
-    color: ${(props) => props.active && props.bubbleStyle && colors.white};
+    background-color: ${(props) =>
+      (props.active && props.bubbleStyle && props.activeBackgroundColor) || props.backgroundColor};
+    color: ${(props) => props.active && props.bubbleStyle && props.activeColor};
     ${(props) =>
       props.active &&
       !props.bubbleStyle &&
@@ -429,7 +436,7 @@ const ReactionScoreItem = styled.div<{
     bottom: -13px;
     width: 100%;
     height: 2px;
-    background-color: ${props.activeColor || colors.primary};
+    background-color: ${props.activeColor};
     border-radius: 2px;
     }
   `}
@@ -464,12 +471,16 @@ const ReactionKey = styled.span`
   cursor: pointer;
 `
 
-const ReactionItem = styled.li<{ isActiveItem?: boolean }>`
+const ReactionItem = styled.li<{ hoverBackgroundColor: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
+
+  &:hover {
+    background-color: ${(props) => props.hoverBackgroundColor};
+  }
 
   & ${UserStatus} {
     width: 10px;

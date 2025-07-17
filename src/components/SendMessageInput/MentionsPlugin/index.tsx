@@ -10,7 +10,7 @@ import {
 import { $createMentionNode } from '../MentionNode'
 import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
 import { THEME, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -187,7 +187,7 @@ function MentionsTypeaheadMenuItem({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
 
   let className = 'item'
@@ -204,7 +204,7 @@ function MentionsTypeaheadMenuItem({
       isActiveItem={isSelected}
       id={'typeahead-item-' + index}
       onMouseEnter={onMouseEnter}
-      activeBackgroundColor={hoverBackground}
+      activeBackgroundColor={backgroundHovered}
       onClick={onClick}
     >
       <AvatarWrapper>
@@ -418,7 +418,7 @@ export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; r
 const MentionsList = styled.ul<{
   height?: number
   hidden?: boolean
-  backgroundColor?: string
+  backgroundColor: string
   withBorder?: boolean
   borderColor: string
   theme: string
@@ -431,7 +431,7 @@ const MentionsList = styled.ul<{
   max-height: 240px;
   z-index: 200;
   padding: 2px 0 0;
-  background: ${(props) => props.backgroundColor || colors.white};
+  background: ${(props) => props.backgroundColor};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   box-shadow: ${(props) =>
@@ -440,14 +440,14 @@ const MentionsList = styled.ul<{
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
 `
 
-export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
+export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
   cursor: pointer;
-  background-color: ${(props) => props.isActiveItem && (props.activeBackgroundColor || colors.hoverBackgroundColor)};
+  background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
 
   & ${UserStatus} {
     width: 10px;

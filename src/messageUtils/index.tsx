@@ -127,8 +127,8 @@ const MessageTextFormat = ({
   getFromContacts: boolean
   isLastMessage?: boolean
   asSampleText?: boolean
-  accentColor?: string
-  textSecondary?: string
+  accentColor: string
+  textSecondary: string
 }) => {
   try {
     let messageText: any = []

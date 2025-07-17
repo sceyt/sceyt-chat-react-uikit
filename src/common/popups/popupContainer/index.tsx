@@ -1,7 +1,10 @@
+import { useColor } from 'hooks'
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
+import { THEME_COLORS } from 'UIHelper/constants'
 
 const PopupContainer = ({ children }: any) => {
+  const { [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } = useColor()
   useEffect(() => {
     const body = document.querySelector('body')
     if (body) {
@@ -14,12 +17,12 @@ const PopupContainer = ({ children }: any) => {
       }
     }
   }, [])
-  return <Container>{children}</Container>
+  return <Container background={overlayBackground}>{children}</Container>
 }
 
 export default PopupContainer
 
-const Container = styled.div<{ width?: number; height?: number; left?: number; top?: number }>`
+const Container = styled.div<{ width?: number; height?: number; left?: number; top?: number; background: string }>`
   direction: initial;
   position: fixed;
   top: 0;
@@ -35,5 +38,5 @@ const Container = styled.div<{ width?: number; height?: number; left?: number; t
   display: flex;
   justify-content: center;
   align-items: center;
-  background: rgba(0, 0, 0, 0.4);
+  background: ${(props) => props.background};
 `

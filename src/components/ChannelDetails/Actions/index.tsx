@@ -38,7 +38,7 @@ import { hideUserPresence } from '../../../helpers/userHelper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember, MuteTime } from '../../../types'
 import { getClient } from '../../../common/client'
 // Components
@@ -194,11 +194,9 @@ const Actions = ({
 }: IProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
-    [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.WARNING]: warningColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -370,12 +368,7 @@ const Actions = ({
   ])
 
   return (
-    <Container
-      isDirect={isDirectChannel}
-      theme={theme}
-      borderColor={borderColor || borderThemeColor}
-      ref={containerRef}
-    >
+    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || surface1} ref={containerRef}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
@@ -394,13 +387,12 @@ const Actions = ({
               key={0}
               order={muteUnmuteNotificationsOrder}
               onClick={() => handleNotificationOnOff()}
-              iconColor={muteNotificationIconColor || textSecondary}
+              iconColor={muteNotificationIconColor || iconPrimary}
               color={muteUnmuteNotificationTextColor || textPrimary}
               hoverColor={muteUnmuteNotificationTextColor || textPrimary}
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>{muteNotificationIcon || <DefaultMutedIcon />} Unmute notifications</React.Fragment>
-              {/* <ToggleSwitch backgroundColor={muteUnmuteNotificationSwitcherColor} state={channel.muted} /> */}
             </ActionItem>
           ) : (
             <DropDown
@@ -413,13 +405,12 @@ const Actions = ({
                 <ActionItem
                   key={0}
                   disableEvent
-                  iconColor={unmuteNotificationIconColor || textSecondary}
+                  iconColor={unmuteNotificationIconColor || iconPrimary}
                   color={muteUnmuteNotificationTextColor || textPrimary}
                   hoverColor={muteUnmuteNotificationTextColor || textPrimary}
                   fontSize={actionItemsFontSize}
                 >
                   <React.Fragment>{unmuteNotificationIcon || <DefaultMuteIcon />} Mute notifications</React.Fragment>
-                  {/* <ToggleSwitch state={channel.muted} /> */}
                 </ActionItem>
               }
             >
@@ -431,7 +422,7 @@ const Actions = ({
                       <DropdownOptionLi
                         textColor={textPrimary}
                         key={value + index}
-                        hoverBackground={hoverBackground}
+                        hoverBackground={surface1}
                         onClick={() => handleNotificationOnOff(value * oneHour)}
                       >
                         Mute for {value < 24 ? `${value} ${value > 1 ? 'hours' : 'hour'} ` : '1 day'}
@@ -443,7 +434,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={1}
-                      hoverBackground={hoverBackground}
+                      hoverBackground={surface1}
                       onClick={() => handleNotificationOnOff(oneHour)}
                     >
                       Mute for 1 hour
@@ -451,7 +442,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={2}
-                      hoverBackground={hoverBackground}
+                      hoverBackground={surface1}
                       onClick={() => handleNotificationOnOff(twoHours)}
                     >
                       Mute for 2 hours
@@ -459,7 +450,7 @@ const Actions = ({
                     <DropdownOptionLi
                       textColor={textPrimary}
                       key={3}
-                      hoverBackground={hoverBackground}
+                      hoverBackground={surface1}
                       onClick={() => handleNotificationOnOff(oneDay)}
                     >
                       Mute for 1 day
@@ -470,7 +461,7 @@ const Actions = ({
                 <DropdownOptionLi
                   textColor={textPrimary}
                   key={4}
-                  hoverBackground={hoverBackground}
+                  hoverBackground={surface1}
                   onClick={() => handleNotificationOnOff()}
                 >
                   Mute forever
@@ -484,7 +475,7 @@ const Actions = ({
             key={1}
             onClick={() => log.info('stared messages')}
             order={starredMessagesOrder}
-            iconColor={staredMessagesIconColor || textSecondary}
+            iconColor={staredMessagesIconColor || iconPrimary}
             color={staredMessagesTextColor || textPrimary}
             hoverColor={staredMessagesTextColor || textPrimary}
             fontSize={actionItemsFontSize}
@@ -499,7 +490,7 @@ const Actions = ({
               key={2}
               onClick={handlePinUnpinChannel}
               order={pinChannelOrder}
-              iconColor={pinChannelIconColor || textSecondary}
+              iconColor={pinChannelIconColor || iconPrimary}
               color={pinChannelTextColor || textPrimary}
               hoverColor={pinChannelTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -519,7 +510,7 @@ const Actions = ({
               key={3}
               onClick={handleToggleChannelMarkAs}
               order={markAsReadUnreadOrder}
-              iconColor={markAsReadIconColor || textSecondary}
+              iconColor={markAsReadIconColor || iconPrimary}
               color={markAsReadUnreadTextColor || textPrimary}
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -531,7 +522,7 @@ const Actions = ({
               key={3}
               order={markAsReadUnreadOrder}
               onClick={handleToggleChannelMarkAs}
-              iconColor={markAsUnreadIconColor || textSecondary}
+              iconColor={markAsUnreadIconColor || iconPrimary}
               color={markAsReadUnreadTextColor || textPrimary}
               hoverColor={markAsReadUnreadTextColor || textPrimary}
               fontSize={actionItemsFontSize}
@@ -544,9 +535,9 @@ const Actions = ({
           <ActionItem
             key={4}
             order={leaveChannelOrder}
-            color={leaveChannelTextColor || errorColor}
-            iconColor={leaveChannelIconColor || errorColor}
-            hoverColor={leaveChannelTextColor || errorColor}
+            color={leaveChannelTextColor || warningColor}
+            iconColor={leaveChannelIconColor || warningColor}
+            hoverColor={leaveChannelTextColor || warningColor}
             fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Leave')
@@ -580,9 +571,9 @@ const Actions = ({
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}
-                  color={unblockUserTextColor || textPrimary}
+                  color={unblockUserTextColor || warningColor}
                   hoverColor={unblockUserTextColor || textPrimary}
-                  iconColor={textSecondary}
+                  iconColor={warningColor}
                   fontSize={actionItemsFontSize}
                   onClick={() => {
                     handleUnblockUser()
@@ -593,9 +584,9 @@ const Actions = ({
               ) : (
                 <ActionItem
                   key={6}
-                  color={deleteChannelTextColor || errorColor}
-                  iconColor={deleteChannelIconColor || errorColor}
-                  hoverColor={deleteChannelTextColor || errorColor}
+                  color={deleteChannelTextColor || warningColor}
+                  iconColor={deleteChannelIconColor || warningColor}
+                  hoverColor={deleteChannelTextColor || warningColor}
                   fontSize={actionItemsFontSize}
                   onClick={() => {
                     setPopupButtonText('Block')
@@ -609,9 +600,9 @@ const Actions = ({
 
             {showReportChannel && (
               <ActionItem
-                color={deleteChannelTextColor || errorColor}
-                iconColor={deleteChannelIconColor || errorColor}
-                hoverColor={deleteChannelTextColor || errorColor}
+                color={deleteChannelTextColor || warningColor}
+                iconColor={deleteChannelIconColor || warningColor}
+                hoverColor={deleteChannelTextColor || warningColor}
                 fontSize={actionItemsFontSize}
                 key={7}
                 onClick={() => toggleReportUserPopup()}
@@ -626,9 +617,9 @@ const Actions = ({
             {showBlockAndLeaveChannel && !isSelfChannel && !channel.isMockChannel && (
               <ActionItem
                 key={8}
-                color={blockAndLeaveChannelTextColor || errorColor}
-                iconColor={blockAndLeaveChannelIconColor || errorColor}
-                hoverColor={blockAndLeaveChannelTextColor || errorColor}
+                color={blockAndLeaveChannelTextColor || warningColor}
+                iconColor={blockAndLeaveChannelIconColor || warningColor}
+                hoverColor={blockAndLeaveChannelTextColor || warningColor}
                 fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Block')
@@ -664,9 +655,9 @@ const Actions = ({
               <ActionItem
                 key={9}
                 order={reportChannelOrder}
-                color={reportChannelTextColor || errorColor}
-                iconColor={reportChannelIconColor || errorColor}
-                hoverColor={reportChannelTextColor || errorColor}
+                color={reportChannelTextColor || warningColor}
+                iconColor={reportChannelIconColor || warningColor}
+                hoverColor={reportChannelTextColor || warningColor}
                 fontSize={actionItemsFontSize}
                 onClick={() => {
                   setPopupButtonText('Report')
@@ -692,11 +683,11 @@ const Actions = ({
             channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) && (
             <ActionItem
               key={10}
-              color={clearHistoryTextColor || errorColor}
-              iconColor={clearHistoryTextColor || errorColor}
+              color={clearHistoryTextColor || warningColor}
+              iconColor={clearHistoryTextColor || warningColor}
               order={clearHistoryOrder}
               fontSize={actionItemsFontSize}
-              hoverColor={clearHistoryTextColor || errorColor}
+              hoverColor={clearHistoryTextColor || warningColor}
               onClick={() => {
                 setPopupButtonText('Clear')
                 setPopupTitle('Clear history')
@@ -712,10 +703,10 @@ const Actions = ({
           checkActionPermission('clearAllMessages') && (
             <ActionItem
               key={11}
-              color={deleteAllMessagesTextColor || errorColor}
-              iconColor={deleteAllMessagesTextColor || errorColor}
+              color={deleteAllMessagesTextColor || warningColor}
+              iconColor={deleteAllMessagesTextColor || warningColor}
               order={deleteAllMessagesOrder}
-              hoverColor={deleteAllMessagesTextColor || errorColor}
+              hoverColor={deleteAllMessagesTextColor || warningColor}
               fontSize={actionItemsFontSize}
               onClick={() => {
                 setPopupButtonText('Clear')
@@ -731,9 +722,9 @@ const Actions = ({
           <ActionItem
             key={12}
             order={deleteChannelOrder}
-            color={deleteChannelTextColor || errorColor}
-            iconColor={deleteChannelIconColor || errorColor}
-            hoverColor={deleteChannelTextColor || errorColor}
+            color={deleteChannelTextColor || warningColor}
+            iconColor={deleteChannelIconColor || warningColor}
+            hoverColor={deleteChannelTextColor || warningColor}
             fontSize={actionItemsFontSize}
             onClick={() => {
               setPopupButtonText('Delete')
@@ -901,7 +892,7 @@ const Actions = ({
 
 export default Actions
 
-const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor?: string }>`
+const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor: string }>`
   padding: 10px 16px;
   border-bottom: 6px solid ${(props) => props.borderColor};
 ]`
@@ -949,7 +940,7 @@ const ActionItem = styled.li<{
   fontSize?: string
   disableEvent?: boolean
   iconColor: string
-  hoverColor?: string
+  hoverColor: string
   order?: number
 }>`
   position: relative;
@@ -972,7 +963,7 @@ const ActionItem = styled.li<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverColor || colors.blue};
+    color: ${(props) => props.hoverColor};
   }
 
   &:last-child {

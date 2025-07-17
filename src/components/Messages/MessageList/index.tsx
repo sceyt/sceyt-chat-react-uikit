@@ -46,7 +46,7 @@ import {
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
 import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -72,7 +72,7 @@ let nextDisable = false
 let prevDisable = false
 let scrollToBottom = false
 let shouldLoadMessages: 'next' | 'prev' | ''
-const messagesIndexMap = {}
+const messagesIndexMap: Record<string, number> = {}
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -442,13 +442,17 @@ const MessageList: React.FC<MessagesProps> = ({
   hiddenMessagesProperties
 }) => {
   const {
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
     [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.BORDER]: border
   } = useColor()
 
   const ChatClient = getClient()
@@ -1060,32 +1064,38 @@ const MessageList: React.FC<MessagesProps> = ({
           onDragLeave={handleDragOut}
           topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
-          backgroundColor={backgroundColor || themeBackgroundColor}
+          backgroundColor={backgroundColor || background}
         >
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea
-            backgroundColor={sectionBackground}
-            color={textSecondary}
+            backgroundColor={outgoingMessageBackground}
+            color={textPrimary}
             margin='32px 32px 12px'
+            iconBackgroundColor={background}
             draggable
             onDrop={handleDropFile}
             onDragOver={handleDragOver}
+            borderColor={border}
+            draggedBorderColor={accentColor}
           >
-            <IconWrapper backgroundColor={sectionBackground} draggable iconColor={accentColor}>
+            <IconWrapper backgroundColor={surface1} draggable iconColor={accentColor}>
               <ChooseFileIcon />
             </IconWrapper>
             Drag & drop to send as file
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea
-              backgroundColor={sectionBackground}
-              color={textSecondary}
+              backgroundColor={outgoingMessageBackground}
+              color={textPrimary}
+              iconBackgroundColor={background}
               draggable
               onDrop={handleDropMedia}
               onDragOver={handleDragOver}
+              borderColor={border}
+              draggedBorderColor={accentColor}
             >
-              <IconWrapper backgroundColor={sectionBackground} draggable iconColor={accentColor}>
+              <IconWrapper backgroundColor={surface1} draggable iconColor={accentColor}>
                 <ChooseMediaIcon />
               </IconWrapper>
               Drag & drop to send as media
@@ -1122,6 +1132,7 @@ const MessageList: React.FC<MessagesProps> = ({
           onMouseLeave={() => setIsScrolling(false)}
           onDragEnter={handleDragIn}
           backgroundColor={backgroundColor || themeBackgroundColor}
+          thumbColor={surface2}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1375,7 +1386,7 @@ interface MessageBoxProps {
   readonly attachmentsSelected: boolean
 }
 
-export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string }>`
+export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string; thumbColor: string }>`
   display: flex;
   flex-direction: column-reverse;
   flex-grow: 1;
@@ -1394,7 +1405,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -1438,6 +1449,7 @@ export const MessageTopDate = styled.div<{
   background: transparent;
   opacity: ${(props) => (props.visible ? '1' : '0')};
   transition: all 0.2s ease-in-out;
+  width: calc(100% - 8px);
 
   span {
     display: inline-block;
@@ -1446,7 +1458,7 @@ export const MessageTopDate = styled.div<{
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
     color: ${(props) => props.dateDividerTextColor};
-    background: ${(props) => props.dateDividerBackgroundColor || '#ffffff'};
+    background-color: ${(props) => `${props.dateDividerBackgroundColor}40`};
     border: ${(props) => props.dateDividerBorder};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
@@ -1495,13 +1507,20 @@ export const IconWrapper = styled.span<{ backgroundColor: string; iconColor: str
   }
 `
 
-export const DropAttachmentArea = styled.div<{ backgroundColor: string; color: string; margin?: string }>`
+export const DropAttachmentArea = styled.div<{
+  backgroundColor: string
+  color: string
+  margin?: string
+  iconBackgroundColor: string
+  borderColor: string
+  draggedBorderColor: string
+}>`
   display: flex;
   align-items: center;
   justify-content: center;
   flex-direction: column;
   height: 100%;
-  border: 1px dashed ${(props) => props.color};
+  border: 1px dashed ${(props) => props.borderColor};
   border-radius: 16px;
   margin: ${(props) => props.margin || '12px 32px 32px'};
   font-weight: 400;
@@ -1513,9 +1532,10 @@ export const DropAttachmentArea = styled.div<{ backgroundColor: string; color: s
 
   &.dragover {
     background-color: ${(props) => props.backgroundColor};
+    border: 1px dashed ${(props) => props.draggedBorderColor};
 
     ${IconWrapper} {
-      background-color: ${colors.white};
+      background-color: ${(props) => props.iconBackgroundColor};
     }
   }
 `

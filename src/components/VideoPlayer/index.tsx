@@ -6,9 +6,10 @@ import { ReactComponent as VolumeIcon } from '../../assets/svg/volume.svg'
 import { ReactComponent as VolumeMuteIcon } from '../../assets/svg/volumeMute.svg'
 import { ReactComponent as FullScreenIcon } from '../../assets/svg/fullscreen.svg'
 import { ReactComponent as FullScreenExitIcon } from '../../assets/svg/fullscreenExit.svg'
-import { colors } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
 import { formatAudioVideoTime } from '../../helpers'
+import { useColor } from 'hooks'
+import { THEME_COLORS } from 'UIHelper/constants'
 
 interface IVideoPlayerProps {
   src: string
@@ -18,6 +19,7 @@ interface IVideoPlayerProps {
 }
 let timerInterval: any
 const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
   const containerRef = useRef<HTMLVideoElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const progressRef = useRef<HTMLVideoElement>(null)
@@ -211,7 +213,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
             </PlayPauseWrapper>
           )}
 
-          <ControlTime>
+          <ControlTime color={textPrimary}>
             {formatAudioVideoTime(currentTime)} / {formatAudioVideoTime(videoTime)}
           </ControlTime>
           <VolumeController>
@@ -335,8 +337,8 @@ const ControlsContainer = styled.div`
     padding: 0 10px;
   }
 `
-const ControlTime = styled.span`
-  color: ${colors.white};
+const ControlTime = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
   font-weight: 400;
   font-size: 15px;
   line-height: 20px;

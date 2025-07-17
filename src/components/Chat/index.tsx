@@ -47,8 +47,8 @@ export default function Chat({
 }: IProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.BACKGROUND]: backgroundColor,
-    [THEME_COLORS.TEXT_PRIMARY]: textPrimaryColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
@@ -115,11 +115,11 @@ export default function Chat({
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>
       {!autoSelectChannel && (!activeChannel || !activeChannel.id) && (
-        <SelectChatContainer backgroundColor={noChannelSelectedBackgroundColor || backgroundColor}>
+        <SelectChatContainer backgroundColor={noChannelSelectedBackgroundColor || background}>
           {CustomNoChannelSelected || (
             <SelectChatContent iconColor={accentColor}>
               <MessageIcon />
-              <SelectChatTitle color={textPrimaryColor}> Select a chat</SelectChatTitle>
+              <SelectChatTitle color={textPrimary}> Select a chat</SelectChatTitle>
               <SelectChatDescription color={textSecondary}>
                 Please select a chat to start messaging.
               </SelectChatDescription>
@@ -157,7 +157,7 @@ const SelectChatContainer = styled.div<{ backgroundColor: string }>`
   z-index: 99;
 `
 
-const SelectChatContent = styled.div<{ iconColor?: string }>`
+const SelectChatContent = styled.div<{ iconColor: string }>`
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -168,7 +168,7 @@ const SelectChatContent = styled.div<{ iconColor?: string }>`
   }
 `
 
-const SelectChatTitle = styled.h3<{ color?: string }>`
+const SelectChatTitle = styled.h3<{ color: string }>`
   font-size: 20px;
   font-style: normal;
   font-weight: 500;
