@@ -383,6 +383,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [searchValue])
+
   useDidUpdate(() => {
     if (getSelectedChannel) {
       getSelectedChannel({
