@@ -264,7 +264,7 @@ const DetailsTabHeader = styled.div<{
   border-bottom: 1px solid ${(props) => props.borderColor};
   background-color: ${(props) => props.backgroundColor || 'transparent'};
   display: flex;
-  justify-content: center;
+  justify-content: space-between;
   position: sticky;
   top: 0;
   z-index: 12;
