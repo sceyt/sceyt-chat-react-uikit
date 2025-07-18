@@ -960,6 +960,8 @@ const ActionItem = styled.li<{
   & > svg {
     margin-right: 16px;
     color: ${(props) => props.iconColor};
+    width: 24px;
+    height: 24px;
   }
 
   &:hover {
