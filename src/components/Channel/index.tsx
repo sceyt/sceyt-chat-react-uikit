@@ -645,7 +645,7 @@ export const ChannelInfo = styled.div<{
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
-  max-width: ${(props) => (props.avatarSize ? `calc(100% - ${props.avatarSize + 12}px)` : 'calc(100% - 62px)')};
+  max-width: ${(props) => (props.avatarSize ? `calc(100% - ${props.avatarSize + 52}px)` : 'calc(100% - 102px)')};
 
   h3 {
     display: inline-block;
