@@ -97,7 +97,7 @@ const ChannelMessageText = ({
   isDirectChannel: boolean
 }) => {
   return (
-    <div>
+    <MessageTextContainer>
       {isTypingOrRecording && (
         <TypingIndicator>
           {!isDirectChannel && <Points color={textPrimary}>:</Points>}
@@ -215,7 +215,7 @@ const ChannelMessageText = ({
             {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
-    </div>
+    </MessageTextContainer>
   )
 }
 
@@ -854,4 +854,10 @@ const PinnedIconWrapper = styled.span<{ color: string }>`
   & > svg {
     color: ${(props) => props.color};
   }
+`
+
+const MessageTextContainer = styled.div`
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
 `

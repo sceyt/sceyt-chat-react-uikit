@@ -161,7 +161,8 @@ export default VoiceItem
 const FileIconCont = styled.span<{ fill?: string }>`
   cursor: pointer;
   display: inline-flex;
-  circle {
+  fill: ${(props) => props.fill || 'transparent'};
+  rect {
     fill: ${(props) => props.fill || 'transparent'};
   }
 `

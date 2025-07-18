@@ -56,8 +56,7 @@ export default function ReactionsPopup({
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
-    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
 
   const popupRef = useRef<HTMLDivElement>(null)
@@ -178,7 +177,6 @@ export default function ReactionsPopup({
         className={isScrolling ? 'show-scrollbar' : ''}
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
-        thumbColor={surface2}
       >
         <ReactionScoresList borderBottom={reactionsDetailsPopupHeaderItemsStyle !== 'bubbles'}>
           <ReactionScoreItem
@@ -218,7 +216,6 @@ export default function ReactionsPopup({
         popupHeight={popupHeight}
         onMouseEnter={() => setIsScrolling(true)}
         onMouseLeave={() => setIsScrolling(false)}
-        thumbColor={surface2}
       >
         {reactions.map((reaction: IReaction) => (
           <ReactionItem key={reaction.id} hoverBackgroundColor={backgroundHovered}>
@@ -314,13 +311,13 @@ const Container = styled.div<{
 `
 
 const UserNamePresence = styled.div`
-  width: 100%;
+  width: calc(100% - 70px);
   margin-left: 12px;
 `
 
 const MemberName = styled.h3<{ color: string }>`
   margin: 0;
-  max-width: calc(100% - 47px);
+  max-width: calc(100% - 7px);
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
@@ -334,56 +331,40 @@ const MemberName = styled.h3<{ color: string }>`
   }
 `
 
-const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number; thumbColor: string }>`
+const ReactionsList = styled.ul<{ popupHeight?: any; scoresHeight?: number }>`
   margin: 0;
   padding: 0;
   overflow: ${(props) => !props.popupHeight && 'hidden'};
+  overflow-y: auto;
   overflow-x: hidden;
   list-style: none;
   transition: all 0.2s;
   height: ${(props) => `calc(100% - ${props.scoresHeight || 57}px)`};
-    calc(100% - 57px);
 
-  &.show-scrollbar {
-    overflow-x: hidden;
-  }
   &::-webkit-scrollbar {
-    width: 8px;
-    background: transparent;
+    display: none;
   }
   &::-webkit-scrollbar-thumb {
-    background: transparent;
+    display: none;
   }
-
-  &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: ${(props) => props.thumbColor};
-    border-radius: 4px;
-  }
-  &.show-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+  &::-webkit-scrollbar-track {
+    display: none;
   }
 `
 
-const ReactionScoresCont = styled.div<{ thumbColor: string }>`
+const ReactionScoresCont = styled.div`
   max-width: 100%;
-  overflow-y: auto;
-  &.show-scrollbar {
-    overflow-x: hidden;
-  }
+  overflow: auto;
+  overflow-y: hidden;
+
   &::-webkit-scrollbar {
-    width: 8px;
-    background: transparent;
+    display: none;
   }
   &::-webkit-scrollbar-thumb {
-    background: transparent;
+    display: none;
   }
-
-  &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: ${(props) => props.thumbColor};
-    border-radius: 4px;
-  }
-  &.show-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
+  &::-webkit-scrollbar-track {
+    display: none;
   }
 `
 
