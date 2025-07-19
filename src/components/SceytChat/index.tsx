@@ -28,13 +28,12 @@ import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
-import { IChatClientProps, ThemeColor } from '../ChatContainer'
-import { colors, defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
+import { IChatClientProps } from '../ChatContainer'
+import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
 import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
-import { moderateColor } from '../../UIHelper/moderateColor'
 import log from 'loglevel'
 
 const SceytChat = ({
@@ -57,7 +56,8 @@ const SceytChat = ({
   autoSelectFirstChannel = false,
   memberCount
 }: IChatClientProps) => {
-  const { [THEME_COLORS.BACKGROUND]: backgroundColor } = useColor()
+  const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
+    useColor()
   const dispatch = useDispatch()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
@@ -91,7 +91,7 @@ const SceytChat = ({
   }
 
   const handleVisibilityChange = () => {
-    if (document[hidden]) {
+    if (document[hidden as keyof Document]) {
       setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     } else {
@@ -107,13 +107,6 @@ const SceytChat = ({
       setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     }
-  }
-
-  const generateBubbleColors = (themeColors: { [key: string]: ThemeColor }) => {
-    colors.outgoingMessageBackgroundDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.85, true)
-    colors.outgoingMessageBackgroundLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.85)
-    colors.outgoingMessageBackgroundXLight = moderateColor(themeColors[THEME_COLORS.ACCENT].light, 0.75)
-    colors.outgoingMessageBackgroundXDark = moderateColor(themeColors[THEME_COLORS.ACCENT].dark || '', 0.75, true)
   }
 
   useEffect(() => {
@@ -151,20 +144,15 @@ const SceytChat = ({
   const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
     for (const key in theme.colors) {
-      if (theme.colors.hasOwnProperty(key)) {
-        updatedColors[key] = {
-          ...defaultTheme.colors[key],
-          ...theme.colors[key]
+      if (Object.prototype.hasOwnProperty.call(theme.colors, key)) {
+        updatedColors[key as keyof typeof defaultTheme.colors] = {
+          ...defaultTheme.colors[key as keyof typeof defaultTheme.colors],
+          ...theme.colors[key as keyof typeof theme.colors]
         } as any
-      }
-      if (key === THEME_COLORS.WARNING) {
-        colors.errorBlur = moderateColor(updatedColors[key].light, 0.2)
       }
     }
 
     const updatedTheme = { ...defaultTheme, colors: updatedColors }
-
-    generateBubbleColors(updatedColors)
 
     dispatch(setTheme(updatedTheme))
   }
@@ -248,7 +236,6 @@ const SceytChat = ({
     if (theme) {
       handleChangedTheme(theme)
     } else {
-      generateBubbleColors(defaultTheme.colors)
       dispatch(setTheme(defaultTheme))
     }
   }, [theme])
@@ -298,6 +285,7 @@ const SceytChat = ({
           onDragOver={handleDragOver}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
           backgroundColor={backgroundColor}
+          highlightedBackground={highlightedBackground}
           id='sceyt_chat_container'
         >
           {children}
@@ -316,10 +304,28 @@ export const Container = styled.div`
   height: 100vh;
 `
 
-const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor?: string }>`
+const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: string; highlightedBackground: string }>`
   display: flex;
   height: 100%;
   max-height: 100vh;
   min-width: ${(props) => props.withChannelsList && '1200px'};
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
+
+  /* Global highlighted background styles */
+  ::selection {
+    background-color: ${(props) => props.highlightedBackground};
+  }
+
+  ::-moz-selection {
+    background-color: ${(props) => props.highlightedBackground};
+  }
+
+  /* For text selection highlighting */
+  *::selection {
+    background-color: ${(props) => props.highlightedBackground};
+  }
+
+  *::-moz-selection {
+    background-color: ${(props) => props.highlightedBackground};
+  }
 `

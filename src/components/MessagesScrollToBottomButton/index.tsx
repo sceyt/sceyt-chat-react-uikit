@@ -9,7 +9,7 @@ import { themeSelector } from '../../store/theme/selector'
 // Assets
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 // Helpers
-import { colors, THEME_COLORS } from '../../UIHelper/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
@@ -48,7 +48,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountFontSize,
   unreadCountTextColor
 }) => {
-  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground } = useColor()
+  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections } = useColor()
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -67,7 +67,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
           height={buttonHeight}
           border={buttonBorder}
           borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor || sectionBackground}
+          backgroundColor={buttonBackgroundColor || backgroundSections}
           hoverBackgroundColor={buttonHoverBackgroundColor}
           shadow={buttonShadow}
           onClick={handleScrollToBottom}
@@ -110,8 +110,8 @@ const BottomButton = styled.div<{
   rightPosition?: number
 }>`
   position: absolute;
-  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition == undefined ? 45 : props.bottomPosition)}px`};
-  right: ${(props) => `${props.rightPosition == undefined ? 16 : props.rightPosition}px`};
+  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition === undefined ? 45 : props.bottomPosition)}px`};
+  right: ${(props) => `${props.rightPosition === undefined ? 16 : props.rightPosition}px`};
   margin-right: 16px;
   display: flex;
   align-items: center;
@@ -140,7 +140,7 @@ const UnreadCount = styled.span<UnreadCountProps>`
   right: 16px;
   flex: 0 0 auto;
   margin-left: auto;
-  background-color: ${(props) => props.backgroundColor || colors.primary};
+  background-color: ${(props) => props.backgroundColor};
   padding: 0 4px;
   font-size: ${(props) => props.fontSize || '13px'};
   line-height: 20px;
@@ -151,6 +151,4 @@ const UnreadCount = styled.span<UnreadCountProps>`
   color: ${(props) => props.textColor || '#fff'};
   border-radius: 10px;
   box-sizing: border-box;
-
-  /*${(props: any) => props.isMuted && 'background-color: #BEBFC7;'}*/
 `

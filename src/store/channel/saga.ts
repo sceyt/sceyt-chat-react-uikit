@@ -90,7 +90,7 @@ import {
   updateMessageOnAllMessages,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
-import { updateMembersPresenceAC } from '../member/actions'
+import { addMembersToListAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -823,6 +823,7 @@ function* switchChannel(action: IAction): any {
       channelToSwitch.linkedFrom = currentActiveChannel
     }
     yield put(setActiveChannelAC({ ...channelToSwitch }))
+    yield put(addMembersToListAC(channelToSwitch.members))
     // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());

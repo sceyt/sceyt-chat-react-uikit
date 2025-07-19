@@ -34,22 +34,36 @@ export interface ICustomUploader {
 
 export type ThemeColors =
   | 'accent'
-  | 'background'
-  | 'sectionBackground'
-  | 'focusBackground'
-  | 'hoverBackground'
+  | 'avatarBrand1'
+  | 'avatarBrand2'
+  | 'avatarBrand3'
+  | 'avatarBrand4'
   | 'textPrimary'
   | 'textSecondary'
   | 'textFootnote'
   | 'textOnPrimary'
   | 'border'
-  | 'iconPrimary'
   | 'iconInactive'
-  | 'surface1'
-  | 'surface2'
+  | 'iconPrimary'
+  | 'background'
+  | 'backgroundSections'
+  | 'backgroundFocused'
+  | 'backgroundHovered'
   | 'overlayBackground'
   | 'overlayBackground2'
-  | 'error'
+  | 'surface1'
+  | 'surface2'
+  | 'surfaceX'
+  | 'warning'
+  | 'attention'
+  | 'onlineStatus'
+  | 'success'
+  | 'outgoingMessageBackground'
+  | 'outgoingMessageBackgroundX'
+  | 'incomingMessageBackground'
+  | 'incomingMessageBackgroundX'
+  | 'linkColor'
+  | 'highlightedBackground'
 
 export interface ThemeColor {
   light: string
@@ -58,9 +72,7 @@ export interface ThemeColor {
 }
 
 export interface SceytChatUIKitTheme {
-  colors: {
-    [key in ThemeColors]?: ThemeColor
-  }
+  colors: Partial<Record<ThemeColors, ThemeColor>>
 }
 
 export type ThemeMode = 'light' | 'dark' | string

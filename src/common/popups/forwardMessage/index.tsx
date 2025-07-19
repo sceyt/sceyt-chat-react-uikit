@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import styled from 'styled-components'
 import {
   getChannelsForForwardAC,
@@ -48,10 +48,14 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.SURFACE_1]: surface1Background,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BACKGROUND]: backgroundColor
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const ChatClient = getClient()
@@ -158,10 +162,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
         height='540px'
         isLoading={loading}
         padding='0'
-        backgroundColor={backgroundColor}
+        backgroundColor={background}
       >
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
-          <CloseIcon onClick={() => togglePopup()} color={textPrimary} />
+          <CloseIcon onClick={() => togglePopup()} color={iconPrimary} />
           <PopupName color={textPrimary} isDelete marginBottom='20px'>
             {title}
           </PopupName>
@@ -173,9 +177,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
           <SelectedChannelsContainer ref={selectedChannelsContRef}>
             {selectedChannels.map((channel) => {
               return (
-                <SelectedChannelBuble backgroundColor={sectionBackground} key={`selected-${channel.id}`}>
+                <SelectedChannelBuble backgroundColor={surface1} key={`selected-${channel.id}`}>
                   <SelectedChannelName color={textPrimary}>{channel.displayName}</SelectedChannelName>
-                  <StyledSubtractSvg onClick={() => removeChannel(channel)} />
+                  <StyledSubtractSvg onClick={() => removeChannel(channel)} color={iconPrimary} />
                 </SelectedChannelBuble>
               )
             })}
@@ -186,6 +190,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             className={isScrolling ? 'show-scrollbar' : ''}
             onMouseEnter={() => setIsScrolling(true)}
             onMouseLeave={() => setIsScrolling(false)}
+            thumbColor={surface2}
           >
             {searchValue ? (
               <React.Fragment>
@@ -207,6 +212,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           key={channel.id}
                           onClick={() => handleChannelSelect(!isSelected, channel)}
                           disabled={selectedChannels.length >= 5 && !isSelected}
+                          backgroundHover={backgroundHovered}
                         >
                           <Avatar
                             name={
@@ -263,6 +269,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             </ChannelMembers>
                           </ChannelInfo>
                           <CustomCheckbox
+                            borderColor={iconInactive}
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
@@ -270,8 +277,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               e.stopPropagation()
                             }}
                             size='18px'
-                            tickColor={accentColor}
-                            backgroundColor={surface1Background}
+                            backgroundColor={'transparent'}
+                            checkedBackgroundColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -288,6 +295,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           key={channel.id}
                           onClick={() => handleChannelSelect(!isSelected, channel)}
                           disabled={selectedChannels.length >= 5 && !isSelected}
+                          backgroundHover={backgroundHovered}
                         >
                           <Avatar
                             name={channel.subject || ''}
@@ -312,6 +320,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                             </ChannelMembers>
                           </ChannelInfo>
                           <CustomCheckbox
+                            borderColor={iconInactive}
                             index={channel.id}
                             disabled={selectedChannels.length >= 5 && !isSelected}
                             state={isSelected}
@@ -319,8 +328,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               e.stopPropagation()
                             }}
                             size='18px'
-                            tickColor={accentColor}
-                            backgroundColor={surface1Background}
+                            backgroundColor={'transparent'}
+                            checkedBackgroundColor={accentColor}
                           />
                         </ChannelItem>
                       )
@@ -392,6 +401,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                       </ChannelMembers>
                     </ChannelInfo>
                     <CustomCheckbox
+                      borderColor={iconInactive}
                       index={channel.id}
                       disabled={selectedChannels.length >= 5 && !isSelected}
                       state={isSelected}
@@ -399,8 +409,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                         e.stopPropagation()
                       }}
                       size='18px'
-                      tickColor={accentColor}
-                      backgroundColor={surface1Background}
+                      backgroundColor={'transparent'}
+                      checkedBackgroundColor={accentColor}
                     />
                   </ChannelItem>
                 )
@@ -408,13 +418,13 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             )}
           </ForwardChannelsCont>
         </PopupBody>
-        <PopupFooter backgroundColor={surface1Background}>
+        <PopupFooter backgroundColor={surface1}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => togglePopup()}>
             Cancel
           </Button>
           <Button
             type='button'
-            color={colors.white}
+            color={textOnPrimary}
             backgroundColor={accentColor}
             borderRadius='8px'
             onClick={handleForwardMessage}
@@ -429,7 +439,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
 export default ForwardMessagePopup
 
-const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
+const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number; thumbColor: string }>`
   overflow-y: auto;
   margin-top: 16px;
   max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 64}px)`};
@@ -444,7 +454,7 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -452,11 +462,18 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number }>`
   }
 `
 
-const ChannelItem = styled.div<any>`
+const ChannelItem = styled.div<{ backgroundHover?: string; disabled?: boolean }>`
   display: flex;
   align-items: center;
   margin-bottom: 8px;
   cursor: pointer;
+  &:hover {
+    background-color: ${(props) => props.backgroundHover};
+  }
+  &:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+  }
 `
 
 const ChannelInfo = styled.div<any>`

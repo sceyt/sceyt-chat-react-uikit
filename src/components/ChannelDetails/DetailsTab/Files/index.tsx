@@ -15,7 +15,7 @@ import { base64ToToDataURL } from '../../../../helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
-import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 import log from 'loglevel'
 
@@ -36,7 +36,6 @@ interface IProps {
 
 const Files = ({
   channelId,
-  theme,
   filePreviewIcon,
   filePreviewHoverIcon,
   filePreviewTitleColor,
@@ -51,7 +50,9 @@ const Files = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
 
   const dispatch = useDispatch()
@@ -80,7 +81,7 @@ const Files = ({
   }, [channelId])
   log.info('attachments. .. . ', attachments)
   return (
-    <Container theme={theme}>
+    <Container>
       {attachments.map(
         (file: IAttachment) => {
           const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
@@ -100,14 +101,18 @@ const Files = ({
               key={file.id}
               // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
               // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-              hoverBackgroundColor={filePreviewHoverBackgroundColor || colors.hoverBackgroundColor}
+              hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
             >
               {metas && metas.tmb ? (
                 <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
               ) : (
                 <React.Fragment>
-                  <FileIconCont iconColor={accentColor}>{filePreviewIcon || <FileIcon />}</FileIconCont>
-                  <FileHoverIconCont iconColor={accentColor}>{filePreviewHoverIcon || <FileIcon />}</FileHoverIconCont>
+                  <FileIconCont iconColor={accentColor} fillColor={surface1}>
+                    {filePreviewIcon || <FileIcon />}
+                  </FileIconCont>
+                  <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
+                    {filePreviewHoverIcon || <FileIcon />}
+                  </FileHoverIconCont>
                 </React.Fragment>
               )}
               <div>
@@ -121,7 +126,7 @@ const Files = ({
                 <FileSizeAndDate
                   fontSize={fileSizeFontSize}
                   lineHeight={fileSizeLineHeight}
-                  color={filePreviewSizeColor || textPrimary}
+                  color={filePreviewSizeColor || textSecondary}
                 >
                   {file.size ? bytesToSize(file.size) : ''}
                 </FileSizeAndDate>
@@ -145,7 +150,7 @@ const Files = ({
                           fill: 'transparent'
                         },
                         path: {
-                          stroke: textSecondary,
+                          stroke: accentColor,
                           strokeLinecap: 'butt',
                           strokeWidth: '6px',
                           transition: 'stroke-dashoffset 0.5s ease 0s',
@@ -191,6 +196,9 @@ const DownloadWrapper = styled.a<{ visible?: boolean; iconColor?: string }>`
   right: 16px;
   cursor: pointer;
   & > svg {
+    & path {
+      fill: ${(props) => props.iconColor};
+    }
     color: ${(props) => props.iconColor};
   }
 `
@@ -219,21 +227,23 @@ const ProgressWrapper = styled.span`
   }
 ` */
 
-const FileIconCont = styled.span<{ iconColor: string }>`
+const FileIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: inline-flex;
 
   & > svg {
     width: 40px;
     height: 40px;
     color: ${(props) => props.iconColor};
+    fill: ${(props) => props.fillColor};
   }
 `
-const FileHoverIconCont = styled.span<{ iconColor: string }>`
+const FileHoverIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: none;
   & > svg {
     color: ${(props) => props.iconColor};
     width: 40px;
     height: 40px;
+    fill: ${(props) => props.fillColor};
   }
 `
 const FileThumb = styled.img`
@@ -243,7 +253,7 @@ const FileThumb = styled.img`
   border-radius: 8px;
   object-fit: cover;
 `
-const FileItem = styled.div<any>`
+const FileItem = styled.div<{ hoverBackgroundColor: string }>`
   position: relative;
   padding: 11px 16px;
   display: flex;
@@ -255,7 +265,7 @@ const FileItem = styled.div<any>`
     width: calc(100% - 48px);
   }
   &:hover {
-    background-color: ${(props) => props.hoverBackgroundColor || colors.gray0};
+    background-color: ${(props) => props.hoverBackgroundColor};
     ${DownloadWrapper} {
       visibility: visible;
     }
@@ -270,7 +280,7 @@ const FileItem = styled.div<any>`
 
   }*/
 `
-const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string }>`
+const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string; color: string }>`
   display: block;
   font-style: normal;
   font-weight: normal;

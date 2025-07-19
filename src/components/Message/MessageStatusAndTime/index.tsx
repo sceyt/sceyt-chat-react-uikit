@@ -5,7 +5,7 @@ import moment from 'moment'
 import { useColor } from '../../../hooks'
 // Helpers
 import { MESSAGE_STATUS } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IMessage } from '../../../types'
 // Components
 import { MessageStatusIcon } from '../../../messageUtils'
@@ -30,6 +30,7 @@ interface IMessageStatusAndTime {
   ownMessageOnRightSide?: boolean
   bottomOfMessage?: boolean
   marginBottom?: string
+  messageTimeColorOnAttachment: string
 }
 
 const MessageStatusAndTime = ({
@@ -51,12 +52,14 @@ const MessageStatusAndTime = ({
   ownMessageOnRightSide,
   leftMargin,
   bottomOfMessage,
-  marginBottom
+  marginBottom,
+  messageTimeColorOnAttachment
 }: IMessageStatusAndTime) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   return (
@@ -71,6 +74,7 @@ const MessageStatusAndTime = ({
       bottomOfMessage={bottomOfMessage}
       marginBottom={marginBottom}
       className='message_status_time'
+      messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
     >
       {message.state === MESSAGE_STATUS.EDIT ? (
         <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
@@ -119,7 +123,8 @@ export default React.memo(MessageStatusAndTime, (prevProps, nextProps) => {
     prevProps.messageStatusVisible === nextProps.messageStatusVisible &&
     prevProps.ownMessageOnRightSide === nextProps.ownMessageOnRightSide &&
     prevProps.bottomOfMessage === nextProps.bottomOfMessage &&
-    prevProps.marginBottom === nextProps.marginBottom
+    prevProps.marginBottom === nextProps.marginBottom &&
+    prevProps.messageTimeColorOnAttachment === nextProps.messageTimeColorOnAttachment
   )
 })
 
@@ -155,6 +160,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   showOnlyOnHover?: boolean
   lineHeight?: string
   statusColor?: string
+  messageTimeColorOnAttachment: string
 }>`
   visibility: ${(props: any) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
@@ -180,7 +186,8 @@ const MessageStatusAndTimeContainer = styled.span<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) => (props.fileAttachment ? props.statusColor : props.withAttachment ? colors.white : '')};
+    color: ${(props) =>
+      props.fileAttachment ? props.statusColor : props.withAttachment ? props.messageTimeColorOnAttachment : ''};
   }
 
   ${(props) =>

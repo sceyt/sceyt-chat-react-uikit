@@ -11,14 +11,12 @@ import { useColor, useDidUpdate } from '../../../../hooks'
 // Assets
 import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePreview.svg'
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
-import { ReactComponent as VoicePlayHoverIcon } from '../../../../assets/svg/voicePreviewHoverIcon.svg'
-import { ReactComponent as VoicePauseHoverIcon } from '../../../../assets/svg/voicePreviewPauseHover.svg'
 // Helpers
 import { getCustomDownloader } from '../../../../helpers/customUploader'
 import { formatAudioVideoTime } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
-import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { IAttachment } from '../../../../types'
 
 interface IProps {
@@ -45,8 +43,8 @@ const VoiceItem = ({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
-    [THEME_COLORS.BACKGROUND]: backgroundColor
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.ACCENT]: accentColor
   } = useColor()
 
   const dispatch = useDispatch()
@@ -116,24 +114,24 @@ const VoiceItem = ({
     <FileItem
       onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
       onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-      hoverBackgroundColor={voicePreviewHoverBackgroundColor || hoverBackground}
+      hoverBackgroundColor={voicePreviewHoverBackgroundColor || backgroundHovered}
     >
       {audioIsPlaying ? (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause} fill={hoverBackground}>
+          <FileIconCont onClick={handlePlayPause} fill={accentColor}>
             {voicePreviewPauseIcon || <VoicePauseIcon />}
           </FileIconCont>
-          <FileHoverIconCont onClick={handlePlayPause} fill={backgroundColor}>
-            {voicePreviewPauseHoverIcon || <VoicePauseHoverIcon />}
+          <FileHoverIconCont onClick={handlePlayPause} fill={accentColor}>
+            {voicePreviewPauseHoverIcon || <VoicePauseIcon />}
           </FileHoverIconCont>
         </React.Fragment>
       ) : (
         <React.Fragment>
-          <FileIconCont onClick={handlePlayPause} fill={hoverBackground}>
+          <FileIconCont onClick={handlePlayPause} fill={accentColor}>
             {voicePreviewPlayIcon || <VoicePlayIcon />}
           </FileIconCont>
-          <FileHoverIconCont onClick={handlePlayPause} fill={backgroundColor}>
-            {voicePreviewPlayHoverIcon || <VoicePlayHoverIcon />}
+          <FileHoverIconCont onClick={handlePlayPause} fill={accentColor}>
+            {voicePreviewPlayHoverIcon || <VoicePlayIcon />}
           </FileHoverIconCont>
         </React.Fragment>
       )}
@@ -176,14 +174,14 @@ const FileHoverIconCont = styled.span<{ fill?: string }>`
     fill: ${(props) => props.fill || 'transparent'};
   }
 `
-const FileItem = styled.li<any>`
+const FileItem = styled.li<{ hoverBackgroundColor: string }>`
   padding: 9px 16px;
   display: flex;
   align-items: center;
   text-decoration: none;
 
   &:hover {
-    background-color: ${(props) => props.hoverBackgroundColor || colors.gray0};
+    background-color: ${(props) => props.hoverBackgroundColor};
   }
   div {
     margin-left: 12px;

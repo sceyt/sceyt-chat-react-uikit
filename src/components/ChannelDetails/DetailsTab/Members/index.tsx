@@ -29,7 +29,7 @@ import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
 import { getClient } from '../../../../common/client'
-import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 // Components
 import ConfirmPopup from '../../../../common/popups/delete'
@@ -74,9 +74,12 @@ const Members = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.WARNING]: errorColor,
+    [THEME_COLORS.BACKGROUND_FOCUSED]: backgroundFocused,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive,
+    [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
 
   const dispatch = useDispatch()
@@ -246,10 +249,10 @@ const Members = ({
               key={1}
               onClick={handleAddMemberPopup}
               color={textPrimary}
-              hoverBackground={hoverBackgroundColor || hoverBackground}
+              hoverBackground={hoverBackgroundColor || backgroundHovered}
               addMemberIconColor={accentColor}
               fontSize={addMemberFontSize}
-              addMemberBackground={hoverBackground}
+              addMemberBackground={surface1}
             >
               {addMemberIcon || <AddMemberIcon />}
               {`Add ${displayMemberText}`}
@@ -259,9 +262,10 @@ const Members = ({
           {!!members.length &&
             members.map((member, index) => (
               <MemberItem
+                addMemberIconColor={iconInactive}
                 key={member.id + index}
                 color={textPrimary}
-                hoverBackground={hoverBackgroundColor || hoverBackground}
+                hoverBackground={hoverBackgroundColor || backgroundHovered}
                 onClick={() => handleCreateChat(member)}
                 fontSize={memberNameFontSize}
               >
@@ -274,7 +278,7 @@ const Members = ({
                 />
                 <MemberNamePresence>
                   <MemberNameWrapper>
-                    <MemberName>
+                    <MemberName color={textPrimary}>
                       {member.id === user.id
                         ? 'You'
                         : makeUsername(
@@ -284,9 +288,13 @@ const Members = ({
                           )}
                     </MemberName>
                     {member.role === 'owner' ? (
-                      <RoleBadge color={accentColor}>Owner</RoleBadge>
+                      <RoleBadge color={accentColor} backgroundColor={backgroundFocused}>
+                        Owner
+                      </RoleBadge>
                     ) : member.role === 'admin' ? (
-                      <RoleBadge color={accentColor}>Admin</RoleBadge>
+                      <RoleBadge color={accentColor} backgroundColor={backgroundFocused}>
+                        Admin
+                      </RoleBadge>
                     ) : (
                       ''
                     )}
@@ -307,8 +315,8 @@ const Members = ({
                     forceClose={!!(closeMenu && closeMenu !== member.id)}
                     watchToggleState={(state) => watchDropdownState(state, member.id)}
                     trigger={
-                      <EditMemberIcon>
-                        <MoreIcon />
+                      <EditMemberIcon color={iconInactive}>
+                        <MoreIcon color={iconInactive} />
                       </EditMemberIcon>
                     }
                   >
@@ -322,7 +330,7 @@ const Members = ({
                             setCloseMenu('1')
                           }}
                           key={1}
-                          hoverBackground={hoverBackground}
+                          hoverBackground={backgroundHovered}
                         >
                           Change role
                         </DropdownOptionLi>
@@ -336,7 +344,7 @@ const Members = ({
                           }}
                           textColor={member.role === 'admin' ? errorColor : ''}
                           key={2}
-                          hoverBackground={hoverBackground}
+                          hoverBackground={backgroundHovered}
                         >
                           {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
                         </DropdownOptionLi>
@@ -350,7 +358,7 @@ const Members = ({
                           }}
                           textColor={errorColor}
                           key={3}
-                          hoverBackground={hoverBackground}
+                          hoverBackground={backgroundHovered}
                         >
                           Remove
                         </DropdownOptionLi>
@@ -359,7 +367,7 @@ const Members = ({
                         <DropdownOptionLi
                           textColor={errorColor}
                           key={4}
-                          hoverBackground={hoverBackground}
+                          hoverBackground={backgroundHovered}
                           onClick={(e: any) => {
                             setSelectedMember(member)
                             toggleBlockMemberPopup(e)
@@ -500,21 +508,26 @@ const MemberNameWrapper = styled.div`
   align-items: center;
 `
 
-const MemberName = styled.h4`
+const MemberName = styled.h4<{ color: string }>`
   margin: 0;
   font-weight: 400;
   white-space: nowrap;
   text-overflow: ellipsis;
   overflow: hidden;
+  color: ${(props) => props.color};
 `
 
-const EditMemberIcon = styled.span`
+const EditMemberIcon = styled.span<{ color: string }>`
   margin-left: auto;
   cursor: pointer;
   padding: 15px;
   opacity: 0;
   visibility: hidden;
   transition: all 0.2s;
+
+  & svg {
+    color: ${(props) => props.color};
+  }
 `
 
 const MembersList = styled.ul`
@@ -526,7 +539,7 @@ const MembersList = styled.ul`
 const MemberItem = styled.li<{
   color: string
   hoverBackground?: string
-  addMemberIconColor?: string
+  addMemberIconColor: string
   addMemberBackground?: string
   fontSize?: string
 }>`
@@ -539,18 +552,26 @@ const MemberItem = styled.li<{
   color: ${(props) => props.color};
   cursor: pointer;
 
+  & > svg {
+    rect {
+      fill: transparent;
+    }
+  }
+
   &:first-child {
     cursor: pointer;
 
     > svg {
-      color: ${(props) => props.addMemberIconColor || colors.primary};
+      color: ${(props) => props.addMemberIconColor};
       margin-right: 12px;
-      fill: ${(props) => props.addMemberBackground || 'transparent'};
+      & > rect {
+        fill: ${(props) => props.addMemberBackground || 'transparent'} !important;
+      }
     }
   }
 
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.gray0};
+    background-color: ${(props) => props.hoverBackground};
   }
 
   &:hover ${EditMemberIcon} {
@@ -570,7 +591,7 @@ const MemberItem = styled.li<{
   }
 `
 
-const RoleBadge = styled.span<{ color?: string }>`
+const RoleBadge = styled.span<{ color: string; backgroundColor: string }>`
   position: relative;
   padding: 2px 8px;
   border-radius: 12px;
@@ -588,7 +609,7 @@ const RoleBadge = styled.span<{ color?: string }>`
     border-radius: 12px;
     width: 100%;
     height: 100%;
-    background-color: ${(props) => props.color || colors.primary};
+    background-color: ${(props) => props.backgroundColor};
     opacity: 0.1;
   }
 `

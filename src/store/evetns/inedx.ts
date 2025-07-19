@@ -78,6 +78,7 @@ import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
+import store from 'store'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -753,13 +754,19 @@ export default function* watchForEvents(): any {
               if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
                 const contactsMap = yield select(contactsMapSelector)
                 const getFromContacts = getShowOnlyContactUsers()
+                const state = store.getState()
+                const theme = state.ThemeReducer.theme || 'light'
+                const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+                const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
                 const messageBody = MessageTextFormat({
                   text: message.body,
                   message,
                   contactsMap,
                   getFromContacts,
                   isLastMessage: false,
-                  asSampleText: true
+                  asSampleText: true,
+                  accentColor,
+                  textSecondary
                 })
                 setNotification(
                   messageBody,
@@ -960,13 +967,19 @@ export default function* watchForEvents(): any {
             if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
               const contactsMap = yield select(contactsMapSelector)
               const getFromContacts = getShowOnlyContactUsers()
+              const state = store.getState()
+              const theme = state.ThemeReducer.theme || 'light'
+              const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+              const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
               const messageBody = MessageTextFormat({
                 text: message.body,
                 message,
                 contactsMap,
                 getFromContacts,
                 isLastMessage: false,
-                asSampleText: true
+                asSampleText: true,
+                accentColor,
+                textSecondary
               })
               setNotification(
                 messageBody,

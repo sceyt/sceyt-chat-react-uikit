@@ -11,15 +11,9 @@ import { isJSON } from 'helpers/message'
 import { getClient } from 'common/client'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { getSendAttachmentsAsSeparateMessages } from 'helpers/customUploader'
-import {
-  attachmentTypes,
-  DEFAULT_CHANNEL_TYPE,
-  MESSAGE_DELIVERY_STATUS,
-  MESSAGE_STATUS,
-  THEME
-} from 'helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
-import { colors, THEME_COLORS } from 'UIHelper/constants'
+import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IChannel, IMessage, IUser } from 'types'
 // Components
 import MessageActions from '../MessageActions'
@@ -116,6 +110,7 @@ interface IMessageBodyProps {
   messageTimeFontSize?: string
   messageTimeColor?: string
   messageStatusAndTimeLineHeight?: string
+  messageTimeColorOnAttachment?: string
   fileAttachmentsBoxWidth?: number
   fileAttachmentsBoxBackground?: string
   fileAttachmentsBoxBorder?: string
@@ -235,6 +230,7 @@ const MessageBody = ({
   messageTimeFontSize,
   messageTimeColor,
   messageStatusAndTimeLineHeight,
+  messageTimeColorOnAttachment,
   fileAttachmentsIcon,
   fileAttachmentsBoxWidth,
   fileAttachmentsBoxBorder,
@@ -277,13 +273,15 @@ const MessageBody = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.LINK_COLOR]: linkColor
   } = useColor()
 
-  const bubbleOutgoing =
-    theme === THEME.DARK ? colors.outgoingMessageBackgroundDark : colors.outgoingMessageBackgroundLight
-  const bubbleIncoming =
-    theme === THEME.DARK ? colors.incomingMessageBackgroundDark : colors.incomingMessageBackgroundLight
+  const bubbleOutgoing = outgoingMessageBackground
+  const bubbleIncoming = incomingMessageBackground
 
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -372,21 +370,21 @@ const MessageBody = ({
         withAttachments
           ? mediaAttachment
             ? (attachmentMetas &&
-              getSendAttachmentsAsSeparateMessages() &&
-              attachmentMetas.szw &&
-              calculateRenderedImageWidth(
-                attachmentMetas.szw,
-                attachmentMetas.szh,
+                getSendAttachmentsAsSeparateMessages() &&
+                attachmentMetas.szw &&
+                calculateRenderedImageWidth(
+                  attachmentMetas.szw,
+                  attachmentMetas.szh,
 
-                mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-                mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
-                // imageAttachmentMaxWidth,
-                // imageAttachmentMaxHeight
-              )[0]) ||
-            420
+                  mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+                  mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
+                  // imageAttachmentMaxWidth,
+                  // imageAttachmentMaxHeight
+                )[0]) ||
+              420
             : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
-            message.attachments[0].type === attachmentTypes.voice
+              message.attachments[0].type === attachmentTypes.voice
               ? 254
               : message.attachments[0].type === attachmentTypes.file
                 ? fileAttachmentsBoxWidth
@@ -544,7 +542,9 @@ const MessageBody = ({
             withBody={!!message.body}
             showSenderName={showMessageSenderName}
             leftPadding={
-              message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit'
+              message.incoming
+                ? incomingMessageStyles?.background !== 'inherit'
+                : outgoingMessageStyles?.background !== 'inherit'
             }
             color={accentColor}
           >
@@ -559,7 +559,11 @@ const MessageBody = ({
         fontSize={messageTextFontSize}
         lineHeight={messageTextLineHeight}
         showMessageSenderName={showMessageSenderName}
-        withPaddings={message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit'}
+        withPaddings={
+          message.incoming
+            ? incomingMessageStyles?.background !== 'inherit'
+            : outgoingMessageStyles?.background !== 'inherit'
+        }
         withAttachment={notLinkAttachment && !!message.body}
         withMediaAttachment={withMediaAttachment}
         fontFamily={fontFamily}
@@ -567,6 +571,7 @@ const MessageBody = ({
         outgoingMessageStyles={outgoingMessageStyles}
         incomingMessageStyles={incomingMessageStyles}
         incoming={message.incoming}
+        linkColor={linkColor}
       >
         <span ref={messageTextRef}>
           {MessageTextFormat({
@@ -574,7 +579,8 @@ const MessageBody = ({
             message,
             contactsMap,
             getFromContacts,
-            accentColor
+            accentColor,
+            textSecondary
           })}
         </span>
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
@@ -583,8 +589,8 @@ const MessageBody = ({
           ''
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
-          !notLinkAttachment &&
-          (messageStatusVisible || messageTimeVisible) ? (
+        !notLinkAttachment &&
+        (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
             message={message}
             showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
@@ -600,6 +606,7 @@ const MessageBody = ({
             messageTimeVisible={!!messageTimeVisible}
             messageStatusVisible={!!messageStatusVisible}
             leftMargin
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         ) : null}
       </MessageText>
@@ -613,7 +620,7 @@ const MessageBody = ({
             messageStatusSize={messageStatusSize}
             messageStatusColor={
               message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                ? colors.white
+                ? textOnPrimary
                 : messageStateColor || textSecondary
             }
             messageReadStatusColor={messageReadStatusColor}
@@ -629,43 +636,46 @@ const MessageBody = ({
             fileAttachment={
               withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
             }
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
       {
         withAttachments &&
-        (message.attachments as any[]).map((attachment: any) => (
-          <Attachment
-            key={attachment.tid || attachment.url}
-            handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
-            attachment={{
-              ...attachment,
-              metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-            }}
-            removeSelected={handleRemoveFailedAttachment}
-            imageMinWidth={
-              message.parentMessage &&
+          (message.attachments as any[]).map((attachment: any) => (
+            <Attachment
+              key={attachment.tid || attachment.url}
+              handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
+              attachment={{
+                ...attachment,
+                metadata: isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+              }}
+              removeSelected={handleRemoveFailedAttachment}
+              imageMinWidth={
+                message.parentMessage &&
                 message.parentMessage.attachments &&
                 message.parentMessage.attachments[0] &&
                 message.parentMessage.attachments[0].type === attachmentTypes.voice
-                ? '210px'
-                : undefined
-            }
-            borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
-            selectedFileAttachmentsIcon={fileAttachmentsIcon}
-            backgroundColor={
-              message.incoming ? incomingMessageStyles?.background || bubbleIncoming : outgoingMessageStyles?.background || bubbleOutgoing
-            }
-            selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-            selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
-            selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
-            closeMessageActions={closeMessageActions}
-            fileAttachmentWidth={fileAttachmentsBoxWidth}
-            imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-            imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-            videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-            videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-          />
-        ))
+                  ? '210px'
+                  : undefined
+              }
+              borderRadius={ownMessageOnRightSide ? borderRadius : '16px'}
+              selectedFileAttachmentsIcon={fileAttachmentsIcon}
+              backgroundColor={
+                message.incoming
+                  ? incomingMessageStyles?.background || bubbleIncoming
+                  : outgoingMessageStyles?.background || bubbleOutgoing
+              }
+              selectedFileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+              selectedFileAttachmentsTitleColor={fileAttachmentsTitleColor}
+              selectedFileAttachmentsSizeColor={fileAttachmentsSizeColor}
+              closeMessageActions={closeMessageActions}
+              fileAttachmentWidth={fileAttachmentsBoxWidth}
+              imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+              imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+              videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+              videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+            />
+          ))
         // </MessageAttachments>
       }
       {emojisPopupOpen && emojisPopupPosition && (

@@ -8,9 +8,9 @@ import { ReactComponent as VoiceIcon } from '../../../assets/svg/voiceIcon.svg'
 import { isJSON, makeUsername } from '../../../helpers/message'
 import { getClient } from '../../../common/client'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { attachmentTypes, MESSAGE_STATUS, THEME } from '../../../helpers/constants'
+import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
 import { MessageOwner, ReplyMessageText } from '../../../UIHelper'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IMessage } from '../../../types'
 import { MessageTextFormat } from '../../../messageUtils'
 // Components
@@ -43,7 +43,6 @@ interface IRepliedMessageProps {
 
 const RepliedMessage = ({
   message,
-  theme,
   handleScrollToRepliedMessage,
   ownMessageOnRightSide,
   ownRepliedMessageBackground,
@@ -66,13 +65,14 @@ const RepliedMessage = ({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
+    [THEME_COLORS.LINK_COLOR]: linkColor
   } = useColor()
 
-  const bubbleOutgoingX =
-    theme === THEME.DARK ? colors.outgoingMessageBackgroundXDark : colors.outgoingMessageBackgroundXLight
-  const bubbleIncomingX =
-    theme === THEME.DARK ? colors.incomingMessageBackgroundXDark : colors.incomingMessageBackgroundXLight
+  const bubbleOutgoingX = outgoingMessageBackgroundX
+  const bubbleIncomingX = incomingMessageBackgroundX
 
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -159,7 +159,7 @@ const RepliedMessage = ({
             : makeUsername(contactsMap[message.parentMessage!.user.id], message.parentMessage!.user, getFromContacts)}
         </MessageOwner>
 
-        <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px'>
+        <ReplyMessageText color={textPrimary} fontSize='14px' lineHeight='16px' linkColor={linkColor}>
           {!!message.parentMessage!.attachments.length &&
             message.parentMessage!.attachments[0].type === attachmentTypes.voice && (
               <VoiceIconWrapper color={accentColor} />
@@ -173,7 +173,8 @@ const RepliedMessage = ({
               contactsMap,
               getFromContacts,
               asSampleText: true,
-              accentColor
+              accentColor,
+              textSecondary
             })
           ) : (
             parentNotLinkAttachment &&
@@ -213,7 +214,7 @@ const ReplyMessageContainer = styled.div<{
   withAttachments?: boolean
   withSenderName?: boolean
   withBody?: boolean
-  backgroundColor?: string
+  backgroundColor: string
 }>`
   display: flex;
   border-left: 2px solid ${(props: any) => props.leftBorderColor || '#b8b9c2'};
@@ -228,7 +229,7 @@ const ReplyMessageContainer = styled.div<{
       : props.withSenderName
         ? '6px 0 8px'
         : '0 0 8px'};
-  background-color: ${(props) => props.backgroundColor || colors.primaryLight};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 0 4px 4px 0;
   margin-top: ${(props) => !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;

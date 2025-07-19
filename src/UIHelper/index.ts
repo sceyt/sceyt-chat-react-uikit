@@ -1,9 +1,7 @@
 import styled, { createGlobalStyle } from 'styled-components'
-import { colors } from './constants'
 import { getAvatarColors } from './avatarColors'
 import { ReactComponent as CloseSvg } from '../assets/svg/close.svg'
 import { ReactComponent as SearchSvg } from '../assets/svg/search.svg'
-import { THEME } from '../helpers/constants'
 import { IMessageStyles } from 'components/Message/Message.types'
 export function md5(inputString: string) {
   const hc = '0123456789abcdef'
@@ -194,7 +192,7 @@ export const DropdownOptionsUl = styled.ul`
 
 export const DropdownOptionLi = styled.li<{
   textColor: string
-  hoverBackground?: string
+  hoverBackground: string
   iconWidth?: string
   iconColor?: string
   margin?: string
@@ -209,7 +207,7 @@ export const DropdownOptionLi = styled.li<{
   padding: 6px 6px 6px 16px;
 
   &:hover {
-    background: ${(props) => props.hoverBackground || colors.gray0};
+    background: ${(props) => props.hoverBackground};
   }
 
   & > svg {
@@ -226,10 +224,12 @@ export const CustomSelect = styled.div<{
   minWidth?: string
   maxWidth?: string
   marginTop?: string
-  backgroundColor?: string
+  backgroundColor: string
   color: string
   placeholderColor: string
   errorColor: string
+  borderColor: string
+  disabledColor: string
 }>`
   display: flex;
   height: 40px;
@@ -237,8 +237,8 @@ export const CustomSelect = styled.div<{
   width: 100%;
   min-width: ${(props) => props.minWidth};
   max-width: ${(props) => props.maxWidth};
-  background: ${(props) => props.backgroundColor || colors.white};
-  border: ${(props) => (props.isError ? `1px solid ${props.errorColor}` : `1px solid ${colors.gray1}`)};
+  background: ${(props) => props.backgroundColor};
+  border: ${(props) => (props.isError ? `1px solid ${props.errorColor}` : `1px solid ${props.borderColor}`)};
   box-sizing: border-box;
   border-radius: 4px;
   font-style: normal;
@@ -253,7 +253,7 @@ export const CustomSelect = styled.div<{
   }
 
   &:disabled {
-    background-color: ${colors.gray1};
+    background-color: ${(props) => props.disabledColor};
   }
 
   .dropdown-wrapper {
@@ -313,12 +313,12 @@ export const CustomInput = styled.input<{
   backgroundColor: string
   errorColor: string
   borderColor: string
+  disabledColor: string
 }>`
   height: 40px;
   width: 100%;
-  background: ${(props) => (props.theme === THEME.DARK ? props.backgroundColor : colors.white)};
-  border: ${(props) =>
-    props.error ? `1px solid ${props.errorColor}` : props.theme !== THEME.DARK ? `1px solid ${colors.gray1}` : 'none'};
+  background: ${(props) => props.backgroundColor};
+  border: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `1px solid ${props.borderColor}`)};
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
@@ -333,15 +333,10 @@ export const CustomInput = styled.input<{
 
   &:focus {
     border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : 'transparent')};
-    outline: ${(props) =>
-      props.error
-        ? `1px solid ${colors.errorBlur}`
-        : props.theme !== THEME.DARK
-          ? `2px solid ${props.borderColor}`
-          : 'none'};
+    outline: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `2px solid ${props.borderColor}`)};
   }
   &:disabled {
-    background-color: ${colors.gray0};
+    background-color: ${(props) => props.disabledColor};
     opacity: 1;
     color: #383b51;
   }
@@ -388,7 +383,8 @@ export const Row = styled.div<any>`
 
 export const Button = styled.button<{
   color: string
-  backgroundColor?: string
+  backgroundColor: string
+  borderColor?: string
   borderRadius?: string
   disabled?: boolean
   margin?: string
@@ -405,9 +401,9 @@ export const Button = styled.button<{
   font-size: 15px;
   line-height: 20px;
   padding: 8px 16px;
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
   color: ${(props) => props.color};
-  border: 1px solid ${(props) => props.backgroundColor || colors.gray1};
+  border: ${(props) => (props.borderColor ? `1px solid ${props.borderColor}` : 'none')};
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
@@ -477,8 +473,7 @@ export const Popup = styled.div<{
   height?: string
   display?: string
   padding?: string
-  backgroundColor?: string
-  boxShadow?: string
+  backgroundColor: string
   isLoading?: boolean
 }>`
   position: relative;
@@ -491,8 +486,7 @@ export const Popup = styled.div<{
   display: ${(props) => props.display || 'flex'};
   flex-direction: column;
   padding: ${(props) => (props.padding ? props.padding : '22px 24px')};
-  background: ${(props) => props.backgroundColor || colors.white};
-  box-shadow: ${(props) => props.boxShadow || '4px 4px 30px rgba(0, 0, 0, 0.06)'};
+  background: ${(props) => props.backgroundColor};
   border-radius: 8px;
   box-sizing: border-box;
 
@@ -522,7 +516,7 @@ export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; p
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 
-export const PopupDescription = styled.span<{ color: string }>`
+export const PopupDescription = styled.span<{ color: string; highlightColor: string }>`
   font-style: normal;
   font-weight: normal;
   font-size: 15px;
@@ -537,7 +531,7 @@ export const PopupDescription = styled.span<{ color: string }>`
   .highlight {
     text-decoration: underline;
     font-weight: 500;
-    color: ${colors.primary};
+    color: ${(props) => props.highlightColor};
   }
 `
 
@@ -667,7 +661,7 @@ export const SwitcherLabel = styled.label`
   }
 ` */
 
-export const UploadAvatarButton = styled.button`
+export const UploadAvatarButton = styled.button<{ backgroundColor: string }>`
   display: block;
   height: 32px;
   margin-top: 8px;
@@ -675,7 +669,7 @@ export const UploadAvatarButton = styled.button`
   color: #fff;
   font-weight: 500;
   font-size: 14px;
-  background: ${colors.primary};
+  background: ${(props) => props.backgroundColor};
   border-radius: 4px;
   outline: none !important;
   cursor: pointer;
@@ -689,7 +683,7 @@ export const UploadAvatarHandler = styled.div<{ color: string }>`
 `
 
 export const StyledText = styled.span<{
-  color?: string
+  color: string
   fontWeight?: string
   fontFamily?: string
   fontStyle?: string
@@ -704,7 +698,7 @@ export const StyledText = styled.span<{
   letter-spacing: ${(props) => props.letterSpacing};
 
   &.mention {
-    color: ${(props) => props.color || colors.textColor1};
+    color: ${(props) => props.color};
     font-weight: ${(props) => props.isLastMessage && '500'};
   }
   &.bold {
@@ -728,14 +722,14 @@ export const StyledText = styled.span<{
 `
 
 export const MessageOwner = styled.h3<{
-  color?: string
+  color: string
   rtlDirection?: boolean
   fontSize?: string
   clickable?: boolean
 }>`
   margin: 0 12px 4px 0;
   white-space: nowrap;
-  color: ${(props) => props.color || colors.primary};
+  color: ${(props) => props.color};
   margin-left: ${(props) => props.rtlDirection && 'auto'};
   font-weight: 500;
   font-size: ${(props) => props.fontSize || '15px'};
@@ -760,6 +754,7 @@ export const MessageText = styled.pre<{
   outgoingMessageStyles?: IMessageStyles
   incomingMessageStyles?: IMessageStyles
   incoming: boolean
+  linkColor: string
 }>`
   display: flow-root;
   position: relative;
@@ -811,7 +806,7 @@ export const MessageText = styled.pre<{
   }
 
   & a {
-    color: ${colors.blue};
+    color: ${(props) => props.linkColor};
   }
 `
 export const ReplyMessageText = styled.span<{
@@ -820,6 +815,7 @@ export const ReplyMessageText = styled.span<{
   lineHeight?: string
   showMessageSenderName?: boolean
   color: string
+  linkColor: string
 }>`
   display: -webkit-box;
   position: relative;
@@ -838,7 +834,7 @@ export const ReplyMessageText = styled.span<{
   text-overflow: ellipsis;
 
   & a {
-    color: ${colors.blue};
+    color: ${(props) => props.linkColor};
   }
 `
 
@@ -861,11 +857,12 @@ export const ClearTypedText = styled(CloseIcon)<{ color?: string }>`
   color: ${(props) => props.color};
 `
 
-export const StyledSearchSvg = styled(SearchSvg)`
+export const StyledSearchSvg = styled(SearchSvg)<{ color?: string }>`
   cursor: pointer;
   position: absolute;
   top: 12px;
   left: ${(props) => props.left || '14px'};
+  color: ${(props) => props.color};
 `
 export const SubTitle = styled.span<{ color: string; margin?: string; fontSize?: string; lineHeight?: string }>`
   font-size: ${(props) => props.fontSize || '13px'};
@@ -875,11 +872,11 @@ export const SubTitle = styled.span<{ color: string; margin?: string; fontSize?:
   margin: ${(props) => props.margin};
 `
 
-export const AttachmentIconCont = styled.span<{ backgroundColor?: string }>`
+export const AttachmentIconCont = styled.span<{ backgroundColor: string }>`
   display: inline-flex;
   width: 40px;
   height: 40px;
-  background-color: ${(props) => props.backgroundColor || colors.primary};
+  background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
 `
 
@@ -975,6 +972,7 @@ export const UploadProgress = styled.div<{
   backgroundColor?: string
   imageMinWidth?: string
   zIndex?: number
+  borderColor: string
 }>`
   position: ${(props) => !props.positionStatic && 'absolute'};
   top: ${(props) => (props.fileAttachment ? '8px' : '0')};
@@ -1008,11 +1006,11 @@ export const UploadProgress = styled.div<{
     props.whiteBackground &&
     `
     background-color: rgba(255,255,255,0.3);
-    border: 1px solid  ${colors.gray1};
+    border: 1px solid  ${props.borderColor};
 
     ${UploadingIcon} {
         border: 4px solid rgba(238,238,238,0.8);
-        border-top: 4px solid ${colors.primary};
+        border-top: 4px solid ${props.borderColor};
     }
   `}
   ${(props) =>

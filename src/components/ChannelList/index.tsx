@@ -47,16 +47,17 @@ import {
   setUploadImageIcon
 } from '../../helpers/channelHalper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, THEME } from '../../helpers/constants'
-import { colors, device, THEME_COLORS } from '../../UIHelper/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
+import { device, THEME_COLORS } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
-import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
+import { IChannel, IContact, IContactsMap, ICreateChannel, IMember } from '../../types'
 // Components
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
 import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
+import { activeChannelMembersSelector } from 'store/member/selector'
 
 interface IChannelListProps {
   List?: FC<{
@@ -201,12 +202,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchedChannelsTitleFontSize
 }) => {
   const {
-    [THEME_COLORS.BACKGROUND]: themeBackgroundColor,
+    [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.BORDER]: borderColor
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -230,6 +231,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const activeChannelMembers = useSelector(activeChannelMembersSelector, shallowEqual)
+
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -380,11 +383,17 @@ const ChannelList: React.FC<IChannelListProps> = ({
       dispatch(setSearchedChannelsAC({ chats_groups: [], channels: [], contacts: [] }))
     }
   }, [searchValue])
+
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      getSelectedChannel(activeChannel)
+      getSelectedChannel({
+        ...activeChannel,
+        ...(activeChannelMembers && activeChannelMembers.length > 0
+          ? { members: activeChannelMembers as IMember[] }
+          : {})
+      })
     }
-  }, [activeChannel.id])
+  }, [activeChannel.id, activeChannelMembers?.length])
 
   useDidUpdate(() => {
     if (closeSearchChannels) {
@@ -425,18 +434,14 @@ const ChannelList: React.FC<IChannelListProps> = ({
       withCustomList={!!List}
       ref={channelListRef}
       borderColor={borderColor}
-      backgroundColor={backgroundColor || themeBackgroundColor}
+      backgroundColor={backgroundColor || background}
     >
       <ChannelListHeader
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
-        borderColor={sectionBackground}
+        borderColor={borderColor}
       >
-        {Profile /* || <ProfileSettings handleCloseProfile={() => setProfileIsOpen(false)} /> */}
-        {/* <ProfileCont onClick={handleOpenProfile}>
-            <Avatar image={user.avatarUrl} name={user.firstName || user.id} size={32} textSize={15} setDefaultAvatar />
-            <BottomIcon />
-          </ProfileCont> */}
+        {Profile}
         {showSearch && searchChannelsPosition === 'inline' ? (
           <ChannelSearch
             inline
@@ -449,11 +454,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             fontSize={searchChannelInputFontSize}
           />
         ) : (
-          ChannelsTitle || (
-            <ChatsTitle lightColor={textPrimary} darkColor={colors.darkModeTextColor1} theme={theme}>
-              Chats
-            </ChatsTitle>
-          )
+          ChannelsTitle || <ChatsTitle color={textPrimary}>Chats</ChatsTitle>
         )}
 
         {showCreateChannelIcon &&
@@ -482,7 +483,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
           fontSize={searchChannelInputFontSize}
         />
       )}
-      {/* <ChannelTabs /> */}
       {List ? (
         <List
           channels={channels}
@@ -674,6 +674,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
               onMouseEnter={() => setIsScrolling(true)}
               onMouseLeave={() => setIsScrolling(false)}
               className={isScrolling ? 'show-scrollbar' : ''}
+              thumbColor={surface2}
             >
               {channels.map((channel: IChannel) =>
                 ListItem ? (
@@ -845,7 +846,7 @@ const Container = styled.div<{ borderColor: string; withCustomList?: boolean; re
  `};
 `
 
-const ChannelsList = styled.div`
+const ChannelsList = styled.div<{ thumbColor: string }>`
   overflow-y: auto;
   width: 400px;
   height: 100%;
@@ -859,7 +860,7 @@ const ChannelsList = styled.div`
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -880,15 +881,14 @@ const SearchedChannelsHeader = styled.p<{ color: string; fontSize?: string }>`
 const DirectChannels = styled.div``
 const GroupChannels = styled.div``
 
-const ChatsTitle = styled.h3<{ lightColor: string; darkColor: string; theme?: string }>`
+const ChatsTitle = styled.h3<{ color: string }>`
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
   line-height: 28px;
   margin: 0 auto;
-  color: ${(props: { lightColor: string; darkColor: string; theme?: string }) =>
-    props.theme === THEME.DARK ? props.darkColor : props.lightColor};
+  color: ${(props) => props.color};
 `
 
 const NoData = styled.div<{ color: string; fontSize?: string }>`

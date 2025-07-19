@@ -10,15 +10,17 @@ import {
 import { $createMentionNode } from '../MentionNode'
 import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
-import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
+import { useSelector } from 'react-redux'
+import { themeSelector } from 'store/theme/selector'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -182,7 +184,11 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
+  } = useColor()
 
   let className = 'item'
   if (isSelected) {
@@ -198,7 +204,7 @@ function MentionsTypeaheadMenuItem({
       isActiveItem={isSelected}
       id={'typeahead-item-' + index}
       onMouseEnter={onMouseEnter}
-      activeBackgroundColor={colors.hoverBackgroundColor}
+      activeBackgroundColor={backgroundHovered}
       onClick={onClick}
     >
       <AvatarWrapper>
@@ -230,7 +236,8 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
-  const { [THEME_COLORS.BORDER]: borderColor } = useColor()
+  const theme = useSelector(themeSelector)
+  const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -278,7 +285,7 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList borderColor={borderColor}>
+      <MentionsList borderColor={borderColor} backgroundColor={background} theme={theme}>
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -411,9 +418,10 @@ export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; r
 const MentionsList = styled.ul<{
   height?: number
   hidden?: boolean
-  backgroundColor?: string
+  backgroundColor: string
   withBorder?: boolean
   borderColor: string
+  theme: string
 }>`
   position: absolute;
   bottom: 100%;
@@ -423,22 +431,23 @@ const MentionsList = styled.ul<{
   max-height: 240px;
   z-index: 200;
   padding: 2px 0 0;
-  background: ${(props) => props.backgroundColor || colors.white};
+  background: ${(props) => props.backgroundColor};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  box-shadow: ${(props) =>
+    props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
 `
 
-export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor?: string }>`
+export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
   cursor: pointer;
-  background-color: ${(props) => props.isActiveItem && (props.activeBackgroundColor || colors.hoverBackgroundColor)};
+  background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
 
   & ${UserStatus} {
     width: 10px;
