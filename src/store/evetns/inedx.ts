@@ -79,6 +79,7 @@ import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
 import store from 'store'
+import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -513,6 +514,7 @@ export default function* watchForEvents(): any {
           if (channelExists) {
             if (activeChannelId === channel.id) {
               yield put(removeMemberFromListAC([member]))
+              yield updateActiveChannelMembersRemove([member])
             }
             yield put(
               updateChannelDataAC(channel.id, {
@@ -574,6 +576,7 @@ export default function* watchForEvents(): any {
           } else {
             if (activeChannelId === channel.id) {
               yield put(removeMemberFromListAC(removedMembers))
+              yield updateActiveChannelMembersRemove(removedMembers)
             }
 
             const groupName = getChannelGroupName(channel)
@@ -610,6 +613,7 @@ export default function* watchForEvents(): any {
         if (channelExists) {
           if (activeChannelId === channel.id) {
             yield put(addMembersToListAC(addedMembers))
+            yield updateActiveChannelMembersAdd(addedMembers)
           }
           yield put(
             updateChannelDataAC(channel.id, {

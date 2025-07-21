@@ -109,7 +109,7 @@ export default (state = initialState, { type, payload }: IAction) => {
 
     case GET_ROLES_SUCCESS: {
       const { roles } = payload
-      const rolesMap = {}
+      const rolesMap: { [key: string]: IRole } = {}
       roles.forEach((role: IRole) => {
         rolesMap[role.name] = role
       })

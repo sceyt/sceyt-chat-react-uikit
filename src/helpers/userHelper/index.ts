@@ -8,7 +8,7 @@ export const setHideUserPresence = (callback: (user: IUser) => boolean) => {
   hideUserPresence = callback
 }
 
-export const usersMap = {}
+export const usersMap: { [key: string]: IUser } = {}
 
 export const updateUserOnMap = (user: IUser) => {
   usersMap[user.id] = user

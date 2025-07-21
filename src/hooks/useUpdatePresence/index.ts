@@ -37,7 +37,7 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
     if (userId && isVisible && directChannelUser) {
       if (!usersMap[userId]) {
         setUserToMap(directChannelUser as IUser)
-      } else if (usersMap[userId].presence.state !== directChannelUser.presence!.state) {
+      } else if (usersMap[userId]?.presence?.state !== directChannelUser.presence!.state) {
         updateUserOnMap(directChannelUser as IUser)
         dispatch(updateUserStatusOnChannelAC({ [directChannelUser.id]: directChannelUser }))
       }
@@ -62,7 +62,7 @@ export default function useUpdatePresence(channel: IChannel, isVisible: boolean)
       (directChannelUser.presence.state !== usersMap[directChannelUser.id].state ||
         (directChannelUser.presence.lastActiveAt &&
           new Date(directChannelUser.presence.lastActiveAt).getTime() !==
-            new Date(usersMap[directChannelUser.id].lastActiveAt).getTime()))
+            new Date(usersMap[directChannelUser.id]?.presence?.lastActiveAt || 0).getTime()))
     ) {
       dispatch(updateUserStatusOnChannelAC({ [directChannelUser.id]: directChannelUser }))
       updateUserOnMap(directChannelUser)
