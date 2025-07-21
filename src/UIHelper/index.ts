@@ -942,8 +942,7 @@ export const UploadPercent = styled.span<{
   color: #fff;
   width: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   height: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
-  //background-color: rgba(0,0,0,0.4);
-  background-color: ${(props) => props.backgroundColor};
+  background-color: ${(props) => `${props.backgroundColor}40`};
   border-radius: ${(props) =>
     props.borderRadius ? props.borderRadius : props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%'};
 }

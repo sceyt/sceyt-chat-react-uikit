@@ -52,7 +52,8 @@ const Files = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2
   } = useColor()
 
   const dispatch = useDispatch()
@@ -147,7 +148,7 @@ const Files = ({
                       text=''
                       styles={{
                         background: {
-                          fill: 'transparent'
+                          fill: `${overlayBackground2}40`
                         },
                         path: {
                           stroke: accentColor,

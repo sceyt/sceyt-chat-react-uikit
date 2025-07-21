@@ -469,7 +469,11 @@ const Attachment = ({
               withPrefix={withPrefix}
               borderColor={borderColor}
             >
-              <UploadPercent isRepliedMessage={isRepliedMessage} isDetailsView={isDetailsView}>
+              <UploadPercent
+                isRepliedMessage={isRepliedMessage}
+                isDetailsView={isDetailsView}
+                backgroundColor={overlayBackground2}
+              >
                 {isInUploadingState ? (
                   <CancelResumeWrapper onClick={handlePauseResumeUpload}>
                     {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
@@ -498,7 +502,7 @@ const Attachment = ({
                         text=''
                         styles={{
                           background: {
-                            fill: overlayBackground2
+                            fill: `${overlayBackground2}40`
                           },
                           path: {
                             // Path color
@@ -600,7 +604,7 @@ const Attachment = ({
                             text=''
                             styles={{
                               background: {
-                                fill: overlayBackground2
+                                fill: `${overlayBackground2}40`
                               },
                               path: {
                                 stroke: textOnPrimary,
@@ -757,9 +761,7 @@ const Attachment = ({
                 fileAttachment
                 borderRadius={!(attachmentThumb || (attachment.attachmentUrl && isPreview)) ? '50%' : undefined}
                 isDetailsView={isDetailsView}
-                backgroundColor={
-                  downloadingFile ? '' : attachment.attachmentUrl || attachmentThumb ? overlayBackground2 : accentColor
-                }
+                backgroundColor={overlayBackground2}
               >
                 {(isInUploadingState || downloadingFile) && (
                   <CancelResumeWrapper onClick={handlePauseResumeUpload}>
@@ -781,7 +783,7 @@ const Attachment = ({
                       text=''
                       styles={{
                         background: {
-                          fill: 'transparent'
+                          fill: `${overlayBackground2}40`
                         },
                         path: {
                           stroke: textOnPrimary,
