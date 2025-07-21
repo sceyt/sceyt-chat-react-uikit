@@ -212,7 +212,7 @@ const Details = ({
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (activeTab === channelDetailsTabs.member) {
         if (membersLoading === LOADING_STATE.LOADED) {
-          dispatch(loadMoreMembersAC(15))
+          dispatch(loadMoreMembersAC(15, activeChannel.id))
         }
       } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {
         dispatch(loadMoreAttachmentsAC(20))

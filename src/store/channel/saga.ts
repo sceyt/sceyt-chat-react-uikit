@@ -742,23 +742,6 @@ function* markMessagesRead(action: IAction): any {
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
         updateMessageOnAllMessages(messageId, updateParams)
       }
-
-      /* if (channelId === activeChannelId) {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId,
-            unreadMessageCount: channel.newMessageCount
-          })
-        )
-      } else {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId
-          })
-        )
-      } */
     }
   } catch (e) {
     log.error(e, 'Error on mark messages read')

@@ -1,5 +1,4 @@
-import { select, put } from 'redux-saga/effects'
-import { updateChannelDataAC } from '../channel/actions'
+import { select } from 'redux-saga/effects'
 import { IMember } from '../../types'
 
 // Utility functions to update active channel members
@@ -10,8 +9,9 @@ export function* updateActiveChannelMembersAdd(addedMembers: IMember[]): any {
     let updatedMembers = [...(activeChannel.members || []), ...addedMembers]
     // remove duplicates
     updatedMembers = Array.from(new Set(updatedMembers))
-    yield put(updateChannelDataAC(activeChannel.id, { members: updatedMembers }))
+    return { members: updatedMembers }
   }
+  return {}
 }
 
 export function* updateActiveChannelMembersRemove(removedMembers: IMember[]): any {
@@ -23,6 +23,7 @@ export function* updateActiveChannelMembersRemove(removedMembers: IMember[]): an
     )
     // remove duplicates
     updatedMembers = Array.from(new Set(updatedMembers))
-    yield put(updateChannelDataAC(activeChannel.id, { members: updatedMembers }))
+    return { members: updatedMembers }
   }
+  return {}
 }
