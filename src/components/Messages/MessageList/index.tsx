@@ -452,7 +452,8 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
-    [THEME_COLORS.BORDER]: border
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground
   } = useColor()
 
   const ChatClient = getClient()
@@ -1193,6 +1194,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         className={
                           (message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''
                         }
+                        highlightBg={highlightedBackground}
                       >
                         <Message
                           message={{
@@ -1540,11 +1542,11 @@ export const DropAttachmentArea = styled.div<{
   }
 `
 
-export const MessageWrapper = styled.div<{}>`
+export const MessageWrapper = styled.div<{ highlightBg: string }>`
   &.highlight {
     & .messageBody {
       transform: scale(1.1);
-      background-color: #d5d5d5;
+      background-color: ${(props) => props.highlightBg || '#d5d5d5'};
     }
   }
 `
