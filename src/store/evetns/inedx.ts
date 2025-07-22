@@ -724,6 +724,17 @@ export default function* watchForEvents(): any {
           }
           yield put(
             updateChannelDataAC(channel.id, {
+              messageCount: channelForAdd.messageCount,
+              unread: channelForAdd.unread,
+              newMessageCount: channelForAdd.newMessageCount,
+              newMentionCount: channelForAdd.newMentionCount,
+              newReactedMessageCount: channelForAdd.newReactedMessageCount,
+              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+              lastMessage: channelForAdd.lastMessage,
+              messages: channelForAdd.messages,
+              newReactions: channelForAdd.newReactions,
               userMessageReactions: [],
               lastReactedMessage: null
             })
@@ -733,6 +744,17 @@ export default function* watchForEvents(): any {
             updateSearchedChannelDataAC(
               channel.id,
               {
+                messageCount: channelForAdd.messageCount,
+                unread: channelForAdd.unread,
+                newMessageCount: channelForAdd.newMessageCount,
+                newMentionCount: channelForAdd.newMentionCount,
+                newReactedMessageCount: channelForAdd.newReactedMessageCount,
+                lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+                lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+                messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+                lastMessage: channelForAdd.lastMessage,
+                messages: channelForAdd.messages,
+                newReactions: channelForAdd.newReactions,
                 userMessageReactions: [],
                 lastReactedMessage: null
               },
@@ -780,8 +802,19 @@ export default function* watchForEvents(): any {
           }
 
           updateChannelOnAllChannels(channel.id, {
-            userMessageReactions: [],
-            lastReactedMessage: null
+            messageCount: channelForAdd.messageCount,
+            unread: channelForAdd.unread,
+            newMessageCount: channelForAdd.newMessageCount,
+            newMentionCount: channelForAdd.newMentionCount,
+            newReactedMessageCount: channelForAdd.newReactedMessageCount,
+            lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+            lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+            messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+            lastMessage: channelForAdd.lastMessage,
+            messages: channelForAdd.messages,
+            newReactions: channelForAdd.newReactions,
+            lastReactedMessage: channel.lastReactedMessage,
+            userMessageReactions: channel.userMessageReactions
           })
           updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
         }

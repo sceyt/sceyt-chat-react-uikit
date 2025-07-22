@@ -28,7 +28,7 @@ interface IProps {
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
-  messageType: string | null | undefined
+  messageType?: string | null | undefined
 }
 
 const VoiceItem = ({
