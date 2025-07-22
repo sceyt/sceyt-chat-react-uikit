@@ -9,11 +9,8 @@ import { ReactComponent as TravelingEmoji } from '../../../assets/svg/emojiTrave
 import { ReactComponent as ObjectEmoji } from '../../../assets/svg/emojiObjectIcon.svg'
 import { ReactComponent as SymbolEmoji } from '../../../assets/svg/emojiSymbolsIcon.svg'
 import { ReactComponent as FlagEmoji } from '../../../assets/svg/emojiFlagicon.svg'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getEmojisCategoryTitle } from '../../../helpers'
-import { useSelector } from 'react-redux'
-import { themeSelector } from '../../../store/theme/selector'
-import { THEME } from '../../../helpers/constants'
 import EMOJIS from '../../Emojis/emojis'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
@@ -73,12 +70,12 @@ function EmojisPopup({
 }) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.BORDER]: border
   } = useColor()
 
-  const theme = useSelector(themeSelector)
   let richTextEditor: any
   try {
     const [editor] = useLexicalComposerContext()
@@ -149,8 +146,8 @@ function EmojisPopup({
 
   return (
     <Container
-      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
-      noBorder={theme === THEME.DARK}
+      backgroundColor={backgroundSections}
+      borderColor={border}
       relativePosition={relativePosition}
       borderRadius={emojisContainerBorderRadius}
       rightSide={rightSide}
@@ -162,10 +159,7 @@ function EmojisPopup({
       emojisPopupPosition={emojisPopupPosition}
     >
       {emojisCategoryIconsPosition === 'top' && (
-        <EmojiFooter
-          borderColor={colors.hoverBackgroundColor}
-          emojisCategoryIconsPosition={emojisCategoryIconsPosition}
-        >
+        <EmojiFooter borderColor={border} emojisCategoryIconsPosition={emojisCategoryIconsPosition}>
           {EMOJIS.map((emoji) => (
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
@@ -199,7 +193,7 @@ function EmojisPopup({
                   const { array } = emojiSmallCollection
                   return array.map((emoji, i) => (
                     <Emoji
-                      hoverBackgroundColor={sectionBackground}
+                      hoverBackgroundColor={backgroundSections}
                       key={`${emoji}`}
                       className='emoji-cont'
                       onClick={() => chooseEmoji(emoji)}
@@ -227,7 +221,7 @@ function EmojisPopup({
         </AllEmojis>
       </EmojiSection>
       {emojisCategoryIconsPosition !== 'top' && (
-        <EmojiFooter>
+        <EmojiFooter borderColor={border}>
           {EMOJIS.map((emoji) => (
             <EmojiCollection
               activeCollection={activeCollection === emoji.key}
@@ -256,7 +250,7 @@ const Container = styled.div<{
   borderRadius?: string
   emojisPopupPosition?: string
   backgroundColor?: string
-  noBorder?: boolean
+  borderColor: string
 }>`
   position: ${(props) => (props.leftPosition ? 'fixed' : props.relativePosition ? 'relative' : 'absolute')};
   left: ${(props) =>
@@ -267,7 +261,7 @@ const Container = styled.div<{
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   bottom: ${(props) => props.bottomPosition};
   width: 306px;
-  border: ${(props) => (props.noBorder ? 'none' : `1px solid ${colors.gray1}`)};
+  border: ${(props) => (props.borderColor ? `1px solid ${props.borderColor}` : 'none')};
   box-sizing: border-box;
   box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
   border-radius: ${(props) => props.borderRadius || '12px'};
@@ -321,15 +315,13 @@ const AllEmojis = styled.ul`
   padding: 0 8px 8px;
   margin: 0;
 `
-const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom'; borderColor?: string }>`
+const EmojiFooter = styled.div<{ emojisCategoryIconsPosition?: 'top' | 'bottom'; borderColor: string }>`
   height: 42px;
   display: flex;
   justify-content: space-around;
   align-items: center;
-  border-top: ${(props) =>
-    props.emojisCategoryIconsPosition !== 'top' && `1px solid ${props.borderColor || colors.gray1}`};
-  border-bottom: ${(props) =>
-    props.emojisCategoryIconsPosition === 'top' && `1px solid ${props.borderColor || colors.gray1}`};
+  border-top: ${(props) => props.emojisCategoryIconsPosition !== 'top' && `1px solid ${props.borderColor}`};
+  border-bottom: ${(props) => props.emojisCategoryIconsPosition === 'top' && `1px solid ${props.borderColor}`};
   padding: 0 10px;
   & > span {
     width: 100%;

@@ -21,10 +21,11 @@ import {
 import { createPortal } from 'react-dom'
 
 import styled from 'styled-components'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
+import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
 type Func = () => void
 export function mergeRegister(...func: Array<Func>): () => void {
   return () => {
@@ -119,9 +120,10 @@ function TextFormatFloatingToolbar({
 }): JSX.Element {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
@@ -229,7 +231,12 @@ function TextFormatFloatingToolbar({
   }, [editor, updateTextFormatFloatingToolbar])
 
   return (
-    <FloatingTextFormatPopup showMenu={showMenu} ref={popupCharStylesEditorRef} className='floating-text-format-popup'>
+    <FloatingTextFormatPopup
+      showMenu={showMenu}
+      ref={popupCharStylesEditorRef}
+      className='floating-text-format-popup'
+      popupColor={backgroundSections}
+    >
       {editor.isEditable() && (
         <React.Fragment>
           <Action
@@ -239,19 +246,20 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as bold'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
               Bold
+              <ArrowDownIcon />
             </ItemNote>
             <BoldIcon />
           </Action>
 
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isItalic}
             type='button'
@@ -260,14 +268,15 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
               Italic
+              <ArrowDownIcon />
             </ItemNote>
             <ItalicIcon />
           </Action>
           <Action
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isStrikethrough}
             type='button'
@@ -276,16 +285,15 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              {' '}
-              Strikethrough{' '}
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Strikethrough <ArrowDownIcon />
             </ItemNote>
             <StrikethroughIcon />
           </Action>
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isCode}
             onClick={() => {
@@ -293,15 +301,15 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              Monospace
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Monospace <ArrowDownIcon />
             </ItemNote>
             <MonoIcon />
           </Action>
           <Action
             type='button'
             iconColor={textSecondary}
-            hoverBackgroundColor={hoverBackground}
+            hoverBackgroundColor={surface1}
             hoverIconColor={accentColor}
             isActive={isUnderline}
             onClick={() => {
@@ -309,8 +317,8 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              Underline
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Underline <ArrowDownIcon />
             </ItemNote>
             <UnderlineIcon />
           </Action>
@@ -476,9 +484,9 @@ export default function FloatingTextFormatToolbarPlugin({
   return useFloatingTextFormatToolbar(editor, anchorElem)
 }
 
-const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean }>`
+const FloatingTextFormatPopup = styled.div<{ showMenu?: boolean; popupColor?: string }>`
   display: flex;
-  background: #fff;
+  background: ${(props) => props.popupColor};
   vertical-align: middle;
   position: absolute;
   top: 0;
@@ -600,7 +608,7 @@ const Action = styled.button<{
   color?: string
   iconColor: string
   order?: number
-  hoverIconColor?: string
+  hoverIconColor: string
   hoverBackgroundColor: string
   isActive?: boolean
 }>`
@@ -619,7 +627,7 @@ const Action = styled.button<{
   ${(props) =>
     props.isActive &&
     `
-    color: ${props.hoverIconColor || colors.primary};
+    color: ${props.hoverIconColor};
     background-color: ${props.hoverBackgroundColor};
   `}
 
@@ -628,7 +636,7 @@ const Action = styled.button<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverIconColor || colors.primary};
+    color: ${(props) => props.hoverIconColor};
     background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {

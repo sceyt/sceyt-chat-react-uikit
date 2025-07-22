@@ -25,31 +25,50 @@ export interface IUploadTask {
 
 export interface ICustomUploader {
   // eslint-disable-next-line no-unused-vars
-  upload: (attachment: IAttachment, uploadTask: IUploadTask) => void
+  upload: (attachment: IAttachment, uploadTask: IUploadTask, messageType: string | null | undefined) => void
   // eslint-disable-next-line no-unused-vars
-  download: (uri: string, download: boolean, progressCallback?: (progress: any) => void) => Promise<any>
+  download: (
+    uri: string,
+    download: boolean,
+    progressCallback: (progress: any) => void,
+    messageType: string | null | undefined
+  ) => Promise<any>
   // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void
 }
 
 export type ThemeColors =
   | 'accent'
-  | 'background'
-  | 'sectionBackground'
-  | 'focusBackground'
-  | 'hoverBackground'
+  | 'avatarBrand1'
+  | 'avatarBrand2'
+  | 'avatarBrand3'
+  | 'avatarBrand4'
   | 'textPrimary'
   | 'textSecondary'
   | 'textFootnote'
   | 'textOnPrimary'
   | 'border'
-  | 'iconPrimary'
   | 'iconInactive'
-  | 'surface1'
-  | 'surface2'
+  | 'iconPrimary'
+  | 'background'
+  | 'backgroundSections'
+  | 'backgroundFocused'
+  | 'backgroundHovered'
   | 'overlayBackground'
   | 'overlayBackground2'
-  | 'error'
+  | 'surface1'
+  | 'surface2'
+  | 'surfaceX'
+  | 'warning'
+  | 'attention'
+  | 'onlineStatus'
+  | 'success'
+  | 'outgoingMessageBackground'
+  | 'outgoingMessageBackgroundX'
+  | 'incomingMessageBackground'
+  | 'incomingMessageBackgroundX'
+  | 'linkColor'
+  | 'highlightedBackground'
 
 export interface ThemeColor {
   light: string
@@ -58,9 +77,7 @@ export interface ThemeColor {
 }
 
 export interface SceytChatUIKitTheme {
-  colors: {
-    [key in ThemeColors]?: ThemeColor
-  }
+  colors: Partial<Record<ThemeColors, ThemeColor>>
 }
 
 export type ThemeMode = 'light' | 'dark' | string

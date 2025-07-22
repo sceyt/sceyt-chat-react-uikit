@@ -27,6 +27,7 @@ import { getClient } from '../../common/client'
 import { sendTextMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import log from 'loglevel'
+import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from './helpers'
 
 function* getMembers(action: IAction): any {
   try {
@@ -51,11 +52,11 @@ function* getMembers(action: IAction): any {
   }
 }
 
-function* loadMoreMembers(action: IAction) {
+function* loadMoreMembers(action: IAction): any {
   try {
     const { payload } = action
     const { limit } = payload
-
+    const { channelId } = payload
     const { membersQuery } = query
 
     if (limit && membersQuery) {
@@ -67,6 +68,9 @@ function* loadMoreMembers(action: IAction) {
 
     yield put(addMembersToListAC(members))
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
+
+    const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
+    yield put(updateChannelDataAC(channelId, { ...updateChannelData }))
   } catch (e) {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
@@ -104,7 +108,14 @@ function* addMembers(action: IAction): any {
       }
       yield put(addMembersToListAC(addedMembers))
       updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount + addedMembers.length })
-      yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount + addedMembers.length }))
+
+      const updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
+      yield put(
+        updateChannelDataAC(channel.id, {
+          memberCount: channel.memberCount + addedMembers.length,
+          ...updateChannelData
+        })
+      )
     }
   } catch (e) {
     log.error('error on add members... ', e)
@@ -136,7 +147,14 @@ function* kickMemberFromChannel(action: IAction): any {
     }
     yield put(removeMemberFromListAC(removedMembers))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
-    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount - removedMembers.length }))
+
+    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+    yield put(
+      updateChannelDataAC(channel.id, {
+        memberCount: channel.memberCount - removedMembers.length,
+        ...updateChannelData
+      })
+    )
   } catch (e) {
     // yield put(setErrorNotification(e.message))
   }
@@ -151,7 +169,14 @@ function* blockMember(action: IAction): any {
     const removedMembers = yield call(channel.blockMembers, [memberId])
     yield put(removeMemberFromListAC(removedMembers))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
-    yield put(updateChannelDataAC(channel.id, { memberCount: channel.memberCount - removedMembers.length }))
+
+    const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+    yield put(
+      updateChannelDataAC(channel.id, {
+        memberCount: channel.memberCount - removedMembers.length,
+        ...updateChannelData
+      })
+    )
   } catch (e) {
     // yield put(setErrorNotification(e.message))
   }

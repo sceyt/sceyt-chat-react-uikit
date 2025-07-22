@@ -4,8 +4,8 @@ import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 
 const useColors = (): Record<string, string> => {
   const themeReducer = useSelector((state: any) => state.ThemeReducer)
-  const currentThemeMode = themeReducer.theme || defaultThemeMode
-  const theme = themeReducer.newTheme || defaultTheme
+  const currentThemeMode = themeReducer?.theme || defaultThemeMode
+  const theme = themeReducer?.newTheme || defaultTheme
 
   return useMemo(() => {
     const colorsWithMode: Record<string, string> = {}

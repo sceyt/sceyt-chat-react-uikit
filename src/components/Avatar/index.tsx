@@ -5,7 +5,10 @@ import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUse
 import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/avatar.svg'
 // Helpers
 import { generateAvatarColor } from '../../UIHelper'
-import { colors } from '../../UIHelper/constants'
+import { useColor } from '../../hooks'
+import { THEME_COLORS } from '../../UIHelper/constants'
+import { useSelector } from 'react-redux'
+import { themeSelector } from 'store/theme/selector'
 
 interface IProps {
   image?: string | null
@@ -35,6 +38,8 @@ const Avatar: React.FC<IProps> = ({
   handleAvatarClick
   // customAvatarColors
 }) => {
+  const theme = useSelector(themeSelector) as 'light' | 'dark'
+  const { [THEME_COLORS.ICON_INACTIVE]: iconInactive } = useColor()
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
   if (!image && name) {
@@ -68,12 +73,13 @@ const Avatar: React.FC<IProps> = ({
       onClick={handleAvatarClick}
       cursorPointer={!!handleAvatarClick}
       borderRadius={borderRadius}
+      theme={theme}
     >
       {isDeletedUserAvatar ? (
-        DeletedIcon || <DeletedAvatarWrapper color={colors.deleteUserIconBackground} />
+        DeletedIcon || <DeletedAvatarWrapper color={iconInactive} />
       ) : !image ? (
         setDefaultAvatar ? (
-          DefaultAvatar || <DefaultAvatarWrapper color={colors.defaultAvatarBackground} />
+          DefaultAvatar || <DefaultAvatarWrapper color={iconInactive} />
         ) : (
           <span>{avatarText}</span>
         )
@@ -95,6 +101,7 @@ interface ContainerProps {
   border?: string
   borderRadius?: string
   cursorPointer?: boolean
+  theme: 'light' | 'dark'
 }
 
 interface AvatarImageProps {
@@ -115,7 +122,8 @@ export const Container = styled.div<ContainerProps>`
   color: #fff;
   overflow: hidden;
   margin: ${(props) => (props.marginAuto ? 'auto' : '')};
-  ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+  ${(props: ContainerProps) =>
+    !props.isImage ? `background-color:${generateAvatarColor(props.avatarName, props.theme)};` : ''};
   cursor: ${(props) => props.cursorPointer && 'pointer'};
 
   span {
@@ -142,10 +150,10 @@ export const AvatarImage = styled.img<AvatarImageProps>`
   object-fit: cover;
 `
 
-export const DefaultAvatarWrapper = styled(DefaultAvatarIcon)`
-  color: ${(props) => props.color || colors.defaultAvatarBackground};
+export const DefaultAvatarWrapper = styled(DefaultAvatarIcon)<{ color: string }>`
+  color: ${(props) => props.color};
 `
 
-export const DeletedAvatarWrapper = styled(DeletedAvatarIcon)`
-  color: ${(props) => props.color || colors.deleteUserIconBackground};
+export const DeletedAvatarWrapper = styled(DeletedAvatarIcon)<{ color: string }>`
+  color: ${(props) => props.color};
 `

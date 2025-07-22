@@ -8,7 +8,6 @@ interface IProps {
   checkedBorderColor: string
   borderColor: string
   border?: string
-  tickColor?: string
   borderRadius?: string
   size?: string
   disabled?: boolean
@@ -55,7 +54,6 @@ const CustomLabel = styled.label<{
   border?: string
   borderColor: string
   checkedBorderColor: string
-  tickColor?: string
   borderRadius?: string
   isChecked: boolean
 }>`

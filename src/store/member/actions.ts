@@ -54,10 +54,10 @@ export function updateMembersPresenceAC(usersMap: { [key: string]: IUser }) {
   }
 }
 
-export function loadMoreMembersAC(limit: number) {
+export function loadMoreMembersAC(limit: number, channelId: string) {
   return {
     type: LOAD_MORE_MEMBERS,
-    payload: { limit }
+    payload: { limit, channelId }
   }
 }
 
