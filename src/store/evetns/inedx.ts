@@ -1085,7 +1085,20 @@ export default function* watchForEvents(): any {
         // yield put(setChannelUnreadCount(0, channel.id));
         if (channel) {
           const updatedChannel = JSON.parse(JSON.stringify(channel))
-          yield put(updateChannelDataAC(channel.id, updatedChannel))
+          yield put(
+            updateChannelDataAC(channel.id, {
+              lastMessage: channel.lastMessage,
+              newMessageCount: channel.newMessageCount,
+              newMentionCount: channel.newMentionCount,
+              unread: channel.unread,
+              newReactedMessageCount: channel.newReactedMessageCount,
+              newReactions: channel.newReactions,
+              lastReactedMessage: channel.lastReactedMessage,
+              lastReceivedMsgId: channel.lastReceivedMsgId,
+              lastDisplayedMessageId: channel.lastDisplayedMessageId,
+              messageRetentionPeriod: channel.messageRetentionPeriod
+            })
+          )
           updateChannelOnAllChannels(channel.id, updatedChannel)
         }
         break
