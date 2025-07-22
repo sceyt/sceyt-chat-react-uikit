@@ -351,6 +351,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     key={channel.id}
                     onClick={() => handleChannelSelect(!isSelected, channel)}
                     disabled={selectedChannels.length >= 5 && !isSelected}
+                    backgroundHover={backgroundHovered}
                   >
                     <Avatar
                       name={
@@ -442,8 +443,7 @@ export default ForwardMessagePopup
 const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number; thumbColor: string }>`
   overflow-y: auto;
   margin-top: 16px;
-  max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 64}px)`};
-  padding-right: 22px;
+  max-height: ${(props) => `calc(100% - ${props.selectedChannelsHeight + 82}px)`};
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -465,8 +465,9 @@ const ForwardChannelsCont = styled.div<{ selectedChannelsHeight: number; thumbCo
 const ChannelItem = styled.div<{ backgroundHover?: string; disabled?: boolean }>`
   display: flex;
   align-items: center;
-  margin-bottom: 8px;
+  padding: 8px 12px;
   cursor: pointer;
+  border-radius: 8px;
   &:hover {
     background-color: ${(props) => props.backgroundHover};
   }

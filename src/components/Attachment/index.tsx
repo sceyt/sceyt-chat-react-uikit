@@ -68,6 +68,7 @@ interface AttachmentPops {
   imageAttachmentMaxHeight?: number
   videoAttachmentMaxWidth?: number
   videoAttachmentMaxHeight?: number
+  messageType?: string | null | undefined
 }
 
 const Attachment = ({
@@ -90,7 +91,8 @@ const Attachment = ({
   imageAttachmentMaxWidth,
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
-  videoAttachmentMaxHeight
+  videoAttachmentMaxHeight,
+  messageType
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -187,7 +189,7 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(attachment.url, false).then((url) => {
+        customDownloader(attachment.url, false, () => {}, messageType).then((url) => {
           downloadImage(url)
         })
       } else {
@@ -252,12 +254,18 @@ const Attachment = ({
   const handleDownloadFileToDevice = (attachment: IAttachment) => {
     setDownloadingFile(true)
     setDownloadIsCancelled(false)
-    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
-      const loadedRes = progress.loaded && progress.loaded / progress.total
-      const uploadPercent = loadedRes && loadedRes * 100
-      setProgress(uploadPercent > 3 ? uploadPercent : 3)
-      setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-    })
+    downloadFile(
+      attachment,
+      true,
+      handleCompleteDownload,
+      (progress) => {
+        const loadedRes = progress.loaded && progress.loaded / progress.total
+        const uploadPercent = loadedRes && loadedRes * 100
+        setProgress(uploadPercent > 3 ? uploadPercent : 3)
+        setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+      },
+      messageType
+    )
   }
 
   const handleDeleteSelectedAttachment = (attachmentTid: string) => {
@@ -271,12 +279,17 @@ const Attachment = ({
       if (!attachment.attachmentUrl) {
         setDownloadingFile(true)
       }
-      const urlPromise = customDownloader(attachment.url, true, (progress) => {
-        const loadedRes = progress.loaded && progress.loaded / progress.total
-        const uploadPercent = loadedRes && loadedRes * 100
-        setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
-        setProgress(uploadPercent)
-      })
+      const urlPromise = customDownloader(
+        attachment.url,
+        true,
+        (progress) => {
+          const loadedRes = progress.loaded && progress.loaded / progress.total
+          const uploadPercent = loadedRes && loadedRes * 100
+          setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+          setProgress(uploadPercent)
+        },
+        messageType
+      )
       setDownloadFilePromise(attachment.id!, urlPromise)
       const result = await urlPromise
       const url = URL.createObjectURL(result.Body)
@@ -335,7 +348,7 @@ const Attachment = ({
               setIsCached(false)
               setDownloadingFile(true)
               if (customDownloader) {
-                customDownloader(attachment.url, false).then(async (url) => {
+                customDownloader(attachment.url, false, () => {}, messageType).then(async (url) => {
                   downloadImage(url)
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.url, response)
@@ -367,7 +380,7 @@ const Attachment = ({
           log.info('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
             setDownloadingFile(true)
-            customDownloader(attachment.url, false).then(async (url) => {
+            customDownloader(attachment.url, false, () => {}, messageType).then(async (url) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.url, response)

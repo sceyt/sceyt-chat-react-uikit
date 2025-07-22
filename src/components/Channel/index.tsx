@@ -255,7 +255,8 @@ const Channel: React.FC<IChannelProps> = ({
     [THEME_COLORS.ONLINE_STATUS]: onlineStatus,
     [THEME_COLORS.BACKGROUND_FOCUSED]: backgroundFocused,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const dispatch = useDispatch()
@@ -408,7 +409,7 @@ const Channel: React.FC<IChannelProps> = ({
             (hideUserPresence(directChannelUser)
               ? ''
               : directChannelUser.presence && directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={onlineStatus} />
+              <UserStatus backgroundColor={onlineStatus} borderColor={background} />
             )}
         </AvatarWrapper>
       )}
@@ -416,6 +417,7 @@ const Channel: React.FC<IChannelProps> = ({
         theme={theme}
         avatar={showAvatar}
         isMuted={channel.muted}
+        isPinned={!!channel.pinnedAt}
         statusWidth={statusWidth}
         uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
         subjectFontSize={channelSubjectFontSize}
@@ -641,11 +643,13 @@ export const ChannelInfo = styled.div<{
   subjectLineHeight?: string
   subjectColor: string
   avatarSize?: number
+  isPinned?: boolean
 }>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
-  max-width: ${(props) => (props.avatarSize ? `calc(100% - ${props.avatarSize + 52}px)` : 'calc(100% - 102px)')};
+  max-width: ${(props) =>
+    props.avatarSize ? `calc(100% - ${props.avatarSize + 52}px)` : `calc(100% - ${props.isPinned ? 92 : 72}px)`};
 
   h3 {
     display: inline-block;
@@ -699,7 +703,7 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const UserStatus = styled.span<{ backgroundColor?: string }>`
+export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
   width: 14px;
   height: 14px;
@@ -707,7 +711,7 @@ export const UserStatus = styled.span<{ backgroundColor?: string }>`
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
-  border: 2.5px solid #ffffff;
+  border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
 `
 

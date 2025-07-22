@@ -11,6 +11,7 @@ import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { base64ToToDataURL } from '../../helpers/resizeImage'
 import { useColor } from 'hooks'
+import { THEME_COLORS } from 'UIHelper/constants'
 // import { CircularProgressbar } from 'react-circular-progressbar'
 // import { ProgressWrapper } from '../Attachment'
 
@@ -44,7 +45,11 @@ const VideoPreview = memo(function VideoPreview({
   isDetailsView,
   setVideoIsReadyToSend
 }: IVideoPreviewProps) {
-  const { textPrimary, border } = useColor()
+  const {
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+  } = useColor()
   // const { [THEME_COLORS.TEXT_PRIMARY]: background } = useSelector(themeSelector)
   // const VideoPreview =
   const [videoDuration, setVideoDuration] = useState(0)
@@ -238,7 +243,12 @@ const VideoPreview = memo(function VideoPreview({
               <PlayIcon />
             </VideoPlayButton>
           )}
-          <VideoTime isDetailsView={isDetailsView} isRepliedMessage={isPreview || isRepliedMessage} color={textPrimary}>
+          <VideoTime
+            isDetailsView={isDetailsView}
+            isRepliedMessage={isPreview || isRepliedMessage}
+            color={textOnPrimary}
+            messageTimeBackgroundColor={overlayBackground2}
+          >
             {!isRepliedMessage && !isPreview && <VideoCamIcon />}
             {videoCurrentTime}
           </VideoTime>
@@ -260,7 +270,12 @@ const VideoControls = styled.div`
   justify-content: center;
 `
 
-const VideoTime = styled.div<{ isRepliedMessage?: boolean; isDetailsView?: boolean; color: string }>`
+const VideoTime = styled.div<{
+  isRepliedMessage?: boolean
+  isDetailsView?: boolean
+  color: string
+  messageTimeBackgroundColor: string
+}>`
   position: absolute;
   top: ${(props) => (props.isRepliedMessage ? '3px' : props.isDetailsView ? undefined : '8px')};
   bottom: ${(props) => (props.isDetailsView ? '8px' : undefined)};
@@ -270,7 +285,7 @@ const VideoTime = styled.div<{ isRepliedMessage?: boolean; isDetailsView?: boole
   align-items: center;
   border-radius: 16px;
   padding: ${(props) => (props.isRepliedMessage ? '0 3px' : '4px 6px')};
-  background-color: rgba(1, 1, 1, 0.3);
+  background-color: ${(props) => `${props.messageTimeBackgroundColor}40`};
   line-height: 14px;
   color: ${(props) => props.color};
 

@@ -51,7 +51,8 @@ const ContactItem: React.FC<IChannelProps> = ({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.ONLINE_STATUS]: online,
-    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const getFromContacts = getShowOnlyContactUsers()
@@ -81,7 +82,7 @@ const ContactItem: React.FC<IChannelProps> = ({
             (hideUserPresence(contact.user)
               ? ''
               : contact.user.presence && contact.user.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={online} />
+              <UserStatus backgroundColor={online} borderColor={background} />
             )}
         </AvatarWrapper>
       )}
@@ -154,7 +155,7 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const UserStatus = styled.span<{ backgroundColor?: string }>`
+export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
   width: 14px;
   height: 14px;
@@ -162,6 +163,6 @@ export const UserStatus = styled.span<{ backgroundColor?: string }>`
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
-  border: 2.5px solid #ffffff;
+  border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
 `

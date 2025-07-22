@@ -43,6 +43,7 @@ interface IProps {
   currentMediaFile: IMedia
   allowEditDeleteIncomingMessage?: boolean
   attachmentsPreview?: IAttachmentProperties
+  messageType: string | null | undefined
 }
 
 const SliderPopup = ({
@@ -51,9 +52,11 @@ const SliderPopup = ({
   mediaFiles,
   currentMediaFile,
   allowEditDeleteIncomingMessage,
-  attachmentsPreview
+  attachmentsPreview,
+  messageType
 }: IProps) => {
-  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2 } =
+    useColor()
 
   const dispatch = useDispatch()
 
@@ -116,15 +119,21 @@ const SliderPopup = ({
     delete stateCopy[attachmentId]
     setDownloadingFilesMap(stateCopy)
   }
-  const handleDownloadFile = (attachment: IAttachment) => {
+  const handleDownloadFile = (attachment: IAttachment, messageType: string | null | undefined) => {
     if (attachment.id) {
       setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent: 1 } }))
     }
-    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
-      const loadedRes = progress.loaded && progress.loaded / progress.total
-      const uploadPercent = loadedRes && loadedRes * 100
-      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
-    })
+    downloadFile(
+      attachment,
+      true,
+      handleCompleteDownload,
+      (progress) => {
+        const loadedRes = progress.loaded && progress.loaded / progress.total
+        const uploadPercent = loadedRes && loadedRes * 100
+        setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
+      },
+      messageType
+    )
   }
 
   const handleClicks = (e: any) => {
@@ -215,7 +224,7 @@ const SliderPopup = ({
             }
           } else {
             if (customDownloader) {
-              customDownloader(currentFile.url, false)
+              customDownloader(currentFile.url, false, () => {}, messageType)
                 .then(async (url) => {
                   const response = await fetch(url)
                   setAttachmentToCache(currentFile.url, response)
@@ -298,7 +307,7 @@ const SliderPopup = ({
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentMediaFile.url, false).then(async (url) => {
+            customDownloader(currentMediaFile.url, false, () => {}, messageType).then(async (url) => {
               const response = await fetch(url)
               setAttachmentToCache(currentMediaFile.url, response)
               if (currentMediaFile.type === 'image') {
@@ -362,7 +371,7 @@ const SliderPopup = ({
           </Info>
         </FileInfo>
         <ActionsWrapper>
-          <IconWrapper onClick={() => handleDownloadFile(currentFile)} color={textOnPrimary}>
+          <IconWrapper onClick={() => handleDownloadFile(currentFile, messageType)} color={textOnPrimary}>
             {currentFile && downloadingFilesMap[currentFile.id] ? (
               <ProgressWrapper>
                 <CircularProgressbar
@@ -374,7 +383,7 @@ const SliderPopup = ({
                   text=''
                   styles={{
                     background: {
-                      fill: 'transparent'
+                      fill: `${overlayBackground2}40`
                     },
                     path: {
                       stroke: textOnPrimary,

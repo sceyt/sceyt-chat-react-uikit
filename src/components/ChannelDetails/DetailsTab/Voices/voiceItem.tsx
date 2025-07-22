@@ -28,6 +28,7 @@ interface IProps {
   voicePreviewTitleColor?: string
   voicePreviewDateAndTimeColor?: string
   voicePreviewHoverBackgroundColor?: string
+  messageType: string | null | undefined
 }
 
 const VoiceItem = ({
@@ -38,7 +39,8 @@ const VoiceItem = ({
   voicePreviewPauseHoverIcon,
   voicePreviewTitleColor,
   voicePreviewDateAndTimeColor,
-  voicePreviewHoverBackgroundColor
+  voicePreviewHoverBackgroundColor,
+  messageType
 }: IProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -99,7 +101,7 @@ const VoiceItem = ({
   }, [playingAudioId])
   useEffect(() => {
     if (customDownloader) {
-      customDownloader(file.url, false).then((url) => {
+      customDownloader(file.url, false, () => {}, messageType).then((url) => {
         setFileUrl(url)
       })
     } else {
