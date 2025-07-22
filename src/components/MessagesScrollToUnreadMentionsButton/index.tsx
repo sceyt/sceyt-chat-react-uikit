@@ -1,25 +1,25 @@
 import styled from 'styled-components'
 import { useDispatch, useSelector } from 'react-redux'
-import React from 'react'
+import React, { useEffect } from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'
 import { getMessagesAC } from '../../store/message/actions'
+import { getChannelMentionsAC, markMessagesAsReadAC, updateChannelDataAC } from '../../store/channel/actions'
 import {
-  activeChannelMessagesSelector,
   sendMessageInputHeightSelector,
-  showScrollToNewMessageButtonSelector
+  showScrollToNewMessageButtonSelector,
+  activeChannelMessagesSelector
 } from '../../store/message/selector'
 import { themeSelector } from '../../store/theme/selector'
 // Assets
-import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
+import { ReactComponent as MentionIcon } from '../../assets/svg/mention.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
-import { markMessagesAsReadAC } from 'store/channel/actions'
 
-interface MessagesScrollToBottomButtonProps {
+interface MessagesScrollToUnreadMentionsButtonProps {
   buttonIcon?: JSX.Element
   buttonWidth?: string
   buttonHeight?: string
@@ -37,7 +37,7 @@ interface MessagesScrollToBottomButtonProps {
   unreadCountBackgroundColor?: string
 }
 
-const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> = ({
+const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMentionsButtonProps> = ({
   buttonIcon,
   buttonWidth,
   buttonHeight,
@@ -61,9 +61,17 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
   const messages = useSelector(activeChannelMessagesSelector) || []
+
   const handleScrollToBottom = () => {
-    dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
-    handleScrollToRepliedMessage(channel.lastMessage.id)
+    if (channel.newMentionCount >= 3 && (!channel.mentionsIds || channel.mentionsIds.length < 3)) {
+      dispatch(getChannelMentionsAC(channel.id))
+    }
+
+    if (channel.mentionsIds && channel.mentionsIds.length) {
+      handleScrollToRepliedMessage(channel.mentionsIds[0])
+      dispatch(markMessagesAsReadAC(channel.id, [channel.mentionsIds[0]]))
+      dispatch(updateChannelDataAC(channel.id, { mentionsIds: channel.mentionsIds.slice(1) }))
+    }
   }
   const handleScrollToRepliedMessage = async (messageId: string) => {
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
@@ -84,9 +92,15 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
     }
   }
 
+  useEffect(() => {
+    if (channel.newMentionCount && (!channel.mentionsIds || channel.mentionsIds.length < 3)) {
+      dispatch(getChannelMentionsAC(channel.id))
+    }
+  }, [channel.newMentionCount])
+
   return (
     <React.Fragment>
-      {showScrollToNewMessageButton && (
+      {channel.newMentionCount ? (
         <BottomButton
           theme={theme}
           width={buttonWidth}
@@ -99,9 +113,10 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
           onClick={handleScrollToBottom}
           bottomOffset={sendMessageInputHeight}
           bottomPosition={bottomPosition}
+          showsUnreadMentionsButton={!!showScrollToNewMessageButton}
           rightPosition={rightPosition}
         >
-          {!!(channel.newMessageCount && channel.newMessageCount > 0) && (
+          {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
             <UnreadCount
               width={unreadCountWidth}
               height={unreadCountHeight}
@@ -110,17 +125,17 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
               backgroundColor={accentColor}
               isMuted={channel.muted}
             >
-              {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
+              {channel.newMentionCount ? (channel.newMentionCount > 99 ? '99+' : channel.newMentionCount) : ''}
             </UnreadCount>
           )}
-          {buttonIcon || <BottomIcon />}
+          {buttonIcon || <MentionIcon />}
         </BottomButton>
-      )}
+      ) : null}
     </React.Fragment>
   )
 }
 
-export default MessagesScrollToBottomButton
+export default MessagesScrollToUnreadMentionsButton
 
 const BottomButton = styled.div<{
   theme?: string
@@ -134,9 +149,15 @@ const BottomButton = styled.div<{
   bottomOffset: number
   bottomPosition?: number
   rightPosition?: number
+  showsUnreadMentionsButton?: boolean
 }>`
   position: absolute;
-  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition === undefined ? 45 : props.bottomPosition)}px`};
+  bottom: ${(props) =>
+    `${
+      props.bottomOffset +
+      (props.bottomPosition === undefined ? 45 : props.bottomPosition) +
+      (props.showsUnreadMentionsButton ? 60 : 0)
+    }px`};
   right: ${(props) => `${props.rightPosition === undefined ? 16 : props.rightPosition}px`};
   margin-right: 16px;
   display: flex;

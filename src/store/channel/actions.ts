@@ -58,7 +58,8 @@ import {
   UPDATE_SEARCHED_CHANNEL_DATA,
   UPDATE_USER_STATUS_ON_CHANNEL,
   WATCH_FOR_EVENTS,
-  SWITCH_RECORDING_INDICATOR
+  SWITCH_RECORDING_INDICATOR,
+  GET_CHANNEL_MENTIONS
 } from './constants'
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
@@ -525,5 +526,12 @@ export function watchForEventsAC() {
 export function destroySession() {
   return {
     type: DESTROY_SESSION
+  }
+}
+
+export function getChannelMentionsAC(channelId: string) {
+  return {
+    type: GET_CHANNEL_MENTIONS,
+    payload: { channelId }
   }
 }

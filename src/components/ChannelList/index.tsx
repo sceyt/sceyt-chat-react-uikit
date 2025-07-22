@@ -19,6 +19,7 @@ import { connectionStatusSelector, contactsMapSelector } from '../../store/user/
 import {
   addChannelAC,
   createChannelAC,
+  getChannelMentionsAC,
   getChannelsAC,
   loadMoreChannels,
   removeChannelAC,
@@ -384,6 +385,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
+      dispatch(getChannelMentionsAC(activeChannel.id))
       getSelectedChannel(activeChannel)
     }
   }, [activeChannel && activeChannel.members && activeChannel.members.length])

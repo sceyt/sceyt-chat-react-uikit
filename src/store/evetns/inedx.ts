@@ -697,12 +697,14 @@ export default function* watchForEvents(): any {
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
           const channelForAdd = JSON.parse(JSON.stringify(channel))
+
           yield put(addChannelAC(channelForAdd))
           if (!channelExists) {
             yield call(setChannelInMap, channel)
           } else if (!message.repliedInThread) {
             yield put(updateChannelLastMessageAC(message, channelForAdd))
           }
+
           if (channel.id === activeChannelId) {
             if (!getHasNextCached()) {
               yield put(addMessageAC(message))
