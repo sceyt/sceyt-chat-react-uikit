@@ -25,6 +25,7 @@ import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
+import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
 type Func = () => void
 export function mergeRegister(...func: Array<Func>): () => void {
   return () => {
@@ -120,9 +121,9 @@ function TextFormatFloatingToolbar({
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const popupCharStylesEditorRef = useRef<HTMLDivElement | null>(null)
@@ -249,8 +250,9 @@ function TextFormatFloatingToolbar({
             hoverIconColor={accentColor}
             isActive={isBold}
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
               Bold
+              <ArrowDownIcon />
             </ItemNote>
             <BoldIcon />
           </Action>
@@ -266,8 +268,9 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text as italics'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
               Italic
+              <ArrowDownIcon />
             </ItemNote>
             <ItalicIcon />
           </Action>
@@ -282,9 +285,8 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Format text with a strikethrough'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              {' '}
-              Strikethrough{' '}
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Strikethrough <ArrowDownIcon />
             </ItemNote>
             <StrikethroughIcon />
           </Action>
@@ -299,8 +301,8 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              Monospace
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Monospace <ArrowDownIcon />
             </ItemNote>
             <MonoIcon />
           </Action>
@@ -315,8 +317,8 @@ function TextFormatFloatingToolbar({
             }}
             aria-label='Insert code block'
           >
-            <ItemNote disabledColor={textSecondary} bgColor={surface2} direction='top'>
-              Underline
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Underline <ArrowDownIcon />
             </ItemNote>
             <UnderlineIcon />
           </Action>

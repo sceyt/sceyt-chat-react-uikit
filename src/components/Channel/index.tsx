@@ -598,41 +598,6 @@ export interface UnreadCountProps {
   fontSize?: string
 }
 
-const Container = styled.div<{
-  selectedChannel: boolean
-  selectedChannelLeftBorder?: string
-  selectedBackgroundColor: string
-  channelsPaddings?: string
-  selectedChannelPaddings?: string
-  channelsMargin?: string
-  selectedChannelBorderRadius?: string
-  theme?: string
-  hoverBackground?: string
-}>`
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  background-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : 'inherit')};
-  border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
-  // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
-  padding: ${(props) =>
-    props.selectedChannel
-      ? props.selectedChannelPaddings || props.channelsPaddings || '8px'
-      : props.channelsPaddings || '8px'};
-  margin: ${(props) => props.channelsMargin || '0 8px'};
-  border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
-
-  transition: all 0.2s;
-  &:hover {
-    ${({ selectedChannel, hoverBackground }) =>
-      !selectedChannel &&
-      `
-      background-color: ${hoverBackground};
-    `}
-  }
-`
-
 export const ChannelInfo = styled.div<{
   statusWidth: number
   avatar?: boolean
@@ -705,14 +670,58 @@ export const AvatarWrapper = styled.div`
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   right: 0;
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
   border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
+`
+const Container = styled.div<{
+  selectedChannel: boolean
+  selectedChannelLeftBorder?: string
+  selectedBackgroundColor: string
+  channelsPaddings?: string
+  selectedChannelPaddings?: string
+  channelsMargin?: string
+  selectedChannelBorderRadius?: string
+  theme?: string
+  hoverBackground?: string
+}>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  background-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : 'inherit')};
+  border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
+  // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
+  padding: ${(props) =>
+    props.selectedChannel
+      ? props.selectedChannelPaddings || props.channelsPaddings || '8px'
+      : props.channelsPaddings || '8px'};
+  margin: ${(props) => props.channelsMargin || '0 8px'};
+  border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
+
+  transition: all 0.2s;
+  &:hover {
+    ${({ selectedChannel, hoverBackground }) =>
+      !selectedChannel &&
+      `
+      background-color: ${hoverBackground};
+    `}
+    ${UserStatus} {
+      border-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+    }
+  }
+  ${UserStatus} {
+    ${(props) =>
+      props.selectedChannel &&
+      `
+      border-color: ${props.selectedBackgroundColor};
+    `}
+  }
 `
 
 export const DraftMessageTitle = styled.span<{ color: string }>`

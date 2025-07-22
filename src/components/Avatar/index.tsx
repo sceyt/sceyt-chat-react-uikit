@@ -7,6 +7,8 @@ import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/avatar.svg
 import { generateAvatarColor } from '../../UIHelper'
 import { useColor } from '../../hooks'
 import { THEME_COLORS } from '../../UIHelper/constants'
+import { useSelector } from 'react-redux'
+import { themeSelector } from 'store/theme/selector'
 
 interface IProps {
   image?: string | null
@@ -36,6 +38,7 @@ const Avatar: React.FC<IProps> = ({
   handleAvatarClick
   // customAvatarColors
 }) => {
+  const theme = useSelector(themeSelector) as 'light' | 'dark'
   const { [THEME_COLORS.ICON_INACTIVE]: iconInactive } = useColor()
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
@@ -70,6 +73,7 @@ const Avatar: React.FC<IProps> = ({
       onClick={handleAvatarClick}
       cursorPointer={!!handleAvatarClick}
       borderRadius={borderRadius}
+      theme={theme}
     >
       {isDeletedUserAvatar ? (
         DeletedIcon || <DeletedAvatarWrapper color={iconInactive} />
@@ -97,6 +101,7 @@ interface ContainerProps {
   border?: string
   borderRadius?: string
   cursorPointer?: boolean
+  theme: 'light' | 'dark'
 }
 
 interface AvatarImageProps {
@@ -117,7 +122,8 @@ export const Container = styled.div<ContainerProps>`
   color: #fff;
   overflow: hidden;
   margin: ${(props) => (props.marginAuto ? 'auto' : '')};
-  ${(props: ContainerProps) => (!props.isImage ? `background-color:${generateAvatarColor(props.avatarName)};` : '')};
+  ${(props: ContainerProps) =>
+    !props.isImage ? `background-color:${generateAvatarColor(props.avatarName, props.theme)};` : ''};
   cursor: ${(props) => props.cursorPointer && 'pointer'};
 
   span {

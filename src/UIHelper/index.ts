@@ -166,8 +166,8 @@ export const GlobalStyles = createGlobalStyle`
   }
 `
 
-export function generateAvatarColor(itemName: any) {
-  const avatarColors = getAvatarColors()
+export function generateAvatarColor(itemName: any, theme: 'light' | 'dark') {
+  const avatarColors = getAvatarColors(theme)
   if (itemName && itemName !== '') {
     const hash = md5(itemName).toString().padStart(32, '0').slice(-6)
     const hashInt = parseInt(hash, 16)
@@ -575,30 +575,18 @@ export const ItemNote = styled.div<{ disabledColor: string; bgColor: string; dir
   pointer-events: none;
   user-select: none;
 
-  &::before {
-    content: '';
+  & > svg {
+    width: 20px;
+    height: 20px;
+    color: ${(props) => props.bgColor};
+    fill: ${(props) => props.bgColor};
     position: absolute;
-    z-index: -1;
-    background-color: ${(props) => props.bgColor};
-    border-radius: 3px;
-    width: 14px;
-    height: 14px;
-
-    ${(props: any) =>
-      props.direction === 'right' &&
-      `
-            left: -5px;
-            top: 50%;
-            transform: translateY(-50%) rotate(45deg);
-        `} ${(props: any) =>
-      props.direction === 'top' &&
-      `
-            bottom: -5px;
-            left: 50%;
-            transform: translateX(-50%) rotate(45deg);
-        `}
+    top: 100%;
+    left: calc(50% - 10px);
+    path {
+      fill: ${(props) => props.bgColor} !important;
+    }
   }
-
   ${(props: any) =>
     props.visible &&
     `

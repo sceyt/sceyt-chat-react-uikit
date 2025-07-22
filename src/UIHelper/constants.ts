@@ -6,6 +6,8 @@ export const THEME_COLORS = {
   AVATAR_BRAND_2: 'avatarBrand2',
   AVATAR_BRAND_3: 'avatarBrand3',
   AVATAR_BRAND_4: 'avatarBrand4',
+  AVATAR_BRAND_5: 'avatarBrand5',
+  AVATAR_BRAND_6: 'avatarBrand6',
   TEXT_PRIMARY: 'textPrimary',
   TEXT_SECONDARY: 'textSecondary',
   TEXT_FOOTNOTE: 'textFootnote',
@@ -31,7 +33,8 @@ export const THEME_COLORS = {
   INCOMING_MESSAGE_BACKGROUND: 'incomingMessageBackground',
   INCOMING_MESSAGE_BACKGROUND_X: 'incomingMessageBackgroundX',
   LINK_COLOR: 'linkColor',
-  HIGHLIGHTED_BACKGROUND: 'highlightedBackground'
+  HIGHLIGHTED_BACKGROUND: 'highlightedBackground',
+  TOOLTIP_BACKGROUND: 'tooltipBackground'
 } as const
 
 export const defaultTheme = {
@@ -60,6 +63,16 @@ export const defaultTheme = {
     [THEME_COLORS.AVATAR_BRAND_4]: {
       light: '#67D292',
       dark: '#67D292'
+    },
+    // 5. avatar brand 1 colors
+    [THEME_COLORS.AVATAR_BRAND_5]: {
+      light: '#9F35E7',
+      dark: '#9F35E7'
+    },
+    // 6. avatar brand 1 colors
+    [THEME_COLORS.AVATAR_BRAND_6]: {
+      light: '#63AFFF',
+      dark: '#63AFFF'
     },
     // 6. background colors
     [THEME_COLORS.BACKGROUND]: {
@@ -190,6 +203,11 @@ export const defaultTheme = {
     [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: {
       light: '#C8D0FF',
       dark: '#3B3D68'
+    },
+    // 32. tooltip background colors
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: {
+      light: '#11153980',
+      dark: '#00000080'
     }
   }
 }

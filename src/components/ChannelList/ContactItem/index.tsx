@@ -102,25 +102,6 @@ const ContactItem: React.FC<IChannelProps> = ({
 
 export default ContactItem
 
-const Container = styled.div<{
-  selectedBackgroundColor?: string
-  channelsPaddings?: string
-  selectedChannelPaddings?: string
-  channelsMargin?: string
-  theme?: string
-  hoverBackground?: string
-}>`
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: ${(props) => props.channelsPaddings || '8px'};
-  margin: ${(props) => props.channelsMargin || '0 8px'};
-  &:hover {
-    background-color: ${(props) => props.hoverBackground};
-  }
-`
-
 export const ChannelInfo = styled.div<{
   textColor: string
   avatar?: boolean
@@ -157,12 +138,34 @@ export const AvatarWrapper = styled.div`
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   right: 0;
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
   border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
+`
+
+const Container = styled.div<{
+  selectedBackgroundColor?: string
+  channelsPaddings?: string
+  selectedChannelPaddings?: string
+  channelsMargin?: string
+  theme?: string
+  hoverBackground?: string
+}>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: ${(props) => props.channelsPaddings || '8px'};
+  margin: ${(props) => props.channelsMargin || '0 8px'};
+  &:hover {
+    background-color: ${(props) => props.hoverBackground};
+    ${UserStatus} {
+      border-color: ${(props) => props.hoverBackground};
+    }
+  }
 `
