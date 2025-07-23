@@ -206,8 +206,8 @@ export const defaultTheme = {
     },
     // 32. tooltip background colors
     [THEME_COLORS.TOOLTIP_BACKGROUND]: {
-      light: '#11153980',
-      dark: '#00000080'
+      light: '#111539E5',
+      dark: '#000000E5'
     }
   }
 }

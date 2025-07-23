@@ -912,6 +912,7 @@ const ChannelListHeader = styled.div<{
   max-width: ${(props: { maxWidth?: number; withoutProfile?: any; withCustomList?: boolean; borderColor?: string }) =>
     props.maxWidth ? `${props.maxWidth}px` : 'inherit'};
   padding: 12px;
+  padding-left: 22px;
   box-sizing: border-box;
   padding-left: ${(props) => props.withoutProfile && '52px'};
   border-right: ${(props) => props.withCustomList && `1px solid ${props.borderColor}`};

@@ -202,16 +202,18 @@ const ChannelMessageText = ({
                   {lastMessage.body ? '' : 'Voice'}
                 </React.Fragment>
               ) : null)}
-            {!!(lastMessage && lastMessage.id) &&
-              MessageTextFormat({
-                text: lastMessage.body,
-                message: lastMessage,
-                contactsMap,
-                getFromContacts,
-                isLastMessage: true,
-                accentColor,
-                textSecondary
-              })}
+            <LastMessageDescription>
+              {!!(lastMessage && lastMessage.id) &&
+                MessageTextFormat({
+                  text: lastMessage.body,
+                  message: lastMessage,
+                  contactsMap,
+                  getFromContacts,
+                  isLastMessage: true,
+                  accentColor,
+                  textSecondary
+                })}
+            </LastMessageDescription>
             {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
@@ -512,7 +514,7 @@ const Channel: React.FC<IChannelProps> = ({
                         : lastMessage.user.id === user.id)))
                 : (isTypingOrRecording && draftMessageText) ||
                   (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
-                <Points color={draftMessageText && warningColor}>: </Points>
+                <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
               )}
             <LastMessageText
               color={textSecondary}
@@ -775,11 +777,40 @@ export const LastMessageText = styled.span<{
   > svg {
     width: 16px;
     height: 16px;
+    min-width: 16px;
+    min-height: 16px;
     margin-right: 4px;
     color: ${(props) => props.color};
-    //transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
     transform: translate(0px, 3px);
   }
+  & > span {
+    display: flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  & > div {
+    display: flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    & > svg {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      min-height: 18px;
+      color: ${(props) => props.color};
+    }
+  }
+`
+export const LastMessageDescription = styled.div`
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 `
 
 export const ChannelStatus = styled.div<{ color: string }>`

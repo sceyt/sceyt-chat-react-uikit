@@ -98,6 +98,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
 import { channelListHiddenSelector } from './selector'
 import log from 'loglevel'
+import { queryDirection } from 'store/message/constants'
 
 function* createChannel(action: IAction): any {
   try {
@@ -681,6 +682,7 @@ function* getChannelMentions(action: IAction): any {
     const mentionsQueryBuilder = new (SceytChatClient.MentionsListQueryBuilder as any)()
     mentionsQueryBuilder.setChannelId(channelId)
     mentionsQueryBuilder.limit(10)
+    mentionsQueryBuilder.setDirection(queryDirection.NEXT)
     const mentionsQuery = yield call(mentionsQueryBuilder.build)
     const mentions = yield call(mentionsQuery.loadNext)
     yield put(updateChannelDataAC(channelId, { mentionsIds: mentions.mentions }))
