@@ -385,10 +385,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      dispatch(getChannelMentionsAC(activeChannel.id))
+      if (!activeChannel?.mentionsIds) {
+        dispatch(getChannelMentionsAC(activeChannel.id))
+      }
       getSelectedChannel(activeChannel)
     }
-  }, [activeChannel && activeChannel.members && activeChannel.members.length])
+  }, [activeChannel, activeChannel?.members, activeChannel?.members?.length, activeChannel?.id])
 
   useDidUpdate(() => {
     if (closeSearchChannels) {
