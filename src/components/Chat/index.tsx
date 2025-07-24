@@ -142,6 +142,7 @@ const Container = styled.div<{ widthOffset: number; channelDetailsWidth?: number
   display: flex;
   transition: all 0.1s;
   flex-direction: column;
+  overflow: hidden;
 `
 
 const SelectChatContainer = styled.div<{ backgroundColor: string }>`

@@ -490,7 +490,6 @@ const Message = ({
 
   return (
     <MessageItem
-      key={message.id || message.tid}
       className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
@@ -582,7 +581,7 @@ const Message = ({
         )}
         {CustomMessageItem ? (
           <CustomMessageItem
-            key={message.id}
+            key={message.id || message.tid}
             channel={channel}
             message={message}
             prevMessage={prevMessage}

@@ -35,6 +35,7 @@ interface MessagesScrollToBottomButtonProps {
   unreadCountFontSize?: string
   unreadCountTextColor?: string
   unreadCountBackgroundColor?: string
+  animateFrom?: string
 }
 
 const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> = ({
@@ -51,7 +52,8 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   unreadCountWidth,
   unreadCountHeight,
   unreadCountFontSize,
-  unreadCountTextColor
+  unreadCountTextColor,
+  animateFrom = 'bottom'
 }) => {
   const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections } = useColor()
 
@@ -71,12 +73,8 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv')
         if (scrollRef) {
-          scrollRef.scrollTop = repliedMessage.offsetTop - scrollRef.offsetHeight / 2
+          scrollRef.scrollTop = repliedMessage.offsetTop
         }
-        repliedMessage.classList.add('highlight')
-        setTimeout(() => {
-          repliedMessage.classList.remove('highlight')
-        }, 1000)
       }
     } else {
       // await handleGetMessages(undefined, messageId)
@@ -86,36 +84,36 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
 
   return (
     <React.Fragment>
-      {showScrollToNewMessageButton && (
-        <BottomButton
-          theme={theme}
-          width={buttonWidth}
-          height={buttonHeight}
-          border={buttonBorder}
-          borderRadius={buttonBorderRadius}
-          backgroundColor={buttonBackgroundColor || backgroundSections}
-          hoverBackgroundColor={buttonHoverBackgroundColor}
-          shadow={buttonShadow}
-          onClick={handleScrollToBottom}
-          bottomOffset={sendMessageInputHeight}
-          bottomPosition={bottomPosition}
-          rightPosition={rightPosition}
-        >
-          {!!(channel.newMessageCount && channel.newMessageCount > 0) && (
-            <UnreadCount
-              width={unreadCountWidth}
-              height={unreadCountHeight}
-              textColor={unreadCountTextColor}
-              fontSize={unreadCountFontSize}
-              backgroundColor={accentColor}
-              isMuted={channel.muted}
-            >
-              {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
-            </UnreadCount>
-          )}
-          {buttonIcon || <BottomIcon />}
-        </BottomButton>
-      )}
+      <BottomButton
+        show={!!showScrollToNewMessageButton}
+        animateFrom={animateFrom}
+        theme={theme}
+        width={buttonWidth}
+        height={buttonHeight}
+        border={buttonBorder}
+        borderRadius={buttonBorderRadius}
+        backgroundColor={buttonBackgroundColor || backgroundSections}
+        hoverBackgroundColor={buttonHoverBackgroundColor}
+        shadow={buttonShadow}
+        onClick={handleScrollToBottom}
+        bottomOffset={sendMessageInputHeight}
+        bottomPosition={bottomPosition}
+        rightPosition={rightPosition}
+      >
+        {!!(channel.newMessageCount && channel.newMessageCount > 0) && (
+          <UnreadCount
+            width={unreadCountWidth}
+            height={unreadCountHeight}
+            textColor={unreadCountTextColor}
+            fontSize={unreadCountFontSize}
+            backgroundColor={accentColor}
+            isMuted={channel.muted}
+          >
+            {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
+          </UnreadCount>
+        )}
+        {buttonIcon || <BottomIcon />}
+      </BottomButton>
     </React.Fragment>
   )
 }
@@ -134,10 +132,22 @@ const BottomButton = styled.div<{
   bottomOffset: number
   bottomPosition?: number
   rightPosition?: number
+  animateFrom?: string
+  show?: boolean
 }>`
+  transition: all 0.3s ease-in-out;
   position: absolute;
-  bottom: ${(props) => `${props.bottomOffset + (props.bottomPosition === undefined ? 45 : props.bottomPosition)}px`};
-  right: ${(props) => `${props.rightPosition === undefined ? 16 : props.rightPosition}px`};
+  ${(props) =>
+    props.animateFrom === 'bottom' &&
+    `bottom: ${props.bottomOffset + (props.bottomPosition === undefined ? 45 : props.bottomPosition) - 130}px`};
+
+  ${(props) =>
+    props.animateFrom === 'right' && `right: ${props.rightPosition === undefined ? 16 : props.rightPosition - 100}px`};
+
+  ${(props) =>
+    props.show && `bottom: ${props.bottomOffset + (props.bottomPosition === undefined ? 45 : props.bottomPosition)}px`};
+  right: ${(props) => (props.rightPosition === undefined ? 16 : props.rightPosition)}px;
+
   margin-right: 16px;
   display: flex;
   align-items: center;
@@ -149,7 +159,6 @@ const BottomButton = styled.div<{
   height: 48px;
   cursor: pointer;
   z-index: 14;
-
   & > svg {
     color: rgba(129, 140, 153, 1);
   }

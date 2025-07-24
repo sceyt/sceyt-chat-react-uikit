@@ -16,6 +16,7 @@ import {
   messagesHasPrevSelector,
   messagesLoadingState,
   openedMessageMenuSelector,
+  scrollToMentionedMessageSelector,
   scrollToMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector
@@ -468,6 +469,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const tabIsActive = useSelector(tabIsActiveSelector, shallowEqual)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+  const scrollToMentionedMessage = useSelector(scrollToMentionedMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
   const hasNextMessages = useSelector(messagesHasNextSelector, shallowEqual)
@@ -486,6 +488,10 @@ const MessageList: React.FC<MessagesProps> = ({
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
   const [lastVisibleMessageId, setLastVisibleMessageId] = useState('')
   const [scrollToReply, setScrollToReply] = useState<any>(null)
+  // Add new state variables for scroll position preservation
+  const [previousMessageCount, setPreviousMessageCount] = useState(0)
+  const [previousScrollTop, setPreviousScrollTop] = useState(0)
+  const [shouldPreserveScroll, setShouldPreserveScroll] = useState(false)
   // eslint-disable-next-line max-len
   // const { handleGetMessages, handleAddMessages, pendingMessages, cachedMessages, hasNext, hasPrev } = useMessages(channel)
   const messageForReply: any = {}
@@ -522,6 +528,15 @@ const MessageList: React.FC<MessagesProps> = ({
   }
   // @ts-ignore
   const handleMessagesListScroll = async (event: any) => {
+    if (scrollToMentionedMessage) {
+      const { target } = event
+      if (target.scrollTop <= -50) {
+        dispatch(showScrollToNewMessageButtonAC(true))
+      } else {
+        dispatch(showScrollToNewMessageButtonAC(false))
+      }
+      return
+    }
     setShowTopDate(true)
     clearTimeout(hideTopDateTimeout.current)
     hideTopDateTimeout.current = setTimeout(() => {
@@ -676,6 +691,9 @@ const MessageList: React.FC<MessagesProps> = ({
   }
 
   const handleLoadMoreMessages = (direction: string, limit: number) => {
+    if (scrollToMentionedMessage) {
+      return
+    }
     const lastMessageId = messages.length && messages[messages.length - 1].id
     const firstMessageId = messages.length && messages[0].id
     // messageQueryBuilder.reverse(true)
@@ -893,6 +911,11 @@ const MessageList: React.FC<MessagesProps> = ({
       dispatch(clearSelectedMessagesAC())
     }
 
+    // Reset scroll preservation state for new channel
+    setPreviousMessageCount(0)
+    setPreviousScrollTop(0)
+    setShouldPreserveScroll(false)
+
     // lastPrevLoadedId = ''
     // firstPrevLoadedId = ''
     // hasNextMessages = true
@@ -930,6 +953,25 @@ const MessageList: React.FC<MessagesProps> = ({
   useEffect(() => {
     // setHideMessages(false)
     // nextTargetMessage = !hasNextMessages ? '' : messages[messages.length - 4] && messages[messages.length - 4].id
+
+    // Preserve scroll position when loading more messages (not on initial load)
+    if (
+      messages.length > previousMessageCount &&
+      previousMessageCount > 0 &&
+      scrollRef.current &&
+      loading &&
+      loadDirection
+    ) {
+      // Only preserve scroll position if user is not at the bottom
+      const isAtBottom =
+        scrollRef.current.scrollTop >= scrollRef.current.scrollHeight - scrollRef.current.offsetHeight - 10
+      if (!isAtBottom) {
+        // Save current scroll position before messages update
+        setPreviousScrollTop(scrollRef.current.scrollTop)
+        setShouldPreserveScroll(true)
+      }
+    }
+
     if (loading) {
       // setTimeout(() => {
       if (loadDirection !== 'next') {
@@ -1016,6 +1058,23 @@ const MessageList: React.FC<MessagesProps> = ({
         scrollToBottom = false
       }, 100) */
     }
+
+    // Restore scroll position after messages update if needed
+    if (shouldPreserveScroll && scrollRef.current && previousScrollTop > 0) {
+      // Use requestAnimationFrame to ensure DOM is updated
+      requestAnimationFrame(() => {
+        if (scrollRef.current) {
+          scrollRef.current.style.scrollBehavior = 'inherit'
+          scrollRef.current.scrollTop = previousScrollTop
+          scrollRef.current.style.scrollBehavior = 'smooth'
+        }
+        setShouldPreserveScroll(false)
+        setPreviousScrollTop(0)
+      })
+    }
+
+    // Update previous message count
+    setPreviousMessageCount(messages.length)
   }, [messages])
   useDidUpdate(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
@@ -1151,7 +1210,7 @@ const MessageList: React.FC<MessagesProps> = ({
                 const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
                 messagesIndexMap[message.id] = index
                 return (
-                  <React.Fragment key={message.id || message.tid}>
+                  <React.Fragment>
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
                       noMargin={
@@ -1175,6 +1234,7 @@ const MessageList: React.FC<MessagesProps> = ({
                     />
                     {message.type === 'system' ? (
                       <SystemMessage
+                        key={message.id || message.tid}
                         channel={channel}
                         message={message}
                         nextMessage={nextMessage}
@@ -1190,6 +1250,7 @@ const MessageList: React.FC<MessagesProps> = ({
                       />
                     ) : (
                       <MessageWrapper
+                        key={message.id || message.tid}
                         id={message.id}
                         className={
                           (message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''
