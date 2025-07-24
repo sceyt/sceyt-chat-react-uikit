@@ -3,7 +3,6 @@ import React, { memo, useEffect, useRef, useState } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
-import { colors } from '../../UIHelper/constants'
 // import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 // import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { getFrame3 } from '../../helpers/getVideoFrame'
@@ -11,6 +10,8 @@ import { setVideoThumb } from '../../helpers/messagesHalper'
 import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { base64ToToDataURL } from '../../helpers/resizeImage'
+import { useColor } from 'hooks'
+import { THEME_COLORS } from 'UIHelper/constants'
 // import { CircularProgressbar } from 'react-circular-progressbar'
 // import { ProgressWrapper } from '../Attachment'
 
@@ -44,6 +45,12 @@ const VideoPreview = memo(function VideoPreview({
   isDetailsView,
   setVideoIsReadyToSend
 }: IVideoPreviewProps) {
+  const {
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+  } = useColor()
+  // const { [THEME_COLORS.TEXT_PRIMARY]: background } = useSelector(themeSelector)
   // const VideoPreview =
   const [videoDuration, setVideoDuration] = useState(0)
   const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(null)
@@ -157,6 +164,7 @@ const VideoPreview = memo(function VideoPreview({
           borderRadius={borderRadius}
           backgroundImage={attachmentThumb}
           withPrefix={withPrefix}
+          borderColor={border}
         >
           {/* {showProgress && (
             <UploadPercent isRepliedMessage={isRepliedMessage} backgroundColor={'rgba(23, 25, 28, 0.40)'}>
@@ -235,7 +243,12 @@ const VideoPreview = memo(function VideoPreview({
               <PlayIcon />
             </VideoPlayButton>
           )}
-          <VideoTime isDetailsView={isDetailsView} isRepliedMessage={isPreview || isRepliedMessage}>
+          <VideoTime
+            isDetailsView={isDetailsView}
+            isRepliedMessage={isPreview || isRepliedMessage}
+            color={textOnPrimary}
+            messageTimeBackgroundColor={overlayBackground2}
+          >
             {!isRepliedMessage && !isPreview && <VideoCamIcon />}
             {videoCurrentTime}
           </VideoTime>
@@ -257,7 +270,12 @@ const VideoControls = styled.div`
   justify-content: center;
 `
 
-const VideoTime = styled.div<{ isRepliedMessage?: boolean; isDetailsView?: boolean }>`
+const VideoTime = styled.div<{
+  isRepliedMessage?: boolean
+  isDetailsView?: boolean
+  color: string
+  messageTimeBackgroundColor: string
+}>`
   position: absolute;
   top: ${(props) => (props.isRepliedMessage ? '3px' : props.isDetailsView ? undefined : '8px')};
   bottom: ${(props) => (props.isDetailsView ? '8px' : undefined)};
@@ -267,12 +285,12 @@ const VideoTime = styled.div<{ isRepliedMessage?: boolean; isDetailsView?: boole
   align-items: center;
   border-radius: 16px;
   padding: ${(props) => (props.isRepliedMessage ? '0 3px' : '4px 6px')};
-  background-color: rgba(1, 1, 1, 0.3);
+  background-color: ${(props) => `${props.messageTimeBackgroundColor}40`};
   line-height: 14px;
-  color: ${colors.white};
+  color: ${(props) => props.color};
 
   & > svg {
-    color: ${colors.white};
+    color: ${(props) => props.color};
     margin-right: 4px;
   }
 `
@@ -342,6 +360,7 @@ export const AttachmentFile = styled.div<{
   borderRadius?: string
   background?: string
   border?: string
+  borderColor: string
 }>`
   display: flex;
   position: relative;
@@ -350,7 +369,7 @@ export const AttachmentFile = styled.div<{
   width: 350px;
   height: 70px;
   background: ${(props) => props.background || '#ffffff'};
-  border: ${(props) => props.border || `1px solid ${colors.gray1}`};
+  border: ${(props) => props.border || `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   margin-right: ${(props) => props.isPrevious && '16px'};
   margin-top: ${(props) => !props.isPrevious && '8px'};

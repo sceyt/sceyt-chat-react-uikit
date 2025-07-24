@@ -1,6 +1,5 @@
 import React from 'react'
 import styled from 'styled-components'
-import { colors } from '../../UIHelper/constants'
 import { ReactComponent as TickIcon } from '../../assets/svg/tick.svg'
 
 interface IProps {
@@ -9,12 +8,12 @@ interface IProps {
   onClick?: (e: any) => void
   state: boolean
   index: any
-  backgroundColor?: string
+  backgroundColor: string
   checkedBackgroundColor?: string
-  tickColor?: string
   borderRadius?: string
   size?: string
   disabled?: boolean
+  borderColor: string
 }
 
 const CustomCheckbox = ({
@@ -24,10 +23,10 @@ const CustomCheckbox = ({
   onClick,
   checkedBackgroundColor,
   backgroundColor,
-  tickColor,
   borderRadius,
   disabled,
-  size
+  size,
+  borderColor
 }: IProps) => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (onChange) {
@@ -48,10 +47,10 @@ const CustomCheckbox = ({
         size={size}
         checkedBackgroundColor={checkedBackgroundColor}
         backgroundColor={backgroundColor}
-        tickColor={tickColor}
         borderRadius={borderRadius}
         htmlFor={`checkbox-${index}`}
         disabled={disabled}
+        borderColor={borderColor}
       >
         {state && <TickIcon />}
       </CustomLabel>
@@ -72,12 +71,12 @@ export default CustomCheckbox
 
 const CustomLabel = styled.label<{
   size?: string
-  backgroundColor?: string
+  backgroundColor: string
   checkedBackgroundColor?: string
-  tickColor?: string
   borderRadius?: string
   isChecked: boolean
   disabled?: boolean
+  borderColor: string
 }>`
   position: relative;
   display: flex;
@@ -88,10 +87,9 @@ const CustomLabel = styled.label<{
   min-width: ${(props) => props.size || '12px'};
   height: ${(props) => props.size || '12px'};
   cursor: ${(props) => !props.disabled && 'pointer'};
-  border: ${(props) => (props.isChecked ? 'none' : `1px solid ${colors.borderColor2}`)};
+  border: ${(props) => (props.isChecked ? 'none' : `1px solid ${props.borderColor}`)};
   border-radius: ${(props) => props.borderRadius || '4px'};
-  background-color: ${(props) =>
-    props.isChecked ? props.checkedBackgroundColor || props.tickColor : props.backgroundColor || '#fff'};
+  background-color: ${(props) => (props.isChecked ? props.checkedBackgroundColor : props.backgroundColor)};
   opacity: ${(props) => props.disabled && 0.4};
 
   & > svg {

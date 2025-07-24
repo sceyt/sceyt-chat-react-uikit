@@ -10,7 +10,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 // Helpers
-import { colors, THEME_COLORS } from '../../UIHelper/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
@@ -42,7 +42,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BACKGROUND]: backgroundColor
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections
   } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
@@ -245,7 +245,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       </PlayPause>
       <WaveContainer>
         <AudioVisualization ref={wavesurferContainer} />
-        <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundColor}>
+        <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundSections}>
           {audioRate}
           <span>X</span>
         </AudioRate>
@@ -265,11 +265,11 @@ const Container = styled.div`
   padding: 8px 12px;
 `
 
-const PlayPause = styled.div<{ iconColor?: string }>`
+const PlayPause = styled.div<{ iconColor: string }>`
   cursor: pointer;
 
   & > svg {
-    color: ${(props) => props.iconColor || colors.primary};
+    color: ${(props) => props.iconColor};
     display: flex;
     width: 40px;
     height: 40px;
@@ -279,11 +279,11 @@ const PlayPause = styled.div<{ iconColor?: string }>`
 const AudioVisualization = styled.div`
   width: 100%;
 `
-const AudioRate = styled.div<{ color: string; backgroundColor?: string }>`
+const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   display: flex;
   align-items: center;
   justify-content: center;
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
   width: 30px;
   min-width: 30px;
   border-radius: 12px;

@@ -24,9 +24,12 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.WARNING]: errorColor
+    [THEME_COLORS.WARNING]: errorColor,
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground
   } = useColor()
 
   // const dispatch = useDispatch()
@@ -101,7 +104,14 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
 
   return (
     <PopupContainer>
-      <Popup maxHeight='482px' width='433px' maxWidth='433px' height='calc(100vh - 50px)' padding='22px 24px 8px'>
+      <Popup
+        maxHeight='482px'
+        width='433px'
+        maxWidth='433px'
+        height='calc(100vh - 50px)'
+        padding='22px 24px 8px'
+        backgroundColor={overlayBackground}
+      >
         <CloseIcon onClick={toggleEditPopup} />
 
         <PopupName color={textPrimary}>Edit Profile</PopupName>
@@ -110,17 +120,19 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
           className={isScrolling ? 'show-scrollbar' : ''}
           onMouseEnter={() => setIsScrolling(true)}
           onMouseLeave={() => setIsScrolling(false)}
+          thumbColor={surface2}
         >
           <Label color={textPrimary}>Username </Label>
           <CustomInput
             errorColor={errorColor}
             placeholderColor={textFootnote}
             borderColor={borderColor}
-            backgroundColor={sectionBackground}
+            backgroundColor={backgroundSections}
             type='text'
             color={textPrimary}
             value={user.id}
             disabled
+            disabledColor={surface1}
           />
 
           <Label color={textPrimary}>First name </Label>
@@ -129,11 +141,12 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
             color={textPrimary}
             errorColor={errorColor}
             borderColor={borderColor}
-            backgroundColor={sectionBackground}
+            backgroundColor={backgroundSections}
             placeholderColor={textFootnote}
             value={firstNameValue}
             onChange={handleTypeFirstName}
             placeholder='Enter Firstname'
+            disabledColor={surface1}
           />
 
           <Label color={textPrimary}>Last name </Label>
@@ -143,10 +156,11 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
             errorColor={errorColor}
             placeholderColor={textFootnote}
             borderColor={borderColor}
-            backgroundColor={sectionBackground}
+            backgroundColor={backgroundSections}
             value={lastNameValue}
             onChange={handleTypeLastName}
             placeholder='Enter Lastname'
+            disabledColor={surface1}
           />
 
           <Label color={textPrimary}>Avatar</Label>
@@ -162,7 +176,9 @@ export default function EditProfile({ toggleEditPopup, user }: any) {
 
             <UploadAvatarHandler color={textPrimary}>
               Format: JPEG, PNG ( max size 1MB )
-              <UploadAvatarButton onClick={handleOpenFileUploader}>Upload Photo</UploadAvatarButton>
+              <UploadAvatarButton onClick={handleOpenFileUploader} backgroundColor={backgroundSections}>
+                Upload Photo
+              </UploadAvatarButton>
               <FileUploaderInput ref={fileUploader} type='file' accept='image/*' onChange={handleFileUpload} />
             </UploadAvatarHandler>
           </UploadChannelAvatar>
@@ -197,7 +213,7 @@ const RemoveUploadIcon = styled(DeleteUpload)`
   cursor: pointer;
 `
 
-const EditProfileContainer = styled.div`
+const EditProfileContainer = styled.div<{ thumbColor: string }>`
   height: 100%;
   overflow-y: auto;
   margin-right: -25px;
@@ -212,7 +228,7 @@ const EditProfileContainer = styled.div`
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {

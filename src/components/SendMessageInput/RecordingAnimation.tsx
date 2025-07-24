@@ -1,8 +1,6 @@
 import React from 'react'
 import styled, { keyframes } from 'styled-components'
 
-const barColor = '#7B818A'
-
 const wave = keyframes`
   0%, 100% {
     transform: scaleY(0.5);
@@ -21,24 +19,24 @@ const Wrapper = styled.div`
   gap: 1.5px;
 `
 
-const Bar = styled.span<{ delay: number }>`
+const Bar = styled.span<{ delay: number; borderColor: string }>`
   display: block;
   width: 3px;
   height: 8px;
   border-radius: 2px;
-  background: ${barColor};
+  background: ${(props) => props.borderColor};
   animation: ${wave} 1s infinite;
   animation-delay: ${({ delay }) => delay}s;
 `
 
-const RecordingAnimation: React.FC = () => (
+const RecordingAnimation: React.FC<{ borderColor: string }> = ({ borderColor }) => (
   <Wrapper>
-    <Bar delay={0} />
-    <Bar delay={0.15} />
-    <Bar delay={0.3} />
-    <Bar delay={0.45} />
-    <Bar delay={0.6} />
+    <Bar delay={0} borderColor={borderColor} />
+    <Bar delay={0.15} borderColor={borderColor} />
+    <Bar delay={0.3} borderColor={borderColor} />
+    <Bar delay={0.45} borderColor={borderColor} />
+    <Bar delay={0.6} borderColor={borderColor} />
   </Wrapper>
 )
 
-export default RecordingAnimation 
+export default RecordingAnimation

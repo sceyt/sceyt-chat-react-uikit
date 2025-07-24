@@ -171,6 +171,7 @@ export interface IChannel {
   members: IMember[]
   newReactions: IReaction[]
   lastReactedMessage?: IMessage
+  mentionsIds?: string[]
   delete: () => Promise<void>
   // eslint-disable-next-line no-unused-vars
   deleteAllMessages: (forEveryone?: boolean) => Promise<void>

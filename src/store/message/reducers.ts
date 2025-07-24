@@ -38,7 +38,8 @@ import {
   ADD_SELECTED_MESSAGE,
   REMOVE_SELECTED_MESSAGE,
   CLEAR_SELECTED_MESSAGES,
-  REMOVE_ATTACHMENT
+  REMOVE_ATTACHMENT,
+  SET_SCROLL_TO_MENTIONED_MESSAGE
 } from './constants'
 import { IAction, IMarker, IMessage, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
@@ -73,6 +74,7 @@ export interface IMessageStore {
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
   scrollToMessage: string | null
+  scrollToMentionedMessage: boolean | null
   reactionsList: IReaction[]
   reactionsHasNext: boolean
   reactionsLoadingState: number | null
@@ -113,6 +115,7 @@ const initialState: IMessageStore = {
   messageForReply: null,
   attachmentsUploadingState: {},
   scrollToMessage: null,
+  scrollToMentionedMessage: false,
   reactionsList: [],
   reactionsHasNext: true,
   reactionsLoadingState: null,
@@ -162,6 +165,10 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
     }
     case SET_SCROLL_TO_MESSAGE: {
       newState.scrollToMessage = payload.messageId
+      return newState
+    }
+    case SET_SCROLL_TO_MENTIONED_MESSAGE: {
+      newState.scrollToMentionedMessage = payload.isScrollToMentionedMessage
       return newState
     }
     case SET_SCROLL_TO_NEW_MESSAGE: {

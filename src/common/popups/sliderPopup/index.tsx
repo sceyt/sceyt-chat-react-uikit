@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
 import Carousel from 'react-elastic-carousel'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { ReactComponent as RightArrow } from '../../../assets/svg/sliderButtonRight.svg'
@@ -41,8 +41,9 @@ interface IProps {
   setIsSliderOpen: (state: any) => void
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
-  allowEditDeleteIncomingMessage?: boolean,
+  allowEditDeleteIncomingMessage?: boolean
   attachmentsPreview?: IAttachmentProperties
+  messageType?: string | null | undefined
 }
 
 const SliderPopup = ({
@@ -51,9 +52,11 @@ const SliderPopup = ({
   mediaFiles,
   currentMediaFile,
   allowEditDeleteIncomingMessage,
-  attachmentsPreview
+  attachmentsPreview,
+  messageType
 }: IProps) => {
-  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2 } =
+    useColor()
 
   const dispatch = useDispatch()
 
@@ -82,11 +85,11 @@ const SliderPopup = ({
   // const attachmentsHasNext = useSelector(attachmentsForPopupHasNextSelector, shallowEqual) || []
   const attachmentUserName = currentFile
     ? currentFile.user &&
-    makeUsername(
-      contactsMap[currentFile.user.id],
-      currentFile.user,
-      getFromContacts && user.id !== currentFile.user.id
-    )
+      makeUsername(
+        contactsMap[currentFile.user.id],
+        currentFile.user,
+        getFromContacts && user.id !== currentFile.user.id
+      )
     : ''
   const handleClosePopup = () => {
     setAttachmentsList([])
@@ -116,15 +119,21 @@ const SliderPopup = ({
     delete stateCopy[attachmentId]
     setDownloadingFilesMap(stateCopy)
   }
-  const handleDownloadFile = (attachment: IAttachment) => {
+  const handleDownloadFile = (attachment: IAttachment, messageType: string | null | undefined) => {
     if (attachment.id) {
       setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent: 1 } }))
     }
-    downloadFile(attachment, true, handleCompleteDownload, (progress) => {
-      const loadedRes = progress.loaded && progress.loaded / progress.total
-      const uploadPercent = loadedRes && loadedRes * 100
-      setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
-    })
+    downloadFile(
+      attachment,
+      true,
+      handleCompleteDownload,
+      (progress) => {
+        const loadedRes = progress.loaded && progress.loaded / progress.total
+        const uploadPercent = loadedRes && loadedRes * 100
+        setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent } }))
+      },
+      messageType
+    )
   }
 
   const handleClicks = (e: any) => {
@@ -191,56 +200,16 @@ const SliderPopup = ({
       }
     }
     if (currentFile) {
-      getAttachmentUrlFromCache(currentFile.url).then((cachedUrl) => {
-        if (cachedUrl) {
-          if (!downloadedFiles[currentFile.id]) {
-            setVisibleSlide(false)
-            if (currentFile.type === 'image') {
-              downloadImage(cachedUrl as string, true)
-            } else {
-              clearTimeout(visibilityTimeout.current)
-              setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: cachedUrl })
-              setPlayedVideo(currentFile.id)
-              visibilityTimeout.current = setTimeout(() => {
-                setVisibleSlide(true)
-              }, 100)
-            }
-          } else {
-            if (currentFile.type === 'image') {
-              downloadImage(cachedUrl as string)
-            } else {
-              setVisibleSlide(true)
-            }
-          }
-        } else {
-          if (customDownloader) {
-            customDownloader(currentFile.url, false)
-              .then(async (url) => {
-                const response = await fetch(url)
-                setAttachmentToCache(currentFile.url, response)
-                if (currentFile.type === 'image') {
-                  downloadImage(url, true)
-                } else {
-                  clearTimeout(visibilityTimeout.current)
-                  setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: url })
-                  // setCurrentFileUrl(url)
-                  setPlayedVideo(currentFile.id)
-                  visibilityTimeout.current = setTimeout(() => {
-                    setVisibleSlide(true)
-                  }, 100)
-                }
-              })
-              .catch((e) => {
-                log.info('fail to download image...... ', e)
-              })
-          } else {
+      getAttachmentUrlFromCache(currentFile.url)
+        .then((cachedUrl) => {
+          if (cachedUrl) {
             if (!downloadedFiles[currentFile.id]) {
               setVisibleSlide(false)
               if (currentFile.type === 'image') {
-                downloadImage(currentFile.url as string, true)
+                downloadImage(cachedUrl as string, true)
               } else {
                 clearTimeout(visibilityTimeout.current)
-                setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: currentFile.url })
+                setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: cachedUrl })
                 setPlayedVideo(currentFile.id)
                 visibilityTimeout.current = setTimeout(() => {
                   setVisibleSlide(true)
@@ -253,9 +222,51 @@ const SliderPopup = ({
                 setVisibleSlide(true)
               }
             }
+          } else {
+            if (customDownloader) {
+              customDownloader(currentFile.url, false, () => {}, messageType)
+                .then(async (url) => {
+                  const response = await fetch(url)
+                  setAttachmentToCache(currentFile.url, response)
+                  if (currentFile.type === 'image') {
+                    downloadImage(url, true)
+                  } else {
+                    clearTimeout(visibilityTimeout.current)
+                    setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: url })
+                    // setCurrentFileUrl(url)
+                    setPlayedVideo(currentFile.id)
+                    visibilityTimeout.current = setTimeout(() => {
+                      setVisibleSlide(true)
+                    }, 100)
+                  }
+                })
+                .catch((e) => {
+                  log.info('fail to download image...... ', e)
+                })
+            } else {
+              if (!downloadedFiles[currentFile.id]) {
+                setVisibleSlide(false)
+                if (currentFile.type === 'image') {
+                  downloadImage(currentFile.url as string, true)
+                } else {
+                  clearTimeout(visibilityTimeout.current)
+                  setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: currentFile.url })
+                  setPlayedVideo(currentFile.id)
+                  visibilityTimeout.current = setTimeout(() => {
+                    setVisibleSlide(true)
+                  }, 100)
+                }
+              } else {
+                if (currentFile.type === 'image') {
+                  downloadImage(cachedUrl as string)
+                } else {
+                  setVisibleSlide(true)
+                }
+              }
+            }
           }
-        }
-      }).catch((e) => log.error(e))
+        })
+        .catch((e) => log.error(e))
     }
   }, [currentFile])
 
@@ -296,7 +307,7 @@ const SliderPopup = ({
           }
         } else {
           if (customDownloader) {
-            customDownloader(currentMediaFile.url, false).then(async (url) => {
+            customDownloader(currentMediaFile.url, false, () => {}, messageType).then(async (url) => {
               const response = await fetch(url)
               setAttachmentToCache(currentMediaFile.url, response)
               if (currentMediaFile.type === 'image') {
@@ -331,10 +342,9 @@ const SliderPopup = ({
     return attachmentsList.findIndex((item) => item.id === currentFile.id)
   }, [attachmentsList, currentFile])
 
-
   const handleCarouselItemMouseDown = (e: React.MouseEvent) => {
     if (e.button === 2) {
-      e.stopPropagation();
+      e.stopPropagation()
     }
   }
 
@@ -349,7 +359,7 @@ const SliderPopup = ({
             image={currentFile && currentFile.user && currentFile.user.avatarUrl}
           />
           <Info>
-            <UserName>{attachmentUserName}</UserName>
+            <UserName color={textOnPrimary}>{attachmentUserName}</UserName>
             {/* <FileName>{currentFile.name}</FileName> */}
             {/* <FileSize></FileSize> */}
             <FileDateAndSize color={textOnPrimary}>
@@ -361,7 +371,7 @@ const SliderPopup = ({
           </Info>
         </FileInfo>
         <ActionsWrapper>
-          <IconWrapper onClick={() => handleDownloadFile(currentFile)}>
+          <IconWrapper onClick={() => handleDownloadFile(currentFile, messageType)} color={textOnPrimary}>
             {currentFile && downloadingFilesMap[currentFile.id] ? (
               <ProgressWrapper>
                 <CircularProgressbar
@@ -373,10 +383,10 @@ const SliderPopup = ({
                   text=''
                   styles={{
                     background: {
-                      fill: 'transparent'
+                      fill: `${overlayBackground2}40`
                     },
                     path: {
-                      stroke: colors.white,
+                      stroke: textOnPrimary,
                       strokeLinecap: 'butt',
                       strokeWidth: '6px',
                       transition: 'stroke-dashoffset 0.5s ease 0s',
@@ -387,35 +397,37 @@ const SliderPopup = ({
                 />
               </ProgressWrapper>
             ) : (
-              <DownloadIcon />
+              <DownloadIcon color={textOnPrimary} />
             )}
           </IconWrapper>
-          {attachmentsPreview?.canForward &&
-            <IconWrapper hideInMobile margin='0 32px' onClick={handleToggleForwardMessagePopup}>
-              <ForwardIcon />
+          {attachmentsPreview?.canForward && (
+            <IconWrapper hideInMobile margin='0 32px' onClick={handleToggleForwardMessagePopup} color={textOnPrimary}>
+              <ForwardIcon color={textOnPrimary} />
             </IconWrapper>
-          }
-          {attachmentsPreview?.canDelete &&
-            <IconWrapper hideInMobile onClick={handleToggleDeleteMessagePopup}>
-              <DeleteIcon />
+          )}
+          {attachmentsPreview?.canDelete && (
+            <IconWrapper hideInMobile onClick={handleToggleDeleteMessagePopup} color={textOnPrimary}>
+              <DeleteIcon color={textOnPrimary} />
             </IconWrapper>
-          }
+          )}
         </ActionsWrapper>
-        <ClosePopupWrapper>
-          <IconWrapper onClick={handleClosePopup}>
-            <CloseIcon />
+        <ClosePopupWrapper color={textOnPrimary}>
+          <IconWrapper onClick={handleClosePopup} color={textOnPrimary}>
+            <CloseIcon color={textOnPrimary} />
           </IconWrapper>
         </ClosePopupWrapper>
       </SliderHeader>
-      <SliderBody onClick={handleClicks} 
-      onMouseDown={(e: React.MouseEvent) => {
-        if (e.button === 2) {
-          e.stopPropagation();
-          e.preventDefault();
-          return false;
-        }
-        return true;
-      }}>
+      <SliderBody
+        onClick={handleClicks}
+        onMouseDown={(e: React.MouseEvent) => {
+          if (e.button === 2) {
+            e.stopPropagation()
+            e.preventDefault()
+            return false
+          }
+          return true
+        }}
+      >
         {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
           // @ts-ignore
           <Carousel
@@ -452,6 +464,7 @@ const SliderPopup = ({
                   }}
                   disabled={isEdge}
                   hide={disabled}
+                  color={textOnPrimary}
                 >
                   {pointer}
                 </ArrowButton>
@@ -467,7 +480,7 @@ const SliderPopup = ({
                 visibleSlide={visibleSlide}
                 onMouseDown={handleCarouselItemMouseDown}
                 onContextMenu={(e: React.MouseEvent) => {
-                  e.stopPropagation();
+                  e.stopPropagation()
                 }}
               >
                 {/* {downloadedFiles[file.id!] ? ( */}
@@ -476,7 +489,7 @@ const SliderPopup = ({
                     <React.Fragment>
                       {!downloadedFiles[file.id!] && imageLoading ? (
                         <UploadCont>
-                          <UploadingIcon />
+                          <UploadingIcon color={textOnPrimary} />
                         </UploadCont>
                       ) : (
                         <img
@@ -485,7 +498,7 @@ const SliderPopup = ({
                           alt={file.name}
                           onMouseDown={(e) => {
                             if (e.button === 2) {
-                              e.stopPropagation();
+                              e.stopPropagation()
                             }
                           }}
                         />
@@ -499,7 +512,7 @@ const SliderPopup = ({
                         src={downloadedFiles[file.id!]}
                         onMouseDown={(e: React.MouseEvent) => {
                           if (e.button === 2) {
-                            e.stopPropagation();
+                            e.stopPropagation()
                           }
                         }}
                       />
@@ -519,7 +532,7 @@ const SliderPopup = ({
             ))}
           </Carousel>
         ) : (
-          <UploadingIcon />
+          <UploadingIcon color={textOnPrimary} />
         )}
       </SliderBody>
       {forwardPopupOpen && (
@@ -576,11 +589,11 @@ const ProgressWrapper = styled.span`
 `
 const SliderHeader = styled.div`
   height: 60px;
-  background: rgba(0, 0, 0, 0.8);
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 0 16px;
+  background-color: rgba(0, 0, 0, 0.8);
 `
 const SliderBody = styled.div`
   width: 100%;
@@ -613,16 +626,15 @@ const FileInfo = styled.div`
   font-size: 14px;
   line-height: 14px;
   min-width: 230px;
-  color: ${colors.white};
 `
 const Info = styled.div`
   margin-left: 12px;
 `
-const ClosePopupWrapper = styled.div`
+const ClosePopupWrapper = styled.div<{ color: string }>`
   width: 40%;
   display: flex;
   justify-content: flex-end;
-  color: ${colors.white};
+  color: ${(props) => props.color};
 `
 /* const FileName = styled.span`
   display: block;
@@ -658,9 +670,9 @@ const FileSize = styled.span<{ color: string }>`
   }
 `
 
-const UserName = styled.h4`
+const UserName = styled.h4<{ color: string }>`
   margin: 0;
-  color: ${colors.white}
+  color: ${(props) => props.color};
   font-weight: 500;
   font-size: 15px;
   line-height: 18px;
@@ -669,10 +681,10 @@ const UserName = styled.h4`
 const ActionsWrapper = styled.div`
   display: flex;
 `
-const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean }>`
+const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean; color: string }>`
   display: flex;
   cursor: pointer;
-  color: ${colors.white};
+  color: ${(props) => props.color};
   margin: ${(props) => props.margin};
 
   & > svg {
@@ -722,13 +734,14 @@ const UploadCont = styled.div`
   justify-content: center;
 `
 
-const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
+const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; color: string }>`
   min-width: 60px;
   max-width: 60px;
   height: 60px;
   margin-right: ${(props) => !props.leftButton && '24px'};
   margin-left: ${(props) => props.leftButton && '24px'};
   border: none;
+  color: ${(props) => props.color};
   background: transparent;
   box-sizing: border-box;
   border-radius: 50%;
@@ -737,6 +750,10 @@ const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean }>`
   outline: none;
   cursor: pointer;
   visibility: ${(props) => props.hide && 'hidden'};
+  & > svg {
+    width: 40px;
+    height: 40px;
+  }
   @media (max-width: 768px) {
     min-width: 36px;
     max-width: 36px;

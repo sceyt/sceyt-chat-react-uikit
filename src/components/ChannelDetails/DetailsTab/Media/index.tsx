@@ -7,17 +7,19 @@ import { activeTabAttachmentsSelector } from '../../../../store/message/selector
 // Helpers
 import { isJSON } from '../../../../helpers/message'
 import { channelDetailsTabs } from '../../../../helpers/constants'
-import { colors } from '../../../../UIHelper/constants'
 import { IAttachment, IChannel } from '../../../../types'
 // Components
 import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
+import { useColor } from '../../../../hooks'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 
 interface IProps {
   channel: IChannel
 }
 
 const Media = ({ channel }: IProps) => {
+  const { [THEME_COLORS.BACKGROUND]: background } = useColor()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -36,7 +38,7 @@ const Media = ({ channel }: IProps) => {
             <Attachment
               attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
               handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={colors.white}
+              backgroundColor={background}
               borderRadius='8px'
               isDetailsView
             />
@@ -46,7 +48,7 @@ const Media = ({ channel }: IProps) => {
             <Attachment
               attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
               handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={colors.white}
+              backgroundColor={background}
               borderRadius='8px'
               isDetailsView
             />

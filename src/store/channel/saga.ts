@@ -48,7 +48,8 @@ import {
   TURN_ON_NOTIFICATION,
   UPDATE_CHANNEL,
   WATCH_FOR_EVENTS,
-  SEND_RECORDING
+  SEND_RECORDING,
+  GET_CHANNEL_MENTIONS
 } from './constants'
 import {
   destroyChannelsMap,
@@ -97,6 +98,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
 import { channelListHiddenSelector } from './selector'
 import log from 'loglevel'
+import { queryDirection } from 'store/message/constants'
 
 function* createChannel(action: IAction): any {
   try {
@@ -672,6 +674,23 @@ function* channelsLoadMore(action: IAction): any {
   }
 }
 
+function* getChannelMentions(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+    const SceytChatClient = getClient()
+    const mentionsQueryBuilder = new (SceytChatClient.MentionsListQueryBuilder as any)()
+    mentionsQueryBuilder.setChannelId(channelId)
+    mentionsQueryBuilder.limit(10)
+    mentionsQueryBuilder.setDirection(queryDirection.NEXT)
+    const mentionsQuery = yield call(mentionsQueryBuilder.build)
+    const mentions = yield call(mentionsQuery.loadNext)
+    yield put(updateChannelDataAC(channelId, { mentionsIds: mentions.mentions }))
+  } catch (error) {
+    log.error(error, 'Error in get channel mentions')
+  }
+}
+
 function* channelsForForwardLoadMore(action: IAction): any {
   try {
     const { payload } = action
@@ -742,23 +761,6 @@ function* markMessagesRead(action: IAction): any {
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
         updateMessageOnAllMessages(messageId, updateParams)
       }
-
-      /* if (channelId === activeChannelId) {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId,
-            unreadMessageCount: channel.newMessageCount
-          })
-        )
-      } else {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId
-          })
-        )
-      } */
     }
   } catch (e) {
     log.error(e, 'Error on mark messages read')
@@ -1109,14 +1111,14 @@ function* checkUsersStatus(/* action: IAction */): any {
     updatedUsers.forEach((updatedUser: IMember) => {
       if (
         updatedUser.presence &&
-        (updatedUser.presence.state !== usersMap[updatedUser.id].presence.state ||
-          updatedUser.presence.status !== usersMap[updatedUser.id].presence.status ||
+        (updatedUser.presence.state !== usersMap[updatedUser.id]?.presence?.state ||
+          updatedUser.presence.status !== usersMap[updatedUser.id]?.presence?.status ||
           (updatedUser.presence.lastActiveAt &&
             new Date(updatedUser.presence.lastActiveAt).getTime() !==
-              new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
-          updatedUser.avatarUrl !== usersMap[updatedUser.id].avatarUrl ||
-          updatedUser.firstName !== usersMap[updatedUser.id].firstName ||
-          updatedUser.lastName !== usersMap[updatedUser.id].lastName)
+              new Date(usersMap[updatedUser.id]?.presence?.lastActiveAt || 0).getTime()) ||
+          updatedUser.avatarUrl !== usersMap[updatedUser.id]?.avatarUrl ||
+          updatedUser.firstName !== usersMap[updatedUser.id]?.firstName ||
+          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName)
       ) {
         updateUserOnMap(updatedUser)
         usersToUpdateMap[updatedUser.id] = updatedUser
@@ -1305,4 +1307,5 @@ export default function* ChannelsSaga() {
   yield takeLatest(JOIN_TO_CHANNEL, joinChannel)
   yield takeLatest(DELETE_ALL_MESSAGES, deleteAllMessages)
   yield takeLatest(REMOVE_CHANNEL_CACHES, removeChannelCaches)
+  yield takeLatest(GET_CHANNEL_MENTIONS, getChannelMentions)
 }
