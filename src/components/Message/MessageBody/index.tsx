@@ -150,6 +150,8 @@ interface IMessageBodyProps {
   handleReactionAddDelete: (emoji: any) => void
   handleCreateChat: (user?: IUser) => void
   messageTextRef: React.RefObject<HTMLSpanElement>
+  handleOpenUserProfile: (user: IUser) => void
+  shouldOpenUserProfileForMention?: boolean
 }
 
 const MessageBody = ({
@@ -268,7 +270,9 @@ const MessageBody = ({
   handleMouseLeave,
   handleReactionAddDelete,
   handleCreateChat,
-  messageTextRef
+  messageTextRef,
+  handleOpenUserProfile,
+  shouldOpenUserProfileForMention
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -580,7 +584,9 @@ const MessageBody = ({
             contactsMap,
             getFromContacts,
             accentColor,
-            textSecondary
+            textSecondary,
+            onMentionNameClick: handleOpenUserProfile,
+            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention
           })}
         </span>
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (

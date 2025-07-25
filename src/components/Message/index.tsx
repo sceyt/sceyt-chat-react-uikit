@@ -18,7 +18,7 @@ import {
   setMessageMenuOpenedAC,
   setMessageToEditAC
 } from 'store/message/actions'
-import { createChannelAC, markMessagesAsReadAC } from 'store/channel/actions'
+import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
 import { CONNECTION_STATUS } from 'store/user/constants'
 // Hooks
 import { useDidUpdate, useOnScreen, useColor } from 'hooks'
@@ -152,8 +152,6 @@ const Message = ({
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
   fileAttachmentsBoxWidth,
-  // fileAttachmentsNameMaxLength,
-  // fileAttachmentsBoxBackground,
   fileAttachmentsBoxBorder,
   fileAttachmentsTitleColor,
   fileAttachmentsSizeColor,
@@ -174,7 +172,8 @@ const Message = ({
   theme,
   messageTextFontSize,
   messageTextLineHeight,
-  messageTimeColorOnAttachment
+  messageTimeColorOnAttachment,
+  shouldOpenUserProfileForMention
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -488,6 +487,31 @@ const Message = ({
     }
   }, [])
 
+  const handleOpenChannelDetails = () => {
+    dispatch(switchChannelInfoAC(true))
+  }
+
+  const handleOpenUserProfile = (user?: any) => {
+    if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
+      dispatch(
+        createChannelAC(
+          {
+            metadata: '',
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
+            members: [
+              {
+                ...user,
+                role: 'owner'
+              }
+            ]
+          },
+          true
+        )
+      )
+      handleOpenChannelDetails()
+    }
+  }
+
   return (
     <MessageItem
       className='message_item'
@@ -612,6 +636,7 @@ const Message = ({
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}
             handleMediaItemClick={handleMediaItemClick}
             isThreadMessage={isThreadMessage}
+            handleOpenUserProfile={handleOpenUserProfile}
           />
         ) : (
           <MessageBody
@@ -734,6 +759,8 @@ const Message = ({
             handleCreateChat={handleCreateChat}
             messageTextRef={messageTextRef}
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            handleOpenUserProfile={handleOpenUserProfile}
+            shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (

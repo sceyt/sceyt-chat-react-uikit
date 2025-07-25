@@ -60,6 +60,7 @@ interface ICustomMessageItem {
   handleScrollToRepliedMessage: (messageId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   isThreadMessage?: boolean
+  handleOpenUserProfile: (user: IUser) => void
 }
 
 export interface IMessageProps {
@@ -189,4 +190,5 @@ export interface IMessageProps {
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
+  shouldOpenUserProfileForMention?: boolean
 }

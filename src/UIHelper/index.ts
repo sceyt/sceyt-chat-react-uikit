@@ -678,6 +678,7 @@ export const StyledText = styled.span<{
   isLastMessage?: boolean
   textDecoration?: string
   letterSpacing?: string
+  shouldOpenUserProfileForMention?: boolean
 }>`
   font-weight: ${(props) => props.fontWeight || (props.isLastMessage && '500')};
   font-family: ${(props) => props.fontFamily};
@@ -688,6 +689,7 @@ export const StyledText = styled.span<{
   &.mention {
     color: ${(props) => props.color};
     font-weight: ${(props) => props.isLastMessage && '500'};
+    cursor: ${(props) => props.shouldOpenUserProfileForMention && 'pointer'};
   }
   &.bold {
     font-weight: 600;
