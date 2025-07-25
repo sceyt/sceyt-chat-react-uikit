@@ -873,6 +873,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (customUploader) {
         if (fileType === 'image') {
           resizeImage(file).then(async (resizedFile: any) => {
+            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
@@ -883,11 +884,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
                 tid,
                 size: dataFromDb ? dataFromDb.size : file.size,
-                metadata: dataFromDb && dataFromDb.metadata
+                metadata: {
+                  ...(dataFromDb && dataFromDb.metadata),
+                  szw: imageWidth,
+                  szh: imageHeight,
+                  tmb: thumbnail
+                }
               }
             ])
           })
         } else if (fileType === 'video') {
+          const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -898,7 +905,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               attachmentUrl: URL.createObjectURL(file),
               tid,
               size: dataFromDb ? dataFromDb.size : file.size,
-              metadata: dataFromDb && dataFromDb.metadata
+              metadata: {
+                ...(dataFromDb && dataFromDb.metadata),
+                szw: width,
+                szh: height,
+                tmb: thumb
+              }
             }
           ])
         } else {

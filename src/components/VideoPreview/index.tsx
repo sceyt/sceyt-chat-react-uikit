@@ -5,8 +5,6 @@ import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 // import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
 // import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
-import { getFrame3 } from '../../helpers/getVideoFrame'
-import { setVideoThumb } from '../../helpers/messagesHalper'
 import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
 import { base64ToToDataURL } from '../../helpers/resizeImage'
@@ -92,42 +90,49 @@ const VideoPreview = memo(function VideoPreview({
     }
   } */
   useEffect(() => {
-    let checkVideoInterval: any
-    if (videoRef.current) {
-      let intervalCount = 0
-      checkVideoInterval = setInterval(async () => {
-        intervalCount++
-        if (videoRef.current && videoRef.current.readyState > 3) {
-          // drawCanvas()
-          // videoRef.current.currentTime = 2
-          setLoading(false)
-          setVideoDuration(videoRef.current.duration)
-          const minutes = Math.floor(videoRef.current.duration / 60)
-          const seconds = Math.floor(videoRef.current.duration % 60)
-          setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-          if (isPreview) {
-            const thumb = await getFrame3(videoRef.current, 0)
-            if (thumb) {
-              setVideoThumb(file.tid!, { ...thumb, duration: videoRef.current.duration })
-              if (setVideoIsReadyToSend) {
-                setVideoIsReadyToSend(file.tid!)
-              }
-            }
-          }
-          clearInterval(checkVideoInterval)
+    const video = videoRef.current
+    if (!video) return
+
+    const checkReadyState = () => {
+      if (video.readyState > 3) {
+        // Video is ready
+        setLoading(false)
+        setVideoDuration(video.duration)
+        const minutes = Math.floor(video.duration / 60)
+        const seconds = Math.floor(video.duration % 60)
+        setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        console.log('videoCurrentTime **************', `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        if (setVideoIsReadyToSend) {
+          setVideoIsReadyToSend(file.tid!)
         }
-        if (intervalCount >= 8) {
-          if (setVideoIsReadyToSend) {
-            setVideoIsReadyToSend(file.tid!)
-            clearInterval(checkVideoInterval)
-          }
-        }
-      }, 1000)
+        return true
+      }
+      return false
     }
-    /* if (downloadIsCancelled) {
-      clearInterval(checkVideoInterval)
-    } */
-    return () => clearInterval(checkVideoInterval)
+
+    // Try immediate check
+    if (checkReadyState()) return
+
+    // Set up event listeners
+    const handleCanPlay = () => checkReadyState()
+    const handleLoadedMetadata = () => checkReadyState()
+
+    video.addEventListener('canplay', handleCanPlay)
+    video.addEventListener('loadedmetadata', handleLoadedMetadata)
+
+    // Fallback interval
+    const interval = setInterval(() => {
+      console.log('checkReadyState **************')
+      if (checkReadyState()) {
+        clearInterval(interval)
+      }
+    }, 1000)
+
+    return () => {
+      video.removeEventListener('canplay', handleCanPlay)
+      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      clearInterval(interval)
+    }
   }, [])
 
   useEffect(() => {
@@ -288,6 +293,7 @@ const VideoTime = styled.div<{
   background-color: ${(props) => `${props.messageTimeBackgroundColor}40`};
   line-height: 14px;
   color: ${(props) => props.color};
+  z-index: 10;
 
   & > svg {
     color: ${(props) => props.color};
