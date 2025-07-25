@@ -1,8 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react'
 import styled from 'styled-components'
 import { useColor, useDidUpdate, useEventListener } from '../../hooks'
-import { colors, THEME_COLORS } from '../../UIHelper/constants'
-import { THEME } from '../../helpers/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import log from 'loglevel'
 
 const DropDownContainer = styled.div<{
@@ -70,7 +69,13 @@ const DropDownTriggerContainer = styled.div<{
         `};
 `
 
-const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundColor: string; zIndex?: string }>`
+const DropDownBody = styled.div<{
+  position?: string
+  onScroll?: any
+  backgroundColor: string
+  zIndex?: string
+  borderColor: string
+}>`
   position: absolute;
   z-index: ${(props) => props.zIndex || '30'};
   min-width: 200px;
@@ -84,10 +89,8 @@ const DropDownBody = styled.div<{ position?: string; onScroll?: any; backgroundC
   border-radius: 8px;
   max-height: 220px;
   overflow-y: auto;
-  box-shadow:
-    0.8px 0.8px 0 rgba(31, 35, 60, 0.06),
-    0 0 2px rgba(31, 35, 60, 0.08),
-    0 2px 6px rgba(31, 35, 60, 0.16);
+  border: 0.5px solid ${(props) => props.borderColor};
+  box-shadow: 0px 0px 24px 0px #11153929;
 
   & > * {
     &:first-child {
@@ -151,7 +154,11 @@ const DropDown = ({
   order,
   zIndex
 }: IProps) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground } = useColor()
+  const {
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive
+  } = useColor()
 
   const [isOpen, setIsOpen] = useState(false)
   const dropDownRef = useRef<any>(null)
@@ -230,19 +237,20 @@ const DropDown = ({
         withIcon={React.isValidElement(trigger) ? withIcon : true}
         isOpen={isOpen}
         className={`dropdown-trigger ${isOpen ? 'open' : ''}`}
-        iconColor={iconColor || (theme === THEME.DARK ? textPrimary : '')}
+        iconColor={iconColor || iconInactive}
       >
         {React.isValidElement(trigger) ? trigger : <span>{trigger}</span>}
         {/* {React.cloneElement(trigger, { onClick: toggleDropdown })} */}
       </DropDownTriggerContainer>
       {isOpen && (
         <DropDownBody
-          backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
+          backgroundColor={backgroundSections}
           onScroll={handleScrolling}
           className='dropdown-body'
           ref={dropDownBodyRef}
           position={position}
           zIndex={zIndex}
+          borderColor={borderColor}
         >
           {children}
         </DropDownBody>

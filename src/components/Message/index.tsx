@@ -18,7 +18,7 @@ import {
   setMessageMenuOpenedAC,
   setMessageToEditAC
 } from 'store/message/actions'
-import { createChannelAC, markMessagesAsReadAC } from 'store/channel/actions'
+import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
 import { CONNECTION_STATUS } from 'store/user/constants'
 // Hooks
 import { useDidUpdate, useOnScreen, useColor } from 'hooks'
@@ -33,8 +33,8 @@ import {
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME } from 'helpers/constants'
-import { colors, THEME_COLORS } from 'UIHelper/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction } from 'types'
 // Components
 import Avatar from '../Avatar'
@@ -152,8 +152,6 @@ const Message = ({
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
   fileAttachmentsBoxWidth,
-  // fileAttachmentsNameMaxLength,
-  // fileAttachmentsBoxBackground,
   fileAttachmentsBoxBorder,
   fileAttachmentsTitleColor,
   fileAttachmentsSizeColor,
@@ -173,18 +171,22 @@ const Message = ({
   connectionStatus,
   theme,
   messageTextFontSize,
-  messageTextLineHeight
+  messageTextLineHeight,
+  messageTimeColorOnAttachment,
+  shouldOpenUserProfileForMention
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BORDER]: border
   } = useColor()
 
-  const bubbleOutgoing =
-    theme === THEME.DARK ? colors.outgoingMessageBackgroundDark : colors.outgoingMessageBackgroundLight
-  const bubbleIncoming =
-    theme === THEME.DARK ? colors.incomingMessageBackgroundDark : colors.incomingMessageBackgroundLight
+  const bubbleOutgoing = outgoingMessageBackground
+  const bubbleIncoming = incomingMessageBackground
 
   const dispatch = useDispatch()
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
@@ -485,9 +487,33 @@ const Message = ({
     }
   }, [])
 
+  const handleOpenChannelDetails = () => {
+    dispatch(switchChannelInfoAC(true))
+  }
+
+  const handleOpenUserProfile = (user?: any) => {
+    if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
+      dispatch(
+        createChannelAC(
+          {
+            metadata: '',
+            type: DEFAULT_CHANNEL_TYPE.DIRECT,
+            members: [
+              {
+                ...user,
+                role: 'owner'
+              }
+            ]
+          },
+          true
+        )
+      )
+      handleOpenChannelDetails()
+    }
+  }
+
   return (
     <MessageItem
-      key={message.id || message.tid}
       className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
@@ -520,7 +546,7 @@ const Message = ({
           disabled={tooManySelected && !isSelectedMessage}
           onClick={handleSelectMessage}
         >
-          {isSelectedMessage ? <SelectionIcon /> : <EmptySelection disabled={tooManySelected} />}
+          {isSelectedMessage ? <SelectionIcon /> : <EmptySelection disabled={tooManySelected} borderColor={border} />}
         </SelectMessageWrapper>
       )}
       {renderAvatar && (
@@ -579,7 +605,7 @@ const Message = ({
         )}
         {CustomMessageItem ? (
           <CustomMessageItem
-            key={message.id}
+            key={message.id || message.tid}
             channel={channel}
             message={message}
             prevMessage={prevMessage}
@@ -610,6 +636,7 @@ const Message = ({
             handleScrollToRepliedMessage={handleScrollToRepliedMessage}
             handleMediaItemClick={handleMediaItemClick}
             isThreadMessage={isThreadMessage}
+            handleOpenUserProfile={handleOpenUserProfile}
           />
         ) : (
           <MessageBody
@@ -731,6 +758,9 @@ const Message = ({
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleCreateChat={handleCreateChat}
             messageTextRef={messageTextRef}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            handleOpenUserProfile={handleOpenUserProfile}
+            shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
@@ -751,6 +781,7 @@ const Message = ({
             bottomOfMessage
             marginBottom={sameUserMessageSpacing}
             ownMessageOnRightSide={ownMessageOnRightSide}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
@@ -779,7 +810,7 @@ const Message = ({
             borderRadius={reactionsContainerBorderRadius}
             topPosition={reactionsContainerTopPosition}
             padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground || sectionBackground}
+            backgroundColor={reactionsContainerBackground || backgroundSections}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
           >
             <MessageReactionsCont
@@ -794,7 +825,7 @@ const Message = ({
                   self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
                   border={reactionItemBorder}
                   borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground || sectionBackground}
+                  backgroundColor={reactionItemBackground || backgroundSections}
                   padding={reactionItemPadding}
                   margin={reactionItemMargin}
                   isLastReaction={reactionsCount === 1}
@@ -985,11 +1016,11 @@ const SelectMessageWrapper = styled.div<{ activeColor?: string; disabled?: any }
     height: 24px;
   }
 `
-const EmptySelection = styled.span<{ disabled?: boolean }>`
+const EmptySelection = styled.span<{ disabled?: boolean; borderColor: string }>`
   display: inline-block;
   width: 24px;
   height: 24px;
-  border: 1.5px solid ${colors.borderColor2};
+  border: 1.5px solid ${(props) => props.borderColor};
   box-sizing: border-box;
   border-radius: 50%;
   transform: scale(0.92);
@@ -1001,7 +1032,7 @@ const ReactionsContainer = styled.div<{
   boxShadow?: string
   borderRadius?: string
   topPosition?: string
-  backgroundColor?: string
+  backgroundColor: string
   padding?: string
   rtlDirection?: boolean
 }>`
@@ -1015,7 +1046,7 @@ const ReactionsContainer = styled.div<{
   box-shadow: ${(props) => props.boxShadow || '0px 4px 12px -2px rgba(17, 21, 57, 0.08)'};
   filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
   border-radius: ${(props) => props.borderRadius || '16px'};
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
   padding: ${(props) => props.padding || '4px 8px'};
   z-index: 9;
   ${(props) =>

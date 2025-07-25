@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../../assets/svg/linkIcon.svg'
-import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
@@ -21,7 +21,12 @@ const LinkItem = ({
   linkPreviewColor,
   linkPreviewHoverBackgroundColor
 }: IProps) => {
-  const { [THEME_COLORS.ACCENT]: accentColor, [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
+  const {
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.SURFACE_1]: surface1
+  } = useColor()
 
   // const [title, setTitle] = useState('')
   // const [imageSrc, setImageSrc] = useState('')
@@ -41,7 +46,7 @@ const LinkItem = ({
     ) */
   }, [])
   return (
-    <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor || colors.hoverBackgroundColor}>
+    <FileItem draggable={false} hoverBackgroundColor={linkPreviewHoverBackgroundColor || backgroundHovered}>
       <a draggable={false} href={link.startsWith('http') ? link : `https://${link}`} target='_blank' rel='noreferrer'>
         {/* {loading ? (
           <Loading />
@@ -49,8 +54,12 @@ const LinkItem = ({
           <LinkMetaImage src={imageSrc} />
         ) : ( */}
         <React.Fragment>
-          <LinkIconCont color={accentColor}>{linkPreviewIcon || <LinkIcon />}</LinkIconCont>
-          <LinkHoverIconCont color={accentColor}>{linkPreviewHoverIcon || <LinkIcon />}</LinkHoverIconCont>
+          <LinkIconCont iconColor={accentColor} fillColor={surface1}>
+            {linkPreviewIcon || <LinkIcon />}
+          </LinkIconCont>
+          <LinkHoverIconCont iconColor={accentColor} fillColor={surface1}>
+            {linkPreviewHoverIcon || <LinkIcon />}
+          </LinkHoverIconCont>
         </React.Fragment>
         {/* )} */}
         <LinkInfoCont>
@@ -65,23 +74,25 @@ const LinkItem = ({
 
 export default LinkItem
 
-const LinkIconCont = styled.span<{ color?: string }>`
+const LinkIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: inline-flex;
   > svg {
-    color: ${(props) => props.color};
+    color: ${(props) => props.iconColor};
+    fill: ${(props) => props.fillColor};
   }
 `
-const LinkHoverIconCont = styled.span<{ color?: string }>`
+const LinkHoverIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: none;
   > svg {
-    color: ${(props) => props.color};
+    color: ${(props) => props.iconColor};
+    fill: ${(props) => props.fillColor};
   }
 `
 const LinkInfoCont = styled.div`
   margin-left: 12px;
   width: calc(100% - 40px);
 `
-const FileItem = styled.li<any>`
+const FileItem = styled.li<{ hoverBackgroundColor: string }>`
   padding: 9px 16px;
   a {
     display: flex;
@@ -89,7 +100,7 @@ const FileItem = styled.li<any>`
     text-decoration: none;
   }
   &:hover {
-    background-color: ${(props) => props.hoverBackgroundColor || colors.gray0};
+    background-color: ${(props) => props.hoverBackgroundColor};
     & ${LinkIconCont} {
       display: none;
     }

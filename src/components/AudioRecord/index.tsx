@@ -29,7 +29,9 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground
+    [THEME_COLORS.WARNING]: warningColor,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
 
   const [recording, setStartRecording] = useState<any>(null)
@@ -69,7 +71,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }
 
   async function startRecording() {
-    handleStartRecording()
     try {
       const permissionStatus = await navigator.permissions.query({ name: 'microphone' } as any)
       if (permissionStatus.state === 'granted') {
@@ -89,6 +90,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         setStartRecording(false)
         setShowRecording(false)
       } else {
+        handleStartRecording()
         recorder
           .start()
           .then(() => {
@@ -216,7 +218,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       .getMp3()
       .then(([buffer, blob]: any) => {
         setCurrentTime(0)
-        log.info(buffer, blob)
         const file = new File(buffer, 'record.mp3', {
           type: blob.type,
           lastModified: Date.now()
@@ -282,12 +283,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
+        handleStartRecording()
         intervalRef.current = setInterval(() => {
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(currentTime)
           }
         }, 10)
+      } else {
+        handleStopRecording()
       }
       wavesurfer.current.playPause()
     }
@@ -398,17 +402,23 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     })()
   }, [])
 
+  useEffect(() => {
+    return () => {
+      handleStopRecording()
+    }
+  }, [showRecording])
+
   return (
     <Container recording={showRecording}>
       {showRecording && (
-        <PlayPause iconColor={accentColor} onClick={() => cancelRecording()}>
+        <PlayPause iconColor={iconPrimary} onClick={() => cancelRecording()}>
           <CancelRecordIcon />
         </PlayPause>
       )}
 
-      <AudioWrapper backgroundColor={sectionBackground} recording={recording || recordedFile}>
+      <AudioWrapper backgroundColor={surface1} recording={recording || recordedFile}>
         {recording && (
-          <PlayPause onClick={() => stopRecording()}>
+          <PlayPause iconColor={warningColor} onClick={() => stopRecording()}>
             <StopIcon />
           </PlayPause>
         )}
@@ -472,6 +482,7 @@ const AudioVisualization = styled.div<{ show?: boolean }>`
   height: 28px;
   max-width: calc(100% - 100px);
   left: 40px;
+  background-color: ${(props) => props.color};
 `
 
 const PlayPause = styled.div<{ iconColor?: string }>`

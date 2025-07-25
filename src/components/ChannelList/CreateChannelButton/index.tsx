@@ -38,8 +38,9 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
-    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
   } = useColor()
 
   const [showAddMemberPopup, setShowAddMemberPopup] = useState(false)
@@ -63,7 +64,7 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
         theme={theme}
         zIndex='300'
         trigger={
-          <CreateDropdownButton hoverBackground={hoverBackground} leftAuto={!showSearch} iconColor={accentColor}>
+          <CreateDropdownButton hoverBackground={backgroundHovered} leftAuto={!showSearch} iconColor={accentColor}>
             {createChannelIcon || <AddChannelIcon />}
           </CreateDropdownButton>
         }
@@ -72,9 +73,10 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={1}
             textColor={textPrimary}
-            hoverBackground={hoverBackground}
+            hoverBackground={backgroundHovered}
             onClick={() => handleOpenCreateChannel('broadcast')}
             iconWidth='20px'
+            iconColor={iconPrimary}
           >
             {newChannelIcon || <CreateChannelIcon />}
             New channel
@@ -82,9 +84,10 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={2}
             textColor={textPrimary}
-            hoverBackground={hoverBackground}
+            hoverBackground={backgroundHovered}
             onClick={() => handleOpenCreateChannel('group')}
             iconWidth='20px'
+            iconColor={iconPrimary}
           >
             {newGroupIcon || <CreateGrouplIcon />}
             New group
@@ -92,9 +95,10 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
           <DropdownOptionLi
             key={3}
             textColor={textPrimary}
-            hoverBackground={hoverBackground}
+            hoverBackground={backgroundHovered}
             onClick={() => handleOpenCreateChannel('direct')}
             iconWidth='20px'
+            iconColor={iconPrimary}
           >
             {newChatIcon || <CreateChatIcon />}
             New chat

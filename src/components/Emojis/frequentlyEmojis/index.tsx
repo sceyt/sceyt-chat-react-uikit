@@ -1,12 +1,9 @@
 import React, { useEffect, useState } from 'react'
-import { useSelector } from 'react-redux'
 import styled from 'styled-components'
 import { ReactComponent as PlusIcon } from '../../../assets/svg/plus.svg'
 import { IReaction } from '../../../types'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
-import { themeSelector } from '../../../store/theme/selector'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
-import { THEME } from '../../../helpers/constants'
 
 function FrequentlyEmojis({
   handleAddEmoji,
@@ -21,12 +18,12 @@ function FrequentlyEmojis({
 }) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
 
-  const defaultEmojisMap = {
+  const defaultEmojisMap: Record<string, { key: string; reacted: boolean }> = {
     '👍': { key: '👍', reacted: false },
     '😍': { key: '😍', reacted: false },
     '❤️': { key: '❤️', reacted: false },
@@ -34,7 +31,6 @@ function FrequentlyEmojis({
     '😂': { key: '😂', reacted: false },
     '😏': { key: '😏', reacted: false }
   }
-  const theme = useSelector(themeSelector)
   const [rendered, setRendered] = useState<any>(false)
   const [emojis, setEmojis] = useState<any>([
     { key: '👍', reacted: false },
@@ -83,10 +79,10 @@ function FrequentlyEmojis({
   }, [])
 
   return (
-    <Container id='emojisContainer' backgroundColor={sectionBackground} rendered={rendered} rightSide={rtlDirection}>
+    <Container id='emojisContainer' backgroundColor={backgroundSections} rendered={rendered} rightSide={rtlDirection}>
       {emojis.map((emoji: any) => (
         <EmojiItem
-          activeBackground={hoverBackground}
+          activeBackground={backgroundHovered}
           active={emoji.reacted}
           key={emoji.key}
           onClick={() => chooseEmoji(emoji.key)}
@@ -96,8 +92,8 @@ function FrequentlyEmojis({
       ))}
       <OpenMoreEmojis
         onClick={() => handleEmojiPopupToggle(true)}
-        iconBackgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
-        hoverBackground={hoverBackground}
+        iconBackgroundColor={backgroundSections}
+        hoverBackground={backgroundHovered}
         iconHoverColor={accentColor}
         iconColor={textSecondary}
       >
@@ -109,13 +105,13 @@ function FrequentlyEmojis({
 
 export default FrequentlyEmojis
 
-const Container = styled.div<{ rendered?: boolean; rightSide?: boolean; backgroundColor?: string }>`
+const Container = styled.div<{ rendered?: boolean; rightSide?: boolean; backgroundColor: string }>`
   transform: scale(0, 0);
   transform-origin: ${(props) => (props.rightSide ? '100% 100%' : '0 100%')};
   display: flex;
   align-items: center;
   padding: 6px;
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
   box-shadow: 0 3px 10px -4px rgba(0, 0, 0, 0.2);
   border-radius: 24px;
   overflow: hidden;
@@ -155,8 +151,8 @@ const EmojiItem = styled.span<{ active?: boolean; activeBackground: string }>`
 `
 
 const OpenMoreEmojis = styled.span<{
-  iconBackgroundColor?: string
-  hoverBackground?: string
+  iconBackgroundColor: string
+  hoverBackground: string
   iconColor: string
   iconHoverColor: string
 }>`
@@ -174,7 +170,7 @@ const OpenMoreEmojis = styled.span<{
     width: 18px;
   }
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.hoverBackgroundColor};
+    background-color: ${(props) => props.hoverBackground};
     & > svg {
       color: ${(props) => props.iconHoverColor};
     }

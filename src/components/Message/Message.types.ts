@@ -23,9 +23,9 @@ export interface IMessageStyles {
   classname?: string
 }
 export interface IAttachmentProperties {
-  show?: boolean,
-  canDelete?: boolean,
-  canDownload?: boolean,
+  show?: boolean
+  canDelete?: boolean
+  canDownload?: boolean
   canForward?: boolean
 }
 
@@ -60,6 +60,7 @@ interface ICustomMessageItem {
   handleScrollToRepliedMessage: (messageId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   isThreadMessage?: boolean
+  handleOpenUserProfile: (user: IUser) => void
 }
 
 export interface IMessageProps {
@@ -188,4 +189,6 @@ export interface IMessageProps {
   theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
+  messageTimeColorOnAttachment?: string
+  shouldOpenUserProfileForMention?: boolean
 }

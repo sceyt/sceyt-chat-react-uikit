@@ -25,8 +25,8 @@ import {
   UploadFileLabel
 } from '../../../UIHelper'
 import { getClient } from '../../../common/client'
-import { DEFAULT_CHANNEL_TYPE, THEME } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { DEFAULT_CHANNEL_TYPE } from '../../../helpers/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel, IMember } from '../../../types'
 // Components
 import DropDown from '../../../common/dropdown'
@@ -34,12 +34,12 @@ import Avatar from '../../Avatar'
 import ImageCrop from '../../../common/imageCrop'
 import ConfirmPopup from '../../../common/popups/delete'
 
-const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor?: string }>`
+const Container = styled.div<{ active: boolean; heightOffset: any; backgroundColor: string }>`
   ${(props) => (props.active ? 'display: block' : 'display: none')};
   height: ${(props) => `calc(100vh - ${props.heightOffset ? props.heightOffset + 48 : 48}px)`};
   position: absolute;
   padding: 24px 16px;
-  background-color: ${(props) => props.backgroundColor || colors.white};
+  background-color: ${(props) => props.backgroundColor};
   z-index: 25;
 `
 
@@ -102,12 +102,16 @@ const EditChannel = ({
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.BORDER]: borderColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.WARNING]: errorColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+    [THEME_COLORS.WARNING]: warningColor,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const ChatClient = getClient()
@@ -239,26 +243,21 @@ const EditChannel = ({
   }, [])
   return (
     <React.Fragment>
-      <Container
-        ref={editContainer}
-        heightOffset={offsetTop}
-        active={isEditMode}
-        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
-      >
+      <Container ref={editContainer} heightOffset={offsetTop} active={isEditMode} backgroundColor={background}>
         <AvatarCont>
           <DropDownWrapper>
             {!isDirectChannel && channel.userRole && (
               <DropDown
                 theme={theme}
                 position='center'
-                iconColor={colors.white}
+                iconColor={iconPrimary}
                 trigger={getUploadImageIcon() || <CameraIcon />}
               >
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
                     textColor={textPrimary}
-                    hoverBackground={hoverBackground}
+                    hoverBackground={backgroundHovered}
                     onClick={() => onOpenFileUploader()}
                     iconWidth='20px'
                   >
@@ -269,8 +268,8 @@ const EditChannel = ({
                   {newAvatar.url && (
                     <DropdownOptionLi
                       key={2}
-                      hoverBackground={hoverBackground}
-                      textColor={errorColor}
+                      hoverBackground={backgroundHovered}
+                      textColor={warningColor}
                       onClick={handleToggleDeleteAvatarPopup}
                       iconWidth='20px'
                     >
@@ -296,15 +295,16 @@ const EditChannel = ({
           theme={theme}
           color={textPrimary}
           borderColor={borderColor}
-          errorColor={errorColor}
+          errorColor={warningColor}
           placeholderColor={textFootnote}
-          backgroundColor={sectionBackground}
+          backgroundColor={backgroundSections}
           placeholder='Channel Subject'
           value={newSubject}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewSubject(e.target.value)}
+          disabledColor={surface1}
         />
         {subjectIsWrong && (
-          <InputErrorMessage color={errorColor}>
+          <InputErrorMessage color={warningColor}>
             Channel name must be a minimum of 1 and a maximum of 250 symbols.
           </InputErrorMessage>
         )}
@@ -314,16 +314,19 @@ const EditChannel = ({
           error={descriptionIsWrong}
           theme={theme}
           color={textPrimary}
-          errorColor={errorColor}
+          errorColor={warningColor}
           borderColor={borderColor}
-          backgroundColor={sectionBackground}
+          backgroundColor={backgroundSections}
           placeholderColor={textFootnote}
           placeholder='Channel description'
           value={newDescription}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setNewDescription(e.target.value)}
+          disabledColor={surface1}
         />
         {descriptionIsWrong && (
-          <InputErrorMessage color={errorColor}>Channel description must be maximum of 2000 symbols.</InputErrorMessage>
+          <InputErrorMessage color={warningColor}>
+            Channel description must be maximum of 2000 symbols.
+          </InputErrorMessage>
         )}
 
         <EditChannelFooter>
@@ -331,7 +334,7 @@ const EditChannel = ({
             type='button'
             borderRadius='8px'
             color={editChannelCancelButtonTextColor || textPrimary}
-            backgroundColor={editChannelCancelButtonBackgroundColor || sectionBackground}
+            backgroundColor={editChannelCancelButtonBackgroundColor || surface1}
             onClick={() => handleToggleEditMode(false)}
           >
             Cancel
@@ -339,7 +342,7 @@ const EditChannel = ({
           <Button
             disabled={subjectIsWrong || descriptionIsWrong}
             borderRadius='8px'
-            color={editChannelSaveButtonTextColor || colors.white}
+            color={editChannelSaveButtonTextColor || textOnPrimary}
             backgroundColor={editChannelSaveButtonBackgroundColor || accentColor}
             onClick={handleSave}
           >

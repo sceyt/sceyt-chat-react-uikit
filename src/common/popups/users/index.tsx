@@ -17,7 +17,7 @@ import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from
 import Avatar from '../../../components/Avatar'
 import { addMembersAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
 import { getContactsAC, getUsersAC, loadMoreUsersAC } from '../../../store/user/actions'
 import {
@@ -72,11 +72,17 @@ const UsersPopup = ({
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
     [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const dispatch = useDispatch()
@@ -176,27 +182,6 @@ const UsersPopup = ({
     }
     setSelectedMembers(newSelectedMembers)
   }
-
-  /* const setUserRole = (username: string, roleName: string) => {
-    if (username && roleName) {
-      const newSelectedMembers = selectedMembers.map((member) => {
-        if (member.id === username) {
-          return {
-            ...member,
-            role: roleName
-          }
-        }
-        if (member.role.name === (roleName === 'owner')) {
-          return {
-            ...member,
-            role: 'participant'
-          }
-        }
-        return member
-      })
-      setSelectedMembers(newSelectedMembers)
-    }
-  } */
 
   const handleCreateChannel = (selectedUser?: IUser) => {
     if (actionType === 'createChat' && selectedUser) {
@@ -317,8 +302,7 @@ const UsersPopup = ({
         height={popupHeight}
         padding='0'
         display='flex'
-        backgroundColor={theme === THEME.DARK ? colors.dark : colors.white}
-        boxShadow={theme === THEME.DARK ? '0px 0px 30px rgba(71, 71, 71, 0.42)' : ''}
+        backgroundColor={background}
       >
         <PopupBody paddingH='12px' paddingV='24px' withFooter={actionType !== 'createChat'}>
           <CloseIcon color={textSecondary} onClick={handleClosePopup} />
@@ -327,7 +311,7 @@ const UsersPopup = ({
             {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
           </PopupName>
           <SearchUserCont className='p-relative'>
-            <StyledSearchSvg />
+            <StyledSearchSvg color={iconInactive} />
             <SearchUsersInput
               height='40px'
               onChange={handleTypeSearchUser}
@@ -335,9 +319,10 @@ const UsersPopup = ({
               placeholder='Search for users'
               type='text'
               widthBorder={theme !== THEME.DARK}
-              backgroundColor={sectionBackground}
+              backgroundColor={surface1}
               color={textPrimary}
-              placeholderColor={textSecondary}
+              placeholderColor={textFootnote}
+              borderColor={border}
             />
             {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
@@ -345,7 +330,7 @@ const UsersPopup = ({
             <SelectedMembersContainer ref={selectedMembersCont}>
               {selectedMembers.map((member) => {
                 return (
-                  <SelectedMemberBubble backgroundColor={sectionBackground} key={`selected-${member.id}`}>
+                  <SelectedMemberBubble backgroundColor={surface1} key={`selected-${member.id}`}>
                     <Avatar
                       image={member.avatarUrl}
                       name={member.displayName || member.id}
@@ -370,6 +355,7 @@ const UsersPopup = ({
             onScroll={handleMembersListScroll}
             onMouseEnter={() => setIsScrolling(true)}
             onMouseLeave={() => setIsScrolling(false)}
+            thumbColor={surface2}
           >
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
@@ -383,7 +369,7 @@ const UsersPopup = ({
 
               return (
                 <ListRow
-                  hoverBackground={hoverBackground}
+                  hoverBackground={backgroundHovered}
                   key={user.id}
                   onClick={() => {
                     actionType === 'createChat' && handleAddMember(user)
@@ -444,27 +430,19 @@ const UsersPopup = ({
                     <CustomCheckbox
                       index={user.id}
                       state={isSelected}
-                      backgroundColor={theme === THEME.DARK ? sectionBackground : colors.white}
+                      backgroundColor={'transparent'}
                       checkedBackgroundColor={accentColor}
+                      borderColor={iconInactive}
                       onClick={(e) => {
                         e.stopPropagation()
                       }}
                       size='18px'
                     />
-                    /* <SelectMember
-                        name='member-username'
-                        type='checkbox'
-                        checked={isSelected}
-                        onChange={(e: React.ChangeEvent<HTMLInputElement>) =>
-                          handleUserSelect(e, { id: contact.user.id, displayName: memberDisplayName })
-                        }
-                      /> */
                   )}
                 </ListRow>
               )
             })}
           </MembersContainer>
-          {/* </MembersContainer> */}
         </PopupBody>
 
         {actionType !== 'createChat' && (
@@ -480,7 +458,7 @@ const UsersPopup = ({
             )}
             <Button
               type='button'
-              color={colors.white}
+              color={textOnPrimary}
               backgroundColor={accentColor}
               borderRadius='8px'
               disabled={selectIsRequired && selectedMembers.length === 0}
@@ -524,6 +502,7 @@ const List = styled.div<{ isAdd: boolean }>`
 const MembersContainer = styled(List)<{
   isAdd: boolean
   selectedMembersHeight: number
+  thumbColor: string
 }>`
   display: flex;
   flex-direction: column;
@@ -544,7 +523,7 @@ const MembersContainer = styled(List)<{
   }
 
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    background: #818c99;
+    background: ${(props) => props.thumbColor};
     border-radius: 4px;
   }
   &.show-scrollbar::-webkit-scrollbar-track {
@@ -571,11 +550,12 @@ const SearchUsersInput = styled.input<{
   backgroundColor?: string
   color: string
   placeholderColor: string
+  borderColor: string
 }>`
   height: 40px;
   width: 100%;
   font-size: 14px;
-  border: ${(props) => (props.widthBorder ? `1px solid ${colors.gray1}` : 'none')};
+  border: ${(props) => (props.widthBorder ? `1px solid ${props.borderColor}` : 'none')};
   box-sizing: border-box;
   border-radius: 8px;
   padding-left: 36px;
@@ -593,7 +573,7 @@ const SearchUsersInput = styled.input<{
   }
 `
 
-const ListRow = styled.div<{ hoverBackground?: string }>`
+const ListRow = styled.div<{ hoverBackground: string }>`
   display: flex;
   justify-content: space-between;
   flex-direction: row;
@@ -602,9 +582,8 @@ const ListRow = styled.div<{ hoverBackground?: string }>`
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
-
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.gray0};
+    background-color: ${(props) => props.hoverBackground};
   }
 
   & ${UserStatus} {

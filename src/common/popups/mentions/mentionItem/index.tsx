@@ -1,7 +1,7 @@
 import React from 'react'
 import styled from 'styled-components'
 import { USER_PRESENCE_STATUS } from '../../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { AvatarWrapper, UserStatus } from '../../../../components/Channel'
 import { Avatar } from '../../../../components'
 import { userLastActiveDateFormat } from '../../../../helpers'
@@ -16,14 +16,14 @@ interface IMentionsPopupProps {
 }
 
 export default function MentionMember({ mention, isFocused, ...parentProps }: IMentionsPopupProps) {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.SURFACE_1]: surface1
+  } = useColor()
+
   return (
-    <MemberItem
-      key={mention.id}
-      isActiveItem={isFocused}
-      activeBackgroundColor={colors.hoverBackgroundColor}
-      {...parentProps}
-    >
+    <MemberItem key={mention.id} isActiveItem={isFocused} activeBackgroundColor={surface1} {...parentProps}>
       <AvatarWrapper>
         <Avatar name={mention.name} image={mention.avatar} size={32} textSize={14} setDefaultAvatar />
       </AvatarWrapper>
@@ -75,7 +75,7 @@ const MemberItem = styled.div<{ isActiveItem?: boolean; activeBackgroundColor?: 
   padding: 6px 16px;
   transition: all 0.2s;
   cursor: pointer;
-  background-color: ${(props) => props.isActiveItem && (props.activeBackgroundColor || colors.hoverBackgroundColor)};
+  background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
 
   &:hover ${EditMemberIcon} {
     opacity: 1;

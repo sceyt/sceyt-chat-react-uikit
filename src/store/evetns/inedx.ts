@@ -78,6 +78,8 @@ import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
+import store from 'store'
+import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -510,14 +512,18 @@ export default function* watchForEvents(): any {
         } else {
           const groupName = getChannelGroupName(channel)
           if (channelExists) {
+            let updateChannelData = {}
             if (activeChannelId === channel.id) {
               yield put(removeMemberFromListAC([member]))
+              updateChannelData = yield call(updateActiveChannelMembersRemove, [member]) || {}
             }
+
             yield put(
               updateChannelDataAC(channel.id, {
                 memberCount: channel.memberCount,
                 muted: channel.muted,
-                mutedTill: channel.mutedTill
+                mutedTill: channel.mutedTill,
+                ...updateChannelData
               })
             )
           }
@@ -571,8 +577,10 @@ export default function* watchForEvents(): any {
               yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
             }
           } else {
+            let updateChannelData = {}
             if (activeChannelId === channel.id) {
               yield put(removeMemberFromListAC(removedMembers))
+              updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
             }
 
             const groupName = getChannelGroupName(channel)
@@ -587,7 +595,8 @@ export default function* watchForEvents(): any {
               updateChannelDataAC(channel.id, {
                 memberCount: channel.memberCount,
                 muted: channel.muted,
-                mutedTill: channel.mutedTill
+                mutedTill: channel.mutedTill,
+                ...updateChannelData
               })
             )
           }
@@ -607,14 +616,17 @@ export default function* watchForEvents(): any {
         const activeChannelId = yield call(getActiveChannelId)
         const channelExists = checkChannelExists(channel.id)
         if (channelExists) {
+          let updateChannelData = {}
           if (activeChannelId === channel.id) {
             yield put(addMembersToListAC(addedMembers))
+            updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
           }
           yield put(
             updateChannelDataAC(channel.id, {
               memberCount: channel.memberCount,
               muted: channel.muted,
-              mutedTill: channel.mutedTill
+              mutedTill: channel.mutedTill,
+              ...updateChannelData
             })
           )
         } else {
@@ -638,6 +650,7 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
+        log.info('channel UPDATE_CHANNEL ... ')
         const { updatedChannel } = args
         const channelExists = checkChannelExists(updatedChannel.id)
         const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
@@ -684,31 +697,15 @@ export default function* watchForEvents(): any {
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
           const channelForAdd = JSON.parse(JSON.stringify(channel))
+
           yield put(addChannelAC(channelForAdd))
           if (!channelExists) {
             yield call(setChannelInMap, channel)
           } else if (!message.repliedInThread) {
             yield put(updateChannelLastMessageAC(message, channelForAdd))
           }
+
           if (channel.id === activeChannelId) {
-            // TODO message for thread reply
-            /* if (message.repliedInThread) {
-              // const messageForThreadReply = yield select(messageForThreadReplySelector);
-              let parentMessage;
-              if (!messageForThreadReply) {
-                const messageQueryBuilder = new sceytClient.MessageListQueryBuilder(channel.id);
-                messageQueryBuilder.limit(1);
-                const messageQuery = yield call(messageQueryBuilder.build);
-                const { messages } = yield call(messageQuery.loadNearMessageId, message.parent.id);
-                [parentMessage] = messages;
-                yield put(setMessageForThreadReply(parentMessage));
-              } else {
-                parentMessage = messageForThreadReply;
-              }
-              yield put(addThreadReplyMessage(message));
-              yield put(updateMessageAC(message.parent.id, { replyCount: parentMessage.replyCount }));
-              yield put(updateMessageForThreadReply({ replyCount: parentMessage.replyCount }));
-            } else { */
             if (!getHasNextCached()) {
               yield put(addMessageAC(message))
             }
@@ -729,7 +726,17 @@ export default function* watchForEvents(): any {
           }
           yield put(
             updateChannelDataAC(channel.id, {
-              ...channelForAdd,
+              messageCount: channelForAdd.messageCount,
+              unread: channelForAdd.unread,
+              newMessageCount: channelForAdd.newMessageCount,
+              newMentionCount: channelForAdd.newMentionCount,
+              newReactedMessageCount: channelForAdd.newReactedMessageCount,
+              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+              lastMessage: channelForAdd.lastMessage,
+              messages: channelForAdd.messages,
+              newReactions: channelForAdd.newReactions,
               userMessageReactions: [],
               lastReactedMessage: null
             })
@@ -739,7 +746,17 @@ export default function* watchForEvents(): any {
             updateSearchedChannelDataAC(
               channel.id,
               {
-                ...channelForAdd,
+                messageCount: channelForAdd.messageCount,
+                unread: channelForAdd.unread,
+                newMessageCount: channelForAdd.newMessageCount,
+                newMentionCount: channelForAdd.newMentionCount,
+                newReactedMessageCount: channelForAdd.newReactedMessageCount,
+                lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+                lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+                messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+                lastMessage: channelForAdd.lastMessage,
+                messages: channelForAdd.messages,
+                newReactions: channelForAdd.newReactions,
                 userMessageReactions: [],
                 lastReactedMessage: null
               },
@@ -753,13 +770,19 @@ export default function* watchForEvents(): any {
               if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
                 const contactsMap = yield select(contactsMapSelector)
                 const getFromContacts = getShowOnlyContactUsers()
+                const state = store.getState()
+                const theme = state.ThemeReducer.theme || 'light'
+                const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+                const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
                 const messageBody = MessageTextFormat({
                   text: message.body,
                   message,
                   contactsMap,
                   getFromContacts,
                   isLastMessage: false,
-                  asSampleText: true
+                  asSampleText: true,
+                  accentColor,
+                  textSecondary
                 })
                 setNotification(
                   messageBody,
@@ -781,9 +804,19 @@ export default function* watchForEvents(): any {
           }
 
           updateChannelOnAllChannels(channel.id, {
-            ...channelForAdd,
-            userMessageReactions: [],
-            lastReactedMessage: null
+            messageCount: channelForAdd.messageCount,
+            unread: channelForAdd.unread,
+            newMessageCount: channelForAdd.newMessageCount,
+            newMentionCount: channelForAdd.newMentionCount,
+            newReactedMessageCount: channelForAdd.newReactedMessageCount,
+            lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+            lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+            messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+            lastMessage: channelForAdd.lastMessage,
+            messages: channelForAdd.messages,
+            newReactions: channelForAdd.newReactions,
+            lastReactedMessage: channel.lastReactedMessage,
+            userMessageReactions: channel.userMessageReactions
           })
           updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
         }
@@ -960,13 +993,19 @@ export default function* watchForEvents(): any {
             if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
               const contactsMap = yield select(contactsMapSelector)
               const getFromContacts = getShowOnlyContactUsers()
+              const state = store.getState()
+              const theme = state.ThemeReducer.theme || 'light'
+              const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+              const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
               const messageBody = MessageTextFormat({
                 text: message.body,
                 message,
                 contactsMap,
                 getFromContacts,
                 isLastMessage: false,
-                asSampleText: true
+                asSampleText: true,
+                accentColor,
+                textSecondary
               })
               setNotification(
                 messageBody,
@@ -1048,7 +1087,20 @@ export default function* watchForEvents(): any {
         // yield put(setChannelUnreadCount(0, channel.id));
         if (channel) {
           const updatedChannel = JSON.parse(JSON.stringify(channel))
-          yield put(updateChannelDataAC(channel.id, updatedChannel))
+          yield put(
+            updateChannelDataAC(channel.id, {
+              lastMessage: channel.lastMessage,
+              newMessageCount: channel.newMessageCount,
+              newMentionCount: channel.newMentionCount,
+              unread: channel.unread,
+              newReactedMessageCount: channel.newReactedMessageCount,
+              newReactions: channel.newReactions,
+              lastReactedMessage: channel.lastReactedMessage,
+              lastReceivedMsgId: channel.lastReceivedMsgId,
+              lastDisplayedMessageId: channel.lastDisplayedMessageId,
+              messageRetentionPeriod: channel.messageRetentionPeriod
+            })
+          )
           updateChannelOnAllChannels(channel.id, updatedChannel)
         }
         break
