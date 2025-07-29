@@ -50,8 +50,13 @@ const VideoPreview = memo(function VideoPreview({
   } = useColor()
   // const { [THEME_COLORS.TEXT_PRIMARY]: background } = useSelector(themeSelector)
   // const VideoPreview =
-  const [videoDuration, setVideoDuration] = useState(0)
-  const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(null)
+  let currentTime = ''
+  if (file.metadata && file.metadata.dur) {
+    const mins = Math.floor(file.metadata.dur / 60)
+    const seconds = Math.floor(file.metadata.dur % 60)
+    currentTime = `${mins}:${seconds < 10 ? `0${seconds}` : seconds}`
+  }
+  const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(currentTime)
   const [loading, setLoading] = useState(true)
   // const [progress, setProgress] = useState(3)
   // const [showProgress, setShowProgress] = useState(false)
@@ -97,7 +102,6 @@ const VideoPreview = memo(function VideoPreview({
       if (video.readyState > 3) {
         // Video is ready
         setLoading(false)
-        setVideoDuration(video.duration)
         const minutes = Math.floor(video.duration / 60)
         const seconds = Math.floor(video.duration % 60)
         setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
@@ -242,7 +246,7 @@ const VideoPreview = memo(function VideoPreview({
       )} */}
       {videoCurrentTime && (
         <VideoControls>
-          {!isPreview && !!videoDuration && !isRepliedMessage && !uploading && !isDetailsView && (
+          {!isPreview && !!videoCurrentTime && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
             <VideoPlayButton>
               <PlayIcon />

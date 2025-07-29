@@ -36,7 +36,6 @@ import {
 } from '../../store/message/actions'
 import {
   joinChannelAC,
-  sendTypingAC,
   setChannelDraftMessageIsRemovedAC,
   setCloseSearchChannelsAC,
   setDraggedAttachmentsAC
@@ -389,9 +388,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   const selectedText = useRef<any>(null)
 
-  const [typingTimout, setTypingTimout] = useState<any>()
-  const [inTypingStateTimout, setInTypingStateTimout] = useState<any>()
-  const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
   const [attachments, setAttachments]: any = useState([])
 
@@ -435,22 +431,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     onError
   }
 
-  const handleSendTypingState = (typingState: boolean) => {
-    if (typingState) {
-      setInTypingStateTimout(
-        setTimeout(() => {
-          setInTypingStateTimout(0)
-        }, 3000)
-      )
-    } else {
-      clearTimeout(inTypingStateTimout)
-    }
-    setInTypingState(typingState)
-    if (!activeChannel.isMockChannel) {
-      dispatch(sendTypingAC(typingState))
-    }
-  }
-
   const handleCloseReply = () => {
     dispatch(setMessageForReplyAC(null))
   }
@@ -467,19 +447,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
   const handleSendEditMessage = (event?: any) => {
-    if (typingTimout) {
-      if (!inTypingStateTimout) {
-        handleSendTypingState(true)
-      }
-      clearTimeout(typingTimout)
-    } else {
-      handleSendTypingState(true)
-    }
-    setTypingTimout(
-      setTimeout(() => {
-        setTypingTimout(0)
-      }, 2000)
-    )
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const shouldSend =
@@ -602,11 +569,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setMessageText('')
 
         fileUploader.current.value = ''
-        if (inTypingState) {
-          handleSendTypingState(false)
-        }
-        clearTimeout(typingTimout)
-        setTypingTimout(undefined)
       }
       setAttachments([])
       attachmentsUpdate = []
@@ -1073,12 +1035,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }
 
   useEffect(() => {
-    if (typingTimout === 0) {
-      handleSendTypingState(false)
-    }
-  }, [typingTimout])
-
-  useEffect(() => {
     if (allowedMediaExtensions?.length) {
       setMediaExtensions(`.${allowedMediaExtensions.join(',.')}`)
     }
@@ -1200,7 +1156,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setAttachments([])
       attachmentsUpdate = []
       handleCloseEditMode()
-      clearTimeout(typingTimout)
 
       const draftMessage = getDraftMessageFromMap(activeChannel.id)
       if (draftMessage) {

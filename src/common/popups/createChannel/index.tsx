@@ -169,18 +169,6 @@ export default function CreateChannel({
       dispatch(createChannelAC({ ...createChannelParams, members: membersToAdd }))
       toggleCreateGroupChannelPopup()
     }
-
-    /* if (createGroupChannel && members.length > 0) {
-      log.info('data for create group ,,,... ', createChannelParams)
-      dispatch(createChannelAC(createChannelParams))
-      toggleCreateGroupChannelPopup()
-    } else if (!createGroupChannel) {
-      // const subscribers = members.map((mem) => ({ ...mem, role: 'subscriber' }))
-      log.info('data for create channel ... ', createChannelParams)
-      // dispatch(createChannelAC({ ...createChannelParams, members: subscribers }))
-      dispatch(createChannelAC(createChannelParams))
-      toggleCreateGroupChannelPopup()
-    } */
   }
 
   const handleTypeSubject = (e: any) => {
