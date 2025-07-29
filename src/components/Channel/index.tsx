@@ -202,16 +202,18 @@ const ChannelMessageText = ({
                   {lastMessage.body ? '' : 'Voice'}
                 </React.Fragment>
               ) : null)}
-            {!!(lastMessage && lastMessage.id) &&
-              MessageTextFormat({
-                text: lastMessage.body,
-                message: lastMessage,
-                contactsMap,
-                getFromContacts,
-                isLastMessage: true,
-                accentColor,
-                textSecondary
-              })}
+            <LastMessageDescription>
+              {!!(lastMessage && lastMessage.id) &&
+                MessageTextFormat({
+                  text: lastMessage.body,
+                  message: lastMessage,
+                  contactsMap,
+                  getFromContacts,
+                  isLastMessage: true,
+                  accentColor,
+                  textSecondary
+                })}
+            </LastMessageDescription>
             {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
@@ -255,7 +257,8 @@ const Channel: React.FC<IChannelProps> = ({
     [THEME_COLORS.ONLINE_STATUS]: onlineStatus,
     [THEME_COLORS.BACKGROUND_FOCUSED]: backgroundFocused,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const dispatch = useDispatch()
@@ -408,7 +411,7 @@ const Channel: React.FC<IChannelProps> = ({
             (hideUserPresence(directChannelUser)
               ? ''
               : directChannelUser.presence && directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={onlineStatus} />
+              <UserStatus backgroundColor={onlineStatus} borderColor={background} />
             )}
         </AvatarWrapper>
       )}
@@ -416,6 +419,7 @@ const Channel: React.FC<IChannelProps> = ({
         theme={theme}
         avatar={showAvatar}
         isMuted={channel.muted}
+        isPinned={!!channel.pinnedAt}
         statusWidth={statusWidth}
         uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
         subjectFontSize={channelSubjectFontSize}
@@ -510,7 +514,7 @@ const Channel: React.FC<IChannelProps> = ({
                         : lastMessage.user.id === user.id)))
                 : (isTypingOrRecording && draftMessageText) ||
                   (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
-                <Points color={draftMessageText && warningColor}>: </Points>
+                <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
               )}
             <LastMessageText
               color={textSecondary}
@@ -596,41 +600,6 @@ export interface UnreadCountProps {
   fontSize?: string
 }
 
-const Container = styled.div<{
-  selectedChannel: boolean
-  selectedChannelLeftBorder?: string
-  selectedBackgroundColor: string
-  channelsPaddings?: string
-  selectedChannelPaddings?: string
-  channelsMargin?: string
-  selectedChannelBorderRadius?: string
-  theme?: string
-  hoverBackground?: string
-}>`
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  background-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : 'inherit')};
-  border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
-  // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
-  padding: ${(props) =>
-    props.selectedChannel
-      ? props.selectedChannelPaddings || props.channelsPaddings || '8px'
-      : props.channelsPaddings || '8px'};
-  margin: ${(props) => props.channelsMargin || '0 8px'};
-  border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
-
-  transition: all 0.2s;
-  &:hover {
-    ${({ selectedChannel, hoverBackground }) =>
-      !selectedChannel &&
-      `
-      background-color: ${hoverBackground};
-    `}
-  }
-`
-
 export const ChannelInfo = styled.div<{
   statusWidth: number
   avatar?: boolean
@@ -641,11 +610,13 @@ export const ChannelInfo = styled.div<{
   subjectLineHeight?: string
   subjectColor: string
   avatarSize?: number
+  isPinned?: boolean
 }>`
   text-align: left;
   margin-left: ${(props) => props.avatar && '12px'};
   width: 100%;
-  max-width: ${(props) => (props.avatarSize ? `calc(100% - ${props.avatarSize + 52}px)` : 'calc(100% - 102px)')};
+  max-width: ${(props) =>
+    props.avatarSize ? `calc(100% - ${props.avatarSize + 52}px)` : `calc(100% - ${props.isPinned ? 92 : 72}px)`};
 
   h3 {
     display: inline-block;
@@ -699,16 +670,60 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const UserStatus = styled.span<{ backgroundColor?: string }>`
+export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   right: 0;
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
-  border: 2.5px solid #ffffff;
+  border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
+`
+const Container = styled.div<{
+  selectedChannel: boolean
+  selectedChannelLeftBorder?: string
+  selectedBackgroundColor: string
+  channelsPaddings?: string
+  selectedChannelPaddings?: string
+  channelsMargin?: string
+  selectedChannelBorderRadius?: string
+  theme?: string
+  hoverBackground?: string
+}>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  background-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : 'inherit')};
+  border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
+  // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
+  padding: ${(props) =>
+    props.selectedChannel
+      ? props.selectedChannelPaddings || props.channelsPaddings || '8px'
+      : props.channelsPaddings || '8px'};
+  margin: ${(props) => props.channelsMargin || '0 8px'};
+  border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
+
+  transition: all 0.2s;
+  &:hover {
+    ${({ selectedChannel, hoverBackground }) =>
+      !selectedChannel &&
+      `
+      background-color: ${hoverBackground};
+    `}
+    ${UserStatus} {
+      border-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+    }
+  }
+  ${UserStatus} {
+    ${(props) =>
+      props.selectedChannel &&
+      `
+      border-color: ${props.selectedBackgroundColor};
+    `}
+  }
 `
 
 export const DraftMessageTitle = styled.span<{ color: string }>`
@@ -762,11 +777,40 @@ export const LastMessageText = styled.span<{
   > svg {
     width: 16px;
     height: 16px;
+    min-width: 16px;
+    min-height: 16px;
     margin-right: 4px;
     color: ${(props) => props.color};
-    //transform: ${(props) => (props.withAttachments ? 'translate(0px, 3px)' : 'translate(0px, 2px)')};
     transform: translate(0px, 3px);
   }
+  & > span {
+    display: flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+  }
+  & > div {
+    display: flex;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 100%;
+    & > svg {
+      width: 18px;
+      height: 18px;
+      min-width: 18px;
+      min-height: 18px;
+      color: ${(props) => props.color};
+    }
+  }
+`
+export const LastMessageDescription = styled.div`
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
 `
 
 export const ChannelStatus = styled.div<{ color: string }>`
