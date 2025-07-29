@@ -12,13 +12,15 @@ import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
 import { colors, THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
-import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
+import { useSelector } from 'react-redux'
+import { themeSelector } from 'store/theme/selector'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -234,6 +236,7 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
+  const theme = useSelector(themeSelector)
   const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
 
   const contRef: any = useRef()
@@ -282,7 +285,7 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList borderColor={borderColor} backgroundColor={background}>
+      <MentionsList borderColor={borderColor} backgroundColor={background} theme={theme}>
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -418,6 +421,7 @@ const MentionsList = styled.ul<{
   backgroundColor?: string
   withBorder?: boolean
   borderColor: string
+  theme: string
 }>`
   position: absolute;
   bottom: 100%;
@@ -430,7 +434,8 @@ const MentionsList = styled.ul<{
   background: ${(props) => props.backgroundColor || colors.white};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
-  box-shadow: 0 0 12px rgba(0, 0, 0, 0.08);
+  box-shadow: ${(props) =>
+    props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
 `
