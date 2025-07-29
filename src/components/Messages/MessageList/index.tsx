@@ -563,6 +563,7 @@ const MessageList: React.FC<MessagesProps> = ({
         scrollToNewMessage.updateMessageList &&
         messagesLoading !== LOADING_STATE.LOADING
       ) {
+        console.log('getMessagesAC **************', true)
         dispatch(getMessagesAC(channel, true))
       }
       if (scrollToReply) {
@@ -715,6 +716,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     } else {
       // await handleGetMessages(undefined, messageId)
+      console.log('getMessagesAC **************', false)
       dispatch(getMessagesAC(channel, undefined, messageId))
     }
   }
@@ -898,15 +900,6 @@ const MessageList: React.FC<MessagesProps> = ({
           prevDisable = false
         }, 800)
       }
-
-      // loading = true
-      /* if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
-        setTimeout(() => {
-          if (getHasNextCached()) {
-            dispatch(getMessagesAC(channel, true))
-          }
-        }, 800)
-      } */
     }
   }, [scrollToNewMessage])
 
@@ -930,7 +923,7 @@ const MessageList: React.FC<MessagesProps> = ({
       const visibleMessagesIds = Object.keys(visibleMessages)
       // const messageId = visibleMessagesIds[Math.floor(visibleMessagesIds.length / 2)]
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-
+      console.log('getMessagesAC **************', false)
       dispatch(getMessagesAC(channel, undefined, messageId))
       setUnreadMessageId(messageId)
     } else {
@@ -938,7 +931,8 @@ const MessageList: React.FC<MessagesProps> = ({
         clearVisibleMessagesMap()
       }
       if (channel) {
-        dispatch(getMessagesAC(channel))
+        console.log('getMessagesAC **************', true)
+        dispatch(getMessagesAC(channel, true, undefined, undefined, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
@@ -1111,6 +1105,7 @@ const MessageList: React.FC<MessagesProps> = ({
       clearMessagesMap()
       removeAllMessages()
       if (channel.id) {
+        console.log('getMessagesAC **************', true)
         dispatch(getMessagesAC(channel))
       }
       // dispatch(switchChannelActionAC(activeChannel.id))

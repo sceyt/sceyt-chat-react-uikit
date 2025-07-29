@@ -1236,7 +1236,7 @@ function* editMessage(action: IAction): any {
 
 function* getMessagesQuery(action: IAction): any {
   try {
-    const { channel, loadWithLastMessage, messageId, limit } = action.payload
+    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages } = action.payload
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
       /* const attachmentQueryBuilder = new (SceytChatClient.AttachmentListQueryBuilder as any)(channel.id)
@@ -1268,17 +1268,21 @@ function* getMessagesQuery(action: IAction): any {
           setAllMessages([])
           // }
           result = yield call(messageQuery.loadPreviousMessageId, '0')
+
           if (result.messages.length === 50) {
             messageQuery.limit = 20
             const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
             result.messages = [...secondResult.messages, ...result.messages]
             result.hasNext = secondResult.hasNext
           }
+          let sentMessages: IMessage[] = []
+          if (withDeliveredMessages) {
+            sentMessages = getFromAllMessagesByMessageId('', '', true)
+          }
+          result.messages = [...result.messages, ...sentMessages]
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          // if (channel.newMessageCount && channel.newMessageCount > 0) {
           setMessagesToMap(channel.id, result.messages)
-          setAllMessages([...result.messages])
-          // }
+          setAllMessages(result.messages)
           yield put(setMessagesHasPrevAC(true))
           yield put(markChannelAsReadAC(channel.id))
         } else {
