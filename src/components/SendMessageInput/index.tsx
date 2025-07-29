@@ -1772,7 +1772,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         paddings={inputPaddings}
                         mentionColor={accentColor}
                         className={inputCustomClassname}
-                        selectionBackgroundColor={textSelectionBackgroundColor || colors.primaryLight}
+                        selectionBackgroundColor={textSelectionBackgroundColor || accentColor}
                         borderRadius={inputBorderRadius}
                         color={textPrimary}
                       >

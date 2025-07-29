@@ -182,7 +182,11 @@ function MentionsTypeaheadMenuItem({
   onMouseEnter: () => void
   option: MentionTypeaheadOption
 }) {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const {
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+  } = useColor()
 
   let className = 'item'
   if (isSelected) {
@@ -198,7 +202,7 @@ function MentionsTypeaheadMenuItem({
       isActiveItem={isSelected}
       id={'typeahead-item-' + index}
       onMouseEnter={onMouseEnter}
-      activeBackgroundColor={colors.hoverBackgroundColor}
+      activeBackgroundColor={hoverBackground}
       onClick={onClick}
     >
       <AvatarWrapper>
@@ -230,7 +234,7 @@ function MentionsContainer({
   setHighlightedIndex,
   setMentionsIsOpen
 }: any) {
-  const { [THEME_COLORS.BORDER]: borderColor } = useColor()
+  const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -278,7 +282,7 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList borderColor={borderColor}>
+      <MentionsList borderColor={borderColor} backgroundColor={background}>
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
