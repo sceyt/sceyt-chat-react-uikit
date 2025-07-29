@@ -119,7 +119,10 @@ const Attachment = ({
   const [attachmentUrl, setAttachmentUrl] = useState('')
   const [failTimeout, setFailTimeout]: any = useState()
   const [progress, setProgress] = useState(3)
-  const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number }>()
+  const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>({
+    loaded: 0,
+    total: attachment?.size || 0
+  })
   const [isCached, setIsCached] = useState(true)
   // const [linkTitle, setLinkTitle] = useState('')
   // const [linkDescription, setLinkDescription] = useState('')

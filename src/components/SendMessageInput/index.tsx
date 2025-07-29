@@ -466,20 +466,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
   }
+
   const handleSendEditMessage = (event?: any) => {
-    if (typingTimout) {
-      if (!inTypingStateTimout) {
-        handleSendTypingState(true)
-      }
-      clearTimeout(typingTimout)
-    } else {
-      handleSendTypingState(true)
-    }
-    setTypingTimout(
-      setTimeout(() => {
-        setTypingTimout(0)
-      }, 2000)
-    )
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
     const shouldSend =
@@ -490,6 +478,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         setShouldClearEditor({ clear: true })
       }
     }
+
     if (shouldSend && !mentionsIsOpen) {
       event.preventDefault()
       event.stopPropagation()
@@ -615,6 +604,21 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setMentionedMembers([])
       setMessageBodyAttributes([])
       dispatch(setCloseSearchChannelsAC(true))
+    } else {
+      if (typingTimout) {
+        if (!inTypingStateTimout) {
+          handleSendTypingState(true)
+        }
+        clearTimeout(typingTimout)
+      } else {
+        handleSendTypingState(true)
+      }
+
+      setTypingTimout(
+        setTimeout(() => {
+          setTypingTimout(0)
+        }, 2000)
+      )
     }
   }
 
