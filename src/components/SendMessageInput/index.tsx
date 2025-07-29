@@ -1897,6 +1897,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
 const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
   background-color: ${(props) => props.backgroundColor};
+  position: relative;
+  z-index: 15;
 `
 const Container = styled.div<{
   margin?: string
@@ -1915,6 +1917,7 @@ const Container = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
   padding: ${(props) => props.padding || '0 calc(4% + 32px)'};
+  z-index: 15;
 
   & span.rdw-suggestion-dropdown {
     position: absolute;

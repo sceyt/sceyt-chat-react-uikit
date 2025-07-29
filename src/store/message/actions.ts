@@ -54,7 +54,8 @@ import {
   REMOVE_SELECTED_MESSAGE,
   CLEAR_SELECTED_MESSAGES,
   REMOVE_ATTACHMENT,
-  ADD_PENDING_MESSAGE
+  ADD_PENDING_MESSAGE,
+  SET_SCROLL_TO_MENTIONED_MESSAGE
 } from './constants'
 import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
 
@@ -131,6 +132,13 @@ export function setScrollToMessagesAC(messageId: string | null) {
   return {
     type: SET_SCROLL_TO_MESSAGE,
     payload: { messageId }
+  }
+}
+
+export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {
+  return {
+    type: SET_SCROLL_TO_MENTIONED_MESSAGE,
+    payload: { isScrollToMentionedMessage }
   }
 }
 

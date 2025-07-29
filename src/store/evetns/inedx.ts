@@ -697,12 +697,14 @@ export default function* watchForEvents(): any {
           const activeChannelId = yield call(getActiveChannelId)
           const channelExists = checkChannelExists(channel.id)
           const channelForAdd = JSON.parse(JSON.stringify(channel))
+
           yield put(addChannelAC(channelForAdd))
           if (!channelExists) {
             yield call(setChannelInMap, channel)
           } else if (!message.repliedInThread) {
             yield put(updateChannelLastMessageAC(message, channelForAdd))
           }
+
           if (channel.id === activeChannelId) {
             if (!getHasNextCached()) {
               yield put(addMessageAC(message))
@@ -724,6 +726,17 @@ export default function* watchForEvents(): any {
           }
           yield put(
             updateChannelDataAC(channel.id, {
+              messageCount: channelForAdd.messageCount,
+              unread: channelForAdd.unread,
+              newMessageCount: channelForAdd.newMessageCount,
+              newMentionCount: channelForAdd.newMentionCount,
+              newReactedMessageCount: channelForAdd.newReactedMessageCount,
+              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+              lastMessage: channelForAdd.lastMessage,
+              messages: channelForAdd.messages,
+              newReactions: channelForAdd.newReactions,
               userMessageReactions: [],
               lastReactedMessage: null
             })
@@ -733,6 +746,17 @@ export default function* watchForEvents(): any {
             updateSearchedChannelDataAC(
               channel.id,
               {
+                messageCount: channelForAdd.messageCount,
+                unread: channelForAdd.unread,
+                newMessageCount: channelForAdd.newMessageCount,
+                newMentionCount: channelForAdd.newMentionCount,
+                newReactedMessageCount: channelForAdd.newReactedMessageCount,
+                lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+                lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+                messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+                lastMessage: channelForAdd.lastMessage,
+                messages: channelForAdd.messages,
+                newReactions: channelForAdd.newReactions,
                 userMessageReactions: [],
                 lastReactedMessage: null
               },
@@ -780,8 +804,19 @@ export default function* watchForEvents(): any {
           }
 
           updateChannelOnAllChannels(channel.id, {
-            userMessageReactions: [],
-            lastReactedMessage: null
+            messageCount: channelForAdd.messageCount,
+            unread: channelForAdd.unread,
+            newMessageCount: channelForAdd.newMessageCount,
+            newMentionCount: channelForAdd.newMentionCount,
+            newReactedMessageCount: channelForAdd.newReactedMessageCount,
+            lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+            lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+            messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+            lastMessage: channelForAdd.lastMessage,
+            messages: channelForAdd.messages,
+            newReactions: channelForAdd.newReactions,
+            lastReactedMessage: channel.lastReactedMessage,
+            userMessageReactions: channel.userMessageReactions
           })
           updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
         }
@@ -1052,7 +1087,20 @@ export default function* watchForEvents(): any {
         // yield put(setChannelUnreadCount(0, channel.id));
         if (channel) {
           const updatedChannel = JSON.parse(JSON.stringify(channel))
-          yield put(updateChannelDataAC(channel.id, updatedChannel))
+          yield put(
+            updateChannelDataAC(channel.id, {
+              lastMessage: channel.lastMessage,
+              newMessageCount: channel.newMessageCount,
+              newMentionCount: channel.newMentionCount,
+              unread: channel.unread,
+              newReactedMessageCount: channel.newReactedMessageCount,
+              newReactions: channel.newReactions,
+              lastReactedMessage: channel.lastReactedMessage,
+              lastReceivedMsgId: channel.lastReceivedMsgId,
+              lastDisplayedMessageId: channel.lastDisplayedMessageId,
+              messageRetentionPeriod: channel.messageRetentionPeriod
+            })
+          )
           updateChannelOnAllChannels(channel.id, updatedChannel)
         }
         break

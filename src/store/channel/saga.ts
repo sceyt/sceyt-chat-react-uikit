@@ -48,7 +48,8 @@ import {
   TURN_ON_NOTIFICATION,
   UPDATE_CHANNEL,
   WATCH_FOR_EVENTS,
-  SEND_RECORDING
+  SEND_RECORDING,
+  GET_CHANNEL_MENTIONS
 } from './constants'
 import {
   destroyChannelsMap,
@@ -97,6 +98,7 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
 import { channelListHiddenSelector } from './selector'
 import log from 'loglevel'
+import { queryDirection } from 'store/message/constants'
 
 function* createChannel(action: IAction): any {
   try {
@@ -669,6 +671,23 @@ function* channelsLoadMore(action: IAction): any {
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */
+  }
+}
+
+function* getChannelMentions(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+    const SceytChatClient = getClient()
+    const mentionsQueryBuilder = new (SceytChatClient.MentionsListQueryBuilder as any)()
+    mentionsQueryBuilder.setChannelId(channelId)
+    mentionsQueryBuilder.limit(10)
+    mentionsQueryBuilder.setDirection(queryDirection.NEXT)
+    const mentionsQuery = yield call(mentionsQueryBuilder.build)
+    const mentions = yield call(mentionsQuery.loadNext)
+    yield put(updateChannelDataAC(channelId, { mentionsIds: mentions.mentions }))
+  } catch (error) {
+    log.error(error, 'Error in get channel mentions')
   }
 }
 
@@ -1288,4 +1307,5 @@ export default function* ChannelsSaga() {
   yield takeLatest(JOIN_TO_CHANNEL, joinChannel)
   yield takeLatest(DELETE_ALL_MESSAGES, deleteAllMessages)
   yield takeLatest(REMOVE_CHANNEL_CACHES, removeChannelCaches)
+  yield takeLatest(GET_CHANNEL_MENTIONS, getChannelMentions)
 }

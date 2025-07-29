@@ -23,6 +23,7 @@ export const channelNewMessageSelector = (store: any) => store.MessageReducer.ac
 export const messageNewMarkersSelector = (store: any) => store.MessageReducer.activeChannelNewMarkers
 export const messageUpdatedSelector = (store: any) => store.MessageReducer.activeChannelMessageUpdated
 export const scrollToNewMessageSelector = (store: any) => store.MessageReducer.scrollToNewMessage
+export const scrollToMentionedMessageSelector = (store: any) => store.MessageReducer.scrollToMentionedMessage
 export const showScrollToNewMessageButtonSelector = (store: any) => store.MessageReducer.showScrollToNewMessageButton
 export const sendMessageInputHeightSelector = (store: any) => store.MessageReducer.sendMessageInputHeight
 export const scrollToMessageSelector = (store: any) => store.MessageReducer.scrollToMessage

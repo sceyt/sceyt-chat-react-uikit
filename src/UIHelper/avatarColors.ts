@@ -26,4 +26,9 @@ export const setAvatarColor = (colors: ICustomAvatarColors) => {
   _avatarColors = { light: colors, dark: colors }
 }
 
-export const getAvatarColors = (theme: 'light' | 'dark') => _avatarColors[theme]
+export const getAvatarColors = (theme: 'light' | 'dark') => {
+  if (!_avatarColors[theme]?.length) {
+    return _avatarColors.light
+  }
+  return _avatarColors[theme]
+}
