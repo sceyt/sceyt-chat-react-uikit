@@ -105,7 +105,6 @@ const VideoPreview = memo(function VideoPreview({
         const minutes = Math.floor(video.duration / 60)
         const seconds = Math.floor(video.duration % 60)
         setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-        console.log('videoCurrentTime **************', `${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
         if (setVideoIsReadyToSend) {
           setVideoIsReadyToSend(file.tid!)
         }
@@ -126,7 +125,6 @@ const VideoPreview = memo(function VideoPreview({
 
     // Fallback interval
     const interval = setInterval(() => {
-      console.log('checkReadyState **************')
       if (checkReadyState()) {
         clearInterval(interval)
       }
