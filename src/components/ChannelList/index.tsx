@@ -50,14 +50,13 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { device, THEME_COLORS } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
-import { IChannel, IContact, IContactsMap, ICreateChannel, IMember } from '../../types'
+import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
 // Components
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
 import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
-import { activeChannelMembersSelector } from 'store/member/selector'
 
 interface IChannelListProps {
   List?: FC<{
@@ -231,7 +230,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const activeChannelMembers = useSelector(activeChannelMembersSelector, shallowEqual)
 
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
@@ -386,14 +384,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      getSelectedChannel({
-        ...activeChannel,
-        ...(activeChannelMembers && activeChannelMembers.length > 0
-          ? { members: activeChannelMembers as IMember[] }
-          : {})
-      })
+      getSelectedChannel(activeChannel)
     }
-  }, [activeChannel.id, activeChannelMembers?.length])
+  }, [activeChannel && activeChannel.members && activeChannel.members.length])
 
   useDidUpdate(() => {
     if (closeSearchChannels) {

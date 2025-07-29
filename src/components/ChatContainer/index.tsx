@@ -25,9 +25,14 @@ export interface IUploadTask {
 
 export interface ICustomUploader {
   // eslint-disable-next-line no-unused-vars
-  upload: (attachment: IAttachment, uploadTask: IUploadTask) => void
+  upload: (attachment: IAttachment, uploadTask: IUploadTask, messageType: string | null | undefined) => void
   // eslint-disable-next-line no-unused-vars
-  download: (uri: string, download: boolean, progressCallback?: (progress: any) => void) => Promise<any>
+  download: (
+    uri: string,
+    download: boolean,
+    progressCallback: (progress: any) => void,
+    messageType: string | null | undefined
+  ) => Promise<any>
   // eslint-disable-next-line no-unused-vars
   cancelRequest: (requestPromise: any) => void
 }

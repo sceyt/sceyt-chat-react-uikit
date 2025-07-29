@@ -338,7 +338,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground
+    [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const dispatch = useDispatch()
@@ -1614,7 +1615,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           />
                         ) : (
                           messageForReply.attachments[0].type === attachmentTypes.file && (
-                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textPrimary}>
+                            <ReplyIconWrapper backgroundColor={accentColor} iconColor={textOnPrimary}>
                               <ChooseFileIcon />
                             </ReplyIconWrapper>
                           )

@@ -51,7 +51,8 @@ const ContactItem: React.FC<IChannelProps> = ({
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.ONLINE_STATUS]: online,
-    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.BACKGROUND]: background
   } = useColor()
 
   const getFromContacts = getShowOnlyContactUsers()
@@ -81,7 +82,7 @@ const ContactItem: React.FC<IChannelProps> = ({
             (hideUserPresence(contact.user)
               ? ''
               : contact.user.presence && contact.user.presence.state === USER_PRESENCE_STATUS.ONLINE) && (
-              <UserStatus backgroundColor={online} />
+              <UserStatus backgroundColor={online} borderColor={background} />
             )}
         </AvatarWrapper>
       )}
@@ -100,25 +101,6 @@ const ContactItem: React.FC<IChannelProps> = ({
 }
 
 export default ContactItem
-
-const Container = styled.div<{
-  selectedBackgroundColor?: string
-  channelsPaddings?: string
-  selectedChannelPaddings?: string
-  channelsMargin?: string
-  theme?: string
-  hoverBackground?: string
-}>`
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-  padding: ${(props) => props.channelsPaddings || '8px'};
-  margin: ${(props) => props.channelsMargin || '0 8px'};
-  &:hover {
-    background-color: ${(props) => props.hoverBackground};
-  }
-`
 
 export const ChannelInfo = styled.div<{
   textColor: string
@@ -154,14 +136,36 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const UserStatus = styled.span<{ backgroundColor?: string }>`
+export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
-  width: 14px;
-  height: 14px;
+  width: 12px;
+  height: 12px;
   right: 0;
   bottom: 0;
   border-radius: 50%;
   background-color: ${(props) => props.backgroundColor || '#56E464'};
-  border: 2.5px solid #ffffff;
+  border: 2.5px solid ${(props) => props.borderColor || '#ffffff'};
   box-sizing: border-box;
+`
+
+const Container = styled.div<{
+  selectedBackgroundColor?: string
+  channelsPaddings?: string
+  selectedChannelPaddings?: string
+  channelsMargin?: string
+  theme?: string
+  hoverBackground?: string
+}>`
+  position: relative;
+  display: flex;
+  align-items: center;
+  cursor: pointer;
+  padding: ${(props) => props.channelsPaddings || '8px'};
+  margin: ${(props) => props.channelsMargin || '0 8px'};
+  &:hover {
+    background-color: ${(props) => props.hoverBackground};
+    ${UserStatus} {
+      border-color: ${(props) => props.hoverBackground};
+    }
+  }
 `

@@ -59,7 +59,8 @@ const MessageStatusAndTime = ({
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2
   } = useColor()
 
   return (
@@ -75,6 +76,7 @@ const MessageStatusAndTime = ({
       marginBottom={marginBottom}
       className='message_status_time'
       messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+      messageTimeBackgroundColor={overlayBackground2}
     >
       {message.state === MESSAGE_STATUS.EDIT ? (
         <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
@@ -159,15 +161,16 @@ const MessageStatusAndTimeContainer = styled.span<{
   bottomOfMessage?: boolean
   showOnlyOnHover?: boolean
   lineHeight?: string
-  statusColor?: string
   messageTimeColorOnAttachment: string
+  messageTimeBackgroundColor?: string
 }>`
   visibility: ${(props: any) => props.showOnlyOnHover && 'hidden'};
   display: ${(props) => (props.hide ? 'none' : 'flex')};
   align-items: flex-end;
   border-radius: 16px;
   padding: ${(props) => props.withAttachment && '4px 6px'};
-  background-color: ${(props) => props.withAttachment && !props.fileAttachment && 'rgba(1, 1, 1, 0.3)'};
+  background-color: ${(props) =>
+    props.withAttachment && !props.fileAttachment && `${props.messageTimeBackgroundColor}40`};
   float: right;
   line-height: ${(props) => props.lineHeight || '14px'};
   margin-right: ${(props) => props.rtlDirection && 'auto'};
@@ -186,8 +189,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) =>
-      props.fileAttachment ? props.statusColor : props.withAttachment ? props.messageTimeColorOnAttachment : ''};
+    color: ${(props) => (props.withAttachment ? props.messageTimeColorOnAttachment : '')};
   }
 
   ${(props) =>

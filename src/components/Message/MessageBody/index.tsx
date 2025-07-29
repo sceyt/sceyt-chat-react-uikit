@@ -674,6 +674,7 @@ const MessageBody = ({
               imageAttachmentMaxHeight={imageAttachmentMaxHeight}
               videoAttachmentMaxWidth={videoAttachmentMaxWidth}
               videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+              messageType={message.type}
             />
           ))
         // </MessageAttachments>

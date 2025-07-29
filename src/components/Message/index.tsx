@@ -734,7 +734,7 @@ const Message = ({
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleCreateChat={handleCreateChat}
             messageTextRef={messageTextRef}
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (

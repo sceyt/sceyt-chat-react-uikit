@@ -262,6 +262,13 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
       } else {
         newState.channels = newState.channels.map((channel) => {
           if (channel.id === channelId) {
+            if (
+              newState.activeChannel &&
+              Object.prototype.hasOwnProperty.call(newState.activeChannel, 'id') &&
+              channel.id === (newState.activeChannel as IChannel).id
+            ) {
+              newState.activeChannel = { ...newState.activeChannel, ...config }
+            }
             return { ...channel, ...config }
           }
           return channel
@@ -283,10 +290,11 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
 
     case UPDATE_SEARCHED_CHANNEL_DATA: {
       const { updateData, groupName, channelId } = payload
-      if (newState.searchedChannels[groupName] && newState.searchedChannels[groupName].length) {
+      const groupKey = groupName as keyof typeof newState.searchedChannels
+      if (newState.searchedChannels[groupKey] && newState.searchedChannels[groupKey].length) {
         newState.searchedChannels = {
           ...newState.searchedChannels,
-          [groupName]: [...newState.searchedChannels[groupName]].map((channel: IChannel) => {
+          [groupName]: [...newState.searchedChannels[groupKey]].map((channel: IChannel) => {
             if (channel.id === channelId) {
               return { ...channel, ...updateData }
             }

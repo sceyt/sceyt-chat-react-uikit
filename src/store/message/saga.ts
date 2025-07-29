@@ -165,7 +165,7 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
           }
         })
       } else {
-        uri = await customUpload(attachment, handleUploadProgress, handleUpdateLocalPath)
+        uri = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
       }
       store.dispatch({
         type: UPLOAD_ATTACHMENT_COMPILATION,
@@ -961,7 +961,13 @@ function* resendMessage(action: IAction): any {
             } else {
               messageAttachment.data = pendingAttachment.file
               messageAttachment.url = pendingAttachment.file
-              uri = yield call(customUpload, messageAttachment, handleUploadProgress, handleUpdateLocalPath)
+              uri = yield call(
+                customUpload,
+                messageAttachment,
+                handleUploadProgress,
+                message.type,
+                handleUpdateLocalPath
+              )
             }
             log.info('messageAttachment ... ', messageAttachment)
 

@@ -90,7 +90,7 @@ import {
   updateMessageOnAllMessages,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
-import { addMembersToListAC, updateMembersPresenceAC } from '../member/actions'
+import { updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -742,23 +742,6 @@ function* markMessagesRead(action: IAction): any {
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
         updateMessageOnAllMessages(messageId, updateParams)
       }
-
-      /* if (channelId === activeChannelId) {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId,
-            unreadMessageCount: channel.newMessageCount
-          })
-        )
-      } else {
-        yield put(
-          updateChannelDataAC(channel.id, {
-            markedAsUnread: channel.unread,
-            lastReadMessageId: channel.lastDisplayedMessageId
-          })
-        )
-      } */
     }
   } catch (e) {
     log.error(e, 'Error on mark messages read')
@@ -823,7 +806,6 @@ function* switchChannel(action: IAction): any {
       channelToSwitch.linkedFrom = currentActiveChannel
     }
     yield put(setActiveChannelAC({ ...channelToSwitch }))
-    yield put(addMembersToListAC(channelToSwitch.members))
     // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());
@@ -1110,14 +1092,14 @@ function* checkUsersStatus(/* action: IAction */): any {
     updatedUsers.forEach((updatedUser: IMember) => {
       if (
         updatedUser.presence &&
-        (updatedUser.presence.state !== usersMap[updatedUser.id].presence.state ||
-          updatedUser.presence.status !== usersMap[updatedUser.id].presence.status ||
+        (updatedUser.presence.state !== usersMap[updatedUser.id]?.presence?.state ||
+          updatedUser.presence.status !== usersMap[updatedUser.id]?.presence?.status ||
           (updatedUser.presence.lastActiveAt &&
             new Date(updatedUser.presence.lastActiveAt).getTime() !==
-              new Date(usersMap[updatedUser.id].presence.lastActiveAt).getTime()) ||
-          updatedUser.avatarUrl !== usersMap[updatedUser.id].avatarUrl ||
-          updatedUser.firstName !== usersMap[updatedUser.id].firstName ||
-          updatedUser.lastName !== usersMap[updatedUser.id].lastName)
+              new Date(usersMap[updatedUser.id]?.presence?.lastActiveAt || 0).getTime()) ||
+          updatedUser.avatarUrl !== usersMap[updatedUser.id]?.avatarUrl ||
+          updatedUser.firstName !== usersMap[updatedUser.id]?.firstName ||
+          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName)
       ) {
         updateUserOnMap(updatedUser)
         usersToUpdateMap[updatedUser.id] = updatedUser

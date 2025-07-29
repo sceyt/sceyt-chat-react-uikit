@@ -113,7 +113,7 @@ const Members = ({
     // setCloseMenu(true)
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (membersLoading === LOADING_STATE.LOADED) {
-        dispatch(loadMoreMembersAC(15))
+        dispatch(loadMoreMembersAC(15, channel.id))
       }
     }
   }

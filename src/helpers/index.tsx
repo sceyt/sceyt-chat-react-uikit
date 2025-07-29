@@ -43,17 +43,23 @@ export const downloadFile = async (
   // eslint-disable-next-line no-unused-vars
   done?: (attachmentId: string, failed?: boolean) => void,
   // eslint-disable-next-line no-unused-vars
-  progressCallback?: (progress: { loaded: number; total: number }) => void
+  progressCallback?: (progress: { loaded: number; total: number }) => void,
+  messageType?: string | null | undefined
 ) => {
   try {
     const customDownloader = getCustomDownloader()
     let response
     if (customDownloader) {
-      const urlPromise = customDownloader(attachment.url, download, (progress) => {
-        if (progressCallback) {
-          progressCallback(progress)
-        }
-      })
+      const urlPromise = customDownloader(
+        attachment.url,
+        download,
+        (progress) => {
+          if (progressCallback) {
+            progressCallback(progress)
+          }
+        },
+        messageType
+      )
       filesPromisesOnDownload[attachment.id!] = urlPromise
       const result = await urlPromise
       /* response = await fetch(result)

@@ -142,6 +142,7 @@ const RepliedMessage = ({
             imageAttachmentMaxHeight={imageAttachmentMaxHeight}
             videoAttachmentMaxWidth={videoAttachmentMaxWidth}
             videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+            messageType={message.type}
           />
         ))}
       <ReplyMessageBody
