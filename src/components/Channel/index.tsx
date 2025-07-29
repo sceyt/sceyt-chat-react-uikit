@@ -740,7 +740,7 @@ export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; r
   ${({ typing, recording }) =>
     (typing || recording) &&
     `
-    font-weight: 400;
+    font-weight: 500;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -758,6 +758,7 @@ export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; r
 export const Points = styled.span<{ color?: string }>`
   margin-right: 4px;
   color: ${(props) => props.color};
+  font-style: normal;
 `
 
 export const LastMessageText = styled.span<{
