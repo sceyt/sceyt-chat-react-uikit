@@ -1,8 +1,8 @@
 import React from 'react'
 import styled from 'styled-components'
 import { makeUsername } from '../../../helpers/message'
-import { USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { IContact } from '../../../types'
@@ -48,9 +48,10 @@ const ContactItem: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize
 }) => {
-  const { 
+  const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.ONLINE]: online
+    [THEME_COLORS.ONLINE_STATUS]: online,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
 
   const getFromContacts = getShowOnlyContactUsers()
@@ -63,7 +64,7 @@ const ContactItem: React.FC<IChannelProps> = ({
       channelsPaddings={channelsPaddings}
       channelsMargin={channelsMargin}
       onClick={() => createChatWithContact(contact)}
-      hoverBackground={channelHoverBackground}
+      hoverBackground={channelHoverBackground || backgroundHovered}
     >
       {showAvatar && (
         <AvatarWrapper>
@@ -90,8 +91,7 @@ const ContactItem: React.FC<IChannelProps> = ({
         subjectFontSize={channelSubjectFontSize}
         subjectLineHeight={channelSubjectLineHeight}
         subjectColor={channelSubjectColor}
-        lightTextColor={textPrimary}
-        darkTextColor={colors.darkModeTextColor1}
+        textColor={textPrimary}
       >
         <h3>{contactUserName}</h3>
       </ChannelInfo>
@@ -121,8 +121,7 @@ const Container = styled.div<{
 `
 
 export const ChannelInfo = styled.div<{
-  lightTextColor: string
-  darkTextColor: string
+  textColor: string
   avatar?: boolean
   theme?: string
   subjectFontSize?: string
@@ -145,8 +144,7 @@ export const ChannelInfo = styled.div<{
     max-width: calc(100% - 2px);
     overflow: hidden;
     white-space: nowrap;
-    color: ${(props) =>
-      props.subjectColor || (props.theme === THEME.DARK ? props.darkTextColor : props.lightTextColor)};
+    color: ${(props) => props.subjectColor || props.textColor};
   }
 `
 

@@ -177,7 +177,7 @@ interface MessagesProps {
   messageTimeFontSize?: string
   messageTimeColor?: string
   messageStatusAndTimeLineHeight?: string
-  hiddenMessagesProperties?: HiddenMessageProperty[];
+  hiddenMessagesProperties?: HiddenMessageProperty[]
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({

@@ -23,9 +23,9 @@ export interface IMessageStyles {
   classname?: string
 }
 export interface IAttachmentProperties {
-  show?: boolean,
-  canDelete?: boolean,
-  canDownload?: boolean,
+  show?: boolean
+  canDelete?: boolean
+  canDownload?: boolean
   canForward?: boolean
 }
 
@@ -188,4 +188,5 @@ export interface IMessageProps {
   theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
+  messageTimeColorOnAttachment?: string
 }

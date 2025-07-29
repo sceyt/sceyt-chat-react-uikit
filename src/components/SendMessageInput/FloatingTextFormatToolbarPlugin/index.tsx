@@ -21,7 +21,7 @@ import {
 import { createPortal } from 'react-dom'
 
 import styled from 'styled-components'
-import { colors, THEME_COLORS } from '../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
 import { useColor, useEventListener } from '../../../hooks'
 import { $isMentionNode } from '../MentionNode'
@@ -121,7 +121,7 @@ function TextFormatFloatingToolbar({
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
-    [THEME_COLORS.SECTION_BACKGROUND]: backgroundSections,
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
 
@@ -606,7 +606,7 @@ const Action = styled.button<{
   color?: string
   iconColor: string
   order?: number
-  hoverIconColor?: string
+  hoverIconColor: string
   hoverBackgroundColor: string
   isActive?: boolean
 }>`
@@ -625,7 +625,7 @@ const Action = styled.button<{
   ${(props) =>
     props.isActive &&
     `
-    color: ${props.hoverIconColor || colors.primary};
+    color: ${props.hoverIconColor};
     background-color: ${props.hoverBackgroundColor};
   `}
 
@@ -634,7 +634,7 @@ const Action = styled.button<{
   }
 
   &:hover {
-    color: ${(props) => props.hoverIconColor || colors.primary};
+    color: ${(props) => props.hoverIconColor};
     background-color: ${(props) => props.hoverBackgroundColor};
 
     ${ItemNote} {

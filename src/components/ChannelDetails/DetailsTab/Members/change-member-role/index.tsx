@@ -19,7 +19,7 @@ import {
   DropdownOptionLi
 } from '../../../../../UIHelper'
 import { IMember, IRole } from '../../../../../types'
-import { colors, THEME_COLORS } from '../../../../../UIHelper/constants'
+import { THEME_COLORS } from '../../../../../UIHelper/constants'
 // Components
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
@@ -35,12 +35,16 @@ interface IProps {
 const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.SECTION_BACKGROUND]: sectionBackground,
-    [THEME_COLORS.SURFACE_1]: surface1Background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.WARNING]: errorColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+    [THEME_COLORS.WARNING]: warningColor,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.BORDER]: border
   } = useColor()
 
   const dispatch = useDispatch()
@@ -72,19 +76,21 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
 
   return (
     <PopupContainer>
-      <Popup backgroundColor={sectionBackground} maxWidth='400px' padding='0'>
+      <Popup backgroundColor={background} maxWidth='400px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
-          <CloseIcon color={textPrimary} onClick={() => handleClosePopup()} />
+          <CloseIcon color={iconPrimary} onClick={handleClosePopup} />
           <PopupName color={textPrimary}>Change member role</PopupName>
 
           <RolesSelect>
-            <RoleLabel color={textPrimary}>Roles</RoleLabel>
+            <RoleLabel color={textSecondary}>Roles</RoleLabel>
 
             <CustomSelect
-              backgroundColor={sectionBackground}
+              backgroundColor={background}
               color={textPrimary}
-              errorColor={errorColor}
+              errorColor={warningColor}
               placeholderColor={textFootnote}
+              borderColor={border}
+              disabledColor={surface1}
             >
               <DropDown
                 withIcon
@@ -100,7 +106,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
                   {!!roles.length &&
                     roles.map((role: IRole) => (
                       <DropdownOptionLi
-                        hoverBackground={hoverBackground}
+                        hoverBackground={backgroundHovered}
                         key={role.name}
                         onClick={() => onChangeFunction(role.name)}
                         textColor={textPrimary}
@@ -113,13 +119,13 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             </CustomSelect>
           </RolesSelect>
         </PopupBody>
-        <PopupFooter backgroundColor={surface1Background}>
+        <PopupFooter backgroundColor={surface1}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={() => handleClosePopup()}>
             Cancel
           </Button>
           <Button
             type='button'
-            color={colors.white}
+            color={textOnPrimary}
             backgroundColor={accentColor}
             borderRadius='8px'
             onClick={handleSave}

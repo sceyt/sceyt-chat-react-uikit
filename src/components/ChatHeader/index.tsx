@@ -23,7 +23,7 @@ import { getChannelTypesMemberDisplayTextMap, getShowChannelDetails } from '../.
 import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { SectionHeader, SubTitle } from '../../UIHelper'
 import { AvatarWrapper, UserStatus } from '../Channel'
-import { colors, THEME_COLORS } from '../../UIHelper/constants'
+import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
 // Components
 import Avatar from '../Avatar'
@@ -78,8 +78,8 @@ export default function ChatHeader({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.HOVER_BACKGROUND]: hoverBackground
+    [THEME_COLORS.BORDER]: border,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
 
   const dispatch = useDispatch()
@@ -138,18 +138,18 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={borderColor}>
+    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={border}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
-          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={hoverBackground}>
+          <MobileBackButtonWrapper onClick={handleBackToChannels} hoverBackground={backgroundHovered}>
             <WrapArrowLeftIcon color={iconPrimary} />
           </MobileBackButtonWrapper>
         )}
       </MobileButtonWrapper>
 
       {activeChannel.isLinkedChannel && (
-        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={hoverBackground} order={backButtonOrder}>
+        <BackButtonWrapper onClick={handleSwitchChannel} hoverBackground={backgroundHovered} order={backButtonOrder}>
           <WrapArrowLeftIcon color={iconPrimary} />
         </BackButtonWrapper>
       )}
@@ -279,7 +279,7 @@ const CustomActionsWrapper = styled.div<{ order?: number }>`
   order: ${(props) => props.order};
 `
 
-const ChanelInfo = styled.span<{ infoIconColor?: string; order?: number }>`
+const ChanelInfo = styled.span<{ infoIconColor: string; order?: number }>`
   display: flex;
   cursor: pointer;
   order: ${(props) => props.order};
@@ -288,7 +288,7 @@ const ChanelInfo = styled.span<{ infoIconColor?: string; order?: number }>`
     color: ${(props) => props.infoIconColor};
   }
 `
-const BackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number }>`
+const BackButtonWrapper = styled.span<{ hoverBackground: string; order?: number }>`
   display: inline-flex;
   cursor: pointer;
   margin-right: 16px;
@@ -296,7 +296,7 @@ const BackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number
   transition: all 0.2s;
   order: ${(props) => props.order};
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
+    background-color: ${(props) => props.hoverBackground};
   }
   @media (max-width: 768px) {
     display: none;
@@ -310,7 +310,7 @@ const MobileButtonWrapper = styled.div`
   }
 `
 
-const MobileBackButtonWrapper = styled.span<{ hoverBackground?: string; order?: number }>`
+const MobileBackButtonWrapper = styled.span<{ hoverBackground: string; order?: number }>`
   display: inline-flex;
   cursor: pointer;
   margin-right: 16px;
@@ -318,7 +318,7 @@ const MobileBackButtonWrapper = styled.span<{ hoverBackground?: string; order?: 
   transition: all 0.2s;
   order: ${(props) => props.order};
   &:hover {
-    background-color: ${(props) => props.hoverBackground || colors.primaryLight};
+    background-color: ${(props) => props.hoverBackground};
   }
 `
 

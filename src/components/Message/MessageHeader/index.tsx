@@ -51,7 +51,9 @@ const MessageHeader = ({
       withPadding={
         withAttachments &&
         notLinkAttachment &&
-        (message.incoming ? incomingMessageStyles?.background !== 'inherit' : outgoingMessageStyles?.background !== 'inherit')
+        (message.incoming
+          ? incomingMessageStyles?.background !== 'inherit'
+          : outgoingMessageStyles?.background !== 'inherit')
       }
     >
       {showMessageSenderName && (
