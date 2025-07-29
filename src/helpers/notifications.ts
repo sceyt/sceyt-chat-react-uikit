@@ -5,7 +5,7 @@ import store from '../store'
 import { SWITCH_CHANNEL } from '../store/channel/constants'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from './constants'
 
-let contactsMap = {}
+let contactsMap: IContactsMap = {}
 let logoSrc = ''
 let showNotifications: boolean | undefined = true
 /* let windowObjectReference: any = null // global variable

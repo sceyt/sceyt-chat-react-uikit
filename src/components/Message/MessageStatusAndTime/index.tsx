@@ -181,6 +181,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   white-space: nowrap;
   width: ${(props) => props.bottomOfMessage && '100%'};
   justify-content: ${(props) => props.bottomOfMessage && props.rtlDirection && 'flex-end'};
+  z-index: 10;
 
   & > svg {
     margin-left: 4px;
@@ -196,7 +197,7 @@ const MessageStatusAndTimeContainer = styled.span<{
     props.withAttachment &&
     `
     position: absolute;
-    z-index: 3;
+    z-index: 10;
     right: ${props.fileAttachment ? '6px' : '10px'};
     bottom: ${props.fileAttachment ? '9px' : '14px'};
   `}

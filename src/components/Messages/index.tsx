@@ -178,6 +178,7 @@ interface MessagesProps {
   messageTimeColor?: string
   messageStatusAndTimeLineHeight?: string
   hiddenMessagesProperties?: HiddenMessageProperty[]
+  shouldOpenUserProfileForMention?: boolean
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -310,7 +311,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   messageTimeFontSize,
   messageTimeColor,
   messageStatusAndTimeLineHeight,
-  hiddenMessagesProperties = []
+  hiddenMessagesProperties = [],
+  shouldOpenUserProfileForMention
 }) => {
   const messages = useSelector(activeChannelMessagesSelector) || []
   return (
@@ -442,6 +444,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         messageTimeColor={messageTimeColor}
         messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
         hiddenMessagesProperties={hiddenMessagesProperties}
+        shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
       />
     </React.Fragment>
   )

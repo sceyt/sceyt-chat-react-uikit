@@ -202,6 +202,7 @@ interface MessagesProps {
     handleReactionAddDelete: (selectedEmoji: any) => void
     handleScrollToRepliedMessage: (messageId: string) => void
     handleMediaItemClick?: (attachment: IAttachment) => void
+    handleOpenUserProfile: (user: IUser) => void
     isThreadMessage?: boolean
   }>
   messageReaction?: boolean
@@ -308,6 +309,7 @@ interface MessagesProps {
   messageTextFontSize?: string
   messageTextLineHeight?: string
   hiddenMessagesProperties?: HiddenMessageProperty[]
+  shouldOpenUserProfileForMention?: boolean
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -441,7 +443,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeFontSize,
   messageTimeColor,
   messageStatusAndTimeLineHeight,
-  hiddenMessagesProperties
+  hiddenMessagesProperties,
+  shouldOpenUserProfileForMention
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -844,7 +847,7 @@ const MessageList: React.FC<MessagesProps> = ({
   useEffect(() => {
     if (
       messages.length > 0 &&
-      messages[messages.length - 1].id === channel.lastMessage.id &&
+      messages[messages.length - 1]?.id === channel.lastMessage?.id &&
       scrollRef.current &&
       scrollRef.current.scrollTop > -50 &&
       !showScrollToNewMessageButton
@@ -1401,6 +1404,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageTimeFontSize={messageTimeFontSize}
                           messageTimeColor={messageTimeColor}
                           messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+                          shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                         />
                       </MessageWrapper>
                     )}
