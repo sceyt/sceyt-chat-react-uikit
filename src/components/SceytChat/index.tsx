@@ -25,7 +25,13 @@ import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
 import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
-import { setContactsMap, setNotificationLogoSrc, setShowNotifications } from '../../helpers/notifications'
+import {
+  setContactsMap,
+  setNotificationLogoSrc,
+  setShowNotifications,
+  initializeNotifications,
+  requestPermissionOnUserInteraction
+} from '../../helpers/notifications'
 import { IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
@@ -88,6 +94,11 @@ const SceytChat = ({
     if (!draggingSelector) {
       dispatch(setIsDraggingAC(true))
     }
+  }
+
+  const handleUserInteraction = () => {
+    // Request notification permission on first user interaction
+    requestPermissionOnUserInteraction()
   }
 
   const handleVisibilityChange = () => {
@@ -194,16 +205,8 @@ const SceytChat = ({
       setChannelTypesFilter(channelTypeFilter)
     }
     if (showNotifications) {
-      try {
-        if (window.Notification && Notification.permission === 'default') {
-          // Notification.requestPermission().then(log.log).catch(log.error)
-          Promise.resolve(Notification.requestPermission()).then(function (permission) {
-            log.info('permission:', permission)
-          })
-        }
-      } catch (e) {
-        log.error('safari Notification request permission', e)
-      }
+      // Initialize notifications with cross-browser support
+      initializeNotifications()
       window.sceytTabNotifications = null
       window.sceytTabUrl = window.location.href
 
@@ -283,6 +286,7 @@ const SceytChat = ({
         <ChatContainer
           onDrop={handleDropFile}
           onDragOver={handleDragOver}
+          onClick={handleUserInteraction}
           withChannelsList={channelsListWidth && channelsListWidth > 0}
           backgroundColor={backgroundColor}
           highlightedBackground={highlightedBackground}
