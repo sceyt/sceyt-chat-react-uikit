@@ -121,10 +121,16 @@ export function setMessageToEditAC(message: IMessage | null) {
   }
 }
 
-export function getMessagesAC(channel: IChannel, loadWithLastMessage?: boolean, messageId?: string, limit?: number) {
+export function getMessagesAC(
+  channel: IChannel,
+  loadWithLastMessage?: boolean,
+  messageId?: string,
+  limit?: number,
+  withDeliveredMessages?: boolean
+) {
   return {
     type: GET_MESSAGES,
-    payload: { channel, loadWithLastMessage, messageId, limit }
+    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages }
   }
 }
 

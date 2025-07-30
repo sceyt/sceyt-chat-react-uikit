@@ -898,15 +898,6 @@ const MessageList: React.FC<MessagesProps> = ({
           prevDisable = false
         }, 800)
       }
-
-      // loading = true
-      /* if (scrollToNewMessage.updateMessageList && messagesLoading !== LOADING_STATE.LOADING) {
-        setTimeout(() => {
-          if (getHasNextCached()) {
-            dispatch(getMessagesAC(channel, true))
-          }
-        }, 800)
-      } */
     }
   }, [scrollToNewMessage])
 
@@ -930,7 +921,6 @@ const MessageList: React.FC<MessagesProps> = ({
       const visibleMessagesIds = Object.keys(visibleMessages)
       // const messageId = visibleMessagesIds[Math.floor(visibleMessagesIds.length / 2)]
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-
       dispatch(getMessagesAC(channel, undefined, messageId))
       setUnreadMessageId(messageId)
     } else {
@@ -938,7 +928,7 @@ const MessageList: React.FC<MessagesProps> = ({
         clearVisibleMessagesMap()
       }
       if (channel) {
-        dispatch(getMessagesAC(channel))
+        dispatch(getMessagesAC(channel, true, undefined, undefined, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
