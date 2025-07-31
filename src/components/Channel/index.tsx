@@ -67,6 +67,33 @@ interface IChannelProps {
   channelAvatarTextSize?: number
 }
 
+const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
+  return (
+    !!(lastMessage.attachments && lastMessage.attachments.length) &&
+    (lastMessage.attachments[0].type === attachmentTypes.image ? (
+      <React.Fragment>
+        <ImageIcon />
+        {lastMessage.body ? '' : 'Photo'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
+      <React.Fragment>
+        <CameraIcon />
+        {lastMessage.body ? '' : 'Video'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
+      <React.Fragment>
+        <FileIcon />
+        {lastMessage.body ? '' : 'File'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
+      <React.Fragment>
+        <VoiceIcon />
+        {lastMessage.body ? '' : 'Voice'}
+      </React.Fragment>
+    ) : null)
+  )
+}
+
 const ChannelMessageText = ({
   isTypingOrRecording,
   textPrimary,
@@ -171,38 +198,17 @@ const ChannelMessageText = ({
           }`
         ) : (
           <React.Fragment>
-            {channel.lastReactedMessage && (
-              <React.Fragment>
-                Reacted
-                <ReactionItem>
-                  {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
-                </ReactionItem>
-                to{' "'}
-              </React.Fragment>
-            )}
-            {!!(lastMessage.attachments && lastMessage.attachments.length) &&
-              (lastMessage.attachments[0].type === attachmentTypes.image ? (
-                <React.Fragment>
-                  <ImageIcon />
-                  {lastMessage.body ? '' : 'Photo'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
-                <React.Fragment>
-                  <CameraIcon />
-                  {lastMessage.body ? '' : 'Video'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
-                <React.Fragment>
-                  <FileIcon />
-                  {lastMessage.body ? '' : 'File'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
-                <React.Fragment>
-                  <VoiceIcon />
-                  {lastMessage.body ? '' : 'Voice'}
-                </React.Fragment>
-              ) : null)}
             <LastMessageDescription>
+              {channel.lastReactedMessage && (
+                <React.Fragment>
+                  Reacted
+                  <ReactionItem>
+                    {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
+                  </ReactionItem>
+                  to{' "'}
+                </React.Fragment>
+              )}
+              {LastMessageAttachments({ lastMessage })}
               {!!(lastMessage && lastMessage.id) &&
                 MessageTextFormat({
                   text: lastMessage.body,
@@ -213,8 +219,8 @@ const ChannelMessageText = ({
                   accentColor,
                   textSecondary
                 })}
+              {channel.lastReactedMessage && '"'}
             </LastMessageDescription>
-            {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
     </MessageTextContainer>
@@ -812,6 +818,12 @@ export const LastMessageDescription = styled.div`
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  & > svg {
+    width: 18px;
+    height: 18px;
+    margin: 3px 0 -3px 0;
+    margin-right: 4px;
+  }
 `
 
 export const ChannelStatus = styled.div<{ color: string }>`

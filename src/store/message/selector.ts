@@ -1,6 +1,7 @@
+import { IMessage } from 'types'
 import { IMessageStore } from './reducers'
 
-export const activeChannelMessagesSelector = (store: { MessageReducer: IMessageStore }) =>
+export const activeChannelMessagesSelector = (store: { MessageReducer: IMessageStore }): IMessage[] =>
   store.MessageReducer.activeChannelMessages
 export const threadReplyMessagesSelector = (store: any) => store.MessageReducer.threadReplyMessages
 export const messagesLoadingState = (store: any) => store.MessageReducer.messagesLoadingState
