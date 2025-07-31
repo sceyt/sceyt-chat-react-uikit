@@ -791,14 +791,14 @@ export const LastMessageText = styled.span<{
     transform: translate(0px, 3px);
   }
   & > span {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
   }
   & > div {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
