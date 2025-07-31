@@ -1279,7 +1279,13 @@ function* getMessagesQuery(action: IAction): any {
           if (withDeliveredMessages) {
             sentMessages = getFromAllMessagesByMessageId('', '', true)
           }
-          result.messages = [...result.messages, ...sentMessages]
+          const messagesMap: { [key: string]: IMessage } = {}
+          result.messages.forEach((msg) => {
+            messagesMap[msg.tid || ''] = msg
+          })
+          const filteredSentMessages = sentMessages.filter((msg) => !messagesMap[msg.tid || ''])
+
+          result.messages = [...result.messages, ...filteredSentMessages]
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setMessagesToMap(channel.id, result.messages)
           setAllMessages(result.messages)
