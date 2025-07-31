@@ -676,7 +676,6 @@ function* sendTextMessage(action: IAction): any {
         yield put(addMessageAC(JSON.parse(JSON.stringify(pendingMessage))))
       }
     }
-    addMessageToMap(channel.id, pendingMessage)
     addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
     const messagesToAdd = getFromAllMessagesByMessageId('', '', true)
     yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
@@ -687,18 +686,6 @@ function* sendTextMessage(action: IAction): any {
       } else {
         messageResponse = yield call(channel.sendMessage, messageToSend)
       }
-      /* if (msgCount <= 200) {
-        const messageToSend: any = {
-          // metadata: mentionedMembersPositions,
-          // body: `\n${msgCount}\n`,
-          body: `text message ${msgCount}`,
-          mentionedMembers: [],
-          attachments: [],
-          type: 'text'
-        }
-        yield put(sendTextMessageAC(messageToSend, channel.id, 'Connected'))
-        msgCount++
-      } */
       const messageUpdateData = {
         id: messageResponse.id,
         body: messageResponse.body,
@@ -1270,7 +1257,7 @@ function* getMessagesQuery(action: IAction): any {
           result = yield call(messageQuery.loadPreviousMessageId, '0')
 
           if (result.messages.length === 50) {
-            messageQuery.limit = 20
+            messageQuery.limit = 30
             const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
             result.messages = [...secondResult.messages, ...result.messages]
             result.hasNext = secondResult.hasNext
@@ -1285,7 +1272,7 @@ function* getMessagesQuery(action: IAction): any {
           })
           const filteredSentMessages = sentMessages.filter((msg) => !messagesMap[msg.tid || ''])
 
-          result.messages = [...result.messages, ...filteredSentMessages]
+          result.messages = [...result.messages, ...filteredSentMessages].slice(filteredSentMessages.length)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setMessagesToMap(channel.id, result.messages)
           setAllMessages(result.messages)
@@ -1446,7 +1433,7 @@ function* getMessagesQuery(action: IAction): any {
           })
           const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
           setPendingMessages(channel.id, filteredPendingMessages)
-          result.messages = [...result.messages, ...filteredPendingMessages]
+          result.messages = [...result.messages, ...filteredPendingMessages].slice(filteredPendingMessages.length)
         }
 
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
