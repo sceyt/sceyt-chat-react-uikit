@@ -668,15 +668,7 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    const hasNextMessages = yield select(messagesHasNextSelector)
-    if (!getHasNextCached()) {
-      if (hasNextMessages) {
-        yield put(getMessagesAC(channel))
-      } else {
-        yield put(addMessageAC(JSON.parse(JSON.stringify(pendingMessage))))
-      }
-    }
-    addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
+    yield call(addPendingMessage, message, pendingMessage, channel)
     const messagesToAdd = getFromAllMessagesByMessageId('', '', true)
     yield put(setMessagesAC(JSON.parse(JSON.stringify(messagesToAdd))))
     if (connectionState === CONNECTION_STATUS.CONNECTED) {

@@ -704,22 +704,41 @@ const MessageList: React.FC<MessagesProps> = ({
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const fileList: File[] = Object.values(e.dataTransfer.files)
-      const attachmentsFiles: any = []
-      new Promise<void>((resolve) => {
-        fileList.forEach((attachment, index) => {
+      new Promise<any>((resolve) => {
+        const attachmentsFiles: any = []
+        let readFiles = 0
+        let errorCount = 0
+
+        fileList.forEach((attachment) => {
           const fileReader = new FileReader()
+
           fileReader.onload = (event: any) => {
             const file = event.target.result
             attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
-            if (fileList.length - 1 === index) {
-              resolve()
+            readFiles++
+
+            if (readFiles + errorCount === fileList.length) {
+              resolve(attachmentsFiles)
             }
           }
+
+          fileReader.onerror = () => {
+            errorCount++
+
+            if (readFiles + errorCount === fileList.length) {
+              resolve(attachmentsFiles)
+            }
+          }
+
           fileReader.readAsDataURL(attachment)
         })
-      }).then(() => {
-        dispatch(setDraggedAttachmentsAC(attachmentsFiles, 'file'))
       })
+        .then((result) => {
+          dispatch(setDraggedAttachmentsAC(result, 'file'))
+        })
+        .catch((error) => {
+          console.error('Error in handleDropFile:', error)
+        })
       e.dataTransfer.clearData()
     }
   }
@@ -730,24 +749,41 @@ const MessageList: React.FC<MessagesProps> = ({
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const fileList: File[] = Object.values(e.dataTransfer.files)
-      const attachmentsFiles: any = []
-      new Promise<void>((resolve) => {
+      new Promise<any>((resolve) => {
+        const attachmentsFiles: any = []
         let readFiles = 0
+        let errorCount = 0
+
         fileList.forEach((attachment) => {
           const fileReader = new FileReader()
+
           fileReader.onload = (event: any) => {
             const file = event.target.result
             attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
             readFiles++
-            if (fileList.length === readFiles) {
-              resolve()
+
+            if (readFiles + errorCount === fileList.length) {
+              resolve(attachmentsFiles)
             }
           }
+
+          fileReader.onerror = () => {
+            errorCount++
+
+            if (readFiles + errorCount === fileList.length) {
+              resolve(attachmentsFiles)
+            }
+          }
+
           fileReader.readAsDataURL(attachment)
         })
-      }).then(() => {
-        dispatch(setDraggedAttachmentsAC(attachmentsFiles, 'media'))
       })
+        .then((result) => {
+          dispatch(setDraggedAttachmentsAC(result, 'media'))
+        })
+        .catch((error) => {
+          console.error('Error in handleDropMedia:', error)
+        })
       e.dataTransfer.clearData()
     }
   }
@@ -1337,6 +1373,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   scroll-behavior: smooth;
   will-change: left, top;
   background-color: ${(props) => props.backgroundColor};
+  overflow-x: hidden;
 
   &::-webkit-scrollbar {
     width: 8px;
