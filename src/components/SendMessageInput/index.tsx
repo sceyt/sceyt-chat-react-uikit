@@ -539,28 +539,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = attachments.map((attachment: any) => {
-            /* if (sendAsSeparateMessage) {
-              if (index !== 0) {
-                messageToSend.body = ''
-                messageToSend.metadata = ''
-                delete messageToSend.mentionedMembers
-              }
-              const attachmentsToSent = [attachmentToSend]
-              if (linkAttachment) {
-                attachmentsToSent.push(linkAttachment)
-              }
-              dispatch(
-                sendMessageAC(
-                  {
-                    ...messageToSend,
-                    attachments: attachmentsToSent
-                  },
-                  activeChannel.id,
-                  connectionStatus,
-                  true
-                )
-              )
-            } */
             return {
               name: attachment.data.name,
               data: attachment.data,

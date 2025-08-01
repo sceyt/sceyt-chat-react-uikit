@@ -161,32 +161,6 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 }
 
-export function addMessagesToMap(channelId: string, messages: IMessage[], direction: 'next' | 'prev') {
-  if (messagesMap[channelId]) {
-    const newMessagesLength = messages.length
-    if (messagesMap[channelId].length > MESSAGES_MAX_LENGTH) {
-      if (direction === MESSAGE_LOAD_DIRECTION.NEXT) {
-        messagesMap[channelId].splice(0, newMessagesLength)
-        messagesMap[channelId] = [...messagesMap[channelId], ...messages]
-      }
-    } else if (newMessagesLength + messagesMap[channelId].length > MESSAGES_MAX_LENGTH) {
-      const sliceElementCount = newMessagesLength + messagesMap[channelId].length - MESSAGES_MAX_LENGTH
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-        messages.splice(0, sliceElementCount)
-        messagesMap[channelId] = [...messages, ...messagesMap[channelId]]
-      } else {
-        messagesMap[channelId].splice(0, sliceElementCount)
-        messagesMap[channelId] = [...messagesMap[channelId], ...messages]
-      }
-    } else {
-      messagesMap[channelId] =
-        direction === MESSAGE_LOAD_DIRECTION.PREV
-          ? [...messages, ...messagesMap[channelId]]
-          : [...messagesMap[channelId], ...messages]
-    }
-  }
-}
-
 export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
     if (
