@@ -325,7 +325,7 @@ const Channel: React.FC<IChannelProps> = ({
         if (channelDraftMessage) {
           setDraftMessageText(channelDraftMessage.text)
         } else if (draftAudioRecording) {
-          setDraftMessageText('Audio')
+          setDraftMessageText('Voice')
         }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
