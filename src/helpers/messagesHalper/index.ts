@@ -16,6 +16,7 @@ export type IAttachmentMeta = {
 }
 
 type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
+type audioRecordingMap = { [key: string]: any }
 type visibleMessagesMap = { [key: string]: { id: string } }
 
 type pendingMessagesMap = {
@@ -391,13 +392,22 @@ export const setPendingMessages = (channelId: string, pendingMessages: any) => {
 export const getPendingMessagesMap = () => pendingMessagesMap
 
 export const draftMessagesMap: draftMessagesMap = {}
-
+export const audioRecordingMap: audioRecordingMap = {}
 export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]
+export const getAudioRecordingFromMap = (channelId: string) => audioRecordingMap[channelId]
 
 export const checkDraftMessagesIsEmpty = () => Object.keys(draftMessagesMap).length === 0
 
+export const setAudioRecordingToMap = (channelId: string, audioRecording: any) => {
+  audioRecordingMap[channelId] = audioRecording
+}
+
 export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
+}
+
+export const removeAudioRecordingFromMap = (channelId: string) => {
+  delete audioRecordingMap[channelId]
 }
 
 export const setDraftMessageToMap = (

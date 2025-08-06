@@ -31,7 +31,7 @@ import Avatar from '../Avatar'
 import { systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -123,6 +123,10 @@ const ChannelMessageText = ({
   channel: IChannel
   isDirectChannel: boolean
 }) => {
+  const audioRecording = useMemo(() => {
+    return getAudioRecordingFromMap(channel.id)
+  }, [channel.id, draftMessageText])
+
   return (
     <MessageTextContainer>
       {isTypingOrRecording && (
@@ -134,7 +138,10 @@ const ChannelMessageText = ({
       )}
       {!isTypingOrRecording &&
         (draftMessageText ? (
-          <DraftMessageText color={textSecondary}>{draftMessageText}</DraftMessageText>
+          <DraftMessageText color={textSecondary}>
+            {audioRecording && <VoiceIcon />}
+            {draftMessageText}
+          </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
         ) : lastMessage.type === 'system' ? (
@@ -313,8 +320,13 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (activeChannel.id !== channel.id) {
       const channelDraftMessage = getDraftMessageFromMap(channel.id)
-      if (channelDraftMessage) {
-        setDraftMessageText(channelDraftMessage.text)
+      const draftAudioRecording = getAudioRecordingFromMap(channel.id)
+      if (channelDraftMessage || draftAudioRecording) {
+        if (channelDraftMessage) {
+          setDraftMessageText(channelDraftMessage.text)
+        } else if (draftAudioRecording) {
+          setDraftMessageText('Audio')
+        }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
       }
@@ -737,6 +749,9 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
 `
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;
