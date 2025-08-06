@@ -31,7 +31,7 @@ import Avatar from '../Avatar'
 import { systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -67,6 +67,33 @@ interface IChannelProps {
   channelAvatarTextSize?: number
 }
 
+const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
+  return (
+    !!(lastMessage.attachments && lastMessage.attachments.length) &&
+    (lastMessage.attachments[0].type === attachmentTypes.image ? (
+      <React.Fragment>
+        <ImageIcon />
+        {lastMessage.body ? '' : 'Photo'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
+      <React.Fragment>
+        <CameraIcon />
+        {lastMessage.body ? '' : 'Video'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
+      <React.Fragment>
+        <FileIcon />
+        {lastMessage.body ? '' : 'File'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
+      <React.Fragment>
+        <VoiceIcon />
+        {lastMessage.body ? '' : 'Voice'}
+      </React.Fragment>
+    ) : null)
+  )
+}
+
 const ChannelMessageText = ({
   isTypingOrRecording,
   textPrimary,
@@ -96,6 +123,10 @@ const ChannelMessageText = ({
   channel: IChannel
   isDirectChannel: boolean
 }) => {
+  const audioRecording = useMemo(() => {
+    return getAudioRecordingFromMap(channel.id)
+  }, [channel.id, draftMessageText])
+
   return (
     <MessageTextContainer>
       {isTypingOrRecording && (
@@ -107,7 +138,10 @@ const ChannelMessageText = ({
       )}
       {!isTypingOrRecording &&
         (draftMessageText ? (
-          <DraftMessageText color={textSecondary}>{draftMessageText}</DraftMessageText>
+          <DraftMessageText color={textSecondary}>
+            {audioRecording && <VoiceIcon />}
+            {draftMessageText}
+          </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
         ) : lastMessage.type === 'system' ? (
@@ -171,38 +205,17 @@ const ChannelMessageText = ({
           }`
         ) : (
           <React.Fragment>
-            {channel.lastReactedMessage && (
-              <React.Fragment>
-                Reacted
-                <ReactionItem>
-                  {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
-                </ReactionItem>
-                to{' "'}
-              </React.Fragment>
-            )}
-            {!!(lastMessage.attachments && lastMessage.attachments.length) &&
-              (lastMessage.attachments[0].type === attachmentTypes.image ? (
-                <React.Fragment>
-                  <ImageIcon />
-                  {lastMessage.body ? '' : 'Photo'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
-                <React.Fragment>
-                  <CameraIcon />
-                  {lastMessage.body ? '' : 'Video'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
-                <React.Fragment>
-                  <FileIcon />
-                  {lastMessage.body ? '' : 'File'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
-                <React.Fragment>
-                  <VoiceIcon />
-                  {lastMessage.body ? '' : 'Voice'}
-                </React.Fragment>
-              ) : null)}
             <LastMessageDescription>
+              {channel.lastReactedMessage && (
+                <React.Fragment>
+                  Reacted
+                  <ReactionItem>
+                    {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
+                  </ReactionItem>
+                  to{' "'}
+                </React.Fragment>
+              )}
+              {LastMessageAttachments({ lastMessage })}
               {!!(lastMessage && lastMessage.id) &&
                 MessageTextFormat({
                   text: lastMessage.body,
@@ -213,8 +226,8 @@ const ChannelMessageText = ({
                   accentColor,
                   textSecondary
                 })}
+              {channel.lastReactedMessage && '"'}
             </LastMessageDescription>
-            {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
     </MessageTextContainer>
@@ -307,8 +320,13 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (activeChannel.id !== channel.id) {
       const channelDraftMessage = getDraftMessageFromMap(channel.id)
-      if (channelDraftMessage) {
-        setDraftMessageText(channelDraftMessage.text)
+      const draftAudioRecording = getAudioRecordingFromMap(channel.id)
+      if (channelDraftMessage || draftAudioRecording) {
+        if (channelDraftMessage) {
+          setDraftMessageText(channelDraftMessage.text)
+        } else if (draftAudioRecording) {
+          setDraftMessageText('Voice')
+        }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
       }
@@ -731,6 +749,9 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
 `
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;
@@ -785,14 +806,14 @@ export const LastMessageText = styled.span<{
     transform: translate(0px, 3px);
   }
   & > span {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
   }
   & > div {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -812,6 +833,12 @@ export const LastMessageDescription = styled.div`
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  & > svg {
+    width: 18px;
+    height: 18px;
+    margin: 3px 0 -3px 0;
+    margin-right: 4px;
+  }
 `
 
 export const ChannelStatus = styled.div<{ color: string }>`

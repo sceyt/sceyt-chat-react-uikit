@@ -77,6 +77,7 @@ import {
   deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
+  getAudioRecordingFromMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
@@ -365,8 +366,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
-  const [recordedFile, setRecordedFile] = useState<any>(null)
-
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
@@ -539,28 +538,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = attachments.map((attachment: any) => {
-            /* if (sendAsSeparateMessage) {
-              if (index !== 0) {
-                messageToSend.body = ''
-                messageToSend.metadata = ''
-                delete messageToSend.mentionedMembers
-              }
-              const attachmentsToSent = [attachmentToSend]
-              if (linkAttachment) {
-                attachmentsToSent.push(linkAttachment)
-              }
-              dispatch(
-                sendMessageAC(
-                  {
-                    ...messageToSend,
-                    attachments: attachmentsToSent
-                  },
-                  activeChannel.id,
-                  connectionStatus,
-                  true
-                )
-              )
-            } */
             return {
               name: attachment.data.name,
               data: attachment.data,
@@ -1134,7 +1111,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [draggedAttachments])
 
-  useEffect(() => {
+  const sendRecordedFile = (recordedFile: any, id: string) => {
     if (recordedFile) {
       const tid = uuidv4()
       const reader = new FileReader()
@@ -1171,7 +1148,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           ],
           type: 'text'
         }
-        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus))
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus))
       }
 
       reader.onerror = (e: any) => {
@@ -1179,7 +1156,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       reader.readAsBinaryString(recordedFile.file)
     }
-  }, [recordedFile])
+  }
 
   useEffect(() => {
     const updateViewPortWidth = () => {
@@ -1699,7 +1676,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                  {showRecording ? (
+                  {showRecording || getAudioRecordingFromMap(activeChannel.id) ? (
                     <AudioCont />
                   ) : (
                     <MessageInputWrapper
@@ -1895,9 +1872,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       activeColor={accentColor}
                     >
                       <AudioRecord
-                        sendRecordedFile={setRecordedFile}
+                        sendRecordedFile={sendRecordedFile}
                         setShowRecording={setShowRecording}
                         showRecording={showRecording}
+                        channelId={activeChannel.id}
                       />
                     </SendMessageButton>
                   )}
