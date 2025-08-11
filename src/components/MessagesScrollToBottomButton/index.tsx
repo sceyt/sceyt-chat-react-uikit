@@ -65,9 +65,9 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const messages = useSelector(activeChannelMessagesSelector) || []
   const handleScrollToBottom = () => {
     dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
-    handleScrollToRepliedMessage(channel.lastMessage.id)
+    handleScrollToLastMessage(channel.lastMessage.id)
   }
-  const handleScrollToRepliedMessage = async (messageId: string) => {
+  const handleScrollToLastMessage = async (messageId: string) => {
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {
@@ -81,7 +81,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
       }
     } else {
       // await handleGetMessages(undefined, messageId)
-      dispatch(getMessagesAC(channel, true, messageId))
+      dispatch(getMessagesAC(channel, true, messageId, undefined, undefined, false))
     }
   }
 

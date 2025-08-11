@@ -1208,6 +1208,7 @@ function* getMessagesQuery(action: IAction): any {
           setHasNextCached(false)
         }
         yield put(setScrollToMessagesAC(messageId))
+        yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
         // dispatch(setMessagesPrevCompleteAC(true))
         setAllMessages([])

@@ -2,6 +2,8 @@ import createSagaMiddleware from 'redux-saga'
 import { configureStore } from '@reduxjs/toolkit'
 import reducers from './reducers'
 import rootSaga from './saga'
+// Import Redux v5 compatibility polyfills
+import '../helpers/redux-polyfills'
 
 const sagaMiddleware = createSagaMiddleware()
 const store = configureStore({

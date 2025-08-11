@@ -448,7 +448,7 @@ const Message = ({
         setMessageToVisibleMessagesMap(message)
       }
 
-      if (scrollToNewMessage.scrollToBottom) {
+      if (scrollToNewMessage.scrollToBottom && (message.id === channel.lastMessage.id || !message.id)) {
         dispatch(scrollToNewMessageAC(false, false, false))
       }
     } else {

@@ -8,7 +8,6 @@ import {
   getMessagesAC,
   loadMoreMessagesAC,
   scrollToNewMessageAC,
-  setMessagesLoadingStateAC,
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC
 } from '../../../store/message/actions'
@@ -65,17 +64,13 @@ import { getClient } from 'common/client'
 import log from 'loglevel'
 
 let loadFromServer = false
-// let lastPrevLoadedId: string = ''
-// let firstPrevLoadedId: string = ''
-// let hasNextMessages = true
-// let hasPrevMessages = true
 let loadDirection = ''
-// let nextTargetMessage = ''
 // @ts-ignore
 let nextDisable = false
 let prevDisable = false
 let scrollToBottom = false
 let shouldLoadMessages: 'next' | 'prev' | ''
+let loading = false
 const messagesIndexMap: Record<string, number> = {}
 
 const CreateMessageDateDivider = ({
@@ -572,7 +567,7 @@ const MessageList: React.FC<MessagesProps> = ({
             !scrollToNewMessage.scrollToBottom &&
             hasPrevMessages
           ) {
-            if (messagesLoading === LOADING_STATE.LOADING || prevDisable) {
+            if (loading || messagesLoading === LOADING_STATE.LOADING || prevDisable) {
               shouldLoadMessages = 'prev'
             } else {
               if (shouldLoadMessages === 'prev') {
@@ -593,7 +588,7 @@ const MessageList: React.FC<MessagesProps> = ({
             !scrollToNewMessage.scrollToBottom &&
             (hasNextMessages || getHasNextCached())
           ) {
-            if (messagesLoading === LOADING_STATE.LOADING || nextDisable) {
+            if (loading || messagesLoading === LOADING_STATE.LOADING || nextDisable) {
               shouldLoadMessages = 'next'
             } else {
               if (shouldLoadMessages === 'next') {
@@ -625,7 +620,10 @@ const MessageList: React.FC<MessagesProps> = ({
       loadDirection,
       getHasPrevCached,
       getHasNextCached,
-      scrollToReply
+      scrollToReply,
+      loading,
+      prevDisable,
+      nextDisable
     ]
   )
 
@@ -668,8 +666,10 @@ const MessageList: React.FC<MessagesProps> = ({
     const hasNextCached = getHasNextCached()
     if (messagesLoading === LOADING_STATE.LOADED && connectionStatus === CONNECTION_STATUS.CONNECTED) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
+        loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, firstMessageId, hasPrevMessages))
       } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && lastMessageId && (hasNextMessages || hasNextCached)) {
+        loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
       }
     }
@@ -807,7 +807,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   useEffect(() => {
     if (scrollToRepliedMessage) {
-      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      loading = false
       scrollRef.current.style.scrollBehavior = 'inherit'
       const repliedMessage = document.getElementById(scrollToRepliedMessage)
       if (repliedMessage) {
@@ -937,7 +937,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
 
-    if (messagesLoading) {
+    if (loading) {
       if (loadDirection !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
         if (lastVisibleMessage) {
@@ -947,7 +947,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
         if (loadFromServer) {
           setTimeout(() => {
-            dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+            loading = false
             loadFromServer = false
             nextDisable = false
             if (shouldLoadMessages === 'prev' && messagesIndexMap[lastVisibleMessageId] < 15) {
@@ -958,7 +958,7 @@ const MessageList: React.FC<MessagesProps> = ({
             }
           }, 50)
         } else {
-          dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+          loading = false
           if (shouldLoadMessages === 'prev') {
             handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
             shouldLoadMessages = ''
@@ -976,7 +976,7 @@ const MessageList: React.FC<MessagesProps> = ({
             lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
-        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+        loading = false
         prevDisable = false
         if (shouldLoadMessages === 'prev') {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
@@ -1007,10 +1007,11 @@ const MessageList: React.FC<MessagesProps> = ({
       })
     }
   }, [messages])
+
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      loading = false
       prevDisable = false
       nextDisable = false
       clearMessagesMap()
