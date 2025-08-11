@@ -1,63 +1,64 @@
 import {
-  ADD_ATTACHMENTS,
-  ADD_MESSAGE,
-  DELETE_MESSAGE,
-  ADD_MESSAGES,
   ADD_REACTION,
-  ADD_REACTION_TO_MESSAGE,
-  CLEAR_MESSAGES,
+  DELETE_MESSAGE,
   DELETE_REACTION,
-  DELETE_REACTION_FROM_MESSAGE,
   EDIT_MESSAGE,
-  EMPTY_CHANNEL_ATTACHMENTS,
+  FORWARD_MESSAGE,
   GET_MESSAGES,
   GET_MESSAGES_ATTACHMENTS,
+  GET_REACTIONS,
   LOAD_MORE_MESSAGES,
   LOAD_MORE_MESSAGES_ATTACHMENTS,
-  SEND_MESSAGE,
-  SET_ATTACHMENTS,
-  SET_ATTACHMENTS_COMPLETE,
-  SET_MESSAGES,
-  SET_MESSAGES_LOADING_STATE,
-  UPDATE_MESSAGE,
-  UPDATE_MESSAGES_STATUS,
-  UPLOAD_ATTACHMENT_COMPILATION,
-  SET_MESSAGE_TO_EDIT,
-  SET_SCROLL_TO_NEW_MESSAGE,
-  SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON,
-  SET_SEND_MESSAGE_INPUT_HEIGHT,
-  RESEND_MESSAGE,
-  SET_MESSAGE_FOR_REPLY,
-  SEND_TEXT_MESSAGE,
-  SET_MESSAGES_HAS_NEXT,
-  SET_HAS_PREV_MESSAGES,
-  SET_SCROLL_TO_MESSAGE,
-  PAUSE_ATTACHMENT_UPLOADING,
-  RESUME_ATTACHMENT_UPLOADING,
-  SET_ATTACHMENTS_FOR_POPUP,
-  SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
-  ADD_ATTACHMENTS_FOR_POPUP,
-  DELETE_MESSAGE_FROM_LIST,
-  FORWARD_MESSAGE,
-  GET_REACTIONS,
   LOAD_MORE_REACTIONS,
-  SET_REACTIONS_LIST,
-  ADD_REACTIONS_TO_LIST,
-  SET_REACTIONS_LOADING_STATE,
-  DELETE_REACTION_FROM_LIST,
-  ADD_REACTION_TO_LIST,
-  SET_MESSAGE_MENU_OPENED,
-  UPDATE_UPLOAD_PROGRESS,
-  REMOVE_UPLOAD_PROGRESS,
-  SET_PLAYING_AUDIO_ID,
-  ADD_SELECTED_MESSAGE,
-  REMOVE_SELECTED_MESSAGE,
-  CLEAR_SELECTED_MESSAGES,
-  REMOVE_ATTACHMENT,
-  ADD_PENDING_MESSAGE,
-  SET_SCROLL_TO_MENTIONED_MESSAGE
+  PAUSE_ATTACHMENT_UPLOADING,
+  RESEND_MESSAGE,
+  RESUME_ATTACHMENT_UPLOADING,
+  SEND_MESSAGE,
+  SEND_TEXT_MESSAGE
 } from './constants'
-import { IAttachment, IChannel, IMessage, IReaction } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IReaction } from '../../types'
+import {
+  addMessage,
+  deleteMessageFromList,
+  setScrollToMessage,
+  setScrollToMentionedMessage,
+  setScrollToNewMessage,
+  setShowScrollToNewMessageButton,
+  setMessages,
+  addMessages,
+  updateMessagesStatus,
+  updateMessage,
+  addReactionToMessage,
+  deleteReactionFromMessage,
+  setHasPrevMessages,
+  setMessagesHasNext,
+  clearMessages,
+  emptyChannelAttachments,
+  setAttachments,
+  removeAttachment,
+  setAttachmentsForPopup,
+  addAttachments,
+  addAttachmentsForPopup,
+  setAttachmentsComplete,
+  setAttachmentsCompleteForPopup,
+  updateUploadProgress,
+  removeUploadProgress,
+  setMessageToEdit,
+  setMessagesLoadingState,
+  setSendMessageInputHeight,
+  setMessageForReply,
+  uploadAttachmentCompilation,
+  setReactionsList,
+  addReactionsToList,
+  addReactionToList,
+  deleteReactionFromList,
+  setReactionsLoadingState,
+  setMessageMenuOpened,
+  setPlayingAudioId,
+  addSelectedMessage,
+  removeSelectedMessage,
+  clearSelectedMessages
+} from './reducers'
 
 export function sendMessageAC(
   message: any,
@@ -101,10 +102,7 @@ export function deleteMessageAC(channelId: string, messageId: string, deleteOpti
 }
 
 export function deleteMessageFromListAC(messageId: string) {
-  return {
-    type: DELETE_MESSAGE_FROM_LIST,
-    payload: { messageId }
-  }
+  return deleteMessageFromList({ messageId })
 }
 
 export function editMessageAC(channelId: string, message: IMessage) {
@@ -115,10 +113,7 @@ export function editMessageAC(channelId: string, message: IMessage) {
 }
 
 export function setMessageToEditAC(message: IMessage | null) {
-  return {
-    type: SET_MESSAGE_TO_EDIT,
-    payload: { message }
-  }
+  return setMessageToEdit({ message })
 }
 
 export function getMessagesAC(
@@ -126,47 +121,33 @@ export function getMessagesAC(
   loadWithLastMessage?: boolean,
   messageId?: string,
   limit?: number,
-  withDeliveredMessages?: boolean
+  withDeliveredMessages?: boolean,
+  highlight = true
 ) {
   return {
     type: GET_MESSAGES,
-    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages }
+    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight }
   }
 }
 
-export function setScrollToMessagesAC(messageId: string | null) {
-  return {
-    type: SET_SCROLL_TO_MESSAGE,
-    payload: { messageId }
-  }
+export function setScrollToMessagesAC(messageId: string | null, highlight = true) {
+  return setScrollToMessage({ messageId: messageId || '', highlight })
 }
 
 export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {
-  return {
-    type: SET_SCROLL_TO_MENTIONED_MESSAGE,
-    payload: { isScrollToMentionedMessage }
-  }
+  return setScrollToMentionedMessage({ isScrollToMentionedMessage: !!isScrollToMentionedMessage })
 }
 
 export function setMessagesLoadingStateAC(state: number) {
-  return {
-    type: SET_MESSAGES_LOADING_STATE,
-    payload: { state }
-  }
+  return setMessagesLoadingState({ state })
 }
 
 export function addMessagesAC(messages: any, direction: string) {
-  return {
-    type: ADD_MESSAGES,
-    payload: { messages, direction }
-  }
+  return addMessages({ messages, direction })
 }
 
 export function setMessagesAC(messages: any) {
-  return {
-    type: SET_MESSAGES,
-    payload: { messages }
-  }
+  return setMessages({ messages })
 }
 
 export function addReactionAC(
@@ -203,17 +184,11 @@ export function deleteReactionAC(channelId: string, messageId: string, key: stri
 }
 
 export function addReactionToMessageAC(message: IMessage, reaction: IReaction, isSelf: boolean) {
-  return {
-    type: ADD_REACTION_TO_MESSAGE,
-    payload: { message, reaction, isSelf }
-  }
+  return addReactionToMessage({ message, reaction, isSelf })
 }
 
 export function deleteReactionFromMessageAC(message: IMessage, reaction: IReaction, isSelf: boolean) {
-  return {
-    type: DELETE_REACTION_FROM_MESSAGE,
-    payload: { message, reaction, isSelf }
-  }
+  return deleteReactionFromMessage({ message, reaction, isSelf })
 }
 
 export function getReactionsAC(messageId: string, key?: string, limit?: number) {
@@ -231,87 +206,42 @@ export function loadMoreReactionsAC(limit: number) {
 }
 
 export function setReactionsListAC(reactions: IReaction[], hasNext: boolean) {
-  return {
-    type: SET_REACTIONS_LIST,
-    payload: { reactions, hasNext }
-  }
+  return setReactionsList({ reactions, hasNext })
 }
 
 export function addReactionsToListAC(reactions: IReaction[], hasNext: boolean) {
-  return {
-    type: ADD_REACTIONS_TO_LIST,
-    payload: { reactions, hasNext }
-  }
+  return addReactionsToList({ reactions, hasNext })
 }
 
 export function addReactionToListAC(reaction: IReaction) {
-  return {
-    type: ADD_REACTION_TO_LIST,
-    payload: { reaction }
-  }
+  return addReactionToList({ reaction })
 }
 export function deleteReactionFromListAC(reaction: IReaction) {
-  return {
-    type: DELETE_REACTION_FROM_LIST,
-    payload: { reaction }
-  }
+  return deleteReactionFromList({ reaction })
 }
 
 export function setReactionsLoadingStateAC(state: number) {
-  return {
-    type: SET_REACTIONS_LOADING_STATE,
-    payload: { state }
-  }
+  return setReactionsLoadingState({ state })
 }
 
 export function updateAttachmentUploadingStateAC(attachmentUploadingState: string, attachmentId?: any) {
-  return {
-    type: UPLOAD_ATTACHMENT_COMPILATION,
-    payload: {
-      attachmentUploadingState,
-      attachmentId
-    }
-  }
+  return uploadAttachmentCompilation({ attachmentUploadingState, attachmentId })
 }
 
 export function updateAttachmentUploadingProgressAC(uploaded: number, total: number, attachmentId: any) {
-  return {
-    type: UPDATE_UPLOAD_PROGRESS,
-    payload: {
-      uploaded,
-      total,
-      attachmentId
-    }
-  }
+  return updateUploadProgress({ uploaded, total, attachmentId })
 }
 
 export function removeAttachmentProgressAC(attachmentId: any) {
-  return {
-    type: REMOVE_UPLOAD_PROGRESS,
-    payload: {
-      attachmentId
-    }
-  }
+  return removeUploadProgress({ attachmentId })
 }
 
 export function emptyChannelAttachmentsAC() {
-  return {
-    type: EMPTY_CHANNEL_ATTACHMENTS
-  }
+  return emptyChannelAttachments()
 }
 
 export function addMessageAC(message: IMessage) {
-  return {
-    type: ADD_MESSAGE,
-    payload: { message }
-  }
-}
-
-export function addPendingMessageAC(pendingMessage: IMessage, channel: IChannel) {
-  return {
-    type: ADD_PENDING_MESSAGE,
-    payload: { pendingMessage, channel }
-  }
+  return addMessage({ message })
 }
 
 export function scrollToNewMessageAC(
@@ -319,17 +249,15 @@ export function scrollToNewMessageAC(
   updateMessageList?: boolean,
   isIncomingMessage?: boolean
 ) {
-  return {
-    type: SET_SCROLL_TO_NEW_MESSAGE,
-    payload: { scrollToBottom, updateMessageList, isIncomingMessage }
-  }
+  return setScrollToNewMessage({
+    scrollToBottom,
+    updateMessageList: !!updateMessageList,
+    isIncomingMessage: !!isIncomingMessage
+  })
 }
 
 export function showScrollToNewMessageButtonAC(state: boolean) {
-  return {
-    type: SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON,
-    payload: { state }
-  }
+  return setShowScrollToNewMessageButton({ state })
 }
 
 export function loadMoreMessagesAC(
@@ -346,40 +274,23 @@ export function loadMoreMessagesAC(
 }
 
 export function setMessagesHasPrevAC(hasPrev: boolean) {
-  return {
-    type: SET_HAS_PREV_MESSAGES,
-    payload: { hasPrev }
-  }
+  return setHasPrevMessages({ hasPrev })
 }
 
 export function setMessagesHasNextAC(hasNext: boolean) {
-  return {
-    type: SET_MESSAGES_HAS_NEXT,
-    payload: { hasNext }
-  }
+  return setMessagesHasNext({ hasNext })
 }
 
 export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {
-  return {
-    type: UPDATE_MESSAGE,
-    payload: { messageId, params, addIfNotExists }
-  }
+  return updateMessage({ messageId, params, addIfNotExists })
 }
 
-export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: boolean }) {
-  return {
-    type: UPDATE_MESSAGES_STATUS,
-    payload: {
-      name,
-      markersMap
-    }
-  }
+export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }) {
+  return updateMessagesStatus({ name, markersMap })
 }
 
 export function clearMessagesAC() {
-  return {
-    type: CLEAR_MESSAGES
-  }
+  return clearMessages()
 }
 
 export function getAttachmentsAC(
@@ -397,24 +308,15 @@ export function getAttachmentsAC(
 }
 
 export function setAttachmentsAC(attachments: IAttachment[]) {
-  return {
-    type: SET_ATTACHMENTS,
-    payload: { attachments }
-  }
+  return setAttachments({ attachments })
 }
 
 export function removeAttachmentAC(attachmentId: string) {
-  return {
-    type: REMOVE_ATTACHMENT,
-    payload: { attachmentId }
-  }
+  return removeAttachment({ attachmentId })
 }
 
 export function setAttachmentsForPopupAC(attachments: IAttachment[]) {
-  return {
-    type: SET_ATTACHMENTS_FOR_POPUP,
-    payload: { attachments }
-  }
+  return setAttachmentsForPopup({ attachments })
 }
 
 export function loadMoreAttachmentsAC(limit: number) {
@@ -425,31 +327,19 @@ export function loadMoreAttachmentsAC(limit: number) {
 }
 
 export function addAttachmentsAC(attachments: IAttachment[]) {
-  return {
-    type: ADD_ATTACHMENTS,
-    payload: { attachments }
-  }
+  return addAttachments({ attachments })
 }
 
 export function addAttachmentsForPopupAC(attachments: IAttachment[], direction: string) {
-  return {
-    type: ADD_ATTACHMENTS_FOR_POPUP,
-    payload: { attachments, direction }
-  }
+  return addAttachmentsForPopup({ attachments, direction })
 }
 
 export function setAttachmentsCompleteAC(hasPrev: boolean) {
-  return {
-    type: SET_ATTACHMENTS_COMPLETE,
-    payload: { hasPrev }
-  }
+  return setAttachmentsComplete({ hasPrev })
 }
 
 export function setAttachmentsCompleteForPopupAC(hasPrev: boolean) {
-  return {
-    type: SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
-    payload: { hasPrev }
-  }
+  return setAttachmentsCompleteForPopup({ hasPrev })
 }
 
 export function pauseAttachmentUploadingAC(attachmentId: string) {
@@ -467,49 +357,29 @@ export function resumeAttachmentUploadingAC(attachmentId: string) {
 }
 
 export function setSendMessageInputHeightAC(height: number) {
-  return {
-    type: SET_SEND_MESSAGE_INPUT_HEIGHT,
-    payload: { height }
-  }
+  return setSendMessageInputHeight({ height })
 }
 
 export function setMessageMenuOpenedAC(messageId: string) {
-  return {
-    type: SET_MESSAGE_MENU_OPENED,
-    payload: { messageId }
-  }
+  return setMessageMenuOpened({ messageId })
 }
 
 export function setMessageForReplyAC(message: IMessage | null) {
-  return {
-    type: SET_MESSAGE_FOR_REPLY,
-    payload: { message }
-  }
+  return setMessageForReply({ message })
 }
 
 export function setPlayingAudioIdAC(id: string | null) {
-  return {
-    type: SET_PLAYING_AUDIO_ID,
-    payload: { id }
-  }
+  return setPlayingAudioId({ id })
 }
 
 export function addSelectedMessageAC(message: IMessage) {
-  return {
-    type: ADD_SELECTED_MESSAGE,
-    payload: { message }
-  }
+  return addSelectedMessage({ message })
 }
 
 export function removeSelectedMessageAC(messageId: string) {
-  return {
-    type: REMOVE_SELECTED_MESSAGE,
-    payload: { messageId }
-  }
+  return removeSelectedMessage({ messageId })
 }
 
 export function clearSelectedMessagesAC() {
-  return {
-    type: CLEAR_SELECTED_MESSAGES
-  }
+  return clearSelectedMessages()
 }

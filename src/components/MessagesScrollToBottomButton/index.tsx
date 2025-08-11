@@ -74,14 +74,14 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
         const scrollRef = document.getElementById('scrollableDiv')
         if (scrollRef) {
           scrollRef.scrollTo({
-            top: repliedMessage.offsetTop - scrollRef.offsetHeight / 2,
+            top: 0,
             behavior: 'smooth'
           })
         }
       }
     } else {
       // await handleGetMessages(undefined, messageId)
-      dispatch(getMessagesAC(channel, undefined, messageId))
+      dispatch(getMessagesAC(channel, true, messageId))
     }
   }
 

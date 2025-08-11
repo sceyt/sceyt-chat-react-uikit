@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import styled from 'styled-components'
 // Hooks
-import { useColor, useDidUpdate } from '../../hooks'
+import { useColor } from '../../hooks'
 // Store
 import { playingAudioIdSelector } from '../../store/message/selector'
 import { setPlayingAudioIdAC } from '../../store/message/actions'
@@ -94,7 +94,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       wavesurfer.current.playPause()
     }
   }
-  useDidUpdate(() => {
+  useEffect(() => {
     if (recording.mediaStream) {
       setRecording({
         ...recording,
@@ -139,6 +139,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
 
     return () => clearInterval(recordingInterval)
   }, [recording.initRecording])
+
   useEffect(() => {
     if (url) {
       if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
@@ -231,6 +232,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file }) => {
       clearInterval(intervalRef.current)
     }
   }, [url])
+
   useEffect(() => {
     if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
       setPlayAudio(false)

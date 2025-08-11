@@ -74,7 +74,6 @@ import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
-import { messagesHasNextSelector } from '../message/selector'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
@@ -715,7 +714,7 @@ export default function* watchForEvents(): any {
             if (message.user.id !== SceytChatClient.user.id) {
               // yield put(markMessagesAsReadAC(channel.id, [message.id]))
             }
-            const hasNextMessage = yield select(messagesHasNextSelector)
+            const hasNextMessage = store.getState().MessageReducer.messagesHasNext
             if (!getHasNextCached() && !hasNextMessage) {
               yield put(scrollToNewMessageAC(true, false, true))
             }
@@ -852,7 +851,7 @@ export default function* watchForEvents(): any {
             }
 
             updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
-            yield put(updateChannelLastMessageStatusAC(lastMessage, JSON.parse(JSON.stringify(channel))))
+            yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
           }
 
           if (activeChannelId === channelId) {
@@ -865,41 +864,12 @@ export default function* watchForEvents(): any {
 
         break
       }
-      /* case CHANNEL_EVENT_TYPES.MESSAGE_AS_READ: {
-        const { channel } = args;
-        const channelExists = checkChannelExists(channel.id);
-        const activeChannelId = yield call(getActiveChannelId);
-        const lastMessage = { ...channel.lastMessage, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ };
-
-        if (activeChannelId === channel.id) {
-          yield put(updateMessagesStatusAC(MESSAGE_DELIVERY_STATUS.READ));
-        }
-        if (channelExists) {
-          yield put(updateChannelLastMessageStatus(lastMessage, channel));
-          // use updateChannelDataAC instead
-
-          // yield put(setChannelUnreadCount(channel.newMessageCount, channel.id));
-          yield put(updateChannelDataAC(channel.id, { unreadMessageCount: channel.newMessageCount }));
-        }
-        break;
-      } */
       case CHANNEL_EVENT_TYPES.DELETE: {
         const { channelId } = args
         log.info('channel DELETE ... ')
-        // const activeChannelId = yield call(getActiveChannelId)
         const channel = getChannelFromMap(channelId)
-
-        /*  if (channel) {
-          yield put(removeChannelAC(channelId))
-          yield call(removeChannelFromMap, channelId)
-        } */
-
         yield put(setChannelToRemoveAC(channel))
         deleteChannelFromAllChannels(channelId)
-        /*   if (activeChannelId === channelId) {
-          const activeChannel = yield call(getLastChannelFromMap)
-          yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
-        } */
         break
       }
       case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {

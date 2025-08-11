@@ -511,7 +511,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         }
         messageToSend.mentionedMembers = mentionMembersToSend
-        log.info('message to send ..........................................', messageToSend)
+        log.info('message to send ..........................................', JSON.stringify(messageToSend))
 
         if (messageForReply) {
           messageToSend.parentMessage = messageForReply

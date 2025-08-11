@@ -21,13 +21,13 @@ export const messageForThreadReplySelector = (store: any) => store.MessageReduce
 export const messageToEditSelector = (store: any) => store.MessageReducer.messageToEdit
 export const pendingMessagesSelector = (store: any) => store.MessageReducer.pendingMessages
 export const channelNewMessageSelector = (store: any) => store.MessageReducer.activeChannelNewMessage
-export const messageNewMarkersSelector = (store: any) => store.MessageReducer.activeChannelNewMarkers
 export const messageUpdatedSelector = (store: any) => store.MessageReducer.activeChannelMessageUpdated
 export const scrollToNewMessageSelector = (store: any) => store.MessageReducer.scrollToNewMessage
 export const scrollToMentionedMessageSelector = (store: any) => store.MessageReducer.scrollToMentionedMessage
 export const showScrollToNewMessageButtonSelector = (store: any) => store.MessageReducer.showScrollToNewMessageButton
 export const sendMessageInputHeightSelector = (store: any) => store.MessageReducer.sendMessageInputHeight
 export const scrollToMessageSelector = (store: any) => store.MessageReducer.scrollToMessage
+export const scrollToMessageHighlightSelector = (store: any) => store.MessageReducer.scrollToMessageHighlight
 export const reactionsListSelector = (store: any) => store.MessageReducer.reactionsList
 export const reactionsHasNextSelector = (store: any) => store.MessageReducer.reactionsHasNext
 export const reactionsLoadingStateSelector = (store: any) => store.MessageReducer.reactionsLoadingState

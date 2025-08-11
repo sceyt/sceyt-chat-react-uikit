@@ -1,4 +1,4 @@
-import { put, takeLatest, call, takeEvery, select } from 'redux-saga/effects'
+import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   addChannelAC,
@@ -96,9 +96,9 @@ import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
-import { channelListHiddenSelector } from './selector'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
+import store from 'store'
 
 function* createChannel(action: IAction): any {
   try {
@@ -298,7 +298,7 @@ function* getChannels(action: IAction): any {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
-    const hiddenList = yield select(channelListHiddenSelector)
+    const hiddenList = store.getState().ChannelReducer.hideChannelList
     if (!hiddenList) {
       const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       allChannelsQueryBuilder.order('lastMessage')

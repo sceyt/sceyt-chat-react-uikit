@@ -121,7 +121,7 @@ export default function ChatHeader({
   }
 
   const handleBackToChannels = () => {
-    dispatch(switchChannelActionAC({}))
+    dispatch(switchChannelActionAC(null))
     mobileBackButtonClicked && mobileBackButtonClicked()
   }
 

@@ -16,6 +16,7 @@ import EmojisPopup from './Emojis'
 import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
+import { OGMetadata } from './Message/OGMetadata'
 
 export {
   SceytChat,
@@ -33,6 +34,7 @@ export {
   Avatar,
   DropDown,
   Attachment,
+  OGMetadata,
   EmojisPopup,
   FrequentlyEmojis,
   SceytChatUIKitTheme,

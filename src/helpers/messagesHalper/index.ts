@@ -109,7 +109,7 @@ export const getHasNextCached = () => nextCached
 export const getFromAllMessagesByMessageId = (messageId: string, direction: string, getWithLastMessage?: boolean) => {
   let messagesForAdd: IMessage[] = []
   if (getWithLastMessage) {
-    messagesForAdd = [...activeChannelAllMessages].slice(-MESSAGES_MAX_LENGTH)
+    messagesForAdd = [...activeChannelAllMessages.slice(-MESSAGES_MAX_LENGTH)]
     setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_LENGTH)
     setHasNextCached(false)
   } else {

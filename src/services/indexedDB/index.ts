@@ -6,9 +6,10 @@ export const setDataToDB = (dbName: string, storeName: string, data: any[], keyP
     log.info("This browser doesn't support IndexedDB")
   } else {
     const openRequest = indexedDB.open(dbName, currentVersion)
-    openRequest.onupgradeneeded = function () {
+    openRequest.onupgradeneeded = function (event: any) {
       const db = openRequest.result
-      addData(db, storeName, keyPath, data)
+      const transaction = event.target.transaction
+      addData(db, storeName, keyPath, data, transaction)
     }
 
     openRequest.onerror = function () {
@@ -45,11 +46,19 @@ export const getDataFromDB = (
     openRequest.onupgradeneeded = function (event: any) {
       // const db = openRequest.result
       const db = event.target.result
+      const transaction = event.target.transaction
 
       if (db.objectStoreNames.contains(storeName)) {
-        const transaction = db.transaction([storeName])
         const objectStore = transaction.objectStore(storeName)
-        resolve(objectStore.get(keyPath))
+        const request = objectStore.get(keyPath)
+        request.onsuccess = (event: any) => {
+          const result = event.target.result
+          resolve(result || '')
+        }
+        request.onerror = (event: any) => {
+          log.error('Error retrieving data during upgrade: ', event.target.error)
+          resolve('')
+        }
       } else {
         db.createObjectStore(storeName, { keyPath: keyPatName })
         resolve('')
@@ -94,33 +103,201 @@ export const getDataFromDB = (
   })
 }
 
-const addData = (db: any, storeName: string, keyPath: string, data: any[]) => {
+const addData = (db: any, storeName: string, keyPath: string, data: any[], transaction?: IDBTransaction) => {
   if (!db.objectStoreNames.contains(storeName)) {
     const objectStore = db.createObjectStore(storeName, { keyPath })
-    // Create the 'channels' object store with the appropriate keyPath
-    objectStore.transaction.oncomplete = () => {
-      const channelObjectStore = db.transaction(storeName, 'readwrite').objectStore(storeName)
+    // Add data immediately using the current version change transaction
+    data.forEach((value: any) => {
+      const request = objectStore.put(value)
+      request.onsuccess = function () {
+        log.info('data added to db during upgrade.. ', request.result)
+      }
+
+      request.onerror = function () {
+        log.info('Error on put data to db during upgrade.. ', request.error)
+      }
+    })
+  } else {
+    // If we have an existing transaction (during upgrade), use it
+    if (transaction) {
+      const store = transaction.objectStore(storeName)
       data.forEach((value: any) => {
-        const request = channelObjectStore.put(value)
-        request.onsuccess = function () {}
+        const request = store.put(value)
+        request.onsuccess = function () {
+          log.info('data added to db using existing transaction.. ', request.result)
+        }
+
+        request.onerror = function () {
+          log.info('Error on put data to db using existing transaction.. ', request.error)
+        }
+      })
+    } else {
+      // Create new transaction only when not in upgrade mode
+      const newTransaction = db.transaction(storeName, 'readwrite')
+      const store = newTransaction.objectStore(storeName)
+      data.forEach((value: any) => {
+        const request = store.put(value)
+        request.onsuccess = function () {
+          log.info('data added to db.. ', request.result)
+        }
 
         request.onerror = function () {
           log.info('Error on put channel to db .. ', request.error)
         }
       })
     }
-  } else {
-    const transaction = db.transaction(storeName, 'readwrite')
-    const store = transaction.objectStore(storeName)
-    data.forEach((value: any) => {
-      const request = store.put(value)
-      request.onsuccess = function () {
-        log.info('data added to db.. ', request.result)
-      }
-
-      request.onerror = function () {
-        log.info('Error on put channel to db .. ', request.error)
-      }
-    })
   }
+}
+
+export const getAllDataFromDB = (dbName: string, storeName: string): Promise<any[]> => {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open(dbName, currentVersion)
+
+    openRequest.onupgradeneeded = function (event: any) {
+      const db = event.target.result
+      const transaction = event.target.transaction
+      if (db.objectStoreNames.contains(storeName)) {
+        const objectStore = transaction.objectStore(storeName)
+        const request = objectStore.getAll()
+        request.onsuccess = function () {
+          resolve(request.result || [])
+        }
+        request.onerror = function () {
+          reject(request.error)
+        }
+      } else {
+        db.createObjectStore(storeName, { keyPath: 'url' })
+        resolve([])
+      }
+    }
+
+    openRequest.onerror = function () {
+      log.error('Indexeddb Error ', openRequest.error)
+      reject(openRequest.error)
+    }
+
+    openRequest.onsuccess = function (event: any) {
+      const db = event.target.result
+      if (db.objectStoreNames.contains(storeName)) {
+        const transaction = db.transaction(storeName, 'readonly')
+        const objectStore = transaction.objectStore(storeName)
+        const request = objectStore.getAll()
+        request.onsuccess = function () {
+          db.close()
+          resolve(request.result || [])
+        }
+        request.onerror = function () {
+          db.close()
+          reject(request.error)
+        }
+      } else {
+        db.close()
+        resolve([])
+      }
+    }
+  })
+}
+
+export const deleteDataFromDB = (dbName: string, storeName: string, keyPath: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open(dbName, currentVersion)
+
+    openRequest.onupgradeneeded = function (event: any) {
+      const db = event.target.result
+      const transaction = event.target.transaction
+      if (db.objectStoreNames.contains(storeName)) {
+        const objectStore = transaction.objectStore(storeName)
+        const request = objectStore.delete(keyPath)
+        request.onsuccess = function () {
+          resolve()
+        }
+        request.onerror = function () {
+          reject(request.error)
+        }
+      } else {
+        resolve()
+      }
+    }
+
+    openRequest.onerror = function () {
+      log.error('Indexeddb Error ', openRequest.error)
+      reject(openRequest.error)
+    }
+
+    openRequest.onsuccess = function (event: any) {
+      const db = event.target.result
+      if (db.objectStoreNames.contains(storeName)) {
+        const transaction = db.transaction(storeName, 'readwrite')
+        const objectStore = transaction.objectStore(storeName)
+        const request = objectStore.delete(keyPath)
+        request.onsuccess = function () {
+          db.close()
+          resolve()
+        }
+        request.onerror = function () {
+          db.close()
+          reject(request.error)
+        }
+      } else {
+        db.close()
+        resolve()
+      }
+    }
+  })
+}
+
+export const getAllStoreNames = (dbName: string): Promise<string[]> => {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open(dbName, currentVersion)
+
+    openRequest.onupgradeneeded = function (event: any) {
+      const db = event.target.result
+      // During upgrade, we can safely get store names
+      resolve(Array.from(db.objectStoreNames) as string[])
+    }
+
+    openRequest.onerror = function () {
+      log.error('Indexeddb Error ', openRequest.error)
+      reject(openRequest.error)
+    }
+
+    openRequest.onsuccess = function (event: any) {
+      const db = event.target.result
+      try {
+        // Get store names without starting a transaction
+        const storeNames = Array.from(db.objectStoreNames) as string[]
+        db.close()
+        resolve(storeNames)
+      } catch (error) {
+        db.close()
+        reject(error)
+      }
+    }
+  })
+}
+
+export const deleteStore = (dbName: string, storeName: string): Promise<void> => {
+  return new Promise((resolve, reject) => {
+    const openRequest = indexedDB.open(dbName, currentVersion + 1)
+
+    openRequest.onupgradeneeded = function (event: any) {
+      const db = event.target.result
+      if (db.objectStoreNames.contains(storeName)) {
+        db.deleteObjectStore(storeName)
+        currentVersion++
+      }
+      // Don't resolve here, wait for onsuccess
+    }
+
+    openRequest.onerror = function () {
+      log.error('Indexeddb Error ', openRequest.error)
+      reject(openRequest.error)
+    }
+
+    openRequest.onsuccess = function (event: any) {
+      const db = event.target.result
+      db.close()
+      resolve()
+    }
+  })
 }

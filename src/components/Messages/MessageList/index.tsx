@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useRef, useEffect, useState, useMemo, FC, useCallback } from 'react'
+import React, { useRef, useEffect, useState, FC, useCallback } from 'react'
 import { shallowEqual, useDispatch, useSelector } from 'react-redux'
 import moment from 'moment'
 // Store
@@ -8,6 +8,7 @@ import {
   getMessagesAC,
   loadMoreMessagesAC,
   scrollToNewMessageAC,
+  setMessagesLoadingStateAC,
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC
 } from '../../../store/message/actions'
@@ -18,6 +19,7 @@ import {
   messagesLoadingState,
   openedMessageMenuSelector,
   scrollToMentionedMessageSelector,
+  scrollToMessageHighlightSelector,
   scrollToMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
@@ -29,7 +31,7 @@ import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
-import { useDidUpdate, useColor } from '../../../hooks'
+import { useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
@@ -48,7 +50,7 @@ import {
   setHasNextCached,
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
-import { isJSON, setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
+import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
@@ -62,7 +64,6 @@ import { HiddenMessageProperty } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
 
-let loading = false
 let loadFromServer = false
 // let lastPrevLoadedId: string = ''
 // let firstPrevLoadedId: string = ''
@@ -457,7 +458,7 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX
   } = useColor()
 
   const ChatClient = getClient()
@@ -474,6 +475,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToMentionedMessage = useSelector(scrollToMentionedMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
+  const scrollToMessageHighlight = useSelector(scrollToMessageHighlightSelector, shallowEqual)
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
   const hasNextMessages = useSelector(messagesHasNextSelector, shallowEqual)
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
@@ -495,9 +497,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const [previousScrollTop, setPreviousScrollTop] = useState(0)
   const [shouldPreserveScroll, setShouldPreserveScroll] = useState(false)
   const messageForReply: any = {}
-  const messageList = useMemo(() => messages, [messages])
   const attachmentsSelected = false
-  const messagesBoxRef = useRef<any>(null)
   const messageTopDateRef = useRef<any>(null)
   const scrollRef = useRef<any>(null)
   const renderTopDate = () => {
@@ -572,7 +572,7 @@ const MessageList: React.FC<MessagesProps> = ({
             !scrollToNewMessage.scrollToBottom &&
             hasPrevMessages
           ) {
-            if (messagesLoading === LOADING_STATE.LOADING || loading || prevDisable) {
+            if (messagesLoading === LOADING_STATE.LOADING || prevDisable) {
               shouldLoadMessages = 'prev'
             } else {
               if (shouldLoadMessages === 'prev') {
@@ -593,7 +593,7 @@ const MessageList: React.FC<MessagesProps> = ({
             !scrollToNewMessage.scrollToBottom &&
             (hasNextMessages || getHasNextCached())
           ) {
-            if (messagesLoading === LOADING_STATE.LOADING || loading || nextDisable) {
+            if (messagesLoading === LOADING_STATE.LOADING || nextDisable) {
               shouldLoadMessages = 'next'
             } else {
               if (shouldLoadMessages === 'next') {
@@ -616,7 +616,6 @@ const MessageList: React.FC<MessagesProps> = ({
       scrollToMentionedMessage,
       scrollToNewMessage,
       messagesLoading,
-      loading,
       hasPrevMessages,
       hasNextMessages,
       messagesIndexMap,
@@ -641,11 +640,18 @@ const MessageList: React.FC<MessagesProps> = ({
           behavior: 'smooth'
         })
         repliedMessage.classList.add('highlight')
-        setTimeout(() => {
-          repliedMessage.classList.remove('highlight')
-          prevDisable = false
-          nextDisable = false
-        }, 1000)
+        const positiveValue =
+          repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2 < 0
+            ? repliedMessage.offsetTop - scrollRef.current.offsetHeight * -1
+            : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
+        setTimeout(
+          () => {
+            repliedMessage.classList.remove('highlight')
+            prevDisable = false
+            nextDisable = false
+          },
+          1000 + positiveValue * 0.1
+        )
       }
     } else {
       dispatch(getMessagesAC(channel, undefined, messageId))
@@ -660,12 +666,10 @@ const MessageList: React.FC<MessagesProps> = ({
     const firstMessageId = messages.length && messages[0].id
     const hasPrevCached = getHasPrevCached()
     const hasNextCached = getHasNextCached()
-    if (!loading && connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (messagesLoading === LOADING_STATE.LOADED && connectionStatus === CONNECTION_STATUS.CONNECTED) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
-        loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, firstMessageId, hasPrevMessages))
       } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && lastMessageId && (hasNextMessages || hasNextCached)) {
-        loading = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
       }
     }
@@ -797,12 +801,13 @@ const MessageList: React.FC<MessagesProps> = ({
       !showScrollToNewMessageButton
     ) {
       dispatch(showScrollToNewMessageButtonAC(false))
+      prevDisable = false
     }
   }, [messages, channel?.lastMessage?.id, scrollRef?.current?.scrollTop, showScrollToNewMessageButton])
 
   useEffect(() => {
     if (scrollToRepliedMessage) {
-      loading = false
+      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       scrollRef.current.style.scrollBehavior = 'inherit'
       const repliedMessage = document.getElementById(scrollToRepliedMessage)
       if (repliedMessage) {
@@ -812,18 +817,25 @@ const MessageList: React.FC<MessagesProps> = ({
           behavior: 'smooth'
         })
         scrollRef.current.style.scrollBehavior = 'smooth'
-        if (!channel.backToLinkedChannel) {
+        if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
           repliedMessage && repliedMessage.classList.add('highlight')
         }
-        setTimeout(() => {
-          if (!channel.backToLinkedChannel) {
-            const repliedMessage = document.getElementById(scrollToRepliedMessage)
-            repliedMessage && repliedMessage.classList.remove('highlight')
-          }
-          prevDisable = false
-          setScrollToReply(null)
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }, 800)
+        const positiveValue =
+          repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2 < 0
+            ? repliedMessage.offsetTop - scrollRef.current.offsetHeight * -1
+            : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
+        setTimeout(
+          () => {
+            if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
+              const repliedMessage = document.getElementById(scrollToRepliedMessage)
+              repliedMessage && repliedMessage.classList.remove('highlight')
+            }
+            prevDisable = false
+            setScrollToReply(null)
+            scrollRef.current.style.scrollBehavior = 'smooth'
+          },
+          1000 + positiveValue * 0.1
+        )
       }
       dispatch(setScrollToMessagesAC(null))
     }
@@ -853,13 +865,13 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }, [scrollToNewMessage])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (!mediaFile && isDragging) {
       setIsDragging(false)
     }
   }, [mediaFile])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (!draggingSelector) {
       setIsDragging(false)
     }
@@ -901,7 +913,7 @@ const MessageList: React.FC<MessagesProps> = ({
     setAllowEditDeleteIncomingMessage(allowEditDeleteIncomingMessage)
   }, [channel.id])
 
-  useDidUpdate(() => {
+  useEffect(() => {
     if (!isDragging) {
       renderTopDate()
     }
@@ -925,7 +937,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
 
-    if (loading) {
+    if (messagesLoading) {
       if (loadDirection !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
         if (lastVisibleMessage) {
@@ -935,7 +947,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
         if (loadFromServer) {
           setTimeout(() => {
-            loading = false
+            dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
             loadFromServer = false
             nextDisable = false
             if (shouldLoadMessages === 'prev' && messagesIndexMap[lastVisibleMessageId] < 15) {
@@ -946,7 +958,7 @@ const MessageList: React.FC<MessagesProps> = ({
             }
           }, 50)
         } else {
-          loading = false
+          dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
           if (shouldLoadMessages === 'prev') {
             handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
             shouldLoadMessages = ''
@@ -964,7 +976,7 @@ const MessageList: React.FC<MessagesProps> = ({
             lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
-        loading = false
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
         prevDisable = false
         if (shouldLoadMessages === 'prev') {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
@@ -975,11 +987,6 @@ const MessageList: React.FC<MessagesProps> = ({
           shouldLoadMessages = ''
         }
       }
-    }
-    if (scrollToNewMessage.scrollToBottom && messages.length) {
-      setTimeout(() => {
-        dispatch(scrollToNewMessageAC(false, false, false))
-      }, 500)
     }
 
     renderTopDate()
@@ -1000,10 +1007,10 @@ const MessageList: React.FC<MessagesProps> = ({
       })
     }
   }, [messages])
-  useDidUpdate(() => {
+  useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      loading = false
+      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       prevDisable = false
       nextDisable = false
       clearMessagesMap()
@@ -1013,6 +1020,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
   }, [connectionStatus])
+
   useEffect(() => {
     if (channel.newMessageCount && channel.newMessageCount > 0 && getUnreadScrollTo()) {
       if (scrollRef.current) {
@@ -1113,15 +1121,13 @@ const MessageList: React.FC<MessagesProps> = ({
               enableResetScrollToCoords={false}
               replyMessage={messageForReply && messageForReply.id}
               attachmentsSelected={attachmentsSelected}
-              ref={messagesBoxRef}
               className='messageBox'
             >
-              {messageList.map((message: any, index: number) => {
+              {messages.map((message: any, index: number) => {
                 const prevMessage = messages[index - 1]
                 const nextMessage = messages[index + 1]
                 const isUnreadMessage =
                   !!(unreadMessageId && unreadMessageId === message.id && nextMessage) && !channel.backToLinkedChannel
-                const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
                 messagesIndexMap[message.id] = index
                 return (
                   <React.Fragment>
@@ -1169,13 +1175,10 @@ const MessageList: React.FC<MessagesProps> = ({
                         className={
                           (message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''
                         }
-                        highlightBg={highlightedBackground}
+                        highlightBg={incomingMessageBackgroundX}
                       >
                         <Message
-                          message={{
-                            ...message,
-                            metadata: messageMetas
-                          }}
+                          message={message}
                           theme={theme}
                           channel={channel}
                           stopScrolling={setStopScrolling}
@@ -1521,10 +1524,16 @@ export const DropAttachmentArea = styled.div<{
 
 export const MessageWrapper = styled.div<{ highlightBg: string }>`
   &.highlight {
-    & .messageBody {
-      transform: scale(1.1);
+    & .message_item {
+      transition: all 0.2s ease-in-out;
+      padding-top: 4px;
+      padding-bottom: 4px;
       background-color: ${(props) => props.highlightBg || '#d5d5d5'};
     }
+  }
+
+  & .message_item {
+    transition: all 0.2s ease-in-out;
   }
 `
 

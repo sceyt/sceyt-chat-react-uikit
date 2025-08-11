@@ -1,48 +1,13 @@
-import {
-  ADD_CHANNEL,
-  ADD_CHANNELS,
-  ADD_CHANNELS_FOR_FORWARD,
-  CHANNEL_INFO_OPEN_CLOSE,
-  CHANNELS_HAS_NEXT,
-  DESTROY_SESSION,
-  DRAFT_IS_REMOVED,
-  GET_CHANNELS,
-  REMOVE_CHANNEL,
-  SET_ACTIVE_CHANNEL,
-  SET_ADDED_TO_CHANNEL,
-  SET_CHANNEL_LIST_WIDTH,
-  SET_CHANNEL_TO_ADD,
-  SET_CHANNEL_TO_HIDE,
-  SET_CHANNEL_TO_REMOVE,
-  SET_CHANNEL_TO_UNHIDE,
-  SET_CHANNELS,
-  SET_CHANNELS_FOR_FORWARD,
-  SET_CHANNELS_LOADING_STATE,
-  SET_CLOSE_SEARCH_CHANNELS,
-  SET_DRAGGED_ATTACHMENTS,
-  SET_HIDE_CHANNEL_LIST,
-  SET_IS_DRAGGING,
-  SET_SEARCHED_CHANNELS,
-  SET_SEARCHED_CHANNELS_FOR_FORWARD,
-  SET_TAB_IS_ACTIVE,
-  SWITCH_TYPING_INDICATOR,
-  SWITCH_RECORDING_INDICATOR,
-  TOGGLE_EDIT_CHANNEL,
-  UPDATE_CHANNEL_DATA,
-  UPDATE_CHANNEL_LAST_MESSAGE,
-  UPDATE_CHANNEL_LAST_MESSAGE_STATUS,
-  UPDATE_SEARCHED_CHANNEL_DATA,
-  UPDATE_USER_STATUS_ON_CHANNEL
-} from './constants'
-import { IAction, IChannel, IContact, IMember, IUser } from '../../types'
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { IChannel, IContact, IMember, IUser, ChannelQueryParams, IMessage } from '../../types'
 import { DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 import { setUserToMap } from '../../helpers/userHelper'
 import { sortChannelByLastMessage } from '../../helpers/channelHalper'
 
-const initialState: {
-  channelsLoadingState: string | null
-  channelsForForwardLoadingState: string | null
+export interface IChannelState {
+  channelsLoadingState: number | null
+  channelsForForwardLoadingState: number | null
   usersLoadingState: string | null
   channelsHasNext: boolean
   channelsForForwardHasNext: boolean
@@ -77,11 +42,13 @@ const initialState: {
   channelEditMode: boolean
   channelListWidth: number
   isDragging: boolean
-  draggedAttachments: { attachment: File; type: 'media' | 'file' }[]
+  draggedAttachments: { data: any; name: any; type: any; attachmentType: string }[]
   tabIsActive: boolean
   hideChannelList: boolean
   draftIsRemoved: string
-} = {
+}
+
+const initialState: IChannelState = {
   channelsLoadingState: null,
   channelsForForwardLoadingState: null,
   usersLoadingState: null,
@@ -114,142 +81,142 @@ const initialState: {
   draftIsRemoved: ''
 }
 
-export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
-  let newState = { ...state }
-
-  switch (type) {
-    case GET_CHANNELS: {
+const channelSlice = createSlice({
+  name: 'channels',
+  initialState,
+  reducers: {
+    getChannels: (state, action: PayloadAction<{ params: ChannelQueryParams; isJoinChannel?: boolean }>) => {
       const {
         params: { search }
-      } = payload
+      } = action.payload
       if (search === '' || search) {
-        newState.searchValue = search
+        state.searchValue = search
       }
-      return newState
-    }
-    case SET_CHANNELS: {
-      newState.channels = [...payload.channels]
-      return newState
-    }
+    },
 
-    case SET_SEARCHED_CHANNELS: {
-      newState.searchedChannels = payload.searchedChannels
-      return newState
-    }
+    setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      state.channels = [...action.payload.channels]
+    },
 
-    case SET_SEARCHED_CHANNELS_FOR_FORWARD: {
-      newState.searchedChannelsForForward = payload.searchedChannels
-      return newState
-    }
+    setSearchedChannels: (
+      state,
+      action: PayloadAction<{
+        searchedChannels: {
+          chats_groups: IChannel[]
+          channels: IChannel[]
+          contacts: IContact[]
+        }
+      }>
+    ) => {
+      state.searchedChannels = action.payload.searchedChannels
+    },
 
-    case SET_CLOSE_SEARCH_CHANNELS: {
-      newState.closeSearchChannel = payload.close
-      return newState
-    }
+    setSearchedChannelsForForward: (
+      state,
+      action: PayloadAction<{
+        searchedChannels: {
+          chats_groups: IChannel[]
+          channels: IChannel[]
+          contacts: IContact[]
+        }
+      }>
+    ) => {
+      state.searchedChannelsForForward = action.payload.searchedChannels
+    },
 
-    case SET_CHANNELS_FOR_FORWARD: {
-      newState.channelsForForward = [...payload.channels]
-      return newState
-    }
+    setCloseSearchChannels: (state, action: PayloadAction<{ close: boolean }>) => {
+      state.closeSearchChannel = action.payload.close
+    },
 
-    case ADD_CHANNEL: {
-      if (!newState.channels.find((chan) => chan.id === payload.channel.id)) {
-        newState.channels = sortChannelByLastMessage([payload.channel, ...newState.channels])
+    setChannelsForForward: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      state.channelsForForward = [...action.payload.channels]
+    },
+
+    addChannel: (state, action: PayloadAction<{ channel: IChannel }>) => {
+      if (!state.channels.find((chan) => chan.id === action.payload.channel.id)) {
+        state.channels = sortChannelByLastMessage([action.payload.channel, ...state.channels])
       }
-      return newState
-    }
+    },
 
-    case ADD_CHANNELS: {
-      newState.channels = [...newState.channels, ...payload.channels]
-      return newState
-    }
+    addChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      state.channels.push(...action.payload.channels)
+    },
 
-    case ADD_CHANNELS_FOR_FORWARD: {
-      newState.channelsForForward = [...newState.channelsForForward, ...payload.channels]
-      return newState
-    }
+    addChannelsForForward: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      state.channelsForForward.push(...action.payload.channels)
+    },
 
-    case REMOVE_CHANNEL: {
-      const { channelId } = payload
-      const channelsCpy = newState.channels
-      newState.channels = channelsCpy.filter((chan) => chan.id !== channelId)
+    removeChannel: (state, action: PayloadAction<{ channelId: string }>) => {
+      const { channelId } = action.payload
+      state.channels = state.channels.filter((chan) => chan.id !== channelId)
+    },
 
-      return newState
-    }
+    setChannelToAdd: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.addedChannel = action.payload.channel
+    },
 
-    case SET_CHANNEL_TO_ADD: {
-      const { channel } = payload
-      newState.addedChannel = channel
+    setAddedToChannel: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.addedToChannel = action.payload.channel
+    },
 
-      return newState
-    }
+    setChannelToRemove: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.deletedChannel = action.payload.channel
+    },
 
-    case SET_ADDED_TO_CHANNEL: {
-      const { channel } = payload
-      newState.addedToChannel = channel
+    setChannelToHide: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.hiddenChannel = action.payload.channel
+    },
 
-      return newState
-    }
+    setChannelToUnhide: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.visibleChannel = action.payload.channel
+    },
 
-    case SET_CHANNEL_TO_REMOVE: {
-      const { channel } = payload
-      newState.deletedChannel = channel
-
-      return newState
-    }
-
-    case SET_CHANNEL_TO_HIDE: {
-      const { channel } = payload
-      newState.hiddenChannel = channel
-
-      return newState
-    }
-
-    case SET_CHANNEL_TO_UNHIDE: {
-      const { channel } = payload
-      newState.visibleChannel = channel
-
-      return newState
-    }
-
-    case SET_CHANNELS_LOADING_STATE: {
-      const { state, forForward } = payload
+    setChannelsLoadingState: (state, action: PayloadAction<{ state: number; forForward?: boolean }>) => {
+      const { state: loadingState, forForward } = action.payload
       if (forForward) {
-        newState.channelsForForwardLoadingState = state
+        state.channelsForForwardLoadingState = loadingState
       } else {
-        newState.channelsLoadingState = state
+        state.channelsLoadingState = loadingState
       }
-      return newState
-    }
+    },
 
-    case CHANNELS_HAS_NEXT: {
-      const { hasNext, forForward } = payload
+    setChannelsHasNext: (state, action: PayloadAction<{ hasNext: boolean; forForward?: boolean }>) => {
+      const { hasNext, forForward } = action.payload
       if (forForward) {
-        newState.channelsForForwardHasNext = hasNext
+        state.channelsForForwardHasNext = hasNext
       } else {
-        newState.channelsHasNext = hasNext
+        state.channelsHasNext = hasNext
       }
-      return newState
-    }
+    },
 
-    case SET_ACTIVE_CHANNEL: {
-      newState.activeChannel = payload.channel || {}
-      if (payload.channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+    setActiveChannel: (state, action: PayloadAction<{ channel: IChannel | {} }>) => {
+      state.activeChannel = action.payload.channel || {}
+      if ((action.payload.channel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT) {
         const ChatClient = getClient()
         const { user } = ChatClient
-        const directChannelUser = payload.channel.members.find((member: IMember) => member.id !== user.id)
+        const directChannelUser = (action.payload.channel as IChannel).members.find(
+          (member: IMember) => member.id !== user.id
+        )
         if (directChannelUser) {
           setUserToMap(directChannelUser)
         }
       }
-      return newState
-    }
+    },
 
-    case UPDATE_CHANNEL_DATA: {
-      const { config, channelId, moveUp, sort } = payload
+    updateChannelData: (
+      state,
+      action: PayloadAction<{
+        config: any
+        channelId: string
+        moveUp?: boolean
+        sort?: boolean
+      }>
+    ) => {
+      const { config, channelId, moveUp, sort } = action.payload
+
       if (moveUp) {
         let updateChannel: any
-        const updatedChannels = newState.channels.filter((chan) => {
+        const updatedChannels = state.channels.filter((chan) => {
           if (chan.id === channelId) {
             updateChannel = chan
           }
@@ -257,44 +224,50 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         })
         if (updateChannel) {
           updateChannel = { ...updateChannel, ...config }
-          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
+          state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       } else {
-        newState.channels = newState.channels.map((channel) => {
+        state.channels = state.channels.map((channel) => {
           if (channel.id === channelId) {
             if (
-              newState.activeChannel &&
-              Object.prototype.hasOwnProperty.call(newState.activeChannel, 'id') &&
-              channel.id === (newState.activeChannel as IChannel).id
+              state.activeChannel &&
+              Object.prototype.hasOwnProperty.call(state.activeChannel, 'id') &&
+              channel.id === (state.activeChannel as IChannel).id
             ) {
-              newState.activeChannel = { ...newState.activeChannel, ...config }
+              state.activeChannel = { ...state.activeChannel, ...config }
             }
             return { ...channel, ...config }
           }
           return channel
         })
         if (sort) {
-          newState.channels = sortChannelByLastMessage(newState.channels)
+          state.channels = sortChannelByLastMessage(state.channels)
         }
       }
 
-      if ((newState.activeChannel as IChannel).id === channelId) {
-        const activeChannelCopy = { ...newState.activeChannel }
-        newState.activeChannel = {
+      if ((state.activeChannel as IChannel).id === channelId) {
+        const activeChannelCopy = { ...state.activeChannel }
+        state.activeChannel = {
           ...activeChannelCopy,
           ...config
         }
       }
-      return newState
-    }
+    },
 
-    case UPDATE_SEARCHED_CHANNEL_DATA: {
-      const { updateData, groupName, channelId } = payload
-      const groupKey = groupName as keyof typeof newState.searchedChannels
-      if (newState.searchedChannels[groupKey] && newState.searchedChannels[groupKey].length) {
-        newState.searchedChannels = {
-          ...newState.searchedChannels,
-          [groupName]: [...newState.searchedChannels[groupKey]].map((channel: IChannel) => {
+    updateSearchedChannelData: (
+      state,
+      action: PayloadAction<{
+        updateData: any
+        groupName: string
+        channelId: string
+      }>
+    ) => {
+      const { updateData, groupName, channelId } = action.payload
+      const groupKey = groupName as keyof typeof state.searchedChannels
+      if (state.searchedChannels[groupKey] && state.searchedChannels[groupKey].length) {
+        state.searchedChannels = {
+          ...state.searchedChannels,
+          [groupName]: [...state.searchedChannels[groupKey]].map((channel: IChannel) => {
             if (channel.id === channelId) {
               return { ...channel, ...updateData }
             }
@@ -302,15 +275,14 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           })
         }
       }
-      return newState
-    }
+    },
 
-    case UPDATE_USER_STATUS_ON_CHANNEL: {
-      const usersMap = payload.usersMap
-      // log.info('UPDATE_USER_STATUS_ON_CHANNEL . .  .', payload.usersMap)
+    updateUserStatusOnChannel: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
+      const usersMap = action.payload.usersMap
       const ChatClient = getClient()
       const { user } = ChatClient
-      const updatedChannels = newState.channels.map((channel) => {
+
+      const updatedChannels = state.channels.map((channel) => {
         const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
         const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
         if (isDirectChannel && directChannelUser && usersMap[directChannelUser.id]) {
@@ -325,13 +297,15 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return channel
       })
+
       const activeChannelUser =
-        (newState.activeChannel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT &&
-        (newState.activeChannel as IChannel).members.find((member: IMember) => member.id !== user.id)
+        (state.activeChannel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT &&
+        (state.activeChannel as IChannel).members.find((member: IMember) => member.id !== user.id)
+
       if (activeChannelUser && usersMap[activeChannelUser.id]) {
-        newState.activeChannel = {
-          ...newState.activeChannel,
-          members: (newState.activeChannel as IChannel).members.map((member) => {
+        state.activeChannel = {
+          ...state.activeChannel,
+          members: (state.activeChannel as IChannel).members.map((member) => {
             if (member.id !== user.id) {
               return { ...member, ...usersMap[activeChannelUser.id] }
             } else {
@@ -340,35 +314,37 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
           })
         }
       }
-      newState.channels = [...updatedChannels]
-      return newState
-    }
+      state.channels = [...updatedChannels]
+    },
 
-    case UPDATE_CHANNEL_LAST_MESSAGE: {
-      const { channel, message } = payload
-      let updateChannel = newState.channels.find((chan) => chan.id === channel.id)
-      if (message.state === MESSAGE_STATUS.DELETE || message.state === MESSAGE_STATUS.EDIT) {
-        if (updateChannel?.lastMessage.id === message.id) {
-          newState.channels = newState.channels.map((chan) => {
+    updateChannelLastMessage: (state, action: PayloadAction<{ message: IMessage | {}; channel: IChannel }>) => {
+      const { channel, message } = action.payload
+      let updateChannel = state.channels.find((chan) => chan.id === channel.id)
+
+      if (
+        (message as IMessage).state === MESSAGE_STATUS.DELETE ||
+        (message as IMessage).state === MESSAGE_STATUS.EDIT
+      ) {
+        if (updateChannel?.lastMessage.id === (message as IMessage).id) {
+          state.channels = state.channels.map((chan) => {
             if (chan.id === channel.id) {
-              return { ...chan, lastMessage: message }
+              return { ...chan, lastMessage: message as IMessage }
             }
             return chan
           })
         }
       } else {
-        const updatedChannels = newState.channels.filter((chan) => chan.id !== channel.id)
+        const updatedChannels = state.channels.filter((chan) => chan.id !== channel.id)
         if (updateChannel) {
-          updateChannel = { ...updateChannel, lastMessage: message }
-          newState.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
+          updateChannel = { ...updateChannel, lastMessage: message as IMessage }
+          state.channels = sortChannelByLastMessage([updateChannel, ...updatedChannels])
         }
       }
-      return newState
-    }
+    },
 
-    case UPDATE_CHANNEL_LAST_MESSAGE_STATUS: {
-      const { channel, message } = payload
-      newState.channels = newState.channels.map((chan) => {
+    updateChannelLastMessageStatus: (state, action: PayloadAction<{ message: IMessage; channel: IChannel }>) => {
+      const { channel, message } = action.payload
+      state.channels = state.channels.map((chan) => {
         if (chan.id === channel.id) {
           return {
             ...channel,
@@ -382,23 +358,26 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return chan
       })
+    },
 
-      return newState
-    }
+    setChannelInfoOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
+      state.channelInfoIsOpen = action.payload.open
+    },
 
-    case CHANNEL_INFO_OPEN_CLOSE: {
-      newState.channelInfoIsOpen = payload.open
-      return newState
-    }
+    toggleEditChannel: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.channelEditMode = action.payload.state
+    },
 
-    case TOGGLE_EDIT_CHANNEL: {
-      newState.channelEditMode = payload.state
-      return newState
-    }
-
-    case SWITCH_TYPING_INDICATOR: {
-      const { typingState, channelId, from } = payload
-      const currentChannelIndicators = newState.typingOrRecordingIndicator[channelId] || {}
+    switchTypingIndicator: (
+      state,
+      action: PayloadAction<{
+        typingState: boolean
+        channelId: string
+        from: IUser
+      }>
+    ) => {
+      const { typingState, channelId, from } = action.payload
+      const currentChannelIndicators = state.typingOrRecordingIndicator[channelId] || {}
       const updatedChannelIndicators = {
         ...currentChannelIndicators,
         [from.id]: {
@@ -408,16 +387,22 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
       }
 
-      newState.typingOrRecordingIndicator = {
-        ...newState.typingOrRecordingIndicator,
+      state.typingOrRecordingIndicator = {
+        ...state.typingOrRecordingIndicator,
         [channelId]: updatedChannelIndicators
       }
-      return newState
-    }
+    },
 
-    case SWITCH_RECORDING_INDICATOR: {
-      const { recordingState, channelId, from } = payload
-      const currentChannelIndicators = newState.typingOrRecordingIndicator[channelId] || {}
+    switchRecordingIndicator: (
+      state,
+      action: PayloadAction<{
+        recordingState: boolean
+        channelId: string
+        from: IUser
+      }>
+    ) => {
+      const { recordingState, channelId, from } = action.payload
+      const currentChannelIndicators = state.typingOrRecordingIndicator[channelId] || {}
       const updatedChannelIndicators = {
         ...currentChannelIndicators,
         [from.id]: {
@@ -427,62 +412,89 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
       }
 
-      newState.typingOrRecordingIndicator = {
-        ...newState.typingOrRecordingIndicator,
+      state.typingOrRecordingIndicator = {
+        ...state.typingOrRecordingIndicator,
         [channelId]: updatedChannelIndicators
       }
-      return newState
-    }
+    },
 
-    case SET_IS_DRAGGING: {
-      const { isDragging } = payload
-      newState.isDragging = isDragging
-      return newState
-    }
+    setIsDragging: (state, action: PayloadAction<{ isDragging: boolean }>) => {
+      state.isDragging = action.payload.isDragging
+    },
 
-    case SET_DRAGGED_ATTACHMENTS: {
-      const { attachments, type } = payload
+    setDraggedAttachments: (state, action: PayloadAction<{ attachments: any[]; type: string }>) => {
+      const { attachments, type } = action.payload
       if (attachments.length && attachments.length > 0) {
-        newState.draggedAttachments = attachments.map((attachment: any) => ({
+        state.draggedAttachments = attachments.map((attachment: any) => ({
           data: attachment.data,
           name: attachment.name,
           type: attachment.type,
           attachmentType: type
         }))
       } else {
-        newState.draggedAttachments = []
+        state.draggedAttachments = []
       }
-      return newState
-    }
+    },
 
-    case SET_CHANNEL_LIST_WIDTH: {
-      const { width } = payload
-      newState.channelListWidth = width
-      return newState
-    }
+    setChannelListWidth: (state, action: PayloadAction<{ width: number }>) => {
+      state.channelListWidth = action.payload.width
+    },
 
-    case SET_TAB_IS_ACTIVE: {
-      const { isActive } = payload
-      newState.tabIsActive = isActive
-      return newState
-    }
-    case SET_HIDE_CHANNEL_LIST: {
-      const { hide } = payload
-      newState.hideChannelList = hide
-      return newState
-    }
+    setTabIsActive: (state, action: PayloadAction<{ isActive: boolean }>) => {
+      state.tabIsActive = action.payload.isActive
+    },
 
-    case DRAFT_IS_REMOVED: {
-      const { channelId } = payload
-      newState.draftIsRemoved = channelId
-      return newState
-    }
+    setHideChannelList: (state, action: PayloadAction<{ hide: boolean }>) => {
+      state.hideChannelList = action.payload.hide
+    },
 
-    case DESTROY_SESSION: {
-      newState = { ...initialState, channelListWidth: newState.channelListWidth }
-      return newState
+    setDraftIsRemoved: (state, action: PayloadAction<{ channelId: string }>) => {
+      state.draftIsRemoved = action.payload.channelId
     }
-    default:
-      return state
+  },
+  extraReducers: (builder) => {
+    builder.addCase('DESTROY_SESSION', (state) => {
+      return { ...initialState, channelListWidth: state.channelListWidth }
+    })
   }
-}
+})
+
+// Export actions
+export const {
+  getChannels,
+  setChannels,
+  setSearchedChannels,
+  setSearchedChannelsForForward,
+  setCloseSearchChannels,
+  setChannelsForForward,
+  addChannel,
+  addChannels,
+  addChannelsForForward,
+  removeChannel,
+  setChannelToAdd,
+  setAddedToChannel,
+  setChannelToRemove,
+  setChannelToHide,
+  setChannelToUnhide,
+  setChannelsLoadingState,
+  setChannelsHasNext,
+  setActiveChannel,
+  updateChannelData,
+  updateSearchedChannelData,
+  updateUserStatusOnChannel,
+  updateChannelLastMessage,
+  updateChannelLastMessageStatus,
+  setChannelInfoOpenClose,
+  toggleEditChannel,
+  switchTypingIndicator,
+  switchRecordingIndicator,
+  setIsDragging,
+  setDraggedAttachments,
+  setChannelListWidth,
+  setTabIsActive,
+  setHideChannelList,
+  setDraftIsRemoved
+} = channelSlice.actions
+
+// Export reducer
+export default channelSlice.reducer

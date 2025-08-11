@@ -90,6 +90,7 @@ export interface IMessage {
   tid?: string
   body: string
   user: IUser
+  channelId: string
   createdAt: Date
   updatedAt?: Date
   type: string
@@ -251,6 +252,20 @@ export interface IContact {
 
 export interface IContactsMap {
   [key: string]: IContact
+}
+
+export interface IOGMetadata {
+  id: string
+  url: string
+  og: {
+    audio: { url: string }[]
+    description: string
+    favicon: { url: string }
+    image: { url: string }[]
+    localeAlternate: any[]
+    title: string
+    video: { url: string }[]
+  }
 }
 
 export type MuteTime = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 24

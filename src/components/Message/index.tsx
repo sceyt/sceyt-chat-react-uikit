@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch, useSelector, shallowEqual } from 'react-redux'
 import moment from 'moment'
 // Store
 import {
@@ -13,7 +13,7 @@ import {
   forwardMessageAC,
   removeSelectedMessageAC,
   resendMessageAC,
-  // resendMessageAC,
+  scrollToNewMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessageToEditAC
@@ -45,6 +45,7 @@ import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
 import log from 'loglevel'
+import { scrollToNewMessageSelector } from 'store/message/selector'
 
 const Message = ({
   message,
@@ -199,6 +200,8 @@ const Message = ({
   const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount =
@@ -310,7 +313,7 @@ const Message = ({
   }
 
   const handleToggleReactionsPopup = () => {
-    const reactionsContainer = document.getElementById(`${message.id}_reactions_container}`)
+    const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
     const reactionsContPos = reactionsContainer && reactionsContainer.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
     const offsetBottom = window.innerHeight - bottomPos
@@ -444,6 +447,10 @@ const Message = ({
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
       }
+
+      if (scrollToNewMessage.scrollToBottom) {
+        dispatch(scrollToNewMessageAC(false, false, false))
+      }
     } else {
       if (!channel.isLinkedChannel) {
         removeMessageFromVisibleMessagesMap(message)
@@ -573,34 +580,6 @@ const Message = ({
         {message.state === MESSAGE_STATUS.FAILED && (
           <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
             <ErrorIconWrapper />
-            {/* <DropDown
-              // forceClose={showChooseAttachmentType}
-              position={nextMessage ? 'right' : 'topRight'}
-              trigger={<ErrorIconWrapper />}
-            >
-              <DropdownOptionsUl>
-                <DropdownOptionLi
-                  key={1}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleResendMessage()}
-                  iconWidth='20px'
-                >
-                  <ResendIcon />
-                  Resend
-                </DropdownOptionLi>
-                <DropdownOptionLi
-                  key={2}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleDeleteFailedMessage()}
-                  iconWidth='20px'
-                >
-                  <DeleteIconWrapper />
-                  Delete
-                </DropdownOptionLi>
-              </DropdownOptionsUl>
-            </DropDown> */}
           </FailedMessageIcon>
         )}
         {CustomMessageItem ? (
@@ -908,7 +887,6 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
     prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.tabIsActive === nextProps.tabIsActive &&
     prevProps.theme === nextProps.theme
   )
 })

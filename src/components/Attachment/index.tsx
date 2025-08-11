@@ -42,6 +42,7 @@ import { IAttachment } from '../../types'
 import VideoPreview from '../VideoPreview'
 import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
+import { isJSON } from 'helpers/message'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -135,7 +136,7 @@ const Attachment = ({
   const [renderWidth, renderHeight] = useMemo(() => {
     let attachmentData = null
     if (attachment.metadata && typeof attachment.metadata === 'string') {
-      attachmentData = JSON.parse(attachment.metadata.replace('"{', "'{").replace('}"', "}'"))
+      attachmentData = isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
     } else if (attachment.metadata && attachment.metadata.szw && attachment.metadata.szh) {
       attachmentData = attachment.metadata
     }
@@ -396,7 +397,8 @@ const Attachment = ({
           }
         })
     }
-  }, [attachment.id])
+  }, [])
+
   useDidUpdate(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED && isInUploadingState) {
       setFailTimeout(
@@ -850,7 +852,6 @@ export default React.memo(Attachment, (prevProps, nextProps) => {
   // Custom comparison function to check if only 'messages' prop has changed
   return (
     prevProps.attachment.url === nextProps.attachment.url &&
-    prevProps.attachment.id === nextProps.attachment.id &&
     prevProps.handleMediaItemClick === nextProps.handleMediaItemClick &&
     prevProps.attachment.attachmentUrl === nextProps.attachment.attachmentUrl
   )
