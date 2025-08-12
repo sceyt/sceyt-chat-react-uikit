@@ -27,7 +27,6 @@ export const setDataToDB = (dbName: string, storeName: string, data: any[], keyP
       }
       db.onversionchange = function () {
         db.close()
-        alert('The database is out of date, please reload the page.')
       }
     }
     openRequest.onblocked = function () {}

@@ -1,13 +1,22 @@
 import createSagaMiddleware from 'redux-saga'
 import { configureStore } from '@reduxjs/toolkit'
-import reducers from './reducers'
+import ChannelReducer from './channel/reducers'
+import MessageReducer from './message/reducers'
+import MembersReducer from './member/reducers'
+import UserReducer from './user/reducers'
+import ThemeReducer from './theme/reducers'
 import rootSaga from './saga'
 // Import Redux v5 compatibility polyfills
-import '../helpers/redux-polyfills'
 
 const sagaMiddleware = createSagaMiddleware()
 const store = configureStore({
-  reducer: reducers,
+  reducer: {
+    ChannelReducer,
+    MessageReducer,
+    MembersReducer,
+    ThemeReducer,
+    UserReducer
+  },
   // middleware: [...getDefaultMiddleware({ thunk: false, serializableCheck: false }), sagaMiddleware],
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({
