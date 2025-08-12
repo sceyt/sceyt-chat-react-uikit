@@ -1114,6 +1114,7 @@ function* editMessage(action: IAction): any {
 function* getMessagesQuery(action: IAction): any {
   log.info('getMessagesQuery ... ')
   try {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight } = action.payload
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
@@ -1122,7 +1123,6 @@ function* getMessagesQuery(action: IAction): any {
       messageQueryBuilder.reverse(true)
       const messageQuery = yield call(messageQueryBuilder.build)
       query.messageQuery = messageQuery
-      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
       const cachedMessages = getMessagesFromMap(channel.id)
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
       if (loadWithLastMessage) {
@@ -1305,7 +1305,6 @@ function* getMessagesQuery(action: IAction): any {
       }
 
       // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));
-      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     } else if (channel.isMockChannel) {
       yield put(setMessagesAC([]))
     }
@@ -1314,6 +1313,8 @@ function* getMessagesQuery(action: IAction): any {
     /* if (e.code !== 10008) {
       yield put(setErrorNotification(e.message));
     } */
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 

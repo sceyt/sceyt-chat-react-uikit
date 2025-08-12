@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux'
 import React from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'
-import { getMessagesAC } from '../../store/message/actions'
+import { getMessagesAC, scrollToNewMessageAC, setMessagesLoadingStateAC } from '../../store/message/actions'
 import {
   activeChannelMessagesSelector,
   sendMessageInputHeightSelector,
@@ -18,6 +18,7 @@ import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
 import { markMessagesAsReadAC } from 'store/channel/actions'
+import { LOADING_STATE } from 'helpers/constants'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
@@ -68,19 +69,20 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
     handleScrollToLastMessage(channel.lastMessage.id)
   }
   const handleScrollToLastMessage = async (messageId: string) => {
+    dispatch(scrollToNewMessageAC(true, false, false))
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
+      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv')
         if (scrollRef) {
           scrollRef.scrollTo({
-            top: 0,
+            top: 1000,
             behavior: 'smooth'
           })
         }
       }
     } else {
-      // await handleGetMessages(undefined, messageId)
       dispatch(getMessagesAC(channel, true, messageId, undefined, undefined, false))
     }
   }

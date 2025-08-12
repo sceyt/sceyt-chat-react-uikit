@@ -16,6 +16,7 @@ import {
   scrollToNewMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
+  setMessagesLoadingStateAC,
   setMessageToEditAC
 } from 'store/message/actions'
 import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
@@ -33,7 +34,7 @@ import {
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction } from 'types'
 // Components
@@ -450,6 +451,7 @@ const Message = ({
 
       if (scrollToNewMessage.scrollToBottom && (message.id === channel.lastMessage.id || !message.id)) {
         dispatch(scrollToNewMessageAC(false, false, false))
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
       if (!channel.isLinkedChannel) {
