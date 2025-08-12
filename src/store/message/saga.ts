@@ -1112,7 +1112,6 @@ function* editMessage(action: IAction): any {
 }
 
 function* getMessagesQuery(action: IAction): any {
-  log.info('getMessagesQuery ... ')
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight } = action.payload
