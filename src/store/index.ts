@@ -1,12 +1,14 @@
 import createSagaMiddleware from 'redux-saga'
 import { configureStore } from '@reduxjs/toolkit'
+import { enableMapSet } from 'immer'
 import ChannelReducer from './channel/reducers'
 import MessageReducer from './message/reducers'
 import MembersReducer from './member/reducers'
 import UserReducer from './user/reducers'
 import ThemeReducer from './theme/reducers'
 import rootSaga from './saga'
-// Import Redux v5 compatibility polyfills
+// Enable Immer support for Map/Set structures used in state
+enableMapSet()
 
 const sagaMiddleware = createSagaMiddleware()
 const store = configureStore({
