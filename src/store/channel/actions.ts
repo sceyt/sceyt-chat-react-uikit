@@ -200,9 +200,9 @@ export const sendTypingAC = (state: boolean) => ({
   payload: { state }
 })
 
-export const sendRecordingAC = (state: boolean) => ({
+export const sendRecordingAC = (state: boolean, channelId: string) => ({
   type: SEND_RECORDING,
-  payload: { state }
+  payload: { state, channelId }
 })
 
 export const switchTypingIndicatorAC = (typingState: boolean, channelId: string, from?: IUser) =>

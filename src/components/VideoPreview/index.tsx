@@ -292,7 +292,7 @@ const VideoTime = styled.div<{
   align-items: center;
   border-radius: 16px;
   padding: ${(props) => (props.isRepliedMessage ? '0 3px' : '4px 6px')};
-  background-color: ${(props) => `${props.messageTimeBackgroundColor}40`};
+  background-color: ${(props) => `${props.messageTimeBackgroundColor}66`};
   line-height: 14px;
   color: ${(props) => props.color};
   z-index: 10;

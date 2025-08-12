@@ -45,7 +45,7 @@ export const Container = styled.div<{
       font-weight: normal;
       font-size: ${(props) => props.dateDividerFontSize || '14px'};
       color: ${(props) => props.dateDividerTextColor};
-      background-color: ${(props) => `${props.dateDividerBackgroundColor}40`};
+      background-color: ${(props) => `${props.dateDividerBackgroundColor}66`};
       box-sizing: border-box;
       border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
       padding: 5px 16px;

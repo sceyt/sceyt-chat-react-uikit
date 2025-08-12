@@ -520,7 +520,7 @@ const Attachment = ({
                         text=''
                         styles={{
                           background: {
-                            fill: `${overlayBackground2}40`
+                            fill: `${overlayBackground2}66`
                           },
                           path: {
                             // Path color
@@ -622,7 +622,7 @@ const Attachment = ({
                             text=''
                             styles={{
                               background: {
-                                fill: `${overlayBackground2}40`
+                                fill: `${overlayBackground2}66`
                               },
                               path: {
                                 stroke: textOnPrimary,
@@ -801,7 +801,7 @@ const Attachment = ({
                       text=''
                       styles={{
                         background: {
-                          fill: `${overlayBackground2}40`
+                          fill: `${overlayBackground2}66`
                         },
                         path: {
                           stroke: textOnPrimary,

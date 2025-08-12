@@ -355,18 +355,14 @@ const Channel: React.FC<IChannelProps> = ({
     const filteredItems = dataValues.filter((item: any) => item.typingState || item.recordingState)
     return {
       items: filteredItems,
-      isTyping: !!filteredItems.find((item: any) => item.typingState)
+      isTyping: !!filteredItems.find((item: any) => item.typingState),
+      isRecording: !!filteredItems.find((item: any) => item.recordingState)
     }
   }, [typingOrRecordingIndicator])
-
-  const isTypingOrRecording = useMemo(() => {
-    return typingOrRecording.items.length > 0
-  }, [typingOrRecording])
-
   const MessageText = useMemo(() => {
     return (
       <ChannelMessageText
-        isTypingOrRecording={isTypingOrRecording}
+        isTypingOrRecording={typingOrRecording?.isTyping || typingOrRecording?.isRecording}
         user={user}
         contactsMap={contactsMap}
         getFromContacts={getFromContacts}
@@ -382,7 +378,8 @@ const Channel: React.FC<IChannelProps> = ({
       />
     )
   }, [
-    isTypingOrRecording,
+    typingOrRecording?.isTyping,
+    typingOrRecording?.isRecording,
     draftMessageText,
     lastMessage,
     user,
@@ -466,11 +463,11 @@ const Channel: React.FC<IChannelProps> = ({
             fontSize={channelLastMessageFontSize}
             height={channelLastMessageHeight}
           >
-            {isTypingOrRecording ? (
+            {typingOrRecording?.isTyping || typingOrRecording?.isRecording ? (
               !isDirectChannel ? (
                 <LastMessageAuthor
                   typing={typingOrRecording.isTyping}
-                  recording={!typingOrRecording.isTyping}
+                  recording={typingOrRecording.isRecording}
                   color={textPrimary}
                 >
                   <span ref={messageAuthorRef}>
@@ -521,16 +518,18 @@ const Channel: React.FC<IChannelProps> = ({
                 </LastMessageAuthor>
               )
             )}
-            {!isTypingOrRecording &&
+            {!typingOrRecording?.isTyping &&
+              !typingOrRecording?.isRecording &&
               (isDirectChannel
-                ? !isTypingOrRecording &&
+                ? !typingOrRecording?.isTyping &&
+                  !typingOrRecording?.isRecording &&
                   (draftMessageText ||
                     (lastMessage.user &&
                       lastMessage.state !== MESSAGE_STATUS.DELETE &&
                       (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                         ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
                         : lastMessage.user.id === user.id)))
-                : (isTypingOrRecording && draftMessageText) ||
+                : ((typingOrRecording?.isTyping || typingOrRecording?.isRecording) && draftMessageText) ||
                   (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
                 <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
               )}
@@ -542,7 +541,8 @@ const Channel: React.FC<IChannelProps> = ({
                   lastMessage.attachments &&
                   lastMessage.attachments.length &&
                   lastMessage.attachments[0].type !== attachmentTypes.link
-                ) && !isTypingOrRecording
+                ) &&
+                (!typingOrRecording?.isTyping || !typingOrRecording?.isRecording)
               }
               noBody={lastMessage && !lastMessage.body}
               deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}

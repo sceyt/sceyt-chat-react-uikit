@@ -63,20 +63,20 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const dispatch = useDispatch()
 
   const handleStartRecording = () => {
-    dispatch(sendRecordingAC(true))
+    dispatch(sendRecordingAC(true, currentChannelId))
     if (sendingInterval) {
       clearInterval(sendingInterval)
       setSendingInterval(null)
       return
     }
     const interval = setInterval(() => {
-      dispatch(sendRecordingAC(true))
+      dispatch(sendRecordingAC(true, currentChannelId))
     }, 1000)
     setSendingInterval(interval)
   }
 
   const handleStopRecording = () => {
-    dispatch(sendRecordingAC(false))
+    dispatch(sendRecordingAC(false, currentChannelId))
     if (sendingInterval) {
       clearInterval(sendingInterval)
       setSendingInterval(null)
@@ -317,10 +317,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         }
       }
 
-      if (draft) {
-        return
-      }
-
+      setCurrentTime(wavesurfer.current[id]?.decodedData?.duration || 0)
       wavesurfer.current[id].on('ready', () => {
         setRecordingIsReadyToPlay(true)
         const audioDuration = wavesurfer.current[id].getDuration()
@@ -357,7 +354,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
         .stop()
         .getMp3()
         .then(([buffer, blob]: any) => {
-          setCurrentTime(0)
           const file = new File(buffer, 'record.mp3', {
             type: blob.type,
             lastModified: Date.now()
@@ -439,15 +435,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
     if (wavesurfer.current?.[cId || currentChannelId]) {
       if (!wavesurfer.current[cId || currentChannelId].isPlaying()) {
         setPlayAudio(true)
-        handleStartRecording()
         intervalRef.current[cId || currentChannelId] = setInterval(() => {
           const currentTime = wavesurfer.current[cId || currentChannelId].getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(currentTime)
           }
         }, 10)
-      } else {
-        handleStopRecording()
       }
       wavesurfer.current[cId || currentChannelId].playPause()
     }
@@ -560,6 +553,8 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       setRecordedFile(audioRecording || null)
       setRecordingIsReadyToPlay(!!audioRecording)
     }
+    handleStopRecording()
+
     setCurrentChannelId(channelId)
   }, [channelId])
 

@@ -1159,10 +1159,9 @@ function* sendTyping(action: IAction): any {
 
 function* sendRecording(action: IAction): any {
   const {
-    payload: { state }
+    payload: { state, channelId }
   } = action
-  const activeChannelId = yield call(getActiveChannelId)
-  const channel = yield call(getChannelFromMap, activeChannelId)
+  const channel = yield call(getChannelFromMap, channelId)
 
   try {
     if (channel) {

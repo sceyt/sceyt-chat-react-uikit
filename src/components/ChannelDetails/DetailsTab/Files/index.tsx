@@ -148,7 +148,7 @@ const Files = ({
                       text=''
                       styles={{
                         background: {
-                          fill: `${overlayBackground2}40`
+                          fill: `${overlayBackground2}66`
                         },
                         path: {
                           stroke: accentColor,

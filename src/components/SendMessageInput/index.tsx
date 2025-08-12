@@ -1378,16 +1378,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [])
 
-  const filteredTypingOrRecordingIndicator = useMemo(() => {
-    return typingOrRecordingIndicator
-      ? Object.values(typingOrRecordingIndicator).filter((item: any) => item.typingState || item.recordingState)
-      : []
+  const typingOrRecording = useMemo(() => {
+    const dataValues = typingOrRecordingIndicator ? Object.values(typingOrRecordingIndicator) : []
+    const filteredItems = dataValues.filter((item: any) => item.typingState || item.recordingState)
+    return {
+      items: filteredItems,
+      isTyping: !!filteredItems.find((item: any) => item.typingState),
+      isRecording: !!filteredItems.find((item: any) => item.recordingState)
+    }
   }, [typingOrRecordingIndicator])
-
-  const isTyping = useMemo(
-    () => !!filteredTypingOrRecordingIndicator.find((item: any) => item.typingState),
-    [filteredTypingOrRecordingIndicator]
-  )
 
   const formatTypingIndicatorText = (users: any[], maxShownUsers: number = 3) => {
     if (users.length === 0) return ''
@@ -1399,7 +1398,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         getFromContacts
       )
       return `${userName}${
-        isTyping
+        typingOrRecording?.isTyping
           ? activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
             ? ' is typing'
             : ''
@@ -1527,10 +1526,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ) : (
               <React.Fragment>
                 <TypingIndicator>
-                  {filteredTypingOrRecordingIndicator.length > 0 &&
+                  {typingOrRecording?.items.length > 0 &&
                     (CustomTypingIndicator ? (
                       <CustomTypingIndicator
-                        from={filteredTypingOrRecordingIndicator.map((item: any) => ({
+                        from={typingOrRecording?.items.map((item: any) => ({
                           id: item.from.id,
                           name: item.from.name,
                           typingState: item.typingState,
@@ -1540,9 +1539,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ) : (
                       <TypingIndicatorCont>
                         <TypingFrom color={textSecondary}>
-                          {formatTypingIndicatorText(filteredTypingOrRecordingIndicator, 3)}
+                          {formatTypingIndicatorText(typingOrRecording?.items, 3)}
                         </TypingFrom>
-                        {isTyping ? (
+                        {typingOrRecording?.isTyping ? (
                           <TypingAnimation borderColor={iconInactive}>
                             <DotOne />
                             <DotTwo />

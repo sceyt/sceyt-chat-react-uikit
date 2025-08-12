@@ -187,7 +187,7 @@ export const Container = styled.div<{
     font-weight: normal;
     font-size: ${(props) => props.fontSize || '14px'};
     color: ${(props) => props.textColor};
-    background-color: ${(props) => `${props.backgroundColor}40`};
+    background-color: ${(props) => `${props.backgroundColor}66`};
     box-sizing: border-box;
     border: ${(props) => props.border};
     border-radius: ${(props) => props.borderRadius || '14px'};

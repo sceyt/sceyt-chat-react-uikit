@@ -1441,7 +1441,7 @@ export const MessageTopDate = styled.div<{
     font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
     color: ${(props) => props.dateDividerTextColor};
-    background-color: ${(props) => `${props.dateDividerBackgroundColor}40`};
+    background-color: ${(props) => `${props.dateDividerBackgroundColor}66`};
     border: ${(props) => props.dateDividerBorder};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
