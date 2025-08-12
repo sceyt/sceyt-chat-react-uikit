@@ -1160,7 +1160,6 @@ function* getMessagesQuery(action: IAction): any {
           setMessagesToMap(channel.id, result.messages)
           setAllMessages(result.messages)
           yield put(setMessagesHasPrevAC(true))
-          yield put(markChannelAsReadAC(channel.id))
         } else {
           result.messages = getFromAllMessagesByMessageId('', '', true)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))

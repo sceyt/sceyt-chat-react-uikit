@@ -45,7 +45,6 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
-import log from 'loglevel'
 import { scrollToNewMessageSelector } from 'store/message/selector'
 
 const Message = ({
@@ -387,7 +386,6 @@ const Message = ({
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
-      log.info('send displayed marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }

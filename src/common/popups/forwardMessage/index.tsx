@@ -336,6 +336,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     })}
                   </React.Fragment>
                 )}
+                {!searchedChannels.chats_groups.length && !searchedChannels.channels.length && (
+                  <NoResults color={textSecondary}>No channels found</NoResults>
+                )}
               </React.Fragment>
             ) : (
               channels.map((channel: IChannel) => {
@@ -550,4 +553,13 @@ const StyledSubtractSvg = styled(CrossIcon)`
   cursor: pointer;
   margin-left: 4px;
   transform: translate(2px, 0);
+`
+
+const NoResults = styled.div`
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 20px;
+  color: ${(props) => props.color};
 `
