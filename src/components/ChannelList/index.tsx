@@ -84,6 +84,7 @@ interface IChannelListProps {
   searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
   searchInputBorderRadius?: string
+  searchChannelsPadding?: string
   getSelectedChannel?: (channel: IChannel) => void
   filter?: { channelType?: string }
   limit?: number
@@ -199,7 +200,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   channelAvatarSize,
   channelAvatarTextSize,
   searchChannelInputFontSize,
-  searchedChannelsTitleFontSize
+  searchedChannelsTitleFontSize,
+  searchChannelsPadding
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -437,6 +439,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
         borderColor={borderColor}
+        padding={searchChannelsPadding}
       >
         {Profile}
         {showSearch && searchChannelsPosition === 'inline' ? (
@@ -904,14 +907,20 @@ const ChannelListHeader = styled.div<{
   withoutProfile?: any
   withCustomList?: boolean
   borderColor?: string
+  padding?: string
 }>`
   display: flex;
   align-items: center;
   flex-direction: row;
   justify-content: space-between;
-  max-width: ${(props: { maxWidth?: number; withoutProfile?: any; withCustomList?: boolean; borderColor?: string }) =>
-    props.maxWidth ? `${props.maxWidth}px` : 'inherit'};
-  padding: 12px;
+  max-width: ${(props: {
+    maxWidth?: number
+    withoutProfile?: any
+    withCustomList?: boolean
+    borderColor?: string
+    padding?: string
+  }) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
+  padding: ${(props) => props.padding || '12px'};
   padding-left: 22px;
   box-sizing: border-box;
   padding-left: ${(props) => props.withoutProfile && '52px'};
