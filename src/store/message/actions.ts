@@ -57,7 +57,8 @@ import {
   setPlayingAudioId,
   addSelectedMessage,
   removeSelectedMessage,
-  clearSelectedMessages
+  clearSelectedMessages,
+  updateMessageAttachment
 } from './reducers'
 
 export function sendMessageAC(
@@ -279,6 +280,10 @@ export function setMessagesHasPrevAC(hasPrev: boolean) {
 
 export function setMessagesHasNextAC(hasNext: boolean) {
   return setMessagesHasNext({ hasNext })
+}
+
+export function setUpdateMessageAttachmentAC(url: string, messageId: string, params: any) {
+  return updateMessageAttachment({ url, messageId, params })
 }
 
 export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {

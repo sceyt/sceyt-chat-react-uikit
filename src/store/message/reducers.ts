@@ -6,7 +6,9 @@ import {
   MESSAGES_MAX_LENGTH,
   removePendingMessageFromMap,
   setHasNextCached,
-  setHasPrevCached
+  setHasPrevCached,
+  updateMessageOnAllMessages,
+  updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
@@ -95,7 +97,6 @@ const messageSlice = createSlice({
   reducers: {
     addMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
       const { message } = action.payload
-      log.info('addMessage ... ', message)
       state.activeChannelMessages.push(message)
     },
 
@@ -239,6 +240,33 @@ const messageSlice = createSlice({
         log.info('message not found on update message, add message to list .. ...', params)
         state.activeChannelMessages.push(params)
       }
+    },
+
+    updateMessageAttachment: (state, action: PayloadAction<{ url: string; messageId: string; params: any }>) => {
+      const { url, messageId, params } = action.payload
+      state.activeChannelMessages = state.activeChannelMessages.map((message: IMessage) => {
+        if (message.id === messageId) {
+          for (let index = 0; index < message.attachments.length; index++) {
+            const attachment = message.attachments[index]
+            if (attachment.url === url) {
+              message.attachments[index] = { ...attachment, ...params }
+            }
+          }
+        }
+        if (message.attachments.length) {
+          const detachedAttachments = message.attachments.map((att) => ({
+            ...att,
+            user: {
+              ...att.user,
+              metadata: { ...((att.user as any)?.metadata || {}) },
+              presence: { ...(att.user?.presence || {}) }
+            }
+          }))
+          updateMessageOnAllMessages(messageId, { attachments: detachedAttachments })
+          updateMessageOnMap(message.channelId, { messageId, params: { attachments: detachedAttachments } })
+        }
+        return message
+      })
     },
 
     addReactionToMessage: (
@@ -488,6 +516,7 @@ export const {
   addMessages,
   updateMessagesStatus,
   updateMessage,
+  updateMessageAttachment,
   addReactionToMessage,
   deleteReactionFromMessage,
   setHasPrevMessages,

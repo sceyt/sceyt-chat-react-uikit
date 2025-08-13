@@ -891,7 +891,7 @@ const MessageList: React.FC<MessagesProps> = ({
         clearVisibleMessagesMap()
       }
       if (channel) {
-        dispatch(getMessagesAC(channel, true, undefined, undefined, true))
+        dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {

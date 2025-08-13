@@ -204,13 +204,6 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
   addMessageToMap(channel.id, messageToAdd)
   addAllMessages([messageToAdd], MESSAGE_LOAD_DIRECTION.NEXT)
   setPendingMessages(channel.id, [messageToAdd])
-  const hasNextMessages = store.getState().MessageReducer.messagesHasNext
-  const activeChannelMessages = store.getState().MessageReducer.activeChannelMessages
-  const isLatestMessageInChannelMessages =
-    activeChannelMessages[activeChannelMessages.length - 1].id === channel.lastMessage.id
-  if (hasNextMessages || !isLatestMessageInChannelMessages) {
-    store.dispatch(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
-  }
 
   store.dispatch(scrollToNewMessageAC(true))
   store.dispatch(addMessageAC(messageToAdd))
@@ -1278,12 +1271,15 @@ function* getMessagesQuery(action: IAction): any {
           result.messages = [...secondResult.messages, ...result.messages]
           result.hasNext = secondResult.hasNext
         }
+        const updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
-          updateMessageOnMap(channel.id, { messageId: msg.id, params: msg })
-          updateMessageOnAllMessages(msg.id, msg)
+          const updatedMessage = updateMessageOnMap(channel.id, { messageId: msg.id, params: msg })
+          updateMessageOnAllMessages(msg.id, updatedMessage || msg)
+          updatedMessages.push(updatedMessage || msg)
         })
-        // setMessagesToMap(channel.id, result.messages)
-        // setAllMessages([...result.messages])
+        setMessagesToMap(channel.id, updatedMessages)
+        setAllMessages([...updatedMessages])
+        yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
         yield put(setMessagesHasPrevAC(result.hasNext))
         yield put(setMessagesHasNextAC(false))
       }

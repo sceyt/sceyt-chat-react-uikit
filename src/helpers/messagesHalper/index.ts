@@ -183,18 +183,30 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
       }
     }
   }
+  let updatedMessageData = null
   if (messagesMap[channelId]) {
-    messagesMap[channelId] = messagesMap[channelId].map((mes) => {
+    messagesMap[channelId].map((mes) => {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
-          return { ...updatedMessage.params }
+          updatedMessageData = { ...updatedMessage.params }
+          return updatedMessageData
         } else {
-          return { ...mes, ...updatedMessage.params }
+          updatedMessageData = {
+            ...mes,
+            ...updatedMessage.params,
+            attachments: [...mes.attachments, ...(updatedMessage.params?.attachments || [])].filter(
+              (att, index, self) =>
+                index === self.findIndex((t) => t.url === att.url && t.type === att.type && t.name === att.name)
+            )
+          }
+          return updatedMessage
         }
       }
       return mes
     })
   }
+
+  return updatedMessageData
 }
 
 export function addReactionToMessageOnMap(channelId: string, message: IMessage, reaction: IReaction, isSelf: boolean) {

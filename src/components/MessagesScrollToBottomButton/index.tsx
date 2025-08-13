@@ -19,6 +19,7 @@ import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
 import { markMessagesAsReadAC } from 'store/channel/actions'
 import { LOADING_STATE } from 'helpers/constants'
+import { getClient } from 'common/client'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
@@ -65,7 +66,10 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
   const messages = useSelector(activeChannelMessagesSelector) || []
   const handleScrollToBottom = () => {
-    dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
+    const user = getClient().user
+    if (channel.lastMessage.user.id !== user.id) {
+      dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
+    }
     handleScrollToLastMessage(channel.lastMessage.id)
   }
   const handleScrollToLastMessage = async (messageId: string) => {

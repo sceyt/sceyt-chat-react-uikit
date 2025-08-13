@@ -9,6 +9,7 @@ import { themeSelector } from '../../store/theme/selector'
 import {
   pauseAttachmentUploadingAC,
   resumeAttachmentUploadingAC,
+  setUpdateMessageAttachmentAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
 } from '../../store/message/actions'
@@ -193,7 +194,17 @@ const Attachment = ({
     if (downloadIsCancelled) {
       setDownloadIsCancelled(false)
       if (customDownloader) {
-        customDownloader(attachment.url, false, () => {}, messageType).then((url) => {
+        customDownloader(
+          attachment.url,
+          false,
+          (progress) => {
+            const loadedRes = progress.loaded && progress.loaded / progress.total
+            const uploadPercent = loadedRes && loadedRes * 100
+            setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+            setProgress(uploadPercent)
+          },
+          messageType
+        ).then((url) => {
           downloadImage(url)
         })
       } else {
@@ -336,6 +347,7 @@ const Attachment = ({
     } */
     // setAttachmentUrl('')
     if (
+      !attachment.attachmentUrl &&
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       attachment.id &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
@@ -347,16 +359,28 @@ const Attachment = ({
               // @ts-ignore
               // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
+              dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.messageId, { attachmentUrl: cachedUrl }))
               setIsCached(true)
             } else {
               setIsCached(false)
               setDownloadingFile(true)
               if (customDownloader) {
-                customDownloader(attachment.url, false, () => {}, messageType).then(async (url) => {
+                customDownloader(
+                  attachment.url,
+                  false,
+                  (progress) => {
+                    const loadedRes = progress.loaded && progress.loaded / progress.total
+                    const uploadPercent = loadedRes && loadedRes * 100
+                    setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+                    setProgress(uploadPercent)
+                  },
+                  messageType
+                ).then(async (url) => {
                   downloadImage(url)
                   const response = await fetch(url)
                   setAttachmentToCache(attachment.url, response)
                   setIsCached(true)
+                  setDownloadingFile(false)
                 })
               } else {
                 downloadImage(attachment.url)
@@ -384,7 +408,17 @@ const Attachment = ({
           log.info('error on get attachment url from cache. .. ', e)
           if (customDownloader) {
             setDownloadingFile(true)
-            customDownloader(attachment.url, false, () => {}, messageType).then(async (url) => {
+            customDownloader(
+              attachment.url,
+              true,
+              (progress) => {
+                const loadedRes = progress.loaded && progress.loaded / progress.total
+                const uploadPercent = loadedRes && loadedRes * 100
+                setSizeProgress({ loaded: progress.loaded || 0, total: progress.total || 0 })
+                setProgress(uploadPercent)
+              },
+              messageType
+            ).then(async (url) => {
               // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.url, response)
@@ -487,75 +521,80 @@ const Attachment = ({
               withPrefix={withPrefix}
               borderColor={borderColor}
             >
-              <UploadPercent
-                isRepliedMessage={isRepliedMessage}
-                isDetailsView={isDetailsView}
-                backgroundColor={overlayBackground2}
-              >
-                {isInUploadingState ? (
-                  <CancelResumeWrapper onClick={handlePauseResumeUpload}>
-                    {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
-                      <CancelIcon />
+              {!isPreview &&
+                (isInUploadingState || downloadingFile) &&
+                sizeProgress &&
+                sizeProgress.loaded < sizeProgress.total && (
+                  <UploadPercent
+                    isRepliedMessage={isRepliedMessage}
+                    isDetailsView={isDetailsView}
+                    backgroundColor={overlayBackground2}
+                  >
+                    {isInUploadingState ? (
+                      <CancelResumeWrapper onClick={handlePauseResumeUpload}>
+                        {attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ? (
+                          <CancelIcon />
+                        ) : (
+                          <UploadIcon />
+                        )}
+                      </CancelResumeWrapper>
                     ) : (
-                      <UploadIcon />
+                      !isCached && (
+                        <CancelResumeWrapper onClick={handlePauseResumeDownload}>
+                          {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
+                        </CancelResumeWrapper>
+                      )
                     )}
-                  </CancelResumeWrapper>
-                ) : (
-                  !isCached && (
-                    <CancelResumeWrapper onClick={handlePauseResumeDownload}>
-                      {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
-                    </CancelResumeWrapper>
-                  )
-                )}
 
-                {(!isCached || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
-                  <React.Fragment>
-                    <ProgressWrapper>
-                      <CircularProgressbar
-                        minValue={0}
-                        maxValue={100}
-                        value={progress}
-                        backgroundPadding={3}
-                        background={true}
-                        text=''
-                        styles={{
-                          background: {
-                            fill: `${overlayBackground2}66`
-                          },
-                          path: {
-                            // Path color
-                            stroke: textOnPrimary,
-                            // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-                            strokeLinecap: 'butt',
-                            strokeWidth: '4px',
-                            // Customize transition animation
-                            transition: 'stroke-dashoffset 0.5s ease 0s',
-                            // Rotate the path
-                            transform: 'rotate(0turn)',
-                            transformOrigin: 'center center'
-                          }
-                          // How long animation takes to go from one percentage to another, in seconds
-                          // pathTransitionDuration: 0.5,
+                    {(!isCached || attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING) && (
+                      <React.Fragment>
+                        <ProgressWrapper>
+                          <CircularProgressbar
+                            minValue={0}
+                            maxValue={100}
+                            value={progress}
+                            backgroundPadding={3}
+                            background={true}
+                            text=''
+                            styles={{
+                              background: {
+                                fill: `${overlayBackground2}66`
+                              },
+                              path: {
+                                // Path color
+                                stroke: textOnPrimary,
+                                // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
+                                strokeLinecap: 'butt',
+                                strokeWidth: '4px',
+                                // Customize transition animation
+                                transition: 'stroke-dashoffset 0.5s ease 0s',
+                                // Rotate the path
+                                transform: 'rotate(0turn)',
+                                transformOrigin: 'center center'
+                              }
+                              // How long animation takes to go from one percentage to another, in seconds
+                              // pathTransitionDuration: 0.5,
 
-                          // Can specify path transition in more detail, or remove it entirely
-                          // pathTransition: 'none',
+                              // Can specify path transition in more detail, or remove it entirely
+                              // pathTransition: 'none',
 
-                          // Colors
-                          // pathColor: '#fff',
-                          // textColor: '#f88',
-                          // trailColor: 'transparent'
-                        }}
-                      />
-                    </ProgressWrapper>
+                              // Colors
+                              // pathColor: '#fff',
+                              // textColor: '#f88',
+                              // trailColor: 'transparent'
+                            }}
+                          />
+                        </ProgressWrapper>
 
-                    {sizeProgress && (
-                      <SizeProgress color={textOnPrimary}>
-                        {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
-                      </SizeProgress>
+                        {sizeProgress && (
+                          <SizeProgress color={textOnPrimary}>
+                            {bytesToSize(sizeProgress.loaded, 1)} / {bytesToSize(sizeProgress.total, 1)}
+                          </SizeProgress>
+                        )}
+                      </React.Fragment>
                     )}
-                  </React.Fragment>
+                  </UploadPercent>
                 )}
-              </UploadPercent>
             </UploadProgress>
           ) : null}
           {isPreview && (
