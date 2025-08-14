@@ -548,11 +548,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       setShowRecording(false)
       setStartRecording(false)
       setPlayAudio(false)
-      setCurrentTime(0)
       const audioRecording = getAudioRecordingFromMap(channelId)
       setRecordedFile(audioRecording || null)
       setRecordingIsReadyToPlay(!!audioRecording)
     }
+    setCurrentTime(0)
     handleStopRecording()
 
     setCurrentChannelId(channelId)

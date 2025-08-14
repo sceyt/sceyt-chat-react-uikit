@@ -67,25 +67,25 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
 
   const showOGMetadata = useMemo(() => {
     return (
-      state === 'deleted' ||
-      metadata?.og?.title === '' ||
-      metadata?.og?.image?.[0]?.url === '' ||
-      metadata?.og?.description === '' ||
-      !metadata
+      state !== 'deleted' &&
+      metadata?.og?.title &&
+      metadata?.og?.image?.[0]?.url &&
+      metadata?.og?.description &&
+      metadata
     )
   }, [state, metadata])
 
   return (
-    <OGMetadataContainer>
+    <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
       <div
         onClick={() => {
           window.open(attachment?.url, '_blank')
         }}
       >
-        <ImageContainer showOGMetadata={showOGMetadata}>
+        <ImageContainer showOGMetadata={!!showOGMetadata}>
           {metadata?.og?.image?.[0]?.url ? <Img src={metadata?.og?.image?.[0]?.url} alt='OG metadata image' /> : null}
         </ImageContainer>
-        {showOGMetadata ? null : (
+        {showOGMetadata ? (
           <OGText>
             <Url>{ogUrl}</Url>
             {metadata?.og?.title ? (
@@ -96,7 +96,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
             ) : null}
             {metadata?.og?.description ? <Desc>{metadata?.og?.description}</Desc> : null}
           </OGText>
-        )}
+        ) : null}
       </div>
     </OGMetadataContainer>
   )
@@ -104,7 +104,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
 
 export { OGMetadata }
 
-const OGMetadataContainer = styled.div`
+const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
   min-width: inherit;
   max-width: inherit;
   display: grid;
@@ -113,7 +113,7 @@ const OGMetadataContainer = styled.div`
   border-radius: 6px;
   margin-bottom: 0.4rem;
   margin: 0 auto;
-  margin-bottom: 0.8rem;
+  margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.8rem' : '0')};
   &:hover {
     background-color: rgba(0, 0, 0, 0.1);
     cursor: pointer;
@@ -124,10 +124,9 @@ const ImageContainer = styled.div<{ showOGMetadata: boolean }>`
   max-width: 100%;
   max-height: 200px;
   width: 100%;
-  height: 200px;
   margin: 0 auto;
-  padding: 0.3rem;
-  height: ${({ showOGMetadata }) => (!showOGMetadata ? '200px' : '0')};
+  padding: ${({ showOGMetadata }) => (showOGMetadata ? '0.3rem' : '0')};
+  height: ${({ showOGMetadata }) => (showOGMetadata ? '200px' : '0')};
   transition: height 0.2s ease;
 `
 

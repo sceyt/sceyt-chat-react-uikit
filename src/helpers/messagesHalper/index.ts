@@ -15,7 +15,9 @@ export type IAttachmentMeta = {
   duration?: number
 }
 
-type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
+type draftMessagesMap = {
+  [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage; bodyAttributes?: any }
+}
 type audioRecordingMap = { [key: string]: any }
 type visibleMessagesMap = { [key: string]: { id: string } }
 
@@ -424,7 +426,13 @@ export const removeAudioRecordingFromMap = (channelId: string) => {
 
 export const setDraftMessageToMap = (
   channelId: string,
-  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage; editorState?: any }
+  draftMessage: {
+    text: string
+    mentionedMembers: any
+    messageForReply?: IMessage
+    editorState?: any
+    bodyAttributes?: any
+  }
 ) => {
   draftMessagesMap[channelId] = draftMessage
 }

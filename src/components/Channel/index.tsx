@@ -140,7 +140,15 @@ const ChannelMessageText = ({
         (draftMessageText ? (
           <DraftMessageText color={textSecondary}>
             {audioRecording && <VoiceIcon />}
-            {draftMessageText}
+            {MessageTextFormat({
+              text: draftMessageText,
+              message: lastMessage,
+              contactsMap,
+              getFromContacts,
+              isLastMessage: true,
+              accentColor,
+              textSecondary
+            })}
           </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
@@ -285,6 +293,7 @@ const Channel: React.FC<IChannelProps> = ({
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
+  const [draftMessage, setDraftMessage] = useState<any>()
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
     lastMessage &&
@@ -324,11 +333,18 @@ const Channel: React.FC<IChannelProps> = ({
       if (channelDraftMessage || draftAudioRecording) {
         if (channelDraftMessage) {
           setDraftMessageText(channelDraftMessage.text)
+          setDraftMessage({
+            mentionedUsers: channelDraftMessage.mentionedMembers,
+            body: channelDraftMessage.text,
+            bodyAttributes: channelDraftMessage.bodyAttributes
+          })
         } else if (draftAudioRecording) {
           setDraftMessageText('Voice')
+          setDraftMessage(undefined)
         }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
+        setDraftMessage(undefined)
       }
     }
   }, [activeChannel.id])
@@ -336,6 +352,7 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (channelDraftIsRemoved && channelDraftIsRemoved === channel.id) {
       setDraftMessageText(undefined)
+      setDraftMessage(undefined)
       dispatch(setChannelDraftMessageIsRemovedAC())
     }
   }, [channelDraftIsRemoved])
@@ -373,7 +390,7 @@ const Channel: React.FC<IChannelProps> = ({
         textPrimary={textPrimary}
         textSecondary={textSecondary}
         draftMessageText={draftMessageText}
-        lastMessage={lastMessage}
+        lastMessage={draftMessage || lastMessage}
         isDirectChannel={isDirectChannel}
       />
     )

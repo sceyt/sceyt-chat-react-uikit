@@ -1247,14 +1247,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           text: messageText,
           mentionedMembers: draftMessage.mentionedMembers,
           messageForReply,
-          editorState: realEditorState
+          editorState: realEditorState,
+          bodyAttributes: messageBodyAttributes
         })
       } else {
         setDraftMessageToMap(activeChannel.id, {
           text: messageText,
           mentionedMembers,
           messageForReply,
-          editorState: realEditorState
+          editorState: realEditorState,
+          bodyAttributes: messageBodyAttributes
         })
       }
 
@@ -1274,7 +1276,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+      setDraftMessageToMap(activeChannel.id, {
+        text: messageText,
+        mentionedMembers,
+        messageForReply,
+        bodyAttributes: messageBodyAttributes
+      })
     }
   }, [mentionedMembers])
 
@@ -1325,7 +1332,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (draftMessagesMap[activeChannel.id]) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+      setDraftMessageToMap(activeChannel.id, {
+        text: messageText,
+        mentionedMembers,
+        messageForReply,
+        bodyAttributes: messageBodyAttributes
+      })
     }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
