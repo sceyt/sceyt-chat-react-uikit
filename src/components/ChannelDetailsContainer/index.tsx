@@ -141,6 +141,7 @@ export interface IDetailsProps {
 
   backgroundColor?: string
   bordersColor?: string
+  showPhoneNumber?: boolean
 }
 
 const ChannelDetailsContainer = ({
@@ -249,7 +250,8 @@ const ChannelDetailsContainer = ({
   tabItemsFontSize,
   tabItemsLineHeight,
   tabItemsMinWidth,
-  bordersColor
+  bordersColor,
+  showPhoneNumber
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -366,6 +368,7 @@ const ChannelDetailsContainer = ({
           tabItemsFontSize={tabItemsFontSize}
           tabItemsLineHeight={tabItemsLineHeight}
           tabItemsMinWidth={tabItemsMinWidth}
+          showPhoneNumber={showPhoneNumber}
         />
       )}
     </DetailsWrapper>

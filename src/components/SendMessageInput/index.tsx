@@ -602,6 +602,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
     if (messageTexToSend) {
+      let linkAttachment: any
+      if (messageTexToSend) {
+        const linkify = new LinkifyIt()
+        const match = linkify.match(messageTexToSend)
+        if (match) {
+          linkAttachment = {
+            type: attachmentTypes.link,
+            data: match[0].url,
+            upload: false
+          }
+        }
+      }
       const mentionedMembersPositions: any = []
       const mentionMembersToSend: any = []
       if (mentionedMembers && mentionedMembers.length) {
@@ -621,6 +633,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       const messageToSend = {
         ...messageToEdit,
+        ...(linkAttachment ? { attachments: [linkAttachment] } : {}),
         metadata: mentionedMembersPositions,
         bodyAttributes: messageBodyAttributes,
         mentionedUsers: mentionMembersToSend,

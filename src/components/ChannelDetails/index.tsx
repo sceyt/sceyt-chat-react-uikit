@@ -148,7 +148,8 @@ const Details = ({
   tabItemsLineHeight,
   tabItemsMinWidth,
   backgroundColor,
-  bordersColor
+  bordersColor,
+  showPhoneNumber
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -344,14 +345,16 @@ const Details = ({
 
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                    ? ''
-                    : directChannelUser &&
-                      directChannelUser.presence &&
-                      (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                        ? 'Online'
-                        : directChannelUser.presence.lastActiveAt &&
-                          userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  {showPhoneNumber
+                    ? `+${directChannelUser.id}`
+                    : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
+                      ? ''
+                      : directChannelUser &&
+                        directChannelUser.presence &&
+                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                          ? 'Online'
+                          : directChannelUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
                 </SubTitle>
               ) : (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>

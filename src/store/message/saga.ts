@@ -1079,6 +1079,21 @@ function* editMessage(action: IAction): any {
         setChannelInMap(channel)
       }
     }
+    if (message.attachments.length > 0) {
+      const linkAttachments = message.attachments.filter((att: IAttachment) => att.type === attachmentTypes.link)
+      const anotherAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
+      const linkAttachmentsToSend: IAttachment[] = []
+      linkAttachments.forEach((linkAttachment: IAttachment) => {
+        const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+        const linkAttachmentToSend = linkAttachmentBuilder
+          .setName(linkAttachment.name)
+          .setUpload(linkAttachment.upload)
+          .create()
+        linkAttachmentsToSend.push(linkAttachmentToSend)
+      })
+      message.attachments = [...anotherAttachments, ...linkAttachmentsToSend]
+    }
+
     const editedMessage = yield call(channel.editMessage, {
       ...message,
       metadata: isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata),

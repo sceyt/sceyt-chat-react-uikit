@@ -335,6 +335,17 @@ export function removePendingMessageFromMap(channelId: string, messageId: string
   }
 }
 
+export function updatePendingMessageOnMap(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
+  if (pendingMessagesMap[channelId]) {
+    pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
+      if (msg.id === messageId || msg.tid === messageId) {
+        return { ...msg, ...updatedMessage }
+      }
+      return msg
+    })
+  }
+}
+
 export function clearMessagesMap() {
   messagesMap = {}
 }

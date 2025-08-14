@@ -50,7 +50,6 @@ import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
   addAllMessages,
-  // addAllMessages,
   addMessageToMap,
   addReactionOnAllMessages,
   addReactionToMessageOnMap,
@@ -65,9 +64,9 @@ import {
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
   updateMessageOnAllMessages,
-  // MESSAGE_LOAD_DIRECTION,
   updateMessageOnMap,
-  updateMessageStatusOnMap
+  updateMessageStatusOnMap,
+  updatePendingMessageOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
 import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
@@ -830,8 +829,13 @@ export default function* watchForEvents(): any {
           const activeChannelId = yield call(getActiveChannelId)
           let updateLastMessage = false
           const markersMap: any = {}
+          const activeChannelMessages = getMessagesFromMap(activeChannelId)
           markerList.messageIds.forEach((messageId: string) => {
-            removePendingMessageFromMap(channel.id, messageId)
+            if (activeChannelMessages.find((message: IMessage) => message.id === messageId)) {
+              removePendingMessageFromMap(activeChannelId, messageId)
+            } else {
+              updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+            }
             markersMap[messageId] = true
             if (channel) {
               if (

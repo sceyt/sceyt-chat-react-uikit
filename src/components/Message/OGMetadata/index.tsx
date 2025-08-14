@@ -3,6 +3,7 @@ import { IAttachment, IOGMetadata } from '../../../types'
 import styled from 'styled-components'
 import { getClient } from '../../../common/client'
 import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadataService'
+import { attachmentTypes } from '../../../helpers/constants'
 
 const validateUrl = (url: string) => {
   try {
@@ -17,8 +18,8 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   const [metadata, setMetadata] = useState<IOGMetadata | null>(null)
 
   const attachment = useMemo(() => {
-    return attachments.find((attachment) => attachment.type === 'link')
-  }, [attachments?.length])
+    return attachments.find((attachment) => attachment.type === attachmentTypes.link)
+  }, [attachments])
 
   const ogMetadataQueryBuilder = useCallback(async (url: string) => {
     const client = getClient()
@@ -37,7 +38,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   }, [])
 
   useEffect(() => {
-    if (attachment?.id && !metadata) {
+    if (attachment?.id && attachment?.url) {
       const url = attachment?.url
 
       if (url) {
@@ -54,7 +55,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
           })
       }
     }
-  }, [attachment?.url, metadata])
+  }, [attachment?.url])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
