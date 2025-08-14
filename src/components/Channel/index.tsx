@@ -596,10 +596,7 @@ const Channel: React.FC<IChannelProps> = ({
       </ChannelStatus>
       <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
-          <UnreadMentionIconWrapper
-            iconColor={channel?.muted ? iconInactive : accentColor}
-            rightMargin={!!(channel.newMessageCount || channel.unread)}
-          >
+          <UnreadMentionIconWrapper iconColor={accentColor} rightMargin={!!(channel.newMessageCount || channel.unread)}>
             <MentionIcon />
           </UnreadMentionIconWrapper>
         )}

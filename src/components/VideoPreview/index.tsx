@@ -104,7 +104,9 @@ const VideoPreview = memo(function VideoPreview({
         setLoading(false)
         const minutes = Math.floor(video.duration / 60)
         const seconds = Math.floor(video.duration % 60)
-        setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        if (!videoCurrentTime) {
+          setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        }
         if (setVideoIsReadyToSend) {
           setVideoIsReadyToSend(file.tid!)
         }
