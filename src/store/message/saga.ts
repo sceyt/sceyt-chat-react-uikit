@@ -108,8 +108,7 @@ import {
   removeReactionOnAllMessages,
   sendMessageHandler,
   removePendingMessageFromMap,
-  addPendingMessageToMap,
-  setPendingMessages
+  setPendingMessage
 } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../user/constants'
 import { customUpload, getCustomUploader, pauseUpload, resumeUpload } from '../../helpers/customUploader'
@@ -203,7 +202,7 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
   )
   addMessageToMap(channel.id, messageToAdd)
   addAllMessages([messageToAdd], MESSAGE_LOAD_DIRECTION.NEXT)
-  setPendingMessages(channel.id, [messageToAdd])
+  setPendingMessage(channel.id, messageToAdd)
 
   store.dispatch(scrollToNewMessageAC(true))
   store.dispatch(addMessageAC(messageToAdd))
@@ -486,8 +485,10 @@ function* sendMessage(action: IAction): any {
             throw Error('Network error')
           }
         } catch (e) {
-          log.error('Error on uploading attachment', message.tid, e)
-          yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, message.tid))
+          log.error('Error on uploading attachment', messageToSend.tid, e)
+          if (messageToSend.attachments && messageToSend.attachments.length) {
+            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
+          }
 
           updateMessageOnMap(channel.id, {
             messageId: messageToSend.tid!,
@@ -710,7 +711,7 @@ function* forwardMessage(action: IAction): any {
       } else if (isCachedChannel) {
         addMessageToMap(channelId, pendingMessage)
       } else {
-        addPendingMessageToMap(channelId, pendingMessage)
+        setPendingMessage(channelId, pendingMessage)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -989,7 +990,12 @@ function* resendMessage(action: IAction): any {
           bodyAttributes: messageResponse.bodyAttributes,
           createdAt: messageResponse.createdAt
         }
-        removePendingMessageFromMap(channel.id, messageCopy.tid)
+        const isInActiveChannel = getMessagesFromMap(channelId)?.find(
+          (message: IMessage) => message.id === messageCopy.tid
+        )
+        if (isInActiveChannel) {
+          removePendingMessageFromMap(channel.id, messageCopy.tid)
+        }
         yield put(updateMessageAC(messageCopy.tid, messageUpdateData))
 
         updateMessageOnMap(channel.id, {
@@ -1307,10 +1313,6 @@ function* getMessagesQuery(action: IAction): any {
         })
         const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        for (let index = 0; index < filteredPendingMessages.length; index++) {
-          const mes = filteredPendingMessages[index]
-          removePendingMessageFromMap(channel?.id, mes.tid || mes.id)
-        }
       }
 
       // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));

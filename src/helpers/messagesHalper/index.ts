@@ -156,11 +156,7 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 
   if (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-    if (pendingMessagesMap[channelId]) {
-      pendingMessagesMap[channelId].push(message)
-    } else {
-      pendingMessagesMap[channelId] = [message]
-    }
+    setPendingMessage(channelId, message)
   }
 }
 
@@ -346,6 +342,13 @@ export function updatePendingMessageOnMap(channelId: string, messageId: string, 
   }
 }
 
+export function getMessageFromPendingMessagesMap(channelId: string, messageId: string) {
+  if (pendingMessagesMap[channelId]) {
+    return pendingMessagesMap[channelId].find((msg) => msg.id === messageId || msg.tid === messageId)
+  }
+  return null
+}
+
 export function clearMessagesMap() {
   messagesMap = {}
 }
@@ -403,17 +406,18 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
 }
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
-export const addPendingMessageToMap = (channelId: string, pendingMessage: IMessage) => {
-  if (pendingMessagesMap[channelId]) {
-    pendingMessagesMap[channelId].push(pendingMessage)
+
+export const setPendingMessage = (channelId: string, pendingMessage: IMessage) => {
+  const pendingMessages = getPendingMessages(channelId)
+  if (pendingMessages && pendingMessages?.length) {
+    if (!pendingMessages?.find((msg: IMessage) => msg.tid === pendingMessage.tid)) {
+      pendingMessages.push(pendingMessage)
+    }
   } else {
     pendingMessagesMap[channelId] = [pendingMessage]
   }
 }
 
-export const setPendingMessages = (channelId: string, pendingMessages: any) => {
-  pendingMessagesMap[channelId] = pendingMessages
-}
 export const getPendingMessagesMap = () => pendingMessagesMap
 
 export const draftMessagesMap: draftMessagesMap = {}

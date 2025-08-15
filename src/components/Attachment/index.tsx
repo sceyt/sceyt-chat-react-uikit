@@ -354,7 +354,7 @@ const Attachment = ({
     ) {
       getAttachmentUrlFromCache(attachment.url)
         .then(async (cachedUrl) => {
-          if (attachment.type === 'image' && !isPreview) {
+          if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
               // @ts-ignore
               // downloadImage(cachedUrl)
@@ -419,10 +419,8 @@ const Attachment = ({
               },
               messageType
             ).then(async (url) => {
-              // if (attachment.type === attachmentTypes.video) {
               const response = await fetch(url)
               setAttachmentToCache(attachment.url, response)
-              // }
               setAttachmentUrl(url)
               setDownloadingFile(false)
             })
@@ -477,7 +475,7 @@ const Attachment = ({
 
   return (
     <React.Fragment>
-      {attachment.type === 'image' ? (
+      {attachment.type === attachmentTypes.image ? (
         <AttachmentImgCont
           draggable={false}
           onClick={() =>
@@ -605,7 +603,7 @@ const Attachment = ({
             />
           )}
         </AttachmentImgCont>
-      ) : attachment.type === 'video' ? (
+      ) : attachment.type === attachmentTypes.video ? (
         <React.Fragment>
           {!isPreview ? (
             <VideoCont
@@ -772,7 +770,7 @@ const Attachment = ({
           ) : (
             // <FileThumbnail src={base64ToToDataURL(attachment.metadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
-              {previewFileType && previewFileType === 'video' ? (
+              {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
                   file={attachment}
                   backgroundColor={

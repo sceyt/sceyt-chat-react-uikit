@@ -55,6 +55,7 @@ import {
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
   getHasNextCached,
+  getMessageFromPendingMessagesMap,
   getMessagesFromMap,
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
@@ -831,10 +832,13 @@ export default function* watchForEvents(): any {
           const markersMap: any = {}
           const activeChannelMessages = getMessagesFromMap(activeChannelId)
           markerList.messageIds.forEach((messageId: string) => {
-            if (activeChannelMessages.find((message: IMessage) => message.id === messageId)) {
+            if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
               removePendingMessageFromMap(activeChannelId, messageId)
             } else {
-              updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+              const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
+              if (isPendingMessage) {
+                updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+              }
             }
             markersMap[messageId] = true
             if (channel) {

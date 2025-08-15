@@ -1300,10 +1300,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      const pendingMessagesMap = getPendingMessagesMap()
+      const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
       setTimeout(() => {
-        const pendingMessagesMap = getPendingMessagesMap()
-        Object.keys(pendingMessagesMap).forEach((key: any) => {
-          pendingMessagesMap[key].forEach((msg: IMessage) => {
+        Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
+          pendingMessagesMapCopy[key].forEach((msg: IMessage) => {
             dispatch(resendMessageAC(msg, key, connectionStatus))
           })
         })
