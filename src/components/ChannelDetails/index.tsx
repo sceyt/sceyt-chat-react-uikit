@@ -199,7 +199,9 @@ const Details = ({
         : activeChannel.memberCount > 1
           ? 'members'
           : 'member')
-  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const directChannelUser =
+    isDirectChannel &&
+    (activeChannel.members.find((member: IMember) => member.id !== user.id) || activeChannel?.members?.[0])
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
     // setCloseMenu(true)
@@ -346,7 +348,7 @@ const Details = ({
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {showPhoneNumber
-                    ? `+${directChannelUser.id}`
+                    ? `+${directChannelUser?.id}`
                     : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                       ? ''
                       : directChannelUser &&

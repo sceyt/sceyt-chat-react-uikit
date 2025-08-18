@@ -447,7 +447,7 @@ const Message = ({
         setMessageToVisibleMessagesMap(message)
       }
 
-      if (scrollToNewMessage.scrollToBottom && (message.id === channel.lastMessage.id || !message.id)) {
+      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
         dispatch(scrollToNewMessageAC(false, false, false))
         dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }

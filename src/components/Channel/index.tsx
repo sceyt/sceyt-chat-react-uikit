@@ -289,7 +289,8 @@ const Channel: React.FC<IChannelProps> = ({
   const activeChannel = useSelector(activeChannelSelector) || {}
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && channel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel && (channel.metadata?.s || (channel.members.length === 1 && channel.members[0].id === user.id))
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
@@ -463,7 +464,7 @@ const Channel: React.FC<IChannelProps> = ({
           {channel.subject ||
             (isDirectChannel && directChannelUser
               ? makeUsername(contactsMap && contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-              : channel.metadata?.s
+              : isSelfChannel
                 ? 'Me'
                 : '')}
         </h3>
