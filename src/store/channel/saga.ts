@@ -103,7 +103,7 @@ import store from 'store'
 function* createChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channelData, dontCreateIfNotExists } = payload
+    const { channelData, dontCreateIfNotExists, callback } = payload
     const SceytChatClient = getClient()
     const createChannelData = { ...channelData }
     if (createChannelData.avatarFile) {
@@ -194,7 +194,10 @@ function* createChannel(action: IAction): any {
       }
     }
     yield put(
-      switchChannelActionAC(JSON.parse(JSON.stringify({ ...createdChannel, isLinkedChannel: dontCreateIfNotExists })))
+      switchChannelActionAC(
+        JSON.parse(JSON.stringify({ ...createdChannel, isLinkedChannel: dontCreateIfNotExists })),
+        !callback
+      )
     )
     if (dontCreateIfNotExists) {
       if (!channelIsExistOnAllChannels) {
@@ -222,7 +225,11 @@ function* createChannel(action: IAction): any {
         addChannelToAllChannels(createdChannel)
       }
     }
-    yield call(setActiveChannelId, createdChannel.id)
+    if (callback) {
+      callback(createdChannel)
+    } else {
+      yield call(setActiveChannelId, createdChannel.id)
+    }
   } catch (e) {
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
@@ -791,9 +798,9 @@ function* markMessagesDelivered(action: IAction): any {
 function* switchChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channel } = payload
+    const { channel, updateActiveChannel } = payload
     let channelToSwitch = channel
-    if (!channel?.id) {
+    if (!channel?.id && updateActiveChannel) {
       yield call(setActiveChannelId, '')
       yield put(setActiveChannelAC({}))
       return
@@ -817,14 +824,15 @@ function* switchChannel(action: IAction): any {
       const channelFromMap = getChannelFromMap(channel.id)
       channelToSwitch = { ...channelToSwitch, ...channelFromMap }
     }
-
-    const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-    yield call(setUnreadScrollTo, true)
-    yield call(setActiveChannelId, channel && channel.id)
-    if (channel.isLinkedChannel) {
-      channelToSwitch.linkedFrom = currentActiveChannel
+    if (updateActiveChannel) {
+      const currentActiveChannel = getChannelFromMap(getActiveChannelId())
+      yield call(setUnreadScrollTo, true)
+      yield call(setActiveChannelId, channel && channel.id)
+      if (channel.isLinkedChannel) {
+        channelToSwitch.linkedFrom = currentActiveChannel
+      }
+      yield put(setActiveChannelAC({ ...channelToSwitch }))
     }
-    yield put(setActiveChannelAC({ ...channelToSwitch }))
     // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());

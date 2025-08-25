@@ -4,6 +4,7 @@ import {
   DELETE_REACTION,
   EDIT_MESSAGE,
   FORWARD_MESSAGE,
+  GET_MESSAGE,
   GET_MESSAGES,
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
@@ -128,6 +129,13 @@ export function getMessagesAC(
   return {
     type: GET_MESSAGES,
     payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight }
+  }
+}
+
+export function getMessageAC(channelId: string, messageId?: string, limit?: number) {
+  return {
+    type: GET_MESSAGE,
+    payload: { channelId, messageId, limit }
   }
 }
 

@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import React, { useEffect, useMemo, useRef } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch } from 'store/hooks'
 // Store
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../../store/user/constants'

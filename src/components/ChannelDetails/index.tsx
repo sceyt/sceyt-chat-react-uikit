@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'

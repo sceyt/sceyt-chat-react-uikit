@@ -7,7 +7,7 @@ import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/avatar.svg
 import { generateAvatarColor } from '../../UIHelper'
 import { useColor } from '../../hooks'
 import { THEME_COLORS } from '../../UIHelper/constants'
-import { useSelector } from 'react-redux'
+import { useSelector } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
 
 interface IProps {

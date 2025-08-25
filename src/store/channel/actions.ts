@@ -70,9 +70,13 @@ import {
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 
 // Action creators that now use Redux Toolkit actions
-export const createChannelAC = (channelData: ICreateChannel, dontCreateIfNotExists?: boolean) => ({
+export const createChannelAC = (
+  channelData: ICreateChannel,
+  dontCreateIfNotExists?: boolean,
+  callback?: (channel: IChannel) => void
+) => ({
   type: CREATE_CHANNEL,
-  payload: { channelData, dontCreateIfNotExists }
+  payload: { channelData, dontCreateIfNotExists, callback }
 })
 
 export const getChannelsAC = (params: ChannelQueryParams, isJoinChannel?: boolean) => ({
@@ -163,9 +167,9 @@ export const setChannelsAC = (channels: IChannel[]) => setChannels({ channels })
 
 export const setActiveChannelAC = (channel: IChannel | {}) => setActiveChannel({ channel })
 
-export const switchChannelActionAC = (channel: IChannel | null) => ({
+export const switchChannelActionAC = (channel: IChannel | null, updateActiveChannel = true) => ({
   type: SWITCH_CHANNEL,
-  payload: { channel }
+  payload: { channel, updateActiveChannel }
 })
 
 export const updateChannelAC = (channelId: string, config: any) => ({

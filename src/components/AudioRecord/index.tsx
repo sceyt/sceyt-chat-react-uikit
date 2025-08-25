@@ -14,7 +14,7 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
-import { useDispatch } from 'react-redux'
+import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
 interface AudioPlayerProps {

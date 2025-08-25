@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import React, { useCallback, useEffect } from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'

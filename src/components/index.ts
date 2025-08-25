@@ -17,6 +17,12 @@ import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
+import {
+  createOrGetDirectChannel,
+  switchChannelActiveChannel,
+  handleSendMessage,
+  handleGetMessage
+} from 'helpers/methods'
 
 export {
   SceytChat,
@@ -39,7 +45,11 @@ export {
   FrequentlyEmojis,
   SceytChatUIKitTheme,
   ThemeMode,
-  THEME_COLORS
+  THEME_COLORS,
+  handleSendMessage,
+  handleGetMessage,
+  createOrGetDirectChannel,
+  switchChannelActiveChannel
 }
 
 declare global {

@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 // import { CHANNEL_TYPE } from '../../helpers/constants'
 import { IChannel, IMember, IUser } from '../../types'
 import { updateUserStatusOnChannelAC } from '../../store/channel/actions'

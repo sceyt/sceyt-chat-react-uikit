@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Hooks
 import usePermissions from '../../../hooks/usePermissions'

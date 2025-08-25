@@ -8,7 +8,7 @@ import {
   searchChannelsForForwardAC,
   setSearchedChannelsForForwardAC
 } from '../../../store/channel/actions'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import {
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,

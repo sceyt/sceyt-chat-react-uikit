@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
@@ -57,7 +58,7 @@ const Files = ({
   } = useColor()
 
   const dispatch = useDispatch()
-  const [downloadingFilesMap, setDownloadingFilesMap] = useState({})
+  const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const nameSizeNum = fileNameFontSize && Number(fileNameFontSize.slice(0, -2))
   const nameMaxLength = nameSizeNum ? 32 - (nameSizeNum - 15) * (nameSizeNum < 20 ? 2 : 1) : 32
@@ -133,7 +134,7 @@ const Files = ({
                 </FileSizeAndDate>
               </div>
               <DownloadWrapper
-                visible={downloadingFilesMap[file.id!]}
+                visible={!!downloadingFilesMap[file.id!]}
                 iconColor={accentColor}
                 onClick={() => handleDownloadFile(file)}
               >

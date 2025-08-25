@@ -30,4 +30,7 @@ const store = configureStore({
 
 sagaMiddleware.run(rootSaga)
 
+export type SceytChatState = ReturnType<typeof store.getState>
+export type SceytChatDispatch = typeof store.dispatch
+
 export default store

@@ -4,6 +4,7 @@ import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
+import { SceytReduxContext } from 'store/context'
 export interface IProgress {
   loaded: number
   total: number
@@ -136,7 +137,7 @@ const SceytChatContainer = ({
   }, [])
 
   return (
-    <Provider store={store}>
+    <Provider store={store} context={SceytReduxContext}>
       <SceytChat
         client={client}
         theme={theme}

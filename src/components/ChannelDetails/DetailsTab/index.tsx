@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { useDispatch } from 'react-redux'
+import { useDispatch } from 'store/hooks'
 // Store
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers

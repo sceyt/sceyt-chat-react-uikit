@@ -19,7 +19,7 @@ import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
-import { useSelector } from 'react-redux'
+import { useSelector } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'

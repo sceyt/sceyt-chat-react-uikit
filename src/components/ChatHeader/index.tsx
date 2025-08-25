@@ -9,7 +9,8 @@ import {
 } from '../../store/channel/selector'
 import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 // Assets
 import { ReactComponent as InfoIconD } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'

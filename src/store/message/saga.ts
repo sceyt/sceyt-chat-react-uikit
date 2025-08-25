@@ -6,6 +6,7 @@ import {
   DELETE_REACTION,
   EDIT_MESSAGE,
   FORWARD_MESSAGE,
+  GET_MESSAGE,
   GET_MESSAGES,
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
@@ -592,7 +593,8 @@ function* sendTextMessage(action: IAction): any {
         metadata: messageResponse.metadata,
         parentMessage: messageResponse.parentMessage,
         repliedInThread: messageResponse.repliedInThread,
-        createdAt: messageResponse.createdAt
+        createdAt: messageResponse.createdAt,
+        channelId: channel.id
       }
       yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
       updateMessageOnMap(channel.id, {
@@ -1329,6 +1331,23 @@ function* getMessagesQuery(action: IAction): any {
   }
 }
 
+function* getMessageQuery(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, messageId } = payload
+    const channel = yield call(getChannelFromMap, channelId)
+    const messages = yield call(channel.getMessagesById, [messageId])
+    yield put(updateMessageAC(messageId, messages[0]))
+    updateMessageOnMap(channel.id, {
+      messageId,
+      params: messages[0]
+    })
+    updateMessageOnAllMessages(messageId, messages[0])
+    yield put(setScrollToMessagesAC(messageId, false))
+  } catch (e) {
+    log.error('error in message query', e)
+  }
+}
 function* loadMoreMessages(action: IAction): any {
   try {
     const { payload } = action
@@ -1615,6 +1634,7 @@ export default function* MessageSaga() {
   yield takeLatest(EDIT_MESSAGE, editMessage)
   yield takeEvery(DELETE_MESSAGE, deleteMessage)
   yield takeLatest(GET_MESSAGES, getMessagesQuery)
+  yield takeLatest(GET_MESSAGE, getMessageQuery)
   yield takeLatest(GET_MESSAGES_ATTACHMENTS, getMessageAttachments)
   yield takeLatest(LOAD_MORE_MESSAGES_ATTACHMENTS, loadMoreMessageAttachments)
   yield takeLatest(ADD_REACTION, addReaction)

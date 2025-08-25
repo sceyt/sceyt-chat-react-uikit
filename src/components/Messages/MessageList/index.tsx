@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import React, { useRef, useEffect, useState, FC, useCallback } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useDispatch, useSelector } from 'store/hooks'
 import moment from 'moment'
 // Store
 import {

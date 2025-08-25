@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { Button, CustomInput, Label, PopupFooter } from '../../../../UIHelper'
