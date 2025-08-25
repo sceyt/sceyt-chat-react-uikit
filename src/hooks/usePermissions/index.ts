@@ -1,4 +1,5 @@
-import { shallowEqual, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector } from 'store/hooks'
 import { rolesMapSelector } from '../../store/member/selector'
 
 export default function usePermissions(myRole: string) {

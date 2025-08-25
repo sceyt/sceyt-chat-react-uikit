@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 // Store
 import { getAttachmentsAC, setAttachmentsAC } from '../../../../store/message/actions'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'

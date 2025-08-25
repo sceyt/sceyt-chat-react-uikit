@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC } from 'react'
+import React, { FC, useMemo } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -26,6 +26,7 @@ import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import log from 'loglevel'
+import { OGMetadata } from '../OGMetadata'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -291,62 +292,113 @@ const MessageBody = ({
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const messageUserID = message.user ? message.user.id : 'deleted'
-  const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
-  const nextMessageUserID = nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null
-  const current = moment(message.createdAt).startOf('day')
-  const firstMessageInInterval =
-    !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system' ||
-    unreadMessageId === prevMessage.id
-  const lastMessageInInterval =
-    !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-    nextMessage.type === 'system'
-  const messageTimeVisible = showMessageTime && (showMessageTimeForEachMessage || !nextMessage)
-  const messageStatusVisible =
-    !message.incoming &&
-    showMessageStatus &&
-    message.state !== MESSAGE_STATUS.DELETE &&
-    (showMessageStatusForEachMessage || !nextMessage)
+  const prevMessageUserID = useMemo(
+    () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
+    [prevMessage]
+  )
+  const nextMessageUserID = useMemo(
+    () => (nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null),
+    [nextMessage]
+  )
+  const current = useMemo(() => moment(message.createdAt).startOf('day'), [message.createdAt])
+  const firstMessageInInterval = useMemo(
+    () =>
+      !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
+      prevMessage?.type === 'system' ||
+      unreadMessageId === prevMessage.id,
+    [prevMessage, current, unreadMessageId]
+  )
+  const lastMessageInInterval = useMemo(
+    () =>
+      !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
+      nextMessage.type === 'system',
+    [nextMessage, current]
+  )
+  const messageTimeVisible = useMemo(
+    () => showMessageTime && (showMessageTimeForEachMessage || !nextMessage),
+    [showMessageTime, showMessageTimeForEachMessage, nextMessage]
+  )
+  const messageStatusVisible = useMemo(
+    () =>
+      !message.incoming &&
+      showMessageStatus &&
+      message.state !== MESSAGE_STATUS.DELETE &&
+      (showMessageStatusForEachMessage || !nextMessage),
+    [message.incoming, showMessageStatus, message.state, showMessageStatusForEachMessage, nextMessage]
+  )
+  const withAttachments = useMemo(() => message.attachments && message.attachments.length > 0, [message.attachments])
+  const notLinkAttachment = useMemo(
+    () => withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link),
+    [withAttachments, message.attachments]
+  )
 
-  const withAttachments = message.attachments && message.attachments.length > 0
-  const notLinkAttachment =
-    withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link)
-
+  const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
-  const mediaAttachment =
-    withAttachments &&
-    message.attachments.find(
-      (attachment: IAttachment) =>
-        attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image
-    )
-  const withMediaAttachment = !!mediaAttachment
-  const attachmentMetas =
-    mediaAttachment &&
-    (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata)
+  const mediaAttachment = useMemo(
+    () =>
+      withAttachments &&
+      message.attachments.find(
+        (attachment: IAttachment) =>
+          attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image,
+        [withAttachments, message.attachments]
+      ),
+    [withAttachments, message.attachments]
+  )
+  const withMediaAttachment = useMemo(() => !!mediaAttachment, [mediaAttachment])
+  const attachmentMetas = useMemo(
+    () =>
+      mediaAttachment &&
+      (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata),
+    [mediaAttachment]
+  )
 
-  const borderRadius =
-    message.incoming && incomingMessageStyles?.background === 'inherit'
-      ? '0px'
-      : !message.incoming && outgoingMessageStyles?.background === 'inherit'
+  const borderRadius = useMemo(
+    () =>
+      message.incoming && incomingMessageStyles?.background === 'inherit'
         ? '0px'
-        : !message.incoming && ownMessageOnRightSide
-          ? prevMessageUserID !== messageUserID || firstMessageInInterval
-            ? '16px 16px 4px 16px'
-            : nextMessageUserID !== messageUserID || lastMessageInInterval
-              ? '16px 4px 16px 16px'
-              : '16px 4px 4px 16px'
-          : prevMessageUserID !== messageUserID || firstMessageInInterval
-            ? '16px 16px 16px 4px'
-            : nextMessageUserID !== messageUserID || lastMessageInInterval
-              ? '4px 16px 16px 16px'
-              : '4px 16px 16px 4px'
-
-  const showMessageSenderName =
-    (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
-    (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
-    (message.incoming || showSenderNameOnOwnMessages)
-
-  const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
+        : !message.incoming && outgoingMessageStyles?.background === 'inherit'
+          ? '0px'
+          : !message.incoming && ownMessageOnRightSide
+            ? prevMessageUserID !== messageUserID || firstMessageInInterval
+              ? '16px 16px 4px 16px'
+              : nextMessageUserID !== messageUserID || lastMessageInInterval
+                ? '16px 4px 16px 16px'
+                : '16px 4px 4px 16px'
+            : prevMessageUserID !== messageUserID || firstMessageInInterval
+              ? '16px 16px 16px 4px'
+              : nextMessageUserID !== messageUserID || lastMessageInInterval
+                ? '4px 16px 16px 16px'
+                : '4px 16px 16px 4px',
+    [
+      message.incoming,
+      incomingMessageStyles?.background,
+      outgoingMessageStyles?.background,
+      prevMessageUserID,
+      messageUserID,
+      firstMessageInInterval,
+      nextMessageUserID,
+      lastMessageInInterval,
+      ownMessageOnRightSide
+    ]
+  )
+  const showMessageSenderName = useMemo(
+    () =>
+      (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+      (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
+      (message.incoming || showSenderNameOnOwnMessages),
+    [
+      isUnreadMessage,
+      prevMessageUserID,
+      messageUserID,
+      firstMessageInInterval,
+      channel.type,
+      showSenderNameOnDirectChannel,
+      showSenderNameOnGroupChannel,
+      message.incoming,
+      showSenderNameOnOwnMessages
+    ]
+  )
+  const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
 
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     log.info('remove attachment .. ', attachmentId)
@@ -577,6 +629,7 @@ const MessageBody = ({
         incoming={message.incoming}
         linkColor={linkColor}
       >
+        {linkAttachment && <OGMetadata attachments={[linkAttachment]} state={message.state} />}
         <span ref={messageTextRef}>
           {MessageTextFormat({
             text: message.body,

@@ -1,6 +1,4 @@
 import React, { FC } from 'react'
-import { useSelector } from 'react-redux'
-import { activeChannelMessagesSelector } from '../../store/message/selector'
 import MessageList from './MessageList'
 import { IAttachment, IChannel, IMessage, IUser } from '../../types'
 import { IAttachmentProperties, IMessageStyles } from '../Message/Message.types'
@@ -314,11 +312,9 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   hiddenMessagesProperties = [],
   shouldOpenUserProfileForMention
 }) => {
-  const messages = useSelector(activeChannelMessagesSelector) || []
   return (
     <React.Fragment>
       <MessageList
-        messages={messages}
         fontFamily={fontFamily}
         ownMessageOnRightSide={ownMessageOnRightSide}
         messageWidthPercent={messageWidthPercent}

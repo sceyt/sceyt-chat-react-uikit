@@ -1,25 +1,13 @@
-import {
-  ADD_MEMBERS_TO_LIST,
-  CLEAR_MEMBERS,
-  GET_ROLES_FAIL,
-  GET_ROLES_SUCCESS,
-  REMOVE_MEMBER_FROM_LIST,
-  SET_MEMBERS_LOADING_STATE,
-  SET_MEMBERS_TO_LIST,
-  UPDATE_MEMBERS,
-  UPDATE_MEMBERS_PRESENCE
-} from './constants'
-import { DESTROY_SESSION } from '../channel/constants'
-import { IAction, IMember, IRole } from '../../types'
-import log from 'loglevel'
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { IMember, IRole, IUser } from '../../types'
 
 export interface IMembersStore {
   membersLoadingState: boolean
   membersHasNext: boolean
-  roles: IRole[] | []
+  roles: IRole[]
   rolesMap: { [key: string]: IRole }
   getRolesFail: { attempts: number; timeout: number } | undefined
-  activeChannelMembers: IMember[] | []
+  activeChannelMembers: IMember[]
 }
 
 const initialState: IMembersStore = {
@@ -31,107 +19,107 @@ const initialState: IMembersStore = {
   rolesMap: {}
 }
 
-export default (state = initialState, { type, payload }: IAction) => {
-  let newState = { ...state }
+const memberSlice = createSlice({
+  name: 'members',
+  initialState,
+  reducers: {
+    setMembersToList: (state, action: PayloadAction<{ members: IMember[] }>) => {
+      const { members } = action.payload
+      state.activeChannelMembers = [...members]
+    },
 
-  switch (type) {
-    case SET_MEMBERS_TO_LIST: {
-      const { members } = payload
-      newState.activeChannelMembers = [...members]
-      return newState
-    }
-    case ADD_MEMBERS_TO_LIST: {
-      const { members } = payload
-      newState.activeChannelMembers = [...newState.activeChannelMembers, ...members]
-      return newState
-    }
-    case UPDATE_MEMBERS: {
-      const { members } = payload
-      log.info('UPDATE_MEMBERS . ... .. ', members)
-      let updateMembers: any = []
-      const membersCopy = [...newState.activeChannelMembers]
+    addMembersToList: (state, action: PayloadAction<{ members: IMember[] }>) => {
+      const { members } = action.payload
+      state.activeChannelMembers.push(...members)
+    },
+
+    updateMembers: (state, action: PayloadAction<{ members: IMember[] }>) => {
+      const { members } = action.payload
+
       if (members.length) {
-        const updatedMembersMap: any = {}
+        const updatedMembersMap: { [key: string]: IMember } = {}
         for (let i = 0; i < members.length; i++) {
           updatedMembersMap[members[i].id] = members[i]
         }
-        updateMembers = membersCopy.map((member) => {
+
+        state.activeChannelMembers = state.activeChannelMembers.map((member) => {
           if (updatedMembersMap[member.id]) {
             return updatedMembersMap[member.id]
           }
           return member
         })
-        newState.activeChannelMembers = updateMembers
       }
-      return newState
-    }
-    case UPDATE_MEMBERS_PRESENCE: {
-      const { usersMap } = payload
-      log.info('UPDATE_MEMBERS_PRESENCE . ... .. ', usersMap)
-      let updateMembers: any = []
-      if (newState.activeChannelMembers.length) {
-        const membersCopy = [...newState.activeChannelMembers]
-        updateMembers = membersCopy.map((member: IMember) => {
+    },
+
+    updateMembersPresence: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
+      const { usersMap } = action.payload
+      if (state.activeChannelMembers.length) {
+        state.activeChannelMembers = state.activeChannelMembers.map((member: IMember) => {
           if (usersMap[member.id]) {
             return { ...member, ...usersMap[member.id] }
           }
           return member
         })
-        newState.activeChannelMembers = updateMembers
       }
-      return newState
-    }
+    },
 
-    case CLEAR_MEMBERS: {
-      newState.activeChannelMembers = []
-      return newState
-    }
+    clearMembers: (state) => {
+      state.activeChannelMembers = []
+    },
 
-    case REMOVE_MEMBER_FROM_LIST: {
-      const { members } = payload
+    removeMemberFromList: (state, action: PayloadAction<{ members: IMember[] }>) => {
+      const { members } = action.payload
       if (members.length) {
-        let updateMembers: any = []
-        const membersCopy = [...newState.activeChannelMembers]
-        const removedMembersMap: any = {}
+        const removedMembersMap: { [key: string]: IMember } = {}
         for (let i = 0; i < members.length; i++) {
           removedMembersMap[members[i].id] = members[i]
         }
-        updateMembers = membersCopy.filter((member) => !removedMembersMap[member.id])
-        newState.activeChannelMembers = updateMembers
+        state.activeChannelMembers = state.activeChannelMembers.filter((member) => !removedMembersMap[member.id])
       }
-      return newState
-    }
+    },
 
-    case SET_MEMBERS_LOADING_STATE: {
-      newState.membersLoadingState = payload.state
-      return newState
-    }
+    setMembersLoadingState: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.membersLoadingState = action.payload.state
+    },
 
-    case GET_ROLES_SUCCESS: {
-      const { roles } = payload
+    getRolesSuccess: (state, action: PayloadAction<{ roles: IRole[] }>) => {
+      const { roles } = action.payload
       const rolesMap: { [key: string]: IRole } = {}
       roles.forEach((role: IRole) => {
         rolesMap[role.name] = role
       })
-      newState.rolesMap = rolesMap
-      newState.roles = roles
-      return newState
-    }
-    case GET_ROLES_FAIL: {
-      const { attempts, timeout } = payload
-      if (attempts || timeout) {
-        newState.getRolesFail = { attempts, timeout }
-      } else {
-        newState.getRolesFail = undefined
-      }
-      return newState
-    }
+      state.rolesMap = rolesMap
+      state.roles = roles
+    },
 
-    case DESTROY_SESSION: {
-      newState = initialState
-      return newState
+    getRolesFail: (state, action: PayloadAction<{ attempts?: number; timeout?: number }>) => {
+      const { attempts, timeout } = action.payload
+      if (attempts || timeout) {
+        state.getRolesFail = { attempts: attempts || 0, timeout: timeout || 0 }
+      } else {
+        state.getRolesFail = undefined
+      }
     }
-    default:
-      return state
+  },
+  extraReducers: (builder) => {
+    builder.addCase('DESTROY_SESSION', () => {
+      return initialState
+    })
   }
-}
+})
+
+// Export actions
+export const {
+  setMembersToList,
+  addMembersToList,
+  updateMembers,
+  updateMembersPresence,
+  clearMembers,
+  removeMemberFromList,
+  setMembersLoadingState,
+  getRolesSuccess,
+  getRolesFail
+} = memberSlice.actions
+
+// Export reducer
+export default memberSlice.reducer

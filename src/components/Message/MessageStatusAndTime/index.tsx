@@ -126,7 +126,8 @@ export default React.memo(MessageStatusAndTime, (prevProps, nextProps) => {
     prevProps.ownMessageOnRightSide === nextProps.ownMessageOnRightSide &&
     prevProps.bottomOfMessage === nextProps.bottomOfMessage &&
     prevProps.marginBottom === nextProps.marginBottom &&
-    prevProps.messageTimeColorOnAttachment === nextProps.messageTimeColorOnAttachment
+    prevProps.messageTimeColorOnAttachment === nextProps.messageTimeColorOnAttachment &&
+    prevProps.withAttachment === nextProps.withAttachment
   )
 })
 
@@ -170,7 +171,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   border-radius: 16px;
   padding: ${(props) => props.withAttachment && '4px 6px'};
   background-color: ${(props) =>
-    props.withAttachment && !props.fileAttachment && `${props.messageTimeBackgroundColor}40`};
+    props.withAttachment && !props.fileAttachment && `${props.messageTimeBackgroundColor}66`};
   float: right;
   line-height: ${(props) => props.lineHeight || '14px'};
   margin-right: ${(props) => props.rtlDirection && 'auto'};

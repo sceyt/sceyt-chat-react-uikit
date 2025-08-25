@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
 // Store
 import {
@@ -13,9 +14,10 @@ import {
   forwardMessageAC,
   removeSelectedMessageAC,
   resendMessageAC,
-  // resendMessageAC,
+  scrollToNewMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
+  setMessagesLoadingStateAC,
   setMessageToEditAC
 } from 'store/message/actions'
 import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
@@ -33,7 +35,7 @@ import {
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction } from 'types'
 // Components
@@ -44,7 +46,7 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
-import log from 'loglevel'
+import { scrollToNewMessageSelector } from 'store/message/selector'
 
 const Message = ({
   message,
@@ -199,6 +201,8 @@ const Message = ({
   const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount =
@@ -310,7 +314,7 @@ const Message = ({
   }
 
   const handleToggleReactionsPopup = () => {
-    const reactionsContainer = document.getElementById(`${message.id}_reactions_container}`)
+    const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
     const reactionsContPos = reactionsContainer && reactionsContainer.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
     const offsetBottom = window.innerHeight - bottomPos
@@ -383,7 +387,6 @@ const Message = ({
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
-      log.info('send displayed marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -443,6 +446,11 @@ const Message = ({
       handleSendReadMarker()
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
+      }
+
+      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+        dispatch(scrollToNewMessageAC(false, false, false))
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
       if (!channel.isLinkedChannel) {
@@ -573,34 +581,6 @@ const Message = ({
         {message.state === MESSAGE_STATUS.FAILED && (
           <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
             <ErrorIconWrapper />
-            {/* <DropDown
-              // forceClose={showChooseAttachmentType}
-              position={nextMessage ? 'right' : 'topRight'}
-              trigger={<ErrorIconWrapper />}
-            >
-              <DropdownOptionsUl>
-                <DropdownOptionLi
-                  key={1}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleResendMessage()}
-                  iconWidth='20px'
-                >
-                  <ResendIcon />
-                  Resend
-                </DropdownOptionLi>
-                <DropdownOptionLi
-                  key={2}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleDeleteFailedMessage()}
-                  iconWidth='20px'
-                >
-                  <DeleteIconWrapper />
-                  Delete
-                </DropdownOptionLi>
-              </DropdownOptionsUl>
-            </DropDown> */}
           </FailedMessageIcon>
         )}
         {CustomMessageItem ? (
@@ -901,6 +881,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.body === nextProps.message.body &&
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
+    prevProps.message.metadata === nextProps.message.metadata &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
@@ -908,7 +889,6 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
     prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.tabIsActive === nextProps.tabIsActive &&
     prevProps.theme === nextProps.theme
   )
 })

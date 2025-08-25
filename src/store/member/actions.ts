@@ -1,137 +1,86 @@
+// Import Redux Toolkit actions from the slice
+import {
+  setMembersToList,
+  addMembersToList,
+  updateMembers,
+  updateMembersPresence,
+  clearMembers,
+  removeMemberFromList,
+  setMembersLoadingState,
+  getRolesSuccess,
+  getRolesFail
+} from './reducers'
+
+// Import saga action constants
 import {
   ADD_MEMBERS,
-  ADD_MEMBERS_TO_LIST,
   BLOCK_MEMBER,
-  CLEAR_MEMBERS,
   GET_MEMBERS,
   KICK_MEMBER,
   LOAD_MORE_MEMBERS,
-  REMOVE_MEMBER_FROM_LIST,
-  SET_MEMBERS_LOADING_STATE,
-  UPDATE_MEMBERS,
   CHANGE_MEMBER_ROLE,
   REPORT_MEMBER,
-  GET_ROLES,
-  GET_ROLES_SUCCESS,
-  SET_MEMBERS_TO_LIST,
-  UPDATE_MEMBERS_PRESENCE,
-  GET_ROLES_FAIL
+  GET_ROLES
 } from './constants'
+
 import { IAddMember, IMember, IRole, IUser } from '../../types'
 
-export function getMembersAC(channelId: string) {
-  return {
-    type: GET_MEMBERS,
-    payload: { channelId }
-  }
-}
+// Saga action creators (keep for async operations)
+export const getMembersAC = (channelId: string) => ({
+  type: GET_MEMBERS,
+  payload: { channelId }
+})
 
-export function setMembersToListAC(members: IMember[]) {
-  return {
-    type: SET_MEMBERS_TO_LIST,
-    payload: { members }
-  }
-}
+export const loadMoreMembersAC = (limit: number, channelId: string) => ({
+  type: LOAD_MORE_MEMBERS,
+  payload: { limit, channelId }
+})
 
-export function addMembersToListAC(members: IMember[]) {
-  return {
-    type: ADD_MEMBERS_TO_LIST,
-    payload: { members }
-  }
-}
+export const addMembersAC = (channelId: string, members: IAddMember[]) => ({
+  type: ADD_MEMBERS,
+  payload: { channelId, members }
+})
 
-export function updateMembersAC(members: IMember[]) {
-  return {
-    type: UPDATE_MEMBERS,
-    payload: { members }
-  }
-}
+export const kickMemberAC = (channelId: string, memberId: string) => ({
+  type: KICK_MEMBER,
+  payload: { channelId, memberId }
+})
 
-export function updateMembersPresenceAC(usersMap: { [key: string]: IUser }) {
-  return {
-    type: UPDATE_MEMBERS_PRESENCE,
-    payload: { usersMap }
-  }
-}
+export const blockMemberAC = (channelId: string, memberId: string) => ({
+  type: BLOCK_MEMBER,
+  payload: { channelId, memberId }
+})
 
-export function loadMoreMembersAC(limit: number, channelId: string) {
-  return {
-    type: LOAD_MORE_MEMBERS,
-    payload: { limit, channelId }
-  }
-}
+export const reportUserAC = (reportData: any) => ({
+  type: REPORT_MEMBER,
+  payload: { reportData }
+})
 
-export function setMembersLoadingStateAC(state: number) {
-  return {
-    type: SET_MEMBERS_LOADING_STATE,
-    payload: { state }
-  }
-}
+export const getRolesAC = (timeout?: number, attempts?: number) => ({
+  type: GET_ROLES,
+  payload: { timeout, attempts }
+})
 
-export function clearMembersAC() {
-  return {
-    type: CLEAR_MEMBERS
-  }
-}
+export const changeMemberRoleAC = (channelId: string, members: IMember[]) => ({
+  type: CHANGE_MEMBER_ROLE,
+  payload: { channelId, members }
+})
 
-export function addMembersAC(channelId: string, members: IAddMember[]) {
-  return {
-    type: ADD_MEMBERS,
-    payload: { channelId, members }
-  }
-}
+// Action creators that now use Redux Toolkit actions
+export const setMembersToListAC = (members: IMember[]) => setMembersToList({ members })
 
-export function kickMemberAC(channelId: string, memberId: string) {
-  return {
-    type: KICK_MEMBER,
-    payload: { channelId, memberId }
-  }
-}
+export const addMembersToListAC = (members: IMember[]) => addMembersToList({ members })
 
-export function blockMemberAC(channelId: string, memberId: string) {
-  return {
-    type: BLOCK_MEMBER,
-    payload: { channelId, memberId }
-  }
-}
+export const updateMembersAC = (members: IMember[]) => updateMembers({ members })
 
-export function reportUserAC(reportData: any) {
-  return {
-    type: REPORT_MEMBER,
-    payload: { reportData }
-  }
-}
+export const updateMembersPresenceAC = (usersMap: { [key: string]: IUser }) => updateMembersPresence({ usersMap })
 
-export function removeMemberFromListAC(members: IMember[]) {
-  return {
-    type: REMOVE_MEMBER_FROM_LIST,
-    payload: { members }
-  }
-}
+export const setMembersLoadingStateAC = (state: number) => setMembersLoadingState({ state: !!state })
 
-export function getRolesAC(timeout?: number, attempts?: number) {
-  return {
-    type: GET_ROLES,
-    payload: { timeout, attempts }
-  }
-}
-export function getRolesFailAC(timeout?: number, attempts?: number) {
-  return {
-    type: GET_ROLES_FAIL,
-    payload: { timeout, attempts }
-  }
-}
+export const clearMembersAC = () => clearMembers()
 
-export function getRolesSuccess(roles: IRole[]) {
-  return {
-    type: GET_ROLES_SUCCESS,
-    payload: { roles }
-  }
-}
+export const removeMemberFromListAC = (members: IMember[]) => removeMemberFromList({ members })
 
-export function changeMemberRoleAC(channelId: string, members: IMember[]) {
-  return {
-    type: CHANGE_MEMBER_ROLE,
-    payload: { channelId, members }
-  }
-}
+export const getRolesSuccessAC = (roles: IRole[]) => getRolesSuccess({ roles })
+
+export const getRolesFailAC = (timeout?: number, attempts?: number) => getRolesFail({ timeout, attempts })
