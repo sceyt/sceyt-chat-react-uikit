@@ -18,7 +18,7 @@ export const createOrGetDirectChannel = async (user?: any, callback?: (channel: 
             }
           ]
         },
-        true,
+        false,
         callback
       )
     )
