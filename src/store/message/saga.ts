@@ -521,6 +521,8 @@ function* sendTextMessage(action: IAction): any {
   }
 
   let sendMessageTid
+  const activeChannelId = getActiveChannelId()
+
   try {
     if (channel.isMockChannel) {
       const SceytChatClient = getClient()
@@ -572,7 +574,9 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    yield call(addPendingMessage, message, pendingMessage, channel)
+    if (activeChannelId === channel.id) {
+      yield call(addPendingMessage, message, pendingMessage, channel)
+    }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
       if (sendMessageHandler) {
@@ -596,12 +600,16 @@ function* sendTextMessage(action: IAction): any {
         createdAt: messageResponse.createdAt,
         channelId: channel.id
       }
-      yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
+      if (activeChannelId === channel.id) {
+        yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
+      }
       updateMessageOnMap(channel.id, {
         messageId: messageToSend.tid,
         params: messageUpdateData
       })
-      updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
+      if (activeChannelId === channel.id) {
+        updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
+      }
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
       updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
       // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
@@ -628,8 +636,10 @@ function* sendTextMessage(action: IAction): any {
       messageId: sendMessageTid,
       params: { state: MESSAGE_STATUS.FAILED }
     })
-    updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
-    yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+    if (activeChannelId === channel.id) {
+      updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
+      yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+    }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   }
