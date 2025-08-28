@@ -1,4 +1,4 @@
-import { useSelector } from 'react-redux'
+import { useSelector } from 'store/hooks'
 import { useMemo } from 'react'
 import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 

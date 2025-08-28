@@ -1,6 +1,6 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef } from 'react'
-import { useDispatch } from 'react-redux'
+import React, { useEffect, useMemo, useRef } from 'react'
+import { useDispatch } from 'store/hooks'
 // Store
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
@@ -53,7 +53,10 @@ const Message = ({
   const getFromContacts = getShowOnlyContactUsers()
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
-  const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+
+  const messageMetas = useMemo(() => {
+    return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+  }, [message.metadata])
 
   const handleSendReadMarker = () => {
     if (
@@ -184,7 +187,7 @@ export const Container = styled.div<{
     font-weight: normal;
     font-size: ${(props) => props.fontSize || '14px'};
     color: ${(props) => props.textColor};
-    background-color: ${(props) => `${props.backgroundColor}40`};
+    background-color: ${(props) => `${props.backgroundColor}66`};
     box-sizing: border-box;
     border: ${(props) => props.border};
     border-radius: ${(props) => props.borderRadius || '14px'};

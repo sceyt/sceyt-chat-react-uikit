@@ -1,5 +1,6 @@
 import React, { FC, useEffect, useMemo, useRef, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import { v4 as uuidv4 } from 'uuid'
 import styled, { keyframes } from 'styled-components'
 import LinkifyIt from 'linkify-it'
@@ -77,6 +78,7 @@ import {
   deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
+  getAudioRecordingFromMap,
   getDraftMessageFromMap,
   getPendingMessagesMap,
   removeDraftMessageFromMap,
@@ -365,8 +367,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   // Voice recording
   const [showRecording, setShowRecording] = useState<boolean>(false)
-  const [recordedFile, setRecordedFile] = useState<any>(null)
-
   const [checkActionPermission] = usePermissions(activeChannel.userRole)
   const [listenerIsAdded, setListenerIsAdded] = useState(false)
   const [messageText, setMessageText] = useState('')
@@ -512,7 +512,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         }
         messageToSend.mentionedMembers = mentionMembersToSend
-        log.info('message to send ..........................................', messageToSend)
+        log.info('message to send ..........................................', JSON.stringify(messageToSend))
 
         if (messageForReply) {
           messageToSend.parentMessage = messageForReply
@@ -539,28 +539,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (attachments.length) {
           const sendAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
           messageToSend.attachments = attachments.map((attachment: any) => {
-            /* if (sendAsSeparateMessage) {
-              if (index !== 0) {
-                messageToSend.body = ''
-                messageToSend.metadata = ''
-                delete messageToSend.mentionedMembers
-              }
-              const attachmentsToSent = [attachmentToSend]
-              if (linkAttachment) {
-                attachmentsToSent.push(linkAttachment)
-              }
-              dispatch(
-                sendMessageAC(
-                  {
-                    ...messageToSend,
-                    attachments: attachmentsToSent
-                  },
-                  activeChannel.id,
-                  connectionStatus,
-                  true
-                )
-              )
-            } */
             return {
               name: attachment.data.name,
               data: attachment.data,
@@ -625,6 +603,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleEditMessage = () => {
     const messageTexToSend = editMessageText.trim()
     if (messageTexToSend) {
+      let linkAttachment: any
+      if (messageTexToSend) {
+        const linkify = new LinkifyIt()
+        const match = linkify.match(messageTexToSend)
+        if (match) {
+          linkAttachment = {
+            type: attachmentTypes.link,
+            data: match[0].url,
+            upload: false
+          }
+        }
+      }
       const mentionedMembersPositions: any = []
       const mentionMembersToSend: any = []
       if (mentionedMembers && mentionedMembers.length) {
@@ -644,6 +634,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       const messageToSend = {
         ...messageToEdit,
+        ...(linkAttachment ? { attachments: [linkAttachment] } : {}),
         metadata: mentionedMembersPositions,
         bodyAttributes: messageBodyAttributes,
         mentionedUsers: mentionMembersToSend,
@@ -1134,7 +1125,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [draggedAttachments])
 
-  useEffect(() => {
+  const sendRecordedFile = (recordedFile: any, id: string) => {
     if (recordedFile) {
       const tid = uuidv4()
       const reader = new FileReader()
@@ -1171,7 +1162,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           ],
           type: 'text'
         }
-        dispatch(sendMessageAC(messageToSend, activeChannel.id, connectionStatus))
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus))
       }
 
       reader.onerror = (e: any) => {
@@ -1179,7 +1170,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       reader.readAsBinaryString(recordedFile.file)
     }
-  }, [recordedFile])
+  }
 
   useEffect(() => {
     const updateViewPortWidth = () => {
@@ -1270,14 +1261,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           text: messageText,
           mentionedMembers: draftMessage.mentionedMembers,
           messageForReply,
-          editorState: realEditorState
+          editorState: realEditorState,
+          bodyAttributes: messageBodyAttributes
         })
       } else {
         setDraftMessageToMap(activeChannel.id, {
           text: messageText,
           mentionedMembers,
           messageForReply,
-          editorState: realEditorState
+          editorState: realEditorState,
+          bodyAttributes: messageBodyAttributes
         })
       }
 
@@ -1297,16 +1290,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (mentionedMembers && mentionedMembers.length) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+      setDraftMessageToMap(activeChannel.id, {
+        text: messageText,
+        mentionedMembers,
+        messageForReply,
+        bodyAttributes: messageBodyAttributes
+      })
     }
   }, [mentionedMembers])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      const pendingMessagesMap = getPendingMessagesMap()
+      const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
       setTimeout(() => {
-        const pendingMessagesMap = getPendingMessagesMap()
-        Object.keys(pendingMessagesMap).forEach((key: any) => {
-          pendingMessagesMap[key].forEach((msg: IMessage) => {
+        Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
+          pendingMessagesMapCopy[key].forEach((msg: IMessage) => {
             dispatch(resendMessageAC(msg, key, connectionStatus))
           })
         })
@@ -1348,7 +1347,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (draftMessagesMap[activeChannel.id]) {
-      setDraftMessageToMap(activeChannel.id, { text: messageText, mentionedMembers, messageForReply })
+      setDraftMessageToMap(activeChannel.id, {
+        text: messageText,
+        mentionedMembers,
+        messageForReply,
+        bodyAttributes: messageBodyAttributes
+      })
     }
     if (messageForReply && messageToEdit) {
       handleCloseEditMode()
@@ -1401,16 +1405,15 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [])
 
-  const filteredTypingOrRecordingIndicator = useMemo(() => {
-    return typingOrRecordingIndicator
-      ? Object.values(typingOrRecordingIndicator).filter((item: any) => item.typingState || item.recordingState)
-      : []
+  const typingOrRecording = useMemo(() => {
+    const dataValues = typingOrRecordingIndicator ? Object.values(typingOrRecordingIndicator) : []
+    const filteredItems = dataValues.filter((item: any) => item.typingState || item.recordingState)
+    return {
+      items: filteredItems,
+      isTyping: !!filteredItems.find((item: any) => item.typingState),
+      isRecording: !!filteredItems.find((item: any) => item.recordingState)
+    }
   }, [typingOrRecordingIndicator])
-
-  const isTyping = useMemo(
-    () => !!filteredTypingOrRecordingIndicator.find((item: any) => item.typingState),
-    [filteredTypingOrRecordingIndicator]
-  )
 
   const formatTypingIndicatorText = (users: any[], maxShownUsers: number = 3) => {
     if (users.length === 0) return ''
@@ -1422,7 +1425,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         getFromContacts
       )
       return `${userName}${
-        isTyping
+        typingOrRecording?.isTyping
           ? activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
             ? ' is typing'
             : ''
@@ -1550,10 +1553,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ) : (
               <React.Fragment>
                 <TypingIndicator>
-                  {filteredTypingOrRecordingIndicator.length > 0 &&
+                  {typingOrRecording?.items.length > 0 &&
                     (CustomTypingIndicator ? (
                       <CustomTypingIndicator
-                        from={filteredTypingOrRecordingIndicator.map((item: any) => ({
+                        from={typingOrRecording?.items.map((item: any) => ({
                           id: item.from.id,
                           name: item.from.name,
                           typingState: item.typingState,
@@ -1563,9 +1566,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ) : (
                       <TypingIndicatorCont>
                         <TypingFrom color={textSecondary}>
-                          {formatTypingIndicatorText(filteredTypingOrRecordingIndicator, 3)}
+                          {formatTypingIndicatorText(typingOrRecording?.items, 3)}
                         </TypingFrom>
-                        {isTyping ? (
+                        {typingOrRecording?.isTyping ? (
                           <TypingAnimation borderColor={iconInactive}>
                             <DotOne />
                             <DotTwo />
@@ -1699,7 +1702,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                  {showRecording ? (
+                  {showRecording || getAudioRecordingFromMap(activeChannel.id) ? (
                     <AudioCont />
                   ) : (
                     <MessageInputWrapper
@@ -1895,9 +1898,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       activeColor={accentColor}
                     >
                       <AudioRecord
-                        sendRecordedFile={setRecordedFile}
+                        sendRecordedFile={sendRecordedFile}
                         setShowRecording={setShowRecording}
                         showRecording={showRecording}
+                        channelId={activeChannel.id}
                       />
                     </SendMessageButton>
                   )}

@@ -38,5 +38,5 @@ const Container = styled.div<{ width?: number; height?: number; left?: number; t
   display: flex;
   justify-content: center;
   align-items: center;
-  background: ${(props) => `${props.background}40`};
+  background: ${(props) => `${props.background}66`};
 `

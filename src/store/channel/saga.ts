@@ -1,4 +1,4 @@
-import { put, takeLatest, call, takeEvery, select } from 'redux-saga/effects'
+import { put, takeLatest, call, takeEvery } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   addChannelAC,
@@ -96,14 +96,14 @@ import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
-import { channelListHiddenSelector } from './selector'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
+import store from 'store'
 
 function* createChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channelData, dontCreateIfNotExists } = payload
+    const { channelData, dontCreateIfNotExists, callback } = payload
     const SceytChatClient = getClient()
     const createChannelData = { ...channelData }
     if (createChannelData.avatarFile) {
@@ -194,7 +194,10 @@ function* createChannel(action: IAction): any {
       }
     }
     yield put(
-      switchChannelActionAC(JSON.parse(JSON.stringify({ ...createdChannel, isLinkedChannel: dontCreateIfNotExists })))
+      switchChannelActionAC(
+        JSON.parse(JSON.stringify({ ...createdChannel, isLinkedChannel: dontCreateIfNotExists })),
+        !callback
+      )
     )
     if (dontCreateIfNotExists) {
       if (!channelIsExistOnAllChannels) {
@@ -222,7 +225,11 @@ function* createChannel(action: IAction): any {
         addChannelToAllChannels(createdChannel)
       }
     }
-    yield call(setActiveChannelId, createdChannel.id)
+    if (callback) {
+      callback(createdChannel)
+    } else {
+      yield call(setActiveChannelId, createdChannel.id)
+    }
   } catch (e) {
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
@@ -298,7 +305,7 @@ function* getChannels(action: IAction): any {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
-    const hiddenList = yield select(channelListHiddenSelector)
+    const hiddenList = store.getState().ChannelReducer.hideChannelList
     if (!hiddenList) {
       const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       allChannelsQueryBuilder.order('lastMessage')
@@ -791,9 +798,9 @@ function* markMessagesDelivered(action: IAction): any {
 function* switchChannel(action: IAction): any {
   try {
     const { payload } = action
-    const { channel } = payload
+    const { channel, updateActiveChannel } = payload
     let channelToSwitch = channel
-    if (!channel?.id) {
+    if (!channel?.id && updateActiveChannel) {
       yield call(setActiveChannelId, '')
       yield put(setActiveChannelAC({}))
       return
@@ -817,14 +824,15 @@ function* switchChannel(action: IAction): any {
       const channelFromMap = getChannelFromMap(channel.id)
       channelToSwitch = { ...channelToSwitch, ...channelFromMap }
     }
-
-    const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-    yield call(setUnreadScrollTo, true)
-    yield call(setActiveChannelId, channel && channel.id)
-    if (channel.isLinkedChannel) {
-      channelToSwitch.linkedFrom = currentActiveChannel
+    if (updateActiveChannel) {
+      const currentActiveChannel = getChannelFromMap(getActiveChannelId())
+      yield call(setUnreadScrollTo, true)
+      yield call(setActiveChannelId, channel && channel.id)
+      if (channel.isLinkedChannel) {
+        channelToSwitch.linkedFrom = currentActiveChannel
+      }
+      yield put(setActiveChannelAC({ ...channelToSwitch }))
     }
-    yield put(setActiveChannelAC({ ...channelToSwitch }))
     // yield put(switchTypingIndicatorAC(false))
     // yield put(setMessageForThreadReply(undefined));
     // yield put(deleteThreadReplyMessagesAC());
@@ -1159,10 +1167,9 @@ function* sendTyping(action: IAction): any {
 
 function* sendRecording(action: IAction): any {
   const {
-    payload: { state }
+    payload: { state, channelId }
   } = action
-  const activeChannelId = yield call(getActiveChannelId)
-  const channel = yield call(getChannelFromMap, activeChannelId)
+  const channel = yield call(getChannelFromMap, channelId)
 
   try {
     if (channel) {

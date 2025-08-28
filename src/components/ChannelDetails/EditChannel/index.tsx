@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import { updateChannelAC } from '../../../store/channel/actions'
 import { channelEditModeSelector } from '../../../store/channel/selector'
