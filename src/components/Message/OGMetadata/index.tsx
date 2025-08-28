@@ -16,6 +16,7 @@ const validateUrl = (url: string) => {
 
 const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state: string }) => {
   const [metadata, setMetadata] = useState<IOGMetadata | null>(null)
+  const [imageLoadError, setImageLoadError] = useState(true)
 
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -83,8 +84,15 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
           window.open(attachment?.url, '_blank')
         }}
       >
-        <ImageContainer showOGMetadata={!!showOGMetadata}>
-          {metadata?.og?.image?.[0]?.url ? <Img src={metadata?.og?.image?.[0]?.url} alt='OG metadata image' /> : null}
+        <ImageContainer showOGMetadata={!!showOGMetadata && !imageLoadError}>
+          {metadata?.og?.image?.[0]?.url ? (
+            <Img
+              src={metadata?.og?.image?.[0]?.url}
+              alt='OG metadata image'
+              onLoad={() => setImageLoadError(false)}
+              onError={() => setImageLoadError(true)}
+            />
+          ) : null}
         </ImageContainer>
         {showOGMetadata ? (
           <OGText>
