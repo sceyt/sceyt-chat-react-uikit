@@ -552,8 +552,8 @@ function* sendTextMessage(action: IAction): any {
       .setAttachments(attachments)
       .setMentionUserIds(mentionedUserIds)
       .setType(message.type)
-      .setDisplayCount(message.type === 'system' ? 0 : 1)
-      .setSilent(message.type === 'system')
+      .setDisplayCount(message?.displayCount !== undefined ? message.displayCount : message.type === 'system' ? 0 : 1)
+      .setSilent(message?.silent !== undefined ? message.silent : message.type === 'system')
       .setMetadata(JSON.stringify(message.metadata))
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
@@ -1358,6 +1358,7 @@ function* getMessageQuery(action: IAction): any {
     log.error('error in message query', e)
   }
 }
+
 function* loadMoreMessages(action: IAction): any {
   try {
     const { payload } = action

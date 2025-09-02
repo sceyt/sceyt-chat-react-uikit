@@ -183,11 +183,13 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
   }
   let updatedMessageData = null
   if (messagesMap[channelId]) {
-    messagesMap[channelId].map((mes) => {
+    const messagesList: IMessage[] = []
+    for (const mes of messagesMap[channelId]) {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
           updatedMessageData = { ...updatedMessage.params }
-          return updatedMessageData
+          messagesList.push({ ...mes, ...updatedMessageData })
+          continue
         } else {
           updatedMessageData = {
             ...mes,
@@ -197,11 +199,13 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
                 index === self.findIndex((t) => t.url === att.url && t.type === att.type && t.name === att.name)
             )
           }
-          return updatedMessage
+          messagesList.push({ ...mes, ...updatedMessageData })
+          continue
         }
       }
-      return mes
-    })
+      messagesList.push(mes)
+    }
+    messagesMap[channelId] = messagesList
   }
 
   return updatedMessageData
