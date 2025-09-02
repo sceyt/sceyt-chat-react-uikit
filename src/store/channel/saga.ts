@@ -129,8 +129,7 @@ function* createChannel(action: IAction): any {
       allChannels.forEach((channel: IChannel) => {
         if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
           if (isSelfChannel) {
-            const meta = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
-            if (meta?.s) {
+            if (channel.members?.length === 1 && channel.members[0].id === memberId) {
               channelIsExistOnAllChannels = true
             }
           } else {
