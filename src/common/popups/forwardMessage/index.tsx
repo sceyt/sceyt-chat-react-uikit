@@ -98,7 +98,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const handleChannelSelect = (isSelected: boolean, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
     const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-    const isSelfChannel = isDirectChannel && channel.metadata?.s
+    const isSelfChannel =
+      isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (isSelected && selectedChannels.length < 5) {
       newSelectedChannels.push({
@@ -202,7 +203,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-                      const isSelfChannel = isDirectChannel && channel.metadata?.s
+                      const isSelfChannel =
+                        isDirectChannel &&
+                        channel.memberCount === 1 &&
+                        channel.members.length > 0 &&
+                        channel.members[0].id === user.id
                       const directChannelUser =
                         isDirectChannel && isSelfChannel
                           ? user
@@ -343,7 +348,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
             ) : (
               channels.map((channel: IChannel) => {
                 const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-                const isSelfChannel = isDirectChannel && channel.metadata?.s
+                const isSelfChannel =
+                  isDirectChannel &&
+                  channel.memberCount === 1 &&
+                  channel.members.length > 0 &&
+                  channel.members[0].id === user.id
                 const directChannelUser =
                   isDirectChannel && isSelfChannel
                     ? user

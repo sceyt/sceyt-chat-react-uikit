@@ -94,7 +94,12 @@ export default function ChatHeader({
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
+
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()

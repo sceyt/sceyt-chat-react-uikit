@@ -185,7 +185,11 @@ const Details = ({
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
     memberDisplayText &&

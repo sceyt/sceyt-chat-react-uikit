@@ -524,8 +524,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }, [currentRecordedFile])
 
   useEffect(() => {
+    if (!showRecording) {
+      setCurrentTime(0)
+    }
     return () => {
       handleStopRecording()
+      setCurrentTime(0)
     }
   }, [showRecording])
 

@@ -221,7 +221,8 @@ const Actions = ({
   const twoHours = oneHour * 2
   const oneDay = oneHour * 24
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && channel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const disableAction = directChannelUser && !isSelfChannel && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []

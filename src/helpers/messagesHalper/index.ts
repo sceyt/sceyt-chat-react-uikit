@@ -193,11 +193,7 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
         } else {
           updatedMessageData = {
             ...mes,
-            ...updatedMessage.params,
-            attachments: [...mes.attachments, ...(updatedMessage.params?.attachments || [])].filter(
-              (att, index, self) =>
-                index === self.findIndex((t) => t.url === att.url && t.type === att.type && t.name === att.name)
-            )
+            ...updatedMessage.params
           }
           messagesList.push({ ...mes, ...updatedMessageData })
           continue

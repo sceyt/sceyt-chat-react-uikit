@@ -17,6 +17,7 @@ const validateUrl = (url: string) => {
 const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state: string }) => {
   const [metadata, setMetadata] = useState<IOGMetadata | null>(null)
   const [imageLoadError, setImageLoadError] = useState(true)
+  const [faviconLoadError, setFaviconLoadError] = useState(true)
 
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -33,6 +34,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         setMetadata(metadata)
       } catch (error) {
         console.log('Failed to fetch OG metadata')
+        setMetadata(null)
       }
     }
     return null
@@ -99,7 +101,13 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
             <Url>{ogUrl}</Url>
             {metadata?.og?.title ? (
               <Title>
-                {metadata?.og?.favicon?.url ? <Favicon src={metadata?.og?.favicon?.url} /> : null}
+                {metadata?.og?.favicon?.url && !faviconLoadError ? (
+                  <Favicon
+                    src={metadata?.og?.favicon?.url}
+                    onLoad={() => setFaviconLoadError(false)}
+                    onError={() => setFaviconLoadError(true)}
+                  />
+                ) : null}
                 <span>{metadata?.og?.title}</span>
               </Title>
             ) : null}
