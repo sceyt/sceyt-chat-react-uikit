@@ -1345,17 +1345,21 @@ function* getMessageQuery(action: IAction): any {
   try {
     const { payload } = action
     const { channelId, messageId } = payload
-    const channel = yield call(getChannelFromMap, channelId)
+    const channel = yield call(getChannelFromAllChannels, channelId)
     const messages = yield call(channel.getMessagesById, [messageId])
-    yield put(updateMessageAC(messageId, messages[0]))
-    updateMessageOnMap(channel.id, {
-      messageId,
-      params: messages[0]
-    })
-    updateMessageOnAllMessages(messageId, messages[0])
-    yield put(setScrollToMessagesAC(messageId, false))
-    if (channel.lastMessage.id === messageId) {
-      yield put(updateChannelLastMessageAC(messages[0], channel))
+    const fetchedMessage = messages && messages[0] ? JSON.parse(JSON.stringify(messages[0])) : null
+    if (fetchedMessage) {
+      yield put(updateMessageAC(messageId, fetchedMessage))
+      updateMessageOnMap(channel.id, {
+        messageId,
+        params: fetchedMessage
+      })
+      updateMessageOnAllMessages(messageId, fetchedMessage)
+      yield put(setScrollToMessagesAC(messageId, false))
+      if (channel.lastMessage && channel.lastMessage.id === messageId) {
+        updateChannelLastMessageOnAllChannels(channel.id, fetchedMessage)
+        yield put(updateChannelLastMessageAC(fetchedMessage, channel))
+      }
     }
   } catch (e) {
     log.error('error in message query', e)
@@ -1648,7 +1652,7 @@ export default function* MessageSaga() {
   yield takeLatest(EDIT_MESSAGE, editMessage)
   yield takeEvery(DELETE_MESSAGE, deleteMessage)
   yield takeLatest(GET_MESSAGES, getMessagesQuery)
-  yield takeLatest(GET_MESSAGE, getMessageQuery)
+  yield takeEvery(GET_MESSAGE, getMessageQuery)
   yield takeLatest(GET_MESSAGES_ATTACHMENTS, getMessageAttachments)
   yield takeLatest(LOAD_MORE_MESSAGES_ATTACHMENTS, loadMoreMessageAttachments)
   yield takeLatest(ADD_REACTION, addReaction)
