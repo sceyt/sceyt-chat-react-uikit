@@ -1354,6 +1354,9 @@ function* getMessageQuery(action: IAction): any {
     })
     updateMessageOnAllMessages(messageId, messages[0])
     yield put(setScrollToMessagesAC(messageId, false))
+    if (channel.lastMessage.id === messageId) {
+      yield put(updateChannelLastMessageAC(messages[0], channel))
+    }
   } catch (e) {
     log.error('error in message query', e)
   }

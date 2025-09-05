@@ -352,7 +352,7 @@ const Details = ({
 
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {showPhoneNumber
+                  {showPhoneNumber && directChannelUser?.id
                     ? `+${directChannelUser?.id}`
                     : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
                       ? ''
