@@ -1224,7 +1224,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (attachments.length) {
         let videoAttachment = false
         attachments.forEach((att: any) => {
-          if (att.type === 'video' || att.data.type.split('/')[0] === 'video') {
+          if ((att.type === 'video' || att.data.type.split('/')[0] === 'video') && att.type !== 'file') {
             videoAttachment = true
             if (!readyVideoAttachments[att.tid]) {
               setSendMessageIsActive(false)

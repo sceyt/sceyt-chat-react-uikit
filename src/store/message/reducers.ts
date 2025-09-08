@@ -48,7 +48,7 @@ export interface IMessageStore {
     [key: string]: {
       uploaded: number
       total: number
-      progress?: number
+      progress: number
     }
   }
   playingAudioId: string | null
@@ -386,10 +386,10 @@ const messageSlice = createSlice({
         uploaded: number
         total: number
         attachmentId: string
-        progress?: number
       }>
     ) => {
-      const { uploaded, total, attachmentId, progress } = action.payload
+      const { uploaded, total, attachmentId } = action.payload
+      const progress = uploaded / total
       const updateData = { uploaded, total, progress }
       state.attachmentsUploadingProgress[attachmentId] = {
         ...state.attachmentsUploadingProgress[attachmentId],
