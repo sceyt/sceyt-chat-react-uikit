@@ -167,6 +167,7 @@ interface IChannelListProps {
     user: IUser,
     MessageText: any
   ) => any
+  doNotShowMessageDeliveryTypes: string[]
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
@@ -222,7 +223,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchChannelInputFontSize,
   searchedChannelsTitleFontSize,
   searchChannelsPadding,
-  getCustomLatestMessage
+  getCustomLatestMessage,
+  doNotShowMessageDeliveryTypes = ['system']
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -550,6 +552,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     contactsMap={contactsMap}
                     setSelectedChannel={setSelectedChannel}
                     getCustomLatestMessage={getCustomLatestMessage as any}
+                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                   />
                 )
               )}
@@ -596,6 +599,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -678,6 +682,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -738,6 +743,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     contactsMap={contactsMap}
                     setSelectedChannel={setSelectedChannel}
                     getCustomLatestMessage={getCustomLatestMessage as any}
+                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                   />
                 )
               )}
@@ -789,6 +795,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             key={channel.id}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -830,6 +837,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             contactsMap={contactsMap}
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}

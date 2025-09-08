@@ -77,6 +77,7 @@ interface IChannelProps {
     user: IUser
     MessageText: any
   }) => any
+  doNotShowMessageDeliveryTypes: string[]
 }
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
@@ -279,7 +280,8 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarSize,
   channelAvatarTextSize,
   setSelectedChannel,
-  getCustomLatestMessage
+  getCustomLatestMessage,
+  doNotShowMessageDeliveryTypes
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -491,6 +493,13 @@ const Channel: React.FC<IChannelProps> = ({
     ]
   )
 
+  const isTypeValid = useCallback(
+    (type: string) => {
+      return !doNotShowMessageDeliveryTypes.includes(type)
+    },
+    [doNotShowMessageDeliveryTypes]
+  )
+
   return (
     <Container
       // ref={channelItemRef}
@@ -678,7 +687,7 @@ const Channel: React.FC<IChannelProps> = ({
             {lastMessage &&
               lastMessage.user &&
               lastMessage.user.id === user.id &&
-              lastMessage.type !== 'system' &&
+              isTypeValid(lastMessage.type) &&
               MessageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',

@@ -179,7 +179,7 @@ export function deleteChannelFromAllChannels(channelId: string) {
 
 export function updateChannelLastMessageOnAllChannels(channelId: string, message: IMessage) {
   let updateChannel = allChannels.find((chan) => chan.id === channelId)
-  if (message.state === 'Deleted' || message.state === 'Edited') {
+  if (message?.state === 'Deleted' || message?.state === 'Edited') {
     if (updateChannel?.lastMessage.id === message.id) {
       allChannels = allChannels.map((chan) => {
         if (chan.id === channelId) {

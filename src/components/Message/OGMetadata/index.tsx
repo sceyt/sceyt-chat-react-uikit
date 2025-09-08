@@ -18,6 +18,9 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   const [metadata, setMetadata] = useState<IOGMetadata | null>(null)
   const [imageLoadError, setImageLoadError] = useState(true)
   const [faviconLoadError, setFaviconLoadError] = useState(true)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [imageWidth, setImageWidth] = useState(0)
+  const [imageHeight, setImageHeight] = useState(0)
 
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -79,6 +82,37 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
     )
   }, [state, metadata])
 
+  useEffect(() => {
+    // load image
+    if (metadata?.og?.image?.[0]?.url) {
+      const image = new Image()
+      image.src = metadata?.og?.image?.[0]?.url
+      image.onload = () => {
+        const imageWidth = image.width
+        const imageHeight = image.height
+        setImageWidth(imageWidth)
+        setImageHeight(imageHeight)
+        setImageLoadError(false)
+        setImageLoaded(true)
+      }
+      image.onerror = () => {
+        setImageLoadError(true)
+        setImageLoaded(true)
+      }
+    }
+  }, [metadata?.og?.image?.[0]?.url])
+
+  const calculatedImageWidth = useMemo(() => {
+    if (imageWidth > 400) {
+      return 400
+    }
+    return imageWidth
+  }, [imageWidth])
+
+  const calculatedImageHeight = useMemo(() => {
+    return imageHeight / (imageWidth / calculatedImageWidth)
+  }, [imageWidth, imageHeight])
+
   return (
     <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
       <div
@@ -86,21 +120,25 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
           window.open(attachment?.url, '_blank')
         }}
       >
-        <ImageContainer showOGMetadata={!!showOGMetadata && !imageLoadError}>
-          {metadata?.og?.image?.[0]?.url ? (
+        <ImageContainer
+          showOGMetadata={!!showOGMetadata && !imageLoadError && imageLoaded}
+          width={calculatedImageWidth}
+          height={calculatedImageHeight}
+        >
+          {metadata?.og?.image?.[0]?.url && !imageLoadError ? (
             <Img
               src={metadata?.og?.image?.[0]?.url}
               alt='OG metadata image'
-              onLoad={() => setImageLoadError(false)}
-              onError={() => setImageLoadError(true)}
+              width={calculatedImageWidth}
+              height={calculatedImageHeight}
             />
           ) : null}
         </ImageContainer>
-        {showOGMetadata ? (
+        {showOGMetadata && imageLoaded ? (
           <OGText>
-            <Url>{ogUrl}</Url>
+            <Url maxWidth={calculatedImageWidth}>{ogUrl}</Url>
             {metadata?.og?.title ? (
-              <Title>
+              <Title maxWidth={calculatedImageWidth}>
                 {metadata?.og?.favicon?.url && !faviconLoadError ? (
                   <Favicon
                     src={metadata?.og?.favicon?.url}
@@ -111,7 +149,9 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
                 <span>{metadata?.og?.title}</span>
               </Title>
             ) : null}
-            {metadata?.og?.description ? <Desc>{metadata?.og?.description}</Desc> : null}
+            {metadata?.og?.description ? (
+              <Desc maxWidth={calculatedImageWidth}>{metadata?.og?.description}</Desc>
+            ) : null}
           </OGText>
         ) : null}
       </div>
@@ -137,13 +177,15 @@ const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
   }
 `
 
-const ImageContainer = styled.div<{ showOGMetadata: boolean }>`
-  max-width: 100%;
-  max-height: 200px;
+const ImageContainer = styled.div<{ showOGMetadata: boolean; width: number; height: number }>`
+  max-width: ${({ width }) => `${width}px`};
+  max-height: ${({ height }) => `${height}px`};
+  opacity: ${({ showOGMetadata }) => (showOGMetadata ? 1 : 0)};
+  overflow: hidden;
   width: 100%;
   margin: 0 auto;
   padding: ${({ showOGMetadata }) => (showOGMetadata ? '0.3rem' : '0')};
-  height: ${({ showOGMetadata }) => (showOGMetadata ? '200px' : '0')};
+  height: ${({ showOGMetadata, height }) => (showOGMetadata ? `${height}px` : '0')};
   transition: height 0.2s ease;
 `
 
@@ -151,40 +193,50 @@ const OGText = styled.div`
   width: 80%;
   padding: 0.5rem;
   margin: 0;
+  transition: all 0.2s ease;
 `
 
-const Url = styled.p`
+const Url = styled.p<{ maxWidth: number }>`
   font-weight: normal;
   font-size: 13px;
   padding: 0;
   margin: 0 0 12px 0;
   color: gray;
+  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  transition: all 0.2s ease;
 `
 
-const Title = styled.p`
+const Title = styled.p<{ maxWidth: number }>`
   font-weight: bold;
   font-size: 13px;
   padding: 0;
   display: flex;
   align-items: center;
+  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  transition: all 0.2s ease;
 `
 
-const Desc = styled.p`
+const Desc = styled.p<{ maxWidth: number }>`
   font-weight: normal;
   font-size: 13px;
   padding: 0;
+  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  transition: all 0.2s ease;
 `
 
-const Img = styled.img`
-  max-width: 100%;
-  max-height: 100%;
-  width: 100%;
-  height: 200px;
+const Img = styled.img<{ width: number; height: number }>`
+  max-width: ${({ width }) => `${width}px`};
+  min-width: ${({ width }) => `${width}px`};
+  max-height: ${({ height }) => `${height}px`};
+  min-height: ${({ height }) => `${height}px`};
+  width: ${({ width }) => `${width}px`};
+  height: ${({ height }) => `${height}px`};
   object-fit: cover;
   transition: height 0.2s ease;
 `
 
 const Favicon = styled.img`
+  transition: all 0.2s ease;
   width: 24px;
   height: 24px;
   object-fit: contain;
