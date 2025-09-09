@@ -178,19 +178,35 @@ const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
 `
 
 const ImageContainer = styled.div<{ showOGMetadata: boolean; width: number; height: number }>`
-  max-width: ${({ width }) => `${width}px`};
-  max-height: ${({ height }) => `${height}px`};
+  ${({ width }) =>
+    width
+      ? `
+    max-width: ${`${width}px`};
+  `
+      : `
+    max-width: 100%;
+    width: 100%;
+  `}
+
+  ${({ height, showOGMetadata }) =>
+    height
+      ? `
+    max-height: ${`${height}px`};
+    height: ${showOGMetadata ? `${height}px` : '0'};
+  `
+      : `
+    max-height: 200px;
+    height: ${showOGMetadata ? '200px' : '0'};
+  `}
+
   opacity: ${({ showOGMetadata }) => (showOGMetadata ? 1 : 0)};
   overflow: hidden;
-  width: 100%;
   margin: 0 auto;
   padding: ${({ showOGMetadata }) => (showOGMetadata ? '0.3rem' : '0')};
-  height: ${({ showOGMetadata, height }) => (showOGMetadata ? `${height}px` : '0')};
   transition: height 0.2s ease;
 `
 
 const OGText = styled.div`
-  width: 80%;
   padding: 0.5rem;
   margin: 0;
   transition: all 0.2s ease;
@@ -202,7 +218,11 @@ const Url = styled.p<{ maxWidth: number }>`
   padding: 0;
   margin: 0 0 12px 0;
   color: gray;
-  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  ${({ maxWidth }) =>
+    maxWidth &&
+    `
+    max-width: ${`${maxWidth}px`};
+  `}
   transition: all 0.2s ease;
 `
 
@@ -212,7 +232,11 @@ const Title = styled.p<{ maxWidth: number }>`
   padding: 0;
   display: flex;
   align-items: center;
-  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  ${({ maxWidth }) =>
+    maxWidth &&
+    `
+    max-width: ${`${maxWidth}px`};
+  `}
   transition: all 0.2s ease;
 `
 
@@ -220,11 +244,15 @@ const Desc = styled.p<{ maxWidth: number }>`
   font-weight: normal;
   font-size: 13px;
   padding: 0;
-  max-width: ${({ maxWidth }) => `${maxWidth}px`};
+  ${({ maxWidth }) =>
+    maxWidth &&
+    `
+    max-width: ${`${maxWidth}px`};
+  `}
   transition: all 0.2s ease;
 `
 
-const Img = styled.img<{ width: number; height: number }>`
+const Img = styled.img<{ width?: number; height?: number }>`
   max-width: ${({ width }) => `${width}px`};
   min-width: ${({ width }) => `${width}px`};
   max-height: ${({ height }) => `${height}px`};

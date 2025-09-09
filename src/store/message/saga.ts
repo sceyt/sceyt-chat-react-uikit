@@ -1346,6 +1346,9 @@ function* getMessageQuery(action: IAction): any {
     const { payload } = action
     const { channelId, messageId } = payload
     const channel = yield call(getChannelFromAllChannels, channelId)
+    if (!channel) {
+      return
+    }
     const messages = yield call(channel.getMessagesById, [messageId])
     const fetchedMessage = messages && messages[0] ? JSON.parse(JSON.stringify(messages[0])) : null
     if (fetchedMessage) {
