@@ -20,6 +20,7 @@ import {
   openedMessageMenuSelector,
   scrollToMentionedMessageSelector,
   scrollToMessageHighlightSelector,
+  scrollToMessageBehaviorSelector,
   scrollToMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
@@ -64,15 +65,7 @@ import { HiddenMessageProperty } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
 
-let loadFromServer = false
-let loadDirection = ''
-// @ts-ignore
-let nextDisable = false
-let prevDisable = false
-let scrollToBottom = false
-let shouldLoadMessages: 'next' | 'prev' | ''
-let loading = false
-const messagesIndexMap: Record<string, number> = {}
+// moved to component-scoped refs below
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -472,6 +465,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const scrollToMentionedMessage = useSelector(scrollToMentionedMessageSelector, shallowEqual)
   const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
   const scrollToMessageHighlight = useSelector(scrollToMessageHighlightSelector, shallowEqual)
+  const scrollToMessageBehavior = useSelector(scrollToMessageBehaviorSelector, shallowEqual)
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
   const hasNextMessages = useSelector(messagesHasNextSelector, shallowEqual)
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
@@ -494,143 +488,147 @@ const MessageList: React.FC<MessagesProps> = ({
   const [shouldPreserveScroll, setShouldPreserveScroll] = useState(false)
   const messageForReply: any = {}
   const attachmentsSelected = false
-  const messageTopDateRef = useRef<any>(null)
+  const [topDateLabel, setTopDateLabel] = useState<string>('')
   const scrollRef = useRef<any>(null)
+  // Refs replacing former module-scope mutable state
+  const loadFromServerRef = useRef<boolean>(false)
+  const loadDirectionRef = useRef<string>('')
+  const nextDisableRef = useRef<boolean>(false)
+  const prevDisableRef = useRef<boolean>(false)
+  const scrollToBottomRef = useRef<boolean>(false)
+  const shouldLoadMessagesRef = useRef<'next' | 'prev' | ''>('')
+  const loadingRef = useRef<boolean>(false)
+  const messagesIndexMapRef = useRef<Record<string, number>>({})
+  const scrollRafRef = useRef<number | null>(null)
   const renderTopDate = () => {
-    const dateLabels = document.querySelectorAll('.divider')
-    const messageTopDate = messageTopDateRef.current
+    const container = scrollRef.current
+    if (!container) return
+    const dateLabels: NodeListOf<HTMLElement> = container.querySelectorAll('.divider')
     let text = ''
     for (let i = dateLabels.length - 1; i >= 0; i--) {
       const dateLabel = dateLabels[i]
-      const span = dateLabel?.firstChild?.firstChild
-      // @ts-ignore
-      if (!text && scrollRef.current.scrollTop > dateLabel.offsetTop) {
-        // @ts-ignore
-        text = span && span.innerText
-        // @ts-ignore
-        span.style.display = 'none'
-      } else {
-        // @ts-ignore
-        span.style.display = 'block'
+      if (!text && container.scrollTop > dateLabel.offsetTop) {
+        const span = dateLabel?.firstChild && ((dateLabel.firstChild as HTMLElement).firstChild as HTMLElement)
+        text = span ? span.innerText || '' : ''
       }
     }
-    if (text) {
-      messageTopDate.innerText = text
-      messageTopDate.style.display = 'inline'
-    } else {
-      messageTopDate.style.display = 'none'
-    }
+    setTopDateLabel(text)
   }
 
   // @ts-ignore
-  const handleMessagesListScroll = useCallback(
-    async (event: any) => {
-      if (scrollToMentionedMessage) {
-        const { target } = event
-        if (target.scrollTop <= -50 || channel.lastMessage.id !== messages[messages.length - 1].id) {
-          dispatch(showScrollToNewMessageButtonAC(true))
-        } else {
-          dispatch(showScrollToNewMessageButtonAC(false))
-        }
-        return
-      }
-      setShowTopDate(true)
-      clearTimeout(hideTopDateTimeout.current)
-      hideTopDateTimeout.current = setTimeout(() => {
-        setShowTopDate(false)
-      }, 1000)
-
-      renderTopDate()
-      const { target } = event
-      let forceLoadPrevMessages = false
-      if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
-        forceLoadPrevMessages = true
-      }
-      if (
-        target.scrollTop === 0 &&
-        scrollToNewMessage.scrollToBottom &&
-        scrollToNewMessage.updateMessageList &&
-        messagesLoading !== LOADING_STATE.LOADING
-      ) {
-        dispatch(getMessagesAC(channel, true))
-      }
-      if (target.scrollTop <= -50) {
+  const handleMessagesListScroll = useCallback(async () => {
+    const target = scrollRef.current
+    if (!target) return
+    if (scrollToMentionedMessage) {
+      if (target.scrollTop <= -50 || channel.lastMessage.id !== messages[messages.length - 1].id) {
         dispatch(showScrollToNewMessageButtonAC(true))
       } else {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
-      if (scrollToReply) {
-        target.scrollTop = scrollToReply
-      } else {
-        if (messagesIndexMap[lastVisibleMessageId] < 15 || forceLoadPrevMessages) {
-          if (
-            connectionStatus === CONNECTION_STATUS.CONNECTED &&
-            !scrollToNewMessage.scrollToBottom &&
-            hasPrevMessages
-          ) {
-            if (loading || messagesLoading === LOADING_STATE.LOADING || prevDisable) {
-              shouldLoadMessages = 'prev'
-            } else {
-              if (shouldLoadMessages === 'prev') {
-                shouldLoadMessages = ''
-              }
-              loadDirection = 'prev'
-              handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-              if (!getHasPrevCached()) {
-                loadFromServer = true
-              }
-              nextDisable = true
-            }
+      return
+    }
+    setShowTopDate(true)
+    clearTimeout(hideTopDateTimeout.current)
+    hideTopDateTimeout.current = setTimeout(() => {
+      setShowTopDate(false)
+    }, 1000)
+    renderTopDate()
+    let forceLoadPrevMessages = false
+    if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
+      forceLoadPrevMessages = true
+    }
+    if (
+      target.scrollTop === 0 &&
+      scrollToNewMessage.scrollToBottom &&
+      scrollToNewMessage.updateMessageList &&
+      messagesLoading !== LOADING_STATE.LOADING
+    ) {
+      dispatch(getMessagesAC(channel, true))
+    }
+    if (target.scrollTop <= -50) {
+      dispatch(showScrollToNewMessageButtonAC(true))
+    } else {
+      dispatch(showScrollToNewMessageButtonAC(false))
+    }
+    if (scrollToReply) {
+      target.scrollTop = scrollToReply
+      return
+    }
+    const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+    const hasIndex = typeof currentIndex === 'number'
+    if ((hasIndex && currentIndex < 15) || forceLoadPrevMessages) {
+      if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
+        if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || prevDisableRef.current) {
+          shouldLoadMessagesRef.current = 'prev'
+        } else {
+          if (shouldLoadMessagesRef.current === 'prev') {
+            shouldLoadMessagesRef.current = ''
           }
-        }
-        if (messagesIndexMap[lastVisibleMessageId] >= messages.length - 15 || target.scrollTop === 0) {
-          if (
-            connectionStatus === CONNECTION_STATUS.CONNECTED &&
-            !scrollToNewMessage.scrollToBottom &&
-            (hasNextMessages || getHasNextCached())
-          ) {
-            if (loading || messagesLoading === LOADING_STATE.LOADING || nextDisable) {
-              shouldLoadMessages = 'next'
-            } else {
-              if (shouldLoadMessages === 'next') {
-                shouldLoadMessages = ''
-              }
-              loadDirection = 'next'
-              prevDisable = true
-              handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-            }
+          loadDirectionRef.current = 'prev'
+          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
+          if (!getHasPrevCached()) {
+            loadFromServerRef.current = true
           }
-        }
-        if (messagesIndexMap[lastVisibleMessageId] > messages.length - 10) {
-          nextDisable = false
+          nextDisableRef.current = true
         }
       }
-    },
-    [
-      channel?.lastMessage?.id,
-      messages,
-      scrollToMentionedMessage,
-      scrollToNewMessage,
-      messagesLoading,
-      hasPrevMessages,
-      hasNextMessages,
-      messagesIndexMap,
-      lastVisibleMessageId,
-      connectionStatus,
-      shouldLoadMessages,
-      loadDirection,
-      getHasPrevCached,
-      getHasNextCached,
-      scrollToReply,
-      loading,
-      prevDisable,
-      nextDisable
-    ]
-  )
+    }
+    if ((hasIndex && currentIndex >= messages.length - 15) || target.scrollTop === 0) {
+      if (
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        !scrollToNewMessage.scrollToBottom &&
+        (hasNextMessages || getHasNextCached())
+      ) {
+        if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || nextDisableRef.current) {
+          shouldLoadMessagesRef.current = 'next'
+        } else {
+          if (shouldLoadMessagesRef.current === 'next') {
+            shouldLoadMessagesRef.current = ''
+          }
+          loadDirectionRef.current = 'next'
+          prevDisableRef.current = true
+          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
+        }
+      }
+    }
+    if (hasIndex && currentIndex > messages.length - 10) {
+      nextDisableRef.current = false
+    }
+  }, [
+    channel?.lastMessage?.id,
+    messages,
+    scrollToMentionedMessage,
+    scrollToNewMessage,
+    messagesLoading,
+    hasPrevMessages,
+    hasNextMessages,
+    lastVisibleMessageId,
+    connectionStatus,
+    getHasPrevCached,
+    getHasNextCached,
+    scrollToReply
+  ])
+
+  const onScroll = useCallback(() => {
+    if (scrollRafRef.current !== null) return
+    scrollRafRef.current = window.requestAnimationFrame(() => {
+      scrollRafRef.current = null
+      handleMessagesListScroll()
+    })
+  }, [handleMessagesListScroll])
+
+  useEffect(() => {
+    return () => {
+      if (scrollRafRef.current !== null) {
+        cancelAnimationFrame(scrollRafRef.current)
+        scrollRafRef.current = null
+      }
+    }
+  }, [])
 
   const handleScrollToRepliedMessage = async (messageId: string) => {
-    prevDisable = true
-    nextDisable = true
+    prevDisableRef.current = true
+    nextDisableRef.current = true
     if (messages.findIndex((msg: IMessage) => msg.id === messageId) >= 10) {
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {
@@ -646,8 +644,8 @@ const MessageList: React.FC<MessagesProps> = ({
         setTimeout(
           () => {
             repliedMessage.classList.remove('highlight')
-            prevDisable = false
-            nextDisable = false
+            prevDisableRef.current = false
+            nextDisableRef.current = false
           },
           1000 + positiveValue * 0.1
         )
@@ -667,10 +665,10 @@ const MessageList: React.FC<MessagesProps> = ({
     const hasNextCached = getHasNextCached()
     if (messagesLoading === LOADING_STATE.LOADED && connectionStatus === CONNECTION_STATUS.CONNECTED) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
-        loading = true
+        loadingRef.current = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, firstMessageId, hasPrevMessages))
       } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && lastMessageId && (hasNextMessages || hasNextCached)) {
-        loading = true
+        loadingRef.current = true
         dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
       }
     }
@@ -703,43 +701,46 @@ const MessageList: React.FC<MessagesProps> = ({
       setIsDragging(false)
     }
   }
+  const readDroppedFiles = (e: any) =>
+    new Promise<any[]>((resolve) => {
+      const fileList: File[] = Object.values(e.dataTransfer.files)
+      const attachmentsFiles: any[] = []
+      let readFiles = 0
+      let errorCount = 0
+
+      fileList.forEach((attachment) => {
+        const fileReader = new FileReader()
+
+        fileReader.onload = (event: any) => {
+          const file = event.target.result
+          attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
+          readFiles++
+
+          if (readFiles + errorCount === fileList.length) {
+            resolve(attachmentsFiles)
+          }
+        }
+
+        fileReader.onerror = () => {
+          errorCount++
+
+          if (readFiles + errorCount === fileList.length) {
+            resolve(attachmentsFiles)
+          }
+        }
+
+        fileReader.readAsDataURL(attachment)
+      })
+    })
+
   const handleDropFile = (e: any) => {
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const fileList: File[] = Object.values(e.dataTransfer.files)
-      new Promise<any>((resolve) => {
-        const attachmentsFiles: any = []
-        let readFiles = 0
-        let errorCount = 0
-
-        fileList.forEach((attachment) => {
-          const fileReader = new FileReader()
-
-          fileReader.onload = (event: any) => {
-            const file = event.target.result
-            attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
-            readFiles++
-
-            if (readFiles + errorCount === fileList.length) {
-              resolve(attachmentsFiles)
-            }
-          }
-
-          fileReader.onerror = () => {
-            errorCount++
-
-            if (readFiles + errorCount === fileList.length) {
-              resolve(attachmentsFiles)
-            }
-          }
-
-          fileReader.readAsDataURL(attachment)
-        })
-      })
+      readDroppedFiles(e)
         .then((result) => {
-          dispatch(setDraggedAttachmentsAC(result, 'file'))
+          dispatch(setDraggedAttachmentsAC(result as any, 'file'))
         })
         .catch((error) => {
           console.error('Error in handleDropFile:', error)
@@ -753,38 +754,9 @@ const MessageList: React.FC<MessagesProps> = ({
     e.stopPropagation()
     setIsDragging(false)
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const fileList: File[] = Object.values(e.dataTransfer.files)
-      new Promise<any>((resolve) => {
-        const attachmentsFiles: any = []
-        let readFiles = 0
-        let errorCount = 0
-
-        fileList.forEach((attachment) => {
-          const fileReader = new FileReader()
-
-          fileReader.onload = (event: any) => {
-            const file = event.target.result
-            attachmentsFiles.push({ name: attachment.name, data: file, type: attachment.type })
-            readFiles++
-
-            if (readFiles + errorCount === fileList.length) {
-              resolve(attachmentsFiles)
-            }
-          }
-
-          fileReader.onerror = () => {
-            errorCount++
-
-            if (readFiles + errorCount === fileList.length) {
-              resolve(attachmentsFiles)
-            }
-          }
-
-          fileReader.readAsDataURL(attachment)
-        })
-      })
+      readDroppedFiles(e)
         .then((result) => {
-          dispatch(setDraggedAttachmentsAC(result, 'media'))
+          dispatch(setDraggedAttachmentsAC(result as any, 'media'))
         })
         .catch((error) => {
           console.error('Error in handleDropMedia:', error)
@@ -802,22 +774,22 @@ const MessageList: React.FC<MessagesProps> = ({
       !showScrollToNewMessageButton
     ) {
       dispatch(showScrollToNewMessageButtonAC(false))
-      prevDisable = false
+      prevDisableRef.current = false
     }
   }, [messages, channel?.lastMessage?.id, scrollRef?.current?.scrollTop, showScrollToNewMessageButton])
 
   useEffect(() => {
     if (scrollToRepliedMessage) {
-      loading = false
+      loadingRef.current = false
       scrollRef.current.style.scrollBehavior = 'inherit'
       const repliedMessage = document.getElementById(scrollToRepliedMessage)
       if (repliedMessage) {
         setScrollToReply(repliedMessage && repliedMessage.offsetTop - (channel.backToLinkedChannel ? 0 : 200))
         scrollRef.current.scrollTo({
           top: repliedMessage && repliedMessage.offsetTop - (channel.backToLinkedChannel ? 0 : 200),
-          behavior: 'smooth'
+          behavior: scrollToMessageBehavior
         })
-        scrollRef.current.style.scrollBehavior = 'smooth'
+        scrollRef.current.style.scrollBehavior = scrollToMessageBehavior
         if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
           repliedMessage && repliedMessage.classList.add('highlight')
         }
@@ -831,9 +803,9 @@ const MessageList: React.FC<MessagesProps> = ({
               const repliedMessage = document.getElementById(scrollToRepliedMessage)
               repliedMessage && repliedMessage.classList.remove('highlight')
             }
-            prevDisable = false
+            prevDisableRef.current = false
             setScrollToReply(null)
-            scrollRef.current.style.scrollBehavior = 'smooth'
+            scrollRef.current.style.scrollBehavior = 'instant'
           },
           1000 + positiveValue * 0.1
         )
@@ -852,15 +824,15 @@ const MessageList: React.FC<MessagesProps> = ({
           })
         }
       } else {
-        nextDisable = true
-        prevDisable = true
+        nextDisableRef.current = true
+        prevDisableRef.current = true
         scrollRef.current.scrollTo({
           top: 0,
           behavior: 'smooth'
         })
         dispatch(showScrollToNewMessageButtonAC(false))
         setTimeout(() => {
-          prevDisable = false
+          prevDisableRef.current = false
         }, 800)
       }
     }
@@ -881,11 +853,19 @@ const MessageList: React.FC<MessagesProps> = ({
   useEffect(() => {
     setHasNextCached(false)
     setHasPrevCached(false)
+    // reset per-channel scroll flags and indexes
+    messagesIndexMapRef.current = {}
+    loadFromServerRef.current = false
+    loadDirectionRef.current = ''
+    nextDisableRef.current = false
+    prevDisableRef.current = false
+    shouldLoadMessagesRef.current = ''
+    loadingRef.current = false
     if (channel.backToLinkedChannel) {
       const visibleMessages = getVisibleMessagesMap()
       const visibleMessagesIds = Object.keys(visibleMessages)
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-      dispatch(getMessagesAC(channel, undefined, messageId))
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, undefined, 'instant'))
       setUnreadMessageId(messageId)
     } else {
       if (!channel.isLinkedChannel) {
@@ -908,9 +888,9 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     setPreviousScrollTop(0)
     setShouldPreserveScroll(false)
-    nextDisable = false
-    prevDisable = false
-    scrollToBottom = true
+    nextDisableRef.current = false
+    prevDisableRef.current = false
+    scrollToBottomRef.current = true
     setAllowEditDeleteIncomingMessage(allowEditDeleteIncomingMessage)
   }, [channel.id])
 
@@ -938,35 +918,40 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
 
-    if (loading) {
-      if (loadDirection !== 'next') {
+    if (loadingRef.current) {
+      if (loadDirectionRef.current !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
         if (lastVisibleMessage) {
           scrollRef.current.style.scrollBehavior = 'inherit'
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
-        if (loadFromServer) {
+        if (loadFromServerRef.current) {
           setTimeout(() => {
-            loading = false
-            loadFromServer = false
-            nextDisable = false
-            if (shouldLoadMessages === 'prev' && messagesIndexMap[lastVisibleMessageId] < 15) {
+            loadingRef.current = false
+            loadFromServerRef.current = false
+            nextDisableRef.current = false
+            const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+            if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
               handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
             }
-            if (shouldLoadMessages === 'next' && messagesIndexMap[lastVisibleMessageId] > messages.length - 15) {
+            if (
+              shouldLoadMessagesRef.current === 'next' &&
+              typeof currentIndex === 'number' &&
+              currentIndex > messages.length - 15
+            ) {
               handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
             }
           }, 50)
         } else {
-          loading = false
-          if (shouldLoadMessages === 'prev') {
+          loadingRef.current = false
+          if (shouldLoadMessagesRef.current === 'prev') {
             handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-            shouldLoadMessages = ''
+            shouldLoadMessagesRef.current = ''
           }
-          if (shouldLoadMessages === 'next') {
+          if (shouldLoadMessagesRef.current === 'next') {
             handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-            shouldLoadMessages = ''
+            shouldLoadMessagesRef.current = ''
           }
         }
       } else {
@@ -977,23 +962,27 @@ const MessageList: React.FC<MessagesProps> = ({
             lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
-        loading = false
-        prevDisable = false
-        if (shouldLoadMessages === 'prev') {
+        loadingRef.current = false
+        prevDisableRef.current = false
+        if (shouldLoadMessagesRef.current === 'prev') {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessages = ''
+          shouldLoadMessagesRef.current = ''
         }
-        if (shouldLoadMessages === 'next') {
+        if (shouldLoadMessagesRef.current === 'next') {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessages = ''
+          shouldLoadMessagesRef.current = ''
         }
       }
     }
 
     renderTopDate()
-    if (scrollToBottom) {
-      dispatch(scrollToNewMessageAC(true))
-      scrollToBottom = false
+    if (scrollToBottomRef.current) {
+      if (channel.backToLinkedChannel) {
+        dispatch(scrollToNewMessageAC(false))
+      } else {
+        dispatch(scrollToNewMessageAC(true))
+      }
+      scrollToBottomRef.current = false
     }
 
     if (shouldPreserveScroll && scrollRef.current && previousScrollTop > 0) {
@@ -1012,9 +1001,9 @@ const MessageList: React.FC<MessagesProps> = ({
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      loading = false
-      prevDisable = false
-      nextDisable = false
+      loadingRef.current = false
+      prevDisableRef.current = false
+      nextDisableRef.current = false
       clearMessagesMap()
       removeAllMessages()
       if (channel.id) {
@@ -1024,7 +1013,8 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [connectionStatus])
 
   useEffect(() => {
-    if (channel.newMessageCount && channel.newMessageCount > 0 && getUnreadScrollTo()) {
+    const unreadScrollTo = getUnreadScrollTo()
+    if (channel.newMessageCount && channel.newMessageCount > 0 && unreadScrollTo) {
       if (scrollRef.current) {
         scrollRef.current.style.scrollBehavior = 'inherit'
       }
@@ -1037,7 +1027,16 @@ const MessageList: React.FC<MessagesProps> = ({
         setUnreadScrollTo(false)
       }
     }
-  })
+  }, [channel.id, channel.newMessageCount, channel.lastDisplayedMessageId])
+
+  // Cleanup hideTopDate timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTopDateTimeout.current) {
+        clearTimeout(hideTopDateTimeout.current)
+      }
+    }
+  }, [])
 
   return (
     <React.Fragment>
@@ -1102,7 +1101,7 @@ const MessageList: React.FC<MessagesProps> = ({
             dateDividerBorderRadius={dateDividerBorderRadius}
             topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           >
-            <span ref={messageTopDateRef} />
+            <span>{topDateLabel}</span>
           </MessageTopDate>
         )}
         {/* {!hideMessages && ( */}
@@ -1111,7 +1110,7 @@ const MessageList: React.FC<MessagesProps> = ({
           className={isScrolling ? 'show-scrollbar' : ''}
           ref={scrollRef}
           stopScrolling={stopScrolling}
-          onScroll={handleMessagesListScroll}
+          onScroll={onScroll}
           onMouseEnter={() => setIsScrolling(true)}
           onMouseLeave={() => setIsScrolling(false)}
           onDragEnter={handleDragIn}
@@ -1130,9 +1129,9 @@ const MessageList: React.FC<MessagesProps> = ({
                 const nextMessage = messages[index + 1]
                 const isUnreadMessage =
                   !!(unreadMessageId && unreadMessageId === message.id && nextMessage) && !channel.backToLinkedChannel
-                messagesIndexMap[message.id] = index
+                messagesIndexMapRef.current[message.id] = index
                 return (
-                  <React.Fragment>
+                  <React.Fragment key={message.id || message.tid}>
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
                       noMargin={

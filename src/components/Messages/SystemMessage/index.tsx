@@ -1,6 +1,6 @@
 import styled from 'styled-components'
 import React, { useEffect, useMemo, useRef } from 'react'
-import { useDispatch } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
@@ -11,9 +11,12 @@ import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
+import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
+import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
+import { scrollToNewMessageSelector } from 'store/message/selector'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -46,7 +49,7 @@ const Message = ({
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
-
+  const scrollToNewMessage = useSelector(scrollToNewMessageSelector)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
@@ -76,6 +79,18 @@ const Message = ({
   useEffect(() => {
     if (isVisible) {
       handleSendReadMarker()
+      if (!channel.isLinkedChannel) {
+        setMessageToVisibleMessagesMap(message)
+      }
+
+      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+        dispatch(scrollToNewMessageAC(false, false, false))
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      }
+    } else {
+      if (!channel.isLinkedChannel) {
+        removeMessageFromVisibleMessagesMap(message)
+      }
     }
   }, [isVisible])
 

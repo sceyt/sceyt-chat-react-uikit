@@ -1140,7 +1140,8 @@ function* editMessage(action: IAction): any {
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight } = action.payload
+    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior } =
+      action.payload
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
@@ -1161,6 +1162,7 @@ function* getMessagesQuery(action: IAction): any {
         if ((channel.newMessageCount && channel.newMessageCount > 0) || !havLastMessage) {
           // if (channel.newMessageCount && channel.newMessageCount > 0) {
           setHasPrevCached(false)
+          setMessagesToMap(channel.id, [])
           setAllMessages([])
           // }
           result = yield call(messageQuery.loadPreviousMessageId, '0')
@@ -1194,7 +1196,7 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setMessagesHasNextAC(false))
         setHasNextCached(false)
         if (messageId) {
-          yield put(setScrollToMessagesAC(messageId, highlight))
+          yield put(setScrollToMessagesAC(messageId, highlight, behavior))
         }
       } else if (messageId) {
         const allMessages = getAllMessages()
@@ -1210,7 +1212,7 @@ function* getMessagesQuery(action: IAction): any {
           log.info('load by message id from server ...............', messageId)
           result = yield call(messageQuery.loadNearMessageId, messageId)
           if (result.messages.length === 50) {
-            messageQuery.limit = (MESSAGES_MAX_LENGTH - 50) / 2
+            messageQuery.limit = MESSAGES_MAX_LENGTH - 50
             const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
             messageQuery.reverse = false
             const thirdResult = yield call(
@@ -1222,19 +1224,18 @@ function* getMessagesQuery(action: IAction): any {
             messageQuery.reverse = true
           }
           log.info('result from server ....... ', result)
-          yield put(setMessagesHasNextAC(true))
+          yield put(setMessagesHasPrevAC(true))
 
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          // setAllMessages([...result.messages])
-
+          setMessagesToMap(channel.id, result.messages)
           setAllMessages([...result.messages])
           setHasPrevCached(false)
           setHasNextCached(false)
         }
-        yield put(setScrollToMessagesAC(messageId))
+        yield put(setScrollToMessagesAC(messageId, true, behavior))
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-        // dispatch(setMessagesPrevCompleteAC(true))
+        setMessagesToMap(channel.id, [])
         setAllMessages([])
         messageQuery.limit = MESSAGES_MAX_LENGTH
         if (Number(channel.lastDisplayedMessageId)) {
@@ -1264,9 +1265,6 @@ function* getMessagesQuery(action: IAction): any {
             result.hasNext = secondResult.hasNext
           }
         }
-        setMessagesToMap(channel.id, result.messages)
-        // }
-
         yield put(setMessagesHasPrevAC(true))
         yield put(
           setMessagesHasNextAC(
@@ -1275,6 +1273,7 @@ function* getMessagesQuery(action: IAction): any {
               channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
+        setMessagesToMap(channel.id, result.messages)
         setAllMessages([...result.messages])
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
         /*
@@ -1290,12 +1289,13 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesNextCompleteAC(true)) */
       } else {
+        setMessagesToMap(channel.id, [])
         setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
+          setMessagesToMap(channel.id, [])
           setAllMessages([...cachedMessages])
           yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
         }
-        // yield put(setMessagesNextCompleteAC(false))
         log.info('load message from server')
         result = yield call(messageQuery.loadPrevious)
         if (result.messages.length === 50) {

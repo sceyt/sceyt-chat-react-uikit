@@ -124,11 +124,12 @@ export function getMessagesAC(
   messageId?: string,
   limit?: number,
   withDeliveredMessages?: boolean,
-  highlight = true
+  highlight = true,
+  behavior?: 'smooth' | 'instant' | 'auto'
 ) {
   return {
     type: GET_MESSAGES,
-    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight }
+    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior }
   }
 }
 
@@ -139,8 +140,12 @@ export function getMessageAC(channelId: string, messageId?: string, limit?: numb
   }
 }
 
-export function setScrollToMessagesAC(messageId: string | null, highlight = true) {
-  return setScrollToMessage({ messageId: messageId || '', highlight })
+export function setScrollToMessagesAC(
+  messageId: string | null,
+  highlight = true,
+  behavior?: 'smooth' | 'instant' | 'auto'
+) {
+  return setScrollToMessage({ messageId: messageId || '', highlight, behavior })
 }
 
 export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {

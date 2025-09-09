@@ -39,6 +39,7 @@ export interface IMessageStore {
   attachmentsUploadingState: { [key: string]: any }
   scrollToMessage: string | null
   scrollToMessageHighlight: boolean
+  scrollToMessageBehavior: 'smooth' | 'instant' | 'auto'
   scrollToMentionedMessage: boolean | null
   reactionsList: IReaction[]
   reactionsHasNext: boolean
@@ -81,6 +82,7 @@ const initialState: IMessageStore = {
   attachmentsUploadingState: {},
   scrollToMessage: null,
   scrollToMessageHighlight: true,
+  scrollToMessageBehavior: 'smooth',
   scrollToMentionedMessage: false,
   reactionsList: [],
   reactionsHasNext: true,
@@ -107,9 +109,13 @@ const messageSlice = createSlice({
       )
     },
 
-    setScrollToMessage: (state, action: PayloadAction<{ messageId: string; highlight: boolean }>) => {
+    setScrollToMessage: (
+      state,
+      action: PayloadAction<{ messageId: string; highlight: boolean; behavior?: 'smooth' | 'instant' | 'auto' }>
+    ) => {
       state.scrollToMessage = action.payload.messageId
       state.scrollToMessageHighlight = action.payload.highlight
+      state.scrollToMessageBehavior = action.payload.behavior || 'smooth'
     },
 
     setScrollToMentionedMessage: (state, action: PayloadAction<{ isScrollToMentionedMessage: boolean }>) => {
