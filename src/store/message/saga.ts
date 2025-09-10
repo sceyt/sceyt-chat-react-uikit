@@ -1207,6 +1207,7 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setHasPrevCached(messageIndex > maxLengthPart)
           setHasNextCached(allMessages.length > maxLengthPart)
+          yield put(setMessagesHasPrevAC(true))
         } else {
           messageQuery.limit = MESSAGES_MAX_LENGTH
           log.info('load by message id from server ...............', messageId)
@@ -1222,16 +1223,16 @@ function* getMessagesQuery(action: IAction): any {
             result.messages = [...secondResult.messages, ...result.messages, ...thirdResult.messages]
             result.hasNext = secondResult.hasNext
             messageQuery.reverse = true
+            yield put(setMessagesHasPrevAC(secondResult.hasNext))
           }
           log.info('result from server ....... ', result)
-          yield put(setMessagesHasPrevAC(true))
-
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setMessagesToMap(channel.id, result.messages)
           setAllMessages([...result.messages])
           setHasPrevCached(false)
           setHasNextCached(false)
         }
+        yield put(setMessagesHasNextAC(true))
         yield put(setScrollToMessagesAC(messageId, true, behavior))
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
@@ -1418,6 +1419,11 @@ function* loadMoreMessages(action: IAction): any {
       yield put(addMessagesAC(JSON.parse(JSON.stringify(result.messages)), direction))
     } else {
       yield put(addMessagesAC([], direction))
+      if (direction === MESSAGE_LOAD_DIRECTION.NEXT) {
+        yield put(setMessagesHasNextAC(false))
+      } else {
+        yield put(setMessagesHasPrevAC(false))
+      }
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {

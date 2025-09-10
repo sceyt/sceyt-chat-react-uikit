@@ -73,8 +73,8 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
     handleScrollToLastMessage(channel.lastMessage.id)
   }
   const handleScrollToLastMessage = async (messageId: string) => {
-    dispatch(scrollToNewMessageAC(true, false, false))
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
+      dispatch(scrollToNewMessageAC(true, false, false))
       dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {

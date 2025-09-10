@@ -160,7 +160,7 @@ const messageSlice = createSlice({
         (message) => !state.activeChannelMessages.some((msg) => msg.tid === message.tid || msg.id === message.id)
       )
 
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+      if (direction === MESSAGE_LOAD_DIRECTION.PREV && newMessagesLength > 0) {
         if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_LENGTH) {
           setHasNextCached(true)
           if (newMessagesLength > 0) {
@@ -179,7 +179,7 @@ const messageSlice = createSlice({
         } else {
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         }
-      } else if (direction === 'next') {
+      } else if (direction === 'next' && newMessagesLength > 0) {
         if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, messagesIsNotIncludeInActiveChannelMessages.length)

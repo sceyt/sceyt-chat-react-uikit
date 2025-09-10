@@ -500,6 +500,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const loadingRef = useRef<boolean>(false)
   const messagesIndexMapRef = useRef<Record<string, number>>({})
   const scrollRafRef = useRef<number | null>(null)
+  const loadingMessagesTimeoutRef = useRef<any>(null)
   const renderTopDate = () => {
     const container = scrollRef.current
     if (!container) return
@@ -907,7 +908,7 @@ const MessageList: React.FC<MessagesProps> = ({
         setUnreadMessageId('')
       }
     }
-  }, [messages])
+  }, [messages, hiddenMessagesProperties, user?.id])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -927,7 +928,7 @@ const MessageList: React.FC<MessagesProps> = ({
           scrollRef.current.style.scrollBehavior = 'smooth'
         }
         if (loadFromServerRef.current) {
-          setTimeout(() => {
+          const timeout = setTimeout(() => {
             loadingRef.current = false
             loadFromServerRef.current = false
             nextDisableRef.current = false
@@ -943,6 +944,10 @@ const MessageList: React.FC<MessagesProps> = ({
               handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
             }
           }, 50)
+          if (loadingMessagesTimeoutRef.current) {
+            clearTimeout(loadingMessagesTimeoutRef.current)
+          }
+          loadingMessagesTimeoutRef.current = timeout
         } else {
           loadingRef.current = false
           if (shouldLoadMessagesRef.current === 'prev') {
@@ -996,7 +1001,42 @@ const MessageList: React.FC<MessagesProps> = ({
         setPreviousScrollTop(0)
       })
     }
+    return () => {
+      if (loadingMessagesTimeoutRef.current) {
+        clearTimeout(loadingMessagesTimeoutRef.current)
+      }
+    }
   }, [messages])
+
+  useEffect(() => {
+    if (messagesLoading === LOADING_STATE.LOADED) {
+      const timeout = setTimeout(() => {
+        loadingRef.current = false
+        loadFromServerRef.current = false
+        nextDisableRef.current = false
+        const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+        if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
+          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
+        }
+        if (
+          shouldLoadMessagesRef.current === 'next' &&
+          typeof currentIndex === 'number' &&
+          currentIndex > messages.length - 15
+        ) {
+          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
+        }
+      }, 50)
+      if (loadingMessagesTimeoutRef.current) {
+        clearTimeout(loadingMessagesTimeoutRef.current)
+      }
+      loadingMessagesTimeoutRef.current = timeout
+    }
+    return () => {
+      if (loadingMessagesTimeoutRef.current) {
+        clearTimeout(loadingMessagesTimeoutRef.current)
+      }
+    }
+  }, [messagesLoading, messages, lastVisibleMessageId])
 
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
