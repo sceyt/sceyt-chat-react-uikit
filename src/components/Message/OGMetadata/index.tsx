@@ -102,15 +102,8 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
     }
   }, [metadata?.og?.image?.[0]?.url])
 
-  const calculatedImageWidth = useMemo(() => {
-    if (imageWidth > 400) {
-      return 400
-    }
-    return imageWidth
-  }, [imageWidth])
-
   const calculatedImageHeight = useMemo(() => {
-    return imageHeight / (imageWidth / calculatedImageWidth)
+    return imageHeight / (imageWidth / 400)
   }, [imageWidth, imageHeight])
 
   return (
@@ -122,23 +115,23 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
       >
         <ImageContainer
           showOGMetadata={!!showOGMetadata && !imageLoadError && imageLoaded}
-          width={calculatedImageWidth}
+          width={400}
           height={calculatedImageHeight}
         >
           {metadata?.og?.image?.[0]?.url && !imageLoadError ? (
             <Img
               src={metadata?.og?.image?.[0]?.url}
               alt='OG metadata image'
-              width={calculatedImageWidth}
+              width={400}
               height={calculatedImageHeight}
             />
           ) : null}
         </ImageContainer>
         {showOGMetadata && imageLoaded ? (
           <OGText>
-            <Url maxWidth={calculatedImageWidth}>{ogUrl}</Url>
+            <Url maxWidth={400}>{ogUrl}</Url>
             {metadata?.og?.title ? (
-              <Title maxWidth={calculatedImageWidth}>
+              <Title maxWidth={400}>
                 {metadata?.og?.favicon?.url && !faviconLoadError ? (
                   <Favicon
                     src={metadata?.og?.favicon?.url}
@@ -149,9 +142,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
                 <span>{metadata?.og?.title}</span>
               </Title>
             ) : null}
-            {metadata?.og?.description ? (
-              <Desc maxWidth={calculatedImageWidth}>{metadata?.og?.description}</Desc>
-            ) : null}
+            {metadata?.og?.description ? <Desc maxWidth={400}>{metadata?.og?.description}</Desc> : null}
           </OGText>
         ) : null}
       </div>
@@ -253,12 +244,20 @@ const Desc = styled.p<{ maxWidth: number }>`
 `
 
 const Img = styled.img<{ width?: number; height?: number }>`
-  max-width: ${({ width }) => `${width}px`};
-  min-width: ${({ width }) => `${width}px`};
-  max-height: ${({ height }) => `${height}px`};
-  min-height: ${({ height }) => `${height}px`};
-  width: ${({ width }) => `${width}px`};
-  height: ${({ height }) => `${height}px`};
+  ${({ width }) =>
+    width &&
+    `
+    max-width: ${`${width}px`};
+    min-width: ${`${width}px`};
+    width: ${`${width}px`};
+  `}
+  ${({ height }) =>
+    height &&
+    `
+    max-height: ${`${height}px`};
+    min-height: ${`${height}px`};
+    height: ${`${height}px`};
+  `}
   object-fit: cover;
   transition: height 0.2s ease;
 `
