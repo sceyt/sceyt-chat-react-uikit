@@ -33,7 +33,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
         const query = await queryBuilder.build()
         const metadata = await query.loadOGData()
-        await storeMetadata(url.replace('https://', '').replace('http://', ''), metadata)
+        await storeMetadata(url, metadata)
         setMetadata(metadata)
       } catch (error) {
         console.log('Failed to fetch OG metadata')
@@ -48,7 +48,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
       const url = attachment?.url
 
       if (url) {
-        getMetadata(url.replace('https://', '').replace('http://', ''))
+        getMetadata(url)
           .then(async (cachedMetadata) => {
             if (cachedMetadata) {
               setMetadata(cachedMetadata)

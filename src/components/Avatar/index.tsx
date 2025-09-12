@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import styled from 'styled-components'
 // Assets
 import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
@@ -9,6 +9,7 @@ import { useColor } from '../../hooks'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { useSelector } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
+import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 
 interface IProps {
   image?: string | null
@@ -40,6 +41,7 @@ const Avatar: React.FC<IProps> = ({
 }) => {
   const theme = useSelector(themeSelector) as 'light' | 'dark'
   const { [THEME_COLORS.ICON_INACTIVE]: iconInactive } = useColor()
+  const [resolvedImageSrc, setResolvedImageSrc] = useState<string | null>(image || null)
   const isDeletedUserAvatar = !image && !name
   let avatarText = ''
   if (!image && name) {
@@ -62,12 +64,59 @@ const Avatar: React.FC<IProps> = ({
     }
   }
 
+  useEffect(() => {
+    let isCancelled = false
+    if (!image) {
+      setResolvedImageSrc(null)
+      return
+    }
+
+    // Only attempt custom cache for network URLs
+    const isHttpUrl = /^https?:\/\//i.test(image)
+    if (!isHttpUrl) {
+      setResolvedImageSrc(image)
+      return
+    }
+
+    // Try to read from Cache Storage first; fall back to network and write-through
+    getAttachmentUrlFromCache(image)
+      .then(async (cachedUrl) => {
+        if (isCancelled) return
+        if (cachedUrl) {
+          setResolvedImageSrc(cachedUrl)
+        } else {
+          try {
+            const response = await fetch(image, { credentials: 'same-origin' })
+            // Write-through to cache; ignore failures
+            setAttachmentToCache(image, response.clone())
+            setResolvedImageSrc(image)
+          } catch (_) {
+            setResolvedImageSrc(image)
+          }
+        }
+      })
+      .catch(async () => {
+        if (isCancelled) return
+        try {
+          const response = await fetch(image, { credentials: 'same-origin' })
+          setAttachmentToCache(image, response.clone())
+          setResolvedImageSrc(image)
+        } catch (_) {
+          setResolvedImageSrc(image)
+        }
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [image])
+
   return (
     <Container
       border={border}
       marginAuto={marginAuto}
       size={size}
-      isImage={!!(image || setDefaultAvatar)}
+      isImage={!!(resolvedImageSrc || setDefaultAvatar)}
       avatarName={name}
       textSize={textSize}
       onClick={handleAvatarClick}
@@ -84,7 +133,7 @@ const Avatar: React.FC<IProps> = ({
           <span>{avatarText}</span>
         )
       ) : (
-        <AvatarImage draggable={false} showImage src={image} size={size} alt='' />
+        <AvatarImage draggable={false} showImage src={resolvedImageSrc || image} size={size} alt='' />
       )}
     </Container>
   )
