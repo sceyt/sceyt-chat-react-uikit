@@ -508,12 +508,13 @@ const MessageList: React.FC<MessagesProps> = ({
     let text = ''
     for (let i = dateLabels.length - 1; i >= 0; i--) {
       const dateLabel = dateLabels[i]
-      if (!text && container.scrollTop > dateLabel.offsetTop) {
+      if (!text && container.scrollTop > dateLabel.offsetTop - 28) {
         const span = dateLabel?.firstChild && ((dateLabel.firstChild as HTMLElement).firstChild as HTMLElement)
         text = span ? span.innerText || '' : ''
+        setTopDateLabel(text)
+        break
       }
     }
-    setTopDateLabel(text)
   }
 
   // @ts-ignore
