@@ -1131,7 +1131,7 @@ const MessageList: React.FC<MessagesProps> = ({
         </DragAndDropContainer>
       )}
       <React.Fragment>
-        {showTopFixedDate && (
+        {showTopFixedDate && topDateLabel && (
           <MessageTopDate
             visible={showTopDate}
             dateDividerFontSize={dateDividerFontSize}
