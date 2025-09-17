@@ -226,7 +226,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       }
     } else {
       shouldDraw = false
-      recorder.stop()
+      recorder?.stop()
     }
     removeAudioRecordingFromMap(currentChannelId)
     setRecordingIsReadyToPlay(false)
