@@ -218,7 +218,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   const cancelRecording = useCallback(() => {
     handleStopRecording()
     if (currentRecordedFile) {
-      removeAudioRecordingFromMap(currentChannelId)
       dispatch(setChannelDraftMessageIsRemovedAC(currentChannelId))
       setRecordedFile(null)
       setPlayAudio(false)
@@ -229,6 +228,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       shouldDraw = false
       recorder.stop()
     }
+    removeAudioRecordingFromMap(currentChannelId)
     setRecordingIsReadyToPlay(false)
     setStartRecording(false)
     setCurrentTime(0)

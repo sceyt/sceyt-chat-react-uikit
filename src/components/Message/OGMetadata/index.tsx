@@ -56,9 +56,14 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
             await storeMetadata(url, { ...metadata, imageWidth, imageHeight })
             handleMetadata({ ...metadata, imageWidth, imageHeight })
           }
-          image.onerror = () => {
+          image.onerror = async () => {
             setImageLoadError(true)
+            await storeMetadata(url, { ...metadata })
+            handleMetadata({ ...metadata })
           }
+        } else {
+          await storeMetadata(url, { ...metadata })
+          handleMetadata({ ...metadata })
         }
       } catch (error) {
         console.log('Failed to fetch OG metadata')
@@ -99,13 +104,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   }, [attachment?.url])
 
   const showOGMetadata = useMemo(() => {
-    return (
-      state !== 'deleted' &&
-      metadata?.og?.title &&
-      metadata?.og?.image?.[0]?.url &&
-      metadata?.og?.description &&
-      metadata
-    )
+    return state !== 'deleted' && metadata?.og?.title && metadata?.og?.description && metadata
   }, [state, metadata])
 
   const calculatedImageHeight = useMemo(() => {
@@ -118,7 +117,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         onClick={() => {
           window.open(attachment?.url, '_blank')
         }}
-        style={{ width: '400px' }}
+        style={{ width: showOGMetadata ? '400px' : 'auto' }}
       >
         <ImageContainer
           showOGMetadata={!!showOGMetadata && !imageLoadError}
