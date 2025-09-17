@@ -113,8 +113,6 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
     return metadata?.imageHeight / (metadata?.imageWidth / 400)
   }, [metadata?.imageWidth, metadata?.imageHeight])
 
-  console.log('metadata', metadata)
-
   return (
     <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
       <div
