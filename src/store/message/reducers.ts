@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { IMarker, IMessage, IReaction } from '../../types'
+import { IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
@@ -54,6 +54,7 @@ export interface IMessageStore {
   }
   playingAudioId: string | null
   selectedMessagesMap: Map<string, IMessage> | null
+  oGMetadata: { [key: string]: IOGMetadata | null }
 }
 
 const initialState: IMessageStore = {
@@ -90,7 +91,8 @@ const initialState: IMessageStore = {
   openedMessageMenu: '',
   attachmentsUploadingProgress: {},
   playingAudioId: null,
-  selectedMessagesMap: null
+  selectedMessagesMap: null,
+  oGMetadata: {}
 }
 
 const messageSlice = createSlice({
@@ -501,6 +503,11 @@ const messageSlice = createSlice({
 
     clearSelectedMessages: (state) => {
       state.selectedMessagesMap = null
+    },
+
+    setOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
+      const { url, metadata } = action.payload
+      state.oGMetadata[url] = metadata
     }
   },
   extraReducers: (builder) => {
@@ -552,7 +559,8 @@ export const {
   setPlayingAudioId,
   addSelectedMessage,
   removeSelectedMessage,
-  clearSelectedMessages
+  clearSelectedMessages,
+  setOGMetadata
 } = messageSlice.actions
 
 // Export reducer

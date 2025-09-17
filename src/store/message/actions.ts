@@ -17,7 +17,7 @@ import {
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE
 } from './constants'
-import { IAttachment, IChannel, IMarker, IMessage, IReaction } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import {
   addMessage,
   deleteMessageFromList,
@@ -59,7 +59,8 @@ import {
   addSelectedMessage,
   removeSelectedMessage,
   clearSelectedMessages,
-  updateMessageAttachment
+  updateMessageAttachment,
+  setOGMetadata
 } from './reducers'
 
 export function sendMessageAC(
@@ -293,6 +294,10 @@ export function setMessagesHasPrevAC(hasPrev: boolean) {
 
 export function setMessagesHasNextAC(hasNext: boolean) {
   return setMessagesHasNext({ hasNext })
+}
+
+export function setOGMetadataAC(url: string, metadata: IOGMetadata | null) {
+  return setOGMetadata({ url, metadata })
 }
 
 export function setUpdateMessageAttachmentAC(url: string, messageId: string, params: any) {

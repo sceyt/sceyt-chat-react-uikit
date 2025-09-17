@@ -4,6 +4,8 @@ import styled from 'styled-components'
 import { getClient } from '../../../common/client'
 import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadataService'
 import { attachmentTypes } from '../../../helpers/constants'
+import { setOGMetadataAC } from '../../../store/message/actions'
+import { useDispatch, useSelector } from '../../../store/hooks'
 
 const validateUrl = (url: string) => {
   try {
@@ -15,16 +17,28 @@ const validateUrl = (url: string) => {
 }
 
 const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state: string }) => {
-  const [metadata, setMetadata] = useState<IOGMetadata | null>(null)
-  const [imageLoadError, setImageLoadError] = useState(true)
-  const [faviconLoadError, setFaviconLoadError] = useState(true)
-  const [imageLoaded, setImageLoaded] = useState(false)
-  const [imageWidth, setImageWidth] = useState(0)
-  const [imageHeight, setImageHeight] = useState(0)
+  const dispatch = useDispatch()
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
 
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
   }, [attachments])
+
+  const metadata = useMemo(() => {
+    return oGMetadata[attachment?.url] || null
+  }, [oGMetadata, attachment?.url])
+
+  const [imageLoadError, setImageLoadError] = useState(false)
+  const [faviconLoadError, setFaviconLoadError] = useState(false)
+  const [shouldAnimate, setShouldAnimate] = useState(false)
+
+  const handleMetadata = useCallback((metadata: IOGMetadata | null) => {
+    if (metadata) {
+      dispatch(setOGMetadataAC(attachment?.url, metadata))
+    } else {
+      dispatch(setOGMetadataAC(attachment?.url, null))
+    }
+  }, [])
 
   const ogMetadataQueryBuilder = useCallback(async (url: string) => {
     const client = getClient()
@@ -33,25 +47,37 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
         const query = await queryBuilder.build()
         const metadata = await query.loadOGData()
-        await storeMetadata(url, metadata)
-        setMetadata(metadata)
+        const image = new Image()
+        image.src = metadata?.og?.image?.[0]?.url
+        if (image.src) {
+          image.onload = async () => {
+            const imageWidth = image.width
+            const imageHeight = image.height
+            await storeMetadata(url, { ...metadata, imageWidth, imageHeight })
+            handleMetadata({ ...metadata, imageWidth, imageHeight })
+          }
+          image.onerror = () => {
+            setImageLoadError(true)
+          }
+        }
       } catch (error) {
         console.log('Failed to fetch OG metadata')
-        setMetadata(null)
+        handleMetadata(null)
       }
     }
     return null
   }, [])
 
   useEffect(() => {
-    if (attachment?.id && attachment?.url) {
+    if (attachment?.id && attachment?.url && !metadata) {
+      setShouldAnimate(true)
       const url = attachment?.url
 
       if (url) {
         getMetadata(url)
           .then(async (cachedMetadata) => {
             if (cachedMetadata) {
-              setMetadata(cachedMetadata)
+              handleMetadata(cachedMetadata)
             } else {
               ogMetadataQueryBuilder(url)
             }
@@ -61,7 +87,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
           })
       }
     }
-  }, [attachment?.url])
+  }, [attachment?.url, metadata])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -82,29 +108,9 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
     )
   }, [state, metadata])
 
-  useEffect(() => {
-    // load image
-    if (metadata?.og?.image?.[0]?.url) {
-      const image = new Image()
-      image.src = metadata?.og?.image?.[0]?.url
-      image.onload = () => {
-        const imageWidth = image.width
-        const imageHeight = image.height
-        setImageWidth(imageWidth)
-        setImageHeight(imageHeight)
-        setImageLoadError(false)
-        setImageLoaded(true)
-      }
-      image.onerror = () => {
-        setImageLoadError(true)
-        setImageLoaded(true)
-      }
-    }
-  }, [metadata?.og?.image?.[0]?.url])
-
   const calculatedImageHeight = useMemo(() => {
-    return imageHeight / (imageWidth / 400)
-  }, [imageWidth, imageHeight])
+    return (metadata?.imageHeight || 0) / ((metadata?.imageWidth || 0) / 400)
+  }, [metadata?.imageWidth, metadata?.imageHeight])
 
   return (
     <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
@@ -112,28 +118,34 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         onClick={() => {
           window.open(attachment?.url, '_blank')
         }}
+        style={{ width: '400px' }}
       >
         <ImageContainer
-          showOGMetadata={!!showOGMetadata && !imageLoadError && imageLoaded}
-          width={400}
+          showOGMetadata={!!showOGMetadata && !imageLoadError}
+          containerWidth={400}
           height={calculatedImageHeight}
+          shouldAnimate={shouldAnimate}
         >
           {metadata?.og?.image?.[0]?.url && !imageLoadError ? (
             <Img
               src={metadata?.og?.image?.[0]?.url}
               alt='OG metadata image'
-              width={400}
+              imageWidth={400}
               height={calculatedImageHeight}
+              shouldAnimate={shouldAnimate}
             />
           ) : null}
         </ImageContainer>
-        {showOGMetadata && imageLoaded ? (
-          <OGText>
-            <Url maxWidth={400}>{ogUrl}</Url>
+        {showOGMetadata ? (
+          <OGText shouldAnimate={shouldAnimate}>
+            <Url maxWidth={400} shouldAnimate={shouldAnimate}>
+              {ogUrl}
+            </Url>
             {metadata?.og?.title ? (
-              <Title maxWidth={400}>
+              <Title maxWidth={400} shouldAnimate={shouldAnimate}>
                 {metadata?.og?.favicon?.url && !faviconLoadError ? (
                   <Favicon
+                    shouldAnimate={shouldAnimate}
                     src={metadata?.og?.favicon?.url}
                     onLoad={() => setFaviconLoadError(false)}
                     onError={() => setFaviconLoadError(true)}
@@ -142,7 +154,11 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
                 <span>{metadata?.og?.title}</span>
               </Title>
             ) : null}
-            {metadata?.og?.description ? <Desc maxWidth={400}>{metadata?.og?.description}</Desc> : null}
+            {metadata?.og?.description ? (
+              <Desc maxWidth={400} shouldAnimate={shouldAnimate}>
+                {metadata?.og?.description}
+              </Desc>
+            ) : null}
           </OGText>
         ) : null}
       </div>
@@ -168,11 +184,16 @@ const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
   }
 `
 
-const ImageContainer = styled.div<{ showOGMetadata: boolean; width: number; height: number }>`
-  ${({ width }) =>
-    width
+const ImageContainer = styled.div<{
+  showOGMetadata: boolean
+  containerWidth: number
+  height: number
+  shouldAnimate: boolean
+}>`
+  ${({ containerWidth }) =>
+    containerWidth
       ? `
-    max-width: ${`${width}px`};
+    max-width: ${`${containerWidth}px`};
   `
       : `
     max-width: 100%;
@@ -193,17 +214,25 @@ const ImageContainer = styled.div<{ showOGMetadata: boolean; width: number; heig
   opacity: ${({ showOGMetadata }) => (showOGMetadata ? 1 : 0)};
   overflow: hidden;
   margin: 0 auto;
-  padding: ${({ showOGMetadata }) => (showOGMetadata ? '0.3rem' : '0')};
-  transition: height 0.2s ease;
+  padding: ${({ showOGMetadata }) => (showOGMetadata ? '4px' : '0')};
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: height 0.2s ease;
+  `}
 `
 
-const OGText = styled.div`
+const OGText = styled.div<{ shouldAnimate: boolean }>`
   padding: 0.5rem;
   margin: 0;
-  transition: all 0.2s ease;
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
 `
 
-const Url = styled.p<{ maxWidth: number }>`
+const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   font-weight: normal;
   font-size: 13px;
   padding: 0;
@@ -214,10 +243,14 @@ const Url = styled.p<{ maxWidth: number }>`
     `
     max-width: ${`${maxWidth}px`};
   `}
-  transition: all 0.2s ease;
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
 `
 
-const Title = styled.p<{ maxWidth: number }>`
+const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   font-weight: bold;
   font-size: 13px;
   padding: 0;
@@ -228,28 +261,39 @@ const Title = styled.p<{ maxWidth: number }>`
     `
     max-width: ${`${maxWidth}px`};
   `}
-  transition: all 0.2s ease;
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
 `
 
-const Desc = styled.p<{ maxWidth: number }>`
+const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   font-weight: normal;
   font-size: 13px;
   padding: 0;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
   ${({ maxWidth }) =>
     maxWidth &&
     `
     max-width: ${`${maxWidth}px`};
   `}
-  transition: all 0.2s ease;
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
 `
 
-const Img = styled.img<{ width?: number; height?: number }>`
-  ${({ width }) =>
-    width &&
+const Img = styled.img<{ imageWidth?: number; height?: number; shouldAnimate: boolean }>`
+  ${({ imageWidth }) =>
+    imageWidth &&
     `
-    max-width: ${`${width}px`};
-    min-width: ${`${width}px`};
-    width: ${`${width}px`};
+    max-width: ${`${imageWidth}px`};
+    width: ${`calc(${imageWidth}px - 8px)`};
   `}
   ${({ height }) =>
     height &&
@@ -259,11 +303,19 @@ const Img = styled.img<{ width?: number; height?: number }>`
     height: ${`${height}px`};
   `}
   object-fit: cover;
-  transition: height 0.2s ease;
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: height 0.2s ease;
+  `}
 `
 
-const Favicon = styled.img`
-  transition: all 0.2s ease;
+const Favicon = styled.img<{ shouldAnimate: boolean }>`
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
   width: 24px;
   height: 24px;
   object-fit: contain;
