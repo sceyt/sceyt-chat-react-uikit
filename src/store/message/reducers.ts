@@ -486,6 +486,14 @@ const messageSlice = createSlice({
     setOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
       const { url, metadata } = action.payload
       state.oGMetadata[url] = metadata
+    },
+
+    updateOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
+      const { url, metadata } = action.payload
+      if (metadata) {
+        const existing = state.oGMetadata[url]
+        state.oGMetadata[url] = existing ? { ...existing, ...metadata } : metadata
+      }
     }
   },
   extraReducers: (builder) => {
@@ -538,7 +546,8 @@ export const {
   addSelectedMessage,
   removeSelectedMessage,
   clearSelectedMessages,
-  setOGMetadata
+  setOGMetadata,
+  updateOGMetadata
 } = messageSlice.actions
 
 // Export reducer

@@ -60,7 +60,8 @@ import {
   removeSelectedMessage,
   clearSelectedMessages,
   updateMessageAttachment,
-  setOGMetadata
+  setOGMetadata,
+  updateOGMetadata
 } from './reducers'
 
 export function sendMessageAC(
@@ -298,6 +299,10 @@ export function setMessagesHasNextAC(hasNext: boolean) {
 
 export function setOGMetadataAC(url: string, metadata: IOGMetadata | null) {
   return setOGMetadata({ url, metadata })
+}
+
+export function updateOGMetadataAC(url: string, metadata: IOGMetadata | null) {
+  return updateOGMetadata({ url, metadata })
 }
 
 export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string) {

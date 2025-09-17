@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { getClient } from '../../../common/client'
 import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadataService'
 import { attachmentTypes } from '../../../helpers/constants'
-import { setOGMetadataAC } from '../../../store/message/actions'
+import { setOGMetadataAC, updateOGMetadataAC } from '../../../store/message/actions'
 import { useDispatch, useSelector } from '../../../store/hooks'
 
 const validateUrl = (url: string) => {
@@ -83,9 +83,8 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
           .then(async (cachedMetadata) => {
             if (cachedMetadata) {
               handleMetadata(cachedMetadata)
-            } else {
-              ogMetadataQueryBuilder(url)
             }
+            ogMetadataQueryBuilder(url)
           })
           .catch(() => {
             ogMetadataQueryBuilder(url)
@@ -108,8 +107,13 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   }, [state, metadata])
 
   const calculatedImageHeight = useMemo(() => {
-    return (metadata?.imageHeight || 0) / ((metadata?.imageWidth || 0) / 400)
+    if (!metadata?.imageWidth) {
+      return 0
+    }
+    return metadata?.imageHeight / (metadata?.imageWidth / 400)
   }, [metadata?.imageWidth, metadata?.imageHeight])
+
+  console.log('metadata', metadata)
 
   return (
     <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
@@ -122,7 +126,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
         <ImageContainer
           showOGMetadata={!!showOGMetadata && !imageLoadError}
           containerWidth={400}
-          height={calculatedImageHeight}
+          containerHeight={calculatedImageHeight}
           shouldAnimate={shouldAnimate}
         >
           {metadata?.og?.image?.[0]?.url && !imageLoadError ? (
@@ -130,7 +134,7 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
               src={metadata?.og?.image?.[0]?.url}
               alt='OG metadata image'
               imageWidth={400}
-              height={calculatedImageHeight}
+              imageHeight={calculatedImageHeight}
               shouldAnimate={shouldAnimate}
             />
           ) : null}
@@ -147,7 +151,15 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
                     shouldAnimate={shouldAnimate}
                     src={metadata?.og?.favicon?.url}
                     onLoad={() => setFaviconLoadError(false)}
-                    onError={() => setFaviconLoadError(true)}
+                    onError={() => {
+                      dispatch(
+                        updateOGMetadataAC(attachment?.url, {
+                          ...metadata,
+                          og: { ...metadata?.og, favicon: { url: '' } }
+                        })
+                      )
+                      setFaviconLoadError(true)
+                    }}
                   />
                 ) : null}
                 <span>{metadata?.og?.title}</span>
@@ -186,7 +198,7 @@ const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
 const ImageContainer = styled.div<{
   showOGMetadata: boolean
   containerWidth: number
-  height: number
+  containerHeight: number
   shouldAnimate: boolean
 }>`
   ${({ containerWidth }) =>
@@ -199,21 +211,20 @@ const ImageContainer = styled.div<{
     width: 100%;
   `}
 
-  ${({ height, showOGMetadata }) =>
-    height
+  ${({ containerHeight, showOGMetadata }) =>
+    containerHeight
       ? `
-    max-height: ${`${height}px`};
-    height: ${showOGMetadata ? `${height}px` : '0'};
+    max-height: ${`${containerHeight}px`};
+    height: ${showOGMetadata ? `${containerHeight}px` : '0'};
   `
       : `
-    max-height: 200px;
-    height: ${showOGMetadata ? '200px' : '0'};
+      height: 0;
   `}
 
-  opacity: ${({ showOGMetadata }) => (showOGMetadata ? 1 : 0)};
+  opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   overflow: hidden;
   margin: 0 auto;
-  padding: ${({ showOGMetadata }) => (showOGMetadata ? '4px' : '0')};
+  padding: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? '4px' : '0')};
   ${({ shouldAnimate }) =>
     shouldAnimate &&
     `
@@ -287,20 +298,21 @@ const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   `}
 `
 
-const Img = styled.img<{ imageWidth?: number; height?: number; shouldAnimate: boolean }>`
+const Img = styled.img<{ imageWidth?: number; imageHeight?: number; shouldAnimate: boolean }>`
   ${({ imageWidth }) =>
     imageWidth &&
     `
     max-width: ${`${imageWidth}px`};
     width: ${`calc(${imageWidth}px - 8px)`};
   `}
-  ${({ height }) =>
-    height &&
+  ${({ imageHeight }) =>
+    imageHeight &&
     `
-    max-height: ${`${height}px`};
-    min-height: ${`${height}px`};
-    height: ${`${height}px`};
+    max-height: ${`${imageHeight}px`};
+    min-height: ${`${imageHeight}px`};
+    height: ${`${imageHeight}px`};
   `}
+
   object-fit: cover;
   ${({ shouldAnimate }) =>
     shouldAnimate &&
