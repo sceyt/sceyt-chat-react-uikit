@@ -35,3 +35,4 @@ export const reactionsLoadingStateSelector = (store: any) => store.MessageReduce
 export const openedMessageMenuSelector = (store: any) => store.MessageReducer.openedMessageMenu
 export const playingAudioIdSelector = (store: any) => store.MessageReducer.playingAudioId
 export const selectedMessagesMapSelector = (store: any) => store.MessageReducer.selectedMessagesMap
+export const attachmentUpdatedMapSelector = (store: any) => store.MessageReducer.attachmentUpdatedMap

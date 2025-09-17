@@ -3,7 +3,11 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector, useDispatch } from 'store/hooks'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
-import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
+import {
+  attachmentCompilationStateSelector,
+  attachmentsUploadProgressSelector,
+  attachmentUpdatedMapSelector
+} from '../../store/message/selector'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
 import {
@@ -116,9 +120,14 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  const [imageLoading, setImageLoading] = useState(!attachment.attachmentUrl)
+  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
+  const attachmentUrlFromMap = useMemo(
+    () => attachmentUpdatedMap[attachment.url],
+    [attachmentUpdatedMap, attachment.url]
+  )
+  const [imageLoading, setImageLoading] = useState(!attachmentUrlFromMap)
   const [downloadingFile, setDownloadingFile] = useState(false)
-  const [attachmentUrl, setAttachmentUrl] = useState('')
+  const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
   const [failTimeout, setFailTimeout]: any = useState()
   const [progress, setProgress] = useState(3)
   const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>({
@@ -134,13 +143,13 @@ const Attachment = ({
   const customDownloader = getCustomDownloader()
   const previewFileType = isPreview && attachment.data.type.split('/')[0]
 
+  const attachmentMetadata = useMemo(() => {
+    return isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+  }, [attachment.metadata])
+
   const [renderWidth, renderHeight] = useMemo(() => {
     let attachmentData = null
-    if (attachment.metadata && typeof attachment.metadata === 'string') {
-      attachmentData = isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-    } else if (attachment.metadata && attachment.metadata.szw && attachment.metadata.szh) {
-      attachmentData = attachment.metadata
-    }
+    attachmentData = attachmentMetadata
 
     return attachmentData && attachmentData.szw && attachmentData.szh
       ? calculateRenderedImageWidth(
@@ -150,28 +159,28 @@ const Attachment = ({
           attachment.type === attachmentTypes.image ? imageAttachmentMaxHeight || 400 : videoAttachmentMaxHeight
         )
       : []
-  }, [])
+  }, [attachmentMetadata])
 
   const isInUploadingState =
     attachmentCompilationState[attachment.tid!] &&
     (attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.UPLOADING ||
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
-  // const attachmentThumb = attachment.metadata && attachment.metadata.tmb
+  // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
   let attachmentThumb
   let withPrefix = true
   if (
     attachment.type !== attachmentTypes.voice &&
     attachment.type !== attachmentTypes.link &&
-    attachment.metadata &&
-    attachment.metadata.tmb
+    attachmentMetadata &&
+    attachmentMetadata.tmb
   ) {
     try {
-      if (attachment.metadata.tmb.length < 70) {
-        attachmentThumb = base64ToToDataURL(attachment.metadata.tmb)
+      if (attachmentMetadata.tmb.length < 70) {
+        attachmentThumb = base64ToToDataURL(attachmentMetadata.tmb)
         withPrefix = false
       } else {
-        attachmentThumb = attachment.metadata && attachment.metadata.tmb
+        attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
       }
     } catch (e) {
       log.error('error on get attachmentThumb', e)
@@ -359,7 +368,7 @@ const Attachment = ({
               // @ts-ignore
               // downloadImage(cachedUrl)
               setAttachmentUrl(cachedUrl)
-              dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.messageId, { attachmentUrl: cachedUrl }))
+              dispatch(setUpdateMessageAttachmentAC(attachment.url, cachedUrl))
               setIsCached(true)
             } else {
               setIsCached(false)
@@ -502,7 +511,7 @@ const Attachment = ({
             fitTheContainer={isDetailsView}
             imageMaxHeight={
               `${renderHeight || 400}px`
-              // attachment.metadata && (attachment.metadata.szh > 400 ? '400px' : `${attachment.metadata.szh}px`)
+              // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
             }
             onLoad={() => setImageLoading(false)}
           />
@@ -768,7 +777,7 @@ const Attachment = ({
           {attachmentThumb ? (
             <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
           ) : (
-            // <FileThumbnail src={base64ToToDataURL(attachment.metadata.tmb)} />
+            // <FileThumbnail src={base64ToToDataURL(attachmentMetadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview

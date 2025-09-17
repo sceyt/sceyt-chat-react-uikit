@@ -300,8 +300,8 @@ export function setOGMetadataAC(url: string, metadata: IOGMetadata | null) {
   return setOGMetadata({ url, metadata })
 }
 
-export function setUpdateMessageAttachmentAC(url: string, messageId: string, params: any) {
-  return updateMessageAttachment({ url, messageId, params })
+export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string) {
+  return updateMessageAttachment({ url, attachmentUrl })
 }
 
 export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {

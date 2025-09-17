@@ -6,9 +6,7 @@ import {
   MESSAGES_MAX_LENGTH,
   removePendingMessageFromMap,
   setHasNextCached,
-  setHasPrevCached,
-  updateMessageOnAllMessages,
-  updateMessageOnMap
+  setHasPrevCached
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
@@ -55,6 +53,7 @@ export interface IMessageStore {
   playingAudioId: string | null
   selectedMessagesMap: Map<string, IMessage> | null
   oGMetadata: { [key: string]: IOGMetadata | null }
+  attachmentUpdatedMap: { [key: string]: string }
 }
 
 const initialState: IMessageStore = {
@@ -92,7 +91,8 @@ const initialState: IMessageStore = {
   attachmentsUploadingProgress: {},
   playingAudioId: null,
   selectedMessagesMap: null,
-  oGMetadata: {}
+  oGMetadata: {},
+  attachmentUpdatedMap: {}
 }
 
 const messageSlice = createSlice({
@@ -250,31 +250,9 @@ const messageSlice = createSlice({
       }
     },
 
-    updateMessageAttachment: (state, action: PayloadAction<{ url: string; messageId: string; params: any }>) => {
-      const { url, messageId, params } = action.payload
-      state.activeChannelMessages = state.activeChannelMessages.map((message: IMessage) => {
-        if (message.id === messageId) {
-          for (let index = 0; index < message.attachments.length; index++) {
-            const attachment = message.attachments[index]
-            if (attachment.url === url) {
-              message.attachments[index] = { ...attachment, ...params }
-            }
-          }
-        }
-        if (message.attachments.length) {
-          const detachedAttachments = message.attachments.map((att) => ({
-            ...att,
-            user: {
-              ...att.user,
-              metadata: { ...((att.user as any)?.metadata || {}) },
-              presence: { ...(att.user?.presence || {}) }
-            }
-          }))
-          updateMessageOnAllMessages(messageId, { attachments: detachedAttachments })
-          updateMessageOnMap(message.channelId, { messageId, params: { attachments: detachedAttachments } })
-        }
-        return message
-      })
+    updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
+      const { url, attachmentUrl } = action.payload
+      state.attachmentUpdatedMap[url] = attachmentUrl
     },
 
     addReactionToMessage: (
