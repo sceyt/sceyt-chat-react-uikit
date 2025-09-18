@@ -6,6 +6,8 @@ import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadata
 import { attachmentTypes } from '../../../helpers/constants'
 import { setOGMetadataAC, updateOGMetadataAC } from '../../../store/message/actions'
 import { useDispatch, useSelector } from '../../../store/hooks'
+import { useColor } from 'hooks'
+import { THEME_COLORS } from 'UIHelper/constants'
 
 const validateUrl = (url: string) => {
   try {
@@ -16,10 +18,21 @@ const validateUrl = (url: string) => {
   }
 }
 
-const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state: string }) => {
+const OGMetadata = ({
+  attachments,
+  state,
+  incoming
+}: {
+  attachments: IAttachment[]
+  state: string
+  incoming: boolean
+}) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
-
+  const {
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX
+  } = useColor()
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
   }, [attachments])
@@ -114,12 +127,15 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
   }, [metadata?.imageWidth, metadata?.imageHeight])
 
   return (
-    <OGMetadataContainer showOGMetadata={!!showOGMetadata}>
+    <OGMetadataContainer
+      showOGMetadata={!!showOGMetadata}
+      bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
+    >
       <div
         onClick={() => {
           window.open(attachment?.url, '_blank')
         }}
-        style={{ width: showOGMetadata ? '400px' : 'auto' }}
+        style={{ width: showOGMetadata ? '100%' : 'auto' }}
       >
         <ImageContainer
           showOGMetadata={!!showOGMetadata && !imageLoadError}
@@ -177,18 +193,18 @@ const OGMetadata = ({ attachments, state }: { attachments: IAttachment[]; state:
 
 export { OGMetadata }
 
-const OGMetadataContainer = styled.div<{ showOGMetadata: boolean }>`
+const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: string }>`
   min-width: inherit;
   max-width: inherit;
   display: grid;
   grid-template-columns: 1fr;
-  background-color: rgba(0, 0, 0, 0.034);
+  background-color: ${({ bgColor }) => bgColor};
   border-radius: 6px;
   margin-bottom: 0.4rem;
   margin: 0 auto;
   margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.8rem' : '0')};
   &:hover {
-    background-color: rgba(0, 0, 0, 0.1);
+    opacity: 0.9;
     cursor: pointer;
   }
 `
@@ -300,7 +316,7 @@ const Img = styled.img<{ imageWidth?: number; imageHeight?: number; shouldAnimat
   ${({ imageWidth }) =>
     imageWidth &&
     `
-    max-width: ${`${imageWidth}px`};
+    max-width: 100%;
     width: ${`calc(${imageWidth}px - 8px)`};
   `}
   ${({ imageHeight }) =>

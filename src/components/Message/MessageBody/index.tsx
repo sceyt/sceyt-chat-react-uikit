@@ -629,7 +629,9 @@ const MessageBody = ({
         incoming={message.incoming}
         linkColor={linkColor}
       >
-        {linkAttachment && <OGMetadata attachments={[linkAttachment]} state={message.state} />}
+        {linkAttachment && (
+          <OGMetadata attachments={[linkAttachment]} state={message.state} incoming={message.incoming} />
+        )}
         <span ref={messageTextRef}>
           {MessageTextFormat({
             text: message.body,
