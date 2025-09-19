@@ -508,7 +508,15 @@ const MessageList: React.FC<MessagesProps> = ({
     let text = ''
     for (let i = dateLabels.length - 1; i >= 0; i--) {
       const dateLabel = dateLabels[i]
-      if (!text && container.scrollTop > dateLabel.offsetTop - 28) {
+      // If scroll position is around the divider itself, hide the fixed top date label
+      const aroundThreshold = 40
+      const labelTop = dateLabel.offsetTop - 28
+      const labelBottom = labelTop + (dateLabel.offsetHeight || 0) - 28
+      if (container.scrollTop >= labelTop - aroundThreshold && container.scrollTop <= labelBottom + aroundThreshold) {
+        setShowTopDate(false)
+        break
+      }
+      if (!text && container.scrollTop > labelTop - 28) {
         const span = dateLabel?.firstChild && ((dateLabel.firstChild as HTMLElement).firstChild as HTMLElement)
         text = span ? span.innerText || '' : ''
         setTopDateLabel(text)
@@ -531,9 +539,9 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     setShowTopDate(true)
     clearTimeout(hideTopDateTimeout.current)
-    hideTopDateTimeout.current = setTimeout(() => {
-      setShowTopDate(false)
-    }, 1000)
+    // hideTopDateTimeout.current = setTimeout(() => {
+    //   setShowTopDate(false)
+    // }, 1000)
     renderTopDate()
     let forceLoadPrevMessages = false
     if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
