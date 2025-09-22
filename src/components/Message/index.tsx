@@ -782,17 +782,18 @@ const Message = ({
             reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
           />
         )}
-        {message.reactionTotals && message.reactionTotals.length && (
-          <ReactionsContainer
-            id={`${message.id}_reactions_container`}
-            border={reactionsContainerBorder}
-            boxShadow={reactionsContainerBoxShadow}
-            borderRadius={reactionsContainerBorderRadius}
-            topPosition={reactionsContainerTopPosition}
-            padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground || backgroundSections}
-            rtlDirection={ownMessageOnRightSide && !message.incoming}
-          >
+        <ReactionsContainer
+          id={`${message.id}_reactions_container`}
+          border={reactionsContainerBorder}
+          boxShadow={reactionsContainerBoxShadow}
+          borderRadius={reactionsContainerBorderRadius}
+          topPosition={reactionsContainerTopPosition}
+          padding={reactionsContainerPadding}
+          backgroundColor={reactionsContainerBackground || backgroundSections}
+          rtlDirection={ownMessageOnRightSide && !message.incoming}
+          isReacted={message.reactionTotals && message.reactionTotals.length > 0}
+        >
+          {message.reactionTotals && message.reactionTotals.length && (
             <MessageReactionsCont
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               onClick={handleToggleReactionsPopup}
@@ -833,8 +834,8 @@ const Message = ({
                 </MessageReaction>
               )}
             </MessageReactionsCont>
-          </ReactionsContainer>
-        )}
+          )}
+        </ReactionsContainer>
       </MessageContent>
       {deletePopupOpen && (
         <ConfirmPopup
@@ -1015,6 +1016,7 @@ const ReactionsContainer = styled.div<{
   backgroundColor: string
   padding?: string
   rtlDirection?: boolean
+  isReacted?: boolean
 }>`
   display: inline-flex;
   margin-left: ${(props: any) => props.rtlDirection && 'auto'};
@@ -1027,7 +1029,7 @@ const ReactionsContainer = styled.div<{
   filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
   border-radius: ${(props) => props.borderRadius || '16px'};
   background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => props.padding || '4px 8px'};
+  padding: ${(props) => (!props.isReacted ? '0' : props.padding || '4px 8px')};
   z-index: 9;
   ${(props) =>
     props.topPosition &&
@@ -1035,6 +1037,9 @@ const ReactionsContainer = styled.div<{
       position: relative;
       top: ${props.topPosition};
   `};
+  overflow: hidden;
+  height: ${(props) => (props.isReacted ? '16px' : '0')};
+  transition: all 0.3s;
 `
 const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`
   position: relative;
