@@ -175,13 +175,13 @@ function* createChannel(action: IAction): any {
       yield call(setChannelInMap, createdChannel)
       if (createdChannel.type !== DEFAULT_CHANNEL_TYPE.DIRECT) {
         const messageToSend: any = {
-          // metadata: mentionedMembersPositions,
+          // metadata: mentionedUsersPositions,
           body:
             createdChannel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
             createdChannel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
               ? 'CC'
               : 'CG',
-          mentionedMembers: [],
+          mentionedUsers: [],
           attachments: [],
           type: 'system'
         }

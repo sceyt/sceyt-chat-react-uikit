@@ -28,6 +28,7 @@ import {
   getActiveChannelId,
   getChannelFromAllChannels,
   getChannelFromMap,
+  getDisableFrowardMentionsCount,
   query,
   removeChannelFromMap,
   setChannelInMap,
@@ -197,7 +198,7 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
     JSON.stringify({
       ...messageCopy,
       createdAt: new Date(Date.now()),
-      mentionedUsers: message.mentionedMembers,
+      mentionedUsers: message.mentionedUsers,
       parentMessage: message.parentMessage
     })
   )
@@ -236,7 +237,7 @@ function* sendMessage(action: IAction): any {
       setChannelInMap(channel)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
+    const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
 
@@ -538,7 +539,7 @@ function* sendTextMessage(action: IAction): any {
       setChannelInMap(channel)
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
+    const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
       const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
@@ -566,7 +567,7 @@ function* sendTextMessage(action: IAction): any {
       JSON.stringify({
         ...messageToSend,
         createdAt: new Date(Date.now()),
-        mentionedUsers: message.mentionedMembers,
+        mentionedUsers: message.mentionedUsers,
         parentMessage: message.parentMessage
       })
     )
@@ -663,7 +664,7 @@ function* forwardMessage(action: IAction): any {
       }
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    const mentionedUserIds = message.mentionedMembers ? message.mentionedMembers.map((member: any) => member.id) : []
+    const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (
       !(
@@ -688,9 +689,9 @@ function* forwardMessage(action: IAction): any {
         .setAttachments(attachments)
         .setMentionUserIds(mentionedUserIds)
         .setType(message.type)
+        .setDisableMentionsCount(getDisableFrowardMentionsCount())
         .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
-
       const messageToSend = messageBuilder.create()
       const pendingMessage = JSON.parse(
         JSON.stringify({
@@ -791,7 +792,7 @@ function* resendMessage(action: IAction): any {
       }
     }
     yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    // const mentionedUserIds = message.mentionedMembers.map((member: any) => member.id)
+    // const mentionedUserIds = message.mentionedUsers.map((member: any) => member.id)
     // let attachmentsToSend: IAttachment[] = []
     const customUploader = getCustomUploader()
 

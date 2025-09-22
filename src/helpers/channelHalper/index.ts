@@ -23,6 +23,7 @@ let UploadImageIcon: JSX.Element
 let showChannelDetails: boolean = false
 let channelTypesFilter: string[] = []
 let memberCount: number = 10
+let disableFrowardMentionsCount: boolean = false
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
@@ -148,6 +149,14 @@ export function getChannelMembersCount() {
 
 export function setChannelMembersCount(count: number) {
   memberCount = count
+}
+
+export function setDisableFrowardMentionsCount(disable: boolean) {
+  disableFrowardMentionsCount = disable
+}
+
+export function getDisableFrowardMentionsCount() {
+  return disableFrowardMentionsCount
 }
 
 // eslint-disable-next-line no-unused-vars

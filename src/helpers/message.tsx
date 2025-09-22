@@ -14,7 +14,7 @@ export const typingTextFormat = ({
 }) => {
   // const messageText: any = [text]
   let messageText: any = ''
-  // if (mentionedMembers.length > 0) {
+  // if (mentionedUsers.length > 0) {
   const attributesPositions: any = Array.isArray(formatAttributes)
     ? [...formatAttributes].sort((a: any, b: any) => a.start - b.start)
     : []
@@ -214,10 +214,10 @@ export const lastMessageDateFormat = (date: Date | number) => {
   return moment(date).format('DD.MM.YY')
 }
 
-export const getDuplicateMentionsFromMeta = (mentionsMetas: any[], mentionedMembers: any[]) => {
+export const getDuplicateMentionsFromMeta = (mentionsMetas: any[], mentionedUsers: any[]) => {
   const mentionsList: any[] = []
   mentionsMetas.forEach((mentionMeta: any) => {
-    const editingMention = mentionedMembers.find((menMem: any) => menMem.id === mentionMeta.id)
+    const editingMention = mentionedUsers.find((menMem: any) => menMem.id === mentionMeta.id)
     if (editingMention) {
       mentionsList.push(editingMention)
     }

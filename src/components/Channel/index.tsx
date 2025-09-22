@@ -343,7 +343,7 @@ const Channel: React.FC<IChannelProps> = ({
         if (channelDraftMessage) {
           setDraftMessageText(channelDraftMessage.text)
           setDraftMessage({
-            mentionedUsers: channelDraftMessage.mentionedMembers,
+            mentionedUsers: channelDraftMessage.mentionedUsers,
             body: channelDraftMessage.text,
             bodyAttributes: channelDraftMessage.bodyAttributes
           })

@@ -109,6 +109,7 @@ export interface IChatClientProps {
   openChatOnUserInteraction?: boolean
   logLevel?: 'silent' | 'trace' | 'debug' | 'info' | 'warn' | 'error'
   memberCount?: number
+  disableFrowardMentionsCount?: boolean
 }
 
 const SceytChatContainer = ({
@@ -130,7 +131,8 @@ const SceytChatContainer = ({
   openChatOnUserInteraction,
   autoSelectFirstChannel,
   logLevel = 'silent',
-  memberCount
+  memberCount,
+  disableFrowardMentionsCount
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -157,6 +159,7 @@ const SceytChatContainer = ({
         autoSelectFirstChannel={autoSelectFirstChannel}
         channelTypeFilter={channelTypeFilter}
         memberCount={memberCount}
+        disableFrowardMentionsCount={disableFrowardMentionsCount}
       />
     </Provider>
   )
