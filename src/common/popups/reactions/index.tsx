@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
@@ -71,10 +71,8 @@ export default function ReactionsPopup({
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [activeTabKey, setActiveTabKey] = useState('all')
-  const [popupVerticalPosition, setPopupVerticalPosition] = useState('')
   // const [popupHorizontalPosition, setPopupHorizontalPosition] = useState('')
   const [popupHeight, setPopupHeight] = useState(0)
-  const [scoresHeight, setScoresHeight] = useState(0)
   const [calculateSizes, setCalculateSizes] = useState(false)
   const [closeIsApproved, setCloseIsApproved] = useState(false)
   let totalReactions = 0
@@ -119,12 +117,14 @@ export default function ReactionsPopup({
       dispatch(setReactionsListAC([], true))
     }
   }, [messageId])
-  useEffect(() => {
+
+  const scoresHeight = useMemo(() => {
     const scoresElem = scoresRef.current
     if (scoresElem) {
-      setScoresHeight(scoresElem.offsetHeight)
+      return scoresElem.offsetHeight
     }
-  })
+    return 0
+  }, [scoresRef])
 
   useEffect(() => {
     if (!reactionTotals || !reactionTotals.length) {
@@ -132,9 +132,12 @@ export default function ReactionsPopup({
     }
   }, [reactionTotals])
 
+  const reactionsHeight = useMemo(() => {
+    return reactions.length * 50 + 45
+  }, [reactions])
+
   useEffect(() => {
     if (reactions && reactionsPrevLength < reactions.length) {
-      const reactionsHeight = reactions.length * 44 + 45
       if (reactionsHeight > popupHeight) {
         setPopupHeight(reactionsHeight)
       }
@@ -153,14 +156,17 @@ export default function ReactionsPopup({
         } else {
           setPopupHorizontalPosition(horizontalPositions.left - channelListWidth > popupPos?.width! ? 'left' : 'right')
         } */
-        const botPost = bottomPosition - messageInputHeight - 40
-        const reactionsHeight = reactions.length * 50 + 45
         setPopupHeight(reactionsHeight)
-        setPopupVerticalPosition(botPost >= (reactionsHeight > 320 ? 320 : reactionsHeight) ? 'bottom' : 'top')
         setCalculateSizes(false)
       }
     }
-  }, [reactions])
+  }, [reactions, reactionsHeight])
+
+  const popupVerticalPosition = useMemo(() => {
+    const botPost = bottomPosition - messageInputHeight - 40
+    return botPost >= (reactionsHeight > 320 ? 320 : reactionsHeight) ? 'bottom' : 'top'
+  }, [bottomPosition, messageInputHeight, reactionsHeight])
+
   return (
     <Container
       ref={popupRef}
