@@ -14,6 +14,7 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
+import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
@@ -508,13 +509,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
       ;(async () => {
         if (!recorder) {
           try {
-            // @ts-ignore
-            const MicRecorderModule = await import('mic-recorder-to-mp3')
-            const MicRecorder = MicRecorderModule.default
-            const recorder = new MicRecorder({
+            const newRecorder = new MicRecorder({
               bitRate: 128
             })
-            setRecorder(recorder)
+            setRecorder(newRecorder)
           } catch (e) {
             log.error('Failed to init mic-recorder-to-mp3', e)
           }

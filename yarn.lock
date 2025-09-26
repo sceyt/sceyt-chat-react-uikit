@@ -8023,9 +8023,10 @@ methods@~1.1.2:
   resolved "https://registry.npmjs.org/methods/-/methods-1.1.2.tgz#5529a4d67654134edcc5266656835b0f851afcee"
   integrity sha512-iclAHeNqNm68zFtnZ0e+1L2yUIdvzNoauKU4WBA3VvH/vPFieF7qfRlwUZU+DA9P9bPXIS90ulxoUoCH23sV2w==
 
-"mic-recorder-to-mp3@https://github.com/NikolaBalaban/mic-recorder-to-mp3.git":
+mic-recorder-to-mp3@^2.2.2:
   version "2.2.2"
-  resolved "https://github.com/NikolaBalaban/mic-recorder-to-mp3.git#b07b6408c41cb55122169739e4bdce626660c109"
+  resolved "https://registry.npmjs.org/mic-recorder-to-mp3/-/mic-recorder-to-mp3-2.2.2.tgz#32e767d1196fb81d10e279f31c304350c9501d01"
+  integrity sha512-xDkOaHbojW3bdKOGn9CI5dT+Mc0RrfczsX/Y1zGJp3FUB4zei5ZKFnNm7Nguc9v910wkd7T3csnCTq5EtCF3Zw==
   dependencies:
     lamejs "^1.2.0"
 
