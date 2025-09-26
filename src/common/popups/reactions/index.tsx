@@ -225,7 +225,11 @@ export default function ReactionsPopup({
         onMouseLeave={() => setIsScrolling(false)}
       >
         {reactions.map((reaction: IReaction) => (
-          <ReactionItem key={reaction.id} hoverBackgroundColor={backgroundHovered}>
+          <ReactionItem
+            key={reaction.id}
+            hoverBackgroundColor={backgroundHovered}
+            onClick={() => handleAddDeleteEmoji(reaction.key)}
+          >
             <AvatarWrapper>
               <Avatar
                 name={reaction.user.firstName || reaction.user.id}
@@ -251,7 +255,7 @@ export default function ReactionsPopup({
                     userLastActiveDateFormat(reaction.user.presence.lastActiveAt)}
               </SubTitle>
             </UserNamePresence>
-            <ReactionKey onClick={() => handleAddDeleteEmoji(reaction.key)}>{reaction.key}</ReactionKey>
+            <ReactionKey>{reaction.key}</ReactionKey>
           </ReactionItem>
         ))}
       </ReactionsList>
@@ -465,6 +469,7 @@ const ReactionItem = styled.li<{ hoverBackgroundColor: string }>`
   font-size: 15px;
   padding: 6px 16px;
   transition: all 0.2s;
+  cursor: pointer;
 
   &:hover {
     background-color: ${(props) => props.hoverBackgroundColor};
