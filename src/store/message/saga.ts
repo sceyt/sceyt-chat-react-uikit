@@ -1670,7 +1670,6 @@ function* getMessageMarkers(action: IAction): any {
       )
       const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
       const messageMarkers = yield call(messageMarkerListQuery.loadNext)
-      console.log('messageMarkers', messageMarkers)
       yield put(setMessageMarkersAC(channelId, messageId, messageMarkers.markers, deliveryStatus))
     }
   } catch (e) {
