@@ -55,7 +55,7 @@ const MessageInfo = ({
   avatarSize = 32,
   maxWidth = '340px',
   minWidth = '340px',
-  height = '322px',
+  height = '300px',
   renderItem,
   formatDate = defaultFormatDate,
   tabsStyles = {},
@@ -96,8 +96,8 @@ const MessageInfo = ({
     return Array.isArray(list) ? [...list].sort(sortByDateDesc) : []
   }, [markers, activeTab])
   // Calculate a row height and max list height for 5 rows (approx: item height + vertical gaps)
-  const rowHeightPx = useMemo(() => (avatarSize || 40) + 24, [avatarSize])
-  const listMaxHeightPx = useMemo(() => rowHeightPx * 5, [rowHeightPx])
+  const rowHeightPx = useMemo(() => (avatarSize || 32) + 24, [avatarSize])
+  const listMaxHeightPx = useMemo(() => rowHeightPx * 5 - 16, [rowHeightPx])
 
   const tabItems: Array<{ key: MessageInfoTab; label: string; data: IMarker[] }> = tabsOrder.map((tab) => {
     switch (tab.key) {
@@ -152,7 +152,7 @@ const MessageInfo = ({
       const listMarginTop = 8
       const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
       const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
-      const maxPx = parseInt(String(height || '322'), 10) || 322
+      const maxPx = parseInt(String(height || '300'), 10) || 300
       const measuredTarget = Math.min(desiredHeight || 0, maxPx)
       // For flip decision while loading, consider worst-case; but keep visual height to measured
       const flipTarget = messagesMarkersLoadingState === LOADING_STATE.LOADING ? maxPx : measuredTarget
@@ -196,8 +196,8 @@ const MessageInfo = ({
       // Use planned height for stable flip decision during transitions
       let dropdownHeight = panelHeightPx || 0
       if (!dropdownHeight || dropdownHeight < 8) {
-        const parsed = parseInt(String(height || '322'), 10)
-        dropdownHeight = isNaN(parsed) ? 322 : parsed
+        const parsed = parseInt(String(height || '300'), 10)
+        dropdownHeight = isNaN(parsed) ? 300 : parsed
       }
 
       const availableBelow = containerRect.bottom - anchorRect.bottom - 8
@@ -267,8 +267,8 @@ const MessageInfo = ({
     const listMarginTop = 8
     const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
     const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
-    const maxPx = parseInt(String(height || '322'), 10)
-    const measuredTarget = Math.min(desiredHeight || 0, isNaN(maxPx) ? 322 : Math.min(maxPx, desiredHeight))
+    const maxPx = parseInt(String(height || '300'), 10)
+    const measuredTarget = Math.min(desiredHeight || 0, isNaN(maxPx) ? 300 : Math.min(maxPx, desiredHeight))
     const nextHeight = Math.max(panelHeightPx || 0, measuredTarget)
 
     const availableBelow = containerRect.bottom - anchorRect.bottom - 8
@@ -362,18 +362,16 @@ const MessageInfo = ({
               </Tab>
             ))}
           </Tabs>
-          {messagesMarkersLoadingState === LOADING_STATE.LOADING ? (
-            <Empty color={textSecondary}>Loading...</Empty>
-          ) : (
-            <List ref={listRef} maxHeight={listMaxHeightPx}>
-              {activeMarkers.map((marker: IMarker) => (
-                <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
-                  {renderRow(marker)}
-                </React.Fragment>
-              ))}
-              {!activeMarkers.length && <Empty color={textSecondary}>No results</Empty>}
-            </List>
-          )}
+          <List ref={listRef} maxHeight={listMaxHeightPx}>
+            {activeMarkers.map((marker: IMarker) => (
+              <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
+                {renderRow(marker)}
+              </React.Fragment>
+            ))}
+            {!activeMarkers.length && messagesMarkersLoadingState !== LOADING_STATE.LOADING && (
+              <Empty color={textSecondary}>No results</Empty>
+            )}
+          </List>
         </Content>
       </Panel>
     </DropdownRoot>
@@ -430,6 +428,7 @@ const List = styled.div<{ maxHeight?: number }>`
   min-height: 0;
   overflow-y: auto;
   max-height: ${(p) => (p.maxHeight ? `${p.maxHeight}px` : 'unset')};
+  min-height: 120px;
 `
 
 const Row = styled.div<{ backgroundHover?: string }>`
@@ -476,6 +475,11 @@ const Empty = styled.div<{ color: string }>`
   text-align: center;
   padding: 16px 0;
   font-size: 14px;
+  height: calc(100% - 32px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 `
 
 const DropdownRoot = styled.div<{ rtl: boolean; backgroundColor: string; flip: boolean; ready: boolean }>`
@@ -504,7 +508,7 @@ const Panel = styled.div<{
   overflow: hidden;
   transition: height 0.25s ease;
   height: ${(p) =>
-    p.open ? `${Math.min(p.heightPx || 0, parseInt(String(p.maxHeight || '322'), 10) || 322)}px` : '0'};
+    p.open ? `${Math.min(p.heightPx || 0, parseInt(String(p.maxHeight || '300'), 10) || 300)}px` : '0'};
   width: ${(p) => p.maxWidth || '340px'};
   min-width: ${(p) => p.minWidth || '340px'};
   display: flex;
