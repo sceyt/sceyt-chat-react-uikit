@@ -15,7 +15,8 @@ import {
   RESEND_MESSAGE,
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
-  SEND_TEXT_MESSAGE
+  SEND_TEXT_MESSAGE,
+  GET_MESSAGE_MARKERS
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import {
@@ -61,7 +62,9 @@ import {
   clearSelectedMessages,
   updateMessageAttachment,
   setOGMetadata,
-  updateOGMetadata
+  updateOGMetadata,
+  setMessageMarkers,
+  setMessagesMarkersLoadingState
 } from './reducers'
 
 export function sendMessageAC(
@@ -410,4 +413,24 @@ export function removeSelectedMessageAC(messageId: string) {
 
 export function clearSelectedMessagesAC() {
   return clearSelectedMessages()
+}
+
+export function getMessageMarkersAC(messageId: string, channelId: string, deliveryStatus: string) {
+  return {
+    type: GET_MESSAGE_MARKERS,
+    payload: { messageId, channelId, deliveryStatus }
+  }
+}
+
+export function setMessageMarkersAC(
+  channelId: string,
+  messageId: string,
+  messageMarkers: IMarker[],
+  deliveryStatus: string
+) {
+  return setMessageMarkers({ channelId, messageId, messageMarkers, deliveryStatus })
+}
+
+export function setMessagesMarkersLoadingStateAC(state: number) {
+  return setMessagesMarkersLoadingState({ state })
 }

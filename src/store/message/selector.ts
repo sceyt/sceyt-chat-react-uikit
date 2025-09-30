@@ -36,3 +36,5 @@ export const openedMessageMenuSelector = (store: any) => store.MessageReducer.op
 export const playingAudioIdSelector = (store: any) => store.MessageReducer.playingAudioId
 export const selectedMessagesMapSelector = (store: any) => store.MessageReducer.selectedMessagesMap
 export const attachmentUpdatedMapSelector = (store: any) => store.MessageReducer.attachmentUpdatedMap
+export const messageMarkersSelector = (store: any) => store.MessageReducer.messageMarkers
+export const messagesMarkersLoadingStateSelector = (store: any) => store.MessageReducer.messagesMarkersLoadingState

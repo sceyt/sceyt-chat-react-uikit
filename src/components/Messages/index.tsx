@@ -1,6 +1,16 @@
 import React, { FC } from 'react'
 import MessageList from './MessageList'
-import { IAttachment, IChannel, IMessage, IUser } from '../../types'
+import {
+  IAttachment,
+  IChannel,
+  IMarker,
+  IMessage,
+  IUser,
+  MessageInfoTab,
+  ILabels,
+  ITabsStyles,
+  IListItemStyles
+} from '../../types'
 import { IAttachmentProperties, IMessageStyles } from '../Message/Message.types'
 import { HiddenMessageProperty } from 'types/enum'
 
@@ -80,6 +90,7 @@ interface MessagesProps {
   forwardMessage?: boolean
   deleteMessage?: boolean
   selectMessage?: boolean
+  showInfoMessage?: boolean
   reportMessage?: boolean
   reactionIcon?: JSX.Element
   editIcon?: JSX.Element
@@ -104,6 +115,7 @@ interface MessagesProps {
   forwardIconOrder?: number
   deleteIconOrder?: number
   selectIconOrder?: number
+  infoIconOrder?: number
   allowEditDeleteIncomingMessage?: boolean
   starIconOrder?: number
   reportIconOrder?: number
@@ -117,6 +129,7 @@ interface MessagesProps {
   selectIconTooltipText?: string
   starIconTooltipText?: string
   reportIconTooltipText?: string
+  infoIconTooltipText?: string
   messageActionIconsColor?: string
   dateDividerFontSize?: string
   dateDividerTextColor?: string
@@ -177,6 +190,20 @@ interface MessagesProps {
   messageStatusAndTimeLineHeight?: string
   hiddenMessagesProperties?: HiddenMessageProperty[]
   shouldOpenUserProfileForMention?: boolean
+  showInfoMessageProps?: {
+    togglePopup?: () => void
+    labels?: ILabels
+    tabsOrder?: { key: MessageInfoTab; label: string; data: IMarker[] }[]
+    showCounts?: boolean
+    avatarSize?: number
+    maxWidth?: string
+    minWidth?: string
+    height?: string
+    renderItem?: (marker: IMarker, defaultNode: JSX.Element) => JSX.Element
+    formatDate?: (date: Date) => string
+    tabsStyles?: ITabsStyles
+    listItemStyles?: IListItemStyles
+  }
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -209,6 +236,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   forwardMessage,
   deleteMessage,
   selectMessage,
+  showInfoMessage,
   reportMessage,
   reactionIcon,
   editIcon,
@@ -253,6 +281,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   selectIconOrder,
   starIconOrder,
   reportIconOrder,
+  infoIconOrder,
   reactionIconTooltipText,
   editIconTooltipText,
   copyIconTooltipText,
@@ -263,6 +292,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
+  infoIconTooltipText,
   messageActionIconsColor,
   dateDividerFontSize,
   dateDividerTextColor,
@@ -310,7 +340,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties = [],
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  showInfoMessageProps = {}
 }) => {
   return (
     <React.Fragment>
@@ -344,6 +375,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         forwardMessage={forwardMessage}
         deleteMessage={deleteMessage}
         selectMessage={selectMessage}
+        showInfoMessage={showInfoMessage}
         reportMessage={reportMessage}
         reactionIcon={reactionIcon}
         editIcon={editIcon}
@@ -386,6 +418,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         forwardIconOrder={forwardIconOrder}
         deleteIconOrder={deleteIconOrder}
         selectIconOrder={selectIconOrder}
+        infoIconOrder={infoIconOrder}
         starIconOrder={starIconOrder}
         reportIconOrder={reportIconOrder}
         reactionIconTooltipText={reactionIconTooltipText}
@@ -398,6 +431,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         selectIconTooltipText={selectIconTooltipText}
         starIconTooltipText={starIconTooltipText}
         reportIconTooltipText={reportIconTooltipText}
+        infoIconTooltipText={infoIconTooltipText}
         messageActionIconsColor={messageActionIconsColor}
         dateDividerFontSize={dateDividerFontSize}
         dateDividerTextColor={dateDividerTextColor}
@@ -441,6 +475,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
         hiddenMessagesProperties={hiddenMessagesProperties}
         shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+        showInfoMessageProps={showInfoMessageProps}
       />
     </React.Fragment>
   )

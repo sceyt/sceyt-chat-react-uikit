@@ -52,6 +52,7 @@ import {
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
   MARK_MESSAGES_AS_READ,
+  MARK_VOICE_MESSAGE_AS_PLAYED,
   PIN_CHANNEL,
   UNPIN_CHANNEL,
   REMOVE_CHANNEL_CACHES,
@@ -196,6 +197,11 @@ export const markMessagesAsReadAC = (channelId: string, messageIds: string[]) =>
 
 export const markMessagesAsDeliveredAC = (channelId: string, messageIds: string[]) => ({
   type: MARK_MESSAGES_AS_DELIVERED,
+  payload: { channelId, messageIds }
+})
+
+export const markVoiceMessageAsPlayedAC = (channelId: string, messageIds: string[]) => ({
+  type: MARK_VOICE_MESSAGE_AS_PLAYED,
   payload: { channelId, messageIds }
 })
 

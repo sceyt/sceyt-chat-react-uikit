@@ -65,6 +65,7 @@ interface IMessageBodyProps {
   forwardMessage?: boolean
   deleteMessage?: boolean
   selectMessage?: boolean
+  showInfoMessage?: boolean
   allowEditDeleteIncomingMessage?: boolean
   reportMessage?: boolean
   reactionIcon?: JSX.Element
@@ -74,6 +75,7 @@ interface IMessageBodyProps {
   replyInThreadIcon?: JSX.Element
   forwardIcon?: JSX.Element
   deleteIcon?: JSX.Element
+  infoIcon?: JSX.Element
   selectIcon?: JSX.Element
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
@@ -88,6 +90,7 @@ interface IMessageBodyProps {
   replyInThreadIconOrder?: number
   forwardIconOrder?: number
   deleteIconOrder?: number
+  infoIconOrder?: number
   selectIconOrder?: number
   starIconOrder?: number
   reportIconOrder?: number
@@ -101,6 +104,7 @@ interface IMessageBodyProps {
   selectIconTooltipText?: string
   starIconTooltipText?: string
   reportIconTooltipText?: string
+  infoIconTooltipText?: string
   messageActionIconsColor?: string
   inlineReactionIcon?: JSX.Element
   messageStatusSize?: string
@@ -133,6 +137,7 @@ interface IMessageBodyProps {
   setMessageActionsShow: (state: boolean) => void
   closeMessageActions: () => void
   handleToggleForwardMessagePopup: () => void
+  handleToggleInfoMessagePopupOpen: () => void
   handleReplyMessage: (rely: boolean) => void
   handleToggleDeleteMessagePopup: () => void
   handleToggleReportPopupOpen: () => void
@@ -190,6 +195,7 @@ const MessageBody = ({
   replyMessageInThread = false,
   deleteMessage = true,
   selectMessage = true,
+  showInfoMessage,
   allowEditDeleteIncomingMessage,
   forwardMessage = true,
   reportMessage = false,
@@ -200,6 +206,7 @@ const MessageBody = ({
   replyInThreadIcon,
   forwardIcon,
   deleteIcon,
+  infoIcon,
   selectIcon,
   starIcon,
   staredIcon,
@@ -211,6 +218,7 @@ const MessageBody = ({
   replyInThreadIconOrder,
   forwardIconOrder,
   deleteIconOrder,
+  infoIconOrder,
   selectIconOrder,
   starIconOrder,
   reportIconOrder,
@@ -224,6 +232,7 @@ const MessageBody = ({
   selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
+  infoIconTooltipText,
   messageActionIconsColor,
   messageStatusSize,
   messageStatusColor,
@@ -252,6 +261,7 @@ const MessageBody = ({
   messageTextFontSize,
   messageTextLineHeight,
   handleToggleForwardMessagePopup,
+  handleToggleInfoMessagePopupOpen,
   messageActionsShow,
   closeMessageActions,
   handleDeletePendingMessage,
@@ -498,6 +508,7 @@ const MessageBody = ({
             handleCopyMessage={handleCopyMessage}
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleOpenForwardMessage={handleToggleForwardMessagePopup}
+            handleOpenInfoMessage={handleToggleInfoMessagePopupOpen}
             handleResendMessage={handleResendMessage}
             handleReplyMessage={handleReplyMessage}
             handleReportMessage={handleToggleReportPopupOpen}
@@ -558,6 +569,10 @@ const MessageBody = ({
             messageActionIconsColor={messageActionIconsColor}
             myRole={channel.userRole}
             isIncoming={message.incoming}
+            infoIconTooltipText={infoIconTooltipText}
+            infoIcon={infoIcon}
+            showInfoMessage={showInfoMessage}
+            infoIconOrder={infoIconOrder}
           />
         ))}
       {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
@@ -736,6 +751,9 @@ const MessageBody = ({
               videoAttachmentMaxWidth={videoAttachmentMaxWidth}
               videoAttachmentMaxHeight={videoAttachmentMaxHeight}
               messageType={message.type}
+              messagePlayed={message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED}
+              channelId={message.channelId}
+              incoming={message.incoming}
             />
           ))
         // </MessageAttachments>

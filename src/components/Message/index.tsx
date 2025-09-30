@@ -47,6 +47,7 @@ import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
 import { scrollToNewMessageSelector } from 'store/message/selector'
+import MessageInfo from 'common/popups/messageInfo'
 
 const Message = ({
   message,
@@ -90,6 +91,7 @@ const Message = ({
   replyMessageInThread = false,
   deleteMessage = true,
   selectMessage = true,
+  showInfoMessage = true,
   allowEditDeleteIncomingMessage,
   forwardMessage = true,
   reportMessage = false,
@@ -115,6 +117,7 @@ const Message = ({
   selectIconOrder,
   starIconOrder,
   reportIconOrder,
+  infoIconOrder,
   reactionIconTooltipText,
   editIconTooltipText,
   copyIconTooltipText,
@@ -125,6 +128,7 @@ const Message = ({
   selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
+  infoIconTooltipText,
   messageActionIconsColor,
   messageStatusSize,
   messageStatusColor,
@@ -175,7 +179,8 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight,
   messageTimeColorOnAttachment,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  showInfoMessageProps = {}
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -194,6 +199,7 @@ const Message = ({
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
+  const [infoPopupOpen, setInfoPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
   const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
   const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
@@ -256,6 +262,14 @@ const Message = ({
     setMessageActionsShow(false)
     stopScrolling(!forwardPopupOpen)
   }
+
+  const handleToggleInfoMessagePopupOpen = () => {
+    setInfoPopupOpen(!infoPopupOpen)
+
+    setMessageActionsShow(false)
+  }
+
+  console.log('infoPopupOpen', infoPopupOpen)
 
   const handleReplyMessage = (threadReply?: boolean) => {
     if (threadReply) {
@@ -600,6 +614,7 @@ const Message = ({
             emojisPopupPosition={emojisPopupPosition}
             handleSetMessageForEdit={toggleEditMode}
             handleResendMessage={handleResendMessage}
+            handleOpenInfoMessage={handleToggleInfoMessagePopupOpen}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
             handleOpenForwardMessage={handleToggleForwardMessagePopup}
             handleCopyMessage={handleCopyMessage}
@@ -654,6 +669,7 @@ const Message = ({
             replyMessageInThread={replyMessageInThread}
             deleteMessage={deleteMessage}
             selectMessage={selectMessage}
+            showInfoMessage={showInfoMessage}
             allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
             forwardMessage={forwardMessage}
             reportMessage={reportMessage}
@@ -678,6 +694,7 @@ const Message = ({
             selectIconOrder={selectIconOrder}
             starIconOrder={starIconOrder}
             reportIconOrder={reportIconOrder}
+            infoIconOrder={infoIconOrder}
             reactionIconTooltipText={reactionIconTooltipText}
             editIconTooltipText={editIconTooltipText}
             copyIconTooltipText={copyIconTooltipText}
@@ -688,6 +705,7 @@ const Message = ({
             selectIconTooltipText={selectIconTooltipText}
             starIconTooltipText={starIconTooltipText}
             reportIconTooltipText={reportIconTooltipText}
+            infoIconTooltipText={infoIconTooltipText}
             messageActionIconsColor={messageActionIconsColor}
             messageStatusSize={messageStatusSize}
             messageStatusColor={messageStatusColor}
@@ -721,6 +739,7 @@ const Message = ({
             setMessageActionsShow={setMessageActionsShow}
             closeMessageActions={closeMessageActions}
             handleToggleForwardMessagePopup={handleToggleForwardMessagePopup}
+            handleToggleInfoMessagePopupOpen={handleToggleInfoMessagePopupOpen}
             handleReplyMessage={handleReplyMessage}
             handleToggleDeleteMessagePopup={handleToggleDeleteMessagePopup}
             handleToggleReportPopupOpen={handleToggleReportPopupOpen}
@@ -869,6 +888,15 @@ const Message = ({
           title="Report Message"
         />
       )} */}
+
+      {infoPopupOpen && (
+        <MessageInfo
+          message={message}
+          togglePopup={handleToggleInfoMessagePopupOpen}
+          {...showInfoMessageProps}
+          handleOpenUserProfile={handleOpenUserProfile}
+        />
+      )}
     </MessageItem>
   )
 }

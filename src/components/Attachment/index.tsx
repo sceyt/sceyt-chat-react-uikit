@@ -75,6 +75,9 @@ interface AttachmentPops {
   videoAttachmentMaxWidth?: number
   videoAttachmentMaxHeight?: number
   messageType?: string | null | undefined
+  messagePlayed?: boolean | undefined
+  channelId?: string
+  incoming?: boolean
 }
 
 const Attachment = ({
@@ -98,7 +101,10 @@ const Attachment = ({
   imageAttachmentMaxHeight,
   videoAttachmentMaxWidth,
   videoAttachmentMaxHeight,
-  messageType
+  messageType,
+  messagePlayed,
+  channelId,
+  incoming
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -747,7 +753,13 @@ const Attachment = ({
           )}
         </React.Fragment>
       ) : attachment.type === attachmentTypes.voice ? (
-        <AudioPlayer url={attachment.attachmentUrl || attachmentUrl} file={attachment} />
+        <AudioPlayer
+          url={attachment.attachmentUrl || attachmentUrl}
+          file={attachment}
+          messagePlayed={messagePlayed}
+          channelId={channelId}
+          incoming={incoming}
+        />
       ) : attachment.type === attachmentTypes.link ? null : (
         /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>
           {linkTitle ? (

@@ -18,7 +18,8 @@ import {
   RESEND_MESSAGE,
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
-  SEND_TEXT_MESSAGE
+  SEND_TEXT_MESSAGE,
+  GET_MESSAGE_MARKERS
 } from './constants'
 
 import { IAction, IAttachment, IChannel, IMessage } from '../../types'
@@ -59,9 +60,11 @@ import {
   setReactionsListAC,
   setReactionsLoadingStateAC,
   setScrollToMessagesAC,
+  setMessageMarkersAC,
   updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
-  updateMessageAC
+  updateMessageAC,
+  setMessagesMarkersLoadingStateAC
 } from './actions'
 import {
   attachmentTypes,
@@ -1654,6 +1657,31 @@ function* resumeAttachmentUploading(action: any) {
   }
 }
 
+function* getMessageMarkers(action: IAction): any {
+  try {
+    yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADING))
+    const { messageId, channelId, deliveryStatus } = action.payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const messageMarkerListQueryBuilder = new sceytChatClient.MessageMarkerListQueryBuilder(
+        channelId,
+        String(messageId),
+        deliveryStatus
+      )
+      const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
+      const messageMarkers = yield call(messageMarkerListQuery.loadNext)
+      console.log('messageMarkers', messageMarkers)
+      yield put(setMessageMarkersAC(channelId, messageId, messageMarkers.markers, deliveryStatus))
+    }
+  } catch (e) {
+    log.error('error in get message markers', e)
+    if (e.code !== 10008) {
+      // yield put(setErrorNotification(e.message))
+    }
+  } finally {
+    yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADED))
+  }
+}
 export default function* MessageSaga() {
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
@@ -1663,6 +1691,7 @@ export default function* MessageSaga() {
   yield takeEvery(DELETE_MESSAGE, deleteMessage)
   yield takeLatest(GET_MESSAGES, getMessagesQuery)
   yield takeEvery(GET_MESSAGE, getMessageQuery)
+  yield takeLatest(GET_MESSAGE_MARKERS, getMessageMarkers)
   yield takeLatest(GET_MESSAGES_ATTACHMENTS, getMessageAttachments)
   yield takeLatest(LOAD_MORE_MESSAGES_ATTACHMENTS, loadMoreMessageAttachments)
   yield takeLatest(ADD_REACTION, addReaction)

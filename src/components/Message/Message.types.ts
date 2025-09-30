@@ -1,4 +1,14 @@
-import { IAttachment, IChannel, IMessage, IUser } from '../../types'
+import {
+  IAttachment,
+  IChannel,
+  IMarker,
+  IMessage,
+  IUser,
+  ITabsStyles,
+  IListItemStyles,
+  ILabels,
+  MessageInfoTab
+} from '../../types'
 import { FC } from 'react'
 
 export interface IMessageActions {
@@ -49,6 +59,7 @@ interface ICustomMessageItem {
   handleCopyMessage?: () => void
   handleReportMessage?: () => void
   handleSelectMessage?: () => void
+  handleOpenInfoMessage?: () => void
   handleOpenEmojis?: () => void
   handleReplyMessage?: (threadReply?: boolean) => void
   handleMouseEnter: () => void
@@ -105,6 +116,8 @@ export interface IMessageProps {
   forwardMessage?: boolean
   deleteMessage?: boolean
   selectMessage?: boolean
+  showInfoMessage?: boolean
+  infoIcon?: JSX.Element
   allowEditDeleteIncomingMessage?: boolean
   reportMessage?: boolean
   reactionIcon?: JSX.Element
@@ -132,6 +145,7 @@ export interface IMessageProps {
   selectIconOrder?: number
   starIconOrder?: number
   reportIconOrder?: number
+  infoIconOrder?: number
   reactionIconTooltipText?: string
   editIconTooltipText?: string
   copyIconTooltipText?: string
@@ -142,6 +156,7 @@ export interface IMessageProps {
   selectIconTooltipText?: string
   starIconTooltipText?: string
   reportIconTooltipText?: string
+  infoIconTooltipText?: string
   messageActionIconsColor?: string
   inlineReactionIcon?: JSX.Element
   reactionsDisplayCount?: number
@@ -191,4 +206,18 @@ export interface IMessageProps {
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
+  showInfoMessageProps?: {
+    togglePopup?: () => void
+    labels?: ILabels
+    tabsOrder?: { key: MessageInfoTab; label: string; data: IMarker[] }[]
+    showCounts?: boolean
+    avatarSize?: number
+    maxWidth?: string
+    minWidth?: string
+    height?: string
+    renderItem?: (marker: IMarker, defaultNode: JSX.Element) => JSX.Element
+    formatDate?: (date: Date) => string
+    tabsStyles?: ITabsStyles
+    listItemStyles?: IListItemStyles
+  }
 }

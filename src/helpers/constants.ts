@@ -9,7 +9,8 @@ export const MESSAGE_DELIVERY_STATUS = {
   PENDING: 'pending',
   SENT: 'sent',
   DELIVERED: 'received',
-  READ: 'displayed'
+  READ: 'displayed',
+  PLAYED: 'played'
 }
 
 export const MESSAGE_STATUS = {

@@ -54,6 +54,8 @@ export interface IMessageStore {
   selectedMessagesMap: Map<string, IMessage> | null
   oGMetadata: { [key: string]: IOGMetadata | null }
   attachmentUpdatedMap: { [key: string]: string }
+  messageMarkers: { [key: string]: { [key: string]: { [key: string]: IMarker[] } } }
+  messagesMarkersLoadingState: number | null
 }
 
 const initialState: IMessageStore = {
@@ -92,7 +94,9 @@ const initialState: IMessageStore = {
   playingAudioId: null,
   selectedMessagesMap: null,
   oGMetadata: {},
-  attachmentUpdatedMap: {}
+  attachmentUpdatedMap: {},
+  messageMarkers: {},
+  messagesMarkersLoadingState: null
 }
 
 const messageSlice = createSlice({
@@ -494,6 +498,27 @@ const messageSlice = createSlice({
         const existing = state.oGMetadata[url]
         state.oGMetadata[url] = existing ? { ...existing, ...metadata } : metadata
       }
+    },
+
+    setMessageMarkers: (
+      state,
+      action: PayloadAction<{ channelId: string; messageId: string; messageMarkers: IMarker[]; deliveryStatus: string }>
+    ) => {
+      const { channelId, messageId, messageMarkers, deliveryStatus } = action.payload
+      if (!state.messageMarkers[channelId]) {
+        state.messageMarkers[channelId] = {}
+      }
+      if (!state.messageMarkers[channelId][messageId]) {
+        state.messageMarkers[channelId][messageId] = {}
+      }
+      if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
+        state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+      }
+      state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers]
+    },
+
+    setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
+      state.messagesMarkersLoadingState = action.payload.state
     }
   },
   extraReducers: (builder) => {
@@ -547,7 +572,9 @@ export const {
   removeSelectedMessage,
   clearSelectedMessages,
   setOGMetadata,
-  updateOGMetadata
+  updateOGMetadata,
+  setMessageMarkers,
+  setMessagesMarkersLoadingState
 } = messageSlice.actions
 
 // Export reducer

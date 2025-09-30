@@ -53,7 +53,18 @@ import {
 } from '../../../helpers/messagesHalper'
 import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IAttachment, IChannel, IContactsMap, IMessage, IUser } from '../../../types'
+import {
+  IAttachment,
+  IChannel,
+  IContactsMap,
+  IMarker,
+  IMessage,
+  IUser,
+  ILabels,
+  MessageInfoTab,
+  ITabsStyles,
+  IListItemStyles
+} from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
 import MessageDivider from '../../MessageDivider'
@@ -238,9 +249,12 @@ interface MessagesProps {
   allowEditDeleteIncomingMessage?: boolean
   starIconOrder?: number
   reportIconOrder?: number
+  infoIconOrder?: number
+  showInfoMessage?: boolean
   reactionIconTooltipText?: string
   editIconTooltipText?: string
   replyIconTooltipText?: string
+  infoIconTooltipText?: string
   copyIconTooltipText?: string
   replyInThreadIconTooltipText?: string
   forwardIconTooltipText?: string
@@ -300,6 +314,20 @@ interface MessagesProps {
   messageTextLineHeight?: string
   hiddenMessagesProperties?: HiddenMessageProperty[]
   shouldOpenUserProfileForMention?: boolean
+  showInfoMessageProps?: {
+    togglePopup?: () => void
+    labels?: ILabels
+    tabsOrder?: { key: MessageInfoTab; label: string; data: IMarker[] }[]
+    showCounts?: boolean
+    avatarSize?: number
+    maxWidth?: string
+    minWidth?: string
+    height?: string
+    renderItem?: (marker: IMarker, defaultNode: JSX.Element) => JSX.Element
+    formatDate?: (date: Date) => string
+    tabsStyles?: ITabsStyles
+    listItemStyles?: IListItemStyles
+  }
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -332,6 +360,7 @@ const MessageList: React.FC<MessagesProps> = ({
   forwardMessage,
   deleteMessage,
   selectMessage,
+  showInfoMessage,
   reportMessage,
   reactionIcon,
   editIcon,
@@ -376,6 +405,7 @@ const MessageList: React.FC<MessagesProps> = ({
   selectIconOrder,
   starIconOrder,
   reportIconOrder,
+  infoIconOrder,
   reactionIconTooltipText,
   editIconTooltipText,
   copyIconTooltipText,
@@ -383,6 +413,7 @@ const MessageList: React.FC<MessagesProps> = ({
   replyInThreadIconTooltipText,
   forwardIconTooltipText,
   deleteIconTooltipText,
+  infoIconTooltipText,
   selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
@@ -433,7 +464,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeColor,
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  showInfoMessageProps = {}
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1268,6 +1300,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           replyMessageInThread={replyMessageInThread}
                           deleteMessage={deleteMessage}
                           selectMessage={selectMessage}
+                          showInfoMessage={showInfoMessage}
                           allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
                           reportMessage={reportMessage}
                           reactionIcon={reactionIcon}
@@ -1293,6 +1326,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           replyInThreadIconOrder={replyInThreadIconOrder}
                           forwardIconOrder={forwardIconOrder}
                           deleteIconOrder={deleteIconOrder}
+                          infoIconOrder={infoIconOrder}
                           selectIconOrder={selectIconOrder}
                           starIconOrder={starIconOrder}
                           reportIconOrder={reportIconOrder}
@@ -1303,6 +1337,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           replyInThreadIconTooltipText={replyInThreadIconTooltipText}
                           forwardIconTooltipText={forwardIconTooltipText}
                           deleteIconTooltipText={deleteIconTooltipText}
+                          infoIconTooltipText={infoIconTooltipText}
                           selectIconTooltipText={selectIconTooltipText}
                           starIconTooltipText={starIconTooltipText}
                           reportIconTooltipText={reportIconTooltipText}
@@ -1353,6 +1388,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageTimeColor={messageTimeColor}
                           messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+                          showInfoMessageProps={showInfoMessageProps}
                         />
                       </MessageWrapper>
                     )}

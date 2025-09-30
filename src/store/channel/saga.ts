@@ -49,7 +49,8 @@ import {
   UPDATE_CHANNEL,
   WATCH_FOR_EVENTS,
   SEND_RECORDING,
-  GET_CHANNEL_MENTIONS
+  GET_CHANNEL_MENTIONS,
+  MARK_VOICE_MESSAGE_AS_PLAYED
 } from './constants'
 import {
   destroyChannelsMap,
@@ -805,6 +806,26 @@ function* markMessagesRead(action: IAction): any {
   }
 }
 
+function* markVoiceMessageAsPlayed(action: IAction): any {
+  const { payload } = action
+  const { channelId, messageIds } = payload
+  try {
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      if (channel) {
+        setChannelInMap(channel)
+      }
+    }
+
+    if (channel) {
+      yield call(channel.markVoiceMessagesAsPlayed, messageIds)
+    }
+  } catch (e) {
+    log.error(e, 'Error on mark voice messages read')
+  }
+}
+
 function* markMessagesDelivered(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
@@ -1331,6 +1352,7 @@ export default function* ChannelsSaga() {
   yield takeLatest(UPDATE_CHANNEL, updateChannel)
   yield takeEvery(MARK_MESSAGES_AS_READ, markMessagesRead)
   yield takeLatest(MARK_MESSAGES_AS_DELIVERED, markMessagesDelivered)
+  yield takeLatest(MARK_VOICE_MESSAGE_AS_PLAYED, markVoiceMessageAsPlayed)
   yield takeLatest(WATCH_FOR_EVENTS, watchForChannelEvents)
   yield takeLatest(TURN_OFF_NOTIFICATION, notificationsTurnOff)
   yield takeLatest(TURN_ON_NOTIFICATION, notificationsTurnOn)

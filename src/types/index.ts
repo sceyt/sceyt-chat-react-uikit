@@ -85,6 +85,13 @@ export interface IBodyAttribute {
   length: number
 }
 
+export interface IMarker {
+  name: string
+  messageId: string
+  createdAt: Date
+  user: IUser | null
+}
+
 export interface IMessage {
   id: string
   tid?: string
@@ -99,12 +106,7 @@ export interface IMessage {
     name: string
     count: number
   }[]
-  userMarkers: {
-    name: string
-    messageId: string
-    createdAt: Date
-    user: IUser | null
-  }[]
+  userMarkers: IMarker[]
   incoming: boolean
   metadata: any
   state: string
@@ -230,7 +232,7 @@ export interface IMedia extends IAttachment {
 
 export interface IMarker {
   messageIds: string[]
-  user: IUser
+  user: IUser | null
   name: string
   createAt: Date
 }
@@ -280,4 +282,23 @@ export interface ChannelQueryParams {
   sort?: 'byLastMessage' | 'byCreationDate'
   search: string
   memberCount?: number
+}
+export interface ITabsStyles {
+  activeColor?: string
+  inactiveColor?: string
+  indicatorColor?: string
+}
+
+export interface IListItemStyles {
+  hoverBackground?: string
+  nameColor?: string
+  dateColor?: string
+}
+
+export type MessageInfoTab = 'played' | 'received' | 'displayed'
+
+export interface ILabels {
+  playedBy?: string
+  receivedBy?: string
+  displayedBy?: string
 }
