@@ -168,7 +168,7 @@ interface IChannelListProps {
     user: IUser,
     MessageText: any
   ) => any
-  doNotShowMessageDeliveryTypes: string[]
+  doNotShowMessageDeliveryTypes?: string[]
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
