@@ -15,7 +15,10 @@ export type IAttachmentMeta = {
   duration?: number
 }
 
-type draftMessagesMap = { [key: string]: { text: string; mentionedMembers: any; messageForReply?: IMessage } }
+type draftMessagesMap = {
+  [key: string]: { text: string; mentionedUsers: any; messageForReply?: IMessage; bodyAttributes?: any }
+}
+type audioRecordingMap = { [key: string]: any }
 type visibleMessagesMap = { [key: string]: { id: string } }
 
 type pendingMessagesMap = {
@@ -108,7 +111,7 @@ export const getHasNextCached = () => nextCached
 export const getFromAllMessagesByMessageId = (messageId: string, direction: string, getWithLastMessage?: boolean) => {
   let messagesForAdd: IMessage[] = []
   if (getWithLastMessage) {
-    messagesForAdd = [...activeChannelAllMessages].slice(-MESSAGES_MAX_LENGTH)
+    messagesForAdd = [...activeChannelAllMessages.slice(-MESSAGES_MAX_LENGTH)]
     setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_LENGTH)
     setHasNextCached(false)
   } else {
@@ -153,37 +156,7 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 
   if (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-    if (pendingMessagesMap[channelId]) {
-      pendingMessagesMap[channelId].push(message)
-    } else {
-      pendingMessagesMap[channelId] = [message]
-    }
-  }
-}
-
-export function addMessagesToMap(channelId: string, messages: IMessage[], direction: 'next' | 'prev') {
-  if (messagesMap[channelId]) {
-    const newMessagesLength = messages.length
-    if (messagesMap[channelId].length > MESSAGES_MAX_LENGTH) {
-      if (direction === MESSAGE_LOAD_DIRECTION.NEXT) {
-        messagesMap[channelId].splice(0, newMessagesLength)
-        messagesMap[channelId] = [...messagesMap[channelId], ...messages]
-      }
-    } else if (newMessagesLength + messagesMap[channelId].length > MESSAGES_MAX_LENGTH) {
-      const sliceElementCount = newMessagesLength + messagesMap[channelId].length - MESSAGES_MAX_LENGTH
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-        messages.splice(0, sliceElementCount)
-        messagesMap[channelId] = [...messages, ...messagesMap[channelId]]
-      } else {
-        messagesMap[channelId].splice(0, sliceElementCount)
-        messagesMap[channelId] = [...messagesMap[channelId], ...messages]
-      }
-    } else {
-      messagesMap[channelId] =
-        direction === MESSAGE_LOAD_DIRECTION.PREV
-          ? [...messages, ...messagesMap[channelId]]
-          : [...messagesMap[channelId], ...messages]
-    }
+    setPendingMessage(channelId, message)
   }
 }
 
@@ -208,18 +181,30 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
       }
     }
   }
+  let updatedMessageData = null
   if (messagesMap[channelId]) {
-    messagesMap[channelId] = messagesMap[channelId].map((mes) => {
+    const messagesList: IMessage[] = []
+    for (const mes of messagesMap[channelId]) {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
-          return { ...updatedMessage.params }
+          updatedMessageData = { ...updatedMessage.params }
+          messagesList.push({ ...mes, ...updatedMessageData })
+          continue
         } else {
-          return { ...mes, ...updatedMessage.params }
+          updatedMessageData = {
+            ...mes,
+            ...updatedMessage.params
+          }
+          messagesList.push({ ...mes, ...updatedMessageData })
+          continue
         }
       }
-      return mes
-    })
+      messagesList.push(mes)
+    }
+    messagesMap[channelId] = messagesList
   }
+
+  return updatedMessageData
 }
 
 export function addReactionToMessageOnMap(channelId: string, message: IMessage, reaction: IReaction, isSelf: boolean) {
@@ -346,6 +331,24 @@ export function removePendingMessageFromMap(channelId: string, messageId: string
   }
 }
 
+export function updatePendingMessageOnMap(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
+  if (pendingMessagesMap[channelId]) {
+    pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
+      if (msg.id === messageId || msg.tid === messageId) {
+        return { ...msg, ...updatedMessage }
+      }
+      return msg
+    })
+  }
+}
+
+export function getMessageFromPendingMessagesMap(channelId: string, messageId: string) {
+  if (pendingMessagesMap[channelId]) {
+    return pendingMessagesMap[channelId].find((msg) => msg.id === messageId || msg.tid === messageId)
+  }
+  return null
+}
+
 export function clearMessagesMap() {
   messagesMap = {}
 }
@@ -403,32 +406,48 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
 }
 
 export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
-export const addPendingMessageToMap = (channelId: string, pendingMessage: IMessage) => {
-  if (pendingMessagesMap[channelId]) {
-    pendingMessagesMap[channelId].push(pendingMessage)
+
+export const setPendingMessage = (channelId: string, pendingMessage: IMessage) => {
+  const pendingMessages = getPendingMessages(channelId)
+  if (pendingMessages && pendingMessages?.length) {
+    if (!pendingMessages?.find((msg: IMessage) => msg.tid === pendingMessage.tid)) {
+      pendingMessages.push(pendingMessage)
+    }
   } else {
     pendingMessagesMap[channelId] = [pendingMessage]
   }
 }
 
-export const setPendingMessages = (channelId: string, pendingMessages: any) => {
-  pendingMessagesMap[channelId] = pendingMessages
-}
 export const getPendingMessagesMap = () => pendingMessagesMap
 
 export const draftMessagesMap: draftMessagesMap = {}
-
+export const audioRecordingMap: audioRecordingMap = {}
 export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]
+export const getAudioRecordingFromMap = (channelId: string) => audioRecordingMap[channelId]
 
 export const checkDraftMessagesIsEmpty = () => Object.keys(draftMessagesMap).length === 0
+
+export const setAudioRecordingToMap = (channelId: string, audioRecording: any) => {
+  audioRecordingMap[channelId] = audioRecording
+}
 
 export const removeDraftMessageFromMap = (channelId: string) => {
   delete draftMessagesMap[channelId]
 }
 
+export const removeAudioRecordingFromMap = (channelId: string) => {
+  delete audioRecordingMap[channelId]
+}
+
 export const setDraftMessageToMap = (
   channelId: string,
-  draftMessage: { text: string; mentionedMembers: any; messageForReply?: IMessage; editorState?: any }
+  draftMessage: {
+    text: string
+    mentionedUsers: any
+    messageForReply?: IMessage
+    editorState?: any
+    bodyAttributes?: any
+  }
 ) => {
   draftMessagesMap[channelId] = draftMessage
 }

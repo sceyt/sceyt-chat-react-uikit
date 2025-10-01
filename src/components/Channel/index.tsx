@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import moment from 'moment'
 // Hooks
@@ -10,13 +10,7 @@ import {
   channelMessageDraftIsRemovedSelector,
   typingOrRecordingIndicatorArraySelector
 } from '../../store/channel/selector'
-import {
-  sendTypingAC,
-  setChannelDraftMessageIsRemovedAC,
-  switchChannelActionAC,
-  updateChannelDataAC
-} from '../../store/channel/actions'
-import { clearMessagesAC } from '../../store/message/actions'
+import { setChannelDraftMessageIsRemovedAC, updateChannelDataAC } from '../../store/channel/actions'
 // Assets
 import { ReactComponent as ImageIcon } from '../../assets/svg/picture.svg'
 import { ReactComponent as CameraIcon } from '../../assets/svg/video-call.svg'
@@ -31,7 +25,7 @@ import Avatar from '../Avatar'
 import { systemMessageUserName } from '../../helpers'
 import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
-import { getDraftMessageFromMap } from '../../helpers/messagesHalper'
+import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
@@ -65,6 +59,52 @@ interface IChannelProps {
   channelLastMessageTimeFontSize?: string
   channelAvatarSize?: number
   channelAvatarTextSize?: number
+  setSelectedChannel: (channel: IChannel) => void
+  getCustomLatestMessage?: (args: {
+    lastMessage: IMessage
+    typingOrRecording: any
+    draftMessageText: any
+    textSecondary: string
+    channel: IChannel
+    channelLastMessageFontSize: string
+    channelLastMessageHeight: string
+    isDirectChannel: boolean
+    textPrimary: string
+    messageAuthorRef: any
+    contactsMap: { [key: string]: IContact }
+    getFromContacts: boolean
+    warningColor: string
+    user: IUser
+    MessageText: any
+  }) => any
+  doNotShowMessageDeliveryTypes: string[]
+}
+
+const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
+  return (
+    !!(lastMessage.attachments && lastMessage.attachments.length) &&
+    (lastMessage.attachments[0].type === attachmentTypes.image ? (
+      <React.Fragment>
+        <ImageIcon />
+        {lastMessage.body ? '' : 'Photo'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
+      <React.Fragment>
+        <CameraIcon />
+        {lastMessage.body ? '' : 'Video'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
+      <React.Fragment>
+        <FileIcon />
+        {lastMessage.body ? '' : 'File'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
+      <React.Fragment>
+        <VoiceIcon />
+        {lastMessage.body ? '' : 'Voice'}
+      </React.Fragment>
+    ) : null)
+  )
 }
 
 const ChannelMessageText = ({
@@ -96,6 +136,10 @@ const ChannelMessageText = ({
   channel: IChannel
   isDirectChannel: boolean
 }) => {
+  const audioRecording = useMemo(() => {
+    return getAudioRecordingFromMap(channel.id)
+  }, [channel.id, draftMessageText])
+
   return (
     <MessageTextContainer>
       {isTypingOrRecording && (
@@ -107,7 +151,18 @@ const ChannelMessageText = ({
       )}
       {!isTypingOrRecording &&
         (draftMessageText ? (
-          <DraftMessageText color={textSecondary}>{draftMessageText}</DraftMessageText>
+          <DraftMessageText color={textSecondary}>
+            {audioRecording && <VoiceIcon />}
+            {MessageTextFormat({
+              text: draftMessageText,
+              message: lastMessage,
+              contactsMap,
+              getFromContacts,
+              isLastMessage: true,
+              accentColor,
+              textSecondary
+            })}
+          </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
         ) : lastMessage.type === 'system' ? (
@@ -171,38 +226,17 @@ const ChannelMessageText = ({
           }`
         ) : (
           <React.Fragment>
-            {channel.lastReactedMessage && (
-              <React.Fragment>
-                Reacted
-                <ReactionItem>
-                  {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
-                </ReactionItem>
-                to{' "'}
-              </React.Fragment>
-            )}
-            {!!(lastMessage.attachments && lastMessage.attachments.length) &&
-              (lastMessage.attachments[0].type === attachmentTypes.image ? (
-                <React.Fragment>
-                  <ImageIcon />
-                  {lastMessage.body ? '' : 'Photo'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
-                <React.Fragment>
-                  <CameraIcon />
-                  {lastMessage.body ? '' : 'Video'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
-                <React.Fragment>
-                  <FileIcon />
-                  {lastMessage.body ? '' : 'File'}
-                </React.Fragment>
-              ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
-                <React.Fragment>
-                  <VoiceIcon />
-                  {lastMessage.body ? '' : 'Voice'}
-                </React.Fragment>
-              ) : null)}
             <LastMessageDescription>
+              {channel.lastReactedMessage && (
+                <React.Fragment>
+                  Reacted
+                  <ReactionItem>
+                    {channel.newReactions && channel.newReactions[0] && channel.newReactions[0].key}
+                  </ReactionItem>
+                  to{' "'}
+                </React.Fragment>
+              )}
+              {LastMessageAttachments({ lastMessage })}
               {!!(lastMessage && lastMessage.id) &&
                 MessageTextFormat({
                   text: lastMessage.body,
@@ -213,8 +247,8 @@ const ChannelMessageText = ({
                   accentColor,
                   textSecondary
                 })}
+              {channel.lastReactedMessage && '"'}
             </LastMessageDescription>
-            {channel.lastReactedMessage && '"'}
           </React.Fragment>
         ))}
     </MessageTextContainer>
@@ -244,7 +278,10 @@ const Channel: React.FC<IChannelProps> = ({
   channelLastMessageTimeFontSize,
   channelLastMessageHeight,
   channelAvatarSize,
-  channelAvatarTextSize
+  channelAvatarTextSize,
+  setSelectedChannel,
+  getCustomLatestMessage,
+  doNotShowMessageDeliveryTypes
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -268,10 +305,12 @@ const Channel: React.FC<IChannelProps> = ({
   const activeChannel = useSelector(activeChannelSelector) || {}
   const channelDraftIsRemoved = useSelector(channelMessageDraftIsRemovedSelector)
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && channel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
   const directChannelUser = isDirectChannel && channel.members.find((member) => member.id !== user.id)
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
+  const [draftMessage, setDraftMessage] = useState<any>()
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
     lastMessage &&
@@ -287,14 +326,6 @@ const Channel: React.FC<IChannelProps> = ({
       : isSelfChannel
         ? 'Me'
         : '')
-
-  const handleChangeActiveChannel = (chan: IChannel) => {
-    if (activeChannel.id !== chan.id) {
-      dispatch(sendTypingAC(false))
-      dispatch(clearMessagesAC())
-      dispatch(switchChannelActionAC(chan))
-    }
-  }
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
 
@@ -307,10 +338,22 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (activeChannel.id !== channel.id) {
       const channelDraftMessage = getDraftMessageFromMap(channel.id)
-      if (channelDraftMessage) {
-        setDraftMessageText(channelDraftMessage.text)
+      const draftAudioRecording = getAudioRecordingFromMap(channel.id)
+      if (channelDraftMessage || draftAudioRecording) {
+        if (channelDraftMessage) {
+          setDraftMessageText(channelDraftMessage.text)
+          setDraftMessage({
+            mentionedUsers: channelDraftMessage.mentionedUsers,
+            body: channelDraftMessage.text,
+            bodyAttributes: channelDraftMessage.bodyAttributes
+          })
+        } else if (draftAudioRecording) {
+          setDraftMessageText('Voice')
+          setDraftMessage(undefined)
+        }
       } else if (draftMessageText) {
         setDraftMessageText(undefined)
+        setDraftMessage(undefined)
       }
     }
   }, [activeChannel.id])
@@ -318,6 +361,7 @@ const Channel: React.FC<IChannelProps> = ({
   useEffect(() => {
     if (channelDraftIsRemoved && channelDraftIsRemoved === channel.id) {
       setDraftMessageText(undefined)
+      setDraftMessage(undefined)
       dispatch(setChannelDraftMessageIsRemovedAC())
     }
   }, [channelDraftIsRemoved])
@@ -337,18 +381,14 @@ const Channel: React.FC<IChannelProps> = ({
     const filteredItems = dataValues.filter((item: any) => item.typingState || item.recordingState)
     return {
       items: filteredItems,
-      isTyping: !!filteredItems.find((item: any) => item.typingState)
+      isTyping: !!filteredItems.find((item: any) => item.typingState),
+      isRecording: !!filteredItems.find((item: any) => item.recordingState)
     }
   }, [typingOrRecordingIndicator])
-
-  const isTypingOrRecording = useMemo(() => {
-    return typingOrRecording.items.length > 0
-  }, [typingOrRecording])
-
   const MessageText = useMemo(() => {
     return (
       <ChannelMessageText
-        isTypingOrRecording={isTypingOrRecording}
+        isTypingOrRecording={typingOrRecording?.isTyping || typingOrRecording?.isRecording}
         user={user}
         contactsMap={contactsMap}
         getFromContacts={getFromContacts}
@@ -359,12 +399,13 @@ const Channel: React.FC<IChannelProps> = ({
         textPrimary={textPrimary}
         textSecondary={textSecondary}
         draftMessageText={draftMessageText}
-        lastMessage={lastMessage}
+        lastMessage={draftMessage || lastMessage}
         isDirectChannel={isDirectChannel}
       />
     )
   }, [
-    isTypingOrRecording,
+    typingOrRecording?.isTyping,
+    typingOrRecording?.isRecording,
     draftMessageText,
     lastMessage,
     user,
@@ -377,6 +418,88 @@ const Channel: React.FC<IChannelProps> = ({
     isDirectChannel
   ])
 
+  const getCustomLatestMessageComponent = useCallback(
+    ({
+      lastMessage,
+      typingOrRecording,
+      draftMessageText,
+      textSecondary,
+      channel,
+      channelLastMessageFontSize,
+      channelLastMessageHeight,
+      isDirectChannel,
+      textPrimary,
+      messageAuthorRef,
+      contactsMap,
+      getFromContacts,
+      warningColor,
+      user,
+      MessageText
+    }: {
+      lastMessage: IMessage
+      typingOrRecording: any
+      draftMessageText: any
+      textSecondary: string
+      channel: IChannel
+      channelLastMessageFontSize: string
+      channelLastMessageHeight: string
+      isDirectChannel: boolean
+      textPrimary: string
+      messageAuthorRef: any
+      contactsMap: { [key: string]: IContact }
+      getFromContacts: boolean
+      warningColor: string
+      user: IUser
+      MessageText: any
+    }) => {
+      return (
+        getCustomLatestMessage &&
+        getCustomLatestMessage({
+          lastMessage,
+          typingOrRecording,
+          draftMessageText,
+          textSecondary,
+          channel,
+          channelLastMessageFontSize,
+          channelLastMessageHeight,
+          isDirectChannel,
+          textPrimary,
+          messageAuthorRef,
+          contactsMap,
+          getFromContacts,
+          warningColor,
+          user,
+          MessageText
+        })
+      )
+    },
+    [
+      getCustomLatestMessage,
+      lastMessage,
+      typingOrRecording,
+      draftMessageText,
+      textSecondary,
+      channel,
+      channelLastMessageFontSize,
+      channelLastMessageHeight,
+      isDirectChannel,
+      textPrimary,
+      messageAuthorRef,
+      contactsMap,
+      getFromContacts,
+      warningColor,
+      user,
+      MessageText
+    ]
+  )
+
+  const isTypeValid = useCallback(
+    (type: string) => {
+      return !doNotShowMessageDeliveryTypes.includes(type)
+    },
+    [doNotShowMessageDeliveryTypes]
+  )
+
   return (
     <Container
       // ref={channelItemRef}
@@ -388,7 +511,7 @@ const Channel: React.FC<IChannelProps> = ({
       channelsPaddings={channelsPaddings}
       selectedChannelBorderRadius={selectedChannelBorderRadius}
       channelsMargin={channelsMargin}
-      onClick={() => handleChangeActiveChannel(channel)}
+      onClick={() => setSelectedChannel(channel)}
       hoverBackground={channelHoverBackground || backgroundHovered}
     >
       {showAvatar && (
@@ -431,7 +554,7 @@ const Channel: React.FC<IChannelProps> = ({
           {channel.subject ||
             (isDirectChannel && directChannelUser
               ? makeUsername(contactsMap && contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-              : channel.metadata?.s
+              : isSelfChannel
                 ? 'Me'
                 : '')}
         </h3>
@@ -440,99 +563,122 @@ const Channel: React.FC<IChannelProps> = ({
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) && (
-          <LastMessage
-            color={textSecondary}
-            markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
-            unreadMentions={!!(channel.newMentionCount && channel.newMentionCount > 0)}
-            fontSize={channelLastMessageFontSize}
-            height={channelLastMessageHeight}
-          >
-            {isTypingOrRecording ? (
-              !isDirectChannel ? (
-                <LastMessageAuthor
-                  typing={typingOrRecording.isTyping}
-                  recording={!typingOrRecording.isTyping}
-                  color={textPrimary}
+        {getCustomLatestMessage
+          ? getCustomLatestMessageComponent({
+              lastMessage,
+              typingOrRecording,
+              draftMessageText,
+              textSecondary,
+              channel,
+              channelLastMessageFontSize: channelLastMessageFontSize || '14px',
+              channelLastMessageHeight: channelLastMessageHeight || '20px',
+              isDirectChannel,
+              textPrimary,
+              messageAuthorRef,
+              contactsMap: contactsMap || {},
+              getFromContacts,
+              warningColor,
+              user,
+              MessageText
+            })
+          : (lastMessage || typingOrRecording.items.length > 0 || draftMessageText) && (
+              <LastMessage
+                color={textSecondary}
+                markedAsUnread={!!(channel.unread || (channel.newMessageCount && channel.newMessageCount > 0))}
+                unreadMentions={!!(channel.newMentionCount && channel.newMentionCount > 0)}
+                fontSize={channelLastMessageFontSize}
+                height={channelLastMessageHeight}
+              >
+                {typingOrRecording?.isTyping || typingOrRecording?.isRecording ? (
+                  !isDirectChannel ? (
+                    <LastMessageAuthor
+                      typing={typingOrRecording.isTyping}
+                      recording={typingOrRecording.isRecording}
+                      color={textPrimary}
+                    >
+                      <span ref={messageAuthorRef}>
+                        {typingOrRecording.items.map((item: any, index: number) => (
+                          <React.Fragment key={item.from.id}>
+                            {makeUsername(contactsMap && contactsMap[item.from.id], item.from, getFromContacts, true)}
+                            {index < typingOrRecording.items.length - 1 && ', '}
+                          </React.Fragment>
+                        ))}
+                      </span>
+                    </LastMessageAuthor>
+                  ) : null
+                ) : draftMessageText ? (
+                  <DraftMessageTitle color={warningColor}>Draft</DraftMessageTitle>
+                ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
+                  lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                  ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
+                  lastMessage.type !== 'system' && (
+                    <LastMessageAuthor color={textPrimary}>
+                      <span ref={messageAuthorRef}>
+                        {channel.newReactions[0].user.id === user.id
+                          ? 'You'
+                          : makeUsername(
+                              contactsMap && contactsMap[channel.newReactions[0].user.id],
+                              channel.newReactions[0].user,
+                              getFromContacts,
+                              true
+                            )}
+                      </span>
+                    </LastMessageAuthor>
+                  )
+                ) : (
+                  lastMessage.user &&
+                  lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                  ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
+                  lastMessage.type !== 'system' && (
+                    <LastMessageAuthor color={textPrimary}>
+                      <span ref={messageAuthorRef}>
+                        {lastMessage.user.id === user.id
+                          ? 'You'
+                          : makeUsername(
+                              contactsMap && contactsMap[lastMessage.user.id],
+                              lastMessage.user,
+                              getFromContacts,
+                              true
+                            )}
+                      </span>
+                    </LastMessageAuthor>
+                  )
+                )}
+                {!typingOrRecording?.isTyping &&
+                  !typingOrRecording?.isRecording &&
+                  (isDirectChannel
+                    ? !typingOrRecording?.isTyping &&
+                      !typingOrRecording?.isRecording &&
+                      (draftMessageText ||
+                        (lastMessage.user &&
+                          lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                          (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
+                            ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
+                            : lastMessage.user.id === user.id)))
+                    : ((typingOrRecording?.isTyping || typingOrRecording?.isRecording) && draftMessageText) ||
+                      (lastMessage &&
+                        lastMessage.state !== MESSAGE_STATUS.DELETE &&
+                        lastMessage.type !== 'system')) && (
+                    <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
+                  )}
+                <LastMessageText
+                  color={textSecondary}
+                  withAttachments={
+                    !!(
+                      lastMessage &&
+                      lastMessage.attachments &&
+                      lastMessage.attachments.length &&
+                      lastMessage.attachments[0].type !== attachmentTypes.link
+                    ) &&
+                    (!typingOrRecording?.isTyping || !typingOrRecording?.isRecording)
+                  }
+                  noBody={lastMessage && !lastMessage.body}
+                  deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}
                 >
-                  <span ref={messageAuthorRef}>
-                    {typingOrRecording.items.map((item: any, index: number) => (
-                      <React.Fragment key={item.from.id}>
-                        {makeUsername(contactsMap && contactsMap[item.from.id], item.from, getFromContacts, true)}
-                        {index < typingOrRecording.items.length - 1 && ', '}
-                      </React.Fragment>
-                    ))}
-                  </span>
-                </LastMessageAuthor>
-              ) : null
-            ) : draftMessageText ? (
-              <DraftMessageTitle color={warningColor}>Draft</DraftMessageTitle>
-            ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
-              lastMessage.state !== MESSAGE_STATUS.DELETE &&
-              ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
-              lastMessage.type !== 'system' && (
-                <LastMessageAuthor color={textPrimary}>
-                  <span ref={messageAuthorRef}>
-                    {channel.newReactions[0].user.id === user.id
-                      ? 'You'
-                      : makeUsername(
-                          contactsMap && contactsMap[channel.newReactions[0].user.id],
-                          channel.newReactions[0].user,
-                          getFromContacts,
-                          true
-                        )}
-                  </span>
-                </LastMessageAuthor>
-              )
-            ) : (
-              lastMessage.user &&
-              lastMessage.state !== MESSAGE_STATUS.DELETE &&
-              ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
-              lastMessage.type !== 'system' && (
-                <LastMessageAuthor color={textPrimary}>
-                  <span ref={messageAuthorRef}>
-                    {lastMessage.user.id === user.id
-                      ? 'You'
-                      : makeUsername(
-                          contactsMap && contactsMap[lastMessage.user.id],
-                          lastMessage.user,
-                          getFromContacts,
-                          true
-                        )}
-                  </span>
-                </LastMessageAuthor>
-              )
+                  {MessageText}
+                </LastMessageText>
+              </LastMessage>
             )}
-            {!isTypingOrRecording &&
-              (isDirectChannel
-                ? !isTypingOrRecording &&
-                  (draftMessageText ||
-                    (lastMessage.user &&
-                      lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                      (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
-                        ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
-                        : lastMessage.user.id === user.id)))
-                : (isTypingOrRecording && draftMessageText) ||
-                  (lastMessage && lastMessage.state !== MESSAGE_STATUS.DELETE && lastMessage.type !== 'system')) && (
-                <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
-              )}
-            <LastMessageText
-              color={textSecondary}
-              withAttachments={
-                !!(
-                  lastMessage &&
-                  lastMessage.attachments &&
-                  lastMessage.attachments.length &&
-                  lastMessage.attachments[0].type !== attachmentTypes.link
-                ) && !isTypingOrRecording
-              }
-              noBody={lastMessage && !lastMessage.body}
-              deletedMessage={lastMessage && lastMessage.state === MESSAGE_STATUS.DELETE}
-            >
-              {MessageText}
-            </LastMessageText>
-          </LastMessage>
-        )}
       </ChannelInfo>
 
       <ChannelStatus color={iconInactive} ref={messageTimeAndStatusRef}>
@@ -541,7 +687,7 @@ const Channel: React.FC<IChannelProps> = ({
             {lastMessage &&
               lastMessage.user &&
               lastMessage.user.id === user.id &&
-              lastMessage.type !== 'system' &&
+              isTypeValid(lastMessage.type) &&
               MessageStatusIcon({
                 messageStatus: lastMessage.deliveryStatus,
                 messageStatusDisplayingType: 'ticks',
@@ -561,10 +707,7 @@ const Channel: React.FC<IChannelProps> = ({
       </ChannelStatus>
       <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) ? '5px' : ''}>
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
-          <UnreadMentionIconWrapper
-            iconColor={channel?.muted ? iconInactive : accentColor}
-            rightMargin={!!(channel.newMessageCount || channel.unread)}
-          >
+          <UnreadMentionIconWrapper iconColor={accentColor} rightMargin={!!(channel.newMessageCount || channel.unread)}>
             <MentionIcon />
           </UnreadMentionIconWrapper>
         )}
@@ -731,6 +874,9 @@ export const DraftMessageTitle = styled.span<{ color: string }>`
 `
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  display: flex;
+  align-items: flex-end;
+  gap: 4px;
 `
 export const LastMessageAuthor = styled.div<{ color: string; typing?: boolean; recording?: boolean }>`
   max-width: 120px;
@@ -785,14 +931,14 @@ export const LastMessageText = styled.span<{
     transform: translate(0px, 3px);
   }
   & > span {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 100%;
   }
   & > div {
-    display: flex;
+    display: block;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -812,6 +958,12 @@ export const LastMessageDescription = styled.div`
   text-overflow: ellipsis;
   white-space: nowrap;
   max-width: 100%;
+  & > svg {
+    width: 18px;
+    height: 18px;
+    margin: 3px 0 -3px 0;
+    margin-right: 4px;
+  }
 `
 
 export const ChannelStatus = styled.div<{ color: string }>`

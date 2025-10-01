@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
 import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
@@ -19,7 +20,8 @@ import {
   setChannelTypesMemberDisplayTextMap,
   setDefaultRolesByChannelTypesMap,
   setHandleNewMessages,
-  setOpenChatOnUserInteraction
+  setOpenChatOnUserInteraction,
+  setDisableFrowardMentionsCount
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
@@ -60,7 +62,8 @@ const SceytChat = ({
   showNotifications,
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false,
-  memberCount
+  memberCount,
+  disableFrowardMentionsCount = false
 }: IChatClientProps) => {
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
     useColor()
@@ -279,6 +282,10 @@ const SceytChat = ({
   useEffect(() => {
     setChannelMembersCount(memberCount || 0)
   }, [memberCount])
+
+  useEffect(() => {
+    setDisableFrowardMentionsCount(disableFrowardMentionsCount)
+  }, [disableFrowardMentionsCount])
 
   return (
     <React.Fragment>

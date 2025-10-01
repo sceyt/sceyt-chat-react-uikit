@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import styled from 'styled-components'
-import { shallowEqual, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector } from 'store/hooks'
 import Details from '../ChannelDetails'
 import { channelInfoIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
@@ -141,6 +142,7 @@ export interface IDetailsProps {
 
   backgroundColor?: string
   bordersColor?: string
+  showPhoneNumber?: boolean
 }
 
 const ChannelDetailsContainer = ({
@@ -249,7 +251,8 @@ const ChannelDetailsContainer = ({
   tabItemsFontSize,
   tabItemsLineHeight,
   tabItemsMinWidth,
-  bordersColor
+  bordersColor,
+  showPhoneNumber
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -366,6 +369,7 @@ const ChannelDetailsContainer = ({
           tabItemsFontSize={tabItemsFontSize}
           tabItemsLineHeight={tabItemsLineHeight}
           tabItemsMinWidth={tabItemsMinWidth}
+          showPhoneNumber={showPhoneNumber}
         />
       )}
     </DetailsWrapper>

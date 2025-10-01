@@ -4,6 +4,7 @@ import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
+import { SceytReduxContext } from 'store/context'
 export interface IProgress {
   loaded: number
   total: number
@@ -108,6 +109,7 @@ export interface IChatClientProps {
   openChatOnUserInteraction?: boolean
   logLevel?: 'silent' | 'trace' | 'debug' | 'info' | 'warn' | 'error'
   memberCount?: number
+  disableFrowardMentionsCount?: boolean
 }
 
 const SceytChatContainer = ({
@@ -129,14 +131,15 @@ const SceytChatContainer = ({
   openChatOnUserInteraction,
   autoSelectFirstChannel,
   logLevel = 'silent',
-  memberCount
+  memberCount,
+  disableFrowardMentionsCount
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
   }, [])
 
   return (
-    <Provider store={store}>
+    <Provider store={store} context={SceytReduxContext}>
       <SceytChat
         client={client}
         theme={theme}
@@ -156,6 +159,7 @@ const SceytChatContainer = ({
         autoSelectFirstChannel={autoSelectFirstChannel}
         channelTypeFilter={channelTypeFilter}
         memberCount={memberCount}
+        disableFrowardMentionsCount={disableFrowardMentionsCount}
       />
     </Provider>
   )

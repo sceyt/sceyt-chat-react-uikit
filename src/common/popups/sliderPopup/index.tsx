@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import moment from 'moment'
 // @ts-ignore
@@ -383,7 +384,7 @@ const SliderPopup = ({
                   text=''
                   styles={{
                     background: {
-                      fill: `${overlayBackground2}40`
+                      fill: `${overlayBackground2}66`
                     },
                     path: {
                       stroke: textOnPrimary,

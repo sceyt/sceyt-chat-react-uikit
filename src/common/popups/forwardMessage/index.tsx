@@ -8,7 +8,7 @@ import {
   searchChannelsForForwardAC,
   setSearchedChannelsForForwardAC
 } from '../../../store/channel/actions'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import {
   channelsForForwardHasNextSelector,
   channelsForForwardSelector,
@@ -98,7 +98,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const handleChannelSelect = (isSelected: boolean, channel: IChannel) => {
     const newSelectedChannels = [...selectedChannels]
     const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-    const isSelfChannel = isDirectChannel && channel.metadata?.s
+    const isSelfChannel =
+      isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
     if (isSelected && selectedChannels.length < 5) {
       newSelectedChannels.push({
@@ -202,7 +203,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     {searchedChannels.chats_groups.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                       const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-                      const isSelfChannel = isDirectChannel && channel.metadata?.s
+                      const isSelfChannel =
+                        isDirectChannel &&
+                        channel.memberCount === 1 &&
+                        channel.members.length > 0 &&
+                        channel.members[0].id === user.id
                       const directChannelUser =
                         isDirectChannel && isSelfChannel
                           ? user
@@ -336,11 +341,18 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     })}
                   </React.Fragment>
                 )}
+                {!searchedChannels.chats_groups.length && !searchedChannels.channels.length && (
+                  <NoResults color={textSecondary}>No channels found</NoResults>
+                )}
               </React.Fragment>
             ) : (
               channels.map((channel: IChannel) => {
                 const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-                const isSelfChannel = isDirectChannel && channel.metadata?.s
+                const isSelfChannel =
+                  isDirectChannel &&
+                  channel.memberCount === 1 &&
+                  channel.members.length > 0 &&
+                  channel.members[0].id === user.id
                 const directChannelUser =
                   isDirectChannel && isSelfChannel
                     ? user
@@ -550,4 +562,13 @@ const StyledSubtractSvg = styled(CrossIcon)`
   cursor: pointer;
   margin-left: 4px;
   transform: translate(2px, 0);
+`
+
+const NoResults = styled.div`
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 20px;
+  color: ${(props) => props.color};
 `

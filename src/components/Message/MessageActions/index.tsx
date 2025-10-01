@@ -15,6 +15,7 @@ import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
+import { ReactComponent as InfoIcon } from '../../../assets/svg/info.svg'
 // Helpers
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
@@ -40,6 +41,7 @@ export default function MessageActions({
   messageStatus,
   handleSelectMessage,
   handleReplyMessage,
+  handleOpenInfoMessage,
   isThreadMessage,
   rtlDirection,
   showMessageReaction,
@@ -51,6 +53,8 @@ export default function MessageActions({
   showDeleteMessage,
   showSelectMessage,
   showReportMessage,
+  showInfoMessage,
+  infoIconOrder,
   reactionIcon,
   editIcon,
   copyIcon,
@@ -58,6 +62,7 @@ export default function MessageActions({
   replyInThreadIcon,
   deleteIcon,
   selectIcon,
+  infoIcon,
   allowEditDeleteIncomingMessage,
   // starIcon,
   // staredIcon,
@@ -81,6 +86,7 @@ export default function MessageActions({
   forwardIconTooltipText,
   deleteIconTooltipText,
   selectIconTooltipText,
+  infoIconTooltipText,
   // starIconTooltipText,
   reportIconTooltipText,
   myRole,
@@ -273,12 +279,29 @@ export default function MessageActions({
             {selectIcon || <SelectIcon />}
           </Action>
         )}
+
+        {showInfoMessage && !isIncoming && (
+          <Action
+            order={infoIconOrder || 7}
+            iconColor={messageActionIconsColor || iconInactive}
+            hoverBackgroundColor={backgroundHovered}
+            hoverIconColor={accentColor}
+            onClick={() => handleOpenInfoMessage()}
+          >
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              {infoIconTooltipText || 'Info'}
+              <ArrowDownIcon />
+            </ItemNote>
+            {infoIcon || <InfoIcon />}
+          </Action>
+        )}
+
         {showDeleteMessage &&
           (channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
             ? myRole === 'owner' || myRole === 'admin'
             : true) && (
             <Action
-              order={deleteIconOrder || 7}
+              order={deleteIconOrder || 8}
               iconColor={messageActionIconsColor || warningColor}
               hoverBackgroundColor={backgroundHovered}
               hoverIconColor={accentColor}
@@ -293,7 +316,7 @@ export default function MessageActions({
           )}
         {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
           <Action
-            order={reportIconOrder || 8}
+            order={reportIconOrder || 9}
             iconColor={messageActionIconsColor || iconInactive}
             hoverBackgroundColor={backgroundHovered}
             hoverIconColor={accentColor}

@@ -1,51 +1,10 @@
-import {
-  ADD_ATTACHMENTS,
-  ADD_MESSAGE,
-  ADD_MESSAGES,
-  ADD_REACTION_TO_MESSAGE,
-  CLEAR_MESSAGES,
-  DELETE_REACTION_FROM_MESSAGE,
-  EMPTY_CHANNEL_ATTACHMENTS,
-  SET_ATTACHMENTS,
-  SET_ATTACHMENTS_COMPLETE,
-  SET_MESSAGE_FOR_REPLY,
-  SET_MESSAGE_TO_EDIT,
-  SET_MESSAGES,
-  SET_MESSAGES_HAS_NEXT,
-  SET_MESSAGES_LOADING_STATE,
-  SET_HAS_PREV_MESSAGES,
-  SET_SCROLL_TO_NEW_MESSAGE,
-  SET_SEND_MESSAGE_INPUT_HEIGHT,
-  SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON,
-  UPDATE_MESSAGE,
-  UPDATE_MESSAGES_STATUS,
-  UPLOAD_ATTACHMENT_COMPILATION,
-  SET_SCROLL_TO_MESSAGE,
-  SET_ATTACHMENTS_FOR_POPUP,
-  ADD_ATTACHMENTS_FOR_POPUP,
-  queryDirection,
-  SET_ATTACHMENTS_COMPLETE_FOR_POPUP,
-  DELETE_MESSAGE_FROM_LIST,
-  SET_REACTIONS_LIST,
-  ADD_REACTIONS_TO_LIST,
-  SET_REACTIONS_LOADING_STATE,
-  DELETE_REACTION_FROM_LIST,
-  ADD_REACTION_TO_LIST,
-  SET_MESSAGE_MENU_OPENED,
-  REMOVE_UPLOAD_PROGRESS,
-  UPDATE_UPLOAD_PROGRESS,
-  SET_PLAYING_AUDIO_ID,
-  ADD_SELECTED_MESSAGE,
-  REMOVE_SELECTED_MESSAGE,
-  CLEAR_SELECTED_MESSAGES,
-  REMOVE_ATTACHMENT,
-  SET_SCROLL_TO_MENTIONED_MESSAGE
-} from './constants'
-import { IAction, IMarker, IMessage, IReaction } from '../../types'
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_LENGTH,
+  removePendingMessageFromMap,
   setHasNextCached,
   setHasPrevCached
 } from '../../helpers/messagesHalper'
@@ -58,7 +17,7 @@ export interface IMessageStore {
   messagesHasPrev: boolean
   threadMessagesHasNext: boolean
   threadMessagesHasPrev: boolean
-  activeChannelMessages: any[]
+  activeChannelMessages: IMessage[]
   pendingMessages: { [key: string]: IMessage[] }
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]
@@ -68,12 +27,17 @@ export interface IMessageStore {
   messageToEdit: IMessage | null
   messageForReply?: IMessage | null
   activeChannelMessageUpdated: { messageId: string; params: IMessage } | null
-  activeChannelNewMarkers: { name: string; markersMap: { [key: string]: IMarker } }
-  scrollToNewMessage: {}
+  scrollToNewMessage: {
+    scrollToBottom: boolean
+    updateMessageList: boolean
+    isIncomingMessage: boolean
+  }
   showScrollToNewMessageButton: boolean
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
   scrollToMessage: string | null
+  scrollToMessageHighlight: boolean
+  scrollToMessageBehavior: 'smooth' | 'instant' | 'auto'
   scrollToMentionedMessage: boolean | null
   reactionsList: IReaction[]
   reactionsHasNext: boolean
@@ -83,12 +47,17 @@ export interface IMessageStore {
     [key: string]: {
       uploaded: number
       total: number
-      progress?: number
+      progress: number
     }
   }
   playingAudioId: string | null
   selectedMessagesMap: Map<string, IMessage> | null
+  oGMetadata: { [key: string]: IOGMetadata | null }
+  attachmentUpdatedMap: { [key: string]: string }
+  messageMarkers: { [key: string]: { [key: string]: { [key: string]: IMarker[] } } }
+  messagesMarkersLoadingState: number | null
 }
+
 const initialState: IMessageStore = {
   messagesLoadingState: null,
   messagesHasNext: false,
@@ -103,7 +72,6 @@ const initialState: IMessageStore = {
   messageToEdit: null,
   activeChannelNewMessage: null,
   pendingMessages: {},
-  activeChannelNewMarkers: { name: '', markersMap: {} },
   activeChannelMessageUpdated: null,
   scrollToNewMessage: {
     scrollToBottom: false,
@@ -115,6 +83,8 @@ const initialState: IMessageStore = {
   messageForReply: null,
   attachmentsUploadingState: {},
   scrollToMessage: null,
+  scrollToMessageHighlight: true,
+  scrollToMessageBehavior: 'smooth',
   scrollToMentionedMessage: false,
   reactionsList: [],
   reactionsHasNext: true,
@@ -122,176 +92,183 @@ const initialState: IMessageStore = {
   openedMessageMenu: '',
   attachmentsUploadingProgress: {},
   playingAudioId: null,
-  selectedMessagesMap: null
+  selectedMessagesMap: null,
+  oGMetadata: {},
+  attachmentUpdatedMap: {},
+  messageMarkers: {},
+  messagesMarkersLoadingState: null
 }
 
-export default (state = initialState, { type, payload }: IAction = { type: '' }) => {
-  let newState = { ...state }
-  switch (type) {
-    case ADD_MESSAGE: {
-      /* if (payload.message.tid) {
-        log.info('add pending on reducer .... ', payload.message)
-        newState.pendingMessages = { ...newState.pendingMessages, [payload.message.tid]: payload.message }
-        newState.scrollToNewMessage = {
-          scrollToBottom: true,
-          updateMessageList: false
-        }
-      } else { */
-      const messagesCopy = [...newState.activeChannelMessages]
-      if (newState.activeChannelMessages.length >= MESSAGES_MAX_LENGTH) {
-        messagesCopy.shift()
-        newState.activeChannelMessages = [...messagesCopy, payload.message]
-      } else {
-        newState.activeChannelMessages = [...messagesCopy, payload.message]
-      }
-      /* if (payload.message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-        newState.scrollToNewMessage = {
-          scrollToBottom: true,
-          updateMessageList: true
-        }
-      } */
-      // log.info('add new message on reducer .... ', payload.message)
-      // newState.activeChannelNewMessage = { ...payload.message }
-      // }
-      // newState.activeChannelMessages = [...payload.message, ...newState.activeChannelMessages]
-      return newState
-    }
+const messageSlice = createSlice({
+  name: 'messages',
+  initialState,
+  reducers: {
+    addMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
+      const { message } = action.payload
+      state.activeChannelMessages.push(message)
+    },
 
-    case DELETE_MESSAGE_FROM_LIST: {
-      newState.activeChannelMessages = [...newState.activeChannelMessages].filter(
-        (msg) => !(msg.id === payload.messageId || msg.tid === payload.messageId)
+    deleteMessageFromList: (state, action: PayloadAction<{ messageId: string }>) => {
+      const { messageId } = action.payload
+      state.activeChannelMessages = state.activeChannelMessages.filter(
+        (msg) => !(msg.id === messageId || msg.tid === messageId)
       )
-      return newState
-    }
-    case SET_SCROLL_TO_MESSAGE: {
-      newState.scrollToMessage = payload.messageId
-      return newState
-    }
-    case SET_SCROLL_TO_MENTIONED_MESSAGE: {
-      newState.scrollToMentionedMessage = payload.isScrollToMentionedMessage
-      return newState
-    }
-    case SET_SCROLL_TO_NEW_MESSAGE: {
-      newState.scrollToNewMessage = {
-        scrollToBottom: payload.scrollToBottom,
-        updateMessageList: payload.updateMessageList,
-        isIncomingMessage: payload.isIncomingMessage
+    },
+
+    setScrollToMessage: (
+      state,
+      action: PayloadAction<{ messageId: string; highlight: boolean; behavior?: 'smooth' | 'instant' | 'auto' }>
+    ) => {
+      state.scrollToMessage = action.payload.messageId
+      state.scrollToMessageHighlight = action.payload.highlight
+      state.scrollToMessageBehavior = action.payload.behavior || 'smooth'
+    },
+
+    setScrollToMentionedMessage: (state, action: PayloadAction<{ isScrollToMentionedMessage: boolean }>) => {
+      state.scrollToMentionedMessage = action.payload.isScrollToMentionedMessage
+    },
+
+    setScrollToNewMessage: (
+      state,
+      action: PayloadAction<{
+        scrollToBottom: boolean
+        updateMessageList: boolean
+        isIncomingMessage: boolean
+      }>
+    ) => {
+      state.scrollToNewMessage = {
+        scrollToBottom: action.payload.scrollToBottom,
+        updateMessageList: action.payload.updateMessageList,
+        isIncomingMessage: action.payload.isIncomingMessage
       }
-      return newState
-    }
+    },
 
-    case SET_SHOW_SCROLL_TO_NEW_MESSAGE_BUTTON: {
-      newState.showScrollToNewMessageButton = payload.state
-      return newState
-    }
+    setShowScrollToNewMessageButton: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.showScrollToNewMessageButton = action.payload.state
+    },
 
-    case SET_MESSAGES: {
-      // const { messages, direction, unreadCount } = payload
-      const { messages } = payload
-      newState.activeChannelMessages = messages
-      return newState
-    }
+    setMessages: (state, action: PayloadAction<{ messages: IMessage[] }>) => {
+      log.info('setMessages ... ', action.payload)
+      state.activeChannelMessages = action.payload.messages
+    },
 
-    case ADD_MESSAGES: {
-      const { messages, direction } = payload
-      const messagesCopy = [...newState.activeChannelMessages]
+    addMessages: (
+      state,
+      action: PayloadAction<{
+        messages: IMessage[]
+        direction: string
+      }>
+    ) => {
+      const { messages, direction } = action.payload
       const newMessagesLength = messages.length
-      const currentMessagesLength = newState.activeChannelMessages.length
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+      const currentMessagesLength = state.activeChannelMessages.length
+      const messagesIsNotIncludeInActiveChannelMessages = messages.filter(
+        (message) => !state.activeChannelMessages.some((msg) => msg.tid === message.tid || msg.id === message.id)
+      )
+
+      if (direction === MESSAGE_LOAD_DIRECTION.PREV && newMessagesLength > 0) {
         if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_LENGTH) {
           setHasNextCached(true)
-          // newState.messagesHasNext = true
           if (newMessagesLength > 0) {
             if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
-              messagesCopy.splice(-newMessagesLength)
+              state.activeChannelMessages.splice(-newMessagesLength)
             } else {
-              messagesCopy.splice(-(newMessagesLength - (MESSAGES_MAX_LENGTH - currentMessagesLength)))
+              state.activeChannelMessages.splice(-(newMessagesLength - (MESSAGES_MAX_LENGTH - currentMessagesLength)))
             }
           }
-          newState.activeChannelMessages = [...messages, ...messagesCopy]
+          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
           const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
           setHasNextCached(true)
-          // newState.messagesHasNext = true
-          messagesCopy.splice(-sliceElementCount)
-          newState.activeChannelMessages = [...messages, ...messagesCopy]
+          state.activeChannelMessages.splice(-sliceElementCount)
+          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         } else {
-          newState.activeChannelMessages = [...messages, ...newState.activeChannelMessages]
+          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         }
-      } else if (direction === 'next') {
+      } else if (direction === 'next' && newMessagesLength > 0) {
         if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
           setHasPrevCached(true)
-          // newState.messagesHasPrev = true
-          messagesCopy.splice(0, messages.length)
-          newState.activeChannelMessages = [...messagesCopy, ...messages]
+          state.activeChannelMessages.splice(0, messagesIsNotIncludeInActiveChannelMessages.length)
+          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
         } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
           const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
           setHasPrevCached(true)
-          // newState.messagesHasPrev = true
-          messagesCopy.splice(0, sliceElementCount)
-          newState.activeChannelMessages = [...messagesCopy, ...messages]
+          state.activeChannelMessages.splice(0, sliceElementCount)
+          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
         } else {
-          newState.activeChannelMessages = [...newState.activeChannelMessages, ...messages]
+          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
         }
       }
-      return newState
-    }
+    },
 
-    case UPDATE_MESSAGES_STATUS: {
-      const { name, markersMap } = payload
+    updateMessagesStatus: (
+      state,
+      action: PayloadAction<{
+        name: string
+        markersMap: { [key: string]: IMarker }
+      }>
+    ) => {
+      const { name, markersMap } = action.payload
       const markerName = name
-      const messagesCopy = [...newState.activeChannelMessages]
-      let isChanged = false
-      // eslint-disable-next-line no-return-assign
-      newState.activeChannelNewMarkers = { name, markersMap }
-      messagesCopy.forEach((message, index) => {
+      for (let index = 0; index < state.activeChannelMessages.length; index++) {
         if (
-          markersMap[message.id] &&
-          (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT || markerName === MESSAGE_DELIVERY_STATUS.READ) &&
-          // (markerName !== MESSAGE_DELIVERY_STATUS.DELIVERED &&
-          //   message.deliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED)) &&
-          message.state !== 'Deleted'
+          markersMap[state.activeChannelMessages[index].id] &&
+          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
+            markerName === MESSAGE_DELIVERY_STATUS.READ) &&
+          state.activeChannelMessages[index].state !== 'Deleted'
         ) {
-          const messageCopy = { ...message }
-          messageCopy.deliveryStatus = markerName
-          messagesCopy[index] = messageCopy
-          if (!isChanged) {
-            isChanged = true
-          }
+          state.activeChannelMessages[index].deliveryStatus = markerName
         }
-      })
-      if (isChanged) {
-        newState.activeChannelMessages = messagesCopy
       }
-      return newState
-    }
+    },
 
-    case UPDATE_MESSAGE: {
-      const { messageId, params, addIfNotExists } = payload
-      const messagesCopy = [...newState.activeChannelMessages]
+    updateMessage: (
+      state,
+      action: PayloadAction<{
+        messageId: string
+        params: IMessage
+        addIfNotExists?: boolean
+      }>
+    ) => {
+      const { messageId, params, addIfNotExists } = action.payload
       let messageFound = false
-      newState.activeChannelMessages = messagesCopy.map((message) => {
+      state.activeChannelMessages = state.activeChannelMessages.map((message) => {
         if (message.tid === messageId || message.id === messageId) {
           messageFound = true
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
-            return { ...message, ...params }
+            const messageData: IMessage = { ...message, ...params }
+            if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
+              removePendingMessageFromMap(messageData.channelId, messageData.tid || messageData.id)
+            }
+            return messageData
           }
         }
         return message
       })
+
       if (!messageFound && addIfNotExists) {
         log.info('message not found on update message, add message to list .. ...', params)
-        newState.activeChannelMessages = [...newState.activeChannelMessages, params]
+        state.activeChannelMessages.push(params)
       }
-      return newState
-    }
+    },
 
-    case ADD_REACTION_TO_MESSAGE: {
-      const { message, reaction, isSelf } = payload
-      // const messagesCopy = [...newState.activeChannelMessages]
-      newState.activeChannelMessages = newState.activeChannelMessages.map((msg) => {
+    updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
+      const { url, attachmentUrl } = action.payload
+      state.attachmentUpdatedMap[url] = attachmentUrl
+    },
+
+    addReactionToMessage: (
+      state,
+      action: PayloadAction<{
+        message: IMessage
+        reaction: IReaction
+        isSelf: boolean
+      }>
+    ) => {
+      const { message, reaction, isSelf } = action.payload
+      state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
           let slfReactions = [...msg.userReactions]
           if (isSelf) {
@@ -309,14 +286,18 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return msg
       })
-      return newState
-    }
+    },
 
-    case DELETE_REACTION_FROM_MESSAGE: {
-      const { reaction, message, isSelf } = payload
-
-      const messagesCopy = [...newState.activeChannelMessages]
-      newState.activeChannelMessages = messagesCopy.map((msg) => {
+    deleteReactionFromMessage: (
+      state,
+      action: PayloadAction<{
+        reaction: IReaction
+        message: IMessage
+        isSelf: boolean
+      }>
+    ) => {
+      const { reaction, message, isSelf } = action.payload
+      state.activeChannelMessages = state.activeChannelMessages.map((msg) => {
         if (msg.id === message.id) {
           let { userReactions } = msg
           if (isSelf) {
@@ -330,199 +311,271 @@ export default (state = initialState, { type, payload }: IAction = { type: '' })
         }
         return msg
       })
-      return newState
-    }
+    },
 
-    case SET_HAS_PREV_MESSAGES: {
-      newState.messagesHasPrev = payload.hasPrev
-      return newState
-    }
+    setHasPrevMessages: (state, action: PayloadAction<{ hasPrev: boolean }>) => {
+      state.messagesHasPrev = action.payload.hasPrev
+    },
 
-    case SET_MESSAGES_HAS_NEXT: {
-      newState.messagesHasNext = payload.hasNext
-      return newState
-    }
+    setMessagesHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
+      state.messagesHasNext = action.payload.hasNext
+    },
 
-    case CLEAR_MESSAGES: {
-      newState.activeChannelMessages = []
-      return newState
-    }
+    clearMessages: (state) => {
+      state.activeChannelMessages = []
+    },
 
-    case EMPTY_CHANNEL_ATTACHMENTS: {
-      newState.activeTabAttachments = []
-      return newState
-    }
+    emptyChannelAttachments: (state) => {
+      state.activeTabAttachments = []
+    },
 
-    case SET_ATTACHMENTS: {
-      const { attachments } = payload
-      newState.activeTabAttachments = attachments
-      return newState
-    }
-    case REMOVE_ATTACHMENT: {
-      const { attachmentId } = payload
-      newState.activeTabAttachments = [...newState.activeTabAttachments].filter((item) => item.id !== attachmentId)
-      newState.attachmentsForPopup = [...newState.attachmentsForPopup].filter((item) => item.id !== attachmentId)
-      return newState
-    }
+    setAttachments: (state, action: PayloadAction<{ attachments: any[] }>) => {
+      state.activeTabAttachments = action.payload.attachments
+    },
 
-    case SET_ATTACHMENTS_FOR_POPUP: {
-      const { attachments } = payload
-      newState.attachmentsForPopup = attachments
-      return newState
-    }
+    removeAttachment: (state, action: PayloadAction<{ attachmentId: string }>) => {
+      const { attachmentId } = action.payload
+      state.activeTabAttachments = state.activeTabAttachments.filter((item) => item.id !== attachmentId)
+      state.attachmentsForPopup = state.attachmentsForPopup.filter((item) => item.id !== attachmentId)
+    },
 
-    case ADD_ATTACHMENTS: {
-      const { attachments } = payload
-      const attachmentsCopy = [...newState.activeTabAttachments]
-      newState.activeTabAttachments = [...attachmentsCopy, ...attachments]
-      return newState
-    }
+    setAttachmentsForPopup: (state, action: PayloadAction<{ attachments: any[] }>) => {
+      state.attachmentsForPopup = action.payload.attachments
+    },
 
-    case ADD_ATTACHMENTS_FOR_POPUP: {
-      const { attachments, direction } = payload
-      const attachmentsCopy = [...newState.attachmentsForPopup]
-      if (direction === queryDirection.PREV) {
-        newState.attachmentsForPopup = [...attachmentsCopy, ...attachments]
+    addAttachments: (state, action: PayloadAction<{ attachments: any[] }>) => {
+      state.activeTabAttachments.push(...action.payload.attachments)
+    },
+
+    addAttachmentsForPopup: (
+      state,
+      action: PayloadAction<{
+        attachments: any[]
+        direction: string
+      }>
+    ) => {
+      const { attachments, direction } = action.payload
+      if (direction === 'prev') {
+        state.attachmentsForPopup.push(...attachments)
       } else {
-        newState.attachmentsForPopup = [...attachments, ...attachmentsCopy]
+        state.attachmentsForPopup.unshift(...attachments)
       }
-      return newState
-    }
+    },
 
-    case SET_ATTACHMENTS_COMPLETE: {
-      const { hasPrev } = payload
-      newState.attachmentHasNext = hasPrev
-      return newState
-    }
+    setAttachmentsComplete: (state, action: PayloadAction<{ hasPrev: boolean }>) => {
+      state.attachmentHasNext = action.payload.hasPrev
+    },
 
-    case SET_ATTACHMENTS_COMPLETE_FOR_POPUP: {
-      const { hasPrev } = payload
-      newState.attachmentForPopupHasNext = hasPrev
-      return newState
-    }
+    setAttachmentsCompleteForPopup: (state, action: PayloadAction<{ hasPrev: boolean }>) => {
+      state.attachmentForPopupHasNext = action.payload.hasPrev
+    },
 
-    case UPDATE_UPLOAD_PROGRESS: {
-      const { uploaded, total, attachmentId, progress } = payload
-      const attachmentsUploadingProgressCopy = { ...newState.attachmentsUploadingProgress }
+    updateUploadProgress: (
+      state,
+      action: PayloadAction<{
+        uploaded: number
+        total: number
+        attachmentId: string
+      }>
+    ) => {
+      const { uploaded, total, attachmentId } = action.payload
+      const progress = uploaded / total
       const updateData = { uploaded, total, progress }
-      attachmentsUploadingProgressCopy[attachmentId] = {
-        ...attachmentsUploadingProgressCopy[attachmentId],
+      state.attachmentsUploadingProgress[attachmentId] = {
+        ...state.attachmentsUploadingProgress[attachmentId],
         ...updateData
       }
-      newState.attachmentsUploadingProgress = attachmentsUploadingProgressCopy
-      return newState
-    }
+    },
 
-    case REMOVE_UPLOAD_PROGRESS: {
-      const { attachmentId } = payload
-      const attachmentsUploadingProgressCopy = { ...newState.attachmentsUploadingProgress }
-      delete attachmentsUploadingProgressCopy[attachmentId]
-      newState.attachmentsUploadingProgress = attachmentsUploadingProgressCopy
-      return newState
-    }
+    removeUploadProgress: (state, action: PayloadAction<{ attachmentId: string }>) => {
+      delete state.attachmentsUploadingProgress[action.payload.attachmentId]
+    },
 
-    case SET_MESSAGE_TO_EDIT: {
-      newState.messageToEdit = payload.message
-      return newState
-    }
+    setMessageToEdit: (state, action: PayloadAction<{ message: IMessage | null }>) => {
+      state.messageToEdit = action.payload.message
+    },
 
-    case SET_MESSAGES_LOADING_STATE: {
-      newState.messagesLoadingState = payload.state
-      return newState
-    }
+    setMessagesLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
+      state.messagesLoadingState = action.payload.state
+    },
 
-    case SET_SEND_MESSAGE_INPUT_HEIGHT: {
-      newState.sendMessageInputHeight = payload.height
-      return newState
-    }
+    setSendMessageInputHeight: (state, action: PayloadAction<{ height: number }>) => {
+      state.sendMessageInputHeight = action.payload.height
+    },
 
-    case SET_MESSAGE_FOR_REPLY: {
-      const { message } = payload
-      newState.messageForReply = message
-      return newState
-    }
+    setMessageForReply: (state, action: PayloadAction<{ message: IMessage | null }>) => {
+      state.messageForReply = action.payload.message
+    },
 
-    case UPLOAD_ATTACHMENT_COMPILATION: {
-      const { attachmentUploadingState, attachmentId } = payload
-      newState.attachmentsUploadingState = {
-        ...newState.attachmentsUploadingState,
-        [attachmentId]: attachmentUploadingState
-      }
-      return newState
-    }
+    uploadAttachmentCompilation: (
+      state,
+      action: PayloadAction<{
+        attachmentUploadingState: any
+        attachmentId: string
+      }>
+    ) => {
+      const { attachmentUploadingState, attachmentId } = action.payload
+      state.attachmentsUploadingState[attachmentId] = attachmentUploadingState
+    },
 
-    case SET_REACTIONS_LIST: {
-      const { reactions, hasNext } = payload
-      newState.reactionsHasNext = hasNext
-      newState.reactionsList = [...reactions]
-      return newState
-    }
+    setReactionsList: (
+      state,
+      action: PayloadAction<{
+        reactions: IReaction[]
+        hasNext: boolean
+      }>
+    ) => {
+      const { reactions, hasNext } = action.payload
+      state.reactionsHasNext = hasNext
+      state.reactionsList = [...reactions]
+    },
 
-    case ADD_REACTIONS_TO_LIST: {
-      const { reactions, hasNext } = payload
-      newState.reactionsHasNext = hasNext
-      newState.reactionsList = [...newState.reactionsList, ...reactions]
-      return newState
-    }
+    addReactionsToList: (
+      state,
+      action: PayloadAction<{
+        reactions: IReaction[]
+        hasNext: boolean
+      }>
+    ) => {
+      const { reactions, hasNext } = action.payload
+      state.reactionsHasNext = hasNext
+      state.reactionsList.push(...reactions)
+    },
 
-    case ADD_REACTION_TO_LIST: {
-      newState.reactionsList = [...newState.reactionsList, payload.reaction]
-      return newState
-    }
+    addReactionToList: (state, action: PayloadAction<{ reaction: IReaction }>) => {
+      state.reactionsList.push(action.payload.reaction)
+    },
 
-    case DELETE_REACTION_FROM_LIST: {
-      const { reaction } = payload
-      newState.reactionsList = [...newState.reactionsList].filter((item) => item.id !== reaction.id)
-      return newState
-    }
+    deleteReactionFromList: (state, action: PayloadAction<{ reaction: IReaction }>) => {
+      const { reaction } = action.payload
+      state.reactionsList = state.reactionsList.filter((item) => item.id !== reaction.id)
+    },
 
-    case SET_REACTIONS_LOADING_STATE: {
-      newState.reactionsLoadingState = payload.state
-      return newState
-    }
+    setReactionsLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
+      state.reactionsLoadingState = action.payload.state
+    },
 
-    case SET_MESSAGE_MENU_OPENED: {
-      newState.openedMessageMenu = payload.messageId
-      return newState
-    }
-    case SET_PLAYING_AUDIO_ID: {
-      newState.playingAudioId = payload.id
-      return newState
-    }
+    setMessageMenuOpened: (state, action: PayloadAction<{ messageId: string }>) => {
+      state.openedMessageMenu = action.payload.messageId
+    },
 
-    case ADD_SELECTED_MESSAGE: {
-      if (!newState.selectedMessagesMap) {
+    setPlayingAudioId: (state, action: PayloadAction<{ id: string | null }>) => {
+      state.playingAudioId = action.payload.id
+    },
+
+    addSelectedMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
+      if (!state.selectedMessagesMap) {
         const messagesMap = new Map()
-        messagesMap.set(payload.message.id, payload.message)
-        newState.selectedMessagesMap = messagesMap
+        messagesMap.set(action.payload.message.id, action.payload.message)
+        state.selectedMessagesMap = messagesMap
       } else {
-        const messagesMap = new Map(newState.selectedMessagesMap)
-        messagesMap.set(payload.message.id, payload.message)
-        newState.selectedMessagesMap = messagesMap
+        const messagesMap = new Map(state.selectedMessagesMap)
+        messagesMap.set(action.payload.message.id, action.payload.message)
+        state.selectedMessagesMap = messagesMap
       }
-      return newState
-    }
+    },
 
-    case REMOVE_SELECTED_MESSAGE: {
-      if (newState.selectedMessagesMap) {
-        const messagesMap = new Map(newState.selectedMessagesMap)
-        messagesMap.delete(payload.messageId)
-        newState.selectedMessagesMap = messagesMap
+    removeSelectedMessage: (state, action: PayloadAction<{ messageId: string }>) => {
+      if (state.selectedMessagesMap) {
+        const messagesMap = new Map(state.selectedMessagesMap)
+        messagesMap.delete(action.payload.messageId)
+        state.selectedMessagesMap = messagesMap
       }
-      return newState
-    }
+    },
 
-    case CLEAR_SELECTED_MESSAGES: {
-      newState.selectedMessagesMap = null
-      return newState
-    }
+    clearSelectedMessages: (state) => {
+      state.selectedMessagesMap = null
+    },
 
-    case DESTROY_SESSION: {
-      newState = initialState
-      return newState
-    }
+    setOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
+      const { url, metadata } = action.payload
+      state.oGMetadata[url] = metadata
+    },
 
-    default:
-      return state
+    updateOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
+      const { url, metadata } = action.payload
+      if (metadata) {
+        const existing = state.oGMetadata[url]
+        state.oGMetadata[url] = existing ? { ...existing, ...metadata } : metadata
+      }
+    },
+
+    setMessageMarkers: (
+      state,
+      action: PayloadAction<{ channelId: string; messageId: string; messageMarkers: IMarker[]; deliveryStatus: string }>
+    ) => {
+      const { channelId, messageId, messageMarkers, deliveryStatus } = action.payload
+      if (!state.messageMarkers[channelId]) {
+        state.messageMarkers[channelId] = {}
+      }
+      if (!state.messageMarkers[channelId][messageId]) {
+        state.messageMarkers[channelId][messageId] = {}
+      }
+      if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
+        state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+      }
+      state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers]
+    },
+
+    setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
+      state.messagesMarkersLoadingState = action.payload.state
+    }
+  },
+  extraReducers: (builder) => {
+    builder.addCase(DESTROY_SESSION, () => {
+      return initialState
+    })
   }
-}
+})
+
+// Export actions
+export const {
+  addMessage,
+  deleteMessageFromList,
+  setScrollToMessage,
+  setScrollToMentionedMessage,
+  setScrollToNewMessage,
+  setShowScrollToNewMessageButton,
+  setMessages,
+  addMessages,
+  updateMessagesStatus,
+  updateMessage,
+  updateMessageAttachment,
+  addReactionToMessage,
+  deleteReactionFromMessage,
+  setHasPrevMessages,
+  setMessagesHasNext,
+  clearMessages,
+  emptyChannelAttachments,
+  setAttachments,
+  removeAttachment,
+  setAttachmentsForPopup,
+  addAttachments,
+  addAttachmentsForPopup,
+  setAttachmentsComplete,
+  setAttachmentsCompleteForPopup,
+  updateUploadProgress,
+  removeUploadProgress,
+  setMessageToEdit,
+  setMessagesLoadingState,
+  setSendMessageInputHeight,
+  setMessageForReply,
+  uploadAttachmentCompilation,
+  setReactionsList,
+  addReactionsToList,
+  addReactionToList,
+  deleteReactionFromList,
+  setReactionsLoadingState,
+  setMessageMenuOpened,
+  setPlayingAudioId,
+  addSelectedMessage,
+  removeSelectedMessage,
+  clearSelectedMessages,
+  setOGMetadata,
+  updateOGMetadata,
+  setMessageMarkers,
+  setMessagesMarkersLoadingState
+} = messageSlice.actions
+
+// Export reducer
+export default messageSlice.reducer

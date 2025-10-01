@@ -9,7 +9,8 @@ import {
 } from '../../store/channel/selector'
 import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 // Assets
 import { ReactComponent as InfoIconD } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
@@ -93,7 +94,12 @@ export default function ChatHeader({
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
+
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
@@ -121,7 +127,7 @@ export default function ChatHeader({
   }
 
   const handleBackToChannels = () => {
-    dispatch(switchChannelActionAC({}))
+    dispatch(switchChannelActionAC(null))
     mobileBackButtonClicked && mobileBackButtonClicked()
   }
 

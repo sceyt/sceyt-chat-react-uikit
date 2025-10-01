@@ -1,9 +1,9 @@
 import styled from 'styled-components'
-import { useDispatch, useSelector } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import React from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'
-import { getMessagesAC } from '../../store/message/actions'
+import { getMessagesAC, scrollToNewMessageAC, setMessagesLoadingStateAC } from '../../store/message/actions'
 import {
   activeChannelMessagesSelector,
   sendMessageInputHeightSelector,
@@ -18,6 +18,8 @@ import { IChannel } from '../../types'
 import { UnreadCountProps } from '../Channel'
 import { useColor } from '../../hooks'
 import { markMessagesAsReadAC } from 'store/channel/actions'
+import { LOADING_STATE } from 'helpers/constants'
+import { getClient } from 'common/client'
 
 interface MessagesScrollToBottomButtonProps {
   buttonIcon?: JSX.Element
@@ -64,21 +66,28 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
   const messages = useSelector(activeChannelMessagesSelector) || []
   const handleScrollToBottom = () => {
-    dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
-    handleScrollToRepliedMessage(channel.lastMessage.id)
+    const user = getClient().user
+    if (channel.lastMessage.user.id !== user.id) {
+      dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
+    }
+    handleScrollToLastMessage(channel.lastMessage.id)
   }
-  const handleScrollToRepliedMessage = async (messageId: string) => {
+  const handleScrollToLastMessage = async (messageId: string) => {
     if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
+      dispatch(scrollToNewMessageAC(true, false, false))
+      dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {
         const scrollRef = document.getElementById('scrollableDiv')
         if (scrollRef) {
-          scrollRef.scrollTop = repliedMessage.offsetTop
+          scrollRef.scrollTo({
+            top: 1000,
+            behavior: 'smooth'
+          })
         }
       }
     } else {
-      // await handleGetMessages(undefined, messageId)
-      dispatch(getMessagesAC(channel, undefined, messageId))
+      dispatch(getMessagesAC(channel, true, messageId, undefined, undefined, false))
     }
   }
 

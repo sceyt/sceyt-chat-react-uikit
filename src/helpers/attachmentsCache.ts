@@ -13,7 +13,7 @@ if (isBrowser) {
   cacheAvailable = 'caches' in global
 }
 
-export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: any) => {
+export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: Response) => {
   if (cacheAvailable) {
     caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
       // Fetch the image or video
@@ -40,17 +40,17 @@ export const removeAttachmentFromCache = (attachmentId: string) => {
 
 export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<string | false> => {
   if (!cacheAvailable) {
-    log.error('Cache is not available');
-    return Promise.reject(new Error('Cache not available'));
+    log.error('Cache is not available')
+    return Promise.reject(new Error('Cache not available'))
   }
 
-  const response = await caches.match(attachmentUrl);
+  const response = await caches.match(attachmentUrl)
   if (response) {
     // Use the cached response
-    return URL.createObjectURL(await response.blob());
+    return URL.createObjectURL(await response.blob())
   } else {
     // The image or video is not cached
-    log.info('The image or video is not cached', attachmentUrl);
-    return false;
+    log.info('The image or video is not cached', attachmentUrl)
+    return false
   }
-};
+}

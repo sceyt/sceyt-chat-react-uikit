@@ -1,16 +1,5 @@
-import { DESTROY_SESSION } from '../channel/constants'
-import {
-  ADD_USERS,
-  BROWSER_TAB_IS_ACTIVE,
-  SET_CONNECTION_STATUS,
-  SET_CONTACTS,
-  SET_USER,
-  SET_USERS,
-  SET_USERS_LOADING_STATE,
-  UPDATE_USER_MAP,
-  UPDATE_USER_PROFILE
-} from './constants'
-import { IAction, IContact, IUser } from '../../types'
+import { createSlice, PayloadAction } from '@reduxjs/toolkit'
+import { IContact, IUser } from '../../types'
 
 export interface IUserStore {
   connectionStatus: string
@@ -34,65 +23,71 @@ const initialState: IUserStore = {
   browserTabIsActive: true
 }
 
-export default (state = initialState, { type, payload }: IAction) => {
-  let newState = { ...state }
+const userSlice = createSlice({
+  name: 'users',
+  initialState,
+  reducers: {
+    setConnectionStatus: (state, action: PayloadAction<{ status: string }>) => {
+      state.connectionStatus = action.payload.status
+    },
 
-  switch (type) {
-    case SET_CONNECTION_STATUS: {
-      const { status } = payload
-      newState.connectionStatus = status
-      return newState
-    }
+    setUser: (state, action: PayloadAction<{ user: IUser }>) => {
+      state.user = { ...action.payload.user }
+    },
 
-    case SET_USER: {
-      newState.user = { ...payload.user }
-      return newState
-    }
+    setUsers: (state, action: PayloadAction<{ users: IUser[] }>) => {
+      state.usersList = [...action.payload.users]
+    },
 
-    case SET_USERS: {
-      newState.usersList = [...payload.users]
-      return newState
-    }
-    case ADD_USERS: {
-      newState.usersList = [...newState.usersList, ...payload.users]
-      return newState
-    }
+    addUsers: (state, action: PayloadAction<{ users: IUser[] }>) => {
+      state.usersList.push(...action.payload.users)
+    },
 
-    case SET_USERS_LOADING_STATE: {
-      newState.usersLoadingState = payload.state
-      return newState
-    }
+    setUsersLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
+      state.usersLoadingState = action.payload.state
+    },
 
-    case UPDATE_USER_MAP: {
-      newState.updatedUserMap = payload.usersMap
-      return newState
-    }
+    updateUserMap: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
+      state.updatedUserMap = action.payload.usersMap
+    },
 
-    case SET_CONTACTS: {
-      const { contacts } = payload
-      newState.contactList = [...contacts]
-      const contactsMap = {}
+    setContacts: (state, action: PayloadAction<{ contacts: IContact[] }>) => {
+      const { contacts } = action.payload
+      state.contactList = [...contacts]
+      const contactsMap: { [key: string]: IContact } = {}
       contacts.forEach((contact: IContact) => {
         contactsMap[contact.id] = contact
       })
-      newState.contactsMap = contactsMap
-      return newState
-    }
+      state.contactsMap = contactsMap
+    },
 
-    case UPDATE_USER_PROFILE: {
-      newState.user = { ...newState.user, ...payload.profile }
-      return newState
-    }
+    updateUserProfile: (state, action: PayloadAction<{ profile: any }>) => {
+      state.user = { ...state.user, ...action.payload.profile }
+    },
 
-    case BROWSER_TAB_IS_ACTIVE: {
-      newState.browserTabIsActive = payload.state
-      return newState
+    setBrowserTabIsActive: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.browserTabIsActive = action.payload.state
     }
-    case DESTROY_SESSION: {
-      newState = initialState
-      return newState
-    }
-    default:
-      return state
+  },
+  extraReducers: (builder) => {
+    builder.addCase('DESTROY_SESSION', () => {
+      return initialState
+    })
   }
-}
+})
+
+// Export actions
+export const {
+  setConnectionStatus,
+  setUser,
+  setUsers,
+  addUsers,
+  setUsersLoadingState,
+  updateUserMap,
+  setContacts,
+  updateUserProfile,
+  setBrowserTabIsActive
+} = userSlice.actions
+
+// Export reducer
+export default userSlice.reducer

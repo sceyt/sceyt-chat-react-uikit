@@ -4,9 +4,9 @@ import {
   removeMemberFromListAC,
   updateMembersAC,
   addMembersToListAC,
-  getRolesSuccess,
   setMembersToListAC,
-  getRolesFailAC
+  getRolesFailAC,
+  getRolesSuccessAC
 } from './actions'
 import { getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
@@ -33,6 +33,9 @@ function* getMembers(action: IAction): any {
   try {
     const { payload } = action
     const { channelId } = payload
+    if (!channelId) {
+      return
+    }
     const SceytChatClient = getClient()
     const membersQueryBuilder = new (SceytChatClient.MemberListQueryBuilder as any)(channelId)
     membersQueryBuilder.all().byAffiliationOrder().orderKeyByUsername().limit(50)
@@ -100,7 +103,7 @@ function* addMembers(action: IAction): any {
         const messageToSend: any = {
           metadata: { m: membersIds },
           body: 'AM',
-          mentionedMembers: addedMembers,
+          mentionedUsers: addedMembers,
           attachments: [],
           type: 'system'
         }
@@ -139,7 +142,7 @@ function* kickMemberFromChannel(action: IAction): any {
       const messageToSend: any = {
         metadata: { m: membersIds },
         body: 'RM',
-        mentionedMembers: removedMembers,
+        mentionedUsers: removedMembers,
         attachments: [],
         type: 'system'
       }
@@ -222,7 +225,7 @@ function* getRoles(action: IAction): any {
   try {
     const SceytChatClient = getClient()
     const roles = yield call(SceytChatClient.getRoles)
-    yield put(getRolesSuccess(roles))
+    yield put(getRolesSuccessAC(roles))
     yield put(getRolesFailAC())
   } catch (e) {
     log.error('ERROR get roles', e)

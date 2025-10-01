@@ -1,5 +1,6 @@
 import React, { FC, useEffect, useRef, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
 import {
@@ -24,6 +25,7 @@ import {
   loadMoreChannels,
   removeChannelAC,
   searchChannelsAC,
+  sendTypingAC,
   setChannelListWithAC,
   setChannelsAC,
   setChannelToAddAC,
@@ -51,13 +53,14 @@ import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import { device, THEME_COLORS } from '../../UIHelper/constants'
 import { UploadingIcon } from '../../UIHelper'
-import { IChannel, IContact, IContactsMap, ICreateChannel } from '../../types'
+import { IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
 // Components
 import Channel from '../Channel'
 import ChannelSearch from './ChannelSearch'
 import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
+import { clearMessagesAC } from 'store/message/actions'
 
 interface IChannelListProps {
   List?: FC<{
@@ -83,7 +86,9 @@ interface IChannelListProps {
   searchInputBackgroundColor?: string
   searchInputTextColor?: string
   searchChannelsPosition?: 'inline' | 'bottom'
+  channelSearchWidth?: string
   searchInputBorderRadius?: string
+  searchChannelsPadding?: string
   getSelectedChannel?: (channel: IChannel) => void
   filter?: { channelType?: string }
   limit?: number
@@ -146,6 +151,24 @@ interface IChannelListProps {
     channel: IChannel,
     setChannels: (updatedChannelList: IChannel[]) => void
   ) => void
+  getCustomLatestMessage?: (
+    lastMessage: IMessage,
+    typingOrRecording: any,
+    draftMessageText: any,
+    textSecondary: string,
+    channel: IChannel,
+    channelLastMessageFontSize: string,
+    channelLastMessageHeight: string,
+    isDirectChannel: boolean,
+    textPrimary: string,
+    messageAuthorRef: any,
+    contactsMap: { [key: string]: IContact },
+    getFromContacts: boolean,
+    warningColor: string,
+    user: IUser,
+    MessageText: any
+  ) => any
+  doNotShowMessageDeliveryTypes: string[]
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
@@ -156,6 +179,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchInputBackgroundColor,
   searchInputTextColor,
   searchChannelsPosition = 'bottom',
+  channelSearchWidth,
   searchInputBorderRadius,
   selectedChannelBorderRadius,
   selectedChannelPaddings,
@@ -199,7 +223,10 @@ const ChannelList: React.FC<IChannelListProps> = ({
   channelAvatarSize,
   channelAvatarTextSize,
   searchChannelInputFontSize,
-  searchedChannelsTitleFontSize
+  searchedChannelsTitleFontSize,
+  searchChannelsPadding,
+  getCustomLatestMessage,
+  doNotShowMessageDeliveryTypes = ['system']
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -263,11 +290,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }
 
-  const handleChangeActiveChannel = (chan: IChannel) => {
-    if (activeChannel.id !== chan.id) {
-      dispatch(switchChannelActionAC(chan))
-    }
-  }
   const handleCrateChatWithContact = (contact: IContact) => {
     if (contact) {
       const channelData: ICreateChannel = {
@@ -425,6 +447,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
       log.info('contactsMap.>>>...', contactsMap)
     }
   }, [contactsMap]) */
+
+  const setSelectedChannel = (channel: IChannel) => {
+    if (activeChannel.id !== channel.id) {
+      dispatch(sendTypingAC(false))
+      dispatch(clearMessagesAC())
+      dispatch(switchChannelActionAC(channel))
+    }
+  }
+
   return (
     <Container
       className={className}
@@ -437,11 +468,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
         withCustomList={!!List}
         maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
         borderColor={borderColor}
+        padding={searchChannelsPadding}
       >
         {Profile}
         {showSearch && searchChannelsPosition === 'inline' ? (
           <ChannelSearch
             inline
+            width={channelSearchWidth}
             borderRadius={searchInputBorderRadius}
             searchValue={searchValue}
             handleSearchValueChange={handleSearchValueChange}
@@ -472,6 +505,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
         <ChannelSearch
           searchValue={searchValue}
           theme={theme}
+          width={channelSearchWidth}
           borderRadius={searchInputBorderRadius}
           handleSearchValueChange={handleSearchValueChange}
           getMyChannels={getMyChannels}
@@ -485,7 +519,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
           channels={channels}
           searchedChannels={searchedChannels}
           selectedChannel={activeChannel}
-          setSelectedChannel={handleChangeActiveChannel}
+          setSelectedChannel={setSelectedChannel}
           loadMoreChannels={handleLoadMoreChannels}
           searchValue={searchValue}
         >
@@ -493,7 +527,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             <React.Fragment>
               {channels.map((channel: IChannel) =>
                 ListItem ? (
-                  <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                  <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                 ) : (
                   <Channel
                     theme={theme}
@@ -520,6 +554,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channel={channel}
                     key={channel.id}
                     contactsMap={contactsMap}
+                    setSelectedChannel={setSelectedChannel}
+                    getCustomLatestMessage={getCustomLatestMessage as any}
+                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                   />
                 )
               )}
@@ -537,7 +574,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -564,6 +601,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}
+                            setSelectedChannel={setSelectedChannel}
+                            getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -579,7 +619,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem
                             contact={contact}
                             createChatWithContact={handleCrateChatWithContact}
-                            setSelectedChannel={handleChangeActiveChannel}
+                            setSelectedChannel={setSelectedChannel}
                             key={contact.id}
                           />
                         ) : (
@@ -617,7 +657,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -644,6 +684,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}
+                            setSelectedChannel={setSelectedChannel}
+                            getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -675,7 +718,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
             >
               {channels.map((channel: IChannel) =>
                 ListItem ? (
-                  <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                  <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                 ) : (
                   <Channel
                     theme={theme}
@@ -702,6 +745,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     channel={channel}
                     key={channel.id}
                     contactsMap={contactsMap}
+                    setSelectedChannel={setSelectedChannel}
+                    getCustomLatestMessage={getCustomLatestMessage as any}
+                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                   />
                 )
               )}
@@ -724,7 +770,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.chats_groups.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -751,6 +797,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channel={channel}
                             contactsMap={contactsMap}
                             key={channel.id}
+                            setSelectedChannel={setSelectedChannel}
+                            getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -763,7 +812,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                       </SearchedChannelsHeader>
                       {searchedChannels.channels.map((channel: IChannel) =>
                         ListItem ? (
-                          <ListItem channel={channel} setSelectedChannel={handleChangeActiveChannel} key={channel.id} />
+                          <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
                             theme={theme}
@@ -790,6 +839,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             channel={channel}
                             key={channel.id}
                             contactsMap={contactsMap}
+                            setSelectedChannel={setSelectedChannel}
+                            getCustomLatestMessage={getCustomLatestMessage as any}
+                            doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                           />
                         )
                       )}
@@ -904,15 +956,20 @@ const ChannelListHeader = styled.div<{
   withoutProfile?: any
   withCustomList?: boolean
   borderColor?: string
+  padding?: string
 }>`
   display: flex;
   align-items: center;
   flex-direction: row;
   justify-content: space-between;
-  max-width: ${(props: { maxWidth?: number; withoutProfile?: any; withCustomList?: boolean; borderColor?: string }) =>
-    props.maxWidth ? `${props.maxWidth}px` : 'inherit'};
-  padding: 12px;
-  padding-left: 22px;
+  max-width: ${(props: {
+    maxWidth?: number
+    withoutProfile?: any
+    withCustomList?: boolean
+    borderColor?: string
+    padding?: string
+  }) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
+  padding: ${(props) => props.padding || '12px'};
   box-sizing: border-box;
   padding-left: ${(props) => props.withoutProfile && '52px'};
   border-right: ${(props) => props.withCustomList && `1px solid ${props.borderColor}`};

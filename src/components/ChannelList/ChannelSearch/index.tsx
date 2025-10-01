@@ -4,10 +4,10 @@ import { ClearTypedText, StyledSearchSvg } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 
-const SearchInputContainer = styled.div<{ inline?: boolean }>`
+const SearchInputContainer = styled.div<{ inline?: boolean; width?: string }>`
   position: relative;
   width: 100%;
-  max-width: ${(props) => props.inline && 'calc(100% - 24px)'};
+  max-width: ${(props) => props.width || (props.inline && 'calc(100% - 24px)')};
   box-sizing: border-box;
   padding: ${(props) => !props.inline && '0 12px 16px'};
 
@@ -56,6 +56,7 @@ interface IChannelSearchProps {
   searchInputBackgroundColor?: string
   searchInputTextColor?: string
   fontSize?: string
+  width?: string
 }
 
 const ChannelSearch: React.FC<IChannelSearchProps> = ({
@@ -66,7 +67,8 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   borderRadius,
   searchInputBackgroundColor,
   searchInputTextColor,
-  fontSize
+  fontSize,
+  width
 }) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -76,7 +78,7 @@ const ChannelSearch: React.FC<IChannelSearchProps> = ({
   } = useColor()
 
   return (
-    <SearchInputContainer inline={inline}>
+    <SearchInputContainer inline={inline} width={width}>
       <StyledSearchSvg left={!inline ? '22px' : ''} color={iconInactive} />
       <SearchInput
         backgroundColor={searchInputBackgroundColor || surface1}

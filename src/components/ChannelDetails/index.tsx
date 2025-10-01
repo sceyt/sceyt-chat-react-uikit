@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
-import { shallowEqual, useDispatch, useSelector } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'
@@ -148,7 +149,8 @@ const Details = ({
   tabItemsLineHeight,
   tabItemsMinWidth,
   backgroundColor,
-  bordersColor
+  bordersColor,
+  showPhoneNumber
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -183,7 +185,11 @@ const Details = ({
   const openTimeOut = useRef<any>(null)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
-  const isSelfChannel = isDirectChannel && activeChannel.metadata?.s
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const displayMemberText =
     memberDisplayText &&
@@ -198,7 +204,9 @@ const Details = ({
         : activeChannel.memberCount > 1
           ? 'members'
           : 'member')
-  const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
+  const directChannelUser =
+    isDirectChannel &&
+    (activeChannel.members.find((member: IMember) => member.id !== user.id) || activeChannel?.members?.[0])
   // const myPermissions: any = []
   const handleMembersListScroll = (event: any) => {
     // setCloseMenu(true)
@@ -344,14 +352,16 @@ const Details = ({
 
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                    ? ''
-                    : directChannelUser &&
-                      directChannelUser.presence &&
-                      (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                        ? 'Online'
-                        : directChannelUser.presence.lastActiveAt &&
-                          userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  {showPhoneNumber && directChannelUser?.id
+                    ? `+${directChannelUser?.id}`
+                    : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
+                      ? ''
+                      : directChannelUser &&
+                        directChannelUser.presence &&
+                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                          ? 'Online'
+                          : directChannelUser.presence.lastActiveAt &&
+                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
                 </SubTitle>
               ) : (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>

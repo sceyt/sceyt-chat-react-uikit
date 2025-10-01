@@ -1,6 +1,6 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef } from 'react'
-import { useDispatch } from 'react-redux'
+import React, { useEffect, useMemo, useRef } from 'react'
+import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
@@ -11,9 +11,12 @@ import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
+import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
+import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
+import { scrollToNewMessageSelector } from 'store/message/selector'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -46,14 +49,17 @@ const Message = ({
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
-
+  const scrollToNewMessage = useSelector(scrollToNewMessageSelector)
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
-  const messageMetas = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+
+  const messageMetas = useMemo(() => {
+    return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+  }, [message.metadata])
 
   const handleSendReadMarker = () => {
     if (
@@ -73,6 +79,18 @@ const Message = ({
   useEffect(() => {
     if (isVisible) {
       handleSendReadMarker()
+      if (!channel.isLinkedChannel) {
+        setMessageToVisibleMessagesMap(message)
+      }
+
+      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+        dispatch(scrollToNewMessageAC(false, false, false))
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      }
+    } else {
+      if (!channel.isLinkedChannel) {
+        removeMessageFromVisibleMessagesMap(message)
+      }
     }
   }, [isVisible])
 
@@ -184,7 +202,7 @@ export const Container = styled.div<{
     font-weight: normal;
     font-size: ${(props) => props.fontSize || '14px'};
     color: ${(props) => props.textColor};
-    background-color: ${(props) => `${props.backgroundColor}40`};
+    background-color: ${(props) => `${props.backgroundColor}66`};
     box-sizing: border-box;
     border: ${(props) => props.border};
     border-radius: ${(props) => props.borderRadius || '14px'};

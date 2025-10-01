@@ -104,7 +104,9 @@ const VideoPreview = memo(function VideoPreview({
         setLoading(false)
         const minutes = Math.floor(video.duration / 60)
         const seconds = Math.floor(video.duration % 60)
-        setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        if (!videoCurrentTime) {
+          setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+        }
         if (setVideoIsReadyToSend) {
           setVideoIsReadyToSend(file.tid!)
         }
@@ -242,7 +244,7 @@ const VideoPreview = memo(function VideoPreview({
           isLoaded={!loading}
         />
       )} */}
-      {videoCurrentTime && (
+      {videoCurrentTime && !isRepliedMessage && (
         <VideoControls>
           {!isPreview && !!videoCurrentTime && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
@@ -292,7 +294,7 @@ const VideoTime = styled.div<{
   align-items: center;
   border-radius: 16px;
   padding: ${(props) => (props.isRepliedMessage ? '0 3px' : '4px 6px')};
-  background-color: ${(props) => `${props.messageTimeBackgroundColor}40`};
+  background-color: ${(props) => `${props.messageTimeBackgroundColor}66`};
   line-height: 14px;
   color: ${(props) => props.color};
   z-index: 10;

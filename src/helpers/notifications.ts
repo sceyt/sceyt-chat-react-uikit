@@ -2,7 +2,7 @@ import { IAttachment, IChannel, IContactsMap, IUser } from '../types'
 import { makeUsername } from './message'
 import { getShowOnlyContactUsers } from './contacts'
 import store from '../store'
-import { SWITCH_CHANNEL } from '../store/channel/constants'
+import { switchChannelActionAC } from '../store/channel/actions'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE } from './constants'
 
 let contactsMap: IContactsMap = {}
@@ -99,10 +99,7 @@ const createCustomNotification = (title: string, body: string) => {
   notificationElement.addEventListener('click', (event) => {
     if (event.target !== closeButton) {
       window.focus()
-      store.dispatch({
-        type: SWITCH_CHANNEL,
-        payload: { channel: null } // Will be set by the caller
-      })
+      store.dispatch(switchChannelActionAC(null))
     }
   })
 
@@ -191,10 +188,7 @@ export const setNotification = (
         notification.onclick = (event: any) => {
           event.preventDefault()
           window.focus()
-          store.dispatch({
-            type: SWITCH_CHANNEL,
-            payload: { channel }
-          })
+          store.dispatch(switchChannelActionAC(channel))
           notification.close()
         }
 

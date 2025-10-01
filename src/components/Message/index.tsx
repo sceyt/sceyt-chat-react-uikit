@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
-import { useDispatch } from 'react-redux'
+import { shallowEqual } from 'react-redux'
+import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
 // Store
 import {
@@ -13,9 +14,10 @@ import {
   forwardMessageAC,
   removeSelectedMessageAC,
   resendMessageAC,
-  // resendMessageAC,
+  scrollToNewMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
+  setMessagesLoadingStateAC,
   setMessageToEditAC
 } from 'store/message/actions'
 import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
@@ -33,7 +35,7 @@ import {
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { IAttachment, IReaction } from 'types'
 // Components
@@ -44,7 +46,8 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
-import log from 'loglevel'
+import { scrollToNewMessageSelector } from 'store/message/selector'
+import MessageInfo from 'common/popups/messageInfo'
 
 const Message = ({
   message,
@@ -88,6 +91,7 @@ const Message = ({
   replyMessageInThread = false,
   deleteMessage = true,
   selectMessage = true,
+  showInfoMessage = true,
   allowEditDeleteIncomingMessage,
   forwardMessage = true,
   reportMessage = false,
@@ -113,6 +117,7 @@ const Message = ({
   selectIconOrder,
   starIconOrder,
   reportIconOrder,
+  infoIconOrder,
   reactionIconTooltipText,
   editIconTooltipText,
   copyIconTooltipText,
@@ -123,6 +128,7 @@ const Message = ({
   selectIconTooltipText,
   starIconTooltipText,
   reportIconTooltipText,
+  infoIconTooltipText,
   messageActionIconsColor,
   messageStatusSize,
   messageStatusColor,
@@ -173,7 +179,8 @@ const Message = ({
   messageTextFontSize,
   messageTextLineHeight,
   messageTimeColorOnAttachment,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  showInfoMessageProps = {}
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -192,6 +199,7 @@ const Message = ({
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
+  const [infoPopupOpen, setInfoPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
   const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
   const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
@@ -199,6 +207,8 @@ const Message = ({
   const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
+
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount =
@@ -252,6 +262,14 @@ const Message = ({
     setMessageActionsShow(false)
     stopScrolling(!forwardPopupOpen)
   }
+
+  const handleToggleInfoMessagePopupOpen = () => {
+    setInfoPopupOpen(!infoPopupOpen)
+
+    setMessageActionsShow(false)
+  }
+
+  console.log('infoPopupOpen', infoPopupOpen)
 
   const handleReplyMessage = (threadReply?: boolean) => {
     if (threadReply) {
@@ -310,7 +328,7 @@ const Message = ({
   }
 
   const handleToggleReactionsPopup = () => {
-    const reactionsContainer = document.getElementById(`${message.id}_reactions_container}`)
+    const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
     const reactionsContPos = reactionsContainer && reactionsContainer.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
     const offsetBottom = window.innerHeight - bottomPos
@@ -383,7 +401,6 @@ const Message = ({
       channel.newMessageCount > 0 &&
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
-      log.info('send displayed marker for message ... ', message)
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
@@ -443,6 +460,11 @@ const Message = ({
       handleSendReadMarker()
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
+      }
+
+      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+        dispatch(scrollToNewMessageAC(false, false, false))
+        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
       if (!channel.isLinkedChannel) {
@@ -573,34 +595,6 @@ const Message = ({
         {message.state === MESSAGE_STATUS.FAILED && (
           <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
             <ErrorIconWrapper />
-            {/* <DropDown
-              // forceClose={showChooseAttachmentType}
-              position={nextMessage ? 'right' : 'topRight'}
-              trigger={<ErrorIconWrapper />}
-            >
-              <DropdownOptionsUl>
-                <DropdownOptionLi
-                  key={1}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleResendMessage()}
-                  iconWidth='20px'
-                >
-                  <ResendIcon />
-                  Resend
-                </DropdownOptionLi>
-                <DropdownOptionLi
-                  key={2}
-                  textColor={colors.gray6}
-                  hoverBackground={colors.gray5}
-                  onClick={() => handleDeleteFailedMessage()}
-                  iconWidth='20px'
-                >
-                  <DeleteIconWrapper />
-                  Delete
-                </DropdownOptionLi>
-              </DropdownOptionsUl>
-            </DropDown> */}
           </FailedMessageIcon>
         )}
         {CustomMessageItem ? (
@@ -620,6 +614,7 @@ const Message = ({
             emojisPopupPosition={emojisPopupPosition}
             handleSetMessageForEdit={toggleEditMode}
             handleResendMessage={handleResendMessage}
+            handleOpenInfoMessage={handleToggleInfoMessagePopupOpen}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
             handleOpenForwardMessage={handleToggleForwardMessagePopup}
             handleCopyMessage={handleCopyMessage}
@@ -674,6 +669,7 @@ const Message = ({
             replyMessageInThread={replyMessageInThread}
             deleteMessage={deleteMessage}
             selectMessage={selectMessage}
+            showInfoMessage={showInfoMessage}
             allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
             forwardMessage={forwardMessage}
             reportMessage={reportMessage}
@@ -698,6 +694,7 @@ const Message = ({
             selectIconOrder={selectIconOrder}
             starIconOrder={starIconOrder}
             reportIconOrder={reportIconOrder}
+            infoIconOrder={infoIconOrder}
             reactionIconTooltipText={reactionIconTooltipText}
             editIconTooltipText={editIconTooltipText}
             copyIconTooltipText={copyIconTooltipText}
@@ -708,6 +705,7 @@ const Message = ({
             selectIconTooltipText={selectIconTooltipText}
             starIconTooltipText={starIconTooltipText}
             reportIconTooltipText={reportIconTooltipText}
+            infoIconTooltipText={infoIconTooltipText}
             messageActionIconsColor={messageActionIconsColor}
             messageStatusSize={messageStatusSize}
             messageStatusColor={messageStatusColor}
@@ -741,6 +739,7 @@ const Message = ({
             setMessageActionsShow={setMessageActionsShow}
             closeMessageActions={closeMessageActions}
             handleToggleForwardMessagePopup={handleToggleForwardMessagePopup}
+            handleToggleInfoMessagePopupOpen={handleToggleInfoMessagePopupOpen}
             handleReplyMessage={handleReplyMessage}
             handleToggleDeleteMessagePopup={handleToggleDeleteMessagePopup}
             handleToggleReportPopupOpen={handleToggleReportPopupOpen}
@@ -802,17 +801,18 @@ const Message = ({
             reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
           />
         )}
-        {message.reactionTotals && message.reactionTotals.length && (
-          <ReactionsContainer
-            id={`${message.id}_reactions_container`}
-            border={reactionsContainerBorder}
-            boxShadow={reactionsContainerBoxShadow}
-            borderRadius={reactionsContainerBorderRadius}
-            topPosition={reactionsContainerTopPosition}
-            padding={reactionsContainerPadding}
-            backgroundColor={reactionsContainerBackground || backgroundSections}
-            rtlDirection={ownMessageOnRightSide && !message.incoming}
-          >
+        <ReactionsContainer
+          id={`${message.id}_reactions_container`}
+          border={reactionsContainerBorder}
+          boxShadow={reactionsContainerBoxShadow}
+          borderRadius={reactionsContainerBorderRadius}
+          topPosition={reactionsContainerTopPosition}
+          padding={reactionsContainerPadding}
+          backgroundColor={reactionsContainerBackground || backgroundSections}
+          rtlDirection={ownMessageOnRightSide && !message.incoming}
+          isReacted={message.reactionTotals && message.reactionTotals.length > 0}
+        >
+          {message.reactionTotals && message.reactionTotals.length && (
             <MessageReactionsCont
               rtlDirection={ownMessageOnRightSide && !message.incoming}
               onClick={handleToggleReactionsPopup}
@@ -853,8 +853,8 @@ const Message = ({
                 </MessageReaction>
               )}
             </MessageReactionsCont>
-          </ReactionsContainer>
-        )}
+          )}
+        </ReactionsContainer>
       </MessageContent>
       {deletePopupOpen && (
         <ConfirmPopup
@@ -888,6 +888,15 @@ const Message = ({
           title="Report Message"
         />
       )} */}
+
+      {infoPopupOpen && (
+        <MessageInfo
+          message={message}
+          togglePopup={handleToggleInfoMessagePopupOpen}
+          {...showInfoMessageProps}
+          handleOpenUserProfile={handleOpenUserProfile}
+        />
+      )}
     </MessageItem>
   )
 }
@@ -901,6 +910,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.body === nextProps.message.body &&
     prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
     prevProps.message.attachments === nextProps.message.attachments &&
+    prevProps.message.metadata === nextProps.message.metadata &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
@@ -908,7 +918,6 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
     prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.tabIsActive === nextProps.tabIsActive &&
     prevProps.theme === nextProps.theme
   )
 })
@@ -1035,6 +1044,7 @@ const ReactionsContainer = styled.div<{
   backgroundColor: string
   padding?: string
   rtlDirection?: boolean
+  isReacted?: boolean
 }>`
   display: inline-flex;
   margin-left: ${(props: any) => props.rtlDirection && 'auto'};
@@ -1047,7 +1057,7 @@ const ReactionsContainer = styled.div<{
   filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
   border-radius: ${(props) => props.borderRadius || '16px'};
   background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => props.padding || '4px 8px'};
+  padding: ${(props) => (!props.isReacted ? '0' : props.padding || '4px 8px')};
   z-index: 9;
   ${(props) =>
     props.topPosition &&
@@ -1055,6 +1065,9 @@ const ReactionsContainer = styled.div<{
       position: relative;
       top: ${props.topPosition};
   `};
+  overflow: hidden;
+  height: ${(props) => (props.isReacted ? '16px' : '0')};
+  transition: all 0.3s;
 `
 const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`
   position: relative;

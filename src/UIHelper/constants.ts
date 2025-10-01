@@ -146,13 +146,13 @@ export const defaultTheme = {
     },
     // 20. overlay background colors
     [THEME_COLORS.OVERLAY_BACKGROUND]: {
-      light: 'rgba(0, 0, 0, 0.5)',
-      dark: 'rgba(0, 0, 0, 0.5)'
+      light: '#111539',
+      dark: '#111539'
     },
     // 21. overlay background 2 colors
     [THEME_COLORS.OVERLAY_BACKGROUND_2]: {
-      light: 'rgba(17, 21, 57, 0.4)',
-      dark: 'rgba(17, 21, 57, 0.4)'
+      light: '#111539',
+      dark: '#111539'
     },
     // 22. warning colors
     [THEME_COLORS.WARNING]: {
