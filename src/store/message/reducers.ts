@@ -538,7 +538,17 @@ const messageSlice = createSlice({
           (marker) => marker.user?.id === userId
         )
         if (!isUserMarkered) {
-          state.messageMarkers[channelId][messageId][deliveryStatus].push(marker)
+          let time = marker.createdAt
+          try {
+            time = new Date(marker.createdAt)
+            if (isNaN(time.getTime())) {
+              time = new Date()
+            }
+          } catch (e) {
+            log.error('error in update messages markers', e)
+            time = new Date()
+          }
+          state.messageMarkers[channelId][messageId][deliveryStatus].push({ ...marker, createdAt: time })
         }
       }
     },
