@@ -1,7 +1,16 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import moment from 'moment'
-import { IMessage, IMarker, ILabels, MessageInfoTab, ITabsStyles, IListItemStyles, IUser } from '../../../types'
+import {
+  IMessage,
+  IMarker,
+  ILabels,
+  MessageInfoTab,
+  ITabsStyles,
+  IListItemStyles,
+  IUser,
+  IContact
+} from '../../../types'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { Avatar } from '../../../components'
 import { useColor } from '../../../hooks'
@@ -9,6 +18,8 @@ import { getMessageMarkersAC } from 'store/message/actions'
 import { useDispatch, useSelector } from 'store/hooks'
 import { messageMarkersSelector, messagesMarkersLoadingStateSelector } from 'store/message/selector'
 import { LOADING_STATE } from 'helpers/constants'
+import { makeUsername } from 'helpers/message'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
 
 interface IProps {
   message: IMessage
@@ -27,6 +38,7 @@ interface IProps {
   tabsStyles?: ITabsStyles
   listItemStyles?: IListItemStyles
   handleOpenUserProfile?: (user: IUser) => void
+  contacts: { [key: string]: IContact }
 }
 
 const defaultFormatDate = (date: Date) => {
@@ -60,7 +72,8 @@ const MessageInfo = ({
   formatDate = defaultFormatDate,
   tabsStyles = {},
   listItemStyles = {},
-  handleOpenUserProfile
+  handleOpenUserProfile,
+  contacts
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -90,6 +103,7 @@ const MessageInfo = ({
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
   const [ready, setReady] = useState<boolean>(false)
   const [flipLocked, setFlipLocked] = useState<boolean>(false)
+  const getFromContacts = useMemo(() => getShowOnlyContactUsers(), [])
 
   const activeMarkers = useMemo(() => {
     const list = (markers && (markers as any)[activeTab]) || []
@@ -112,9 +126,10 @@ const MessageInfo = ({
   })
 
   const renderRow = (marker: IMarker) => {
-    const displayName = marker.user ? marker.user.firstName || marker.user.id : 'Deleted User'
+    const contact = contacts[marker.user?.id || '']
+    const displayName = makeUsername(contact, marker.user as IUser, getFromContacts)
     const avatarUrl = marker.user ? marker.user.avatarUrl : ''
-    const dateVal: any = (marker as any).createdAt || (marker as any).createAt
+    const dateVal: any = (marker as any).createdAt || (marker as any).createdAt
     const dateFormat = dateVal ? formatDate(new Date(dateVal)) : ''
 
     const node = (
@@ -381,8 +396,8 @@ const MessageInfo = ({
 export default MessageInfo
 
 function sortByDateDesc(a: IMarker, b: IMarker) {
-  const aDate: any = (a as any).createdAt || (a as any).createAt
-  const bDate: any = (b as any).createdAt || (b as any).createAt
+  const aDate: any = (a as any).createdAt || (a as any).createdAt
+  const bDate: any = (b as any).createdAt || (b as any).createdAt
   const aTime = aDate ? new Date(aDate).getTime() : 0
   const bTime = bDate ? new Date(bDate).getTime() : 0
   return bTime - aTime
@@ -428,7 +443,6 @@ const List = styled.div<{ maxHeight?: number }>`
   min-height: 0;
   overflow-y: auto;
   max-height: ${(p) => (p.maxHeight ? `${p.maxHeight}px` : 'unset')};
-  min-height: 120px;
 `
 
 const Row = styled.div<{ backgroundHover?: string }>`

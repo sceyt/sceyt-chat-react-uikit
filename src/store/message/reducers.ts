@@ -517,6 +517,42 @@ const messageSlice = createSlice({
       state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers]
     },
 
+    updateMessagesMarkers: (
+      state,
+      action: PayloadAction<{ channelId: string; deliveryStatus: string; marker: IMarker }>
+    ) => {
+      const { channelId, deliveryStatus, marker } = action.payload
+      const userId = marker.user?.id
+      const messageIds = marker.messageIds
+      for (const messageId of messageIds) {
+        if (!state.messageMarkers[channelId]) {
+          state.messageMarkers[channelId] = {}
+        }
+        if (!state.messageMarkers[channelId][messageId]) {
+          state.messageMarkers[channelId][messageId] = {}
+        }
+        if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
+          state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+        }
+        const isUserMarkered = state.messageMarkers[channelId][messageId][deliveryStatus].some(
+          (marker) => marker.user?.id === userId
+        )
+        if (!isUserMarkered) {
+          let time = marker.createdAt
+          try {
+            time = new Date(marker.createdAt)
+            if (isNaN(time.getTime())) {
+              time = new Date()
+            }
+          } catch (e) {
+            log.error('error in update messages markers', e)
+            time = new Date()
+          }
+          state.messageMarkers[channelId][messageId][deliveryStatus].push({ ...marker, createdAt: time })
+        }
+      }
+    },
+
     setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
       state.messagesMarkersLoadingState = action.payload.state
     }
@@ -574,7 +610,8 @@ export const {
   setOGMetadata,
   updateOGMetadata,
   setMessageMarkers,
-  setMessagesMarkersLoadingState
+  setMessagesMarkersLoadingState,
+  updateMessagesMarkers
 } = messageSlice.actions
 
 // Export reducer

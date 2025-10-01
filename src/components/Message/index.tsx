@@ -269,8 +269,6 @@ const Message = ({
     setMessageActionsShow(false)
   }
 
-  console.log('infoPopupOpen', infoPopupOpen)
-
   const handleReplyMessage = (threadReply?: boolean) => {
     if (threadReply) {
       // dispatch(setMessageForThreadReply(message));
@@ -894,6 +892,7 @@ const Message = ({
           message={message}
           togglePopup={handleToggleInfoMessagePopupOpen}
           {...showInfoMessageProps}
+          contacts={contactsMap}
           handleOpenUserProfile={handleOpenUserProfile}
         />
       )}

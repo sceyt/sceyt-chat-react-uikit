@@ -218,7 +218,7 @@ export interface IChannel {
   deleteReaction: (messageId: string, key: string) => Promise<{ message: any; reaction: any }>
   createMessageBuilder: () => any
   // eslint-disable-next-line no-unused-vars
-  createAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
+  createdAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
   // eslint-disable-next-line no-unused-vars
   createThread: (messageId: string) => IChannel
   // eslint-disable-next-line no-unused-vars
@@ -234,7 +234,7 @@ export interface IMarker {
   messageIds: string[]
   user: IUser | null
   name: string
-  createAt: Date
+  createdAt: Date
 }
 
 export interface IRole {
