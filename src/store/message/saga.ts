@@ -184,7 +184,7 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
                 ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
               })
           })
-      const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
+      const attachmentBuilder = channel.createdAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
         .setMetadata(attachmentMeta)
@@ -260,7 +260,7 @@ function* sendMessage(action: IAction): any {
           if (attachment.cachedUrl) {
             uri = attachment.cachedUrl
           }
-          const attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
+          const attachmentBuilder = channel.createdAttachmentBuilder(uri || attachment.data, attachment.type)
 
           const messageAttachment = attachmentBuilder
             .setName(attachment.name)
@@ -400,7 +400,7 @@ function* sendMessage(action: IAction): any {
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
-              const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+              const linkAttachmentBuilder = channel.createdAttachmentBuilder(linkAttachment.data, linkAttachment.type)
               linkAttachmentToSend = linkAttachmentBuilder
                 .setName(linkAttachment.name)
                 .setUpload(linkAttachment.upload)
@@ -545,7 +545,7 @@ function* sendTextMessage(action: IAction): any {
     const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
-      const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
+      const attachmentBuilder = channel.createdAttachmentBuilder(attachments[0].data, attachments[0].type)
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
@@ -676,7 +676,7 @@ function* forwardMessage(action: IAction): any {
       )
     ) {
       if (message.attachments && message.attachments.length) {
-        const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
+        const attachmentBuilder = channel.createdAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
           .setMetadata(attachments[0].metadata)
@@ -905,7 +905,7 @@ function* resendMessage(action: IAction): any {
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
-            const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
+            const attachmentBuilder = channel.createdAttachmentBuilder(uri, messageAttachment.type)
 
             /* const attachmentToSend = { ...messageAttachment, url: uri, upload: false } */
             const attachmentToSend = attachmentBuilder
@@ -1106,7 +1106,7 @@ function* editMessage(action: IAction): any {
       const anotherAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
       const linkAttachmentsToSend: IAttachment[] = []
       linkAttachments.forEach((linkAttachment: IAttachment) => {
-        const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+        const linkAttachmentBuilder = channel.createdAttachmentBuilder(linkAttachment.data, linkAttachment.type)
         const linkAttachmentToSend = linkAttachmentBuilder
           .setName(linkAttachment.name)
           .setUpload(linkAttachment.upload)

@@ -44,6 +44,7 @@ import {
   deleteReactionFromMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
+  updateMessagesMarkersAC,
   updateMessagesStatusAC
 } from '../message/actions'
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
@@ -868,6 +869,7 @@ export default function* watchForEvents(): any {
           }
 
           updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
+          yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
         }
 
         break

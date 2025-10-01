@@ -517,6 +517,32 @@ const messageSlice = createSlice({
       state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers]
     },
 
+    updateMessagesMarkers: (
+      state,
+      action: PayloadAction<{ channelId: string; deliveryStatus: string; marker: IMarker }>
+    ) => {
+      const { channelId, deliveryStatus, marker } = action.payload
+      const userId = marker.user?.id
+      const messageIds = marker.messageIds
+      for (const messageId of messageIds) {
+        if (!state.messageMarkers[channelId]) {
+          state.messageMarkers[channelId] = {}
+        }
+        if (!state.messageMarkers[channelId][messageId]) {
+          state.messageMarkers[channelId][messageId] = {}
+        }
+        if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
+          state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+        }
+        const isUserMarkered = state.messageMarkers[channelId][messageId][deliveryStatus].some(
+          (marker) => marker.user?.id === userId
+        )
+        if (!isUserMarkered) {
+          state.messageMarkers[channelId][messageId][deliveryStatus].push(marker)
+        }
+      }
+    },
+
     setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
       state.messagesMarkersLoadingState = action.payload.state
     }
@@ -574,7 +600,8 @@ export const {
   setOGMetadata,
   updateOGMetadata,
   setMessageMarkers,
-  setMessagesMarkersLoadingState
+  setMessagesMarkersLoadingState,
+  updateMessagesMarkers
 } = messageSlice.actions
 
 // Export reducer

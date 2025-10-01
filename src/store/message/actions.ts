@@ -64,7 +64,8 @@ import {
   setOGMetadata,
   updateOGMetadata,
   setMessageMarkers,
-  setMessagesMarkersLoadingState
+  setMessagesMarkersLoadingState,
+  updateMessagesMarkers
 } from './reducers'
 
 export function sendMessageAC(
@@ -429,6 +430,10 @@ export function setMessageMarkersAC(
   deliveryStatus: string
 ) {
   return setMessageMarkers({ channelId, messageId, messageMarkers, deliveryStatus })
+}
+
+export function updateMessagesMarkersAC(channelId: string, deliveryStatus: string, marker: IMarker) {
+  return updateMessagesMarkers({ channelId, deliveryStatus, marker })
 }
 
 export function setMessagesMarkersLoadingStateAC(state: number) {

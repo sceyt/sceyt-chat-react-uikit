@@ -790,7 +790,7 @@ function* markMessagesRead(action: IAction): any {
           userMarkers: [
             {
               user: messageListMarker.user,
-              createdAt: messageListMarker.createAt,
+              createdAt: messageListMarker.createdAt,
               messageId,
               name: MESSAGE_DELIVERY_STATUS.READ
             }
