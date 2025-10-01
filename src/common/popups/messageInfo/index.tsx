@@ -443,7 +443,6 @@ const List = styled.div<{ maxHeight?: number }>`
   min-height: 0;
   overflow-y: auto;
   max-height: ${(p) => (p.maxHeight ? `${p.maxHeight}px` : 'unset')};
-  min-height: 120px;
 `
 
 const Row = styled.div<{ backgroundHover?: string }>`
