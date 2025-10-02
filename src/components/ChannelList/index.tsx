@@ -169,6 +169,7 @@ interface IChannelListProps {
     MessageText: any
   ) => any
   doNotShowMessageDeliveryTypes?: string[]
+  showPhoneNumber?: boolean
 }
 
 const ChannelList: React.FC<IChannelListProps> = ({
@@ -226,7 +227,8 @@ const ChannelList: React.FC<IChannelListProps> = ({
   searchedChannelsTitleFontSize,
   searchChannelsPadding,
   getCustomLatestMessage,
-  doNotShowMessageDeliveryTypes = ['system']
+  doNotShowMessageDeliveryTypes = ['system'],
+  showPhoneNumber = false
 }) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -557,6 +559,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     setSelectedChannel={setSelectedChannel}
                     getCustomLatestMessage={getCustomLatestMessage as any}
                     doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                    showPhoneNumber={showPhoneNumber}
                   />
                 )
               )}
@@ -604,6 +607,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                            showPhoneNumber={showPhoneNumber}
                           />
                         )
                       )}
@@ -687,6 +691,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                            showPhoneNumber={showPhoneNumber}
                           />
                         )
                       )}
@@ -748,6 +753,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     setSelectedChannel={setSelectedChannel}
                     getCustomLatestMessage={getCustomLatestMessage as any}
                     doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                    showPhoneNumber={showPhoneNumber}
                   />
                 )
               )}
@@ -800,6 +806,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                            showPhoneNumber={showPhoneNumber}
                           />
                         )
                       )}
@@ -842,6 +849,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             setSelectedChannel={setSelectedChannel}
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                            showPhoneNumber={showPhoneNumber}
                           />
                         )
                       )}
