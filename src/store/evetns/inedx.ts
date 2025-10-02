@@ -685,7 +685,7 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.MESSAGE: {
         const { channel, message } = args
-        log.info('channel MESSAGE ... id : ', message.id, ' message: ', message, ' channel.id: ', channel.id)
+        log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
         const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
         const channelFilterTypes = getChannelTypesFilter()
         if (
@@ -796,7 +796,6 @@ export default function* watchForEvents(): any {
               }
             }
           }
-          log.info('send delivered for message . .. . ', message)
           if (message.repliedInThread && message.parentMessage.id) {
             yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
           } else {
@@ -921,7 +920,6 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
         const { channel, /* user, */ message } = args
-        log.info('channel EDIT_MESSAGE ... ', message)
         const activeChannelId = getActiveChannelId()
         const channelExists = checkChannelExists(channel.id)
         if (channel.id === activeChannelId) {
@@ -960,7 +958,6 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
         const { channel, user, message, reaction } = args
-        log.info('channel REACTION_ADDED ... ', args)
         const isSelf = user.id === SceytChatClient.user.id
         const activeChannelId = getActiveChannelId()
 

@@ -218,7 +218,7 @@ export interface IChannel {
   deleteReaction: (messageId: string, key: string) => Promise<{ message: any; reaction: any }>
   createMessageBuilder: () => any
   // eslint-disable-next-line no-unused-vars
-  createdAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
+  createAttachmentBuilder: (url: string, type: string) => AttachmentBuilder
   // eslint-disable-next-line no-unused-vars
   createThread: (messageId: string) => IChannel
   // eslint-disable-next-line no-unused-vars

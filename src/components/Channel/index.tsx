@@ -78,6 +78,7 @@ interface IChannelProps {
     MessageText: any
   }) => any
   doNotShowMessageDeliveryTypes: string[]
+  showPhoneNumber?: boolean
 }
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
@@ -281,7 +282,8 @@ const Channel: React.FC<IChannelProps> = ({
   channelAvatarTextSize,
   setSelectedChannel,
   getCustomLatestMessage,
-  doNotShowMessageDeliveryTypes
+  doNotShowMessageDeliveryTypes,
+  showPhoneNumber
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -555,7 +557,9 @@ const Channel: React.FC<IChannelProps> = ({
             (isDirectChannel && directChannelUser
               ? makeUsername(contactsMap && contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
               : isSelfChannel
-                ? 'Me'
+                ? showPhoneNumber && channel.members?.length && channel.members[0]?.id
+                  ? `+${channel.members[0]?.id} (You)`
+                  : 'Me'
                 : '')}
         </h3>
         {channel.muted && (

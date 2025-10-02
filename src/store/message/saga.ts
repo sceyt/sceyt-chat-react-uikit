@@ -184,7 +184,7 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
                 ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
               })
           })
-      const attachmentBuilder = channel.createdAttachmentBuilder(uri, attachment.type)
+      const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
         .setMetadata(attachmentMeta)
@@ -260,7 +260,7 @@ function* sendMessage(action: IAction): any {
           if (attachment.cachedUrl) {
             uri = attachment.cachedUrl
           }
-          const attachmentBuilder = channel.createdAttachmentBuilder(uri || attachment.data, attachment.type)
+          const attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
 
           const messageAttachment = attachmentBuilder
             .setName(attachment.name)
@@ -400,7 +400,7 @@ function* sendMessage(action: IAction): any {
             }
             let linkAttachmentToSend: IAttachment | null = null
             if (i === 0 && linkAttachment) {
-              const linkAttachmentBuilder = channel.createdAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+              const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
               linkAttachmentToSend = linkAttachmentBuilder
                 .setName(linkAttachment.name)
                 .setUpload(linkAttachment.upload)
@@ -545,7 +545,7 @@ function* sendTextMessage(action: IAction): any {
     const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
-      const attachmentBuilder = channel.createdAttachmentBuilder(attachments[0].data, attachments[0].type)
+      const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
@@ -626,12 +626,13 @@ function* sendTextMessage(action: IAction): any {
       if (channel.unread) {
         yield put(markChannelAsReadAC(channel.id))
       }
+      channel.lastMessage = messageToUpdate
     } else {
       // eslint-disable-next-line
       throw new Error('Connection required to send message')
     }
 
-    store.dispatch(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
+    yield put(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
@@ -676,7 +677,7 @@ function* forwardMessage(action: IAction): any {
       )
     ) {
       if (message.attachments && message.attachments.length) {
-        const attachmentBuilder = channel.createdAttachmentBuilder(attachments[0].url, attachments[0].type)
+        const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
           .setMetadata(attachments[0].metadata)
@@ -787,7 +788,6 @@ function* resendMessage(action: IAction): any {
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
   let channel = yield call(getChannelFromMap, channelId)
   try {
-    log.info('resend message .... ', message)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
       if (channel) {
@@ -905,7 +905,7 @@ function* resendMessage(action: IAction): any {
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
-            const attachmentBuilder = channel.createdAttachmentBuilder(uri, messageAttachment.type)
+            const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
 
             /* const attachmentToSend = { ...messageAttachment, url: uri, upload: false } */
             const attachmentToSend = attachmentBuilder
@@ -990,7 +990,6 @@ function* resendMessage(action: IAction): any {
 
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageCopy)
-        log.info('resend message response ... ', messageResponse)
         const messageUpdateData = {
           id: messageResponse.id,
           body: messageResponse.body,
@@ -1070,7 +1069,6 @@ function* deleteMessage(action: IAction): any {
     }
 
     const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-    log.info('deletedMessage . .. . .', deletedMessage)
     yield put(updateMessageAC(deletedMessage.id, deletedMessage))
     updateMessageOnMap(channel.id, {
       messageId: deletedMessage.id,
@@ -1106,7 +1104,7 @@ function* editMessage(action: IAction): any {
       const anotherAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
       const linkAttachmentsToSend: IAttachment[] = []
       linkAttachments.forEach((linkAttachment: IAttachment) => {
-        const linkAttachmentBuilder = channel.createdAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+        const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
         const linkAttachmentToSend = linkAttachmentBuilder
           .setName(linkAttachment.name)
           .setUpload(linkAttachment.upload)
@@ -1229,7 +1227,6 @@ function* getMessagesQuery(action: IAction): any {
             messageQuery.reverse = true
             yield put(setMessagesHasPrevAC(secondResult.hasNext))
           }
-          log.info('result from server ....... ', result)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setMessagesToMap(channel.id, result.messages)
           setAllMessages([...result.messages])
@@ -1393,23 +1390,18 @@ function* loadMoreMessages(action: IAction): any {
       } else if (hasNext) {
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
         if (result.messages.length) {
-          // log.info('add to all messages result.messages', result.messages)
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.PREV)
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
     } else {
-      // log.info('load next saga ,,,,  getHasNextCached() , , , ', getHasNextCached())
       if (getHasNextCached()) {
         result.messages = getFromAllMessagesByMessageId(messageId, MESSAGE_LOAD_DIRECTION.NEXT)
-        // log.info('res. next cached messages ... ', result.messages)
       } else if (hasNext) {
         log.info('saga load next from server ... ', messageId)
         messageQuery.reverse = false
         result = yield call(messageQuery.loadNextMessageId, messageId)
-        log.info('result from server next ... ', result)
         if (result.messages.length) {
-          // log.info('add to all messages result.messages', result.messages)
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.NEXT)
         }
         yield put(setMessagesHasNextAC(result.hasNext))
@@ -1492,7 +1484,6 @@ function* deleteReaction(action: IAction): any {
       yield put(updateChannelDataAC(channel.id, channelUpdateParam))
       updateChannelOnAllChannels(channel.id, channelUpdateParam)
     }
-    log.info('message received. ... ', message)
     yield put(deleteReactionFromListAC(reaction))
     yield put(deleteReactionFromMessageAC(message, reaction, true))
     removeReactionToMessageOnMap(channelId, message, reaction, true)

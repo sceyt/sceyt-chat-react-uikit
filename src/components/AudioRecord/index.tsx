@@ -283,7 +283,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
           const thumbData = (audioRecording || currentRecordedFile)?.thumb
           // Validate thumb data is an array and has valid length
           if (Array.isArray(thumbData) && thumbData.length > 0) {
-            const maxVal = Math.max(...thumbData)
+            const maxVal = thumbData.reduce((acc: number, n: number) => (n > acc ? n : acc), -Infinity)
             // Check if maxVal is a valid number and not zero
             if (maxVal > 0 && isFinite(maxVal)) {
               const dec = maxVal / 100
@@ -386,9 +386,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
                   // Extract the segment of audio data from the buffer.
                   const segment = audioBuffer.getChannelData(0).slice(start, end)
 
-                  // Find the peak amplitude for this segment.
-                  // @ts-ignore
-                  const maxAmplitude = Math.max(...segment.map(Math.abs))
+                  // Find the peak amplitude for this segment without spreading large arrays
+                  let maxAmplitude = 0
+                  for (let j = 0; j < segment.length; j++) {
+                    const val = segment[j]
+                    const absVal = val < 0 ? -val : val
+                    if (absVal > maxAmplitude) {
+                      maxAmplitude = absVal
+                    }
+                  }
 
                   // Convert the peak amplitude to a value in your desired range (e.g., 0-1000) and add it to the waveform array.
                   waveform.push(Math.floor(maxAmplitude * 1000))
@@ -448,7 +454,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }
 
   useEffect(() => {
-    const MAX_RECORDER_TIME = 250
+    const MAX_RECORDER_TIME = 1800
     let recordingInterval: any = null
 
     if (recording) {

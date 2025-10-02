@@ -72,6 +72,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const loadingRef = useRef(false)
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -80,11 +81,22 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
 
   const handleChannelListScroll = (event: any) => {
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
-      if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext) {
+      if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext && !loadingRef.current) {
+        loadingRef.current = true
         dispatch(loadMoreChannelsForForward(15))
+        const timeout = setTimeout(() => {
+          loadingRef.current = false
+          clearTimeout(timeout)
+        }, 100)
       }
     }
   }
+
+  useEffect(() => {
+    if (channelsLoading === LOADING_STATE.LOADED) {
+      loadingRef.current = false
+    }
+  }, [channelsLoading])
 
   const handleSearchValueChange = (e: any) => {
     const { value } = e.target

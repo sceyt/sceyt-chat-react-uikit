@@ -295,7 +295,6 @@ const MessageTextFormat = ({
     return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
   } catch (e) {
     log.error(' failed to format message .>>> ', e)
-    log.info('message: ', message)
     return text
   }
 }

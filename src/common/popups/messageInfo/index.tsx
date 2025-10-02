@@ -57,11 +57,11 @@ const MessageInfo = ({
   togglePopup,
   labels,
   tabsOrder = [
+    { key: 'received' as const, label: 'Delivered to', data: [] as IMarker[] },
+    { key: 'displayed' as const, label: 'Seen by', data: [] as IMarker[] },
     ...(message.attachments && message.attachments.length > 0 && message.attachments[0].type === 'voice'
       ? [{ key: 'played' as const, label: 'Played by', data: [] as IMarker[] }]
-      : []),
-    { key: 'received' as const, label: 'Delivered to', data: [] as IMarker[] },
-    { key: 'displayed' as const, label: 'Seen by', data: [] as IMarker[] }
+      : [])
   ] as { key: MessageInfoTab; label: string; data: IMarker[] }[],
   showCounts = false,
   avatarSize = 32,

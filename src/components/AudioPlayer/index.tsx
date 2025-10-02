@@ -180,7 +180,10 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
               setCurrentTime(formatAudioVideoTime(file.metadata.dur))
             }
             if (file.metadata.tmb) {
-              const maxVal = Math.max(...file.metadata.tmb)
+              const maxVal =
+                Array.isArray(file.metadata.tmb) && file.metadata.tmb.length > 0
+                  ? (file.metadata.tmb as number[]).reduce((acc: number, n: number) => (n > acc ? n : acc), -Infinity)
+                  : 0
               const dec = maxVal / 100
               peaks = file.metadata.tmb.map((peak: number) => {
                 return peak / dec / 100
