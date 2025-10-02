@@ -626,12 +626,13 @@ function* sendTextMessage(action: IAction): any {
       if (channel.unread) {
         yield put(markChannelAsReadAC(channel.id))
       }
+      channel.lastMessage = messageToUpdate
     } else {
       // eslint-disable-next-line
       throw new Error('Connection required to send message')
     }
 
-    store.dispatch(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
+    yield put(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
