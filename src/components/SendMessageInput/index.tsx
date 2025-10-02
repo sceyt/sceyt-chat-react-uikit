@@ -486,7 +486,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         handleEditMessage()
       } else if (messageText.trim() || (attachments.length && attachments.length > 0)) {
         const messageTexToSend = messageText.trim()
-        log.info('messageTexToSend . . . . .', messageTexToSend)
         const messageToSend: any = {
           // metadata: mentionedUsersPositions,
           body: messageTexToSend,
@@ -512,7 +511,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         }
         messageToSend.mentionedUsers = mentionUsersToSend
-        log.info('message to send ..........................................', JSON.stringify(messageToSend))
 
         if (messageForReply) {
           messageToSend.parentMessage = messageForReply

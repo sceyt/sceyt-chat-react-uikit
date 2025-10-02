@@ -148,7 +148,6 @@ const messageSlice = createSlice({
     },
 
     setMessages: (state, action: PayloadAction<{ messages: IMessage[] }>) => {
-      log.info('setMessages ... ', action.payload)
       state.activeChannelMessages = action.payload.messages
     },
 
@@ -249,7 +248,6 @@ const messageSlice = createSlice({
       })
 
       if (!messageFound && addIfNotExists) {
-        log.info('message not found on update message, add message to list .. ...', params)
         state.activeChannelMessages.push(params)
       }
     },
