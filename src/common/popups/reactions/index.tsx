@@ -4,7 +4,7 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IReaction } from '../../../types'
+import { IReaction, IUser } from '../../../types'
 import { AvatarWrapper, UserStatus } from '../../../components/Channel'
 import { Avatar } from '../../../components'
 import { userLastActiveDateFormat } from '../../../helpers'
@@ -37,6 +37,7 @@ interface IReactionsPopupProps {
   rtlDirection?: boolean
   reactionsDetailsPopupBorderRadius?: string
   reactionsDetailsPopupHeaderItemsStyle?: 'bubbles' | 'inline'
+  openUserProfile: (user: IUser) => void
 }
 let reactionsPrevLength: any = 0
 export default function ReactionsPopup({
@@ -48,7 +49,8 @@ export default function ReactionsPopup({
   reactionTotals,
   reactionsDetailsPopupBorderRadius,
   reactionsDetailsPopupHeaderItemsStyle,
-  rtlDirection
+  rtlDirection,
+  openUserProfile
 }: IReactionsPopupProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -124,7 +126,7 @@ export default function ReactionsPopup({
       return scoresElem.offsetHeight
     }
     return 0
-  }, [scoresRef])
+  }, [scoresRef, reactionTotals?.length])
 
   useEffect(() => {
     if (!reactionTotals || !reactionTotals.length) {
@@ -137,28 +139,19 @@ export default function ReactionsPopup({
   }, [reactions])
 
   useEffect(() => {
-    if (reactions && reactionsPrevLength < reactions.length) {
-      if (reactionsHeight > popupHeight) {
+    if (reactions) {
+      if (reactionsPrevLength !== reactions.length) {
         setPopupHeight(reactionsHeight)
+        reactionsPrevLength = reactions.length
       }
-      reactionsPrevLength = reactions.length
     } else {
-      reactionsPrevLength = !reactions ? 0 : reactions.length
+      reactionsPrevLength = 0
+      setPopupHeight(0)
     }
 
-    if (reactions && reactions.length) {
-      if (calculateSizes) {
-        // const popupPos = popupRef.current?.getBoundingClientRect()
-        /*  if (rtlDirection) {
-          setPopupHorizontalPosition(
-            horizontalPositions.right - (channelDetailsIsOpen ? 362 : 0) > popupPos?.width! ? 'right' : 'left'
-          )
-        } else {
-          setPopupHorizontalPosition(horizontalPositions.left - channelListWidth > popupPos?.width! ? 'left' : 'right')
-        } */
-        setPopupHeight(reactionsHeight)
-        setCalculateSizes(false)
-      }
+    if (reactions && reactions.length && calculateSizes) {
+      setPopupHeight(reactionsHeight)
+      setCalculateSizes(false)
     }
   }, [reactions, reactionsHeight])
 
@@ -228,7 +221,14 @@ export default function ReactionsPopup({
           <ReactionItem
             key={reaction.id}
             hoverBackgroundColor={backgroundHovered}
-            onClick={() => handleAddDeleteEmoji(reaction.key)}
+            onClick={() => {
+              if (reaction.user.id === user.id) {
+                handleAddDeleteEmoji(reaction.key)
+              } else {
+                openUserProfile(reaction.user)
+                handleReactionsPopupClose()
+              }
+            }}
           >
             <AvatarWrapper>
               <Avatar

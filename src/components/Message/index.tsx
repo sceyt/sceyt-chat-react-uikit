@@ -788,6 +788,7 @@ const Message = ({
         )}
         {reactionsPopupOpen && (
           <ReactionsPopup
+            openUserProfile={handleOpenUserProfile}
             bottomPosition={reactionsPopupPosition}
             horizontalPositions={reactionsPopupHorizontalPosition}
             reactionTotals={message.reactionTotals || []}
