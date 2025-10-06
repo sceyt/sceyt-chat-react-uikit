@@ -329,7 +329,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   voiceMessage = true,
   placeholderText,
   placeholderTextColor,
-  audioRecordingMaxDuration = 1800
+  audioRecordingMaxDuration
 
 }) => {
   const {
