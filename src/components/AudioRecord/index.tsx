@@ -18,6 +18,7 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
+
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   sendRecordedFile: (data: { file: File; objectUrl: string; thumb: number[]; dur: number }, id?: string) => void
@@ -29,14 +30,16 @@ interface AudioPlayerProps {
   defaultDuration?: number
 }
 let shouldDraw = false
+const DEFAULT_RECORDER_TIME = 1800 
+
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ 
   sendRecordedFile, 
   setShowRecording, 
   showRecording, 
   channelId, 
-  maxDuration = 1800,
-  defaultDuration = 1800
+  maxDuration,
+  defaultDuration = DEFAULT_RECORDER_TIME
  }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -467,13 +470,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     let backupTimeout: any = null
   
     if (recording) {
+      const durationLimit = maxDuration ?? defaultDuration
+      
       backupTimeout = setTimeout(() => {
         stopRecording(false, currentChannelId, false, recorder)
-      }, (maxDuration + 0.5) * 1000)
+      }, (durationLimit + 0.5) * 1000)
   
       recordingInterval = setInterval(() => {
         setCurrentTime((prevState: any) => {
-          if (prevState >= maxDuration) {
+          if (prevState >= durationLimit) {
             clearInterval(recordingInterval)
             clearTimeout(backupTimeout)
             stopRecording(false, currentChannelId, false, recorder)
