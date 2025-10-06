@@ -25,10 +25,19 @@ interface AudioPlayerProps {
   setShowRecording: (start: boolean) => void
   showRecording: boolean
   channelId: string
+  maxDuration?: number
+  defaultDuration?: number
 }
 let shouldDraw = false
 // @ts-ignore
-const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording, channelId }) => {
+const AudioRecord: React.FC<AudioPlayerProps> = ({ 
+  sendRecordedFile, 
+  setShowRecording, 
+  showRecording, 
+  channelId, 
+  maxDuration = 3,
+  defaultDuration = 3
+ }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -454,31 +463,43 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }
 
   useEffect(() => {
-    const MAX_RECORDER_TIME = 1800
     let recordingInterval: any = null
-
+    let backupTimeout: any = null
+  
     if (recording) {
-      setTimeout(() => {
-        recordingInterval = setInterval(() => {
-          setCurrentTime((prevState: any) => {
-            if (prevState.recordingSeconds === MAX_RECORDER_TIME) {
-              clearInterval(recordingInterval)
-              stopRecording(false, currentChannelId, false, recorder)
-              return 0
-            }
-            return prevState + 1
-          })
-        }, 1000)
-      }, 150)
-    } else clearInterval(recordingInterval)
-
+      backupTimeout = setTimeout(() => {
+        stopRecording(false, currentChannelId, false, recorder)
+      }, (maxDuration + 0.5) * 1000)
+  
+      recordingInterval = setInterval(() => {
+        setCurrentTime((prevState: any) => {
+          if (prevState >= maxDuration) {
+            clearInterval(recordingInterval)
+            clearTimeout(backupTimeout)
+            stopRecording(false, currentChannelId, false, recorder)
+            return 0
+          }
+          return prevState + 1
+        })
+      }, 1000)
+    } else {
+      clearInterval(recordingInterval)
+      clearTimeout(backupTimeout)
+    }
+  
     return () => {
       if (sendingInterval) {
         clearInterval(sendingInterval)
       }
-      clearInterval(recordingInterval)
+      if (recordingInterval) {
+        clearInterval(recordingInterval)
+      }
+      if (backupTimeout) {
+        clearTimeout(backupTimeout)
+      }
     }
-  }, [recording])
+  }, [recording, maxDuration, defaultDuration])
+  
 
   useEffect(() => {
     if (currentRecordedFile) {
