@@ -268,7 +268,6 @@ interface SendMessageProps {
   placeholderText?: string
   placeholderTextColor?: string
   audioRecordingMaxDuration?: number
-  audioRecordingDefaultDuration?: number
 }
 
 const SendMessageInput: React.FC<SendMessageProps> = ({
@@ -330,8 +329,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   voiceMessage = true,
   placeholderText,
   placeholderTextColor,
-  audioRecordingMaxDuration = 1800,
-  audioRecordingDefaultDuration = 1800
+  audioRecordingMaxDuration = 1800
 
 }) => {
   const {
@@ -1906,7 +1904,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         showRecording={showRecording}
                         channelId={activeChannel.id}
                         maxDuration={audioRecordingMaxDuration}
-                        defaultDuration={audioRecordingDefaultDuration}
                       />
                     </SendMessageButton>
                   )}
