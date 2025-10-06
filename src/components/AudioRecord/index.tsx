@@ -35,8 +35,8 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   setShowRecording, 
   showRecording, 
   channelId, 
-  maxDuration = 3,
-  defaultDuration = 3
+  maxDuration = 1800,
+  defaultDuration = 1800
  }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
