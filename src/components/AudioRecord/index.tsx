@@ -29,7 +29,7 @@ interface AudioPlayerProps {
   maxRecordingDuration?: number
 }
 let shouldDraw = false
-const DEFAULT_MAX_RECORDING_DURATION = 1800 
+const DEFAULT_MAX_RECORDING_DURATION = 600
 
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ 
