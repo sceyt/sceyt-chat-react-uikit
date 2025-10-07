@@ -26,7 +26,7 @@ interface AudioPlayerProps {
   setShowRecording: (start: boolean) => void
   showRecording: boolean
   channelId: string
-  maxDuration?: number
+  maxRecordingDuration?: number
 }
 let shouldDraw = false
 const DEFAULT_MAX_RECORDING_DURATION = 1800 
@@ -37,7 +37,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   setShowRecording, 
   showRecording, 
   channelId, 
-  maxDuration = DEFAULT_MAX_RECORDING_DURATION
+  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION
  }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -470,11 +470,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     if (recording) {
       backupTimeout = setTimeout(() => {
         stopRecording(false, currentChannelId, false, recorder)
-      }, (maxDuration + 0.5) * 1000)
+      }, (maxRecordingDuration + 0.5) * 1000)
   
       recordingInterval = setInterval(() => {
         setCurrentTime((prevState: any) => {
-          if (prevState >= maxDuration) {
+          if (prevState >= maxRecordingDuration) {
             clearInterval(recordingInterval)
             clearTimeout(backupTimeout)
             stopRecording(false, currentChannelId, false, recorder)
@@ -499,7 +499,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         clearTimeout(backupTimeout)
       }
     }
-  }, [recording, maxDuration])
+  }, [recording, maxRecordingDuration])
   
 
   useEffect(() => {

@@ -1903,7 +1903,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         setShowRecording={setShowRecording}
                         showRecording={showRecording}
                         channelId={activeChannel.id}
-                        maxDuration={audioRecordingMaxDuration}
+                        maxRecordingDuration={audioRecordingMaxDuration}
                       />
                     </SendMessageButton>
                   )}
