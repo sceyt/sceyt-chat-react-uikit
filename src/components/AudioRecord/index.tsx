@@ -29,7 +29,7 @@ interface AudioPlayerProps {
   maxDuration?: number
 }
 let shouldDraw = false
-const DEFAULT_MAX_RECORDING_TIME = 1800 
+const DEFAULT_MAX_RECORDING_DURATION = 1800 
 
 // @ts-ignore
 const AudioRecord: React.FC<AudioPlayerProps> = ({ 
@@ -37,7 +37,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   setShowRecording, 
   showRecording, 
   channelId, 
-  maxDuration = DEFAULT_MAX_RECORDING_TIME
+  maxDuration = DEFAULT_MAX_RECORDING_DURATION
  }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
