@@ -401,20 +401,21 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
                 }
                 setStartRecording(false)
                 const objectUrl = URL.createObjectURL(blob)
+                const durationInt = Math.round(audioBuffer.duration)
                 if (send) {
-                  sendRecordedFile({ file, objectUrl, thumb: waveform, dur: audioBuffer.duration }, id)
+                  sendRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt }, id)
                   setShowRecording(false)
                   removeAudioRecordingFromMap(id)
                   dispatch(setChannelDraftMessageIsRemovedAC(id))
                 } else {
                   if (!draft) {
-                    setRecordedFile({ file, objectUrl, thumb: waveform, dur: audioBuffer.duration })
+                    setRecordedFile({ file, objectUrl, thumb: waveform, dur: durationInt })
                   }
                   const audioRecording = {
                     file,
                     objectUrl,
                     thumb: waveform,
-                    dur: audioBuffer.duration
+                    dur: durationInt
                   }
                   setAudioRecordingToMap(id, audioRecording)
                   if (draft) {
