@@ -191,7 +191,7 @@ const MessageStatusAndTimeContainer = styled.span<{
   }
 
   & > ${HiddenMessageTime} {
-    color: ${(props) => (props.withAttachment ? props.messageTimeColorOnAttachment : '')};
+    color: ${(props) => (props.withAttachment && !props.fileAttachment ? props.messageTimeColorOnAttachment : '')};
   }
 
   ${(props) =>
