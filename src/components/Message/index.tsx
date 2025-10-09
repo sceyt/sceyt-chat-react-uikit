@@ -188,7 +188,7 @@ const Message = ({
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: border
   } = useColor()
 
@@ -755,7 +755,7 @@ const Message = ({
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleCreateChat={handleCreateChat}
             messageTextRef={messageTextRef}
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
             handleOpenUserProfile={handleOpenUserProfile}
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
           />
@@ -778,7 +778,7 @@ const Message = ({
             bottomOfMessage
             marginBottom={sameUserMessageSpacing}
             ownMessageOnRightSide={ownMessageOnRightSide}
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
           />
         )}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (

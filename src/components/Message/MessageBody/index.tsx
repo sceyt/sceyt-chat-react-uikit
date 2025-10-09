@@ -682,7 +682,7 @@ const MessageBody = ({
             messageTimeVisible={!!messageTimeVisible}
             messageStatusVisible={!!messageStatusVisible}
             leftMargin
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
           />
         ) : null}
       </MessageText>
@@ -712,7 +712,7 @@ const MessageBody = ({
             fileAttachment={
               withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
             }
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
           />
         )}
       {
