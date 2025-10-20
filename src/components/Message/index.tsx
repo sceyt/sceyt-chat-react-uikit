@@ -181,14 +181,14 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {}
-}: IMessageProps) => {
+}: IMessageProps) => {   
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.BORDER]: border
   } = useColor()
 
@@ -755,7 +755,7 @@ const Message = ({
             handleDeletePendingMessage={handleDeletePendingMessage}
             handleCreateChat={handleCreateChat}
             messageTextRef={messageTextRef}
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
             handleOpenUserProfile={handleOpenUserProfile}
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
           />
@@ -778,7 +778,7 @@ const Message = ({
             bottomOfMessage
             marginBottom={sameUserMessageSpacing}
             ownMessageOnRightSide={ownMessageOnRightSide}
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
         {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
