@@ -1154,7 +1154,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               upload: true,
               size: recordedFile.file.size,
               attachmentUrl: recordedFile.objectUrl,
-              metadata: { tmb: recordedFile.thumb, dur: recordedFile.dur },
+              metadata: JSON.stringify({ tmb: recordedFile.thumb, dur: recordedFile.dur }),
               type: attachmentTypes.voice
             }
           ],
