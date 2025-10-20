@@ -682,7 +682,7 @@ const MessageBody = ({
             messageTimeVisible={!!messageTimeVisible}
             messageStatusVisible={!!messageStatusVisible}
             leftMargin
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textSecondary}
           />
         ) : null}
       </MessageText>
@@ -695,9 +695,11 @@ const MessageBody = ({
             messageStatusDisplayingType={messageStatusDisplayingType}
             messageStatusSize={messageStatusSize}
             messageStatusColor={
-              message.attachments[0].type !== 'voice' && message.attachments[0].type !== 'file'
-                ? textOnPrimary
-                : messageStateColor || textSecondary
+              message.attachments[0].type === 'voice'
+                ? textSecondary 
+                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
+                  ? textOnPrimary
+                  : messageStateColor || textSecondary
             }
             messageReadStatusColor={messageReadStatusColor}
             messageStateFontSize={messageStateFontSize}
@@ -712,9 +714,16 @@ const MessageBody = ({
             fileAttachment={
               withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
             }
-            messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
+            messageTimeColorOnAttachment={
+              message.attachments[0].type === 'voice'
+                ? textSecondary 
+                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
+                  ? textOnPrimary 
+                  : textSecondary
+            }
           />
         )}
+
       {
         withAttachments &&
           (message.attachments as any[]).map((attachment: any) => (
