@@ -18,6 +18,7 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
+
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   sendRecordedFile: (data: { file: File; objectUrl: string; thumb: number[]; dur: number }, id?: string) => void
@@ -25,10 +26,19 @@ interface AudioPlayerProps {
   setShowRecording: (start: boolean) => void
   showRecording: boolean
   channelId: string
+  maxRecordingDuration?: number
 }
 let shouldDraw = false
+const DEFAULT_MAX_RECORDING_DURATION = 600
+
 // @ts-ignore
-const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowRecording, showRecording, channelId }) => {
+const AudioRecord: React.FC<AudioPlayerProps> = ({ 
+  sendRecordedFile, 
+  setShowRecording, 
+  showRecording, 
+  channelId, 
+  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION
+ }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -455,31 +465,43 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({ sendRecordedFile, setShowReco
   }
 
   useEffect(() => {
-    const MAX_RECORDER_TIME = 1800
     let recordingInterval: any = null
-
+    let backupTimeout: any = null
+  
     if (recording) {
-      setTimeout(() => {
-        recordingInterval = setInterval(() => {
-          setCurrentTime((prevState: any) => {
-            if (prevState.recordingSeconds === MAX_RECORDER_TIME) {
-              clearInterval(recordingInterval)
-              stopRecording(false, currentChannelId, false, recorder)
-              return 0
-            }
-            return prevState + 1
-          })
-        }, 1000)
-      }, 150)
-    } else clearInterval(recordingInterval)
-
+      backupTimeout = setTimeout(() => {
+        stopRecording(false, currentChannelId, false, recorder)
+      }, (maxRecordingDuration + 0.5) * 1000)
+  
+      recordingInterval = setInterval(() => {
+        setCurrentTime((prevState: any) => {
+          if (prevState >= maxRecordingDuration) {
+            clearInterval(recordingInterval)
+            clearTimeout(backupTimeout)
+            stopRecording(false, currentChannelId, false, recorder)
+            return 0
+          }
+          return prevState + 1
+        })
+      }, 1000)
+    } else {
+      clearInterval(recordingInterval)
+      clearTimeout(backupTimeout)
+    }
+  
     return () => {
       if (sendingInterval) {
         clearInterval(sendingInterval)
       }
-      clearInterval(recordingInterval)
+      if (recordingInterval) {
+        clearInterval(recordingInterval)
+      }
+      if (backupTimeout) {
+        clearTimeout(backupTimeout)
+      }
     }
-  }, [recording])
+  }, [recording, maxRecordingDuration])
+  
 
   useEffect(() => {
     if (currentRecordedFile) {
