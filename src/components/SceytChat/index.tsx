@@ -63,7 +63,8 @@ const SceytChat = ({
   openChatOnUserInteraction = true,
   autoSelectFirstChannel = false,
   memberCount,
-  disableFrowardMentionsCount = false
+  disableFrowardMentionsCount = false,
+  chatMinWidth
 }: IChatClientProps) => {
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
     useColor()
@@ -298,6 +299,7 @@ const SceytChat = ({
           backgroundColor={backgroundColor}
           highlightedBackground={highlightedBackground}
           id='sceyt_chat_container'
+          chatMinWidth={chatMinWidth}
         >
           {children}
         </ChatContainer>
@@ -315,11 +317,11 @@ export const Container = styled.div`
   height: 100vh;
 `
 
-const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: string; highlightedBackground: string }>`
+const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: string; highlightedBackground: string, chatMinWidth?: string }>`
   display: flex;
   height: 100%;
   max-height: 100vh;
-  min-width: ${(props) => props.withChannelsList && '1200px'};
+  min-width: ${(props) => props.withChannelsList && (props.chatMinWidth || '1200px')};
   background-color: ${(props) => props.backgroundColor};
 
   /* Global highlighted background styles */
