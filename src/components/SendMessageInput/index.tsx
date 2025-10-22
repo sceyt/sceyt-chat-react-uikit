@@ -330,7 +330,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   placeholderText,
   placeholderTextColor,
   audioRecordingMaxDuration
-
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -879,7 +878,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 type: isMediaAttachment ? fileType : 'file',
                 attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
                 tid,
-                size: resizedFile?.blob ? resizedFile?.blob?.size : file.size,
+                size: dataFromDb ? dataFromDb.size : file.size,
                 metadata: {
                   ...(dataFromDb && dataFromDb.metadata),
                   szw: imageWidth,
