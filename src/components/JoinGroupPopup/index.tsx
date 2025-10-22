@@ -36,12 +36,12 @@ export default function JoinGroupPopup({ onClose, onJoin, channelName, channelAv
 
   return (
     <PopupContainer>
-      <Popup maxWidth='420px' minWidth='420px' padding='0' backgroundColor={background}>
+      <Popup maxWidth='400px' width='400px' height='383px' padding='0' backgroundColor={background}>
         <PopupBody paddingH='32px' paddingV='28px'>
-          <CloseIcon onClick={onClose} color={iconPrimary} />
+          <CloseIcon onClick={onClose} color={iconPrimary} height='12px' width='12px' />
 
           <TopAvatar>
-            <Avatar name={channelName} image={channelAvatarUrl} size={72} textSize={24} setDefaultAvatar />
+            <Avatar name={channelName} image={channelAvatarUrl} size={90} textSize={24} setDefaultAvatar />
           </TopAvatar>
 
           <Title color={textPrimary}>{channelName}</Title>
@@ -50,7 +50,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channelName, channelAv
           <MembersRow>
             {firstMembers.map((m, idx) => (
               <MemberAvatar key={m.id} index={idx}>
-                <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={32} textSize={12} setDefaultAvatar />
+                <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={40} textSize={12} setDefaultAvatar />
               </MemberAvatar>
             ))}
             {extraCount > 0 && (
@@ -78,20 +78,26 @@ const TopAvatar = styled.div`
 `
 
 const Title = styled.h3<{ color: string }>`
-  margin: 16px 0 4px;
+  // margin-top: 32px;
   text-align: center;
-  font-weight: 600;
-  font-size: 20px;
   line-height: 24px;
   color: ${(p) => p.color};
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 20px;
+  line-height: 120%;
+  letter-spacing: 0%;
 `
 
 const Subtitle = styled.div<{ color: string }>`
   text-align: center;
-  font-size: 14px;
-  line-height: 16px;
   color: ${(p) => p.color};
   margin-bottom: 16px;
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: 0px;
 `
 
 const MembersRow = styled.div`
@@ -105,7 +111,7 @@ const MemberAvatar = styled.div<{ index: number }>`
   margin-left: ${(p) => (p.index === 0 ? '0' : '-8px')};
   border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 0 0 2px #fff; /* small outline to separate overlapping avatars */
+  box-shadow: 0 0 0 2px #fff;
 `
 
 const ExtraBadge = styled.span<{ backgroundColor: string; color: string }>`
@@ -126,9 +132,9 @@ const ExtraBadge = styled.span<{ backgroundColor: string; color: string }>`
 
 const MembersText = styled.div<{ color: string }>`
   text-align: center;
-  margin-top: 10px;
-  font-size: 13px;
-  line-height: 16px;
+  margin-top: 8px;
+  font-size: 14px;
+  line-height: 18px;
   color: ${(p) => p.color};
 `
 
