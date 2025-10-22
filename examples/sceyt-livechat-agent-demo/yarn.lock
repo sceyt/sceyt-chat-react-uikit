@@ -1205,12 +1205,10 @@
   dependencies:
     regenerator-runtime "^0.13.11"
 
-"@babel/runtime@^7.12.1", "@babel/runtime@^7.6.3":
-  version "7.26.0"
-  resolved "https://registry.npmjs.org/@babel/runtime/-/runtime-7.26.0.tgz#8600c2f595f277c60815256418b85356a65173c1"
-  integrity sha512-FDSOghenHTiToteC/QRlv2q3DhPZ/oOXTBoirfWNx1Cx3TMVcGWQtMMmQcSvb/JjpNeGzx8Pq/b4fKEJuWm1sw==
-  dependencies:
-    regenerator-runtime "^0.14.0"
+"@babel/runtime@^7.28.4":
+  version "7.28.4"
+  resolved "https://registry.yarnpkg.com/@babel/runtime/-/runtime-7.28.4.tgz#a70226016fabe25c5783b2f22d3e1c9bc5ca3326"
+  integrity sha512-Q/N6JNWvIvPnLDvjlE1OUBLPQHH6l3CltCEsHIujp45zQUSSh8K+gHnaEX45yAT1nyngnINhvWtzN+Nb9D8RAQ==
 
 "@babel/template@^7.18.10", "@babel/template@^7.20.7", "@babel/template@^7.21.9", "@babel/template@^7.3.3":
   version "7.21.9"
@@ -2050,48 +2048,48 @@
   resolved "https://registry.yarnpkg.com/@protobufjs/utf8/-/utf8-1.1.0.tgz#a777360b5b39a1a2e5106f8e858f2fd2d060c570"
   integrity sha512-Vvn3zZrhQZkkBE8LSuW3em98c0FwgO4nxzv6OdSxPKJIEKY2bGbHn+mhGIPerzI4twdxaP8/0+06HBpwf345Lw==
 
-"@redux-saga/core@^1.3.0":
-  version "1.3.0"
-  resolved "https://registry.npmjs.org/@redux-saga/core/-/core-1.3.0.tgz#2ce08b73d407fc6ea9e7f7d83d2e97d981a3a8b8"
-  integrity sha512-L+i+qIGuyWn7CIg7k1MteHGfttKPmxwZR5E7OsGikCL2LzYA0RERlaUY00Y3P3ZV2EYgrsYlBrGs6cJP5OKKqA==
+"@redux-saga/core@^1.4.2":
+  version "1.4.2"
+  resolved "https://registry.yarnpkg.com/@redux-saga/core/-/core-1.4.2.tgz#7d64721b490c2ed88eb8b07a45074a428d5076d6"
+  integrity sha512-nIMLGKo6jV6Wc1sqtVQs1iqbB3Kq20udB/u9XEaZQisT6YZ0NRB8+4L6WqD/E+YziYutd27NJbG8EWUPkb7c6Q==
   dependencies:
-    "@babel/runtime" "^7.6.3"
-    "@redux-saga/deferred" "^1.2.1"
-    "@redux-saga/delay-p" "^1.2.1"
-    "@redux-saga/is" "^1.1.3"
-    "@redux-saga/symbols" "^1.1.3"
-    "@redux-saga/types" "^1.2.1"
+    "@babel/runtime" "^7.28.4"
+    "@redux-saga/deferred" "^1.3.1"
+    "@redux-saga/delay-p" "^1.3.1"
+    "@redux-saga/is" "^1.2.1"
+    "@redux-saga/symbols" "^1.2.1"
+    "@redux-saga/types" "^1.3.1"
     typescript-tuple "^2.2.1"
 
-"@redux-saga/deferred@^1.2.1":
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/@redux-saga/deferred/-/deferred-1.2.1.tgz#aca373a08ccafd6f3481037f2f7ee97f2c87c3ec"
-  integrity sha512-cmin3IuuzMdfQjA0lG4B+jX+9HdTgHZZ+6u3jRAOwGUxy77GSlTi4Qp2d6PM1PUoTmQUR5aijlA39scWWPF31g==
+"@redux-saga/deferred@^1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@redux-saga/deferred/-/deferred-1.3.1.tgz#f274c9df9a1e8b837dc912188fff3dfdf7fd24e8"
+  integrity sha512-0YZ4DUivWojXBqLB/TmuRRpDDz7tyq1I0AuDV7qi01XlLhM5m51W7+xYtIckH5U2cMlv9eAuicsfRAi1XHpXIg==
 
-"@redux-saga/delay-p@^1.2.1":
-  version "1.2.1"
-  resolved "https://registry.npmjs.org/@redux-saga/delay-p/-/delay-p-1.2.1.tgz#e72ac4731c5080a21f75b61bedc31cb639d9e446"
-  integrity sha512-MdiDxZdvb1m+Y0s4/hgdcAXntpUytr9g0hpcOO1XFVyyzkrDu3SKPgBFOtHn7lhu7n24ZKIAT1qtKyQjHqRd+w==
+"@redux-saga/delay-p@^1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@redux-saga/delay-p/-/delay-p-1.3.1.tgz#c2d481de63c1ef674c1cddab538992c39375855e"
+  integrity sha512-597I7L5MXbD/1i3EmcaOOjL/5suxJD7p5tnbV1PiWnE28c2cYiIHqmSMK2s7us2/UrhOL2KTNBiD0qBg6KnImg==
   dependencies:
-    "@redux-saga/symbols" "^1.1.3"
+    "@redux-saga/symbols" "^1.2.1"
 
-"@redux-saga/is@^1.1.3":
-  version "1.1.3"
-  resolved "https://registry.npmjs.org/@redux-saga/is/-/is-1.1.3.tgz#b333f31967e87e32b4e6b02c75b78d609dd4ad73"
-  integrity sha512-naXrkETG1jLRfVfhOx/ZdLj0EyAzHYbgJWkXbB3qFliPcHKiWbv/ULQryOAEKyjrhiclmr6AMdgsXFyx7/yE6Q==
-  dependencies:
-    "@redux-saga/symbols" "^1.1.3"
-    "@redux-saga/types" "^1.2.1"
-
-"@redux-saga/symbols@^1.1.3":
-  version "1.1.3"
-  resolved "https://registry.npmjs.org/@redux-saga/symbols/-/symbols-1.1.3.tgz#b731d56201719e96dc887dc3ae9016e761654367"
-  integrity sha512-hCx6ZvU4QAEUojETnX8EVg4ubNLBFl1Lps4j2tX7o45x/2qg37m3c6v+kSp8xjDJY+2tJw4QB3j8o8dsl1FDXg==
-
-"@redux-saga/types@^1.2.1":
+"@redux-saga/is@^1.2.1":
   version "1.2.1"
-  resolved "https://registry.npmjs.org/@redux-saga/types/-/types-1.2.1.tgz#9403f51c17cae37edf870c6bc0c81c1ece5ccef8"
-  integrity sha512-1dgmkh+3so0+LlBWRhGA33ua4MYr7tUOj+a9Si28vUi0IUFNbff1T3sgpeDJI/LaC75bBYnQ0A3wXjn0OrRNBA==
+  resolved "https://registry.yarnpkg.com/@redux-saga/is/-/is-1.2.1.tgz#5fe101fcb365236577f5a8c625e4c0a3c2eab736"
+  integrity sha512-x3aWtX3GmQfEvn8dh0ovPbsXgK9JjpiR24wKztpGbZP8JZUWWvUgKrvnWZ/T/4iphOBftyVc9VrIwhAnsM+OFA==
+  dependencies:
+    "@redux-saga/symbols" "^1.2.1"
+    "@redux-saga/types" "^1.3.1"
+
+"@redux-saga/symbols@^1.2.1":
+  version "1.2.1"
+  resolved "https://registry.yarnpkg.com/@redux-saga/symbols/-/symbols-1.2.1.tgz#48b6137ac47d3a3a93b847f1850c86fb461e0012"
+  integrity sha512-3dh+uDvpBXi7EUp/eO+N7eFM4xKaU4yuGBXc50KnZGzIrR/vlvkTFQsX13zsY8PB6sCFYAgROfPSRUj8331QSA==
+
+"@redux-saga/types@^1.3.1":
+  version "1.3.1"
+  resolved "https://registry.yarnpkg.com/@redux-saga/types/-/types-1.3.1.tgz#7cda9b29dca868a9689a7105aec7c21d54575489"
+  integrity sha512-YRCrJdhQLobGIQ8Cj1sta3nn6DrZDTSUnrIYhS2e5V590BmfVDleKoAquclAiKSBKWJwmuXTb+b4BL6rSHnahw==
 
 "@rollup/plugin-babel@^5.2.0":
   version "5.3.1"
@@ -2448,14 +2446,6 @@
   dependencies:
     "@types/node" "*"
 
-"@types/hoist-non-react-statics@^3.3.1":
-  version "3.3.6"
-  resolved "https://registry.npmjs.org/@types/hoist-non-react-statics/-/hoist-non-react-statics-3.3.6.tgz#6bba74383cdab98e8db4e20ce5b4a6b98caed010"
-  integrity sha512-lPByRJUer/iN/xa4qpyL0qmL11DqNW81iU/IG1S3uvRUq4oKagz8VCxZjiWkumgt66YT3vOdDgZ0o32sGKtCEw==
-  dependencies:
-    "@types/react" "*"
-    hoist-non-react-statics "^3.3.0"
-
 "@types/html-minifier-terser@^6.0.0":
   version "6.1.0"
   resolved "https://registry.yarnpkg.com/@types/html-minifier-terser/-/html-minifier-terser-6.1.0.tgz#4fc33a00c1d0c16987b1a20cf92d20614c55ac35"
@@ -2658,10 +2648,10 @@
   resolved "https://registry.yarnpkg.com/@types/trusted-types/-/trusted-types-2.0.3.tgz#a136f83b0758698df454e328759dbd3d44555311"
   integrity sha512-NfQ4gyz38SL8sDNrSixxU2Os1a5xcdFxipAFxYEuLUlvU2uDwS4NUpsImcf1//SlWItCVMMLiylsxbmNMToV/g==
 
-"@types/use-sync-external-store@^0.0.3":
-  version "0.0.3"
-  resolved "https://registry.npmjs.org/@types/use-sync-external-store/-/use-sync-external-store-0.0.3.tgz#b6725d5f4af24ace33b36fafd295136e75509f43"
-  integrity sha512-EwmlvuaxPNej9+T4v5AuBPJa2x2UOJVdjCtDHgcDqitUeOtjnJKJ+apYjVcAoBEMjKW1VVFGZLUb5+qqa09XFA==
+"@types/use-sync-external-store@^0.0.6":
+  version "0.0.6"
+  resolved "https://registry.yarnpkg.com/@types/use-sync-external-store/-/use-sync-external-store-0.0.6.tgz#60be8d21baab8c305132eb9cb912ed497852aadc"
+  integrity sha512-zFDAD+tlpf2r4asuHEj0XH6pY6i0g5NeAHPn+15wk3BV6JA69eERFXC1gyGThDkVa1zCyKr5jox1+2LbV/AMLg==
 
 "@types/uuid@8.3.4":
   version "8.3.4"
@@ -5418,7 +5408,7 @@ he@^1.2.0:
   resolved "https://registry.yarnpkg.com/he/-/he-1.2.0.tgz#84ae65fa7eafb165fddb61566ae14baf05664f0f"
   integrity sha512-F/1DnUGPopORZi0ni+CvrCgHQ5FyEAHRLSApuYWMmrbSwoN2Mn/7k+Gl38gJnR7yyDZk6WLXwiGod1JOWNDKGw==
 
-hoist-non-react-statics@^3.0.0, hoist-non-react-statics@^3.3.0, hoist-non-react-statics@^3.3.2:
+hoist-non-react-statics@^3.0.0:
   version "3.3.2"
   resolved "https://registry.npmjs.org/hoist-non-react-statics/-/hoist-non-react-statics-3.3.2.tgz#ece0acaf71d62c2969c2ec59feff42a4b1a85b45"
   integrity sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==
@@ -8265,17 +8255,13 @@ react-only-when@^1.0.2:
   resolved "https://registry.npmjs.org/react-only-when/-/react-only-when-1.0.2.tgz#a8a79b48dd6cfbd91ddc710674a94153e88039d3"
   integrity sha512-agE6l3L6bqaVuwNtjihTQ36M+VBfPS63KOzcNL4ZTmlwSxQPvhzIqmBWfiol0/wLYmKxCcBqgXkEJpvj5Kob8Q==
 
-react-redux@^8.0.2:
-  version "8.1.3"
-  resolved "https://registry.npmjs.org/react-redux/-/react-redux-8.1.3.tgz#4fdc0462d0acb59af29a13c27ffef6f49ab4df46"
-  integrity sha512-n0ZrutD7DaX/j9VscF+uTALI3oUPa/pO4Z3soOBIjuRn/FzVu6aehhysxZCLi6y7duMf52WNZGMl7CtuK5EnRw==
+react-redux@^9.2.0:
+  version "9.2.0"
+  resolved "https://registry.yarnpkg.com/react-redux/-/react-redux-9.2.0.tgz#96c3ab23fb9a3af2cb4654be4b51c989e32366f5"
+  integrity sha512-ROY9fvHhwOD9ySfrF0wmvu//bKCQ6AeZZq1nJNtbDC+kk5DuSuNX/n6YWYF/SYy7bSba4D4FSz8DJeKY/S/r+g==
   dependencies:
-    "@babel/runtime" "^7.12.1"
-    "@types/hoist-non-react-statics" "^3.3.1"
-    "@types/use-sync-external-store" "^0.0.3"
-    hoist-non-react-statics "^3.3.2"
-    react-is "^18.0.0"
-    use-sync-external-store "^1.0.0"
+    "@types/use-sync-external-store" "^0.0.6"
+    use-sync-external-store "^1.4.0"
 
 react-refresh@^0.11.0:
   version "0.11.0"
@@ -8402,19 +8388,17 @@ redent@^3.0.0:
     indent-string "^4.0.0"
     strip-indent "^3.0.0"
 
-redux-saga@^1.1.3:
-  version "1.3.0"
-  resolved "https://registry.npmjs.org/redux-saga/-/redux-saga-1.3.0.tgz#a59ada7c28010189355356b99738c9fcb7ade30e"
-  integrity sha512-J9RvCeAZXSTAibFY0kGw6Iy4EdyDNW7k6Q+liwX+bsck7QVsU78zz8vpBRweEfANxnnlG/xGGeOvf6r8UXzNJQ==
+redux-saga@^1.3.0:
+  version "1.4.2"
+  resolved "https://registry.yarnpkg.com/redux-saga/-/redux-saga-1.4.2.tgz#98947e62a19712150dc63dd1418a5b070bfadd5a"
+  integrity sha512-QLIn/q+7MX/B+MkGJ/K6R3//60eJ4QNy65eqPsJrfGezbxdh1Jx+37VRKE2K4PsJnNET5JufJtgWdT30WBa+6w==
   dependencies:
-    "@redux-saga/core" "^1.3.0"
+    "@redux-saga/core" "^1.4.2"
 
-redux@^4.2.0:
-  version "4.2.1"
-  resolved "https://registry.npmjs.org/redux/-/redux-4.2.1.tgz#c08f4306826c49b5e9dc901dee0452ea8fce6197"
-  integrity sha512-LAUYz4lc+Do8/g7aeRa8JkyDErK6ekstQaqWQrNRW//MY1TvCEpMtpTWvlQ+FPbWCx+Xixu/6SHt5N0HR+SB4w==
-  dependencies:
-    "@babel/runtime" "^7.9.2"
+redux@^5.0.1:
+  version "5.0.1"
+  resolved "https://registry.yarnpkg.com/redux/-/redux-5.0.1.tgz#97fa26881ce5746500125585d5642c77b6e9447b"
+  integrity sha512-M9/ELqF6fy8FwmkpnF0S3YKOqMyoWJ4+CS5Efg2ct3oY9daQvd/Pc71FpGZsVsbl3Cpb+IIcjBDUnnyBdQbq4w==
 
 regenerate-unicode-properties@^10.1.0:
   version "10.1.0"
@@ -8432,11 +8416,6 @@ regenerator-runtime@^0.13.11, regenerator-runtime@^0.13.9:
   version "0.13.11"
   resolved "https://registry.yarnpkg.com/regenerator-runtime/-/regenerator-runtime-0.13.11.tgz#f6dca3e7ceec20590d07ada785636a90cdca17f9"
   integrity sha512-kY1AZVr2Ra+t+piVaJ4gxaFaReZVH40AKNo7UCX6W+dEwBo/2oZJzqfuN1qLq1oL45o56cPaTXELwrTh8Fpggg==
-
-regenerator-runtime@^0.14.0:
-  version "0.14.1"
-  resolved "https://registry.npmjs.org/regenerator-runtime/-/regenerator-runtime-0.14.1.tgz#356ade10263f685dda125100cd862c1db895327f"
-  integrity sha512-dYnhHh0nJoMfnkZs6GmmhFknAGRrLznOu5nc9ML+EJxGvrx6H7teuevqVqCuPcPK//3eDrrjQhehXVx9cnkGdw==
 
 regenerator-transform@^0.15.1:
   version "0.15.1"
@@ -8665,10 +8644,10 @@ saxes@^5.0.1:
   dependencies:
     xmlchars "^2.2.0"
 
-sceyt-chat-react-uikit@^1.6.3:
-  version "1.6.3"
-  resolved "https://registry.npmjs.org/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.6.3.tgz#3f5a27d69afe870d6b9d32e7b252dd84cc6eafdd"
-  integrity sha512-znEiKoXBKrC3SstEBTYnDsEULwA46Fic/7o7rh2emAuEBXkPF0UOhP9jHE6SHf3PDOz5vdCMDJuPuvrVOTwQWg==
+sceyt-chat-react-uikit@^1.7.4-beta.1:
+  version "1.7.4-beta.1"
+  resolved "https://registry.yarnpkg.com/sceyt-chat-react-uikit/-/sceyt-chat-react-uikit-1.7.4-beta.1.tgz#656e926ce42ea21f5469058516501679e04b9ee0"
+  integrity sha512-CAydVS1sLH5bUu/jlQ9p/5foH297qxaRoz0Owd+ZzeVk1TBwMgrrnTO8K/cO9zcYKoIJhDyQmYVwWpm18y2s7A==
   dependencies:
     "@lexical/offset" "^0.12.2"
     "@lexical/react" "^0.12.2"
@@ -8680,9 +8659,9 @@ sceyt-chat-react-uikit@^1.6.3:
     react-circular-progressbar "^2.1.0"
     react-easy-crop "^4.6.2"
     react-elastic-carousel "^0.11.5"
-    react-redux "^8.0.2"
-    redux "^4.2.0"
-    redux-saga "^1.1.3"
+    react-redux "^9.2.0"
+    redux "^5.0.1"
+    redux-saga "^1.3.0"
     styled-components "^5.3.5"
     uuid "^9.0.0"
     wavesurfer.js "^6.6.3"
@@ -9654,10 +9633,10 @@ use-strict@1.0.1:
   resolved "https://registry.npmjs.org/use-strict/-/use-strict-1.0.1.tgz#0bb80d94f49a4a05192b84a8c7d34e95f1a7e3a0"
   integrity sha512-IeiWvvEXfW5ltKVMkxq6FvNf2LojMKvB2OCeja6+ct24S1XOmQw2dGr2JyndwACWAGJva9B7yPHwAmeA9QCqAQ==
 
-use-sync-external-store@^1.0.0:
-  version "1.4.0"
-  resolved "https://registry.npmjs.org/use-sync-external-store/-/use-sync-external-store-1.4.0.tgz#adbc795d8eeb47029963016cefdf89dc799fcebc"
-  integrity sha512-9WXSPC5fMv61vaupRkCKCxsPxBocVnwakBEkMIHHpkTTg6icbJtg6jzgtLDm4bl3cSHAca52rYWih0k4K3PfHw==
+use-sync-external-store@^1.4.0:
+  version "1.6.0"
+  resolved "https://registry.yarnpkg.com/use-sync-external-store/-/use-sync-external-store-1.6.0.tgz#b174bfa65cb2b526732d9f2ac0a408027876f32d"
+  integrity sha512-Pp6GSwGP/NrPIrxVFAIkOQeyw8lFenOHijQWkUTrDvrF4ALqylP2C/KCkeS9dpUM3KvYRQhna5vt7IL95+ZQ9w==
 
 util-deprecate@^1.0.1, util-deprecate@^1.0.2, util-deprecate@~1.0.1:
   version "1.0.2"
