@@ -14,7 +14,7 @@ import { useSelector } from 'store/hooks'
 interface IProps {
   onClose: () => void
   onJoin: () => void
-  channel: IChannel & { membersTotalCount: number }
+  channel: IChannel & { membersTotalCount: number; avatar: string }
 }
 
 export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
@@ -57,10 +57,10 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
           <TopAvatar>
             <Avatar
               name={channel.subject || ''}
-              image={channel.avatarUrl || ''}
+              image={channel.avatar || ''}
               size={90}
               textSize={24}
-              setDefaultAvatar
+              setDefaultAvatar={false}
             />
           </TopAvatar>
 
