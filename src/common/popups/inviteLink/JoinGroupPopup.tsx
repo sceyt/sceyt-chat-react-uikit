@@ -22,8 +22,8 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND]: background,
-    [THEME_COLORS.SURFACE_1]: surface1,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
 
@@ -51,7 +51,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
   return (
     <PopupContainer>
       <Popup maxWidth='400px' width='400px' height='383px' padding='0' backgroundColor={background}>
-        <PopupBody paddingH='32px' paddingV='28px'>
+        <PopupBody paddingH='32px' paddingV='31px'>
           <CloseIcon onClick={onClose} color={iconPrimary} height='12px' width='12px' />
 
           <TopAvatar>
@@ -69,12 +69,16 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
 
           <MembersRow>
             {firstMembers.map((m, idx) => (
-              <MemberAvatar key={m.id} index={idx}>
+              <MemberAvatar key={m.id} index={idx} borderColor={background}>
                 <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={40} textSize={12} setDefaultAvatar />
               </MemberAvatar>
             ))}
             {extraCount > 0 && (
-              <ExtraBadge backgroundColor={surface1} color={textPrimary}>{`+${extraCount}`}</ExtraBadge>
+              <ExtraBadge
+                borderColor={background}
+                backgroundColor={surface1}
+                color={textPrimary}
+              >{`+${extraCount}`}</ExtraBadge>
             )}
           </MembersRow>
           {membersLine && <MembersText color={textSecondary}>{membersLine}</MembersText>}
@@ -94,73 +98,79 @@ const TopAvatar = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 8px;
 `
 
 const Title = styled.h3<{ color: string }>`
-  // margin-top: 32px;
   text-align: center;
-  line-height: 24px;
   color: ${(p) => p.color};
   font-weight: 500;
   font-style: Medium;
   font-size: 20px;
-  line-height: 120%;
+  line-height: 24px;
   letter-spacing: 0%;
+  margin-bottom: 4px;
+  margin-top: 24px;
 `
 
 const Subtitle = styled.div<{ color: string }>`
   text-align: center;
   color: ${(p) => p.color};
-  margin-bottom: 16px;
   font-weight: 500;
   font-style: Medium;
   font-size: 15px;
   line-height: 20px;
   letter-spacing: 0px;
+  margin-bottom: 24px;
 `
 
 const MembersRow = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 4px;
+  margin-top: 8px;
+  gap: 4px;
 `
 
-const MemberAvatar = styled.div<{ index: number }>`
-  margin-left: ${(p) => (p.index === 0 ? '0' : '-8px')};
+const MemberAvatar = styled.div<{ index: number; borderColor?: string }>`
+  margin-left: ${(p) => (p.index === 0 ? '0' : '-12px')};
   border-radius: 50%;
   overflow: hidden;
-  box-shadow: 0 0 0 2px #fff;
+  width: 40px;
+  height: 40px;
+  border: 2px solid ${(p) => p.borderColor || '#fff'};
 `
 
-const ExtraBadge = styled.span<{ backgroundColor: string; color: string }>`
-  margin-left: 8px;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 6px;
-  border-radius: 14px;
+const ExtraBadge = styled.span<{ borderColor?: string; backgroundColor?: string; color: string }>`
+  margin-left: -12px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  background-color: ${(p) => p.backgroundColor};
   color: ${(p) => p.color};
-  font-size: 12px;
+  font-size: 16px;
   font-weight: 600;
-  box-shadow: 0 0 0 2px #fff;
+  border: 2px solid ${(p) => p.borderColor || '#fff'};
+  background-color: ${(p) => p.backgroundColor || '#fff'};
 `
 
 const MembersText = styled.div<{ color: string }>`
   text-align: center;
   margin-top: 8px;
-  font-size: 14px;
-  line-height: 18px;
   color: ${(p) => p.color};
+  font-weight: 500;
+  font-style: Medium;
+  font-size: 14px;
+  line-height: 17.78px;
+  letter-spacing: -0.1px;
+  margin-top: 10px;
 `
 
 const Center = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-top: 18px;
+  margin-top: 24px;
 `
