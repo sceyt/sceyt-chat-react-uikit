@@ -57,7 +57,8 @@ import {
   GET_CHANNEL_INVITE_KEYS,
   REGENERATE_CHANNEL_INVITE_KEY,
   UPDATE_CHANNEL_INVITE_KEY,
-  GET_CHANNEL_BY_INVITE_KEY
+  GET_CHANNEL_BY_INVITE_KEY,
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY
 } from './constants'
 import {
   destroyChannelsMap,
@@ -1376,7 +1377,6 @@ function* getChannelInviteKeys(action: IAction): any {
     }
     if (channel) {
       const inviteKeys = yield call(channel.getInviteKeys)
-      console.log('inviteKeys', inviteKeys)
       yield put(setChannelInviteKeysAC(channelId, inviteKeys))
     }
   } catch (e) {
@@ -1449,9 +1449,38 @@ function* getChannelByInviteKey(action: IAction): any {
     const { key } = payload
     const SceytChatClient = getClient()
     const channel = yield call(SceytChatClient.Channel.getChannelByInviteKey, key)
-    yield put(setJoinableChannelAC(JSON.parse(JSON.stringify(channel))))
+    if (channel && channel.length > 0 && !channel[0]?.role) {
+      yield put(setJoinableChannelAC(JSON.parse(JSON.stringify(channel[0]))))
+    } else if (channel && channel.length > 0 && channel[0]?.role) {
+      yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel[0]))))
+      window.history.pushState({}, '', window.location.pathname)
+    }
   } catch (e) {
     log.error('ERROR in get channel by invite key', e)
+  }
+}
+
+function* joinChannelWithInviteKey(action: IAction): any {
+  try {
+    const { payload } = action
+    const { key } = payload
+    const SceytChatClient = getClient()
+    const user = SceytChatClient.user
+    const channel = yield call(SceytChatClient.Channel.joinChannelByInviteKey, key)
+    yield put(setJoinableChannelAC(null as unknown as IChannel))
+    yield call(setChannelInMap, channel)
+    const messageToSend: any = {
+      // metadata: mentionedUsersPositions,
+      body: 'JL',
+      mentionedUsers: [user],
+      attachments: [],
+      type: 'system'
+    }
+    yield put(sendTextMessageAC(messageToSend, channel?.id, CONNECTION_STATUS.CONNECTED))
+    yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
+    window.history.pushState({}, '', window.location.pathname)
+  } catch (e) {
+    log.error('ERROR in join channel with invite key', e)
   }
 }
 
@@ -1495,4 +1524,5 @@ export default function* ChannelsSaga() {
   // yield takeLatest(DELETE_REVOKED_CHANNEL_INVITE_KEY, deleteRevokedChannelInviteKey)
   // yield takeLatest(GET_REVOKED_CHANNEL_INVITE_KEYS, getRevokedChannelInviteKeys)
   yield takeLatest(GET_CHANNEL_BY_INVITE_KEY, getChannelByInviteKey)
+  yield takeLatest(JOIN_TO_CHANNEL_WITH_INVITE_KEY, joinChannelWithInviteKey)
 }

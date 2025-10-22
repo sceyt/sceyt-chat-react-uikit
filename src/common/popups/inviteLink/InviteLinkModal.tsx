@@ -52,7 +52,7 @@ export default function InviteLinkModal({
       accessPriorHistory: boolean
     }[]
   } = useSelector(channelInviteKeysSelector, shallowEqual)
-  console.log('channelsInviteKeys', channelsInviteKeys)
+
   const dispatch = useDispatch()
 
   const [activeTab, setActiveTab] = useState<'link' | 'qr'>('link')

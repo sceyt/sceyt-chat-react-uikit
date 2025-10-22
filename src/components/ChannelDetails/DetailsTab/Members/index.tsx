@@ -95,7 +95,6 @@ const Members = ({
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
   const [openInviteModal, setOpenInviteModal] = useState(false)
-  console.log('openInviteModal', openInviteModal)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
@@ -251,12 +250,13 @@ const Members = ({
     dispatch(getMembersAC(channel.id))
   }, [channel])
 
-  console.log('channel', channel)
+  const currentUserRole = members.find((member) => member.id === user.id)?.role
+
   return (
     <Container theme={theme}>
       <ActionsMenu>
         <MembersList onScroll={handleMembersListScroll}>
-          {checkActionPermission('addMember') && (
+          {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}

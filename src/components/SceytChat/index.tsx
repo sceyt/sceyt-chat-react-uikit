@@ -6,7 +6,9 @@ import styled from 'styled-components'
 import {
   destroySession,
   getChannelByInviteKeyAC,
+  joinChannelWithInviteKeyAC,
   setIsDraggingAC,
+  setJoinableChannelAC,
   setTabIsActiveAC,
   watchForEventsAC
 } from '../../store/channel/actions'
@@ -40,7 +42,7 @@ import {
   initializeNotifications,
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
-import { IContactsMap } from '../../types'
+import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
@@ -296,21 +298,31 @@ const SceytChat = ({
     setDisableFrowardMentionsCount(disableFrowardMentionsCount)
   }, [disableFrowardMentionsCount])
 
-  useEffect(() => {
+  const getKeyFromUrl = () => {
     const join = new URLSearchParams(window.location.search).get('join')
     if (join) {
-      const key = join.split('/').pop()
-      if (key) {
-        dispatch(getChannelByInviteKeyAC(key))
-      }
+      return join.split('/').pop()
+    }
+    return null
+  }
+  useEffect(() => {
+    const key = getKeyFromUrl()
+    if (key) {
+      dispatch(getChannelByInviteKeyAC(key))
     }
   }, [])
 
-  useEffect(() => {
-    if (joinableChannel) {
-      console.log('joinableChannel', joinableChannel)
+  const handleJoinChannel = () => {
+    const key = getKeyFromUrl()
+    if (key) {
+      dispatch(joinChannelWithInviteKeyAC(key))
     }
-  }, [joinableChannel])
+  }
+
+  const handleCloseJoinPopup = () => {
+    window.history.pushState({}, '', window.location.pathname)
+    dispatch(setJoinableChannelAC(null as unknown as IChannel))
+  }
 
   return (
     <React.Fragment>
@@ -330,8 +342,8 @@ const SceytChat = ({
       ) : (
         ''
       )}
-      {joinableChannel && joinableChannel?.length > 0 && (
-        <JoinGroupPopup onClose={() => {}} onJoin={() => {}} channel={joinableChannel[0]} />
+      {joinableChannel && (
+        <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
       )}
     </React.Fragment>
   )

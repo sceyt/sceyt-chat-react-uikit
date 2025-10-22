@@ -481,7 +481,7 @@ const channelSlice = createSlice({
       }
     },
 
-    setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel }>) => {
+    setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
       state.joinableChannel = action.payload.channel
     }
   },

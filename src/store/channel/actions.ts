@@ -72,7 +72,8 @@ import {
   GET_CHANNEL_INVITE_KEYS,
   REGENERATE_CHANNEL_INVITE_KEY,
   UPDATE_CHANNEL_INVITE_KEY,
-  GET_CHANNEL_BY_INVITE_KEY
+  GET_CHANNEL_BY_INVITE_KEY,
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -276,7 +277,7 @@ export const updateUserStatusOnChannelAC = (usersMap: { [key: string]: IUser }) 
 
 export const setChannelListWithAC = (width: number) => setChannelListWidth({ width })
 
-export const setJoinableChannelAC = (channel: IChannel) => setJoinableChannel({ channel })
+export const setJoinableChannelAC = (channel: IChannel | null) => setJoinableChannel({ channel })
 
 export const clearHistoryAC = (channelId: string) => ({
   type: CLEAR_HISTORY,
@@ -357,4 +358,9 @@ export const updateChannelInviteKeyAC = (
 ) => ({
   type: UPDATE_CHANNEL_INVITE_KEY,
   payload: { channelId, key, accessPriorHistory, expiresAt, maxUses }
+})
+
+export const joinChannelWithInviteKeyAC = (key: string) => ({
+  type: JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  payload: { key }
 })
