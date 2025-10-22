@@ -3,8 +3,14 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
-import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
-import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
+import {
+  destroySession,
+  getChannelByInviteKeyAC,
+  setIsDraggingAC,
+  setTabIsActiveAC,
+  watchForEventsAC
+} from '../../store/channel/actions'
+import { channelListWidthSelector, isDraggingSelector, joinableChannelSelector } from '../../store/channel/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { getRolesFailSelector } from '../../store/member/selector'
@@ -43,6 +49,7 @@ import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalpe
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
+import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 
 const SceytChat = ({
   client,
@@ -73,6 +80,7 @@ const SceytChat = ({
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
+  const joinableChannel = useSelector(joinableChannelSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const [tabIsActive, setTabIsActive] = useState(true)
 
@@ -288,6 +296,22 @@ const SceytChat = ({
     setDisableFrowardMentionsCount(disableFrowardMentionsCount)
   }, [disableFrowardMentionsCount])
 
+  useEffect(() => {
+    const join = new URLSearchParams(window.location.search).get('join')
+    if (join) {
+      const key = join.split('/').pop()
+      if (key) {
+        dispatch(getChannelByInviteKeyAC(key))
+      }
+    }
+  }, [])
+
+  useEffect(() => {
+    if (joinableChannel) {
+      console.log('joinableChannel', joinableChannel)
+    }
+  }, [joinableChannel])
+
   return (
     <React.Fragment>
       {SceytChatClient ? (
@@ -306,6 +330,9 @@ const SceytChat = ({
       ) : (
         ''
       )}
+      {joinableChannel && joinableChannel?.length > 0 && (
+        <JoinGroupPopup onClose={() => {}} onJoin={() => {}} channel={joinableChannel[0]} />
+      )}
     </React.Fragment>
   )
 }
@@ -317,7 +344,12 @@ export const Container = styled.div`
   height: 100vh;
 `
 
-const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: string; highlightedBackground: string, chatMinWidth?: string }>`
+const ChatContainer = styled.div<{
+  withChannelsList: boolean
+  backgroundColor: string
+  highlightedBackground: string
+  chatMinWidth?: string
+}>`
   display: flex;
   height: 100%;
   max-height: 100vh;

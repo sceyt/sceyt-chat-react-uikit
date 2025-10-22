@@ -150,7 +150,8 @@ const Details = ({
   tabItemsMinWidth,
   backgroundColor,
   bordersColor,
-  showPhoneNumber
+  showPhoneNumber,
+  QRCodeIcon
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -492,6 +493,7 @@ const Details = ({
             tabItemsLineHeight={tabItemsLineHeight}
             tabItemsMinWidth={tabItemsMinWidth}
             onTabChange={handleTabChange}
+            QRCodeIcon={QRCodeIcon}
           />
         )}
         {/* </div> */}

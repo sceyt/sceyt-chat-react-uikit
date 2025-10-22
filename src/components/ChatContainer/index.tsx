@@ -3,10 +3,10 @@ import { Provider } from 'react-redux'
 import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser, IMember } from '../../types'
+import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
-import JoinGroupPopup from 'components/JoinGroupPopup'
 
+import { setBaseUrlForInviteMembers } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
   total: number
@@ -113,6 +113,7 @@ export interface IChatClientProps {
   memberCount?: number
   disableFrowardMentionsCount?: boolean
   chatMinWidth?: string
+  baseUrlForInviteMembers?: string
 }
 
 const SceytChatContainer = ({
@@ -136,10 +137,14 @@ const SceytChatContainer = ({
   logLevel = 'silent',
   memberCount,
   disableFrowardMentionsCount,
-  chatMinWidth
+  chatMinWidth,
+  baseUrlForInviteMembers
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
+    if (baseUrlForInviteMembers) {
+      setBaseUrlForInviteMembers(baseUrlForInviteMembers)
+    }
   }, [])
 
   return (
@@ -165,80 +170,6 @@ const SceytChatContainer = ({
         memberCount={memberCount}
         disableFrowardMentionsCount={disableFrowardMentionsCount}
         chatMinWidth={chatMinWidth}
-      />
-      <JoinGroupPopup
-        onClose={() => {}}
-        onJoin={() => {}}
-        channelName={'channel'}
-        members={
-          [
-            {
-              id: '37494163175',
-              firstName: 'KarenTestTwo',
-              lastName: 'Ch',
-              avatarUrl: '',
-              metadata: {
-                ge: '0',
-                last_name: 'Ch',
-                bulsho_user_data: '{"bd":270199998000,"pr":true}',
-                first_name: 'KarenTestTwo'
-              },
-              username: '',
-              state: 'active',
-              presence: {
-                state: 'online',
-                status: 'Hey there! I am using WAAFI',
-                lastActiveAt: '2025-10-21T13:19:24.551Z'
-              },
-              blocked: false,
-              role: 'owner'
-            },
-            {
-              id: '37494163174',
-              firstName: 'KarenKarenKaren',
-              lastName: 'Ch',
-              avatarUrl: '',
-              metadata: {
-                bulsho_user_data: '{"bd":905341188000,"pr":true}',
-                first_name: 'KarenKarenKaren',
-                ge: '0',
-                last_name: 'Ch'
-              },
-              username: '',
-              state: 'active',
-              presence: {
-                state: 'online',
-                status: 'Hey there! I am using WAAFI',
-                lastActiveAt: '2025-10-21T13:09:10.919Z'
-              },
-              blocked: false,
-              role: 'participant'
-            },
-            {
-              id: '37494163173',
-              firstName: 'Karen',
-              lastName: 'Chilingaryan Chilingaryan',
-              avatarUrl:
-                // eslint-disable-next-line max-len
-                'https://uk-london-south-api-2-staging.waafi.com/user/api/v1/files/vd8l6eom9y/3e853b11c6d18bfa35a945e7c6eaff0197ccfc8aa79dc62ef94ec5e72acb053d2115159d9b46c39cc879e622be84/Icon.png',
-              metadata: {
-                first_name: 'KarenKarenkaren',
-                ge: '0',
-                last_name: 'Chilingaryan Chilingaryan',
-                bulsho_user_data: '{"bd":648310451000,"pr":true}'
-              },
-              username: '',
-              state: 'active',
-              presence: {
-                state: 'offline',
-                status: 'Hey there! I am using WAAFI',
-                lastActiveAt: '2025-10-20T12:27:55.881Z'
-              },
-              blocked: false,
-              role: 'participant'
-            }
-          ] as unknown as IMember[]
-        }
       />
     </Provider>
   )

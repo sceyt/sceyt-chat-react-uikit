@@ -38,6 +38,7 @@ import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
 import log from 'loglevel'
+import AddMembersListItemInviteLink from '../inviteLink/AddMembersListItemInviteLink'
 
 interface ISelectedUserData {
   id: string
@@ -58,6 +59,7 @@ interface IProps {
   creatChannelSelectedMembers?: any[]
   popupWidth?: string
   popupHeight?: string
+  handleOpenInviteModal?: () => void
 }
 
 const UsersPopup = ({
@@ -69,7 +71,8 @@ const UsersPopup = ({
   creatChannelSelectedMembers,
   popupHeight,
   selectIsRequired,
-  popupWidth
+  popupWidth,
+  handleOpenInviteModal
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -293,6 +296,7 @@ const UsersPopup = ({
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
   }, [])
+
   return (
     <PopupContainer theme={theme}>
       <Popup
@@ -358,6 +362,7 @@ const UsersPopup = ({
             onMouseLeave={() => setIsScrolling(false)}
             thumbColor={surface2}
           >
+            {actionType === 'addMembers' && <AddMembersListItemInviteLink onClick={handleOpenInviteModal} />}
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
                 return null

@@ -46,6 +46,15 @@ export interface IChannelState {
   tabIsActive: boolean
   hideChannelList: boolean
   draftIsRemoved: string
+  channelInviteKeys: {
+    [key: string]: {
+      key: string
+      maxUses: number
+      expiresAt: number
+      accessPriorHistory: boolean
+    }[]
+  }
+  joinableChannel: IChannel | null
 }
 
 const initialState: IChannelState = {
@@ -78,7 +87,9 @@ const initialState: IChannelState = {
   tabIsActive: true,
   hideChannelList: false,
   draggedAttachments: [],
-  draftIsRemoved: ''
+  draftIsRemoved: '',
+  channelInviteKeys: {},
+  joinableChannel: null
 }
 
 const channelSlice = createSlice({
@@ -450,6 +461,28 @@ const channelSlice = createSlice({
 
     setDraftIsRemoved: (state, action: PayloadAction<{ channelId: string }>) => {
       state.draftIsRemoved = action.payload.channelId
+    },
+
+    setChannelInviteKeys: (
+      state,
+      action: PayloadAction<{
+        channelId: string
+        inviteKeys: {
+          key: string
+          maxUses: number
+          expiresAt: number
+          accessPriorHistory: boolean
+        }[]
+      }>
+    ) => {
+      state.channelInviteKeys = {
+        ...state.channelInviteKeys,
+        [action.payload.channelId]: action.payload.inviteKeys
+      }
+    },
+
+    setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel }>) => {
+      state.joinableChannel = action.payload.channel
     }
   },
   extraReducers: (builder) => {
@@ -493,7 +526,9 @@ export const {
   setChannelListWidth,
   setTabIsActive,
   setHideChannelList,
-  setDraftIsRemoved
+  setDraftIsRemoved,
+  setChannelInviteKeys,
+  setJoinableChannel
 } = channelSlice.actions
 
 // Export reducer

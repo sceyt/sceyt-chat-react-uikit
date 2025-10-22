@@ -2,6 +2,7 @@ import { IChannel, IMessage } from '../../types'
 import { isJSON } from '../message'
 import { CHANNEL_GROUP_TYPES, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../constants'
 
+let baseUrlForInviteMembers: string = ''
 type channelMap = {
   [key: string]: IChannel
 }
@@ -24,6 +25,14 @@ let showChannelDetails: boolean = false
 let channelTypesFilter: string[] = []
 let memberCount: number = 10
 let disableFrowardMentionsCount: boolean = false
+
+export function setBaseUrlForInviteMembers(url: string) {
+  baseUrlForInviteMembers = url
+}
+
+export function getBaseUrlForInviteMembers() {
+  return baseUrlForInviteMembers
+}
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }

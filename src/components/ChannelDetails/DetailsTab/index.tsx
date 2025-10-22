@@ -61,6 +61,7 @@ interface IProps {
   tabItemsLineHeight?: string
   tabItemsMinWidth?: string
   onTabChange?: () => void
+  QRCodeIcon?: JSX.Element
 }
 
 const DetailsTab = ({
@@ -105,7 +106,8 @@ const DetailsTab = ({
   tabItemsFontSize,
   tabItemsLineHeight,
   tabItemsMinWidth,
-  onTabChange
+  onTabChange,
+  QRCodeIcon
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -199,6 +201,7 @@ const DetailsTab = ({
           memberNameFontSize={memberNameFontSize}
           memberAvatarSize={memberAvatarSize}
           memberPresenceFontSize={memberPresenceFontSize}
+          QRCodeIcon={QRCodeIcon}
         />
       )}
       {activeTab === channelDetailsTabs.media && <Media channel={channel} />}
