@@ -166,9 +166,6 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
           imageHeight: meta.height,
           duration: meta.duration
         }
-        try {
-          fileSize = await getImageSize(filePath)
-        } catch {}
       }
 
       const attachmentMeta = attachment.cachedUrl
@@ -886,9 +883,6 @@ function* resendMessage(action: IAction): any {
                   imageHeight: meta.height,
                   duration: meta.duration
                 }
-                try {
-                  fileSize = yield call(getImageSize, filePath)
-                } catch (e) {}
               }
             }
             let attachmentMeta: string
