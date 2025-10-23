@@ -29,7 +29,8 @@ import {
   setDefaultRolesByChannelTypesMap,
   setHandleNewMessages,
   setOpenChatOnUserInteraction,
-  setDisableFrowardMentionsCount
+  setDisableFrowardMentionsCount,
+  getUseInviteLink
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
@@ -75,6 +76,7 @@ const SceytChat = ({
   disableFrowardMentionsCount = false,
   chatMinWidth
 }: IChatClientProps) => {
+  const useInviteLink = getUseInviteLink()
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
     useColor()
   const dispatch = useDispatch()
@@ -305,16 +307,17 @@ const SceytChat = ({
     }
     return null
   }
+
   useEffect(() => {
     const key = getKeyFromUrl()
-    if (key) {
+    if (key && getUseInviteLink()) {
       dispatch(getChannelByInviteKeyAC(key))
     }
-  }, [])
+  }, [useInviteLink])
 
   const handleJoinChannel = () => {
     const key = getKeyFromUrl()
-    if (key) {
+    if (key && getUseInviteLink()) {
       dispatch(joinChannelWithInviteKeyAC(key))
     }
   }
@@ -342,7 +345,7 @@ const SceytChat = ({
       ) : (
         ''
       )}
-      {joinableChannel && (
+      {joinableChannel && getUseInviteLink() && (
         <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
       )}
     </React.Fragment>

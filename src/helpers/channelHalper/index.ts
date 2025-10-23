@@ -26,12 +26,22 @@ let channelTypesFilter: string[] = []
 let memberCount: number = 10
 let disableFrowardMentionsCount: boolean = false
 
+let useInviteLink: boolean = false
+
 export function setBaseUrlForInviteMembers(url: string) {
   baseUrlForInviteMembers = url
 }
 
+export function setUseInviteLink(use: boolean) {
+  useInviteLink = use
+}
+
 export function getBaseUrlForInviteMembers() {
   return baseUrlForInviteMembers
+}
+
+export function getUseInviteLink() {
+  return useInviteLink
 }
 
 export function setChannelInMap(channel: IChannel) {

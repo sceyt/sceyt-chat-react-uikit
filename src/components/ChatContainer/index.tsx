@@ -6,7 +6,7 @@ import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
 
-import { setBaseUrlForInviteMembers } from '../../helpers/channelHalper'
+import { setBaseUrlForInviteMembers, setUseInviteLink } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
   total: number
@@ -114,6 +114,7 @@ export interface IChatClientProps {
   disableFrowardMentionsCount?: boolean
   chatMinWidth?: string
   baseUrlForInviteMembers?: string
+  useInviteLink?: boolean
 }
 
 const SceytChatContainer = ({
@@ -138,12 +139,16 @@ const SceytChatContainer = ({
   memberCount,
   disableFrowardMentionsCount,
   chatMinWidth,
-  baseUrlForInviteMembers
+  baseUrlForInviteMembers,
+  useInviteLink = false
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
     if (baseUrlForInviteMembers) {
       setBaseUrlForInviteMembers(baseUrlForInviteMembers)
+    }
+    if (useInviteLink) {
+      setUseInviteLink(useInviteLink)
     }
   }, [])
 

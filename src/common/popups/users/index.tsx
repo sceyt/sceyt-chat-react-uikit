@@ -33,7 +33,11 @@ import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate, useColor } from '../../../hooks'
-import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
+import {
+  getChannelTypesMemberDisplayTextMap,
+  getDefaultRolesByChannelTypesMap,
+  getUseInviteLink
+} from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
@@ -362,7 +366,9 @@ const UsersPopup = ({
             onMouseLeave={() => setIsScrolling(false)}
             thumbColor={surface2}
           >
-            {actionType === 'addMembers' && <AddMembersListItemInviteLink onClick={handleOpenInviteModal} />}
+            {actionType === 'addMembers' && getUseInviteLink() && (
+              <AddMembersListItemInviteLink onClick={handleOpenInviteModal} />
+            )}
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
                 return null
