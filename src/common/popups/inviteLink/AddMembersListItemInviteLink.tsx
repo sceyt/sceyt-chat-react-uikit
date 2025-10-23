@@ -9,7 +9,7 @@ interface Props {
   onClick?: () => void
 }
 
-function AddMembersListItemInviteLink({ onClick }: Props) {
+function AddMembersListItemInviteLink({ onClick }: Props): JSX.Element | null {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -27,15 +27,20 @@ function AddMembersListItemInviteLink({ onClick }: Props) {
   if (!show) return null
 
   if (customRender) {
-    return customRender({
+    const node = customRender({
       onClick,
       colors: { accentColor, textPrimary, backgroundHovered },
       defaults: { titleText },
       DefaultIcon: <StyledLinkIcon color={accentColor} />
     })
+    return React.isValidElement(node) ? (node as JSX.Element) : <span>{node as any}</span>
   }
   if (customComponent) {
-    return customComponent as unknown as JSX.Element
+    return React.isValidElement(customComponent) ? (
+      (customComponent as JSX.Element)
+    ) : (
+      <span>{customComponent as any}</span>
+    )
   }
 
   return (
