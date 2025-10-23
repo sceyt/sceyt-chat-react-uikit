@@ -988,7 +988,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       attachmentUrl: URL.createObjectURL(resizedFile),
                       tid,
                       type: fileType,
-                      size: resizedFile.size,
+                      size: file.size,
                       metadata: JSON.stringify({
                         tmb: metas.thumbnail,
                         szw: resizedFileData.newWidth,
