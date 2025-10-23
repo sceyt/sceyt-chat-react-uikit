@@ -1,6 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
-import { ReactComponent as LinkIcon } from '../../../assets/svg/linkIcon.svg'
+import { ReactComponent as LinkIcon } from '../../../assets/svg/linkIconWB.svg'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 
