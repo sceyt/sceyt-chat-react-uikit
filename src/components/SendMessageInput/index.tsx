@@ -869,14 +869,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (fileType === 'image') {
           resizeImage(file).then(async (resizedFile: any) => {
             const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+            const resizedImageFile = resizedFile.blob
+              ? new File([resizedFile.blob], resizedFile.file?.name || file.name, { type: 'image/jpeg' })
+              : file
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
-                data: file,
+                data: isMediaAttachment ? resizedImageFile : file,
                 cachedUrl,
                 upload: false,
                 type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
+                attachmentUrl: URL.createObjectURL((isMediaAttachment ? resizedImageFile : file) as any),
                 tid,
                 size: dataFromDb
                   ? dataFromDb.size
