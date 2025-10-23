@@ -3,6 +3,7 @@ import styled from 'styled-components'
 import { ReactComponent as LinkIcon } from '../../../assets/svg/linkIconWB.svg'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
+import { getInviteLinkOptions, InviteLinkListItemOptions } from '../../../helpers/channelHalper'
 
 interface Props {
   onClick?: () => void
@@ -15,12 +16,34 @@ function AddMembersListItemInviteLink({ onClick }: Props) {
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
 
+  const opts = getInviteLinkOptions()?.ListItemInviteLink as InviteLinkListItemOptions | undefined
+  const show = opts?.show !== false
+  const titleText = opts?.titleText || 'Invite link'
+  const CustomIcon = opts?.CustomIcon
+  const showIcon = opts?.showIcon !== false
+  const customRender = typeof opts?.render === 'function' ? opts?.render : null
+  const customComponent = opts?.component || opts?.CustomComponent
+
+  if (!show) return null
+
+  if (customRender) {
+    return customRender({
+      onClick,
+      colors: { accentColor, textPrimary, backgroundHovered },
+      defaults: { titleText },
+      DefaultIcon: <StyledLinkIcon color={accentColor} />
+    })
+  }
+  if (customComponent) {
+    return customComponent as unknown as JSX.Element
+  }
+
   return (
     <Row hoverBackground={backgroundHovered} onClick={onClick}>
       <IconCircle backgroundColor={backgroundHovered}>
-        <StyledLinkIcon color={accentColor} />
+        {showIcon && (CustomIcon || <StyledLinkIcon color={accentColor} />)}
       </IconCircle>
-      <Title color={textPrimary}>Invite link</Title>
+      <Title color={textPrimary}>{titleText}</Title>
     </Row>
   )
 }

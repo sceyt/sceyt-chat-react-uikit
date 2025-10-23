@@ -12,7 +12,12 @@ import { getChannelInviteKeysAC, regenerateChannelInviteKeyAC, updateChannelInvi
 import { channelInviteKeysSelector } from 'store/channel/selector'
 import { shallowEqual } from 'react-redux'
 import ResetLinkConfirmModal from './ResetLinkConfirmModal'
-import { getBaseUrlForInviteMembers } from 'helpers/channelHalper'
+import {
+  getBaseUrlForInviteMembers,
+  getInviteLinkOptions,
+  InviteKey,
+  InviteLinkModalOptions
+} from 'helpers/channelHalper'
 
 interface InviteLinkModalProps {
   onClose: () => void
@@ -45,15 +50,29 @@ export default function InviteLinkModal({
 
   const theme = useSelector(themeSelector) || 'light'
   const channelsInviteKeys: {
-    [key: string]: {
-      key: string
-      maxUses: number
-      expiresAt: number
-      accessPriorHistory: boolean
-    }[]
+    [key: string]: InviteKey[]
   } = useSelector(channelInviteKeysSelector, shallowEqual)
 
   const dispatch = useDispatch()
+
+  const options = (getInviteLinkOptions()?.InviteLinkModal || {}) as InviteLinkModalOptions
+  const customRender = typeof options.render === 'function' ? options.render : null
+  const customComponent = options.component || options.CustomComponent
+  const titleText = options.titleText || 'Invite link'
+  const linkLabel = options.linkLabel || 'Link'
+  const linkDescription = options.linkDescription || 'You can invite anyone to the chat using this link'
+  const shareButtonText = options.shareButtonText || 'Share'
+  const cancelButtonText = options.cancelButtonText || 'Cancel'
+  const showHistorySection = options.showHistorySection !== false
+  const showResetButton = options.showResetButton !== false
+  const historyTitle = options.historyTitle || 'History'
+  const showPreviousMessagesLabel = options.showPreviousMessagesLabel || 'Show Previous Messages'
+  const tabs = options.tabs || { link: { show: true, title: 'Group Link' }, qr: { show: true, title: 'QR Code' } }
+  const showLinkTab = tabs.link?.show !== false
+  const showQrTab = tabs.qr?.show !== false
+  const linkTabTitle = tabs.link?.title || 'Group Link'
+  const qrTabTitle = tabs.qr?.title || 'QR Code'
+  const qrHintText = options.qrHintText || 'Show or send this to anyone who wants to join this channel'
 
   const [activeTab, setActiveTab] = useState<'link' | 'qr'>('link')
   const [showResetConfirm, setShowResetConfirm] = useState(false)
@@ -103,12 +122,44 @@ export default function InviteLinkModal({
     () => (channelId && channelsInviteKeys?.[channelId] ? channelsInviteKeys[channelId] : []),
     [channelId, channelsInviteKeys]
   )
-  const inviteKey = useMemo(() => channelInviteKeys?.[0] || null, [channelInviteKeys])
+  const inviteKey = useMemo<InviteKey | null>(() => channelInviteKeys?.[0] || null, [channelInviteKeys])
 
   const inviteUrl = useMemo(() => link || `${getBaseUrlForInviteMembers()}/${inviteKey?.key || ''}`, [link, inviteKey])
 
   const handleShowPreviousMessages = () => {
     dispatch(updateChannelInviteKeyAC(channelId, inviteKey?.key || '', !inviteKey?.accessPriorHistory || false))
+  }
+
+  if (customRender) {
+    return customRender({
+      onClose,
+      onShare: () => handleShare(),
+      onReset: () => handleReset(),
+      inviteUrl,
+      channelId,
+      theme,
+      colors: {
+        accentColor,
+        textPrimary,
+        textSecondary,
+        background,
+        backgroundHovered,
+        surface1,
+        textOnPrimary,
+        border,
+        iconPrimary
+      },
+      inviteKey,
+      dispatch,
+      actions: {
+        getChannelInviteKeysAC,
+        regenerateChannelInviteKeyAC,
+        updateChannelInviteKeyAC
+      }
+    })
+  }
+  if (customComponent) {
+    return customComponent as unknown as JSX.Element
   }
 
   return (
@@ -117,39 +168,45 @@ export default function InviteLinkModal({
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
           <CloseIcon onClick={onClose} color={iconPrimary} />
           <PopupName color={textPrimary} marginBottom='16px'>
-            Invite link
+            {titleText}
           </PopupName>
 
-          <Tabs borderColor={border} backgroundColor={surface1}>
-            <TabButton
-              type='button'
-              active={activeTab === 'link'}
-              onClick={() => setActiveTab('link')}
-              activeColor={textPrimary}
-              inactiveColor={textSecondary}
-              activeBackgroundColor={background}
-              backgroundColor={backgroundHovered}
-            >
-              Group Link
-            </TabButton>
-            <TabButton
-              type='button'
-              active={activeTab === 'qr'}
-              onClick={() => setActiveTab('qr')}
-              activeColor={textPrimary}
-              inactiveColor={textSecondary}
-              activeBackgroundColor={background}
-              backgroundColor={backgroundHovered}
-            >
-              QR Code
-            </TabButton>
-          </Tabs>
+          {(showLinkTab || showQrTab) && (
+            <Tabs borderColor={border} backgroundColor={surface1}>
+              {showLinkTab && (
+                <TabButton
+                  type='button'
+                  active={activeTab === 'link'}
+                  onClick={() => setActiveTab('link')}
+                  activeColor={textPrimary}
+                  inactiveColor={textSecondary}
+                  activeBackgroundColor={background}
+                  backgroundColor={backgroundHovered}
+                >
+                  {linkTabTitle}
+                </TabButton>
+              )}
+              {showQrTab && (
+                <TabButton
+                  type='button'
+                  active={activeTab === 'qr'}
+                  onClick={() => setActiveTab('qr')}
+                  activeColor={textPrimary}
+                  inactiveColor={textSecondary}
+                  activeBackgroundColor={background}
+                  backgroundColor={backgroundHovered}
+                >
+                  {qrTabTitle}
+                </TabButton>
+              )}
+            </Tabs>
+          )}
 
           {activeTab === 'link' ? (
             <React.Fragment>
-              <Description color={textSecondary}>You can invite anyone to the chat using this link</Description>
+              <Description color={textSecondary}>{linkDescription}</Description>
 
-              <FieldLabel color={textSecondary}>Link</FieldLabel>
+              <FieldLabel color={textSecondary}>{linkLabel}</FieldLabel>
               <LinkField borderColor={border} backgroundColor={surface1}>
                 <LinkInput value={inviteUrl} readOnly color={textPrimary} />
                 <CopyButton onClick={handleCopy} aria-label='Copy invite link'>
@@ -157,21 +214,25 @@ export default function InviteLinkModal({
                 </CopyButton>
               </LinkField>
 
-              <SectionTitle color={textSecondary}>History</SectionTitle>
-              <HistoryRow>
-                <span>
-                  <FieldLabel color={textPrimary}>Show Previous Messages</FieldLabel>
-                </span>
-                <Switch
-                  onClick={handleShowPreviousMessages}
-                  active={inviteKey?.accessPriorHistory || false}
-                  accent={accentColor}
-                />
-              </HistoryRow>
+              {showHistorySection && <SectionTitle color={textSecondary}>{historyTitle}</SectionTitle>}
+              {showHistorySection && (
+                <HistoryRow>
+                  <span>
+                    <FieldLabel color={textPrimary}>{showPreviousMessagesLabel}</FieldLabel>
+                  </span>
+                  <Switch
+                    onClick={handleShowPreviousMessages}
+                    active={inviteKey?.accessPriorHistory || false}
+                    accent={accentColor}
+                  />
+                </HistoryRow>
+              )}
 
-              <ResetLink type='button' onClick={handleReset}>
-                Reset link
-              </ResetLink>
+              {showResetButton && (
+                <ResetLink type='button' onClick={handleReset}>
+                  {options.resetButtonText || 'Reset link'}
+                </ResetLink>
+              )}
             </React.Fragment>
           ) : (
             <React.Fragment>
@@ -186,13 +247,13 @@ export default function InviteLinkModal({
                 />
                 <LogoIconCont>{SVGLogoIcon}</LogoIconCont>
               </QRCodeBox>
-              <QrHint color={textSecondary}>Show or send this to anyone who wants to join this channel</QrHint>
+              <QrHint color={textSecondary}>{qrHintText}</QrHint>
             </React.Fragment>
           )}
         </PopupBody>
         <PopupFooter backgroundColor={surface1}>
           <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={onClose}>
-            Cancel
+            {cancelButtonText}
           </Button>
           <Button
             type='button'
@@ -201,7 +262,7 @@ export default function InviteLinkModal({
             borderRadius='8px'
             onClick={handleShare}
           >
-            Share
+            {shareButtonText}
           </Button>
         </PopupFooter>
       </Popup>

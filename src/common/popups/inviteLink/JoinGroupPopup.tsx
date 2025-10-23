@@ -10,6 +10,7 @@ import { makeUsername } from 'helpers/message'
 import { contactsMapSelector } from 'store/user/selector'
 import { shallowEqual } from 'react-redux'
 import { useSelector } from 'store/hooks'
+import { getInviteLinkOptions, JoinGroupPopupOptions, MemberSummary } from 'helpers/channelHalper'
 
 interface IProps {
   onClose: () => void
@@ -27,7 +28,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
   } = useColor()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
 
-  const members = useMemo(
+  const members = useMemo<MemberSummary[]>(
     () =>
       channel.members.map((m) => ({
         avatarUrl: (m as any)?.user?.profile?.avatar || '',
@@ -48,6 +49,41 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
     return extraCount > 0 ? `${base} and ${extraCount} others` : base
   }, [firstMembers, extraCount])
 
+  const options = (getInviteLinkOptions()?.JoinGroupPopup || {}) as JoinGroupPopupOptions
+  const show = options.show !== false
+  const customRender = typeof options.render === 'function' ? options.render : null
+  const customComponent = options.component || options.CustomComponent
+  const titleText = options.titleText || channel.subject
+  const subtitleText = options.subtitleText || 'Group chat invite'
+  const joinButtonText = options.joinButtonText || 'Join Group'
+  const showMembersAvatars = options.showMembersAvatars !== false
+  const showMembersLine = options.showMembersLine !== false
+
+  if (!show) return null
+
+  if (customRender) {
+    return customRender({
+      onClose,
+      onJoin,
+      channel,
+      themeColors: {
+        textPrimary,
+        textSecondary,
+        background,
+        iconPrimary,
+        surface1
+      },
+      contactsMap,
+      members,
+      firstMembers,
+      extraCount,
+      membersLine
+    }) as unknown as JSX.Element
+  }
+  if (customComponent) {
+    return customComponent as unknown as JSX.Element
+  }
+
   return (
     <PopupContainer>
       <Popup maxWidth='400px' width='400px' height='383px' padding='0' backgroundColor={background}>
@@ -64,28 +100,30 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
             />
           </TopAvatar>
 
-          <Title color={textPrimary}>{channel.subject}</Title>
-          <Subtitle color={textPrimary}>Group chat invite</Subtitle>
+          <Title color={textPrimary}>{titleText}</Title>
+          <Subtitle color={textPrimary}>{subtitleText}</Subtitle>
 
-          <MembersRow>
-            {firstMembers.map((m, idx) => (
-              <MemberAvatar key={m.id} index={idx} borderColor={background}>
-                <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={40} textSize={12} setDefaultAvatar />
-              </MemberAvatar>
-            ))}
-            {extraCount > 0 && (
-              <ExtraBadge
-                borderColor={background}
-                backgroundColor={surface1}
-                color={textPrimary}
-              >{`+${extraCount}`}</ExtraBadge>
-            )}
-          </MembersRow>
-          {membersLine && <MembersText color={textSecondary}>{membersLine}</MembersText>}
+          {showMembersAvatars && (
+            <MembersRow>
+              {firstMembers.map((m, idx) => (
+                <MemberAvatar key={m.id} index={idx} borderColor={background}>
+                  <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={40} textSize={12} setDefaultAvatar />
+                </MemberAvatar>
+              ))}
+              {extraCount > 0 && (
+                <ExtraBadge
+                  borderColor={background}
+                  backgroundColor={surface1}
+                  color={textPrimary}
+                >{`+${extraCount}`}</ExtraBadge>
+              )}
+            </MembersRow>
+          )}
+          {showMembersLine && membersLine && <MembersText color={textSecondary}>{membersLine}</MembersText>}
 
           <Center>
             <Button type='button' color={'#fff'} backgroundColor={'#0DBD8B'} borderRadius='8px' onClick={onJoin}>
-              Join Group
+              {joinButtonText}
             </Button>
           </Center>
         </PopupBody>
