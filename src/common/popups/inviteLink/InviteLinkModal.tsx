@@ -102,12 +102,16 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
     setOpenForwardPopup(false)
 
     for (const channelId of channelIds) {
+      const channel = getChannelFromMap(channelId)
       if (shareMode === 'link') {
+        const linkAttachmentBuilder = channel.createAttachmentBuilder(inviteUrl, attachmentTypes.link)
+        const linkAttachmentToSend = linkAttachmentBuilder.setName('Invite link').setUpload(false).create()
         const message = {
           metadata: '',
           body: inviteUrl,
           mentionedUsers: [],
-          type: 'text'
+          type: 'text',
+          attachments: [linkAttachmentToSend]
         }
         dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
       } else {
@@ -141,7 +145,6 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
               }
             ]
           }
-          const channel = getChannelFromMap(channelId)
           const attachmentsToSend = await handleUploadAttachments(
             [
               {
@@ -164,7 +167,15 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
           dispatch(forwardMessageAC({ ...message, attachments: attachmentsToSend }, channelId, connectionStatus, false))
         } catch (e) {
           console.log('error', e)
-          const message = { metadata: '', body: inviteUrl, mentionedUsers: [], type: 'text' }
+          const linkAttachmentBuilder = channel.createAttachmentBuilder(inviteUrl, attachmentTypes.link)
+          const linkAttachmentToSend = linkAttachmentBuilder.setName('Invite link').setUpload(false).create()
+          const message = {
+            metadata: '',
+            body: inviteUrl,
+            mentionedUsers: [],
+            type: 'text',
+            attachments: [linkAttachmentToSend]
+          }
           dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
         }
       }
