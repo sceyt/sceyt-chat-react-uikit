@@ -878,7 +878,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 type: isMediaAttachment ? fileType : 'file',
                 attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
                 tid,
-                size: dataFromDb ? dataFromDb.size : file.size,
+                size: dataFromDb
+                  ? dataFromDb.size
+                  : isMediaAttachment && resizedFile.blob
+                    ? (resizedFile.blob as Blob).size
+                    : file.size,
                 metadata: {
                   ...(dataFromDb && dataFromDb.metadata),
                   szw: imageWidth,
@@ -981,7 +985,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       attachmentUrl: URL.createObjectURL(resizedFile),
                       tid,
                       type: fileType,
-                      size: file.size,
+                      size: resizedFile.size,
                       metadata: JSON.stringify({
                         tmb: metas.thumbnail,
                         szw: resizedFileData.newWidth,
