@@ -14,28 +14,26 @@ import { shallowEqual } from 'react-redux'
 import ResetLinkConfirmModal from './ResetLinkConfirmModal'
 import {
   getBaseUrlForInviteMembers,
+  getChannelFromMap,
   getInviteLinkOptions,
   InviteKey,
   InviteLinkModalOptions
 } from 'helpers/channelHalper'
+import ForwardMessagePopup from '../forwardMessage'
+import { forwardMessageAC } from 'store/message/actions'
+import { connectionStatusSelector } from 'store/user/selector'
+import { handleUploadAttachments } from 'store/message/saga'
+import { attachmentTypes } from 'helpers/constants'
 
 interface InviteLinkModalProps {
   onClose: () => void
   link?: string
-  onShare?: (link: string) => void
   onReset?: () => void
   SVGLogoIcon?: React.ReactNode
   channelId: string
 }
 
-export default function InviteLinkModal({
-  onClose,
-  link,
-  onShare,
-  onReset,
-  SVGLogoIcon,
-  channelId
-}: InviteLinkModalProps) {
+export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, channelId }: InviteLinkModalProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -49,6 +47,7 @@ export default function InviteLinkModal({
   } = useColor()
 
   const theme = useSelector(themeSelector) || 'light'
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const channelsInviteKeys: {
     [key: string]: InviteKey[]
   } = useSelector(channelInviteKeysSelector, shallowEqual)
@@ -76,6 +75,8 @@ export default function InviteLinkModal({
 
   const [activeTab, setActiveTab] = useState<'link' | 'qr'>('link')
   const [showResetConfirm, setShowResetConfirm] = useState(false)
+  const [openForwardPopup, setOpenForwardPopup] = useState(false)
+  const [shareMode, setShareMode] = useState<'link' | 'qr'>('link')
 
   const handleCopy = async () => {
     try {
@@ -86,20 +87,88 @@ export default function InviteLinkModal({
   }
 
   const handleShare = async () => {
-    if (onShare) {
-      onShare(inviteUrl)
+    setShareMode(activeTab)
+    setOpenForwardPopup(true)
+  }
+
+  const handleForwardChannels = async (channelIds: string[]) => {
+    if (!channelIds?.length) {
+      setOpenForwardPopup(false)
       return
     }
-    try {
-      if ((navigator as any).share) {
-        await (navigator as any).share({ text: inviteUrl, url: inviteUrl })
+    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+      inviteUrl
+    )}&size=200x200&ecc=H&margin=12&color=000000&bgcolor=FFFFFF`
+    setOpenForwardPopup(false)
+
+    for (const channelId of channelIds) {
+      if (shareMode === 'link') {
+        const message = {
+          metadata: '',
+          body: inviteUrl,
+          mentionedUsers: [],
+          type: 'text'
+        }
+        dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
       } else {
-        await navigator.clipboard.writeText(inviteUrl)
+        try {
+          const resp = await fetch(qrImageUrl)
+          const blob = await resp.blob()
+          const file = new File([blob], 'invite-qr.png', { type: 'image/png' })
+          const localUrl = URL.createObjectURL(file)
+
+          const message = {
+            metadata: '',
+            body: '',
+            mentionedUsers: [],
+            type: 'text',
+            attachments: [
+              {
+                name: 'invite-qr.png',
+                data: file,
+                upload: false,
+                type: `${file.type}`,
+                url: {
+                  type: `${file.type}`,
+                  data: file
+                },
+                createdAt: new Date(),
+                progress: 0,
+                completion: 0,
+                messageId: '',
+                size: file.size,
+                attachmentUrl: localUrl
+              }
+            ]
+          }
+          const channel = getChannelFromMap(channelId)
+          const attachmentsToSend = await handleUploadAttachments(
+            [
+              {
+                name: 'invite-qr.png',
+                data: file,
+                upload: false,
+                type: attachmentTypes.image,
+                url: file,
+                createdAt: new Date(),
+                progress: 0,
+                completion: 0,
+                messageId: '',
+                size: file.size,
+                attachmentUrl: localUrl
+              }
+            ],
+            message as any,
+            channel
+          )
+          dispatch(forwardMessageAC({ ...message, attachments: attachmentsToSend }, channelId, connectionStatus, false))
+        } catch (e) {
+          console.log('error', e)
+          const message = { metadata: '', body: inviteUrl, mentionedUsers: [], type: 'text' }
+          dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
+        }
       }
-    } catch (e) {
-      // ignore
     }
-    onClose()
   }
 
   const handleReset = () => {
@@ -268,6 +337,14 @@ export default function InviteLinkModal({
       </Popup>
       {showResetConfirm && (
         <ResetLinkConfirmModal onCancel={() => setShowResetConfirm(false)} onConfirm={handleConfirmReset} />
+      )}
+      {openForwardPopup && (
+        <ForwardMessagePopup
+          title={'Share invite'}
+          buttonText={'Share'}
+          togglePopup={() => setOpenForwardPopup(false)}
+          handleForward={handleForwardChannels}
+        />
       )}
     </PopupContainer>
   )
