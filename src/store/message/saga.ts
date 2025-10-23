@@ -126,7 +126,7 @@ import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
 
-const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
+export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
     attachments.map(async (attachment) => {
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
@@ -654,7 +654,7 @@ function* forwardMessage(action: IAction): any {
   // let messageForCatch = {}
   try {
     const { payload } = action
-    const { message, channelId, connectionState } = payload
+    const { message, channelId, connectionState, isForward } = payload
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
@@ -703,14 +703,17 @@ function* forwardMessage(action: IAction): any {
           createdAt: new Date(Date.now())
         })
       )
-      if (message.forwardingDetails) {
-        pendingMessage.forwardingDetails.user = message.forwardingDetails.user
-        pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
-      } else {
-        pendingMessage.forwardingDetails.user = message.user
-        pendingMessage.forwardingDetails.channelId = channelId
+      if (isForward) {
+        if (message.forwardingDetails) {
+          pendingMessage.forwardingDetails.user = message.forwardingDetails.user
+          pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
+        } else {
+          pendingMessage.forwardingDetails.user = message.user
+          pendingMessage.forwardingDetails.channelId = channelId
+        }
+        pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
       }
-      pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
+
       const activeChannelId = getActiveChannelId()
       const isCachedChannel = checkChannelExistsOnMessagesMap(channelId)
       if (channelId === activeChannelId) {

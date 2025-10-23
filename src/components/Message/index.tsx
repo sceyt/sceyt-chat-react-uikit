@@ -181,7 +181,7 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {}
-}: IMessageProps) => {   
+}: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,

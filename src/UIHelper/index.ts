@@ -171,12 +171,7 @@ export function generateAvatarColor(itemName: any, theme: 'light' | 'dark') {
   if (itemName && itemName !== '') {
     const hash = md5(itemName).toString().padStart(32, '0').slice(-6)
     const hashInt = parseInt(hash, 16)
-    // if (itemName === 't😀') {
-    // }
     const colorIndex = hashInt % avatarColors.length
-    // if (colorIndex >= avatarColors.length) {
-    //   colorIndex -= avatarColors.length
-    // }
     return avatarColors[colorIndex]
   }
   return null

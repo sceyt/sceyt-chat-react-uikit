@@ -158,7 +158,9 @@ const Message = ({
                   }`
                 : message.body === 'LG'
                   ? ' left the group'
-                  : ''}
+                  : message.body === 'JL'
+                    ? ` joined via invite link`
+                    : ''}
       </span>
     </Container>
   )
