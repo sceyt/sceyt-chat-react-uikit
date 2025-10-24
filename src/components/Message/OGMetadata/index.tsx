@@ -22,7 +22,7 @@ const OGMetadata = ({
   attachments,
   state,
   incoming,
-  ogLayoutOrder,
+  ogLayoutOrder = 'link-first',
   ogShowUrl = true,
   ogShowTitle = true,
   ogShowDescription = true,
