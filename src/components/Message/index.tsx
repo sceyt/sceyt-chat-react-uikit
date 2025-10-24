@@ -181,7 +181,7 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   ogMetadataProps = {
-    ogLayoutOrder: 'link-first',
+    ogLayoutOrder: 'og-first',
     ogShowUrl: true,
     ogShowTitle: true,
     ogShowDescription: true,
