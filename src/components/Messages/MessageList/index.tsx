@@ -328,6 +328,13 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  ogMetadataProps?: {
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+  }
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -465,7 +472,14 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  ogMetadataProps = {
+    ogLayoutOrder: 'link-first',
+    ogShowUrl: true,
+    ogShowTitle: true,
+    ogShowDescription: true,
+    ogShowFavicon: true
+  }
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1389,6 +1403,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                           showInfoMessageProps={showInfoMessageProps}
+                          ogMetadataProps={ogMetadataProps}
                         />
                       </MessageWrapper>
                     )}

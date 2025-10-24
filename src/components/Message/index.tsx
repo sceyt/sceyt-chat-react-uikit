@@ -180,8 +180,15 @@ const Message = ({
   messageTextLineHeight,
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
+  ogMetadataProps = {
+    ogLayoutOrder: 'link-first',
+    ogShowUrl: true,
+    ogShowTitle: true,
+    ogShowDescription: true,
+    ogShowFavicon: true
+  },
   showInfoMessageProps = {}
-}: IMessageProps) => {   
+}: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
@@ -758,6 +765,7 @@ const Message = ({
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
             handleOpenUserProfile={handleOpenUserProfile}
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+            ogMetadataProps={ogMetadataProps}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (

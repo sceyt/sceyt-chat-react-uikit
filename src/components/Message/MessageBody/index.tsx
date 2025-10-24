@@ -158,6 +158,13 @@ interface IMessageBodyProps {
   messageTextRef: React.RefObject<HTMLSpanElement>
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: {
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+  }
 }
 
 const MessageBody = ({
@@ -283,7 +290,8 @@ const MessageBody = ({
   handleCreateChat,
   messageTextRef,
   handleOpenUserProfile,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  ogMetadataProps
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -343,6 +351,8 @@ const MessageBody = ({
   )
 
   const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
+  const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
+  const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment = useMemo(
     () =>
@@ -644,8 +654,17 @@ const MessageBody = ({
         incoming={message.incoming}
         linkColor={linkColor}
       >
-        {linkAttachment && (
-          <OGMetadata attachments={[linkAttachment]} state={message.state} incoming={message.incoming} />
+        {ogContainerFirst && linkAttachment && (
+          <OGMetadata
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogLayoutOrder={(ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'link-first'}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+          />
         )}
         <span ref={messageTextRef}>
           {MessageTextFormat({
@@ -663,6 +682,18 @@ const MessageBody = ({
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
           ''
+        )}
+        {!ogContainerFirst && linkAttachment && (
+          <OGMetadata
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogLayoutOrder={(ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'link-first'}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+          />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
         !notLinkAttachment &&
@@ -696,7 +727,7 @@ const MessageBody = ({
             messageStatusSize={messageStatusSize}
             messageStatusColor={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
                   ? textOnPrimary
                   : messageStateColor || textSecondary
@@ -716,9 +747,9 @@ const MessageBody = ({
             }
             messageTimeColorOnAttachment={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary 
+                  ? textOnPrimary
                   : textSecondary
             }
           />
@@ -904,7 +935,13 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.messageActionsShow === nextProps.messageActionsShow &&
     prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
     prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
-    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen
+    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen &&
+    (prevProps.ogMetadataProps?.ogLayoutOrder || 'og-first') ===
+      (nextProps.ogMetadataProps?.ogLayoutOrder || 'og-first') &&
+    prevProps.ogMetadataProps?.ogShowUrl === nextProps.ogMetadataProps?.ogShowUrl &&
+    prevProps.ogMetadataProps?.ogShowTitle === nextProps.ogMetadataProps?.ogShowTitle &&
+    prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
+    prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon
   )
 })
 
