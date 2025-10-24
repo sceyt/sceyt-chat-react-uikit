@@ -206,6 +206,13 @@ export interface IMessageProps {
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: {
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+  }
   showInfoMessageProps?: {
     togglePopup?: () => void
     labels?: ILabels
