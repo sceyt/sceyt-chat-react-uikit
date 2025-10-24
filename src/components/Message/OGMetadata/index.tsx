@@ -139,7 +139,6 @@ const OGMetadata = ({
 
   return (
     <>
-      {/* === LINK-FIRST: Message → OG Card === */}
       {ogLayoutOrder !== 'og-first' && (
         <OGMetadataContainer
           showOGMetadata={!!showOGMetadata}
@@ -198,7 +197,6 @@ const OGMetadata = ({
         </OGMetadataContainer>
       )}
 
-      {/* === OG-FIRST: OG Card → Message === */}
       {ogLayoutOrder === 'og-first' && (
         <OGMetadataContainer
           showOGMetadata={!!showOGMetadata}
