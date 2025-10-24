@@ -197,7 +197,7 @@ const OGMetadata = ({
                   src={metadata?.og?.image?.[0]?.url}
                   alt='OG metadata image'
                   imageWidth={400}
-                  imageHeight={calculatedImageHeight}
+                  imageHeight={240}
                   shouldAnimate={shouldAnimate}
                 />
               ) : null}

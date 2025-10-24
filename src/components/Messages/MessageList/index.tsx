@@ -474,7 +474,7 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps = {
-    ogLayoutOrder: 'link-first',
+    ogLayoutOrder: 'og-first',
     ogShowUrl: true,
     ogShowTitle: true,
     ogShowDescription: true,
