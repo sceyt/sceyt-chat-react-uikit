@@ -138,7 +138,7 @@ const OGMetadata = ({
   }, [metadata?.imageWidth, metadata?.imageHeight])
 
   return (
-    <>
+    <React.Fragment>
       {ogLayoutOrder !== 'og-first' && (
         <OGMetadataContainer
           showOGMetadata={!!showOGMetadata}
@@ -254,7 +254,7 @@ const OGMetadata = ({
           </div>
         </OGMetadataContainer>
       )}
-    </>
+    </React.Fragment>
   )
 }
 
