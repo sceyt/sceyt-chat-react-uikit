@@ -285,8 +285,7 @@ const ImageContainer = styled.div<{
   shouldAnimate: boolean
 }>`
   width: 400px;
-  height: ${({ showOGMetadata, containerHeight }) =>
-    showOGMetadata && containerHeight ? `${containerHeight}px` : '0px'};
+  height: 240px;
   max-width: 400px;
   max-height: 240px;
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
