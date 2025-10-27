@@ -221,8 +221,6 @@ const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: strin
   grid-template-columns: 1fr;
   background-color: ${({ bgColor }) => bgColor};
   border-radius: 8px;
-  margin-bottom: 0.4rem;
-  margin-top: 0.4rem;
   margin: 0.8rem auto;
   margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
   &:hover {
@@ -237,8 +235,6 @@ const ImageContainer = styled.div<{
   containerHeight: number
   shouldAnimate: boolean
 }>`
-  // width: 400px;
-  // height: 240px;
   max-width: 400px;
   max-height: 240px;
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
@@ -250,24 +246,9 @@ const ImageContainer = styled.div<{
 
 const OGText = styled.div<{ shouldAnimate: boolean }>`
   margin: 12px;
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    transition: all 0.2s ease;
-  `}
-`
-
-const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
-  font-weight: normal;
-  font-size: 13px;
-  padding: 0;
-  margin: 0 0 12px 0;
-  color: gray;
-  ${({ maxWidth }) =>
-    maxWidth &&
-    `
-    max-width: ${`${maxWidth}px`};
-  `}
+  display: flex;
+  flex-direction: column;
+  gap: 0; /* spacing is handled by element margins */
   ${({ shouldAnimate }) =>
     shouldAnimate &&
     `
@@ -278,12 +259,13 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   font-weight: bold;
   font-size: 13px;
-  display: flex;
-  align-items: center;
+  line-height: 16px;
+  margin: 0 0 4px 0;
+  padding: 0;
   ${({ maxWidth }) =>
     maxWidth &&
     `
-    max-width: ${`${maxWidth}px`};
+    max-width: ${maxWidth}px;
   `}
   ${({ shouldAnimate }) =>
     shouldAnimate &&
@@ -292,23 +274,25 @@ const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
   `}
 `
 
-const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean; color: string }>`
+const Desc = styled.p<{
+  maxWidth: number
+  shouldAnimate: boolean
+  color: string
+}>`
   font-weight: normal;
   font-size: 13px;
-  margin: 8px;
-  overflow: hidden;
-  display: -webkit-box;
-  font-weight: 400;
-  font-size: 13px;
   line-height: 16px;
-  letter-spacing: 0px;
-  color: ${(props) => props.color};
+  margin: 0 0 8px 0;
+  padding: 0;
+  color: ${({ color }) => color};
+  display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
+  overflow: hidden;
   ${({ maxWidth }) =>
     maxWidth &&
     `
-    max-width: ${`${maxWidth}px`};
+    max-width: ${maxWidth}px;
   `}
   ${({ shouldAnimate }) =>
     shouldAnimate &&
@@ -317,24 +301,30 @@ const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean; color: string 
   `}
 `
 
-const Img = styled.img<{ imageWidth?: number; imageHeight?: number; shouldAnimate: boolean }>`
-  //width: 100%;
-  // height: 100%;
+const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
+  font-weight: normal;
+  font-size: 13px;
+  line-height: 16px;
+  margin: 0 0 12px 0;
+  padding: 0;
+  color: gray;
+  ${({ maxWidth }) =>
+    maxWidth &&
+    `
+    max-width: ${maxWidth}px;
+  `}
+  ${({ shouldAnimate }) =>
+    shouldAnimate &&
+    `
+    transition: all 0.2s ease;
+  `}
+`
+
+const Img = styled.img<{ shouldAnimate: boolean }>`
   max-width: 100%;
+  height: auto;
   object-fit: cover;
   display: block;
   border-radius: inherit;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'opacity 0.2s ease' : 'none')};
 `
-
-// const Favicon = styled.img<{ shouldAnimate: boolean }>`
-//   ${({ shouldAnimate }) =>
-//     shouldAnimate &&
-//     `
-//     transition: all 0.2s ease;
-//   `}
-//   width: 24px;
-//   height: 24px;
-//   object-fit: contain;
-//   margin-right: 4px;
-// `
