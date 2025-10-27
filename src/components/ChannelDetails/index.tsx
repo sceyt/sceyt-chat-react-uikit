@@ -16,6 +16,7 @@ import usePermissions from '../../hooks/usePermissions'
 // Assets
 import { ReactComponent as ArrowLeft } from '../../assets/svg/arrowLeft.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
+import { ReactComponent as ArrowDownIcon } from '../../assets/svg/arrowDown.svg'
 import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
@@ -25,7 +26,7 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
-import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
+import { CloseIcon, SectionHeader, SubTitle, ItemNote } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
@@ -158,7 +159,8 @@ const Details = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -183,6 +185,8 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const detailsHeaderRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
+  const copyTooltipTimeoutRef = useRef<any>(null)
+  const [phoneCopied, setPhoneCopied] = useState<boolean>(false)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel =
@@ -248,12 +252,47 @@ const Details = ({
     }
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (copyTooltipTimeoutRef.current) {
+        clearTimeout(copyTooltipTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const handleTabChange = () => {
     if (detailsRef.current && detailsHeaderRef.current) {
       detailsRef.current.scrollTo({
         top: actionsHeight + detailsHeaderRef.current.offsetHeight,
         behavior: 'smooth'
       })
+    }
+  }
+
+  const handleCopyPhoneNumber = async () => {
+    const phone = directChannelUser?.id ? `+${directChannelUser.id}` : ''
+    if (!phone) return
+    try {
+      if (navigator && navigator.clipboard && navigator.clipboard.writeText) {
+        await navigator.clipboard.writeText(phone)
+      } else {
+        const textarea = document.createElement('textarea')
+        textarea.value = phone
+        textarea.setAttribute('readonly', '')
+        textarea.style.position = 'absolute'
+        textarea.style.left = '-9999px'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      setPhoneCopied(true)
+      if (copyTooltipTimeoutRef.current) {
+        clearTimeout(copyTooltipTimeoutRef.current)
+      }
+      copyTooltipTimeoutRef.current = setTimeout(() => setPhoneCopied(false), 1200)
+    } catch (e) {
+      // no-op
     }
   }
 
@@ -351,18 +390,33 @@ const Details = ({
               </ChannelNameWrapper>
 
               {isDirectChannel ? (
-                <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {showPhoneNumber && directChannelUser?.id
-                    ? `+${directChannelUser?.id}`
-                    : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                      ? ''
-                      : directChannelUser &&
-                        directChannelUser.presence &&
-                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                          ? 'Online'
-                          : directChannelUser.presence.lastActiveAt &&
-                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
-                </SubTitle>
+                <PhoneRow>
+                  <PhoneSubTitle
+                    role='button'
+                    title={showPhoneNumber && directChannelUser?.id ? 'Click to copy' : ''}
+                    color={textSecondary}
+                    fontSize={channelMembersFontSize}
+                    lineHeight={channelMembersLineHeight}
+                    onClick={showPhoneNumber && directChannelUser?.id ? handleCopyPhoneNumber : undefined}
+                  >
+                    {showPhoneNumber && directChannelUser?.id
+                      ? `+${directChannelUser?.id}`
+                      : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
+                        ? ''
+                        : directChannelUser &&
+                          directChannelUser.presence &&
+                          (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                            ? 'Online'
+                            : directChannelUser.presence.lastActiveAt &&
+                              userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  </PhoneSubTitle>
+                  {showPhoneNumber && directChannelUser?.id && phoneCopied && (
+                    <CopiedNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+                      Copied
+                      <ArrowDownIcon />
+                    </CopiedNote>
+                  )}
+                </PhoneRow>
               ) : (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
                   {activeChannel && activeChannel.memberCount} {displayMemberText}
@@ -619,4 +673,18 @@ const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>
   margin-left: 6px;
   cursor: pointer;
   color: #b2b6be;
+`
+
+const PhoneRow = styled.div`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+`
+
+const PhoneSubTitle = styled(SubTitle)`
+  cursor: pointer;
+`
+
+const CopiedNote = styled(ItemNote)<{ visible?: boolean }>`
+  pointer-events: none;
 `

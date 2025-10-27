@@ -696,7 +696,7 @@ const MessageBody = ({
             messageStatusSize={messageStatusSize}
             messageStatusColor={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
                   ? textOnPrimary
                   : messageStateColor || textSecondary
@@ -716,9 +716,9 @@ const MessageBody = ({
             }
             messageTimeColorOnAttachment={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary 
+                  ? textOnPrimary
                   : textSecondary
             }
           />
