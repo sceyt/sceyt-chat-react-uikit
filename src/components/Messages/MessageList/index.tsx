@@ -334,6 +334,7 @@ interface MessagesProps {
     ogShowTitle?: boolean
     ogShowDescription?: boolean
     ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
   }
 }
 
@@ -474,11 +475,12 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps = {
-    ogLayoutOrder: 'og-first',
+    ogLayoutOrder: 'link-first',
     ogShowUrl: true,
     ogShowTitle: true,
     ogShowDescription: true,
-    ogShowFavicon: true
+    ogShowFavicon: true,
+    order: { image: 1, title: 2, description: 3, link: 4 }
   }
 }) => {
   const {

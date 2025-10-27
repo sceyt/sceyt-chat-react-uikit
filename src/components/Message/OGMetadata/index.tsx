@@ -4,7 +4,7 @@ import styled from 'styled-components'
 import { getClient } from '../../../common/client'
 import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadataService'
 import { attachmentTypes } from '../../../helpers/constants'
-import { setOGMetadataAC, updateOGMetadataAC } from '../../../store/message/actions'
+import { setOGMetadataAC } from '../../../store/message/actions'
 import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
@@ -26,7 +26,8 @@ const OGMetadata = ({
   ogShowUrl = true,
   ogShowTitle = true,
   ogShowDescription = true,
-  ogShowFavicon = true
+  // ogShowFavicon = false,
+  order = { image: 1, title: 2, description: 3, link: 4 }
 }: {
   attachments: IAttachment[]
   state: string
@@ -36,6 +37,7 @@ const OGMetadata = ({
   ogShowTitle?: boolean
   ogShowDescription?: boolean
   ogShowFavicon?: boolean
+  order?: { image?: number; title?: number; description?: number; link?: number }
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -53,7 +55,7 @@ const OGMetadata = ({
   }, [oGMetadata, attachment?.url])
 
   const [imageLoadError, setImageLoadError] = useState(false)
-  const [faviconLoadError, setFaviconLoadError] = useState(false)
+  // const [faviconLoadError, setFaviconLoadError] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
   const handleMetadata = useCallback((metadata: IOGMetadata | null) => {
@@ -101,7 +103,6 @@ const OGMetadata = ({
     if (attachment?.id && attachment?.url && !metadata) {
       setShouldAnimate(true)
       const url = attachment?.url
-
       if (url) {
         getMetadata(url)
           .then(async (cachedMetadata) => {
@@ -137,124 +138,77 @@ const OGMetadata = ({
     return metadata?.imageHeight / (metadata?.imageWidth / 400)
   }, [metadata?.imageWidth, metadata?.imageHeight])
 
+  if (!showOGMetadata) return null
+
+  const hasImage = metadata?.og?.image?.[0]?.url && !imageLoadError
+  const resolvedOrder = order || { image: 1, title: 2, description: 3, link: 4 }
+
+  const elements = [
+    hasImage
+      ? {
+          key: 'image',
+          order: resolvedOrder?.image ?? 1,
+          render: (
+            <ImageContainer
+              showOGMetadata={!!showOGMetadata}
+              containerWidth={400}
+              containerHeight={calculatedImageHeight}
+              shouldAnimate={shouldAnimate}
+            >
+              <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
+            </ImageContainer>
+          )
+        }
+      : null,
+    {
+      key: 'title',
+      order: resolvedOrder?.title ?? 2,
+      render: ogShowTitle && metadata?.og?.title && (
+        <Title maxWidth={400} shouldAnimate={shouldAnimate}>
+          <span>{metadata?.og?.title}</span>
+        </Title>
+      )
+    },
+    {
+      key: 'description',
+      order: resolvedOrder?.description ?? 3,
+      render: ogShowDescription && metadata?.og?.description && (
+        <Desc maxWidth={400} shouldAnimate={shouldAnimate} color={textSecondary}>
+          {metadata?.og?.description}
+        </Desc>
+      )
+    },
+    {
+      key: 'link',
+      order: resolvedOrder?.link ?? 4,
+      render: ogShowUrl && (
+        <Url maxWidth={400} shouldAnimate={shouldAnimate}>
+          {ogUrl}
+        </Url>
+      )
+    }
+  ]
+    .filter((el): el is { key: string; order: number; render: JSX.Element | false } => !!el)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
+
+  const content = (
+    <OGText shouldAnimate={shouldAnimate}>
+      {elements.map((el) => (
+        <React.Fragment key={el.key}>{el.render}</React.Fragment>
+      ))}
+    </OGText>
+  )
+
   return (
-    <React.Fragment>
-      {ogLayoutOrder !== 'og-first' && (
-        <OGMetadataContainer
-          showOGMetadata={!!showOGMetadata}
-          bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
-        >
-          <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
-            <ImageContainer
-              showOGMetadata={!!showOGMetadata && !imageLoadError}
-              containerWidth={400}
-              containerHeight={calculatedImageHeight}
-              shouldAnimate={shouldAnimate}
-            >
-              {metadata?.og?.image?.[0]?.url && !imageLoadError && (
-                <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
-              )}
-            </ImageContainer>
-
-            {showOGMetadata && (
-              <OGText shouldAnimate={shouldAnimate}>
-                {ogShowTitle && metadata?.og?.title && (
-                  <Title maxWidth={400} shouldAnimate={shouldAnimate}>
-                    {ogShowFavicon && metadata?.og?.favicon?.url && !faviconLoadError && (
-                      <Favicon
-                        shouldAnimate={shouldAnimate}
-                        src={metadata?.og?.favicon?.url}
-                        onLoad={() => setFaviconLoadError(false)}
-                        onError={() => {
-                          dispatch(
-                            updateOGMetadataAC(attachment?.url, {
-                              ...metadata,
-                              og: { ...metadata?.og, favicon: { url: '' } }
-                            })
-                          )
-                          setFaviconLoadError(true)
-                        }}
-                      />
-                    )}
-                    <span>{metadata?.og?.title}</span>
-                  </Title>
-                )}
-
-                {ogShowDescription && metadata?.og?.description && (
-                  <Desc maxWidth={400} shouldAnimate={shouldAnimate} color={textSecondary}>
-                    {metadata?.og?.description}
-                  </Desc>
-                )}
-
-                {ogShowUrl && (
-                  <Url maxWidth={400} shouldAnimate={shouldAnimate}>
-                    {ogUrl}
-                  </Url>
-                )}
-              </OGText>
-            )}
-          </div>
-        </OGMetadataContainer>
-      )}
-
-      {ogLayoutOrder === 'og-first' && (
-        <OGMetadataContainer
-          showOGMetadata={!!showOGMetadata}
-          bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
-        >
-          <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
-            <ImageContainer
-              showOGMetadata={!!showOGMetadata && !imageLoadError}
-              containerWidth={400}
-              containerHeight={calculatedImageHeight}
-              shouldAnimate={shouldAnimate}
-            >
-              {metadata?.og?.image?.[0]?.url && !imageLoadError && (
-                <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
-              )}
-            </ImageContainer>
-
-            {showOGMetadata && (
-              <OGText shouldAnimate={shouldAnimate}>
-                {ogShowTitle && metadata?.og?.title && (
-                  <Title maxWidth={400} shouldAnimate={shouldAnimate}>
-                    {ogShowFavicon && metadata?.og?.favicon?.url && !faviconLoadError && (
-                      <Favicon
-                        shouldAnimate={shouldAnimate}
-                        src={metadata?.og?.favicon?.url}
-                        onLoad={() => setFaviconLoadError(false)}
-                        onError={() => {
-                          dispatch(
-                            updateOGMetadataAC(attachment?.url, {
-                              ...metadata,
-                              og: { ...metadata?.og, favicon: { url: '' } }
-                            })
-                          )
-                          setFaviconLoadError(true)
-                        }}
-                      />
-                    )}
-                    <span>{metadata?.og?.title}</span>
-                  </Title>
-                )}
-
-                {ogShowDescription && metadata?.og?.description && (
-                  <Desc maxWidth={400} shouldAnimate={shouldAnimate} color={textSecondary}>
-                    {metadata?.og?.description}
-                  </Desc>
-                )}
-
-                {ogShowUrl && (
-                  <Url maxWidth={400} shouldAnimate={shouldAnimate}>
-                    {ogUrl}
-                  </Url>
-                )}
-              </OGText>
-            )}
-          </div>
-        </OGMetadataContainer>
-      )}
-    </React.Fragment>
+    <OGMetadataContainer
+      showOGMetadata={!!showOGMetadata}
+      bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
+    >
+      {ogLayoutOrder === 'og-first' && content}
+      <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
+        {ogLayoutOrder !== 'og-first' && content}
+      </div>
+    </OGMetadataContainer>
   )
 }
 
@@ -263,7 +217,6 @@ export { OGMetadata }
 const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: string }>`
   min-width: 294px;
   max-width: 400px;
-  // height: ${({ showOGMetadata }) => (showOGMetadata ? '416px' : 'auto')};
   display: grid;
   grid-template-columns: 1fr;
   background-color: ${({ bgColor }) => bgColor};
@@ -284,19 +237,18 @@ const ImageContainer = styled.div<{
   containerHeight: number
   shouldAnimate: boolean
 }>`
-  width: 400px;
-  height: 240px;
+  // width: 400px;
+  // height: 240px;
   max-width: 400px;
   max-height: 240px;
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   overflow: hidden;
   margin: 0 auto;
-  border-radius: 8px 8px 0 0;
+  border-radius: 8px;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'height 0.2s ease, opacity 0.2s ease' : 'none')};
 `
 
 const OGText = styled.div<{ shouldAnimate: boolean }>`
-  // padding: 0.5rem;
   margin: 12px;
   ${({ shouldAnimate }) =>
     shouldAnimate &&
@@ -324,13 +276,8 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
 `
 
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
-  font-weight: 500;
-  font-size: 14px;
-  line-height: 18px;
-  letter-spacing: 0px;
   font-weight: bold;
   font-size: 13px;
-  padding: 0;
   display: flex;
   align-items: center;
   ${({ maxWidth }) =>
@@ -348,7 +295,6 @@ const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
 const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean; color: string }>`
   font-weight: normal;
   font-size: 13px;
-  // padding: 0;
   margin: 8px;
   overflow: hidden;
   display: -webkit-box;
@@ -372,22 +318,23 @@ const Desc = styled.p<{ maxWidth: number; shouldAnimate: boolean; color: string 
 `
 
 const Img = styled.img<{ imageWidth?: number; imageHeight?: number; shouldAnimate: boolean }>`
-  width: 100%;
-  height: 100%;
+  //width: 100%;
+  // height: 100%;
+  max-width: 100%;
   object-fit: cover;
   display: block;
   border-radius: inherit;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'opacity 0.2s ease' : 'none')};
 `
 
-const Favicon = styled.img<{ shouldAnimate: boolean }>`
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    transition: all 0.2s ease;
-  `}
-  width: 24px;
-  height: 24px;
-  object-fit: contain;
-  margin-right: 4px;
-`
+// const Favicon = styled.img<{ shouldAnimate: boolean }>`
+//   ${({ shouldAnimate }) =>
+//     shouldAnimate &&
+//     `
+//     transition: all 0.2s ease;
+//   `}
+//   width: 24px;
+//   height: 24px;
+//   object-fit: contain;
+//   margin-right: 4px;
+// `

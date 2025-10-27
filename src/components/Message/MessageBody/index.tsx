@@ -164,6 +164,7 @@ interface IMessageBodyProps {
     ogShowTitle?: boolean
     ogShowDescription?: boolean
     ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
   }
 }
 
@@ -664,6 +665,7 @@ const MessageBody = ({
             ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
             ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
             ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 3, title: 1, description: 2, link: 4 }}
           />
         )}
         <span ref={messageTextRef}>
@@ -693,6 +695,7 @@ const MessageBody = ({
             ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
             ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
             ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 1, title: 2, description: 3, link: 4 }}
           />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
@@ -941,7 +944,8 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.ogMetadataProps?.ogShowUrl === nextProps.ogMetadataProps?.ogShowUrl &&
     prevProps.ogMetadataProps?.ogShowTitle === nextProps.ogMetadataProps?.ogShowTitle &&
     prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
-    prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon
+    prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
+    prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order
   )
 })
 

@@ -212,6 +212,7 @@ export interface IMessageProps {
     ogShowTitle?: boolean
     ogShowDescription?: boolean
     ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
   }
   showInfoMessageProps?: {
     togglePopup?: () => void
