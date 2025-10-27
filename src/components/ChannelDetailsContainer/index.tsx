@@ -376,5 +376,7 @@ const ChannelDetailsContainer = ({
   )
 }
 
-const DetailsWrapper = styled.div``
+const DetailsWrapper = styled.div`
+   user-select: text;
+`
 export default ChannelDetailsContainer
