@@ -217,6 +217,7 @@ export { OGMetadata }
 const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: string }>`
   min-width: 294px;
   max-width: 400px;
+  width: 100%;
   display: grid;
   grid-template-columns: 1fr;
   background-color: ${({ bgColor }) => bgColor};
