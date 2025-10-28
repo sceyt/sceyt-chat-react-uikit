@@ -27,7 +27,7 @@ const OGMetadata = ({
   ogShowUrl = true,
   ogShowTitle = true,
   ogShowDescription = true,
-  // ogShowFavicon = false,
+  ogShowFavicon = true,
   order = { image: 1, title: 2, description: 3, link: 4 }
 }: {
   attachments: IAttachment[]
@@ -142,6 +142,7 @@ const OGMetadata = ({
   if (!showOGMetadata) return null
 
   const hasImage = metadata?.og?.image?.[0]?.url && !imageLoadError
+  const faviconUrl = metadata?.og?.favicon?.url
   const resolvedOrder = order || { image: 1, title: 2, description: 3, link: 4 }
 
   const elements = [
@@ -192,12 +193,31 @@ const OGMetadata = ({
     .filter((el): el is { key: string; order: number; render: JSX.Element | false } => !!el)
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
-  const content = (
+  const textContent = (
+    <OGText shouldAnimate={shouldAnimate}>
+      {elements
+        .filter((el) => el.key !== 'image')
+        .map((el) => (
+          <React.Fragment key={el.key}>{el.render}</React.Fragment>
+        ))}
+    </OGText>
+  )
+
+  const content = hasImage ? (
     <OGText shouldAnimate={shouldAnimate}>
       {elements.map((el) => (
         <React.Fragment key={el.key}>{el.render}</React.Fragment>
       ))}
     </OGText>
+  ) : ogShowFavicon && faviconUrl ? (
+    <OGRow>
+      <OGTextWrapper>{textContent}</OGTextWrapper>
+      <FaviconContainer aria-hidden='true'>
+        <FaviconImg src={faviconUrl} alt='' />
+      </FaviconContainer>
+    </OGRow>
+  ) : (
+    textContent
   )
 
   return (
@@ -329,4 +349,30 @@ const Img = styled.img<{ shouldAnimate: boolean }>`
   display: block;
   border-radius: inherit;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'opacity 0.2s ease' : 'none')};
+`
+
+const OGRow = styled.div`
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+`
+
+const OGTextWrapper = styled.div`
+  flex: 1 1 auto;
+`
+
+const FaviconContainer = styled.div`
+  width: 52px;
+  height: 52px;
+  border-radius: 8px;
+  overflow: hidden;
+  margin: 12px;
+  flex: 0 0 52px;
+`
+
+const FaviconImg = styled.img`
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 `
