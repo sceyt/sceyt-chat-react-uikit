@@ -19,6 +19,7 @@ import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
+import { copyToClipboard } from '../../helpers/clipboard'
 import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
@@ -159,7 +160,9 @@ const Details = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const dispatch = useDispatch()
@@ -184,6 +187,8 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const detailsHeaderRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
+  const copiedPhoneTimerRef = useRef<any>(null)
+  const [copiedPhone, setCopiedPhone] = useState(false)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel =
@@ -249,12 +254,32 @@ const Details = ({
     }
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (copiedPhoneTimerRef.current) {
+        clearTimeout(copiedPhoneTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleTabChange = () => {
     if (detailsRef.current && detailsHeaderRef.current) {
       detailsRef.current.scrollTo({
         top: actionsHeight + detailsHeaderRef.current.offsetHeight,
         behavior: 'smooth'
       })
+    }
+  }
+
+  const handleCopyPhoneNumber = async () => {
+    if (directChannelUser?.id) {
+      const value = `+${directChannelUser.id}`
+      await copyToClipboard(value)
+      setCopiedPhone(true)
+      if (copiedPhoneTimerRef.current) {
+        clearTimeout(copiedPhoneTimerRef.current)
+      }
+      copiedPhoneTimerRef.current = setTimeout(() => setCopiedPhone(false), 1200)
     }
   }
 
@@ -355,16 +380,25 @@ const Details = ({
 
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {showPhoneNumber && directChannelUser?.id
-                    ? `+${directChannelUser?.id}`
-                    : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                      ? ''
-                      : directChannelUser &&
-                        directChannelUser.presence &&
-                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                          ? 'Online'
-                          : directChannelUser.presence.lastActiveAt &&
-                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  {showPhoneNumber && directChannelUser?.id ? (
+                    <PhoneNumberContainer onClick={handleCopyPhoneNumber} role='button' aria-label='Copy phone number'>
+                      {`+${directChannelUser.id}`}
+                      {copiedPhone && (
+                        <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                          Copied
+                        </CopiedTooltip>
+                      )}
+                    </PhoneNumberContainer>
+                  ) : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser) ? (
+                    ''
+                  ) : (
+                    directChannelUser &&
+                    directChannelUser.presence &&
+                    (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                      ? 'Online'
+                      : directChannelUser.presence.lastActiveAt &&
+                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))
+                  )}
                 </SubTitle>
               ) : (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
@@ -623,4 +657,28 @@ const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>
   margin-left: 6px;
   cursor: pointer;
   color: #b2b6be;
+`
+
+const PhoneNumberContainer = styled.span`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: text;
+`
+
+const CopiedTooltip = styled.span<{ background: string; color: string }>`
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 6px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: ${(props) => props.background};
+  color: ${(props) => props.color};
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
 `
