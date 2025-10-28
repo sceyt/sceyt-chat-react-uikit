@@ -236,8 +236,8 @@ const OGMetadata = ({
 export { OGMetadata }
 
 const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: string }>`
-  min-width: 294px;
-  max-width: 400px;
+  min-width: inherit;
+  max-width: inherit;
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
@@ -257,12 +257,13 @@ const ImageContainer = styled.div<{
   containerHeight: number
   shouldAnimate: boolean
 }>`
+  width: 100%;
   max-width: 400px;
-  max-height: 240px;
+  height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
-  overflow: hidden;
   margin: 0 auto;
   border-radius: 8px;
+  overflow: hidden;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'height 0.2s ease, opacity 0.2s ease' : 'none')};
 `
 
@@ -270,7 +271,7 @@ const OGText = styled.div<{ shouldAnimate: boolean }>`
   margin: 12px;
   display: flex;
   flex-direction: column;
-  gap: 0; /* spacing is handled by element margins */
+  gap: 0;
   ${({ shouldAnimate }) =>
     shouldAnimate &&
     `
@@ -343,9 +344,11 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
 `
 
 const Img = styled.img<{ shouldAnimate: boolean }>`
-  max-width: 100%;
-  height: auto;
-  object-fit: cover;
+  // width: 400px;
+  // height: 240px;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
   display: block;
   border-radius: inherit;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'opacity 0.2s ease' : 'none')};
