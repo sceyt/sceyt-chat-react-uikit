@@ -27,13 +27,11 @@ import { attachmentTypes } from 'helpers/constants'
 
 interface InviteLinkModalProps {
   onClose: () => void
-  link?: string
-  onReset?: () => void
   SVGLogoIcon?: React.ReactNode
   channelId: string
 }
 
-export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, channelId }: InviteLinkModalProps) {
+export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: InviteLinkModalProps): JSX.Element {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -189,7 +187,6 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
   const handleConfirmReset = () => {
     setShowResetConfirm(false)
     dispatch(regenerateChannelInviteKeyAC(channelId, channelInviteKeys?.[0]?.key || ''))
-    if (onReset) onReset()
   }
 
   useEffect(() => {
@@ -204,7 +201,7 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
   )
   const inviteKey = useMemo<InviteKey | null>(() => channelInviteKeys?.[0] || null, [channelInviteKeys])
 
-  const inviteUrl = useMemo(() => link || `${getBaseUrlForInviteMembers()}/${inviteKey?.key || ''}`, [link, inviteKey])
+  const inviteUrl = useMemo(() => `${getBaseUrlForInviteMembers()}/${inviteKey?.key || ''}`, [inviteKey])
 
   const handleShowPreviousMessages = () => {
     dispatch(updateChannelInviteKeyAC(channelId, inviteKey?.key || '', !inviteKey?.accessPriorHistory || false))
@@ -236,7 +233,7 @@ export default function InviteLinkModal({ onClose, link, onReset, SVGLogoIcon, c
         regenerateChannelInviteKeyAC,
         updateChannelInviteKeyAC
       }
-    })
+    }) as unknown as JSX.Element
   }
   if (customComponent) {
     return customComponent as unknown as JSX.Element

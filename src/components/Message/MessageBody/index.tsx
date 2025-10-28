@@ -25,6 +25,7 @@ import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
 import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
+import PollMessage from '../PollMessage'
 import log from 'loglevel'
 import { OGMetadata } from '../OGMetadata'
 
@@ -696,7 +697,7 @@ const MessageBody = ({
             messageStatusSize={messageStatusSize}
             messageStatusColor={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
                   ? textOnPrimary
                   : messageStateColor || textSecondary
@@ -716,9 +717,9 @@ const MessageBody = ({
             }
             messageTimeColorOnAttachment={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary 
+                  ? textOnPrimary
                   : textSecondary
             }
           />
@@ -767,6 +768,8 @@ const MessageBody = ({
           ))
         // </MessageAttachments>
       }
+
+      {message.type === 'poll' && <PollMessage message={message} />}
       {emojisPopupOpen && emojisPopupPosition && (
         <EmojiContainer
           id={`${message.id}_emoji_popup_container`}

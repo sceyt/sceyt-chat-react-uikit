@@ -17,6 +17,7 @@ import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
+import PollMessage from './Message/PollMessage'
 import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
@@ -40,6 +41,7 @@ export {
   Avatar,
   DropDown,
   Attachment,
+  PollMessage,
   OGMetadata,
   EmojisPopup,
   FrequentlyEmojis,

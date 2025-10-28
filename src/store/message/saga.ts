@@ -1,5 +1,5 @@
 import { put, call, takeLatest, takeEvery, select } from 'redux-saga/effects'
-
+import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -19,10 +19,14 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS
+  GET_MESSAGE_MARKERS,
+  ADD_POLL_VOTE,
+  DELETE_POLL_VOTE,
+  CLOSE_POLL,
+  RETRACT_POLL_VOTE
 } from './constants'
 
-import { IAction, IAttachment, IChannel, IMessage } from '../../types'
+import { IAction, IAttachment, IChannel, IMessage, IPollVote } from '../../types'
 import { getClient } from '../../common/client'
 import {
   addChannelToAllChannels,
@@ -559,6 +563,8 @@ function* sendTextMessage(action: IAction): any {
       .setDisplayCount(message?.displayCount !== undefined ? message.displayCount : message.type === 'system' ? 0 : 1)
       .setSilent(message?.silent !== undefined ? message.silent : message.type === 'system')
       .setMetadata(JSON.stringify(message.metadata))
+      .setPollDetails(message.pollDetails ? message.pollDetails : null)
+
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
     }
@@ -1675,6 +1681,158 @@ function* getMessageMarkers(action: IAction): any {
     yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
+
+const updatePollDetails = (
+  pollDetails: IMessage['pollDetails'],
+  optionId: string,
+  addVote: boolean = true,
+  allowMultipleVotes: boolean = false
+) => {
+  const isOwnVote = pollDetails?.ownVotes?.some((vote: IPollVote) => vote.optionId === optionId)
+  const isSelectedOption = (pollDetails?.ownVotes?.length || 0) > 0 && !allowMultipleVotes
+
+  if (isOwnVote && addVote) {
+    return pollDetails
+  } else if (!isOwnVote && !addVote) {
+    return pollDetails
+  }
+
+  if (!addVote) {
+    return {
+      ...pollDetails,
+      votesPerOption: {
+        ...pollDetails?.votesPerOption,
+        [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
+      },
+      votes: [
+        ...(pollDetails?.votes || []).filter(
+          (vote: IPollVote) => vote.optionId !== optionId || vote.user.id !== getClient().user.id
+        )
+      ],
+      ownVotes: !allowMultipleVotes
+        ? []
+        : [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
+    }
+  }
+
+  const vote = {
+    id: uuidv4(),
+    pollId: pollDetails?.id,
+    optionId,
+    createdAt: new Date(),
+    user: getClient().user
+  }
+  return {
+    ...pollDetails,
+    votesPerOption: {
+      ...pollDetails?.votesPerOption,
+      [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1,
+      ...(isSelectedOption
+        ? {
+            [pollDetails?.ownVotes[0]?.optionId + '']:
+              (pollDetails?.votesPerOption?.[pollDetails?.ownVotes[0]?.optionId + ''] || 0) - 1
+          }
+        : {})
+    },
+    votes: isSelectedOption
+      ? [...(pollDetails?.votes || []), vote].filter((vote: IPollVote) => vote.optionId !== optionId)
+      : [...(pollDetails?.votes || []), vote],
+    ownVotes: isSelectedOption ? [vote] : [...(pollDetails?.ownVotes || []), vote]
+  }
+}
+
+function* addPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message, allowMultipleVotes } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      const pollDetails = JSON.parse(
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, allowMultipleVotes))
+      )
+
+      updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
+      updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
+      if (channel) {
+        const pollVote = yield call(channel.addVote, pollId, optionId)
+        console.log('poll vote added', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in add poll vote', e)
+  }
+}
+
+function* deletePollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message, allowMultipleVotes } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      const pollDetails = JSON.parse(
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, allowMultipleVotes))
+      )
+      updateMessageOnMap(channel.id, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
+      if (channel) {
+        const pollVote = yield call(channel.deleteVote, pollId, optionId)
+        console.log('poll vote deleted', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in delete poll vote', e)
+  }
+}
+
+function* closePoll(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      if (channel) {
+        const poll = yield call(channel.closePoll, pollId)
+        console.log('poll closed', poll)
+      }
+    }
+  } catch (e) {
+    log.error('error in close poll', e)
+  }
+}
+
+function* retractPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      if (channel) {
+        const pollVote = yield call(channel.retractVote, pollId)
+        console.log('poll vote retracted', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in retract poll vote', e)
+  }
+}
+
 export default function* MessageSaga() {
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
@@ -1694,4 +1852,8 @@ export default function* MessageSaga() {
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
   yield takeEvery(RESUME_ATTACHMENT_UPLOADING, resumeAttachmentUploading)
+  yield takeEvery(ADD_POLL_VOTE, addPollVote)
+  yield takeEvery(DELETE_POLL_VOTE, deletePollVote)
+  yield takeEvery(CLOSE_POLL, closePoll)
+  yield takeEvery(RETRACT_POLL_VOTE, retractPollVote)
 }

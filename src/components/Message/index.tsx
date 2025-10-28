@@ -912,6 +912,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.metadata === nextProps.message.metadata &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
+    prevProps.message.pollDetails === nextProps.message.pollDetails &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&

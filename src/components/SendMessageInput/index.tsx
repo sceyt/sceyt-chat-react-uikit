@@ -112,6 +112,7 @@ import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ChooseFileIcon } from '../../assets/svg/choseFile.svg'
+import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
 import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
@@ -130,6 +131,7 @@ import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
+import CreatePollPopup from './Poll/CreatePollPopup'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -268,6 +270,15 @@ interface SendMessageProps {
   placeholderText?: string
   placeholderTextColor?: string
   audioRecordingMaxDuration?: number
+  pollOptions?: {
+    showAddPoll?: boolean
+    choosePollText?: string
+    pollOptions?: {
+      id: string
+      text: string
+      votes: number
+    }[]
+  }
 }
 
 const SendMessageInput: React.FC<SendMessageProps> = ({
@@ -329,7 +340,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   voiceMessage = true,
   placeholderText,
   placeholderTextColor,
-  audioRecordingMaxDuration
+  audioRecordingMaxDuration,
+  pollOptions
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -380,7 +392,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [emojisPopupLeftPosition, setEmojisPopupLeftPosition] = useState(0)
   const [emojisPopupBottomPosition, setEmojisPopupBottomPosition] = useState(0)
   const [addAttachmentsInRightSide, setAddAttachmentsInRightSide] = useState(false)
-
+  const [showPoll, setShowPoll] = useState(false)
   const [shouldClearEditor, setShouldClearEditor] = useState<{ clear: boolean; draftMessage?: any }>({ clear: false })
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedUsers, setMentionedUsers] = useState<any>([])
@@ -469,14 +481,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleSendEditMessage = (event?: any) => {
+  const handleSendEditMessage = (
+    event?: any,
+    pollDetails?: {
+      question: string
+      options: { id: string; name: string }[]
+      anonymous: boolean
+      allowMultipleVotes: boolean
+      allowVoteRetract: boolean
+    }
+  ) => {
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
+    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.question.trim()
+    const messageTextForSend = isPoll ? pollDetails?.question.trim() : messageText.trim()
     const shouldSend =
-      (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
+      (isEnter || type === 'click') &&
+      (messageToEdit || messageTextForSend || (attachments.length && attachments.length > 0))
     if (isEnter) {
       event.preventDefault()
-      if (!messageText.trim() && !attachments.length && !messageToEdit) {
+      if (!messageTextForSend?.trim() && !attachments.length && !messageToEdit) {
         setShouldClearEditor({ clear: true })
       }
     }
@@ -486,8 +510,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
-      } else if (messageText.trim() || (attachments.length && attachments.length > 0)) {
-        const messageTexToSend = messageText.trim()
+      } else if (messageTextForSend?.trim() || (attachments.length && attachments.length > 0)) {
+        const messageTexToSend = messageTextForSend?.trim()
         const messageToSend: any = {
           // metadata: mentionedUsersPositions,
           body: messageTexToSend,
@@ -530,9 +554,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-        if (messageTexToSend && !attachments.length) {
+        if (messageTexToSend?.trim() && !attachments.length) {
           if (linkAttachment) {
             messageToSend.attachments = [linkAttachment]
+          }
+          if (isPoll) {
+            messageToSend.pollDetails = pollDetails
+            messageToSend.type = 'poll'
+            messageToSend.body = messageTextForSend?.trim()
           }
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
@@ -712,7 +741,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     fileUploader.current.click()
   }
 
+  const handleOpenPoll = () => {
+    setShowPoll(true)
+  }
+
   const handlePastAttachments = (e: any) => {
+    // Allow pasting into explicit allow-paste inputs (e.g., poll popup fields)
+    const target = e.target as HTMLElement
+    if (target && (target as any).dataset && (target as any).dataset.allowPaste === 'true') {
+      return
+    }
     const os = detectOS()
     if (!(os === 'Windows' && browser === 'Firefox')) {
       if (e.clipboardData.files && e.clipboardData.files.length > 0) {
@@ -1552,6 +1590,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               </ReadOnlyCont>
             ) : (
               <React.Fragment>
+                {showPoll && (
+                  <CreatePollPopup
+                    togglePopup={() => setShowPoll(false)}
+                    onCreate={(event, payload) => {
+                      handleSendEditMessage(event, payload)
+                    }}
+                  />
+                )}
                 <TypingIndicator>
                   {typingOrRecording?.items.length > 0 &&
                     (CustomTypingIndicator ? (
@@ -1774,6 +1820,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               >
                                 <ChooseFileIcon />
                                 {chooseFileAttachmentText ?? 'File'}
+                              </DropdownOptionLi>
+                            )}
+                            {pollOptions?.showAddPoll && (
+                              <DropdownOptionLi
+                                key={3}
+                                textColor={textPrimary}
+                                hoverBackground={backgroundHovered}
+                                onClick={handleOpenPoll}
+                                iconWidth='20px'
+                                iconColor={iconInactive}
+                              >
+                                <PollIcon />
+                                {pollOptions?.choosePollText ?? 'Poll'}
                               </DropdownOptionLi>
                             )}
                           </DropdownOptionsUl>

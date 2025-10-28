@@ -92,6 +92,19 @@ export interface IMarker {
   user: IUser | null
 }
 
+export interface IPollOption {
+  id: string
+  name: string
+}
+
+export interface IPollVote {
+  id: string
+  pollId: string
+  optionId: string
+  createdAt: Date
+  user: IUser
+}
+
 export interface IMessage {
   id: string
   tid?: string
@@ -131,6 +144,22 @@ export interface IMessage {
     hops: number
     messageId: string
     user: IUser
+  }
+  pollDetails?: {
+    id: string
+    name: string
+    description: string
+    options: IPollOption[]
+    anonymous: boolean
+    allowMultipleVotes: boolean
+    allowVoteRetract: boolean
+    votesPerOption: Record<string, number>
+    votes: IPollVote[]
+    ownVotes: IPollVote[]
+    createdAt: Date
+    updatedAt: Date
+    closedAt: Date
+    closed: boolean
   }
 }
 

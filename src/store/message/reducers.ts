@@ -246,7 +246,6 @@ const messageSlice = createSlice({
         }
         return message
       })
-
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }

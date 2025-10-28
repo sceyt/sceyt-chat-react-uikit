@@ -16,7 +16,11 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS
+  GET_MESSAGE_MARKERS,
+  DELETE_POLL_VOTE,
+  CLOSE_POLL,
+  ADD_POLL_VOTE,
+  RETRACT_POLL_VOTE
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import {
@@ -438,4 +442,44 @@ export function updateMessagesMarkersAC(channelId: string, deliveryStatus: strin
 
 export function setMessagesMarkersLoadingStateAC(state: number) {
   return setMessagesMarkersLoadingState({ state })
+}
+
+export function addPollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  allowMultipleVotes: boolean
+) {
+  return {
+    type: ADD_POLL_VOTE,
+    payload: { channelId, pollId, optionId, message, allowMultipleVotes }
+  }
+}
+
+export function deletePollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  allowMultipleVotes: boolean
+) {
+  return {
+    type: DELETE_POLL_VOTE,
+    payload: { channelId, pollId, optionId, message, allowMultipleVotes }
+  }
+}
+
+export function closePollAC(channelId: string, pollId: string) {
+  return {
+    type: CLOSE_POLL,
+    payload: { channelId, pollId }
+  }
+}
+
+export function retractPollVoteAC(channelId: string, pollId: string) {
+  return {
+    type: RETRACT_POLL_VOTE,
+    payload: { channelId, pollId }
+  }
 }
