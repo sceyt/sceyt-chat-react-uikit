@@ -8,6 +8,7 @@ import { setOGMetadataAC } from '../../../store/message/actions'
 import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 const validateUrl = (url: string) => {
   try {
@@ -68,7 +69,7 @@ const OGMetadata = ({
 
   const ogMetadataQueryBuilder = useCallback(async (url: string) => {
     const client = getClient()
-    if (client) {
+    if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
       try {
         const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
         const query = await queryBuilder.build()
