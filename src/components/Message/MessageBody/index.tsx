@@ -27,6 +27,7 @@ import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import log from 'loglevel'
 import { OGMetadata } from '../OGMetadata'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -158,6 +159,7 @@ interface IMessageBodyProps {
   messageTextRef: React.RefObject<HTMLSpanElement>
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  unsupportedMessage: boolean
 }
 
 const MessageBody = ({
@@ -283,7 +285,8 @@ const MessageBody = ({
   handleCreateChat,
   messageTextRef,
   handleOpenUserProfile,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  unsupportedMessage
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -314,14 +317,14 @@ const MessageBody = ({
   const firstMessageInInterval = useMemo(
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-      prevMessage?.type === 'system' ||
+      prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
     [prevMessage, current, unreadMessageId]
   )
   const lastMessageInInterval = useMemo(
     () =>
       !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-      nextMessage.type === 'system',
+      nextMessage.type === MESSAGE_TYPE.SYSTEM,
     [nextMessage, current]
   )
   const messageTimeVisible = useMemo(
@@ -643,6 +646,8 @@ const MessageBody = ({
         incomingMessageStyles={incomingMessageStyles}
         incoming={message.incoming}
         linkColor={linkColor}
+        unsupportedMessage={unsupportedMessage}
+        unsupportedMessageColor={textSecondary}
       >
         {linkAttachment && (
           <OGMetadata attachments={[linkAttachment]} state={message.state} incoming={message.incoming} />
@@ -656,7 +661,8 @@ const MessageBody = ({
             accentColor,
             textSecondary,
             onMentionNameClick: handleOpenUserProfile,
-            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention
+            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+            unsupportedMessage
           })}
         </span>
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
@@ -696,7 +702,7 @@ const MessageBody = ({
             messageStatusSize={messageStatusSize}
             messageStatusColor={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
                   ? textOnPrimary
                   : messageStateColor || textSecondary
@@ -716,9 +722,9 @@ const MessageBody = ({
             }
             messageTimeColorOnAttachment={
               message.attachments[0].type === 'voice'
-                ? textSecondary 
+                ? textSecondary
                 : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary 
+                  ? textOnPrimary
                   : textSecondary
             }
           />

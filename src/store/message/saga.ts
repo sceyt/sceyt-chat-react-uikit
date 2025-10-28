@@ -125,6 +125,7 @@ import { isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
+import { MESSAGE_TYPE } from 'types/enum'
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -321,8 +322,8 @@ function* sendMessage(action: IAction): any {
               .setBodyAttributes(i === 0 ? message.bodyAttributes : {})
               .setMentionUserIds(i === 0 ? mentionedUserIds : [])
               .setType(message.type)
-              .setDisplayCount(message.type === 'system' ? 0 : 1)
-              .setSilent(message.type === 'system')
+              .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+              .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
               .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
             if (message.parentMessage) {
               messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
@@ -360,8 +361,8 @@ function* sendMessage(action: IAction): any {
             .setAttachments(message.attachments)
             .setMentionUserIds(mentionedUserIds)
             .setType(message.type)
-            .setDisplayCount(message.type === 'system' ? 0 : 1)
-            .setSilent(message.type === 'system')
+            .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+            .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
             .setMetadata(JSON.stringify(message.metadata))
 
           if (message.parentMessage) {
@@ -556,8 +557,10 @@ function* sendTextMessage(action: IAction): any {
       .setAttachments(attachments)
       .setMentionUserIds(mentionedUserIds)
       .setType(message.type)
-      .setDisplayCount(message?.displayCount !== undefined ? message.displayCount : message.type === 'system' ? 0 : 1)
-      .setSilent(message?.silent !== undefined ? message.silent : message.type === 'system')
+      .setDisplayCount(
+        message?.displayCount !== undefined ? message.displayCount : message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1
+      )
+      .setSilent(message?.silent !== undefined ? message.silent : message.type === MESSAGE_TYPE.SYSTEM)
       .setMetadata(JSON.stringify(message.metadata))
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)

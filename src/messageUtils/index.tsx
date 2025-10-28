@@ -121,7 +121,8 @@ const MessageTextFormat = ({
   accentColor,
   textSecondary,
   onMentionNameClick,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  unsupportedMessage
 }: {
   text: string
   message: any
@@ -133,11 +134,15 @@ const MessageTextFormat = ({
   textSecondary: string
   onMentionNameClick?: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  unsupportedMessage?: boolean
 }) => {
   try {
     let messageText: any = []
     const linkify = new LinkifyIt()
     const messageBodyAttributes = message.bodyAttributes && JSON.parse(JSON.stringify(message.bodyAttributes))
+    if (unsupportedMessage) {
+      return 'This message is not supported. Update your app to view this message.'
+    }
     if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
       const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
       const textPart = text

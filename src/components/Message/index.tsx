@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
@@ -20,7 +20,12 @@ import {
   setMessagesLoadingStateAC,
   setMessageToEditAC
 } from 'store/message/actions'
-import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
+import {
+  createChannelAC,
+  markMessagesAsDeliveredAC,
+  markMessagesAsReadAC,
+  switchChannelInfoAC
+} from 'store/channel/actions'
 import { CONNECTION_STATUS } from 'store/user/constants'
 // Hooks
 import { useDidUpdate, useOnScreen, useColor } from 'hooks'
@@ -48,6 +53,7 @@ import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
 import { scrollToNewMessageSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
+import { MESSAGE_TYPE } from 'types/enum'
 
 const Message = ({
   message,
@@ -221,7 +227,7 @@ const Message = ({
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system' ||
+    prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
     unreadMessageId === prevMessage.id
 
   const messageTimeVisible = showMessageTime && (showMessageTimeForEachMessage || !nextMessage)
@@ -401,6 +407,16 @@ const Message = ({
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
+
+    if (!message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
+      if (
+        message.userMarkers &&
+        message.userMarkers.length &&
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
+      ) {
+        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
+      }
+    }
   }
 
   const handleForwardMessage = (channelIds: string[]) => {
@@ -532,6 +548,17 @@ const Message = ({
     }
   }
 
+  const unsupportedMessage = useMemo(() => {
+    return (
+      message.type !== MESSAGE_TYPE.SYSTEM &&
+      message.type !== MESSAGE_TYPE.POLL &&
+      message.type !== MESSAGE_TYPE.FILE &&
+      message.type !== MESSAGE_TYPE.LINK &&
+      message.type !== MESSAGE_TYPE.MEDIA &&
+      message.type !== MESSAGE_TYPE.TEXT
+    )
+  }, [message.type])
+
   return (
     <MessageItem
       className='message_item'
@@ -546,7 +573,7 @@ const Message = ({
           : ''
       }
       topMargin={
-        prevMessage?.type === 'system'
+        prevMessage?.type === MESSAGE_TYPE.SYSTEM
           ? '0'
           : prevMessage && unreadMessageId === prevMessage.id
             ? '16px'
@@ -630,6 +657,7 @@ const Message = ({
             handleMediaItemClick={handleMediaItemClick}
             isThreadMessage={isThreadMessage}
             handleOpenUserProfile={handleOpenUserProfile}
+            unsupportedMessage={unsupportedMessage}
           />
         ) : (
           <MessageBody
@@ -758,6 +786,7 @@ const Message = ({
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
             handleOpenUserProfile={handleOpenUserProfile}
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+            unsupportedMessage={unsupportedMessage}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (

@@ -72,7 +72,7 @@ import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
-import { HiddenMessageProperty } from 'types/enum'
+import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
 
@@ -205,6 +205,7 @@ interface MessagesProps {
     handleMediaItemClick?: (attachment: IAttachment) => void
     handleOpenUserProfile: (user: IUser) => void
     isThreadMessage?: boolean
+    unsupportedMessage: boolean
   }>
   messageReaction?: boolean
   editMessage?: boolean
@@ -1216,7 +1217,10 @@ const MessageList: React.FC<MessagesProps> = ({
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
                       noMargin={
-                        !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
+                        !isUnreadMessage &&
+                        prevMessage &&
+                        prevMessage.type === MESSAGE_TYPE.SYSTEM &&
+                        message.type !== MESSAGE_TYPE.SYSTEM
                       }
                       theme={theme}
                       lastIndex={false}
@@ -1230,11 +1234,13 @@ const MessageList: React.FC<MessagesProps> = ({
                       chatBackgroundColor={backgroundColor || themeBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
-                        prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
+                        prevMessage && prevMessage.type === MESSAGE_TYPE.SYSTEM && message.type !== MESSAGE_TYPE.SYSTEM
+                          ? '16px'
+                          : '0'
                       }
                       marginTop={differentUserMessageSpacing}
                     />
-                    {message.type === 'system' ? (
+                    {message.type === MESSAGE_TYPE.SYSTEM ? (
                       <SystemMessage
                         key={message.id || message.tid}
                         channel={channel}
@@ -1404,8 +1410,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                        marginTop={message.type === 'system' ? '0px' : ''}
-                        marginBottom={message.type === 'system' ? '16px' : '0'}
+                        marginTop={message.type === MESSAGE_TYPE.SYSTEM ? '0px' : ''}
+                        marginBottom={message.type === MESSAGE_TYPE.SYSTEM ? '16px' : '0'}
                         chatBackgroundColor={backgroundColor || themeBackgroundColor}
                         unread
                       />

@@ -740,6 +740,8 @@ export const MessageText = styled.pre<{
   incomingMessageStyles?: IMessageStyles
   incoming: boolean
   linkColor: string
+  unsupportedMessage?: boolean
+  unsupportedMessageColor?: string
 }>`
   display: flow-root;
   position: relative;
@@ -771,7 +773,12 @@ export const MessageText = styled.pre<{
     props.color};
   user-select: text;
   //overflow: hidden;
-
+  ${(props) =>
+    props.unsupportedMessage &&
+    `
+      color: ${props.unsupportedMessageColor || '#757D8B'};
+      font-style: italic;
+    `}
   ${(props) =>
     props.isRepliedMessage &&
     `
