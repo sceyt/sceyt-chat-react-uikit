@@ -318,7 +318,7 @@ const Details = ({
               name={
                 (activeChannel && activeChannel.subject) ||
                 (directChannelUser && (directChannelUser.firstName || directChannelUser.id)) ||
-                (isSelfChannel && 'Me')
+                (isSelfChannel && showPhoneNumber ? `+${user.id} (You)` : 'Me')
               }
               size={channelAvatarSize || 72}
               textSize={channelAvatarTextSize || 26}
@@ -337,7 +337,9 @@ const Details = ({
                     (isDirectChannel && directChannelUser
                       ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                       : isSelfChannel
-                        ? 'Me'
+                        ? showPhoneNumber
+                          ? `+${user.id} (You)`
+                          : 'Me'
                         : '')}
                 </ChannelName>
                 {!isDirectChannel && checkActionPermission('updateChannel') && (

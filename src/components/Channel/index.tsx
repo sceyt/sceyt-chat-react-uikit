@@ -332,7 +332,9 @@ const Channel: React.FC<IChannelProps> = ({
     (isDirectChannel && directChannelUser
       ? directChannelUser.firstName || directChannelUser.id
       : isSelfChannel
-        ? 'Me'
+        ? showPhoneNumber
+          ? `+${user.id} (You)`
+          : 'Me'
         : '')
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
@@ -582,7 +584,9 @@ const Channel: React.FC<IChannelProps> = ({
               : isSelfChannel
                 ? showPhoneNumber && channel.members?.length && channel.members[0]?.id
                   ? `+${channel.members[0]?.id} (You)`
-                  : 'Me'
+                  : showPhoneNumber
+                    ? `+${user.id} (You)`
+                    : 'Me'
                 : '')}
         </h3>
         {channel.muted && (
