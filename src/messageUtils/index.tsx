@@ -84,7 +84,7 @@ const MessageStatusIcon = ({
   }
 }
 
-const linkifyTextPart = (textPart: string, match: any) => {
+const linkifyTextPart = (textPart: string, match: any, target: string = '_blank') => {
   let newMessageText: any
   let prevMatchEnd = 0
   let lastFoundIndex = 0
@@ -94,12 +94,12 @@ const linkifyTextPart = (textPart: string, match: any) => {
     if (index === 0) {
       newMessageText = [
         textPart.substring(0, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a draggable={false} key={index} href={matchItem.url} target={target} rel='noreferrer'>{`${matchItem.text}`}</a>
       ]
     } else {
       newMessageText.push(
         textPart.substring(prevMatchEnd, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a draggable={false} key={index} href={matchItem.url} target={target} rel='noreferrer'>{`${matchItem.text}`}</a>
       )
     }
 
@@ -122,7 +122,8 @@ const MessageTextFormat = ({
   textSecondary,
   onMentionNameClick,
   shouldOpenUserProfileForMention,
-  unsupportedMessage
+  unsupportedMessage,
+  target = '_blank'
 }: {
   text: string
   message: any
@@ -135,6 +136,7 @@ const MessageTextFormat = ({
   onMentionNameClick?: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
   unsupportedMessage?: boolean
+  target?: string
 }) => {
   try {
     let messageText: any = []
@@ -157,12 +159,12 @@ const MessageTextFormat = ({
           const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
           if (!isLastMessage && !asSampleText && firstPartMatch) {
-            firstPart = linkifyTextPart(firstPart, firstPartMatch)
+            firstPart = linkifyTextPart(firstPart, firstPartMatch, target)
           }
           let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
           const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
           if (!isLastMessage && !asSampleText && secondPartMatch) {
-            secondPart = linkifyTextPart(secondPart, secondPartMatch)
+            secondPart = linkifyTextPart(secondPart, secondPartMatch, target)
           }
 
           if (attribute.type.includes('mention')) {
@@ -278,7 +280,7 @@ const MessageTextFormat = ({
       const match = linkify.match(text)
       if (!isLastMessage && !asSampleText && match) {
         // log.info('newMessageText ... . ', newMessageText)
-        messageText = linkifyTextPart(text, match)
+        messageText = linkifyTextPart(text, match, target)
       }
     }
 

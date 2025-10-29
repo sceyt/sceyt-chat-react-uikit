@@ -21,11 +21,13 @@ const validateUrl = (url: string) => {
 const OGMetadata = ({
   attachments,
   state,
-  incoming
+  incoming,
+  target = '_blank'
 }: {
   attachments: IAttachment[]
   state: string
   incoming: boolean
+  target?: string
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -133,7 +135,7 @@ const OGMetadata = ({
     >
       <div
         onClick={() => {
-          window.open(attachment?.url, '_blank')
+          window.open(attachment?.url, target)
         }}
         style={{ width: showOGMetadata ? '100%' : 'auto' }}
       >
