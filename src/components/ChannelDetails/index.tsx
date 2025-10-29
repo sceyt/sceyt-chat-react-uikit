@@ -26,7 +26,7 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
-import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
+import { CloseIcon, CopiedTooltip, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
@@ -665,20 +665,4 @@ const PhoneNumberContainer = styled.span`
   align-items: center;
   cursor: pointer;
   user-select: text;
-`
-
-const CopiedTooltip = styled.span<{ background: string; color: string }>`
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 6px);
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: ${(props) => props.background};
-  color: ${(props) => props.color};
-  font-size: 12px;
-  line-height: 14px;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 10;
 `

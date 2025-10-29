@@ -228,7 +228,9 @@ const ChannelMessageText = ({
                       }`
                     : lastMessage.body === 'LG'
                       ? 'Left this group'
-                      : ''
+                      : lastMessage.body === 'JL'
+                        ? 'Joined this group via invite link'
+                        : ''
           }`
         ) : (
           <React.Fragment>

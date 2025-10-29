@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
+import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter, CopiedTooltip } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 import { ReactComponent as CopySvg } from '../../../assets/svg/copyIcon.svg'
@@ -41,7 +41,8 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const theme = useSelector(themeSelector) || 'light'
@@ -75,12 +76,21 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [openForwardPopup, setOpenForwardPopup] = useState(false)
   const [shareMode, setShareMode] = useState<'link' | 'qr'>('link')
+  const [showCopiedToast, setShowCopiedToast] = useState(false)
 
   const logoRef = useRef<HTMLDivElement | null>(null)
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl)
+      setShowCopiedToast(true)
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
+      toastTimeoutRef.current = setTimeout(() => {
+        setShowCopiedToast(false)
+      }, 2000)
     } catch (e) {
       // ignore
     }
@@ -286,6 +296,14 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
     }
   }, [channelId])
 
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
+    }
+  }, [])
+
   const channelInviteKeys = useMemo(
     () => (channelId && channelsInviteKeys?.[channelId] ? channelsInviteKeys[channelId] : []),
     [channelId, channelsInviteKeys]
@@ -377,9 +395,16 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
               <FieldLabel color={textSecondary}>{linkLabel}</FieldLabel>
               <LinkField borderColor={border} backgroundColor={surface1}>
                 <LinkInput value={inviteUrl} readOnly color={textPrimary} />
-                <CopyButton onClick={handleCopy} aria-label='Copy invite link'>
-                  <CopySvg color={accentColor} />
-                </CopyButton>
+                <CopyButtonWrapper>
+                  <CopyButton onClick={handleCopy} aria-label='Copy invite link'>
+                    <CopySvg color={accentColor} />
+                  </CopyButton>
+                  {showCopiedToast && (
+                    <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                      Copied
+                    </CopiedTooltip>
+                  )}
+                </CopyButtonWrapper>
               </LinkField>
 
               {showHistorySection && <SectionTitle color={textSecondary}>{historyTitle}</SectionTitle>}
@@ -542,6 +567,13 @@ const CopyButton = styled.button`
   border: none;
   background: transparent;
   cursor: pointer;
+`
+
+const CopyButtonWrapper = styled.div`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 `
 
 const SectionTitle = styled.h4<{ color: string }>`
