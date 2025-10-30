@@ -27,6 +27,7 @@ import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import log from 'loglevel'
 import { OGMetadata } from '../OGMetadata'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -172,7 +173,9 @@ interface IMessageBodyProps {
     ogContainerClassName?: string
     ogContainerShowBackground?: boolean
     ogContainerBackground?: string
+    infoPadding?: string
   }
+  unsupportedMessage: boolean
 }
 
 const MessageBody = ({
@@ -299,7 +302,8 @@ const MessageBody = ({
   messageTextRef,
   handleOpenUserProfile,
   shouldOpenUserProfileForMention,
-  ogMetadataProps
+  ogMetadataProps,
+  unsupportedMessage
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -330,14 +334,14 @@ const MessageBody = ({
   const firstMessageInInterval = useMemo(
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-      prevMessage?.type === 'system' ||
+      prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
     [prevMessage, current, unreadMessageId]
   )
   const lastMessageInInterval = useMemo(
     () =>
       !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-      nextMessage.type === 'system',
+      nextMessage.type === MESSAGE_TYPE.SYSTEM,
     [nextMessage, current]
   )
   const messageTimeVisible = useMemo(
@@ -661,11 +665,13 @@ const MessageBody = ({
         incomingMessageStyles={incomingMessageStyles}
         incoming={message.incoming}
         linkColor={linkColor}
+        unsupportedMessage={unsupportedMessage}
+        unsupportedMessageColor={textSecondary}
       >
         {ogContainerFirst && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataProps?.maxWidth || 400}
-            maxHeight={ogMetadataProps?.maxHeight || 240}
+            maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
             incoming={message.incoming}
@@ -679,6 +685,7 @@ const MessageBody = ({
             ogContainerClassName={ogMetadataProps?.ogContainerClassName}
             ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
             ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
           />
         )}
         <span ref={messageTextRef}>
@@ -690,7 +697,8 @@ const MessageBody = ({
             accentColor,
             textSecondary,
             onMentionNameClick: handleOpenUserProfile,
-            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention
+            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+            unsupportedMessage
           })}
         </span>
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
@@ -701,7 +709,7 @@ const MessageBody = ({
         {!ogContainerFirst && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataProps?.maxWidth || 400}
-            maxHeight={ogMetadataProps?.maxHeight || 240}
+            maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
             incoming={message.incoming}
@@ -715,6 +723,7 @@ const MessageBody = ({
             ogContainerClassName={ogMetadataProps?.ogContainerClassName}
             ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
             ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
           />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&

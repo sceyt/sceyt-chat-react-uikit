@@ -143,6 +143,7 @@ export interface IDetailsProps {
   backgroundColor?: string
   bordersColor?: string
   showPhoneNumber?: boolean
+  QRCodeIcon?: JSX.Element
 }
 
 const ChannelDetailsContainer = ({
@@ -252,7 +253,8 @@ const ChannelDetailsContainer = ({
   tabItemsLineHeight,
   tabItemsMinWidth,
   bordersColor,
-  showPhoneNumber
+  showPhoneNumber,
+  QRCodeIcon
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -370,11 +372,14 @@ const ChannelDetailsContainer = ({
           tabItemsLineHeight={tabItemsLineHeight}
           tabItemsMinWidth={tabItemsMinWidth}
           showPhoneNumber={showPhoneNumber}
+          QRCodeIcon={QRCodeIcon}
         />
       )}
     </DetailsWrapper>
   )
 }
 
-const DetailsWrapper = styled.div``
+const DetailsWrapper = styled.div`
+  user-select: text;
+`
 export default ChannelDetailsContainer

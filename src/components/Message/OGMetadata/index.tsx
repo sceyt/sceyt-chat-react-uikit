@@ -23,20 +23,21 @@ const OGMetadata = ({
   attachments,
   state,
   incoming,
-  ogShowUrl = true,
+  ogShowUrl = false,
   ogShowTitle = true,
   ogShowDescription = true,
   ogShowFavicon = true,
   order = { image: 1, title: 2, description: 3, link: 4 },
   maxWidth = 400,
-  maxHeight = 240,
+  maxHeight,
   ogContainerBorderRadius,
   ogContainerPadding,
   ogContainerClassName,
   ogContainerShowBackground = true,
   ogContainerBackground,
-  infoPadding = '0',
-  ogContainerMargin
+  infoPadding = '0 8px',
+  ogContainerMargin,
+  target = '_blank'
 }: {
   attachments: IAttachment[]
   state: string
@@ -55,6 +56,7 @@ const OGMetadata = ({
   ogContainerBackground?: string
   infoPadding?: string
   ogContainerMargin?: string
+  target?: string
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -173,7 +175,7 @@ const OGMetadata = ({
               containerHeight={calculatedImageHeight}
               shouldAnimate={shouldAnimate}
               maxWidth={maxWidth}
-              maxHeight={maxHeight}
+              maxHeight={maxHeight || calculatedImageHeight}
             >
               <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
             </ImageContainer>
@@ -250,7 +252,7 @@ const OGMetadata = ({
         className={ogContainerClassName}
         containerMargin={ogContainerMargin}
       >
-        <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
+        <div onClick={() => window.open(attachment?.url, target)} style={{ width: '100%', cursor: 'pointer' }}>
           {content}
         </div>
       </OGMetadataContainer>
@@ -295,7 +297,6 @@ const ImageContainer = styled.div<{
   maxHeight: number
 }>`
   width: 100%;
-  max-width: ${({ maxWidth }) => (maxWidth ? `${maxWidth}px` : '400px')};
   max-height: ${({ maxHeight }) => (maxHeight ? `${maxHeight}px` : '240px')};
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
@@ -322,6 +323,7 @@ const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: str
   line-height: 16px;
   margin: 8px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
+  box-sizing: border-box;
   ${({ maxWidth }) =>
     maxWidth &&
     `
@@ -350,6 +352,7 @@ const Desc = styled.p<{
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
+  box-sizing: border-box;
   ${({ maxWidth }) =>
     maxWidth &&
     `
@@ -369,6 +372,7 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: strin
   margin: 0 0 12px 0;
   padding: ${({ padding }) => padding ?? '0'};
   color: gray;
+  box-sizing: border-box;
   ${({ maxWidth }) =>
     maxWidth &&
     `
@@ -384,7 +388,7 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: strin
 const Img = styled.img<{ shouldAnimate: boolean }>`
   width: 100%;
   height: 100%;
-  object-fit: contain;
+  object-fit: cover;
   display: block;
   border-radius: inherit;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'opacity 0.2s ease' : 'none')};

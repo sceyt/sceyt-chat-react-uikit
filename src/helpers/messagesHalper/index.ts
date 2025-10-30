@@ -420,6 +420,12 @@ export const setPendingMessage = (channelId: string, pendingMessage: IMessage) =
 
 export const getPendingMessagesMap = () => pendingMessagesMap
 
+export const clearPendingMessagesMap = () => {
+  Object.keys(pendingMessagesMap).forEach((channelId) => {
+    delete pendingMessagesMap[channelId]
+  })
+}
+
 export const draftMessagesMap: draftMessagesMap = {}
 export const audioRecordingMap: audioRecordingMap = {}
 export const getDraftMessageFromMap = (channelId: string) => draftMessagesMap[channelId]

@@ -72,6 +72,7 @@ interface ICustomMessageItem {
   handleMediaItemClick?: (attachment: IAttachment) => void
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
+  unsupportedMessage: boolean
 }
 
 export interface IMessageProps {
@@ -220,6 +221,7 @@ export interface IMessageProps {
     ogContainerClassName?: string
     ogContainerShowBackground?: boolean
     ogContainerBackground?: string
+    infoPadding?: string
   }
   showInfoMessageProps?: {
     togglePopup?: () => void
