@@ -1,6 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
+import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter, CopiedTooltip } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 import { ReactComponent as CopySvg } from '../../../assets/svg/copyIcon.svg'
@@ -27,11 +27,11 @@ import { attachmentTypes } from 'helpers/constants'
 
 interface InviteLinkModalProps {
   onClose: () => void
-  SVGLogoIcon?: React.ReactNode
+  SVGOrPNGLogoIcon?: React.ReactNode
   channelId: string
 }
 
-export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: InviteLinkModalProps): JSX.Element {
+export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }: InviteLinkModalProps): JSX.Element {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -41,7 +41,8 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary
+    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const theme = useSelector(themeSelector) || 'light'
@@ -75,10 +76,21 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const [openForwardPopup, setOpenForwardPopup] = useState(false)
   const [shareMode, setShareMode] = useState<'link' | 'qr'>('link')
+  const [showCopiedToast, setShowCopiedToast] = useState(false)
+
+  const logoRef = useRef<HTMLDivElement | null>(null)
+  const toastTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
   const handleCopy = async () => {
     try {
       await navigator.clipboard.writeText(inviteUrl)
+      setShowCopiedToast(true)
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
+      toastTimeoutRef.current = setTimeout(() => {
+        setShowCopiedToast(false)
+      }, 2000)
     } catch (e) {
       // ignore
     }
@@ -94,9 +106,6 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
       setOpenForwardPopup(false)
       return
     }
-    const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
-      inviteUrl
-    )}&size=200x200&ecc=H&margin=12&color=000000&bgcolor=FFFFFF`
     setOpenForwardPopup(false)
 
     for (const channelId of channelIds) {
@@ -114,8 +123,99 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
         dispatch(forwardMessageAC(message as any, channelId, connectionStatus, false))
       } else {
         try {
-          const resp = await fetch(qrImageUrl)
-          const blob = await resp.blob()
+          const toPngBlob = async (): Promise<Blob> => {
+            const dpr = 4
+            const baseQrSize = 200
+            const qrSize = baseQrSize * dpr
+            const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
+              inviteUrl
+            )}&size=${qrSize}x${qrSize}&ecc=H&margin=32&color=000000&bgcolor=FFFFFF`
+            const qrResp = await fetch(qrUrl, { cache: 'no-store' })
+            const qrBlob = await qrResp.blob()
+            const qrObjectUrl = URL.createObjectURL(qrBlob)
+
+            const boxWidth = qrSize
+            const boxHeight = qrSize
+
+            const canvas = document.createElement('canvas')
+            canvas.width = boxWidth
+            canvas.height = boxHeight
+            const ctx = canvas.getContext('2d')!
+
+            // Draw QR image
+            const img = new Image()
+            img.src = qrObjectUrl
+            await new Promise((resolve, reject) => {
+              img.onload = () => resolve(null)
+              img.onerror = reject
+            })
+            ctx.imageSmoothingEnabled = false
+            ctx.drawImage(img, 0, 0, qrSize, qrSize)
+
+            // Overlay logo container
+            const overlaySize = (qrSize * 22) / 100
+            const overlayX = (boxWidth - overlaySize) / 2
+            const overlayY = (boxHeight - overlaySize) / 2
+            const roundedPath = (x: number, y: number, w: number, h: number, r: number) => {
+              ctx.beginPath()
+              ctx.moveTo(x + r, y)
+              ctx.lineTo(x + w - r, y)
+              ctx.quadraticCurveTo(x + w, y, x + w, y + r)
+              ctx.lineTo(x + w, y + h - r)
+              ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h)
+              ctx.lineTo(x + r, y + h)
+              ctx.quadraticCurveTo(x, y + h, x, y + h - r)
+              ctx.lineTo(x, y + r)
+              ctx.quadraticCurveTo(x, y, x + r, y)
+              ctx.closePath()
+            }
+            const cornerRadius = 8 * dpr
+
+            // Draw PNG <img> or SVG if available
+            const imgElement = logoRef.current?.querySelector('img') as HTMLImageElement | null
+            if (imgElement && (imgElement.currentSrc || imgElement.src)) {
+              const logoUrl = imgElement.currentSrc || imgElement.src
+              const logoImg = new Image()
+              logoImg.src = logoUrl
+              await new Promise((resolve, reject) => {
+                logoImg.onload = () => resolve(null)
+                logoImg.onerror = reject
+              })
+              ctx.save()
+              roundedPath(overlayX, overlayY, overlaySize, overlaySize, cornerRadius)
+              ctx.clip()
+              ctx.drawImage(logoImg, overlayX, overlayY, overlaySize, overlaySize)
+              ctx.restore()
+            } else {
+              const svgElement = logoRef.current?.querySelector('svg') as SVGElement | null
+              if (svgElement) {
+                const serializer = new XMLSerializer()
+                let svgString = serializer.serializeToString(svgElement)
+                if (!/^<svg[^>]+xmlns=/.test(svgString)) {
+                  svgString = svgString.replace('<svg', '<svg xmlns="http://www.w3.org/2000/svg"')
+                }
+                const svgBlob = new Blob([svgString], { type: 'image/svg+xml;charset=utf-8' })
+                const svgUrl = URL.createObjectURL(svgBlob)
+                const logoImg = new Image()
+                logoImg.src = svgUrl
+                await new Promise((resolve, reject) => {
+                  logoImg.onload = () => resolve(null)
+                  logoImg.onerror = reject
+                })
+                ctx.save()
+                roundedPath(overlayX, overlayY, overlaySize, overlaySize, cornerRadius)
+                ctx.clip()
+                ctx.drawImage(logoImg, overlayX, overlayY, overlaySize, overlaySize)
+                ctx.restore()
+                URL.revokeObjectURL(svgUrl)
+              }
+            }
+
+            URL.revokeObjectURL(qrObjectUrl)
+            return await new Promise<Blob>((resolve) => canvas.toBlob((b) => resolve(b as Blob), 'image/png'))
+          }
+
+          const blob = await toPngBlob()
           const file = new File([blob], 'invite-qr.png', { type: 'image/png' })
           const localUrl = URL.createObjectURL(file)
 
@@ -143,6 +243,7 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
               }
             ]
           }
+
           const attachmentsToSend = await handleUploadAttachments(
             [
               {
@@ -194,6 +295,14 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
       dispatch(getChannelInviteKeysAC(channelId))
     }
   }, [channelId])
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) {
+        clearTimeout(toastTimeoutRef.current)
+      }
+    }
+  }, [])
 
   const channelInviteKeys = useMemo(
     () => (channelId && channelsInviteKeys?.[channelId] ? channelsInviteKeys[channelId] : []),
@@ -286,9 +395,16 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
               <FieldLabel color={textSecondary}>{linkLabel}</FieldLabel>
               <LinkField borderColor={border} backgroundColor={surface1}>
                 <LinkInput value={inviteUrl} readOnly color={textPrimary} />
-                <CopyButton onClick={handleCopy} aria-label='Copy invite link'>
-                  <CopySvg color={accentColor} />
-                </CopyButton>
+                <CopyButtonWrapper>
+                  <CopyButton onClick={handleCopy} aria-label='Copy invite link'>
+                    <CopySvg color={accentColor} />
+                  </CopyButton>
+                  {showCopiedToast && (
+                    <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                      Copied
+                    </CopiedTooltip>
+                  )}
+                </CopyButtonWrapper>
               </LinkField>
 
               {showHistorySection && <SectionTitle color={textSecondary}>{historyTitle}</SectionTitle>}
@@ -317,12 +433,12 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
                 <img
                   src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(
                     inviteUrl
-                  )}&size=200x200&ecc=H&margin=12&color=000000&bgcolor=FFFFFF`}
+                  )}&size=200x200&ecc=H&margin=12&color=000000&bgcolor=FFFFFF&format=png`}
                   alt='Invite QR'
                   width={200}
                   height={200}
                 />
-                <LogoIconCont>{SVGLogoIcon}</LogoIconCont>
+                <LogoIconCont ref={logoRef}>{SVGOrPNGLogoIcon}</LogoIconCont>
               </QRCodeBox>
               <QrHint color={textSecondary}>{qrHintText}</QrHint>
             </React.Fragment>
@@ -360,16 +476,22 @@ export default function InviteLinkModal({ onClose, SVGLogoIcon, channelId }: Inv
 
 const LogoIconCont = styled.div`
   position: absolute;
-  top: calc(50% - 18px);
-  left: calc(50% - 18px);
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background-color: #ffffff;
-  align-items: center;
-  justify-content: center;
-  display: flex;
-  padding: 6px;
+  top: calc(50% - 11%);
+  left: calc(50% - 11%);
+  width: 22%;
+  height: 22%;
+  img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 10px;
+  }
+  svg {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    border-radius: 10px;
+  }
 `
 
 const Tabs = styled.div<{ borderColor: string; backgroundColor: string }>`
@@ -445,6 +567,13 @@ const CopyButton = styled.button`
   border: none;
   background: transparent;
   cursor: pointer;
+`
+
+const CopyButtonWrapper = styled.div`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 `
 
 const SectionTitle = styled.h4<{ color: string }>`

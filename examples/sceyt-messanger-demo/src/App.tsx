@@ -110,7 +110,7 @@ function App() {
           window.addEventListener('online', (e) => onlineStatusChanged(e, sceytClient));
         }
       })
-      .catch((e: any) => {
+      .catch((e) => {
         const date = new Date()
         log.error(`${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}:${date.getMilliseconds()} : Error on connect ... `, e);
         getToken()

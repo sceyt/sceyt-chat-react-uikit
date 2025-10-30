@@ -19,13 +19,14 @@ import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
+import { copyToClipboard } from '../../helpers/clipboard'
 import { makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
-import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
+import { CloseIcon, CopiedTooltip, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
@@ -159,7 +160,9 @@ const Details = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: borderThemeColor,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const dispatch = useDispatch()
@@ -184,6 +187,8 @@ const Details = ({
   const detailsRef = useRef<any>(null)
   const detailsHeaderRef = useRef<any>(null)
   const openTimeOut = useRef<any>(null)
+  const copiedPhoneTimerRef = useRef<any>(null)
+  const [copiedPhone, setCopiedPhone] = useState(false)
   // const tabsRef = useRef<any>(null)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel =
@@ -249,12 +254,32 @@ const Details = ({
     }
   }, [])
 
+  useEffect(() => {
+    return () => {
+      if (copiedPhoneTimerRef.current) {
+        clearTimeout(copiedPhoneTimerRef.current)
+      }
+    }
+  }, [])
+
   const handleTabChange = () => {
     if (detailsRef.current && detailsHeaderRef.current) {
       detailsRef.current.scrollTo({
         top: actionsHeight + detailsHeaderRef.current.offsetHeight,
         behavior: 'smooth'
       })
+    }
+  }
+
+  const handleCopyPhoneNumber = async () => {
+    if (directChannelUser?.id) {
+      const value = `+${directChannelUser.id}`
+      await copyToClipboard(value)
+      setCopiedPhone(true)
+      if (copiedPhoneTimerRef.current) {
+        clearTimeout(copiedPhoneTimerRef.current)
+      }
+      copiedPhoneTimerRef.current = setTimeout(() => setCopiedPhone(false), 1200)
     }
   }
 
@@ -318,7 +343,7 @@ const Details = ({
               name={
                 (activeChannel && activeChannel.subject) ||
                 (directChannelUser && (directChannelUser.firstName || directChannelUser.id)) ||
-                (isSelfChannel && 'Me')
+                (isSelfChannel && showPhoneNumber ? `+${user.id} (You)` : 'Me')
               }
               size={channelAvatarSize || 72}
               textSize={channelAvatarTextSize || 26}
@@ -337,7 +362,9 @@ const Details = ({
                     (isDirectChannel && directChannelUser
                       ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                       : isSelfChannel
-                        ? 'Me'
+                        ? showPhoneNumber
+                          ? `+${user.id} (You)`
+                          : 'Me'
                         : '')}
                 </ChannelName>
                 {!isDirectChannel && checkActionPermission('updateChannel') && (
@@ -353,16 +380,25 @@ const Details = ({
 
               {isDirectChannel ? (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
-                  {showPhoneNumber && directChannelUser?.id
-                    ? `+${directChannelUser?.id}`
-                    : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser)
-                      ? ''
-                      : directChannelUser &&
-                        directChannelUser.presence &&
-                        (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                          ? 'Online'
-                          : directChannelUser.presence.lastActiveAt &&
-                            userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))}
+                  {showPhoneNumber && directChannelUser?.id ? (
+                    <PhoneNumberContainer onClick={handleCopyPhoneNumber} role='button' aria-label='Copy phone number'>
+                      {`+${directChannelUser.id}`}
+                      {copiedPhone && (
+                        <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                          Copied
+                        </CopiedTooltip>
+                      )}
+                    </PhoneNumberContainer>
+                  ) : hideUserPresence && directChannelUser && hideUserPresence(directChannelUser) ? (
+                    ''
+                  ) : (
+                    directChannelUser &&
+                    directChannelUser.presence &&
+                    (directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
+                      ? 'Online'
+                      : directChannelUser.presence.lastActiveAt &&
+                        userLastActiveDateFormat(directChannelUser.presence.lastActiveAt))
+                  )}
                 </SubTitle>
               ) : (
                 <SubTitle color={textSecondary} fontSize={channelMembersFontSize} lineHeight={channelMembersLineHeight}>
@@ -621,4 +657,12 @@ const EditButton = styled.span<{ topPosition?: string; rightPosition?: string }>
   margin-left: 6px;
   cursor: pointer;
   color: #b2b6be;
+`
+
+const PhoneNumberContainer = styled.span`
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: text;
 `

@@ -495,7 +495,11 @@ const Members = ({
         />
       )}
       {openInviteModal && (
-        <InviteLinkModal onClose={() => setOpenInviteModal(false)} SVGLogoIcon={QRCodeIcon} channelId={channel.id} />
+        <InviteLinkModal
+          onClose={() => setOpenInviteModal(false)}
+          SVGOrPNGLogoIcon={QRCodeIcon}
+          channelId={channel.id}
+        />
       )}
     </Container>
   )

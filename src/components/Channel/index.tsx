@@ -34,6 +34,7 @@ import { getClient } from '../../common/client'
 import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
+import { MESSAGE_TYPE } from '../../types/enum'
 
 interface IChannelProps {
   channel: IChannel
@@ -76,6 +77,7 @@ interface IChannelProps {
     warningColor: string
     user: IUser
     MessageText: any
+    unsupportedMessage?: boolean
   }) => any
   doNotShowMessageDeliveryTypes: string[]
   showPhoneNumber?: boolean
@@ -121,7 +123,8 @@ const ChannelMessageText = ({
   accentColor,
   typingOrRecording,
   channel,
-  isDirectChannel
+  isDirectChannel,
+  unsupportedMessage
 }: {
   isTypingOrRecording?: boolean
   textPrimary: string
@@ -136,6 +139,7 @@ const ChannelMessageText = ({
   typingOrRecording: any
   channel: IChannel
   isDirectChannel: boolean
+  unsupportedMessage?: boolean
 }) => {
   const audioRecording = useMemo(() => {
     return getAudioRecordingFromMap(channel.id)
@@ -161,12 +165,13 @@ const ChannelMessageText = ({
               getFromContacts,
               isLastMessage: true,
               accentColor,
-              textSecondary
+              textSecondary,
+              unsupportedMessage
             })}
           </DraftMessageText>
         ) : lastMessage.state === MESSAGE_STATUS.DELETE ? (
           'Message was deleted.'
-        ) : lastMessage.type === 'system' ? (
+        ) : lastMessage.type === MESSAGE_TYPE.SYSTEM ? (
           `${
             lastMessage.user &&
             (lastMessage.user.id === user.id
@@ -223,7 +228,9 @@ const ChannelMessageText = ({
                       }`
                     : lastMessage.body === 'LG'
                       ? 'Left this group'
-                      : ''
+                      : lastMessage.body === 'JL'
+                        ? 'Joined this group via invite link'
+                        : ''
           }`
         ) : (
           <React.Fragment>
@@ -246,7 +253,8 @@ const ChannelMessageText = ({
                   getFromContacts,
                   isLastMessage: true,
                   accentColor,
-                  textSecondary
+                  textSecondary,
+                  unsupportedMessage
                 })}
               {channel.lastReactedMessage && '"'}
             </LastMessageDescription>
@@ -316,7 +324,7 @@ const Channel: React.FC<IChannelProps> = ({
   const lastMessage = channel.lastReactedMessage || channel.lastMessage
   const lastMessageMetas =
     lastMessage &&
-    lastMessage.type === 'system' &&
+    lastMessage.type === MESSAGE_TYPE.SYSTEM &&
     lastMessage.metadata &&
     (isJSON(lastMessage.metadata) ? JSON.parse(lastMessage.metadata) : lastMessage.metadata)
   const [statusWidth, setStatusWidth] = useState(0)
@@ -326,7 +334,9 @@ const Channel: React.FC<IChannelProps> = ({
     (isDirectChannel && directChannelUser
       ? directChannelUser.firstName || directChannelUser.id
       : isSelfChannel
-        ? 'Me'
+        ? showPhoneNumber
+          ? `+${user.id} (You)`
+          : 'Me'
         : '')
   const messageAuthorRef = useRef<any>(null)
   const messageTimeAndStatusRef = useRef<any>(null)
@@ -387,6 +397,17 @@ const Channel: React.FC<IChannelProps> = ({
       isRecording: !!filteredItems.find((item: any) => item.recordingState)
     }
   }, [typingOrRecordingIndicator])
+  const unsupportedMessage = useMemo(() => {
+    return (
+      lastMessage?.type !== MESSAGE_TYPE.SYSTEM &&
+      lastMessage?.type !== MESSAGE_TYPE.TEXT &&
+      lastMessage?.type !== MESSAGE_TYPE.MEDIA &&
+      lastMessage?.type !== MESSAGE_TYPE.FILE &&
+      lastMessage?.type !== MESSAGE_TYPE.LINK &&
+      lastMessage?.type !== MESSAGE_TYPE.POLL
+    )
+  }, [lastMessage?.type])
+
   const MessageText = useMemo(() => {
     return (
       <ChannelMessageText
@@ -403,6 +424,7 @@ const Channel: React.FC<IChannelProps> = ({
         draftMessageText={draftMessageText}
         lastMessage={draftMessage || lastMessage}
         isDirectChannel={isDirectChannel}
+        unsupportedMessage={unsupportedMessage}
       />
     )
   }, [
@@ -417,7 +439,8 @@ const Channel: React.FC<IChannelProps> = ({
     accentColor,
     typingOrRecording,
     channel,
-    isDirectChannel
+    isDirectChannel,
+    unsupportedMessage
   ])
 
   const getCustomLatestMessageComponent = useCallback(
@@ -436,7 +459,8 @@ const Channel: React.FC<IChannelProps> = ({
       getFromContacts,
       warningColor,
       user,
-      MessageText
+      MessageText,
+      unsupportedMessage
     }: {
       lastMessage: IMessage
       typingOrRecording: any
@@ -453,6 +477,7 @@ const Channel: React.FC<IChannelProps> = ({
       warningColor: string
       user: IUser
       MessageText: any
+      unsupportedMessage?: boolean
     }) => {
       return (
         getCustomLatestMessage &&
@@ -471,7 +496,8 @@ const Channel: React.FC<IChannelProps> = ({
           getFromContacts,
           warningColor,
           user,
-          MessageText
+          MessageText,
+          unsupportedMessage
         })
       )
     },
@@ -491,7 +517,8 @@ const Channel: React.FC<IChannelProps> = ({
       getFromContacts,
       warningColor,
       user,
-      MessageText
+      MessageText,
+      unsupportedMessage
     ]
   )
 
@@ -559,7 +586,9 @@ const Channel: React.FC<IChannelProps> = ({
               : isSelfChannel
                 ? showPhoneNumber && channel.members?.length && channel.members[0]?.id
                   ? `+${channel.members[0]?.id} (You)`
-                  : 'Me'
+                  : showPhoneNumber
+                    ? `+${user.id} (You)`
+                    : 'Me'
                 : '')}
         </h3>
         {channel.muted && (
@@ -583,7 +612,8 @@ const Channel: React.FC<IChannelProps> = ({
               getFromContacts,
               warningColor,
               user,
-              MessageText
+              MessageText,
+              unsupportedMessage
             })
           : (lastMessage || typingOrRecording.items.length > 0 || draftMessageText) && (
               <LastMessage
@@ -615,7 +645,7 @@ const Channel: React.FC<IChannelProps> = ({
                 ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
                   lastMessage.state !== MESSAGE_STATUS.DELETE &&
                   ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
-                  lastMessage.type !== 'system' && (
+                  lastMessage.type !== MESSAGE_TYPE.SYSTEM && (
                     <LastMessageAuthor color={textPrimary}>
                       <span ref={messageAuthorRef}>
                         {channel.newReactions[0].user.id === user.id
@@ -633,7 +663,7 @@ const Channel: React.FC<IChannelProps> = ({
                   lastMessage.user &&
                   lastMessage.state !== MESSAGE_STATUS.DELETE &&
                   ((lastMessage.user && lastMessage.user.id === user.id) || !isDirectChannel) &&
-                  lastMessage.type !== 'system' && (
+                  lastMessage.type !== MESSAGE_TYPE.SYSTEM && (
                     <LastMessageAuthor color={textPrimary}>
                       <span ref={messageAuthorRef}>
                         {lastMessage.user.id === user.id

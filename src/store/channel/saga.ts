@@ -398,7 +398,11 @@ function* searchChannels(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
-            if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
+            if (
+              userName.includes(lowerCaseSearchBy) ||
+              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+            ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
             }
@@ -578,7 +582,11 @@ function* searchChannelsForForward(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
-            if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
+            if (
+              userName.includes(lowerCaseSearchBy) ||
+              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+            ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
             }

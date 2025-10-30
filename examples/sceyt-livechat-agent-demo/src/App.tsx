@@ -110,7 +110,6 @@ function App() {
             <SceytChat
               client={client}
               logLevel='silent'
-              baseUrlForInviteMembers={'http://localhost:3000/join'}
             >
               <ChannelList />
               <Chat>

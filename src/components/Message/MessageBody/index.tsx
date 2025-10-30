@@ -28,6 +28,7 @@ import MessageStatusAndTime from '../MessageStatusAndTime'
 import PollMessage from '../PollMessage'
 import log from 'loglevel'
 import { OGMetadata } from '../OGMetadata'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -159,6 +160,23 @@ interface IMessageBodyProps {
   messageTextRef: React.RefObject<HTMLSpanElement>
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
+    ogContainerBorderRadius?: string | number
+    ogContainerPadding?: string
+    ogContainerClassName?: string
+    ogContainerShowBackground?: boolean
+    ogContainerBackground?: string
+    infoPadding?: string
+  }
+  unsupportedMessage: boolean
 }
 
 const MessageBody = ({
@@ -284,7 +302,9 @@ const MessageBody = ({
   handleCreateChat,
   messageTextRef,
   handleOpenUserProfile,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  ogMetadataProps,
+  unsupportedMessage
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -315,14 +335,14 @@ const MessageBody = ({
   const firstMessageInInterval = useMemo(
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-      prevMessage?.type === 'system' ||
+      prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
     [prevMessage, current, unreadMessageId]
   )
   const lastMessageInInterval = useMemo(
     () =>
       !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-      nextMessage.type === 'system',
+      nextMessage.type === MESSAGE_TYPE.SYSTEM,
     [nextMessage, current]
   )
   const messageTimeVisible = useMemo(
@@ -344,6 +364,8 @@ const MessageBody = ({
   )
 
   const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
+  const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
+  const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment = useMemo(
     () =>
@@ -362,6 +384,10 @@ const MessageBody = ({
       (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata),
     [mediaAttachment]
   )
+
+  const fileAttachment = useMemo(() => {
+    return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file)
+  }, [message.attachments])
 
   const borderRadius = useMemo(
     () =>
@@ -644,9 +670,28 @@ const MessageBody = ({
         incomingMessageStyles={incomingMessageStyles}
         incoming={message.incoming}
         linkColor={linkColor}
+        unsupportedMessage={unsupportedMessage}
+        unsupportedMessageColor={textSecondary}
       >
-        {linkAttachment && (
-          <OGMetadata attachments={[linkAttachment]} state={message.state} incoming={message.incoming} />
+        {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+          <OGMetadata
+            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxHeight={ogMetadataProps?.maxHeight}
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 3, title: 1, description: 2, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
+          />
         )}
         <span ref={messageTextRef}>
           {MessageTextFormat({
@@ -657,13 +702,34 @@ const MessageBody = ({
             accentColor,
             textSecondary,
             onMentionNameClick: handleOpenUserProfile,
-            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention
+            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+            unsupportedMessage
           })}
         </span>
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
           ''
+        )}
+        {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+          <OGMetadata
+            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxHeight={ogMetadataProps?.maxHeight}
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 1, title: 2, description: 3, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
+          />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
         !notLinkAttachment &&
@@ -907,7 +973,14 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.messageActionsShow === nextProps.messageActionsShow &&
     prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
     prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
-    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen
+    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen &&
+    (prevProps.ogMetadataProps?.ogLayoutOrder || 'og-first') ===
+      (nextProps.ogMetadataProps?.ogLayoutOrder || 'og-first') &&
+    prevProps.ogMetadataProps?.ogShowUrl === nextProps.ogMetadataProps?.ogShowUrl &&
+    prevProps.ogMetadataProps?.ogShowTitle === nextProps.ogMetadataProps?.ogShowTitle &&
+    prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
+    prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
+    prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order
   )
 })
 
@@ -926,7 +999,7 @@ const ForwardedTitle = styled.h3<{
   font-size: 13px;
   line-height: 16px;
   color: ${(props) => props.color};
-  //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
+  // margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
   padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
   padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};

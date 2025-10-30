@@ -75,6 +75,7 @@ import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
+  clearPendingMessagesMap,
   deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
@@ -1341,6 +1342,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       const pendingMessagesMap = getPendingMessagesMap()
       const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
+      clearPendingMessagesMap()
+      
       setTimeout(() => {
         Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
           pendingMessagesMapCopy[key].forEach((msg: IMessage) => {
