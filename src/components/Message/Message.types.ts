@@ -207,12 +207,19 @@ export interface IMessageProps {
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
   ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
     ogLayoutOrder?: 'link-first' | 'og-first'
     ogShowUrl?: boolean
     ogShowTitle?: boolean
     ogShowDescription?: boolean
     ogShowFavicon?: boolean
     order?: { image?: number; title?: number; description?: number; link?: number }
+    ogContainerBorderRadius?: string | number
+    ogContainerPadding?: string
+    ogContainerClassName?: string
+    ogContainerShowBackground?: boolean
+    ogContainerBackground?: string
   }
   showInfoMessageProps?: {
     togglePopup?: () => void

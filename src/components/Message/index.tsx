@@ -181,6 +181,8 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   ogMetadataProps = {
+    maxWidth: 400,
+    maxHeight: 240,
     ogLayoutOrder: 'link-first',
     ogShowUrl: true,
     ogShowTitle: true,

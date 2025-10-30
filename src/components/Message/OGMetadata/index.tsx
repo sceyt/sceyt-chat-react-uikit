@@ -23,22 +23,38 @@ const OGMetadata = ({
   attachments,
   state,
   incoming,
-  ogLayoutOrder = 'link-first',
   ogShowUrl = true,
   ogShowTitle = true,
   ogShowDescription = true,
   ogShowFavicon = true,
-  order = { image: 1, title: 2, description: 3, link: 4 }
+  order = { image: 1, title: 2, description: 3, link: 4 },
+  maxWidth = 400,
+  maxHeight = 240,
+  ogContainerBorderRadius,
+  ogContainerPadding,
+  ogContainerClassName,
+  ogContainerShowBackground = true,
+  ogContainerBackground,
+  infoPadding = '0',
+  ogContainerMargin
 }: {
   attachments: IAttachment[]
   state: string
   incoming: boolean
-  ogLayoutOrder?: 'link-first' | 'og-first'
   ogShowUrl?: boolean
   ogShowTitle?: boolean
   ogShowDescription?: boolean
   ogShowFavicon?: boolean
   order?: { image?: number; title?: number; description?: number; link?: number }
+  maxWidth?: number
+  maxHeight?: number
+  ogContainerBorderRadius?: string | number
+  ogContainerPadding?: string
+  ogContainerClassName?: string
+  ogContainerShowBackground?: boolean
+  ogContainerBackground?: string
+  infoPadding?: string
+  ogContainerMargin?: string
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -136,8 +152,8 @@ const OGMetadata = ({
     if (!metadata?.imageWidth) {
       return 0
     }
-    return metadata?.imageHeight / (metadata?.imageWidth / 400)
-  }, [metadata?.imageWidth, metadata?.imageHeight])
+    return metadata?.imageHeight / (metadata?.imageWidth / maxWidth)
+  }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
   if (!showOGMetadata) return null
 
@@ -153,9 +169,11 @@ const OGMetadata = ({
           render: (
             <ImageContainer
               showOGMetadata={!!showOGMetadata}
-              containerWidth={400}
+              containerWidth={maxWidth}
               containerHeight={calculatedImageHeight}
               shouldAnimate={shouldAnimate}
+              maxWidth={maxWidth}
+              maxHeight={maxHeight}
             >
               <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
             </ImageContainer>
@@ -166,7 +184,7 @@ const OGMetadata = ({
       key: 'title',
       order: resolvedOrder?.title ?? 2,
       render: ogShowTitle && metadata?.og?.title && (
-        <Title maxWidth={400} shouldAnimate={shouldAnimate}>
+        <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
           <span>{metadata?.og?.title}</span>
         </Title>
       )
@@ -175,7 +193,7 @@ const OGMetadata = ({
       key: 'description',
       order: resolvedOrder?.description ?? 3,
       render: ogShowDescription && metadata?.og?.description && (
-        <Desc maxWidth={400} shouldAnimate={shouldAnimate} color={textSecondary}>
+        <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
           {metadata?.og?.description}
         </Desc>
       )
@@ -184,7 +202,7 @@ const OGMetadata = ({
       key: 'link',
       order: resolvedOrder?.link ?? 4,
       render: ogShowUrl && (
-        <Url maxWidth={400} shouldAnimate={shouldAnimate}>
+        <Url maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
           {ogUrl}
         </Url>
       )
@@ -194,7 +212,7 @@ const OGMetadata = ({
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0))
 
   const textContent = (
-    <OGText shouldAnimate={shouldAnimate}>
+    <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
       {elements
         .filter((el) => el.key !== 'image')
         .map((el) => (
@@ -204,7 +222,7 @@ const OGMetadata = ({
   )
 
   const content = hasImage ? (
-    <OGText shouldAnimate={shouldAnimate}>
+    <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
       {elements.map((el) => (
         <React.Fragment key={el.key}>{el.render}</React.Fragment>
       ))}
@@ -221,30 +239,47 @@ const OGMetadata = ({
   )
 
   return (
-    <OGMetadataContainer
-      showOGMetadata={!!showOGMetadata}
-      bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
-    >
-      {ogLayoutOrder === 'og-first' && content}
-      <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
-        {ogLayoutOrder !== 'og-first' && content}
-      </div>
-    </OGMetadataContainer>
+    <div className='ogmetadata-container'>
+      <OGMetadataContainer
+        showOGMetadata={!!showOGMetadata}
+        bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
+        showBackground={ogContainerShowBackground}
+        customBg={ogContainerBackground}
+        borderRadius={ogContainerBorderRadius}
+        padding={ogContainerPadding}
+        className={ogContainerClassName}
+        containerMargin={ogContainerMargin}
+      >
+        <div onClick={() => window.open(attachment?.url, '_blank')} style={{ width: '100%', cursor: 'pointer' }}>
+          {content}
+        </div>
+      </OGMetadataContainer>
+    </div>
   )
 }
 
 export { OGMetadata }
 
-const OGMetadataContainer = styled.div<{ showOGMetadata: boolean; bgColor: string }>`
+const OGMetadataContainer = styled.div<{
+  showOGMetadata: boolean
+  bgColor: string
+  showBackground: boolean
+  customBg?: string
+  borderRadius?: string | number
+  padding?: string
+  containerMargin?: string
+}>`
   min-width: inherit;
   max-width: inherit;
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
-  background-color: ${({ bgColor }) => bgColor};
-  border-radius: 8px;
-  margin: 0.8rem auto;
-  margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
+  background-color: ${({ showBackground, customBg, bgColor }) =>
+    showBackground ? customBg ?? bgColor : 'transparent'};
+  border-radius: ${({ borderRadius }) => (borderRadius !== undefined ? borderRadius : '8px')};
+  margin: ${({ containerMargin }) => containerMargin ?? '0.8rem auto 0'};
+  // margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
+  padding: ${({ padding }) => padding ?? '0'};
   &:hover {
     opacity: 0.9;
     cursor: pointer;
@@ -256,19 +291,20 @@ const ImageContainer = styled.div<{
   containerWidth: number
   containerHeight: number
   shouldAnimate: boolean
+  maxWidth: number
+  maxHeight: number
 }>`
   width: 100%;
-  max-width: 400px;
+  max-width: ${({ maxWidth }) => (maxWidth ? `${maxWidth}px` : '400px')};
+  max-height: ${({ maxHeight }) => (maxHeight ? `${maxHeight}px` : '240px')};
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   margin: 0 auto;
-  border-radius: 8px;
   overflow: hidden;
   transition: ${({ shouldAnimate }) => (shouldAnimate ? 'height 0.2s ease, opacity 0.2s ease' : 'none')};
 `
 
-const OGText = styled.div<{ shouldAnimate: boolean }>`
-  margin: 12px;
+const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
   display: flex;
   flex-direction: column;
   gap: 0;
@@ -277,14 +313,15 @@ const OGText = styled.div<{ shouldAnimate: boolean }>`
     `
     transition: all 0.2s ease;
   `}
+  ${({ margin }) => (margin ? '12px' : '0')};
 `
 
-const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
+const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
   font-weight: bold;
   font-size: 13px;
   line-height: 16px;
-  margin: 0 0 4px 0;
-  padding: 0;
+  margin: 8px 0 0 0;
+  padding: ${({ padding }) => padding ?? '0'};
   ${({ maxWidth }) =>
     maxWidth &&
     `
@@ -301,12 +338,13 @@ const Desc = styled.p<{
   maxWidth: number
   shouldAnimate: boolean
   color: string
+  padding?: string
 }>`
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
   margin: 0 0 8px 0;
-  padding: 0;
+  padding: ${({ padding }) => padding ?? '0'};
   color: ${({ color }) => color};
   display: -webkit-box;
   -webkit-line-clamp: 3;
@@ -324,12 +362,12 @@ const Desc = styled.p<{
   `}
 `
 
-const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
+const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
   margin: 0 0 12px 0;
-  padding: 0;
+  padding: ${({ padding }) => padding ?? '0'};
   color: gray;
   ${({ maxWidth }) =>
     maxWidth &&
@@ -344,8 +382,6 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean }>`
 `
 
 const Img = styled.img<{ shouldAnimate: boolean }>`
-  // width: 400px;
-  // height: 240px;
   width: 100%;
   height: 100%;
   object-fit: contain;

@@ -159,12 +159,19 @@ interface IMessageBodyProps {
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
   ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
     ogLayoutOrder?: 'link-first' | 'og-first'
     ogShowUrl?: boolean
     ogShowTitle?: boolean
     ogShowDescription?: boolean
     ogShowFavicon?: boolean
     order?: { image?: number; title?: number; description?: number; link?: number }
+    ogContainerBorderRadius?: string | number
+    ogContainerPadding?: string
+    ogContainerClassName?: string
+    ogContainerShowBackground?: boolean
+    ogContainerBackground?: string
   }
 }
 
@@ -657,15 +664,21 @@ const MessageBody = ({
       >
         {ogContainerFirst && linkAttachment && (
           <OGMetadata
+            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxHeight={ogMetadataProps?.maxHeight || 240}
             attachments={[linkAttachment]}
             state={message.state}
             incoming={message.incoming}
-            ogLayoutOrder='og-first'
             ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
             ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
             ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
             ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
             order={ogMetadataProps?.order || { image: 3, title: 1, description: 2, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
           />
         )}
         <span ref={messageTextRef}>
@@ -687,15 +700,21 @@ const MessageBody = ({
         )}
         {!ogContainerFirst && linkAttachment && (
           <OGMetadata
+            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxHeight={ogMetadataProps?.maxHeight || 240}
             attachments={[linkAttachment]}
             state={message.state}
             incoming={message.incoming}
-            ogLayoutOrder={ogContainerOrder}
             ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
             ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
             ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
             ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
             order={ogMetadataProps?.order || { image: 1, title: 2, description: 3, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
           />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
@@ -964,7 +983,7 @@ const ForwardedTitle = styled.h3<{
   font-size: 13px;
   line-height: 16px;
   color: ${(props) => props.color};
-  //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
+  // margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
   padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
   padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};

@@ -329,6 +329,8 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
     ogLayoutOrder?: 'link-first' | 'og-first'
     ogShowUrl?: boolean
     ogShowTitle?: boolean
@@ -475,6 +477,8 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps = {
+    maxWidth: 400,
+    maxHeight: 240,
     ogLayoutOrder: 'link-first',
     ogShowUrl: true,
     ogShowTitle: true,
