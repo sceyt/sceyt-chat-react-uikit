@@ -384,6 +384,10 @@ const MessageBody = ({
     [mediaAttachment]
   )
 
+  const fileAttachment = useMemo(() => {
+    return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file)
+  }, [message.attachments])
+
   const borderRadius = useMemo(
     () =>
       message.incoming && incomingMessageStyles?.background === 'inherit'
@@ -668,7 +672,7 @@ const MessageBody = ({
         unsupportedMessage={unsupportedMessage}
         unsupportedMessageColor={textSecondary}
       >
-        {ogContainerFirst && linkAttachment && (
+        {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
             maxWidth={ogMetadataProps?.maxWidth || 400}
             maxHeight={ogMetadataProps?.maxHeight}
@@ -706,7 +710,7 @@ const MessageBody = ({
         ) : (
           ''
         )}
-        {!ogContainerFirst && linkAttachment && (
+        {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
             maxWidth={ogMetadataProps?.maxWidth || 400}
             maxHeight={ogMetadataProps?.maxHeight}
