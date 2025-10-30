@@ -111,7 +111,7 @@ const OGMetadata = ({
           handleMetadata({ ...metadata })
         }
       } catch (error) {
-        console.log('Failed to fetch OG metadata')
+        console.log('Failed to fetch OG metadata', url)
         handleMetadata(null)
       }
     }
@@ -254,7 +254,7 @@ const OGMetadata = ({
   ) : (
     textContent
   ), [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent])
-  console.log('showOGMetadata, containerHeight', showOGMetadata, calculatedImageHeight)
+
   return (
     <div className='ogmetadata-container'>
       <OGMetadataContainer
