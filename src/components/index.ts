@@ -23,6 +23,7 @@ import {
   handleSendMessage,
   handleGetMessage
 } from 'helpers/methods'
+import { MESSAGE_TYPE } from 'types/enum'
 
 export {
   SceytChat,
@@ -46,6 +47,7 @@ export {
   SceytChatUIKitTheme,
   ThemeMode,
   THEME_COLORS,
+  MESSAGE_TYPE,
   handleSendMessage,
   handleGetMessage,
   createOrGetDirectChannel,

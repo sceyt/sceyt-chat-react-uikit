@@ -204,6 +204,17 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
+    infoPadding?: string
+  }
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -341,7 +352,18 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties = [],
   shouldOpenUserProfileForMention,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  ogMetadataProps = {
+    maxWidth: 400,
+    maxHeight: undefined,
+    ogLayoutOrder: 'link-first',
+    ogShowUrl: false,
+    ogShowTitle: true,
+    ogShowDescription: true,
+    ogShowFavicon: true,
+    order: { image: 1, title: 2, description: 3, link: 4 },
+    infoPadding: '0 8px'
+  }
 }) => {
   return (
     <React.Fragment>
@@ -476,6 +498,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         hiddenMessagesProperties={hiddenMessagesProperties}
         shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
         showInfoMessageProps={showInfoMessageProps}
+        ogMetadataProps={ogMetadataProps}
       />
     </React.Fragment>
   )

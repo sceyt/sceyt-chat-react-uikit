@@ -12,6 +12,7 @@ import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
 import { MessageOwner, ReplyMessageText } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IMessage } from '../../../types'
+import { MESSAGE_TYPE } from 'types/enum'
 import { MessageTextFormat } from '../../../messageUtils'
 // Components
 import Attachment from '../../Attachment'
@@ -102,6 +103,17 @@ const RepliedMessage = ({
     message.parentMessage!.attachments.length
   ])
 
+  const unsupportedMessage = useMemo(() => {
+    return (
+      message.parentMessage!.type !== MESSAGE_TYPE.SYSTEM &&
+      message.parentMessage!.type !== MESSAGE_TYPE.TEXT &&
+      message.parentMessage!.type !== MESSAGE_TYPE.MEDIA &&
+      message.parentMessage!.type !== MESSAGE_TYPE.FILE &&
+      message.parentMessage!.type !== MESSAGE_TYPE.LINK &&
+      message.parentMessage!.type !== MESSAGE_TYPE.POLL
+    )
+  }, [message.parentMessage!.type])
+
   return (
     <ReplyMessageContainer
       withSenderName={showMessageSenderName}
@@ -175,7 +187,8 @@ const RepliedMessage = ({
               getFromContacts,
               asSampleText: true,
               accentColor,
-              textSecondary
+              textSecondary,
+              unsupportedMessage
             })
           ) : (
             parentNotLinkAttachment &&
