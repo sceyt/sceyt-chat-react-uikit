@@ -157,7 +157,6 @@ function App() {
                             <SceytChat
                                 showNotifications={false}
                                 client={client}
-                                baseUrlForInviteMembers={'http://localhost:3000/join'}
                                 autoSelectFirstChannel={true}
                             >
                                 <Chat onSelectedChannelUpdated={handleUpdateUnreadCount} hideChannelList={true}>
