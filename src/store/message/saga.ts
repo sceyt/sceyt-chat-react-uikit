@@ -168,9 +168,11 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
         }
       }
 
-      const attachmentMeta = attachment.cachedUrl
-        ? attachment.metadata
-        : JSON.stringify({
+      const attachmentMetaObj = attachment.cachedUrl
+        ? typeof attachment.metadata === 'string'
+          ? JSON.parse(attachment.metadata)
+          : attachment.metadata
+        : {
             ...(attachment.metadata
               ? typeof attachment.metadata === 'string'
                 ? JSON.parse(attachment.metadata)
@@ -183,7 +185,14 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
                 szh: thumbnailMetas.imageHeight,
                 ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
               })
-          })
+          }
+
+      // Always stringify metadata for SDK
+      const attachmentMeta =
+        typeof attachmentMetaObj === 'object' && attachmentMetaObj !== null
+          ? JSON.stringify(attachmentMetaObj)
+          : attachmentMetaObj || ''
+
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -262,9 +271,14 @@ function* sendMessage(action: IAction): any {
           }
           const attachmentBuilder = channel.createAttachmentBuilder(uri || attachment.data, attachment.type)
 
+          const metadataForSDK =
+            typeof attachment.metadata === 'object' && attachment.metadata !== null
+              ? JSON.stringify(attachment.metadata)
+              : attachment.metadata
+
           const messageAttachment = attachmentBuilder
             .setName(attachment.name)
-            .setMetadata(attachment.metadata)
+            .setMetadata(metadataForSDK)
             .setUpload(customUploader ? false : attachment.upload)
             .setFileSize(attachment.size)
             .create()
@@ -412,7 +426,43 @@ function* sendMessage(action: IAction): any {
               messageToSend.attachments = [...attachmentsToSend]
             }
 
+            // LOG: Before sending - check for voice attachments
+            const voiceAttachments = messageToSend.attachments?.filter((att: IAttachment) => att.type === 'voice')
+            if (voiceAttachments && voiceAttachments.length > 0) {
+              log.info(
+                '🎤📤 [SEND] Voice attachment metadata before sending to SDK:',
+                voiceAttachments.map((att: IAttachment) => ({
+                  tid: att.tid,
+                  name: att.name,
+                  type: att.type,
+                  metadata: att.metadata,
+                  size: att.size
+                }))
+              )
+            }
+
             const messageResponse = yield call(channel.sendMessage, messageToSend)
+
+            // LOG: After receiving response - check for voice attachments
+            const voiceAttachmentsResponse = messageResponse.attachments?.filter(
+              (att: IAttachment) => att.type === 'voice'
+            )
+            if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
+              log.info(
+                '🎤📥 [RESPONSE] Voice attachment metadata after SDK response:',
+                voiceAttachmentsResponse.map((att: IAttachment) => ({
+                  id: att.id,
+                  name: att.name,
+                  type: att.type,
+                  metadata: att.metadata,
+                  metadataType: typeof att.metadata,
+                  metadataLength: typeof att.metadata === 'string' ? att.metadata.length : 'N/A',
+                  url: att.url
+                }))
+              )
+            }
+
+            log.info('🔍 [SAGA] Full messageResponse.attachments:', messageResponse.attachments)
             if (customUploader) {
               for (let k = 0; k < messageAttachment.length; k++) {
                 messageResponse.attachments[k] = {
@@ -448,9 +498,58 @@ function* sendMessage(action: IAction): any {
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 if (currentAttachmentsMap[attachment.tid!]) {
                   log.info('set at')
-                  return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+
+                  // Parse metadata if it's a string
+                  let parsedMetadata = attachment.metadata
+                  log.info('🔍 [SAGA] Processing attachment metadata:', {
+                    tid: attachment.tid,
+                    metadataType: typeof attachment.metadata,
+                    metadata: attachment.metadata,
+                    metadataLength: typeof attachment.metadata === 'string' ? attachment.metadata.length : 'N/A'
+                  })
+
+                  if (
+                    typeof attachment.metadata === 'string' &&
+                    attachment.metadata &&
+                    attachment.metadata.trim() !== ''
+                  ) {
+                    try {
+                      parsedMetadata = JSON.parse(attachment.metadata)
+                      log.info('✅ [SAGA] Parsed attachment metadata string for tid:', attachment.tid, parsedMetadata)
+                    } catch (e) {
+                      log.warn('❌ [SAGA] Failed to parse attachment metadata:', e)
+                      // Keep original metadata if parsing fails
+                      parsedMetadata = attachment.metadata
+                    }
+                  } else if (typeof attachment.metadata === 'string' && attachment.metadata.trim() === '') {
+                    log.warn('⚠️ [SAGA] Attachment metadata is empty string, keeping original')
+                    // Metadata is empty string - don't overwrite
+                    parsedMetadata = attachment.metadata
+                  }
+
+                  return {
+                    ...attachment,
+                    metadata: parsedMetadata,
+                    attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl
+                  }
                 }
-                return attachment
+
+                // Also parse metadata for attachments not in the map
+                let parsedMetadata = attachment.metadata
+                if (
+                  typeof attachment.metadata === 'string' &&
+                  attachment.metadata &&
+                  attachment.metadata.trim() !== ''
+                ) {
+                  try {
+                    parsedMetadata = JSON.parse(attachment.metadata)
+                  } catch (e) {
+                    log.warn('❌ [SAGA] Failed to parse attachment metadata:', e)
+                    parsedMetadata = attachment.metadata
+                  }
+                }
+
+                return { ...attachment, metadata: parsedMetadata }
               })
             }
             const messageUpdateData = {
@@ -582,12 +681,56 @@ function* sendTextMessage(action: IAction): any {
       yield call(addPendingMessage, message, pendingMessage, channel)
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
+      // LOG: Before sending - check for voice attachments
+      const voiceAttachments = messageToSend.attachments?.filter((att: IAttachment) => att.type === 'voice')
+      if (voiceAttachments && voiceAttachments.length > 0) {
+        log.info(
+          '🎤📤 [SEND_TEXT] Voice attachment metadata before sending to SDK:',
+          voiceAttachments.map((att: IAttachment) => ({
+            name: att.name,
+            type: att.type,
+            metadata: att.metadata
+          }))
+        )
+      }
+
       let messageResponse
       if (sendMessageHandler) {
         messageResponse = yield call(sendMessageHandler, messageToSend, channel.id)
       } else {
         messageResponse = yield call(channel.sendMessage, messageToSend)
       }
+
+      // Parse attachment metadata if needed
+      const parsedAttachments =
+        messageResponse.attachments?.map((att: IAttachment) => {
+          let parsedMetadata = att.metadata
+          if (typeof att.metadata === 'string' && att.metadata) {
+            try {
+              parsedMetadata = JSON.parse(att.metadata)
+              log.info('✅ [SAGA] Parsed attachment metadata in sendTextMessage')
+            } catch (e) {
+              log.warn('❌ [SAGA] Failed to parse attachment metadata in sendTextMessage:', e)
+            }
+          }
+          return { ...att, metadata: parsedMetadata }
+        }) || []
+
+      // LOG: After receiving response - check for voice attachments
+      const voiceAttachmentsResponse = parsedAttachments?.filter((att: IAttachment) => att.type === 'voice')
+      if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
+        log.info(
+          '🎤📥 [RESPONSE_TEXT] Voice attachment metadata after SDK response:',
+          voiceAttachmentsResponse.map((att: IAttachment) => ({
+            id: att.id,
+            name: att.name,
+            type: att.type,
+            metadata: att.metadata,
+            url: att.url
+          }))
+        )
+      }
+
       const messageUpdateData = {
         id: messageResponse.id,
         body: messageResponse.body,
@@ -596,7 +739,7 @@ function* sendTextMessage(action: IAction): any {
         bodyAttributes: messageResponse.bodyAttributes,
         displayCount: messageResponse.displayCount,
         deliveryStatus: messageResponse.deliveryStatus,
-        attachments: messageResponse.attachments,
+        attachments: parsedAttachments,
         mentionedUsers: messageResponse.mentionedUsers,
         metadata: messageResponse.metadata,
         parentMessage: messageResponse.parentMessage,
@@ -677,10 +820,16 @@ function* forwardMessage(action: IAction): any {
       )
     ) {
       if (message.attachments && message.attachments.length) {
+        // Stringify metadata if it's an object (SDK expects string)
+        const metadataForSDK =
+          typeof attachments[0].metadata === 'object' && attachments[0].metadata !== null
+            ? JSON.stringify(attachments[0].metadata)
+            : attachments[0].metadata || ''
+
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
-          .setMetadata(attachments[0].metadata)
+          .setMetadata(metadataForSDK)
           .setFileSize(attachments[0].size)
           .setUpload(false)
           .create()
@@ -732,13 +881,29 @@ function* forwardMessage(action: IAction): any {
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
+
+        // Parse attachment metadata if needed
+        const parsedAttachments =
+          messageResponse.attachments?.map((att: IAttachment) => {
+            let parsedMetadata = att.metadata
+            if (typeof att.metadata === 'string' && att.metadata) {
+              try {
+                parsedMetadata = JSON.parse(att.metadata)
+                log.info('✅ [SAGA] Parsed attachment metadata in forwardMessage')
+              } catch (e) {
+                log.warn('❌ [SAGA] Failed to parse attachment metadata in forwardMessage:', e)
+              }
+            }
+            return { ...att, metadata: parsedMetadata }
+          }) || []
+
         const messageUpdateData = {
           id: messageResponse.id,
           type: messageResponse.type,
           state: messageResponse.state,
           displayCount: messageResponse.displayCount,
           deliveryStatus: messageResponse.deliveryStatus,
-          attachments: messageResponse.attachments,
+          attachments: parsedAttachments,
           mentionedUsers: messageResponse.mentionedUsers,
           metadata: messageResponse.metadata,
           parentMessage: messageResponse.parentMessage,
@@ -885,11 +1050,14 @@ function* resendMessage(action: IAction): any {
                 }
               }
             }
-            let attachmentMeta: string
+            let attachmentMetaObj
             if (messageAttachment.cachedUrl) {
-              attachmentMeta = messageAttachment.metadata
+              attachmentMetaObj =
+                typeof messageAttachment.metadata === 'string'
+                  ? JSON.parse(messageAttachment.metadata)
+                  : messageAttachment.metadata
             } else {
-              attachmentMeta = JSON.stringify({
+              attachmentMetaObj = {
                 ...(messageAttachment.metadata
                   ? typeof messageAttachment.metadata === 'string'
                     ? JSON.parse(messageAttachment.metadata)
@@ -902,8 +1070,14 @@ function* resendMessage(action: IAction): any {
                     szh: thumbnailMetas.imageHeight,
                     ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
                   })
-              })
+              }
             }
+
+            // Always stringify metadata for SDK
+            const attachmentMeta =
+              typeof attachmentMetaObj === 'object' && attachmentMetaObj !== null
+                ? JSON.stringify(attachmentMetaObj)
+                : attachmentMetaObj || ''
             log.info('attachmentMeta ... ', attachmentMeta)
             const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
 
@@ -927,8 +1101,48 @@ function* resendMessage(action: IAction): any {
             messageCopy.attachments = [attachmentToSend]
 
             if (connectionState === CONNECTION_STATUS.CONNECTED) {
+              // LOG: Before resending - check for voice attachments
+              if (attachmentToSend.type === 'voice') {
+                log.info('🎤📤 [RESEND] Voice attachment metadata before resending to SDK:', {
+                  tid: attachmentToSend.tid,
+                  name: attachmentToSend.name,
+                  type: attachmentToSend.type,
+                  metadata: attachmentToSend.metadata
+                })
+              }
+
               const messageResponse = yield call(channel.sendMessage, messageCopy)
+
+              // LOG: After receiving response - check for voice attachments
+              const voiceAttachmentsResponse = messageResponse.attachments?.filter(
+                (att: IAttachment) => att.type === 'voice'
+              )
+              if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
+                log.info(
+                  '🎤📥 [RESPONSE_RESEND] Voice attachment metadata after SDK response:',
+                  voiceAttachmentsResponse.map((att: IAttachment) => ({
+                    id: att.id,
+                    name: att.name,
+                    type: att.type,
+                    metadata: att.metadata,
+                    url: att.url
+                  }))
+                )
+              }
+
               deletePendingAttachment(messageAttachment.tid)
+
+              // Parse attachment metadata if needed
+              let parsedMetadata = messageResponse.attachments[0]?.metadata
+              if (typeof parsedMetadata === 'string' && parsedMetadata) {
+                try {
+                  parsedMetadata = JSON.parse(parsedMetadata)
+                  log.info('✅ [SAGA] Parsed attachment metadata in resendMessage')
+                } catch (e) {
+                  log.warn('❌ [SAGA] Failed to parse attachment metadata in resendMessage:', e)
+                }
+              }
+
               const messageUpdateData = {
                 id: messageResponse.id,
                 body: messageResponse.body,
@@ -939,6 +1153,7 @@ function* resendMessage(action: IAction): any {
                 attachments: [
                   {
                     ...messageResponse.attachments[0],
+                    metadata: parsedMetadata,
                     attachmentUrl: attachmentToSend.attachmentUrl,
                     tid: attachmentToSend.tid
                   }
@@ -989,7 +1204,37 @@ function* resendMessage(action: IAction): any {
       delete messageCopy.createdAt
 
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
+        // LOG: Before resending failed message - check for voice attachments
+        const voiceAttachments = messageCopy.attachments?.filter((att: IAttachment) => att.type === 'voice')
+        if (voiceAttachments && voiceAttachments.length > 0) {
+          log.info(
+            '🎤📤 [RESEND_FAILED] Voice attachment metadata before resending to SDK:',
+            voiceAttachments.map((att: IAttachment) => ({
+              id: att.id,
+              name: att.name,
+              type: att.type,
+              metadata: att.metadata
+            }))
+          )
+        }
+
         const messageResponse = yield call(channel.sendMessage, messageCopy)
+
+        // LOG: After receiving response - check for voice attachments
+        const voiceAttachmentsResponse = messageResponse.attachments?.filter((att: IAttachment) => att.type === 'voice')
+        if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
+          log.info(
+            '🎤📥 [RESPONSE_RESEND_FAILED] Voice attachment metadata after SDK response:',
+            voiceAttachmentsResponse.map((att: IAttachment) => ({
+              id: att.id,
+              name: att.name,
+              type: att.type,
+              metadata: att.metadata,
+              url: att.url
+            }))
+          )
+        }
+
         const messageUpdateData = {
           id: messageResponse.id,
           body: messageResponse.body,
