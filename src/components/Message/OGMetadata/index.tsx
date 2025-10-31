@@ -186,7 +186,7 @@ const OGMetadata = ({
         metadataGetSuccessCallback?.(false, false)
       }
     }
-  }, [metadata, metadataGetSuccessCallback, metadataLoaded, oGMetadata, attachment?.url, hasImage])
+  }, [metadata, metadataLoaded, oGMetadata, attachment?.url, hasImage])
 
   const elements = useMemo(() => [
     hasImage
