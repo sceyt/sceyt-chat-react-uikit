@@ -37,7 +37,8 @@ const OGMetadata = ({
   ogContainerBackground,
   infoPadding = '0 8px',
   ogContainerMargin,
-  target = '_blank'
+  target = '_blank',
+  metadataGetSuccessCallback
 }: {
   attachments: IAttachment[]
   state: string
@@ -57,6 +58,7 @@ const OGMetadata = ({
   infoPadding?: string
   ogContainerMargin?: string
   target?: string
+  metadataGetSuccessCallback?: (success: boolean) => void
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -69,12 +71,12 @@ const OGMetadata = ({
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
   }, [attachments])
 
+
   const metadata = useMemo(() => {
-    return oGMetadata[attachment?.url] || null
+    return oGMetadata?.[attachment?.url] || null
   }, [oGMetadata, attachment])
 
   const [imageLoadError, setImageLoadError] = useState(false)
-  // const [faviconLoadError, setFaviconLoadError] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
   const handleMetadata = useCallback((metadata: IOGMetadata | null) => {
@@ -103,8 +105,19 @@ const OGMetadata = ({
           }
           image.onerror = async () => {
             setImageLoadError(true)
-            await storeMetadata(url, { ...metadata })
-            handleMetadata({ ...metadata })
+
+            const favicon = new Image()
+            favicon.src = metadata?.og?.favicon?.url
+            if (favicon.src) {
+              favicon.onload = async () => {
+                await storeMetadata(url, { ...metadata, faviconLoaded: true })
+                handleMetadata({ ...metadata, faviconLoaded: true })
+              }
+              favicon.onerror = async () => {
+                await storeMetadata(url, { ...metadata, faviconLoaded: false })
+                handleMetadata({ ...metadata, faviconLoaded: false })
+              }
+            }
           }
         } else {
           await storeMetadata(url, { ...metadata })
@@ -158,27 +171,33 @@ const OGMetadata = ({
   }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
   const hasImage = useMemo(() => metadata?.og?.image?.[0]?.url && !imageLoadError, [metadata?.og?.image?.[0]?.url, imageLoadError])
-  const faviconUrl = useMemo(() => metadata?.og?.favicon?.url, [metadata?.og?.favicon?.url])
+  const faviconUrl = useMemo(() => ogShowFavicon && metadata?.faviconLoaded ? metadata?.og?.favicon?.url : '', [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
+
+  useEffect(() => {
+    if (metadata && metadataGetSuccessCallback && hasImage) {
+      metadataGetSuccessCallback(true)
+    }
+  }, [metadata, metadataGetSuccessCallback])
 
   const elements = useMemo(() => [
     hasImage
       ? {
-          key: 'image',
-          order: resolvedOrder?.image ?? 1,
-          render: (
-            <ImageContainer
-              showOGMetadata={!!showOGMetadata}
-              containerWidth={maxWidth}
-              containerHeight={calculatedImageHeight}
-              shouldAnimate={shouldAnimate}
-              maxWidth={maxWidth}
-              maxHeight={maxHeight || calculatedImageHeight}
-            >
-              <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
-            </ImageContainer>
-          )
-        }
+        key: 'image',
+        order: resolvedOrder?.image ?? 1,
+        render: (
+          <ImageContainer
+            showOGMetadata={!!showOGMetadata}
+            containerWidth={maxWidth}
+            containerHeight={calculatedImageHeight}
+            shouldAnimate={shouldAnimate}
+            maxWidth={maxWidth}
+            maxHeight={maxHeight || calculatedImageHeight}
+          >
+            <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
+          </ImageContainer>
+        )
+      }
       : null,
     {
       key: 'title',
@@ -244,7 +263,7 @@ const OGMetadata = ({
         <React.Fragment key={el.key}>{el.render}</React.Fragment>
       ))}
     </OGText>
-  ) : ogShowFavicon && faviconUrl ? (
+  ) : faviconUrl ? (
     <OGRow>
       <OGTextWrapper>{textContent}</OGTextWrapper>
       <FaviconContainer aria-hidden='true'>
