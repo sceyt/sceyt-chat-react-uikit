@@ -13,9 +13,9 @@ import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
-import log from 'loglevel'
-import WaveSurfer from 'wavesurfer.js'
 import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
+// Components
+import Waveform from 'components/Waveform'
 
 interface Recording {
   recordingSeconds: number
@@ -25,24 +25,17 @@ interface Recording {
   mediaRecorder: null | MediaRecorder
   audio?: string
 }
-
 interface AudioPlayerProps {
   url: string
   file: IAttachment
   messagePlayed: boolean | undefined
   channelId?: string
   incoming?: boolean
+  recording?: Recording
+  onRecordingChange?: (recording: Recording) => void
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, channelId, incoming }) => {
-  const recordingInitialState = {
-    recordingSeconds: 0,
-    recordingMilliseconds: 0,
-    initRecording: false,
-    mediaStream: null,
-    mediaRecorder: null,
-    audio: undefined
-  }
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -50,213 +43,182 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
-  const [recording, setRecording] = useState<Recording>(recordingInitialState)
-  const [isRendered, setIsRendered] = useState<any>(false)
-  const [playAudio, setPlayAudio] = useState<any>(false)
+  const [playAudio, setPlayAudio] = useState<boolean>(false)
+  const [currentTime, setCurrentTime] = useState<string>('')
+  const [audioRate, setAudioRate] = useState<number>(1)
+  const [duration, setDuration] = useState<number>(0)
+  const [progress, setProgress] = useState<number>(0)
+  const [peaks, setPeaks] = useState<number[]>([])
 
-  const [currentTime, setCurrentTime] = useState<any>('')
-  const [audioRate, setAudioRate] = useState<any>(1)
-
-  const wavesurfer = useRef<any>(null)
-  const wavesurferContainer = useRef<any>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
   const intervalRef = useRef<any>(null)
 
   const handleSetAudioRate = () => {
-    if (wavesurfer.current) {
+    if (audioRef.current) {
       if (audioRate === 1) {
         setAudioRate(1.5)
-        wavesurfer.current.setPlaybackRate(1.5)
+        audioRef.current.playbackRate = 1.5
       } else if (audioRate === 1.5) {
         setAudioRate(2)
-        wavesurfer.current.audioRate = 2
-        wavesurfer.current.setPlaybackRate(2)
+        audioRef.current.playbackRate = 2
       } else {
         setAudioRate(1)
-        wavesurfer.current.audioRate = 1
-        wavesurfer.current.setPlaybackRate(1)
+        audioRef.current.playbackRate = 1
       }
     }
   }
 
   const handlePlayPause = () => {
-    if (wavesurfer.current) {
-      if (!wavesurfer.current.isPlaying()) {
+    if (audioRef.current) {
+      if (audioRef.current.paused) {
+        audioRef.current.play()
         setPlayAudio(true)
         dispatch(setPlayingAudioIdAC(`player_${file.id}`))
-        // const audioDuration = wavesurfer.current.getDuration()
-        intervalRef.current = setInterval(() => {
-          const currentTime = wavesurfer.current.getCurrentTime()
-          if (currentTime >= 0) {
-            setCurrentTime(formatAudioVideoTime(currentTime))
-          }
-        }, 10)
+        if (!messagePlayed && incoming) {
+          dispatch(markVoiceMessageAsPlayedAC(channelId!, [file.messageId]))
+        }
       } else {
+        audioRef.current.pause()
+        setPlayAudio(false)
         if (playingAudioId === file.id) {
           dispatch(setPlayingAudioIdAC(null))
         }
       }
-      wavesurfer.current.playPause()
-      if (!messagePlayed && incoming) {
-        dispatch(markVoiceMessageAsPlayedAC(channelId!, [file.messageId]))
-      }
     }
   }
-  useEffect(() => {
-    if (recording.mediaStream) {
-      setRecording({
-        ...recording,
-        mediaRecorder: new MediaRecorder(recording.mediaStream, {
-          mimeType: 'audio/webm'
-        })
-      })
+
+  const handleSeek = (seekProgress: number) => {
+    if (audioRef.current && duration) {
+      audioRef.current.currentTime = seekProgress * duration
+      setProgress(seekProgress)
     }
-  }, [recording.mediaStream])
+  }
 
   useEffect(() => {
-    const MAX_RECORDER_TIME = 15
-    let recordingInterval: any = null
+    setProgress(0)
+    setPlayAudio(false)
 
-    if (recording.initRecording) {
-      recordingInterval = setInterval(() => {
-        setRecording((prevState) => {
-          if (prevState.recordingSeconds === MAX_RECORDER_TIME && prevState.recordingMilliseconds === 0) {
-            clearInterval(recordingInterval)
-            return prevState
-          }
-
-          if (prevState.recordingMilliseconds >= 0 && prevState.recordingMilliseconds < 99) {
-            return {
-              ...prevState,
-              recordingMilliseconds: prevState.recordingMilliseconds + 1
-            }
-          }
-
-          if (prevState.recordingMilliseconds === 99) {
-            return {
-              ...prevState,
-              recordingSeconds: prevState.recordingSeconds + 1,
-              recordingMilliseconds: 0
-            }
-          }
-
-          return prevState
-        })
-      }, 10)
-    } else clearInterval(recordingInterval)
-
-    return () => clearInterval(recordingInterval)
-  }, [recording.initRecording])
-
-  useEffect(() => {
-    if (url) {
-      if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
-        wavesurfer.current.destroy()
-      }
-      const initWaveSurfer = async () => {
+    let metadata = file.metadata
+    if (typeof metadata === 'string') {
+      if (metadata.trim() === '') {
+        metadata = null
+      } else {
         try {
-          wavesurfer.current = WaveSurfer.create({
-            container: wavesurferContainer.current,
-            waveColor: textSecondary,
-            progressColor: accentColor,
-            // audioContext,
-            // cursorColor: 'transparent',
-            // splitChannels: true,
-            // barWidth: 1.5,
-            audioRate,
-            // barHeight: 3,
-
-            barWidth: 1,
-            barHeight: 1,
-
-            hideScrollbar: true,
-            barRadius: 1.5,
-            cursorWidth: 0,
-            barGap: 2,
-            height: 20
-          })
-          let peaks
-          if (file.metadata) {
-            if (file.metadata.dur) {
-              setCurrentTime(formatAudioVideoTime(file.metadata.dur))
-            }
-            if (file.metadata.tmb) {
-              const maxVal =
-                Array.isArray(file.metadata.tmb) && file.metadata.tmb.length > 0
-                  ? (file.metadata.tmb as number[]).reduce((acc: number, n: number) => (n > acc ? n : acc), -Infinity)
-                  : 0
-              const dec = maxVal / 100
-              peaks = file.metadata.tmb.map((peak: number) => {
-                return peak / dec / 100
-              })
-            }
-          }
-
-          wavesurfer.current.load(url, peaks)
-
-          wavesurfer.current.on('ready', () => {
-            const audioDuration = wavesurfer.current.getDuration()
-            setCurrentTime(formatAudioVideoTime(audioDuration))
-
-            wavesurfer.current.drawBuffer = (d: any) => {
-              log.info('filters --- ', d)
-            }
-          })
-          /* wavesurfer.current.drawBuffer = () => {
-           return file.metadata.tmb
-         } */
-          wavesurfer.current.on('finish', () => {
-            setPlayAudio(false)
-            wavesurfer.current.seekTo(0)
-            const audioDuration = wavesurfer.current.getDuration()
-            // const currentTime = wavesurfer.current.getCurrentTime()
-            setCurrentTime(formatAudioVideoTime(audioDuration))
-            if (playingAudioId === file.id) {
-              dispatch(setPlayingAudioIdAC(null))
-            }
-            clearInterval(intervalRef.current)
-          })
-
-          wavesurfer.current.on('pause', () => {
-            setPlayAudio(false)
-            if (playingAudioId === file.id) {
-              dispatch(setPlayingAudioIdAC(null))
-            }
-            clearInterval(intervalRef.current)
-          })
-
-          wavesurfer.current.on('interaction', () => {
-            // const audioDuration = wavesurfer.current.getDuration()
-            const currentTime = wavesurfer.current.getCurrentTime()
-            setCurrentTime(formatAudioVideoTime(currentTime))
-          })
-          if (url !== '_') {
-            setIsRendered(true)
-          }
+          metadata = JSON.parse(metadata)
         } catch (e) {
-          log.error('Failed to init wavesurfer', e)
+          metadata = null
         }
       }
-      initWaveSurfer()
     }
-    return () => {
-      clearInterval(intervalRef.current)
+
+    if (metadata) {
+      if (metadata.dur) {
+        setDuration(metadata.dur)
+        setCurrentTime(formatAudioVideoTime(metadata.dur))
+      }
+      if (metadata.tmb && Array.isArray(metadata.tmb) && metadata.tmb.length > 0) {
+        const maxVal = Math.max(...metadata.tmb.filter((n: number) => isFinite(n)))
+
+        if (maxVal > 0 && isFinite(maxVal)) {
+          const normalizedPeaks = metadata.tmb.map((peak: number) => {
+            return peak / maxVal
+          })
+
+          setPeaks(normalizedPeaks)
+        } else {
+          setPeaks(Array(50).fill(0.5))
+        }
+      } else {
+        setPeaks(Array(50).fill(0.5))
+      }
+    } else {
+      setPeaks(Array(50).fill(0.5))
     }
-  }, [url])
+  }, [url, file.id, file.metadata])
 
   useEffect(() => {
-    if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
-      setPlayAudio(false)
-      wavesurfer.current.pause()
+    const audio = audioRef.current
+    if (!audio) return
+
+    const handleLoadedMetadata = () => {
+      const audioDuration = audio.duration
+      if (audioDuration && isFinite(audioDuration)) {
+        setDuration(audioDuration)
+        if (!file.metadata?.dur) {
+          setCurrentTime(formatAudioVideoTime(audioDuration))
+        }
+      }
     }
-  }, [playingAudioId])
+
+    const handleTimeUpdate = () => {
+      if (audio.duration && isFinite(audio.duration)) {
+        const currentProgress = audio.currentTime / audio.duration
+        setProgress(currentProgress)
+        setCurrentTime(formatAudioVideoTime(audio.currentTime))
+      }
+    }
+
+    const handleEnded = () => {
+      setPlayAudio(false)
+      setProgress(0)
+      audio.currentTime = 0
+      setCurrentTime(formatAudioVideoTime(duration || audio.duration))
+      if (playingAudioId === file.id) {
+        dispatch(setPlayingAudioIdAC(null))
+      }
+    }
+
+    const handlePause = () => {
+      setPlayAudio(false)
+    }
+
+    const handlePlay = () => {
+      setPlayAudio(true)
+    }
+
+    audio.addEventListener('loadedmetadata', handleLoadedMetadata)
+    audio.addEventListener('timeupdate', handleTimeUpdate)
+    audio.addEventListener('ended', handleEnded)
+    audio.addEventListener('pause', handlePause)
+    audio.addEventListener('play', handlePlay)
+
+    return () => {
+      audio.removeEventListener('loadedmetadata', handleLoadedMetadata)
+      audio.removeEventListener('timeupdate', handleTimeUpdate)
+      audio.removeEventListener('ended', handleEnded)
+      audio.removeEventListener('pause', handlePause)
+      audio.removeEventListener('play', handlePlay)
+      clearInterval(intervalRef.current)
+    }
+  }, [url, duration, file.id, file.metadata?.dur, playingAudioId, dispatch])
+
+  useEffect(() => {
+    if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && audioRef.current) {
+      audioRef.current.pause()
+      setPlayAudio(false)
+    }
+  }, [playingAudioId, playAudio, file.id])
 
   return (
     <Container>
+      <audio ref={audioRef} src={url} preload='metadata' style={{ display: 'none' }} />
       <PlayPause onClick={handlePlayPause} iconColor={accentColor}>
         {playAudio ? <PauseIcon /> : <PlayIcon />}
       </PlayPause>
       <WaveContainer>
-        <AudioVisualization ref={wavesurferContainer} />
+        <AudioVisualization>
+          <Waveform
+            peaks={peaks}
+            progress={progress}
+            waveColor={textSecondary}
+            progressColor={accentColor}
+            barWidth={1}
+            barGap={2}
+            barRadius={1.5}
+            height={20}
+            onSeek={handleSeek}
+          />
+        </AudioVisualization>
         <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundSections}>
           {audioRate}
           <span>X</span>
