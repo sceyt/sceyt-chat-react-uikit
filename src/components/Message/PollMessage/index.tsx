@@ -84,7 +84,10 @@ const PollMessage = ({ message }: PollMessageProps) => {
               background={surface1}
               hover={backgroundHovered}
               color={textPrimary}
-              onClick={() => handleVote(opt.id)}
+              onClick={() => {
+                if (poll.closed) return
+                handleVote(opt.id)
+              }}
               role='button'
             >
               <TopRow>
@@ -185,7 +188,6 @@ const Indicator = styled.div<{ disabled?: boolean }>`
   height: 20px;
   margin-right: 8px;
   opacity: ${(p) => (p.disabled ? 0.5 : 1)};
-  pointer-events: ${(p) => (p.disabled ? 'none' : 'auto')};
   cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
 `
 
