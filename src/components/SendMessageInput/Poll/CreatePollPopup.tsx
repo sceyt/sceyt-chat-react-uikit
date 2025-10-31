@@ -19,11 +19,12 @@ interface IProps {
   onCreate?: (
     event: React.MouseEvent<HTMLButtonElement>,
     payload: {
-      question: string
+      name: string
       options: IPollOption[]
       anonymous: boolean
       allowMultipleVotes: boolean
       allowVoteRetract: boolean
+      id: string
     }
   ) => void
 }
@@ -49,11 +50,10 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   ])
   const [anonymous, setAnonymous] = useState(true)
   const [allowMultipleVotes, setAllowMultipleVotes] = useState(true)
-  const [allowVoteRetract, setAllowVoteRetract] = useState(false)
+  const [allowVoteRetract, setAllowVoteRetract] = useState(true)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const optionsListRef = useRef<HTMLDivElement>(null)
-  const nextOptionIdRef = useRef<number>(3)
   const optionInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
   const questionLimit = 80
@@ -71,7 +71,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   }
 
   const addOption = () => {
-    const nextId = `${nextOptionIdRef.current++}`
+    const nextId = uuidv4()
     setOptions([...options, { id: nextId, name: '' }])
   }
 
@@ -89,7 +89,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       const updated = prev.map((o, i) => (i === index ? { ...o, name: value } : o))
       const nowFilled = value.trim().length > 0
       if (isLast && wasEmpty && nowFilled) {
-        const nextId = `${nextOptionIdRef.current++}`
+        const nextId = uuidv4()
         return [...updated, { id: nextId, name: '' }]
       }
       return updated
@@ -110,11 +110,12 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   const handleCreate = (event: React.MouseEvent<HTMLButtonElement>) => {
     if (!canCreate) return
     const payload = {
-      question: question.trim(),
+      name: question.trim(),
       options: options.filter((o) => o.name.trim()),
       anonymous,
       allowMultipleVotes,
-      allowVoteRetract
+      allowVoteRetract,
+      id: uuidv4()
     }
     if (onCreate) onCreate(event, payload)
     togglePopup()
@@ -148,7 +149,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       if (next) {
         optionInputRefs.current[next.id]?.focus()
       } else {
-        const newId = `${nextOptionIdRef.current++}`
+        const newId = uuidv4()
         setOptions((prev) => [...prev, { id: newId, name: '' }])
         setTimeout(() => optionInputRefs.current[newId]?.focus(), 0)
       }
@@ -271,7 +272,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
             <SettingItem color={textPrimary}>
               <CustomCheckbox
                 index='allowVoteRetract'
-                state={allowVoteRetract}
+                state={!allowVoteRetract}
                 onClick={() => setAllowVoteRetract(!allowVoteRetract)}
                 backgroundColor={background}
                 checkedBackgroundColor={accentColor}

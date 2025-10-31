@@ -12,6 +12,8 @@ import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
 import { ReactComponent as ReactionIcon } from '../../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
+import { ReactComponent as RetractVoteIcon } from '../../../assets/svg/retractVote.svg'
+import { ReactComponent as EndVoteIcon } from '../../../assets/svg/endVote.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
@@ -31,6 +33,7 @@ interface EditMessageContainerProps {
 }
 
 export default function MessageActions({
+  isPollMessage = false,
   editModeToggle,
   channel,
   handleResendMessage,
@@ -40,6 +43,8 @@ export default function MessageActions({
   handleReportMessage,
   messageStatus,
   handleSelectMessage,
+  handleRetractVote,
+  handleEndVote,
   handleReplyMessage,
   handleOpenInfoMessage,
   isThreadMessage,
@@ -60,6 +65,8 @@ export default function MessageActions({
   copyIcon,
   replyIcon,
   replyInThreadIcon,
+  retractVoteIcon,
+  endVoteIcon,
   deleteIcon,
   selectIcon,
   infoIcon,
@@ -144,7 +151,7 @@ export default function MessageActions({
   return (
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
       <EditMessageContainer backgroundColor={backgroundSections} className='message_actions_cont '>
-        {showMessageReaction &&
+        {showMessageReaction && !isPollMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           checkActionPermission('addMessageReaction') && (
             <Action
@@ -161,7 +168,7 @@ export default function MessageActions({
               {reactionIcon || <ReactionIcon />}
             </Action>
           )}
-        {showEditMessage &&
+        {showEditMessage && !isPollMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
@@ -233,7 +240,7 @@ export default function MessageActions({
             )}
           </React.Fragment>
         )}
-        {showCopyMessage && (
+        {showCopyMessage && !isPollMessage && (
           <Action
             order={copyIconOrder || 4}
             iconColor={messageActionIconsColor || iconInactive}
@@ -246,6 +253,34 @@ export default function MessageActions({
               <ArrowDownIcon />
             </ItemNote>
             {copyIcon || <CopyIcon />}
+          </Action>
+        )}
+
+        {isPollMessage && (
+          <Action onClick={handleRetractVote} 
+            iconColor={messageActionIconsColor || iconInactive}
+            hoverBackgroundColor={backgroundHovered}
+            hoverIconColor={accentColor}
+          >
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              Retract Vote
+              <ArrowDownIcon />
+            </ItemNote>
+            { retractVoteIcon || <RetractVoteIcon />}
+          </Action>
+        )}
+
+        {!isPollMessage && (
+          <Action onClick={handleEndVote} 
+            iconColor={messageActionIconsColor || iconInactive}
+            hoverBackgroundColor={backgroundHovered}
+            hoverIconColor={accentColor}
+          >
+            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+              End Vote
+              <ArrowDownIcon />
+            </ItemNote>
+            { endVoteIcon || <EndVoteIcon />}
           </Action>
         )}
 
@@ -280,7 +315,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {showInfoMessage && !isIncoming && (
+        {showInfoMessage && !isIncoming && !isPollMessage && (
           <Action
             order={infoIconOrder || 7}
             iconColor={messageActionIconsColor || iconInactive}

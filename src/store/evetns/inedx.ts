@@ -223,6 +223,50 @@ export default function* watchForEvents(): any {
         }
       })
     }
+    channelListener.onPollAdded = (channel: IChannel, message: IMessage, user: IUser) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_ADDED,
+        args: {
+          channel,
+          message,
+          user
+        }
+      })
+    }
+    channelListener.onPollRetracted = (channel: IChannel, message: IMessage, user: IUser) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_RETRACTED,
+        args: {
+          channel,
+          message,
+          user
+        }
+      })
+    }
+    channelListener.onPollDeleted = (channel: IChannel, message: IMessage, user: IUser) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_DELETED,
+        args: {
+          channel,
+          message,
+          user
+        }
+      })
+    }
+    channelListener.onPollClosed = (channel: IChannel, message: IMessage, user: IUser) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_CLOSED,
+        args: {
+          channel,
+          message,
+          user
+        }
+      })
+    }
     channelListener.onReactionDeleted = (channel: IChannel, user: IUser, message: IMessage, reaction: IReaction) => {
       if (shouldSkip(channel)) return
       emitter({
@@ -1018,6 +1062,65 @@ export default function* watchForEvents(): any {
         if (checkChannelExistsOnMessagesMap(channel.id)) {
           addReactionToMessageOnMap(channel.id, message, reaction, true)
         }
+        break
+      }
+      case CHANNEL_EVENT_TYPES.POLL_ADDED: {
+        const { channel, message } = args
+        const pollDetails = message?.pollDetails || {}
+        console.log('POLL_UPDATED', pollDetails)
+        const activeChannelId = getActiveChannelId()
+        const addedVotes = pollDetails?.votes || []
+        updateMessageOnMap(channel.id, {
+          messageId: message.id,
+          params: {},
+        }, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption })
+        if (channel.id === activeChannelId) {
+          updateMessageOnAllMessages(message.id, {}, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption || {} })
+          yield put(updateMessageAC(message.id, {}, undefined, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          break
+        }
+      }
+      case CHANNEL_EVENT_TYPES.POLL_DELETED: {
+        const { channel, message } = args
+        const pollDetails = message?.pollDetails || {}
+        console.log('POLL_DELETED', pollDetails)
+        const activeChannelId = getActiveChannelId()
+        const deletedVotes = pollDetails?.votes || []
+        updateMessageOnMap(channel.id, {
+          messageId: message.id,
+          params: {},
+        }, { deletedVotes, votesPerOption: pollDetails.votesPerOption })
+        if (channel.id === activeChannelId) {
+          updateMessageOnAllMessages(message.id, {}, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} })
+          yield put(updateMessageAC(message.id, {}, undefined, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          break
+        }
+        break
+      }
+      case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
+        const { channel, message } = args
+        const pollDetails = message?.pollDetails || {}
+        console.log('POLL_RETRACTED', pollDetails)
+        const activeChannelId = getActiveChannelId()
+        const retractedVotes = pollDetails?.votes || []
+        updateMessageOnMap(channel.id, {
+          messageId: message.id,
+          params: {},
+        }, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption })
+        if (channel.id === activeChannelId) {
+          updateMessageOnAllMessages(message.id, {}, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} })
+          yield put(updateMessageAC(message.id, {}, undefined, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          break
+        }
+        break
+      }
+      case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
+        const { channel, message } = args
+        const pollDetails = message?.pollDetails || {}
+        console.log('POLL_CLOSED', pollDetails)
+        const activeChannelId = getActiveChannelId()
+        const closedVotes = pollDetails?.votes || []
+        console.log('closedVotes', closedVotes, channel, activeChannelId)
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {

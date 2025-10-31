@@ -52,16 +52,13 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
     if (hasVoted) {
       if (!poll.allowVoteRetract) return
-      dispatch(deletePollVoteAC(channel.id, poll.id, optionId, message, poll.allowMultipleVotes))
+      dispatch(deletePollVoteAC(channel.id, poll.id, optionId, message))
       return
     }
-
-    dispatch(addPollVoteAC(channel.id, poll.id, optionId, message, poll.allowMultipleVotes))
+    dispatch(addPollVoteAC(channel.id, poll.id, optionId, message))
   }
 
   const handleViewResults = () => setShowResults(true)
-
-  console.log('message', message)
 
   return (
     <Container>
@@ -73,6 +70,13 @@ const PollMessage = ({ message }: PollMessageProps) => {
           const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
           const selected = ownVotedOptionIds.has(opt.id)
           const optionVotesUsers = votesUsers.filter((v: IPollVote) => v.optionId === opt.id).slice(0, 3)
+          if (optionVotesUsers.length < 3) {
+            poll?.ownVotes?.forEach((vote: IPollVote) => {
+              if (vote.optionId === opt.id) {
+                optionVotesUsers.push(vote)
+              }
+            })
+          }
 
           return (
             <Option
@@ -92,9 +96,9 @@ const PollMessage = ({ message }: PollMessageProps) => {
                   <UsersContainer>
                     {optionVotesUsers.map((vote: IPollVote) => (
                       <Avatar
-                        key={vote.user.id}
-                        image={vote.user.avatarUrl}
-                        name={vote.user.firstName || vote.user.id}
+                        key={vote?.user?.id}
+                        image={vote?.user?.profile?.avatar}
+                        name={vote?.user?.profile?.firstName}
                         size={18}
                         textSize={12}
                         setDefaultAvatar

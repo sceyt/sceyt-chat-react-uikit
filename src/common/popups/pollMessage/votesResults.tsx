@@ -90,7 +90,7 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
                           <VoterName color={textPrimary}>
                             {vote.user.firstName || vote.user.id} {vote.user.lastName || ''}
                           </VoterName>
-                          <VotedAt color={textSecondary}>{formatDate(vote.createdAt)}</VotedAt>
+                          <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
                         </VoterInfo>
                       </VoterRow>
                     ))}

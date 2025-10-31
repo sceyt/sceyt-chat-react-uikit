@@ -485,17 +485,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleSendEditMessage = (
     event?: any,
     pollDetails?: {
-      question: string
+      name: string
       options: { id: string; name: string }[]
       anonymous: boolean
       allowMultipleVotes: boolean
       allowVoteRetract: boolean
+      id: string
     }
   ) => {
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
-    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.question.trim()
-    const messageTextForSend = isPoll ? pollDetails?.question.trim() : messageText.trim()
+    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim()
+    const messageTextForSend = isPoll ? pollDetails?.name.trim() : messageText.trim()
     const shouldSend =
       (isEnter || type === 'click') &&
       (messageToEdit || messageTextForSend || (attachments.length && attachments.length > 0))
@@ -1825,7 +1826,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 {chooseFileAttachmentText ?? 'File'}
                               </DropdownOptionLi>
                             )}
-                            {pollOptions?.showAddPoll && (
+                            {pollOptions?.showAddPoll && !isDirectChannel && (
                               <DropdownOptionLi
                                 key={3}
                                 textColor={textPrimary}
@@ -1981,7 +1982,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
   background-color: ${(props) => props.backgroundColor};
   position: relative;
-  z-index: 15;
+  z-index: 100;
 `
 const Container = styled.div<{
   margin?: string
@@ -2000,7 +2001,7 @@ const Container = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
   padding: ${(props) => props.padding || '0 calc(4% + 32px)'};
-  z-index: 15;
+  z-index: 100;
 
   & span.rdw-suggestion-dropdown {
     position: absolute;

@@ -22,7 +22,7 @@ import {
   ADD_POLL_VOTE,
   RETRACT_POLL_VOTE
 } from './constants'
-import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
   addMessage,
   deleteMessageFromList,
@@ -317,8 +317,8 @@ export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string)
   return updateMessageAttachment({ url, attachmentUrl })
 }
 
-export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {
-  return updateMessage({ messageId, params, addIfNotExists })
+export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption: { [key: string]: number } }) {
+  return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
 export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }) {
@@ -449,11 +449,10 @@ export function addPollVoteAC(
   pollId: string,
   optionId: string,
   message: IMessage,
-  allowMultipleVotes: boolean
 ) {
   return {
     type: ADD_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message, allowMultipleVotes }
+    payload: { channelId, pollId, optionId, message }
   }
 }
 
@@ -462,24 +461,23 @@ export function deletePollVoteAC(
   pollId: string,
   optionId: string,
   message: IMessage,
-  allowMultipleVotes: boolean
 ) {
   return {
     type: DELETE_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message, allowMultipleVotes }
+    payload: { channelId, pollId, optionId, message }
   }
 }
 
-export function closePollAC(channelId: string, pollId: string) {
+export function closePollAC(channelId: string, pollId: string, messageId: string) {
   return {
     type: CLOSE_POLL,
-    payload: { channelId, pollId }
+    payload: { channelId, pollId, messageId }
   }
 }
 
-export function retractPollVoteAC(channelId: string, pollId: string) {
+export function retractPollVoteAC(channelId: string, pollId: string, message: IMessage) {
   return {
     type: RETRACT_POLL_VOTE,
-    payload: { channelId, pollId }
+    payload: { channelId, pollId, message }
   }
 }

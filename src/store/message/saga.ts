@@ -1,5 +1,4 @@
 import { put, call, takeLatest, takeEvery, select } from 'redux-saga/effects'
-import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -176,19 +175,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...(attachment.metadata
-              ? typeof attachment.metadata === 'string'
-                ? JSON.parse(attachment.metadata)
-                : attachment.metadata
-              : {}),
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight,
-                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-              })
+          ...(attachment.metadata
+            ? typeof attachment.metadata === 'string'
+              ? JSON.parse(attachment.metadata)
+              : attachment.metadata
+            : {}),
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+            tmb: thumbnailMetas.thumbnail,
+            szw: thumbnailMetas.imageWidth,
+            szh: thumbnailMetas.imageHeight,
+            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
           })
+        })
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -705,6 +704,7 @@ function* forwardMessage(action: IAction): any {
         .setDisableMentionsCount(getDisableFrowardMentionsCount())
         .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
+        .setPollDetails(message.pollDetails ? message.pollDetails : null)
       const messageToSend = messageBuilder.create()
       const pendingMessage = JSON.parse(
         JSON.stringify({
@@ -909,11 +909,11 @@ function* resendMessage(action: IAction): any {
                   : {}),
                 ...(thumbnailMetas &&
                   thumbnailMetas.thumbnail && {
-                    tmb: thumbnailMetas.thumbnail,
-                    szw: thumbnailMetas.imageWidth,
-                    szh: thumbnailMetas.imageHeight,
-                    ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-                  })
+                  tmb: thumbnailMetas.thumbnail,
+                  szw: thumbnailMetas.imageWidth,
+                  szh: thumbnailMetas.imageHeight,
+                  ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+                })
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
@@ -1283,8 +1283,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-              result.messages.length > 0 &&
-              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+            result.messages.length > 0 &&
+            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
         setMessagesToMap(channel.id, result.messages)
@@ -1691,68 +1691,83 @@ const updatePollDetails = (
   addVote: boolean = true,
   allowMultipleVotes: boolean = false
 ) => {
-  const isOwnVote = pollDetails?.ownVotes?.some((vote: IPollVote) => vote.optionId === optionId)
-  const isSelectedOption = (pollDetails?.ownVotes?.length || 0) > 0 && !allowMultipleVotes
-
-  if (isOwnVote && addVote) {
-    return pollDetails
-  } else if (!isOwnVote && !addVote) {
-    return pollDetails
-  }
-
-  if (!addVote) {
+  const user = getClient().user
+  if (addVote) {
+    const vote: IPollVote = {
+      optionId,
+      createdAt: new Date().getTime(),
+      user: {
+        id: user.id,
+        presence: {
+          status: user.presence?.status || 'online'
+        },
+        profile: {
+          avatar: user.avatarUrl || '',
+          firstName: user.firstName,
+          lastName: user.lastName,
+          metadata: user.metadata || '',
+          metadataMap: user.metadataMap || {},
+          updatedAt: new Date().getTime(),
+          username: user.username || '',
+          createdAt: new Date().getTime()
+        },
+        createdAt: new Date().getTime()
+      }
+    }
+    if (allowMultipleVotes) {
+      return {
+        ...pollDetails,
+        votesPerOption: {
+          ...pollDetails?.votesPerOption,
+          [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1
+        },
+        ownVotes: [...(pollDetails?.ownVotes || []), vote]
+      }
+    }
+    const isVotedAlready = (pollDetails?.ownVotes?.length || 0) > 0;
     return {
       ...pollDetails,
       votesPerOption: {
         ...pollDetails?.votesPerOption,
+        ...(isVotedAlready ? {
+          [String(pollDetails?.ownVotes?.[0]?.optionId)]: (pollDetails?.votesPerOption?.[String(pollDetails?.ownVotes?.[0]?.optionId)] || 0) - 1} : 
+          {}),
+        [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1
+      },
+      ownVotes: [vote]
+    }
+  } else {
+    if (allowMultipleVotes) {
+      return {
+        ...pollDetails,
+        votes: [...(pollDetails?.votes || []).filter((vote: IPollVote) => !(vote.optionId === optionId && vote.user.id === user.id))],
+        votesPerOption: {
+          ...pollDetails?.votesPerOption,
+          [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
+        }
+      }
+    }
+    return {
+      ...pollDetails,
+      votes: [...(pollDetails?.votes || []).filter((vote: IPollVote) => !(vote.optionId === optionId && vote.user.id === user.id))],
+      votesPerOption: {
+        ...pollDetails?.votesPerOption,
         [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
       },
-      votes: [
-        ...(pollDetails?.votes || []).filter(
-          (vote: IPollVote) => vote.optionId !== optionId || vote.user.id !== getClient().user.id
-        )
-      ],
-      ownVotes: !allowMultipleVotes
-        ? []
-        : [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
+      ownVotes: [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
     }
-  }
-
-  const vote = {
-    id: uuidv4(),
-    pollId: pollDetails?.id,
-    optionId,
-    createdAt: new Date(),
-    user: getClient().user
-  }
-  return {
-    ...pollDetails,
-    votesPerOption: {
-      ...pollDetails?.votesPerOption,
-      [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1,
-      ...(isSelectedOption
-        ? {
-            [pollDetails?.ownVotes[0]?.optionId + '']:
-              (pollDetails?.votesPerOption?.[pollDetails?.ownVotes[0]?.optionId + ''] || 0) - 1
-          }
-        : {})
-    },
-    votes: isSelectedOption
-      ? [...(pollDetails?.votes || []), vote].filter((vote: IPollVote) => vote.optionId !== optionId)
-      : [...(pollDetails?.votes || []), vote],
-    ownVotes: isSelectedOption ? [vote] : [...(pollDetails?.ownVotes || []), vote]
   }
 }
 
 function* addPollVote(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, pollId, optionId, message, allowMultipleVotes } = payload
+    const { channelId, pollId, optionId, message } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const channel = yield call(getChannelFromMap, channelId)
       const pollDetails = JSON.parse(
-        JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, allowMultipleVotes))
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false))
       )
 
       updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
@@ -1763,7 +1778,7 @@ function* addPollVote(action: IAction): any {
         })
       )
       if (channel) {
-        const pollVote = yield call(channel.addVote, pollId, optionId)
+        const pollVote = yield call(channel.addVote, message.id, pollId, [optionId])
         console.log('poll vote added', pollVote)
       }
     }
@@ -1775,12 +1790,12 @@ function* addPollVote(action: IAction): any {
 function* deletePollVote(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, pollId, optionId, message, allowMultipleVotes } = payload
+    const { channelId, pollId, optionId, message } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const channel = yield call(getChannelFromMap, channelId)
       const pollDetails = JSON.parse(
-        JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, allowMultipleVotes))
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
       )
       updateMessageOnMap(channel.id, {
         messageId: message.id,
@@ -1793,7 +1808,7 @@ function* deletePollVote(action: IAction): any {
         })
       )
       if (channel) {
-        const pollVote = yield call(channel.deleteVote, pollId, optionId)
+        const pollVote = yield call(channel.deleteVote, message.id, pollId, [optionId])
         console.log('poll vote deleted', pollVote)
       }
     }
@@ -1805,12 +1820,12 @@ function* deletePollVote(action: IAction): any {
 function* closePoll(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, pollId } = payload
+    const { channelId, pollId, messageId } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const channel = yield call(getChannelFromMap, channelId)
       if (channel) {
-        const poll = yield call(channel.closePoll, pollId)
+        const poll = yield call(channel.closePoll, messageId, pollId)
         console.log('poll closed', poll)
       }
     }
@@ -1822,12 +1837,27 @@ function* closePoll(action: IAction): any {
 function* retractPollVote(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, pollId } = payload
+    const { channelId, pollId, message } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const channel = yield call(getChannelFromMap, channelId)
+      let pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
+      for (const vote of pollDetails.ownVotes) {
+        pollDetails = updatePollDetails(pollDetails, vote.optionId, false, message.pollDetails?.allowMultipleVotes || false)
+      }
+
+      updateMessageOnMap(channelId, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
       if (channel) {
-        const pollVote = yield call(channel.retractVote, pollId)
+        const pollVote = yield call(channel.retractVote, message.id, pollId)
         console.log('poll vote retracted', pollVote)
       }
     }
