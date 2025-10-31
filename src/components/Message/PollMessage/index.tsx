@@ -89,6 +89,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
                 handleVote(opt.id)
               }}
               role='button'
+              disabled={poll.closed}
             >
               <TopRow>
                 <Indicator disabled={poll.closed}>
@@ -166,11 +167,12 @@ const Options = styled.div`
   margin-top: 4px;
 `
 
-const Option = styled.div<{ background: string; hover: string; color: string }>`
+const Option = styled.div<{ background: string; hover: string; color: string; disabled?: boolean }>`
   padding: 12px 14px;
   color: ${(p) => p.color};
   cursor: pointer;
   user-select: none;
+  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
 `
 
 const TopRow = styled.div`
