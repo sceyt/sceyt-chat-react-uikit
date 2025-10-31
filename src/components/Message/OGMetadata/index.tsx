@@ -58,7 +58,7 @@ const OGMetadata = ({
   infoPadding?: string
   ogContainerMargin?: string
   target?: string
-  metadataGetSuccessCallback?: (success: boolean, hasImage: boolean) => void
+  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean) => void
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -180,9 +180,9 @@ const OGMetadata = ({
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
       if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
-        metadataGetSuccessCallback(true, hasImage)
+        metadataGetSuccessCallback(attachment?.url, true, hasImage)
       } else {
-        metadataGetSuccessCallback?.(false, false)
+        metadataGetSuccessCallback?.(attachment?.url, false, false)
       }
     }
   }, [metadata, metadataLoaded, oGMetadata, attachment?.url, hasImage])
