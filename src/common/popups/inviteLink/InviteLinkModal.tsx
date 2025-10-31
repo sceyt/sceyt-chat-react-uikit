@@ -31,7 +31,7 @@ interface InviteLinkModalProps {
   channelId: string
 }
 
-export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }: InviteLinkModalProps) {
+export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }: InviteLinkModalProps): JSX.Element {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
