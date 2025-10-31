@@ -58,7 +58,7 @@ const OGMetadata = ({
   infoPadding?: string
   ogContainerMargin?: string
   target?: string
-  metadataGetSuccessCallback?: (success: boolean) => void
+  metadataGetSuccessCallback?: (success: boolean, hasImage: boolean) => void
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -180,13 +180,13 @@ const OGMetadata = ({
 
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
-      if (metadata && metadataGetSuccessCallback && hasImage) {
-        metadataGetSuccessCallback(true)
+      if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
+        metadataGetSuccessCallback(true, hasImage)
       } else {
-        metadataGetSuccessCallback?.(false)
+        metadataGetSuccessCallback?.(false, false)
       }
     }
-  }, [metadata, metadataGetSuccessCallback, metadataLoaded, oGMetadata, attachment?.url, hasImage])
+  }, [metadata, metadataLoaded, oGMetadata, attachment?.url, hasImage])
 
   const elements = useMemo(() => [
     hasImage
@@ -283,24 +283,22 @@ const OGMetadata = ({
   ), [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent])
 
   return (
-    <div className='ogmetadata-container'>
-      <OGMetadataContainer
-        showOGMetadata={!!showOGMetadata}
-        bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
-        showBackground={ogContainerShowBackground}
-        customBg={ogContainerBackground}
-        borderRadius={ogContainerBorderRadius}
-        padding={ogContainerPadding}
-        className={ogContainerClassName}
-        containerMargin={ogContainerMargin}
-        as="a"
-        href={attachment?.url}
-        target={target}
-        rel={target === '_blank' ? 'noopener noreferrer' : undefined}
-      >
-        {content}
-      </OGMetadataContainer>
-    </div>
+    <OGMetadataContainer
+      showOGMetadata={!!showOGMetadata}
+      bgColor={incoming ? incomingMessageBackgroundX : outgoingMessageBackgroundX}
+      showBackground={ogContainerShowBackground}
+      customBg={ogContainerBackground}
+      borderRadius={ogContainerBorderRadius}
+      padding={ogContainerPadding}
+      className={ogContainerClassName}
+      containerMargin={ogContainerMargin}
+      as="a"
+      href={attachment?.url}
+      target={target}
+      rel={target === '_blank' ? 'noopener noreferrer' : undefined}
+    >
+      {content}
+    </OGMetadataContainer>
   )
 }
 

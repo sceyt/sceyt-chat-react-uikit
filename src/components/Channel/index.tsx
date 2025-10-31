@@ -179,7 +179,8 @@ const ChannelMessageText = ({
               : makeUsername(
                   lastMessage.user && contactsMap && contactsMap[lastMessage.user.id],
                   lastMessage.user,
-                  getFromContacts
+                  getFromContacts,
+                  true
                 ))
           } ${
             lastMessage.body === 'CC'
@@ -229,7 +230,7 @@ const ChannelMessageText = ({
                     : lastMessage.body === 'LG'
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
-                        ? 'Joined this group via invite link'
+                        ? 'Joined via invite link'
                         : ''
           }`
         ) : (
