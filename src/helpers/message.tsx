@@ -285,10 +285,11 @@ export const EditorTheme: EditorThemeClasses = {
 }
 
 export const isMessageUnsupported = (message: IMessage) => {
-  return message.type !== MESSAGE_TYPE.TEXT &&
-    message.type !== MESSAGE_TYPE.MEDIA &&
-    message.type !== MESSAGE_TYPE.FILE &&
-    message.type !== MESSAGE_TYPE.LINK &&
-    message.type !== MESSAGE_TYPE.POLL &&
-    message.type !== MESSAGE_TYPE.DELETED
+  return message?.type !== MESSAGE_TYPE.TEXT &&
+    message?.type !== MESSAGE_TYPE.MEDIA &&
+    message?.type !== MESSAGE_TYPE.FILE &&
+    message?.type !== MESSAGE_TYPE.LINK &&
+    message?.type !== MESSAGE_TYPE.POLL &&
+    message?.type !== MESSAGE_TYPE.DELETED &&
+    message?.type !== MESSAGE_TYPE.SYSTEM
 }
