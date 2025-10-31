@@ -52,7 +52,7 @@ export interface IMessageStore {
   }
   playingAudioId: string | null
   selectedMessagesMap: Map<string, IMessage> | null
-  oGMetadata: { [key: string]: IOGMetadata | null }
+  oGMetadata: { [key: string]: IOGMetadata | null } | null
   attachmentUpdatedMap: { [key: string]: string }
   messageMarkers: { [key: string]: { [key: string]: { [key: string]: IMarker[] } } }
   messagesMarkersLoadingState: number | null
@@ -93,7 +93,7 @@ const initialState: IMessageStore = {
   attachmentsUploadingProgress: {},
   playingAudioId: null,
   selectedMessagesMap: null,
-  oGMetadata: {},
+  oGMetadata: null,
   attachmentUpdatedMap: {},
   messageMarkers: {},
   messagesMarkersLoadingState: null
@@ -486,12 +486,18 @@ const messageSlice = createSlice({
 
     setOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
       const { url, metadata } = action.payload
+      if (!state.oGMetadata) {
+        state.oGMetadata = {}
+      }
       state.oGMetadata[url] = metadata
     },
 
     updateOGMetadata: (state, action: PayloadAction<{ url: string; metadata: IOGMetadata | null }>) => {
       const { url, metadata } = action.payload
       if (metadata) {
+        if (!state.oGMetadata) {
+          state.oGMetadata = {}
+        }
         const existing = state.oGMetadata[url]
         state.oGMetadata[url] = existing ? { ...existing, ...metadata } : metadata
       }

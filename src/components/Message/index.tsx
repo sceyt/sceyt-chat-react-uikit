@@ -54,6 +54,7 @@ import MessageStatusAndTime from './MessageStatusAndTime'
 import { scrollToNewMessageSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
+import { isMessageUnsupported } from 'helpers/message'
 
 const Message = ({
   message,
@@ -560,15 +561,8 @@ const Message = ({
   }
 
   const unsupportedMessage = useMemo(() => {
-    return (
-      message.type !== MESSAGE_TYPE.SYSTEM &&
-      message.type !== MESSAGE_TYPE.POLL &&
-      message.type !== MESSAGE_TYPE.FILE &&
-      message.type !== MESSAGE_TYPE.LINK &&
-      message.type !== MESSAGE_TYPE.MEDIA &&
-      message.type !== MESSAGE_TYPE.TEXT
-    )
-  }, [message.type])
+    return isMessageUnsupported(message)
+  }, [message])
 
   return (
     <MessageItem

@@ -9,5 +9,6 @@ export enum MESSAGE_TYPE {
   SYSTEM = 'system',
   LINK = 'link',
   FILE = 'file',
-  POLL = 'poll'
+  POLL = 'poll',
+  DELETED = ''
 }

@@ -5,14 +5,13 @@ import { useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as VoiceIcon } from '../../../assets/svg/voiceIcon.svg'
 // Helpers
-import { isJSON, makeUsername } from '../../../helpers/message'
+import { isJSON, isMessageUnsupported, makeUsername } from '../../../helpers/message'
 import { getClient } from '../../../common/client'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
 import { MessageOwner, ReplyMessageText } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAttachment, IMessage } from '../../../types'
-import { MESSAGE_TYPE } from 'types/enum'
 import { MessageTextFormat } from '../../../messageUtils'
 // Components
 import Attachment from '../../Attachment'
@@ -104,14 +103,7 @@ const RepliedMessage = ({
   ])
 
   const unsupportedMessage = useMemo(() => {
-    return (
-      message.parentMessage!.type !== MESSAGE_TYPE.SYSTEM &&
-      message.parentMessage!.type !== MESSAGE_TYPE.TEXT &&
-      message.parentMessage!.type !== MESSAGE_TYPE.MEDIA &&
-      message.parentMessage!.type !== MESSAGE_TYPE.FILE &&
-      message.parentMessage!.type !== MESSAGE_TYPE.LINK &&
-      message.parentMessage!.type !== MESSAGE_TYPE.POLL
-    )
+    return isMessageUnsupported(message.parentMessage!)
   }, [message.parentMessage!.type])
 
   return (

@@ -23,7 +23,7 @@ import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
 import Avatar from '../Avatar'
 // Helpers
 import { systemMessageUserName } from '../../helpers'
-import { isJSON, lastMessageDateFormat, makeUsername } from '../../helpers/message'
+import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
 import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
@@ -398,14 +398,7 @@ const Channel: React.FC<IChannelProps> = ({
     }
   }, [typingOrRecordingIndicator])
   const unsupportedMessage = useMemo(() => {
-    return (
-      lastMessage?.type !== MESSAGE_TYPE.SYSTEM &&
-      lastMessage?.type !== MESSAGE_TYPE.TEXT &&
-      lastMessage?.type !== MESSAGE_TYPE.MEDIA &&
-      lastMessage?.type !== MESSAGE_TYPE.FILE &&
-      lastMessage?.type !== MESSAGE_TYPE.LINK &&
-      lastMessage?.type !== MESSAGE_TYPE.POLL
-    )
+    return isMessageUnsupported(lastMessage)
   }, [lastMessage?.type])
 
   const MessageText = useMemo(() => {

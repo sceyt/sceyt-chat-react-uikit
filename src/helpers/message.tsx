@@ -1,8 +1,9 @@
 import { attachmentTypes } from './constants'
-import { IBodyAttribute, IContact, IUser } from '../types'
+import { IBodyAttribute, IContact, IMessage, IUser } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
+import { MESSAGE_TYPE } from 'types/enum'
 export const typingTextFormat = ({
   text,
   formatAttributes,
@@ -281,4 +282,13 @@ export const EditorTheme: EditorThemeClasses = {
     underline: 'text_underline',
     underlineStrikethrough: 'text_underlineStrikethrough'
   }
+}
+
+export const isMessageUnsupported = (message: IMessage) => {
+  return message.type !== MESSAGE_TYPE.TEXT &&
+    message.type !== MESSAGE_TYPE.MEDIA &&
+    message.type !== MESSAGE_TYPE.FILE &&
+    message.type !== MESSAGE_TYPE.LINK &&
+    message.type !== MESSAGE_TYPE.POLL &&
+    message.type !== MESSAGE_TYPE.DELETED
 }
