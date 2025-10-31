@@ -15,6 +15,8 @@ export interface IMessageActions {
   message: IMessage
   channel: IChannel
   handleSetMessageForEdit?: () => void
+  handleRetractVote?: () => void
+  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -53,6 +55,8 @@ interface ICustomMessageItem {
   messageTextRef: any
   emojisPopupPosition: string
   handleSetMessageForEdit?: () => void
+  handleRetractVote?: () => void
+  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -72,6 +76,7 @@ interface ICustomMessageItem {
   handleMediaItemClick?: (attachment: IAttachment) => void
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
+  unsupportedMessage: boolean
 }
 
 export interface IMessageProps {
@@ -131,6 +136,8 @@ export interface IMessageProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -206,6 +213,22 @@ export interface IMessageProps {
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
+    ogContainerBorderRadius?: string | number
+    ogContainerPadding?: string
+    ogContainerClassName?: string
+    ogContainerShowBackground?: boolean
+    ogContainerBackground?: string
+    infoPadding?: string
+  }
   showInfoMessageProps?: {
     togglePopup?: () => void
     labels?: ILabels

@@ -8,6 +8,7 @@ import {
   removeChannelAC,
   removeChannelCachesAC,
   setActiveChannelAC,
+  setChannelInviteKeysAC,
   setChannelsAC,
   setChannelsForForwardAC,
   setChannelsLoadingStateAC,
@@ -19,7 +20,8 @@ import {
   switchChannelActionAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC,
-  updateUserStatusOnChannelAC
+  updateUserStatusOnChannelAC,
+  setJoinableChannelAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -50,7 +52,13 @@ import {
   WATCH_FOR_EVENTS,
   SEND_RECORDING,
   GET_CHANNEL_MENTIONS,
-  MARK_VOICE_MESSAGE_AS_PLAYED
+  MARK_VOICE_MESSAGE_AS_PLAYED,
+  CREATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_INVITE_KEYS,
+  REGENERATE_CHANNEL_INVITE_KEY,
+  UPDATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_BY_INVITE_KEY,
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY
 } from './constants'
 import {
   destroyChannelsMap,
@@ -390,7 +398,11 @@ function* searchChannels(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
-            if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
+            if (
+              userName.includes(lowerCaseSearchBy) ||
+              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+            ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
             }
@@ -570,7 +582,11 @@ function* searchChannelsForForward(action: IAction): any {
               directChannelUser,
               getFromContacts
             ).toLowerCase()
-            if (userName.includes(lowerCaseSearchBy) || (isSelfChannel && 'me'.includes(lowerCaseSearchBy))) {
+            if (
+              userName.includes(lowerCaseSearchBy) ||
+              (isSelfChannel && 'me'.includes(lowerCaseSearchBy)) ||
+              (isSelfChannel && 'you'.includes(lowerCaseSearchBy))
+            ) {
               // directChannels.push(JSON.parse(JSON.stringify(channel)))
               chatsGroups.push(channel)
             }
@@ -1337,6 +1353,145 @@ function* watchForChannelEvents() {
   yield call(watchForEvents)
 }
 
+function* createChannelInviteKey(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+    const SceytChatClient = getClient()
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+    if (channel) {
+      const inviteKey = yield call(SceytChatClient.createInviteKey, {
+        maxUses: 0,
+        expiresAt: 0,
+        accessPriorHistory: true
+      })
+      yield put(setChannelInviteKeysAC(channelId, [inviteKey]))
+    }
+  } catch (e) {
+    log.error('ERROR in create channel invite key', e)
+  }
+}
+
+function* getChannelInviteKeys(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId } = payload
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+    if (channel) {
+      const inviteKeys = yield call(channel.getInviteKeys)
+      yield put(setChannelInviteKeysAC(channelId, inviteKeys))
+    }
+  } catch (e) {
+    log.error('ERROR in get channel invite keys', e)
+  }
+}
+
+function* regenerateChannelInviteKey(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, key } = payload
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+    if (channel) {
+      const inviteKey = yield call(channel.regenerateInviteKey, {
+        key,
+        channelId
+      })
+      yield put(setChannelInviteKeysAC(channelId, [inviteKey]))
+    }
+  } catch (e) {
+    log.error('ERROR in regenerate channel invite key', e)
+  }
+}
+
+function* updateChannelInviteKey(action: IAction): any {
+  let channelInviteKeys: any[] = []
+  let channelId: string = ''
+  try {
+    const { payload } = action
+    const { channelId: payloadChannelId, key, accessPriorHistory, expiresAt, maxUses } = payload
+    channelId = payloadChannelId
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+    channelInviteKeys = store.getState().ChannelReducer.channelInviteKeys[channelId]
+    const copiedChannelInviteKeys = JSON.parse(JSON.stringify(channelInviteKeys))
+    if (copiedChannelInviteKeys) {
+      copiedChannelInviteKeys.forEach((inviteKey: any) => {
+        if (inviteKey.key === key) {
+          inviteKey.accessPriorHistory = accessPriorHistory
+          inviteKey.expiresAt = expiresAt
+          inviteKey.maxUses = maxUses
+        }
+      })
+      yield put(setChannelInviteKeysAC(channelId, copiedChannelInviteKeys))
+    }
+
+    if (channel) {
+      yield call(channel.updateInviteKey, {
+        key,
+        channelId,
+        maxUses,
+        expiresAt,
+        accessPriorHistory
+      })
+    }
+  } catch (e) {
+    log.error('ERROR in update channel invite key', e)
+    yield put(setChannelInviteKeysAC(channelId, channelInviteKeys))
+  }
+}
+
+function* getChannelByInviteKey(action: IAction): any {
+  try {
+    const { payload } = action
+    const { key } = payload
+    const SceytChatClient = getClient()
+    const channel = yield call(SceytChatClient.Channel.getChannelByInviteKey, key)
+    if (channel && channel.length > 0 && !channel[0]?.role) {
+      yield put(setJoinableChannelAC(JSON.parse(JSON.stringify(channel[0]))))
+    } else if (channel && channel.length > 0 && channel[0]?.role) {
+      yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel[0]))))
+      window.history.pushState({}, '', window.location.pathname)
+    }
+  } catch (e) {
+    log.error('ERROR in get channel by invite key', e)
+  }
+}
+
+function* joinChannelWithInviteKey(action: IAction): any {
+  try {
+    const { payload } = action
+    const { key } = payload
+    const SceytChatClient = getClient()
+    const user = SceytChatClient.user
+    const channel = yield call(SceytChatClient.Channel.joinChannelByInviteKey, key)
+    yield put(setJoinableChannelAC(null as unknown as IChannel))
+    yield call(setChannelInMap, channel)
+    const messageToSend: any = {
+      // metadata: mentionedUsersPositions,
+      body: 'JL',
+      mentionedUsers: [user],
+      attachments: [],
+      type: 'system'
+    }
+    yield put(sendTextMessageAC(messageToSend, channel?.id, CONNECTION_STATUS.CONNECTED))
+    yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel))))
+    window.history.pushState({}, '', window.location.pathname)
+  } catch (e) {
+    log.error('ERROR in join channel with invite key', e)
+  }
+}
+
 export default function* ChannelsSaga() {
   yield takeLatest(CREATE_CHANNEL, createChannel)
   yield takeLatest(GET_CHANNELS, getChannels)
@@ -1368,4 +1523,14 @@ export default function* ChannelsSaga() {
   yield takeLatest(DELETE_ALL_MESSAGES, deleteAllMessages)
   yield takeLatest(REMOVE_CHANNEL_CACHES, removeChannelCaches)
   yield takeLatest(GET_CHANNEL_MENTIONS, getChannelMentions)
+  yield takeLatest(CREATE_CHANNEL_INVITE_KEY, createChannelInviteKey)
+  yield takeLatest(UPDATE_CHANNEL_INVITE_KEY, updateChannelInviteKey)
+  yield takeLatest(REGENERATE_CHANNEL_INVITE_KEY, regenerateChannelInviteKey)
+  // yield takeLatest(GET_CHANNEL_INVITE_KEY, getChannelInviteKey)
+  yield takeLatest(GET_CHANNEL_INVITE_KEYS, getChannelInviteKeys)
+  // yield takeLatest(REVOKE_CHANNEL_INVITE_KEY, revokeChannelInviteKey)
+  // yield takeLatest(DELETE_REVOKED_CHANNEL_INVITE_KEY, deleteRevokedChannelInviteKey)
+  // yield takeLatest(GET_REVOKED_CHANNEL_INVITE_KEYS, getRevokedChannelInviteKeys)
+  yield takeLatest(GET_CHANNEL_BY_INVITE_KEY, getChannelByInviteKey)
+  yield takeLatest(JOIN_TO_CHANNEL_WITH_INVITE_KEY, joinChannelWithInviteKey)
 }

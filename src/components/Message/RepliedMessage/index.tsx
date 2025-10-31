@@ -5,7 +5,7 @@ import { useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as VoiceIcon } from '../../../assets/svg/voiceIcon.svg'
 // Helpers
-import { isJSON, makeUsername } from '../../../helpers/message'
+import { isJSON, isMessageUnsupported, makeUsername } from '../../../helpers/message'
 import { getClient } from '../../../common/client'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { attachmentTypes, MESSAGE_STATUS } from '../../../helpers/constants'
@@ -102,6 +102,10 @@ const RepliedMessage = ({
     message.parentMessage!.attachments.length
   ])
 
+  const unsupportedMessage = useMemo(() => {
+    return isMessageUnsupported(message.parentMessage!)
+  }, [message.parentMessage!.type])
+
   return (
     <ReplyMessageContainer
       withSenderName={showMessageSenderName}
@@ -175,7 +179,8 @@ const RepliedMessage = ({
               getFromContacts,
               asSampleText: true,
               accentColor,
-              textSecondary
+              textSecondary,
+              unsupportedMessage
             })
           ) : (
             parentNotLinkAttachment &&

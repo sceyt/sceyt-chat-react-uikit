@@ -16,7 +16,7 @@ interface IProps {
   name: string
   size?: number
   textSize?: number
-  marginAuto?: boolean
+  marginAuto?: string
   setDefaultAvatar?: boolean
   DefaultAvatar?: JSX.Element
   DeletedIcon?: JSX.Element
@@ -146,7 +146,7 @@ interface ContainerProps {
   avatarName: string
   textSize?: number
   isImage?: boolean
-  marginAuto?: boolean
+  marginAuto?: string
   border?: string
   borderRadius?: string
   cursorPointer?: boolean
@@ -170,7 +170,7 @@ export const Container = styled.div<ContainerProps>`
   border-radius: ${(props) => props.borderRadius || '50%'};
   color: #fff;
   overflow: hidden;
-  margin: ${(props) => (props.marginAuto ? 'auto' : '')};
+  margin: ${(props) => props.marginAuto || ''};
   ${(props: ContainerProps) =>
     !props.isImage ? `background-color:${generateAvatarColor(props.avatarName, props.theme)};` : ''};
   cursor: ${(props) => props.cursorPointer && 'pointer'};

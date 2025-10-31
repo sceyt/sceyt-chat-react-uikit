@@ -45,7 +45,8 @@ interface MessagesProps {
     handleOpenEmojis?: () => void
     handleSelectMessage?: () => void
     handleReplyMessage?: () => void
-
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
     isThreadMessage?: boolean
     rtlDirection?: boolean
   }>
@@ -80,6 +81,8 @@ interface MessagesProps {
     handleScrollToRepliedMessage: (messageId: string) => void
     handleMediaItemClick?: (attachment: IAttachment) => void
     isThreadMessage?: boolean
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
   }>
   showOwnAvatar?: boolean
   messageReaction?: boolean
@@ -103,6 +106,8 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -204,6 +209,17 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
+    infoPadding?: string
+  }
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -250,6 +266,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   starIcon,
   staredIcon,
   reportIcon,
+  retractVoteIcon,
+  endVoteIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions,
   fixEmojiCategoriesTitleOnTop,
@@ -341,7 +359,18 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties = [],
   shouldOpenUserProfileForMention,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  ogMetadataProps = {
+    maxWidth: 400,
+    maxHeight: undefined,
+    ogLayoutOrder: 'link-first',
+    ogShowUrl: false,
+    ogShowTitle: true,
+    ogShowDescription: true,
+    ogShowFavicon: true,
+    order: { image: 1, title: 2, description: 3, link: 4 },
+    infoPadding: '0 8px'
+  }
 }) => {
   return (
     <React.Fragment>
@@ -389,6 +418,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         starIcon={starIcon}
         staredIcon={staredIcon}
         reportIcon={reportIcon}
+        retractVoteIcon={retractVoteIcon}
+        endVoteIcon={endVoteIcon}
         reactionIconOrder={reactionIconOrder}
         openFrequentlyUsedReactions={openFrequentlyUsedReactions}
         fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
@@ -476,6 +507,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         hiddenMessagesProperties={hiddenMessagesProperties}
         shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
         showInfoMessageProps={showInfoMessageProps}
+        ogMetadataProps={ogMetadataProps}
       />
     </React.Fragment>
   )

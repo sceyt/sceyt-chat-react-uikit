@@ -72,7 +72,7 @@ import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
-import { HiddenMessageProperty } from 'types/enum'
+import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
 
@@ -169,6 +169,8 @@ interface MessagesProps {
     handleReportMessage?: () => void
     handleOpenEmojis?: () => void
     handleReplyMessage?: () => void
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
 
     isThreadMessage?: boolean
     rtlDirection?: boolean
@@ -187,6 +189,8 @@ interface MessagesProps {
     messageTextRef: any
     emojisPopupPosition: string
     handleSetMessageForEdit?: () => void
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
     handleResendMessage?: () => void
     handleOpenDeleteMessage?: () => void
     handleOpenForwardMessage?: () => void
@@ -205,6 +209,7 @@ interface MessagesProps {
     handleMediaItemClick?: (attachment: IAttachment) => void
     handleOpenUserProfile: (user: IUser) => void
     isThreadMessage?: boolean
+    unsupportedMessage: boolean
   }>
   messageReaction?: boolean
   editMessage?: boolean
@@ -226,6 +231,8 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -328,6 +335,17 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  ogMetadataProps?: {
+    maxWidth?: number
+    maxHeight?: number
+    ogLayoutOrder?: 'link-first' | 'og-first'
+    ogShowUrl?: boolean
+    ogShowTitle?: boolean
+    ogShowDescription?: boolean
+    ogShowFavicon?: boolean
+    order?: { image?: number; title?: number; description?: number; link?: number }
+    infoPadding?: string
+  }
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -370,6 +388,8 @@ const MessageList: React.FC<MessagesProps> = ({
   forwardIcon,
   deleteIcon,
   selectIcon,
+  retractVoteIcon,
+  endVoteIcon,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -465,7 +485,18 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  ogMetadataProps = {
+    maxWidth: 400,
+    maxHeight: undefined,
+    ogLayoutOrder: 'link-first',
+    ogShowUrl: false,
+    ogShowTitle: true,
+    ogShowDescription: true,
+    ogShowFavicon: true,
+    order: { image: 1, title: 2, description: 3, link: 4 },
+    infoPadding: '0 8px'
+  }
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1216,7 +1247,10 @@ const MessageList: React.FC<MessagesProps> = ({
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
                       noMargin={
-                        !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
+                        !isUnreadMessage &&
+                        prevMessage &&
+                        prevMessage.type === MESSAGE_TYPE.SYSTEM &&
+                        message.type !== MESSAGE_TYPE.SYSTEM
                       }
                       theme={theme}
                       lastIndex={false}
@@ -1230,11 +1264,13 @@ const MessageList: React.FC<MessagesProps> = ({
                       chatBackgroundColor={backgroundColor || themeBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
-                        prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
+                        prevMessage && prevMessage.type === MESSAGE_TYPE.SYSTEM && message.type !== MESSAGE_TYPE.SYSTEM
+                          ? '16px'
+                          : '0'
                       }
                       marginTop={differentUserMessageSpacing}
                     />
-                    {message.type === 'system' ? (
+                    {message.type === MESSAGE_TYPE.SYSTEM ? (
                       <SystemMessage
                         key={message.id || message.tid}
                         channel={channel}
@@ -1311,6 +1347,8 @@ const MessageList: React.FC<MessagesProps> = ({
                           forwardIcon={forwardIcon}
                           deleteIcon={deleteIcon}
                           selectIcon={selectIcon}
+                          retractVoteIcon={retractVoteIcon}
+                          endVoteIcon={endVoteIcon}
                           forwardMessage={forwardMessage}
                           starIcon={starIcon}
                           staredIcon={staredIcon}
@@ -1389,6 +1427,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                           showInfoMessageProps={showInfoMessageProps}
+                          ogMetadataProps={ogMetadataProps}
                         />
                       </MessageWrapper>
                     )}
@@ -1404,8 +1443,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                        marginTop={message.type === 'system' ? '0px' : ''}
-                        marginBottom={message.type === 'system' ? '16px' : '0'}
+                        marginTop={message.type === MESSAGE_TYPE.SYSTEM ? '0px' : ''}
+                        marginBottom={message.type === MESSAGE_TYPE.SYSTEM ? '16px' : '0'}
                         chatBackgroundColor={backgroundColor || themeBackgroundColor}
                         unread
                       />

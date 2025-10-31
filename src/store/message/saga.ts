@@ -1,5 +1,4 @@
 import { put, call, takeLatest, takeEvery, select } from 'redux-saga/effects'
-
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -19,10 +18,14 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS
+  GET_MESSAGE_MARKERS,
+  ADD_POLL_VOTE,
+  DELETE_POLL_VOTE,
+  CLOSE_POLL,
+  RETRACT_POLL_VOTE
 } from './constants'
 
-import { IAction, IAttachment, IChannel, IMessage } from '../../types'
+import { IAction, IAttachment, IChannel, IMessage, IPollVote } from '../../types'
 import { getClient } from '../../common/client'
 import {
   addChannelToAllChannels,
@@ -125,8 +128,9 @@ import { isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
+import { MESSAGE_TYPE } from 'types/enum'
 
-const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
+export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
     attachments.map(async (attachment) => {
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
@@ -171,19 +175,19 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...(attachment.metadata
-              ? typeof attachment.metadata === 'string'
-                ? JSON.parse(attachment.metadata)
-                : attachment.metadata
-              : {}),
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight,
-                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-              })
+          ...(attachment.metadata
+            ? typeof attachment.metadata === 'string'
+              ? JSON.parse(attachment.metadata)
+              : attachment.metadata
+            : {}),
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+            tmb: thumbnailMetas.thumbnail,
+            szw: thumbnailMetas.imageWidth,
+            szh: thumbnailMetas.imageHeight,
+            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
           })
+        })
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -321,8 +325,8 @@ function* sendMessage(action: IAction): any {
               .setBodyAttributes(i === 0 ? message.bodyAttributes : {})
               .setMentionUserIds(i === 0 ? mentionedUserIds : [])
               .setType(message.type)
-              .setDisplayCount(message.type === 'system' ? 0 : 1)
-              .setSilent(message.type === 'system')
+              .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+              .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
               .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
             if (message.parentMessage) {
               messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
@@ -360,8 +364,8 @@ function* sendMessage(action: IAction): any {
             .setAttachments(message.attachments)
             .setMentionUserIds(mentionedUserIds)
             .setType(message.type)
-            .setDisplayCount(message.type === 'system' ? 0 : 1)
-            .setSilent(message.type === 'system')
+            .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+            .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
             .setMetadata(JSON.stringify(message.metadata))
 
           if (message.parentMessage) {
@@ -556,9 +560,13 @@ function* sendTextMessage(action: IAction): any {
       .setAttachments(attachments)
       .setMentionUserIds(mentionedUserIds)
       .setType(message.type)
-      .setDisplayCount(message?.displayCount !== undefined ? message.displayCount : message.type === 'system' ? 0 : 1)
-      .setSilent(message?.silent !== undefined ? message.silent : message.type === 'system')
+      .setDisplayCount(
+        message?.displayCount !== undefined ? message.displayCount : message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1
+      )
+      .setSilent(message?.silent !== undefined ? message.silent : message.type === MESSAGE_TYPE.SYSTEM)
       .setMetadata(JSON.stringify(message.metadata))
+      .setPollDetails(message.pollDetails ? message.pollDetails : null)
+
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
     }
@@ -654,7 +662,7 @@ function* forwardMessage(action: IAction): any {
   // let messageForCatch = {}
   try {
     const { payload } = action
-    const { message, channelId, connectionState } = payload
+    const { message, channelId, connectionState, isForward } = payload
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
@@ -696,6 +704,7 @@ function* forwardMessage(action: IAction): any {
         .setDisableMentionsCount(getDisableFrowardMentionsCount())
         .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
+        .setPollDetails(message.pollDetails ? message.pollDetails : null)
       const messageToSend = messageBuilder.create()
       const pendingMessage = JSON.parse(
         JSON.stringify({
@@ -703,14 +712,17 @@ function* forwardMessage(action: IAction): any {
           createdAt: new Date(Date.now())
         })
       )
-      if (message.forwardingDetails) {
-        pendingMessage.forwardingDetails.user = message.forwardingDetails.user
-        pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
-      } else {
-        pendingMessage.forwardingDetails.user = message.user
-        pendingMessage.forwardingDetails.channelId = channelId
+      if (isForward) {
+        if (message.forwardingDetails) {
+          pendingMessage.forwardingDetails.user = message.forwardingDetails.user
+          pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
+        } else {
+          pendingMessage.forwardingDetails.user = message.user
+          pendingMessage.forwardingDetails.channelId = channelId
+        }
+        pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
       }
-      pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
+
       const activeChannelId = getActiveChannelId()
       const isCachedChannel = checkChannelExistsOnMessagesMap(channelId)
       if (channelId === activeChannelId) {
@@ -897,11 +909,11 @@ function* resendMessage(action: IAction): any {
                   : {}),
                 ...(thumbnailMetas &&
                   thumbnailMetas.thumbnail && {
-                    tmb: thumbnailMetas.thumbnail,
-                    szw: thumbnailMetas.imageWidth,
-                    szh: thumbnailMetas.imageHeight,
-                    ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-                  })
+                  tmb: thumbnailMetas.thumbnail,
+                  szw: thumbnailMetas.imageWidth,
+                  szh: thumbnailMetas.imageHeight,
+                  ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+                })
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
@@ -1271,8 +1283,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-              result.messages.length > 0 &&
-              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+            result.messages.length > 0 &&
+            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
         setMessagesToMap(channel.id, result.messages)
@@ -1672,6 +1684,197 @@ function* getMessageMarkers(action: IAction): any {
     yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
+
+const updatePollDetails = (
+  pollDetails: IMessage['pollDetails'],
+  optionId: string,
+  addVote: boolean = true,
+  allowMultipleVotes: boolean = false
+) => {
+  const user = getClient().user
+  if (addVote) {
+    const vote: IPollVote = {
+      optionId,
+      createdAt: new Date().getTime(),
+      user: {
+        id: user.id,
+        presence: {
+          status: user.presence?.status || 'online'
+        },
+        profile: {
+          avatar: user.avatarUrl || '',
+          firstName: user.firstName,
+          lastName: user.lastName,
+          metadata: user.metadata || '',
+          metadataMap: user.metadataMap || {},
+          updatedAt: new Date().getTime(),
+          username: user.username || '',
+          createdAt: new Date().getTime()
+        },
+        createdAt: new Date().getTime()
+      }
+    }
+    if (allowMultipleVotes) {
+      return {
+        ...pollDetails,
+        votesPerOption: {
+          ...pollDetails?.votesPerOption,
+          [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1
+        },
+        ownVotes: [...(pollDetails?.ownVotes || []), vote]
+      }
+    }
+    const isVotedAlready = (pollDetails?.ownVotes?.length || 0) > 0;
+    return {
+      ...pollDetails,
+      votesPerOption: {
+        ...pollDetails?.votesPerOption,
+        ...(isVotedAlready ? {
+          [String(pollDetails?.ownVotes?.[0]?.optionId)]: (pollDetails?.votesPerOption?.[String(pollDetails?.ownVotes?.[0]?.optionId)] || 0) - 1} : 
+          {}),
+        [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1
+      },
+      ownVotes: [vote]
+    }
+  } else {
+    if (allowMultipleVotes) {
+      return {
+        ...pollDetails,
+        votesPerOption: {
+          ...pollDetails?.votesPerOption,
+          [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
+        },
+        ownVotes: [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
+      }
+    }
+    return {
+      ...pollDetails,
+      votesPerOption: {
+        ...pollDetails?.votesPerOption,
+        [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
+      },
+      ownVotes: [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
+    }
+  }
+}
+
+function* addPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      const pollDetails = JSON.parse(
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false))
+      )
+
+      updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
+      updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
+      if (channel) {
+        const pollVote = yield call(channel.addVote, message.id, pollId, [optionId])
+        console.log('poll vote added', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in add poll vote', e)
+  }
+}
+
+function* deletePollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      const pollDetails = JSON.parse(
+        JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
+      )
+      updateMessageOnMap(channel.id, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
+      if (channel) {
+        const pollVote = yield call(channel.deleteVote, message.id, pollId, [optionId])
+        console.log('poll vote deleted', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in delete poll vote', e)
+  }
+}
+
+function* closePoll(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, message } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      // should update the poll details on the message
+      const pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
+      pollDetails.closed = true
+      pollDetails.closedAt = new Date().getTime()
+      updateMessageOnMap(channelId, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(updateMessageAC(message.id, { pollDetails }))
+      if (channel) {
+        const poll = yield call(channel.closePoll, message.id, pollId)
+        console.log('poll closed', poll)
+      }
+    }
+  } catch (e) {
+    log.error('error in close poll', e)
+  }
+}
+
+function* retractPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, message } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const channel = yield call(getChannelFromMap, channelId)
+      let pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
+      for (const vote of pollDetails.ownVotes) {
+        pollDetails = updatePollDetails(pollDetails, vote.optionId, false, message.pollDetails?.allowMultipleVotes || false)
+      }
+
+      updateMessageOnMap(channelId, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(
+        updateMessageAC(message.id, {
+          pollDetails
+        })
+      )
+      if (channel) {
+        const pollVote = yield call(channel.retractVote, message.id, pollId)
+        console.log('poll vote retracted', pollVote)
+      }
+    }
+  } catch (e) {
+    log.error('error in retract poll vote', e)
+  }
+}
+
 export default function* MessageSaga() {
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
@@ -1691,4 +1894,8 @@ export default function* MessageSaga() {
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
   yield takeEvery(RESUME_ATTACHMENT_UPLOADING, resumeAttachmentUploading)
+  yield takeEvery(ADD_POLL_VOTE, addPollVote)
+  yield takeEvery(DELETE_POLL_VOTE, deletePollVote)
+  yield takeEvery(CLOSE_POLL, closePoll)
+  yield takeEvery(RETRACT_POLL_VOTE, retractPollVote)
 }

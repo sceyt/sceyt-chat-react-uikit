@@ -37,6 +37,7 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
+import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
 
 interface IProps {
@@ -54,6 +55,7 @@ interface IProps {
   memberNameFontSize?: string
   memberAvatarSize?: number
   memberPresenceFontSize?: string
+  QRCodeIcon?: JSX.Element
 }
 
 const Members = ({
@@ -69,7 +71,8 @@ const Members = ({
   addMemberIcon,
   memberNameFontSize,
   memberAvatarSize,
-  memberPresenceFontSize
+  memberPresenceFontSize,
+  QRCodeIcon
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -91,6 +94,7 @@ const Members = ({
   const [makeAdminPopup, setMakeAdminPopup] = useState(false)
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
+  const [openInviteModal, setOpenInviteModal] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
@@ -234,17 +238,25 @@ const Members = ({
     }
   }
 
+  const handleOpenInviteModal = () => {
+    setOpenInviteModal(true)
+    setAddMemberPopupOpen(false)
+  }
+
   useEffect(() => {
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
     dispatch(getMembersAC(channel.id))
   }, [channel])
+
+  const currentUserRole = members.find((member) => member.id === user.id)?.role
+
   return (
     <Container theme={theme}>
       <ActionsMenu>
         <MembersList onScroll={handleMembersListScroll}>
-          {checkActionPermission('addMember') && (
+          {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
@@ -479,6 +491,14 @@ const Members = ({
           selectIsRequired
           memberIds={members.map((mem) => mem.id)}
           toggleCreatePopup={handleAddMemberPopup}
+          handleOpenInviteModal={handleOpenInviteModal}
+        />
+      )}
+      {openInviteModal && (
+        <InviteLinkModal
+          onClose={() => setOpenInviteModal(false)}
+          SVGOrPNGLogoIcon={QRCodeIcon}
+          channelId={channel.id}
         />
       )}
     </Container>

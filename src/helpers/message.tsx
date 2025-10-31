@@ -1,8 +1,9 @@
 import { attachmentTypes } from './constants'
-import { IBodyAttribute, IContact, IUser } from '../types'
+import { IBodyAttribute, IContact, IMessage, IPollVote, IUser } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
+import { MESSAGE_TYPE } from 'types/enum'
 export const typingTextFormat = ({
   text,
   formatAttributes,
@@ -71,9 +72,8 @@ export const typingTextFormat = ({
             ((currentAttributeEnd && currentAttributeEnd === mention.end) ||
               (!nextPart.trim() && !separateLines[i + 1]))
 
-          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class=${mention.type}>${
-            mention.displayName
-          }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class=${mention.type}>${mention.displayName
+            }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
 
           nextTextPart = nextPart
           prevEnd = currentAttributeEnd === mention.end ? mention.end + 1 : mention.end
@@ -282,3 +282,24 @@ export const EditorTheme: EditorThemeClasses = {
     underlineStrikethrough: 'text_underlineStrikethrough'
   }
 }
+
+export const isMessageUnsupported = (message: IMessage) => {
+  return message?.type !== MESSAGE_TYPE.TEXT &&
+    message?.type !== MESSAGE_TYPE.MEDIA &&
+    message?.type !== MESSAGE_TYPE.FILE &&
+    message?.type !== MESSAGE_TYPE.LINK &&
+    message?.type !== MESSAGE_TYPE.POLL &&
+    message?.type !== MESSAGE_TYPE.DELETED &&
+    message?.type !== MESSAGE_TYPE.SYSTEM
+}
+
+
+export const deleteVotesFromPollDetails = (votes: IPollVote[], deletedVotes: IPollVote[]) => {
+  const newVotes = [];
+  for (const vote of votes) {
+    if (!deletedVotes.find((deletedVote: IPollVote) => deletedVote.optionId === vote.optionId)) {
+      newVotes.push(vote);
+    }
+  }
+  return newVotes;
+} 

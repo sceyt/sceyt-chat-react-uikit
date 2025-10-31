@@ -50,6 +50,7 @@ interface IProps {
   channelInfoOrder?: number
   infoIconOrder?: number
   customActionsOrder?: number
+  showPhoneNumber?: boolean
 }
 
 export default function ChatHeader({
@@ -72,7 +73,8 @@ export default function ChatHeader({
   backButtonOrder,
   channelInfoOrder,
   infoIconOrder,
-  customActionsOrder
+  customActionsOrder,
+  showPhoneNumber
 }: IProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -173,7 +175,9 @@ export default function ChatHeader({
                 (isDirectChannel && directChannelUser
                   ? directChannelUser.firstName || directChannelUser.id
                   : isSelfChannel
-                    ? 'Me'
+                    ? showPhoneNumber
+                      ? `+${user.id} (You)`
+                      : 'Me'
                     : '')
               }
               image={
@@ -203,7 +207,9 @@ export default function ChatHeader({
               (isDirectChannel && directChannelUser
                 ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                 : isSelfChannel
-                  ? 'Me'
+                  ? showPhoneNumber
+                    ? `+${user.id} (You)`
+                    : 'Me'
                   : '')}
           </SectionHeader>
           {showMemberInfo &&
