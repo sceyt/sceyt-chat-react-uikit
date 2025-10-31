@@ -15,8 +15,6 @@ export interface IMessageActions {
   message: IMessage
   channel: IChannel
   handleSetMessageForEdit?: () => void
-  handleRetractVote?: () => void
-  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -55,8 +53,6 @@ interface ICustomMessageItem {
   messageTextRef: any
   emojisPopupPosition: string
   handleSetMessageForEdit?: () => void
-  handleRetractVote?: () => void
-  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -136,8 +132,6 @@ export interface IMessageProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
-  retractVoteIcon?: JSX.Element
-  endVoteIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'

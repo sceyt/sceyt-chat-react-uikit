@@ -8,7 +8,6 @@ import {
   addReactionAC,
   addSelectedMessageAC,
   clearSelectedMessagesAC,
-  closePollAC,
   deleteMessageAC,
   deleteMessageFromListAC,
   deleteReactionAC,
@@ -19,8 +18,7 @@ import {
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessagesLoadingStateAC,
-  setMessageToEditAC,
-  retractPollVoteAC
+  setMessageToEditAC
 } from 'store/message/actions'
 import {
   createChannelAC,
@@ -57,7 +55,6 @@ import { scrollToNewMessageSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
 import { isMessageUnsupported } from 'helpers/message'
-import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
 
 const Message = ({
   message,
@@ -116,8 +113,6 @@ const Message = ({
   starIcon,
   staredIcon,
   reportIcon,
-  retractVoteIcon,
-  endVoteIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions = true,
   editIconOrder,
@@ -224,7 +219,6 @@ const Message = ({
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [infoPopupOpen, setInfoPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
-  const [showEndVoteConfirmPopup, setShowEndVoteConfirmPopup] = useState(false)
   const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
   const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
   const [reactionsPopupOpen, setReactionsPopupOpen] = useState(false)
@@ -268,24 +262,6 @@ const Message = ({
   const toggleEditMode = () => {
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
-  }
-
-  const handleRetractVote = () => {
-    if (message?.pollDetails?.id) {
-      dispatch(retractPollVoteAC(channel.id, message?.pollDetails?.id, message))
-      setMessageActionsShow(false)
-    }
-  }
-
-  const handleEndVote = () => {
-    setShowEndVoteConfirmPopup(true)
-    setMessageActionsShow(false)
-  }
-
-  const endVote = () => {
-    if (!message?.pollDetails?.id) return
-    dispatch(closePollAC(channel.id, message?.pollDetails?.id, message))
-    setShowEndVoteConfirmPopup(false)
   }
 
   const handleToggleDeleteMessagePopup = () => {
@@ -667,8 +643,6 @@ const Message = ({
             messageTextRef={messageTextRef}
             emojisPopupPosition={emojisPopupPosition}
             handleSetMessageForEdit={toggleEditMode}
-            handleRetractVote={handleRetractVote}
-            handleEndVote={handleEndVote}
             handleResendMessage={handleResendMessage}
             handleOpenInfoMessage={handleToggleInfoMessagePopupOpen}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
@@ -692,8 +666,6 @@ const Message = ({
           />
         ) : (
           <MessageBody
-            handleRetractVote={handleRetractVote}
-            handleEndVote={handleEndVote}
             message={message}
             channel={channel}
             MessageActionsMenu={MessageActionsMenu}
@@ -743,8 +715,6 @@ const Message = ({
             starIcon={starIcon}
             staredIcon={staredIcon}
             reportIcon={reportIcon}
-            retractVoteIcon={retractVoteIcon}
-            endVoteIcon={endVoteIcon}
             reactionIconOrder={reactionIconOrder}
             editIconOrder={editIconOrder}
             copyIconOrder={copyIconOrder}
@@ -962,15 +932,6 @@ const Message = ({
           handleOpenUserProfile={handleOpenUserProfile}
         />
       )}
-      {showEndVoteConfirmPopup && (
-        <ConfirmEndPollPopup
-          handleFunction={endVote}
-          togglePopup={() => setShowEndVoteConfirmPopup(false)}
-          title='End Poll'
-          buttonText='End Poll'
-          description='Are you sure you want to end this poll? People will no longer be able to vote.'
-        />
-      )}
     </MessageItem>
   )
 }
@@ -986,7 +947,6 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.metadata === nextProps.message.metadata &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
-    prevProps.message.pollDetails === nextProps.message.pollDetails &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&

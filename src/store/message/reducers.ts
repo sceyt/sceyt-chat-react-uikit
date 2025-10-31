@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
-import { IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
+import { IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
@@ -10,7 +10,6 @@ import {
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
-import { deleteVotesFromPollDetails } from 'helpers/message'
 
 export interface IMessageStore {
   messagesLoadingState: number | null
@@ -228,15 +227,9 @@ const messageSlice = createSlice({
         messageId: string
         params: IMessage
         addIfNotExists?: boolean
-        voteDetails?: {
-          votes?: IPollVote[],
-          deletedVotes?: IPollVote[],
-          votesPerOption?: { [key: string]: number }
-          closed?: boolean
-        }
       }>
     ) => {
-      const { messageId, params, addIfNotExists, voteDetails } = action.payload
+      const { messageId, params, addIfNotExists } = action.payload
       let messageFound = false
       state.activeChannelMessages = state.activeChannelMessages.map((message) => {
         if (message.tid === messageId || message.id === messageId) {
@@ -244,36 +237,7 @@ const messageSlice = createSlice({
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
-            let messageData: IMessage = { 
-              ...message, 
-              ...params, 
-              ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails ? { 
-                pollDetails: { 
-                  ...message.pollDetails, 
-                  votes: [...(message.pollDetails.votes || []), ...voteDetails.votes],
-                  votesPerOption: voteDetails.votesPerOption
-                } 
-              } : {}) 
-            }
-            if (voteDetails && voteDetails.deletedVotes && messageData.pollDetails) {
-              messageData = {
-                ...messageData,
-                pollDetails: {
-                  ...messageData.pollDetails,
-                  votes: deleteVotesFromPollDetails(messageData.pollDetails.votes, voteDetails.deletedVotes),
-                  votesPerOption: voteDetails.votesPerOption || {}
-                }
-              }
-            }
-            if (voteDetails && voteDetails.closed && messageData.pollDetails) {
-              messageData = {
-                ...messageData,
-                pollDetails: {
-                  ...messageData.pollDetails,
-                  closed: voteDetails.closed
-                }
-              }
-            }
+            const messageData: IMessage = { ...message, ...params }
             if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
               removePendingMessageFromMap(messageData.channelId, messageData.tid || messageData.id)
             }
@@ -282,6 +246,7 @@ const messageSlice = createSlice({
         }
         return message
       })
+
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }

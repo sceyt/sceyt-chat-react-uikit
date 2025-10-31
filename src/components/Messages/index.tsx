@@ -45,8 +45,7 @@ interface MessagesProps {
     handleOpenEmojis?: () => void
     handleSelectMessage?: () => void
     handleReplyMessage?: () => void
-    handleRetractVote?: () => void
-    handleEndVote?: () => void
+
     isThreadMessage?: boolean
     rtlDirection?: boolean
   }>
@@ -81,8 +80,6 @@ interface MessagesProps {
     handleScrollToRepliedMessage: (messageId: string) => void
     handleMediaItemClick?: (attachment: IAttachment) => void
     isThreadMessage?: boolean
-    handleRetractVote?: () => void
-    handleEndVote?: () => void
   }>
   showOwnAvatar?: boolean
   messageReaction?: boolean
@@ -106,8 +103,6 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
-  retractVoteIcon?: JSX.Element
-  endVoteIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -266,8 +261,6 @@ const MessagesContainer: React.FC<MessagesProps> = ({
   starIcon,
   staredIcon,
   reportIcon,
-  retractVoteIcon,
-  endVoteIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions,
   fixEmojiCategoriesTitleOnTop,
@@ -418,8 +411,6 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         starIcon={starIcon}
         staredIcon={staredIcon}
         reportIcon={reportIcon}
-        retractVoteIcon={retractVoteIcon}
-        endVoteIcon={endVoteIcon}
         reactionIconOrder={reactionIconOrder}
         openFrequentlyUsedReactions={openFrequentlyUsedReactions}
         fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}

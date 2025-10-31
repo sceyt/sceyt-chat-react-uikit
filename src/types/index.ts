@@ -7,7 +7,6 @@ export interface IAction {
 
 export interface IUser {
   id: string
-  avatar?: string
   firstName: string
   lastName: string
   avatarUrl?: string
@@ -93,64 +92,6 @@ export interface IMarker {
   user: IUser | null
 }
 
-export interface IPollOption {
-  id: string;
-  name: string;
-}
-
-export interface IPollVote {
-  optionId: string;
-  createdAt: number;
-  user: {
-    id: string;
-    presence: {
-      status: string;
-    };
-    profile: {
-      avatar: string;
-      firstName: string;
-      lastName: string;
-      metadata: string;
-      metadataMap: {
-        [key: string]: string;
-      };
-      updatedAt: number;
-      username: string;
-      createdAt: number;
-    };
-    createdAt: number;
-  };
-}
-
-export interface IPollDetails {
-  id: string; 
-  name: string;
-  description: string;
-  options: IPollOption[];
-  anonymous: boolean;
-  allowMultipleVotes: boolean;
-  allowVoteRetract: boolean;
-  votesPerOption: { [key: string]: number };
-  votes: IPollVote[];
-  ownVotes: IPollVote[];
-  createdAt: number;
-  updatedAt: number;
-  closedAt: number;
-  closed: boolean;
-}
-
-export interface IPollVoteParams {
-  channelId: string;
-  messageId: string;
-  pollId: string;
-  optionId: string[];
-}
-
-export interface IPollUpdateParams { 
-  channelId: string;
-  pollId: string;
-}
-
 export interface IMessage {
   id: string
   tid?: string
@@ -191,7 +132,6 @@ export interface IMessage {
     messageId: string
     user: IUser
   }
-  pollDetails?: IPollDetails
 }
 
 export interface IMember extends IUser {

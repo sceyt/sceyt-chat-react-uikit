@@ -1,8 +1,7 @@
-import { IAttachment, IMessage, IPollVote, IReaction } from '../../types'
+import { IAttachment, IMessage, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
-import { deleteVotesFromPollDetails } from '../message'
 export const MESSAGES_MAX_LENGTH = 80
 export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
@@ -63,45 +62,13 @@ export const addAllMessages = (messages: IMessage[], direction: string) => {
   }
 }
 
-export const updateMessageOnAllMessages = (messageId: string, updatedParams: any, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) => {
+export const updateMessageOnAllMessages = (messageId: string, updatedParams: any) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (message.tid === messageId || message.id === messageId) {
       if (updatedParams.state === MESSAGE_STATUS.DELETE) {
         return { ...updatedParams }
       }
-      let updatedMessage = {
-        ...message,
-        ...updatedParams,
-        ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails ?
-          {
-            pollDetails: {
-              ...message.pollDetails, votes:
-                [...(message.pollDetails?.votes || []),
-                ...voteDetails.votes],
-              votesPerOption: voteDetails.votesPerOption,
-            }
-          } : {})
-      }
-      if (voteDetails && voteDetails.deletedVotes && updatedMessage.pollDetails) {
-        updatedMessage = {
-          ...updatedMessage,
-          pollDetails: {
-            ...updatedMessage.pollDetails,
-            votes: deleteVotesFromPollDetails(updatedMessage.pollDetails.votes, voteDetails.deletedVotes),
-            votesPerOption: voteDetails.votesPerOption
-          }
-        }
-      }
-      if (voteDetails && voteDetails.closed && updatedMessage.pollDetails) {
-        updatedMessage = {
-          ...updatedMessage,
-          pollDetails: {
-            ...updatedMessage.pollDetails,
-            closed: voteDetails.closed
-          }
-        }
-      }
-      return updatedMessage
+      return { ...message, ...updatedParams }
     }
     return message
   })
@@ -193,7 +160,7 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 }
 
-export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
+export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
     if (
       updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
@@ -226,27 +193,7 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
         } else {
           updatedMessageData = {
             ...mes,
-            ...updatedMessage.params,
-            ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && mes.pollDetails ? { pollDetails: { ...mes.pollDetails, votes: [...(mes.pollDetails?.votes || []), ...voteDetails.votes], votesPerOption: voteDetails.votesPerOption } } : {}),
-          }
-          if (voteDetails && voteDetails.deletedVotes && updatedMessageData.pollDetails) {
-            updatedMessageData = {
-              ...updatedMessageData,
-              pollDetails: {
-                ...updatedMessageData.pollDetails,
-                votes: deleteVotesFromPollDetails(updatedMessageData.pollDetails.votes, voteDetails.deletedVotes),
-                votesPerOption: voteDetails.votesPerOption
-              }
-            }
-          }
-          if (voteDetails && voteDetails.closed && updatedMessageData.pollDetails) {
-            updatedMessageData = {
-              ...updatedMessageData,
-              pollDetails: {
-                ...updatedMessageData.pollDetails,
-                closed: voteDetails.closed
-              }
-            }
+            ...updatedMessage.params
           }
           messagesList.push({ ...mes, ...updatedMessageData })
           continue

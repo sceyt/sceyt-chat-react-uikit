@@ -16,13 +16,9 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS,
-  DELETE_POLL_VOTE,
-  CLOSE_POLL,
-  ADD_POLL_VOTE,
-  RETRACT_POLL_VOTE
+  GET_MESSAGE_MARKERS
 } from './constants'
-import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
 import {
   addMessage,
   deleteMessageFromList,
@@ -317,8 +313,8 @@ export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string)
   return updateMessageAttachment({ url, attachmentUrl })
 }
 
-export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
-  return updateMessage({ messageId, params, addIfNotExists, voteDetails })
+export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {
+  return updateMessage({ messageId, params, addIfNotExists })
 }
 
 export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }) {
@@ -442,42 +438,4 @@ export function updateMessagesMarkersAC(channelId: string, deliveryStatus: strin
 
 export function setMessagesMarkersLoadingStateAC(state: number) {
   return setMessagesMarkersLoadingState({ state })
-}
-
-export function addPollVoteAC(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-) {
-  return {
-    type: ADD_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message }
-  }
-}
-
-export function deletePollVoteAC(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-) {
-  return {
-    type: DELETE_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message }
-  }
-}
-
-export function closePollAC(channelId: string, pollId: string, message: IMessage) {
-  return {
-    type: CLOSE_POLL,
-    payload: { channelId, pollId, message }
-  }
-}
-
-export function retractPollVoteAC(channelId: string, pollId: string, message: IMessage) {
-  return {
-    type: RETRACT_POLL_VOTE,
-    payload: { channelId, pollId, message }
-  }
 }

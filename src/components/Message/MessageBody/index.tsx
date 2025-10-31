@@ -25,7 +25,6 @@ import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
 import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
-import PollMessage from '../PollMessage'
 import log from 'loglevel'
 import { OGMetadata } from '../OGMetadata'
 import { MESSAGE_TYPE } from 'types/enum'
@@ -82,8 +81,6 @@ interface IMessageBodyProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
-  retractVoteIcon?: JSX.Element
-  endVoteIcon?: JSX.Element
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
@@ -139,8 +136,6 @@ interface IMessageBodyProps {
   messageTextLineHeight?: string
   messageActionsShow?: boolean
   setMessageActionsShow: (state: boolean) => void
-  handleRetractVote: () => void
-  handleEndVote: () => void
   closeMessageActions: () => void
   handleToggleForwardMessagePopup: () => void
   handleToggleInfoMessagePopupOpen: () => void
@@ -231,8 +226,6 @@ const MessageBody = ({
   deleteIcon,
   infoIcon,
   selectIcon,
-  retractVoteIcon,
-  endVoteIcon,
   starIcon,
   staredIcon,
   reportIcon,
@@ -288,8 +281,6 @@ const MessageBody = ({
   handleToggleForwardMessagePopup,
   handleToggleInfoMessagePopupOpen,
   messageActionsShow,
-  handleRetractVote,
-  handleEndVote,
   closeMessageActions,
   handleDeletePendingMessage,
   handleReplyMessage,
@@ -532,12 +523,9 @@ const MessageBody = ({
             handleReportMessage={handleToggleReportPopupOpen}
             handleSelectMessage={handleSelectMessage}
             handleOpenEmojis={handleOpenEmojis}
-            handleRetractVote={handleRetractVote}
-            handleEndVote={handleEndVote}
           />
         ) : (
           <MessageActions
-            isPollMessage={message?.type === MESSAGE_TYPE.POLL}
             messageFrom={message.user}
             channel={channel}
             editModeToggle={toggleEditMode}
@@ -551,8 +539,6 @@ const MessageBody = ({
             handleReplyMessage={handleReplyMessage}
             handleReportMessage={handleToggleReportPopupOpen}
             handleSelectMessage={handleSelectMessage}
-            handleRetractVote={handleRetractVote}
-            handleEndVote={handleEndVote}
             handleOpenEmojis={handleOpenEmojis}
             selfMessage={message.user && messageUserID === user.id}
             isThreadMessage={isThreadMessage}
@@ -582,8 +568,6 @@ const MessageBody = ({
             forwardIcon={forwardIcon}
             deleteIcon={deleteIcon}
             selectIcon={selectIcon}
-            retractVoteIcon={retractVoteIcon}
-            endVoteIcon={endVoteIcon}
             allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
             starIcon={starIcon}
             staredIcon={staredIcon}
@@ -849,8 +833,6 @@ const MessageBody = ({
           ))
         // </MessageAttachments>
       }
-
-      {message.type === 'poll' && <PollMessage message={message} />}
       {emojisPopupOpen && emojisPopupPosition && (
         <EmojiContainer
           id={`${message.id}_emoji_popup_container`}

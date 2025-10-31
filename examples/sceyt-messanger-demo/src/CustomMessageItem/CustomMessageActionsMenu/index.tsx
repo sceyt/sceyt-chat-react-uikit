@@ -39,7 +39,7 @@ function CustomMessageActionsMenu({
   handleSelectMessage?: () => void;
   handleOpenEmojis?: () => void;
   handleReplyMessage?: (threadReply?: boolean) => void;
-  
+
   isThreadMessage?: boolean;
   rtlDirection?: boolean;
   client: any;

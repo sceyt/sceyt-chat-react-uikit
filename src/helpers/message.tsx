@@ -1,5 +1,5 @@
 import { attachmentTypes } from './constants'
-import { IBodyAttribute, IContact, IMessage, IPollVote, IUser } from '../types'
+import { IBodyAttribute, IContact, IMessage, IUser } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
@@ -72,8 +72,9 @@ export const typingTextFormat = ({
             ((currentAttributeEnd && currentAttributeEnd === mention.end) ||
               (!nextPart.trim() && !separateLines[i + 1]))
 
-          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class=${mention.type}>${mention.displayName
-            }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
+          messageText += `${nextTextPart.substring(0, mentionStartInCurrentLine)}<span class=${mention.type}>${
+            mention.displayName
+          }</span>${setSpaceToEnd ? '&nbsp;' : ''}`
 
           nextTextPart = nextPart
           prevEnd = currentAttributeEnd === mention.end ? mention.end + 1 : mention.end
@@ -292,14 +293,3 @@ export const isMessageUnsupported = (message: IMessage) => {
     message?.type !== MESSAGE_TYPE.DELETED &&
     message?.type !== MESSAGE_TYPE.SYSTEM
 }
-
-
-export const deleteVotesFromPollDetails = (votes: IPollVote[], deletedVotes: IPollVote[]) => {
-  const newVotes = [];
-  for (const vote of votes) {
-    if (!deletedVotes.find((deletedVote: IPollVote) => deletedVote.optionId === vote.optionId)) {
-      newVotes.push(vote);
-    }
-  }
-  return newVotes;
-} 

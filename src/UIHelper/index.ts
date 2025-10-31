@@ -273,13 +273,13 @@ export const CustomSelectTrigger = styled.span<{ color: string }>`
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color: string; marginTop?: string }>`
+export const Label = styled.label<{ color: string }>`
   display: inline-block;
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
-  margin-top: ${(props) => props.marginTop || '20px'};
+  margin-top: 20px;
   margin-bottom: 4px;
   color: ${(props) => props.color};
 `

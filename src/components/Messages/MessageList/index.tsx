@@ -169,8 +169,6 @@ interface MessagesProps {
     handleReportMessage?: () => void
     handleOpenEmojis?: () => void
     handleReplyMessage?: () => void
-    handleRetractVote?: () => void
-    handleEndVote?: () => void
 
     isThreadMessage?: boolean
     rtlDirection?: boolean
@@ -189,8 +187,6 @@ interface MessagesProps {
     messageTextRef: any
     emojisPopupPosition: string
     handleSetMessageForEdit?: () => void
-    handleRetractVote?: () => void
-    handleEndVote?: () => void
     handleResendMessage?: () => void
     handleOpenDeleteMessage?: () => void
     handleOpenForwardMessage?: () => void
@@ -231,8 +227,6 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
-  retractVoteIcon?: JSX.Element
-  endVoteIcon?: JSX.Element
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -388,8 +382,6 @@ const MessageList: React.FC<MessagesProps> = ({
   forwardIcon,
   deleteIcon,
   selectIcon,
-  retractVoteIcon,
-  endVoteIcon,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -1347,8 +1339,6 @@ const MessageList: React.FC<MessagesProps> = ({
                           forwardIcon={forwardIcon}
                           deleteIcon={deleteIcon}
                           selectIcon={selectIcon}
-                          retractVoteIcon={retractVoteIcon}
-                          endVoteIcon={endVoteIcon}
                           forwardMessage={forwardMessage}
                           starIcon={starIcon}
                           staredIcon={staredIcon}
