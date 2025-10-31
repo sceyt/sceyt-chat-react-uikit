@@ -180,7 +180,7 @@ const OGMetadata = ({
 
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
-      if (metadata && metadataGetSuccessCallback && hasImage) {
+      if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
         metadataGetSuccessCallback(true)
       } else {
         metadataGetSuccessCallback?.(false)
