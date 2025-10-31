@@ -15,7 +15,7 @@ import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
 import { ReactComponent as ArrowDownIcon } from '../../../assets/svg/arrowDown.svg'
-import { ReactComponent as InfoIcon } from '../../../assets/svg/info.svg'
+import { ReactComponent as InfoIcon } from '../../../assets/svg/info-action.svg'
 // Helpers
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ItemNote } from '../../../UIHelper'
