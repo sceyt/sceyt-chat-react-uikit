@@ -5,6 +5,7 @@ import { ReactComponent as RemoveIcon } from '../../../assets/svg/close.svg'
 import { Popup, PopupBody, PopupFooter, PopupName, Button, Label, CustomInput, CloseIcon, Row } from '../../../UIHelper'
 import PopupContainer from '../../../common/popups/popupContainer'
 import CustomCheckbox from '../../../common/customCheckbox'
+import ConfirmPopup from '../../../common/popups/delete'
 import { useColor } from '../../../hooks'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { v4 as uuidv4 } from 'uuid'
@@ -48,18 +49,26 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     { id: uuidv4(), name: '' },
     { id: uuidv4(), name: '' }
   ])
-  const [anonymous, setAnonymous] = useState(true)
+  const [anonymous, setAnonymous] = useState(false)
   const [allowMultipleVotes, setAllowMultipleVotes] = useState(true)
-  const [allowVoteRetract, setAllowVoteRetract] = useState(true)
+  const [allowVoteRetract, setAllowVoteRetract] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const optionsListRef = useRef<HTMLDivElement>(null)
   const optionInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
 
-  const questionLimit = 80
+  const questionLimit = 200
+  const optionLimit = 120
   const canCreate = useMemo(() => {
     const validOptions = options.map((o) => o.name.trim()).filter(Boolean)
     return question.trim().length > 0 && validOptions.length >= 2
+  }, [question, options])
+
+  const hasUnsavedChanges = useMemo(() => {
+    const hasQuestion = question.trim().length > 0
+    const hasOptions = options.some((o) => o.name.trim().length > 0)
+    return hasQuestion || hasOptions
   }, [question, options])
 
   const allowPaste = (e: React.ClipboardEvent<HTMLInputElement>, type: 'question' | 'option', id?: string) => {
@@ -121,6 +130,19 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     togglePopup()
   }
 
+  const handleCloseAttempt = () => {
+    if (hasUnsavedChanges) {
+      setShowDiscardConfirm(true)
+    } else {
+      togglePopup()
+    }
+  }
+
+  const handleDiscard = () => {
+    setShowDiscardConfirm(false)
+    togglePopup()
+  }
+
   const handleAutoScroll = (e: React.DragEvent<HTMLDivElement>) => {
     const container = optionsListRef.current
     if (!container) return
@@ -160,7 +182,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     <PopupContainer>
       <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' padding='0'>
         <PopupBody paddingH='20px' paddingV='20px'>
-          <CloseIcon color={iconPrimary} onClick={togglePopup} />
+          <CloseIcon color={iconPrimary} onClick={handleCloseAttempt} />
           <PopupName color={textPrimary}>Create poll</PopupName>
 
           <Label color={textSecondary}>Question</Label>
@@ -217,6 +239,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
                   borderColor={borderColor}
                   errorColor={borderColor}
                   disabledColor={surface1}
+                  maxLength={optionLimit}
                   value={opt.name}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => editOption(opt.id, e.target.value)}
                   placeholder='Add option'
@@ -286,7 +309,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
 
         <PopupFooter backgroundColor={surface1}>
           <Row>
-            <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={togglePopup}>
+            <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleCloseAttempt}>
               Cancel
             </Button>
             <Button
@@ -303,6 +326,15 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           </Row>
         </PopupFooter>
       </Popup>
+      {showDiscardConfirm && (
+        <ConfirmPopup
+          togglePopup={() => setShowDiscardConfirm(false)}
+          handleFunction={handleDiscard}
+          title='Discard Poll'
+          description='Are you sure you want to discard this poll? All changes will be lost.'
+          buttonText='Discard'
+        />
+      )}
     </PopupContainer>
   )
 }

@@ -19,6 +19,7 @@ import { ReactComponent as VoiceIcon } from '../../assets/svg/voiceIcon.svg'
 import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.svg'
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
 import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
+import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
 // Components
 import Avatar from '../Avatar'
 // Helpers
@@ -85,8 +86,14 @@ interface IChannelProps {
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
   return (
-    !!(lastMessage.attachments && lastMessage.attachments.length) &&
-    (lastMessage.attachments[0].type === attachmentTypes.image ? (
+    !!((lastMessage.attachments && lastMessage.attachments.length) || (lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL)) &&
+    (
+      lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL ? (
+        <React.Fragment>
+          <PollIcon />
+          {lastMessage.body ? '' : 'Poll'}
+        </React.Fragment>
+      ): lastMessage.attachments[0].type === attachmentTypes.image ? (
       <React.Fragment>
         <ImageIcon />
         {lastMessage.body ? '' : 'Photo'}
@@ -235,7 +242,7 @@ const ChannelMessageText = ({
           }`
         ) : (
           <React.Fragment>
-            <LastMessageDescription>
+            <LastMessageDescription poll={lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL}>
               {channel.lastReactedMessage && (
                 <React.Fragment>
                   Reacted
@@ -980,7 +987,7 @@ export const LastMessageText = styled.span<{
     }
   }
 `
-export const LastMessageDescription = styled.div`
+export const LastMessageDescription = styled.div<{ poll?: boolean }>`
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -989,7 +996,7 @@ export const LastMessageDescription = styled.div`
   & > svg {
     width: 18px;
     height: 18px;
-    margin: 3px 0 -3px 0;
+    margin: ${props => props.poll ? '0 0 -3px 0' : '3px 0 -3px 0'};
     margin-right: 4px;
   }
 `

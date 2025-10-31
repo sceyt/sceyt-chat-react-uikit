@@ -20,7 +20,10 @@ import {
   DELETE_POLL_VOTE,
   CLOSE_POLL,
   ADD_POLL_VOTE,
-  RETRACT_POLL_VOTE
+  RETRACT_POLL_VOTE,
+  GET_POLL_VOTES,
+  LOAD_MORE_POLL_VOTES,
+  RESEND_PENDING_POLL_ACTIONS
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
@@ -69,7 +72,10 @@ import {
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
-  updateMessagesMarkers
+  updateMessagesMarkers,
+  setPollVotesList,
+  addPollVotesToList,
+  setPollVotesLoadingState
 } from './reducers'
 
 export function sendMessageAC(
@@ -480,4 +486,37 @@ export function retractPollVoteAC(channelId: string, pollId: string, message: IM
     type: RETRACT_POLL_VOTE,
     payload: { channelId, pollId, message }
   }
+}
+
+export function resendPendingPollActionsAC(connectionState: string) {
+  return {
+    type: RESEND_PENDING_POLL_ACTIONS,
+    payload: { connectionState }
+  }
+}
+
+export function getPollVotesAC(messageId: string | number, pollId: string, optionId: string, limit?: number) {
+  return {
+    type: GET_POLL_VOTES,
+    payload: { messageId, pollId, optionId, limit }
+  }
+}
+
+export function loadMorePollVotesAC(pollId: string, optionId: string, limit?: number) {
+  return {
+    type: LOAD_MORE_POLL_VOTES,
+    payload: { pollId, optionId, limit }
+  }
+}
+
+export function setPollVotesListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean) {
+  return setPollVotesList({ pollId, optionId, votes, hasNext })
+}
+
+export function addPollVotesToListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean) {
+  return addPollVotesToList({ pollId, optionId, votes, hasNext })
+}
+
+export function setPollVotesLoadingStateAC(pollId: string, optionId: string, loadingState: number | null) {
+  return setPollVotesLoadingState({ pollId, optionId, loadingState })
 }

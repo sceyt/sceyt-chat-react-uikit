@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, useEffect, useCallback } from 'react'
 import styled from 'styled-components'
 import PopupContainer from '../popupContainer'
 import { Popup, PopupBody, PopupName, CloseIcon, Row, Button } from 'UIHelper'
@@ -6,6 +6,10 @@ import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
 import { IPollVote } from 'types'
+import { useDispatch, useSelector } from 'store/hooks'
+import { getPollVotesAC, loadMorePollVotesAC } from 'store/message/actions'
+import { pollVotesListSelector, pollVotesHasMoreSelector, pollVotesLoadingStateSelector } from 'store/message/selector'
+import { LOADING_STATE } from 'helpers/constants'
 
 interface VotesResultsPopupProps {
   onClose: () => void
@@ -16,12 +20,13 @@ interface VotesResultsPopupProps {
     votes: IPollVote[]
     votesPerOption: Record<string, number>
   }
+  messageId: string | number
   // Optional: number of voters to show initially per option
   initialCount?: number
   onViewMoreOption?: (optionId: string) => void
 }
 
-const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }: VotesResultsPopupProps) => {
+const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 5, onViewMoreOption }: VotesResultsPopupProps) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -31,16 +36,47 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
     [THEME_COLORS.ACCENT]: accent
   } = useColor()
 
-  const optionIdToVotes = useMemo(() => {
-    const map: Record<string, IPollVote[]> = {}
-    ;(poll.votes || []).forEach((v) => {
-      if (!map[v.optionId]) map[v.optionId] = []
-      map[v.optionId].push(v)
+  const dispatch = useDispatch()
+  const pollVotesList = useSelector(pollVotesListSelector)
+  const pollVotesHasMore = useSelector(pollVotesHasMoreSelector)
+  const pollVotesLoadingState = useSelector(pollVotesLoadingStateSelector)
+
+  // Default load: Load initial votes for all options when popup opens
+  useEffect(() => {
+    poll.options.forEach((option) => {
+      const key = `${poll.id}_${option.id}`
+      const reduxVotes = pollVotesList[key] || []
+      
+      // Load if we don't have Redux votes yet
+      if (reduxVotes.length === 0) {
+        const totalVotes = poll.votesPerOption?.[option.id] || 0
+        if (totalVotes > 0) {
+          dispatch(getPollVotesAC(messageId, poll.id, option.id, initialCount))
+        }
+      }
     })
-    // sort by createdAt desc (latest first)
-    Object.keys(map).forEach((k) => map[k].sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt)))
-    return map
-  }, [poll.votes])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  const handleViewMore = useCallback(
+    (optionId: string) => {
+      if (onViewMoreOption) {
+        onViewMoreOption(optionId)
+      }
+      dispatch(loadMorePollVotesAC(poll.id, optionId, 20))
+    },
+    [dispatch, poll.id, onViewMoreOption]
+  )
+
+  // Get votes from Redux only
+  const optionIdToVotes = useMemo(() => {
+    const votes: Record<string, IPollVote[]> = {}
+    poll.options.forEach((opt) => {
+      const key = `${poll.id}_${opt.id}`
+      votes[opt.id] = pollVotesList[key] || []
+    })
+    return votes
+  }, [pollVotesList, poll.id, poll.options])
 
   const formatDate = (d: Date) => {
     try {
@@ -65,9 +101,11 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
 
           <OptionsList>
             {poll.options.map((opt) => {
+              const key = `${poll.id}_${opt.id}`
               const allVotes = optionIdToVotes[opt.id] || []
-              const shownVotes = allVotes.slice(0, initialCount)
-              const remaining = Math.max(0, (poll.votesPerOption?.[opt.id] || allVotes.length) - shownVotes.length)
+              const hasMore = pollVotesHasMore[key] ?? false
+              const isLoading = pollVotesLoadingState[key] === LOADING_STATE.LOADING
+
               return (
                 <OptionBlock key={opt.id} background={surface1} border={border}>
                   <OptionHeader>
@@ -77,7 +115,7 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
                     </OptionCount>
                   </OptionHeader>
                   <Voters>
-                    {shownVotes.map((vote) => (
+                    {allVotes.map((vote) => (
                       <VoterRow key={`${opt.id}_${vote.user.id}`}>
                         <Avatar
                           image={vote.user.profile.avatar}
@@ -95,15 +133,16 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
                       </VoterRow>
                     ))}
                   </Voters>
-                  {remaining > 0 && (
+                  {hasMore && (
                     <Row justify='center' marginTop='8px'>
                       <Button
                         type='button'
                         backgroundColor='transparent'
                         color={accent}
-                        onClick={() => onViewMoreOption && onViewMoreOption(opt.id)}
+                        onClick={() => handleViewMore(opt.id)}
+                        disabled={isLoading}
                       >
-                        View More
+                        {isLoading ? 'Loading...' : 'View More'}
                       </Button>
                     </Row>
                   )}

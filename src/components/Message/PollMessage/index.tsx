@@ -40,7 +40,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
   }
 
   const votesPerOption: Record<string, number> = poll.votesPerOption || {}
-  const totalVotes = Object.values(votesPerOption).reduce((acc, n) => acc + (n || 0), 0)
+  const maxVotes = poll.options.reduce((acc, opt) => Math.max(acc, votesPerOption[opt.id] || 0), 0)
   const ownVotedOptionIds = new Set((poll.ownVotes || []).map((v) => v.optionId))
   const votesUsers = poll.votes || []
 
@@ -63,11 +63,11 @@ const PollMessage = ({ message }: PollMessageProps) => {
   return (
     <Container>
       <Question color={textPrimary}>{poll.name}</Question>
-      <SubTitle color={textSecondary}>{poll.anonymous ? 'Anonymous poll' : 'Public poll'}</SubTitle>
+      <SubTitle color={textSecondary}>{poll.closed ? 'Poll finished' : poll.anonymous ? 'Anonymous poll' : 'Public poll'}</SubTitle>
       <Options>
         {(poll.options || []).map((opt: any) => {
           const votes = votesPerOption[opt.id] || 0
-          const pct = totalVotes > 0 ? Math.round((votes / totalVotes) * 100) : 0
+          const pct = maxVotes > 0 ? Math.round((votes / maxVotes) * 100) : 0
           const selected = ownVotedOptionIds.has(opt.id)
           const optionVotesUsers = votesUsers.filter((v: IPollVote) => v.optionId === opt.id).slice(0, 3)
           if (optionVotesUsers.length < 3) {
@@ -85,16 +85,16 @@ const PollMessage = ({ message }: PollMessageProps) => {
               hover={backgroundHovered}
               color={textPrimary}
               onClick={() => {
-                if (poll.closed) return
+                if (poll?.closed) return
                 handleVote(opt.id)
               }}
               role='button'
-              disabled={poll.closed}
+              disabled={poll?.closed}
             >
               <TopRow>
-                <Indicator disabled={poll.closed}>
+                {!poll.closed && <Indicator disabled={poll?.closed}>
                   {selected ? <StyledCheck color={accent} /> : <EmptyCircle border={borderSecondary} />}
-                </Indicator>
+                </Indicator>}
                 <Title color={textPrimary}>{opt.name}</Title>
                 {poll.anonymous ? null : (
                   <UsersContainer>
@@ -114,7 +114,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
                 )}
                 <Votes color={textPrimary}>{votes}</Votes>
               </TopRow>
-              <Bar track={borderSecondary}>
+              <Bar track={borderSecondary} closed={poll.closed}>
                 <Fill style={{ width: `${pct}%`, background: accent }} />
               </Bar>
             </Option>
@@ -128,12 +128,18 @@ const PollMessage = ({ message }: PollMessageProps) => {
           color={accent}
           borderRadius='14px'
           onClick={handleViewResults}
-          style={{ width: '100%', marginTop: 12 }}
+          style={{ width: '100%', marginTop: 10 }}
         >
           View Results
         </Button>
       )}
-      {showResults && <VotesResultsPopup onClose={() => setShowResults(false)} poll={poll as any} />}
+      {showResults && (
+        <VotesResultsPopup
+          onClose={() => setShowResults(false)}
+          poll={poll as any}
+          messageId={message.id}
+        />
+      )}
     </Container>
   )
 }
@@ -143,7 +149,6 @@ export default PollMessage
 const Container = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
   min-width: 250px;
 `
 
@@ -156,19 +161,22 @@ const Question = styled.div<{ color: string }>`
 `
 
 const SubTitle = styled.div<{ color: string }>`
-  font-size: 14px;
   color: ${(p) => p.color};
+  margin: 4px 0 6px 0;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: -0.08px;
 `
 
 const Options = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 12px;
   margin-top: 4px;
 `
 
 const Option = styled.div<{ background: string; hover: string; color: string; disabled?: boolean }>`
-  padding: 12px 14px;
+  padding: 10px 0;
   color: ${(p) => p.color};
   cursor: pointer;
   user-select: none;
@@ -210,10 +218,12 @@ const StyledCheck = styled(FilledCheckboxIcon) <{ color: string }>`
 
 const Title = styled.div<{ color: string }>`
   flex: 1 1 auto;
-  font-size: 16px;
-  line-height: 20px;
   color: ${(p) => p.color};
   margin-right: auto;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
 `
 
 const Votes = styled.span<{ color: string }>`
@@ -227,8 +237,8 @@ const Votes = styled.span<{ color: string }>`
   margin-bottom: 1px;
 `
 
-const Bar = styled.div<{ track: string }>`
-  width: calc(100% - 28px);
+const Bar = styled.div<{ track: string; closed?: boolean }>`
+  width: ${(p) => p.closed ? '100%' : `calc(100% - 28px)`};
   height: 6px;
   border-radius: 6px;
   background: ${(p) => p.track};

@@ -57,6 +57,9 @@ export interface IMessageStore {
   attachmentUpdatedMap: { [key: string]: string }
   messageMarkers: { [key: string]: { [key: string]: { [key: string]: IMarker[] } } }
   messagesMarkersLoadingState: number | null
+  pollVotesList: { [key: string]: IPollVote[] } // key format: pollId_optionId
+  pollVotesHasMore: { [key: string]: boolean }
+  pollVotesLoadingState: { [key: string]: number | null }
 }
 
 const initialState: IMessageStore = {
@@ -97,7 +100,10 @@ const initialState: IMessageStore = {
   oGMetadata: null,
   attachmentUpdatedMap: {},
   messageMarkers: {},
-  messagesMarkersLoadingState: null
+  messagesMarkersLoadingState: null,
+  pollVotesList: {},
+  pollVotesHasMore: {},
+  pollVotesLoadingState: {}
 }
 
 const messageSlice = createSlice({
@@ -594,6 +600,58 @@ const messageSlice = createSlice({
 
     setMessagesMarkersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
       state.messagesMarkersLoadingState = action.payload.state
+    },
+
+    setPollVotesList: (
+      state,
+      action: PayloadAction<{
+        pollId: string
+        optionId: string
+        votes: IPollVote[]
+        hasNext: boolean
+      }>
+    ) => {
+      const { pollId, optionId, votes, hasNext } = action.payload
+      const key = `${pollId}_${optionId}`
+      state.pollVotesHasMore[key] = hasNext
+      // Sort by createdAt desc (latest first)
+      const sortedVotes = [...votes].sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt))
+      state.pollVotesList[key] = sortedVotes
+    },
+
+    addPollVotesToList: (
+      state,
+      action: PayloadAction<{
+        pollId: string
+        optionId: string
+        votes: IPollVote[]
+        hasNext: boolean
+      }>
+    ) => {
+      const { pollId, optionId, votes, hasNext } = action.payload
+      const key = `${pollId}_${optionId}`
+      state.pollVotesHasMore[key] = hasNext
+      const existing = state.pollVotesList[key] || []
+      // Deduplicate by user.id
+      const existingIds = new Set(existing.map((v) => v.user.id))
+      const newVotes = votes.filter((v) => !existingIds.has(v.user.id))
+      const merged = [...existing, ...newVotes]
+      // Sort by createdAt desc
+      merged.sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt))
+      state.pollVotesList[key] = merged
+    },
+
+    setPollVotesLoadingState: (
+      state,
+      action: PayloadAction<{
+        pollId: string
+        optionId: string
+        loadingState: number | null
+      }>
+    ) => {
+      const { pollId, optionId, loadingState } = action.payload
+      const key = `${pollId}_${optionId}`
+      state.pollVotesLoadingState[key] = loadingState
     }
   },
   extraReducers: (builder) => {
@@ -650,7 +708,10 @@ export const {
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
-  updateMessagesMarkers
+  updateMessagesMarkers,
+  setPollVotesList,
+  addPollVotesToList,
+  setPollVotesLoadingState
 } = messageSlice.actions
 
 // Export reducer

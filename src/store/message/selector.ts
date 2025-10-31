@@ -38,3 +38,6 @@ export const selectedMessagesMapSelector = (store: any) => store.MessageReducer.
 export const attachmentUpdatedMapSelector = (store: any) => store.MessageReducer.attachmentUpdatedMap
 export const messageMarkersSelector = (store: any) => store.MessageReducer.messageMarkers
 export const messagesMarkersLoadingStateSelector = (store: any) => store.MessageReducer.messagesMarkersLoadingState
+export const pollVotesListSelector = (store: any) => store.MessageReducer.pollVotesList
+export const pollVotesHasMoreSelector = (store: any) => store.MessageReducer.pollVotesHasMore
+export const pollVotesLoadingStateSelector = (store: any) => store.MessageReducer.pollVotesLoadingState

@@ -29,6 +29,7 @@ import {
   editMessageAC,
   forwardMessageAC,
   resendMessageAC,
+  resendPendingPollActionsAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessageForReplyAC,
@@ -1352,6 +1353,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           })
         })
       }, 1000)
+
+      // Resend pending poll actions
+      dispatch(resendPendingPollActionsAC(connectionStatus))
     }
   }, [connectionStatus])
 

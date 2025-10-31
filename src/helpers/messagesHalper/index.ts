@@ -526,3 +526,98 @@ export const setMessageToVisibleMessagesMap = (message: IMessage) => {
 export const removeMessageFromVisibleMessagesMap = (message: IMessage) => {
   delete visibleMessagesMap[message.id]
 }
+
+type PendingPollAction = {
+  type: 'ADD_POLL_VOTE' | 'DELETE_POLL_VOTE' | 'CLOSE_POLL' | 'RETRACT_POLL_VOTE'
+  channelId: string
+  pollId: string
+  optionId?: string
+  message: IMessage
+}
+
+type pendingPollActionsMap = {
+  [messageId: string]: PendingPollAction[]
+}
+
+const pendingPollActionsMap: pendingPollActionsMap = {}
+
+export const checkPendingPollActionConflict = (action: PendingPollAction): { hasConflict: boolean; shouldSkip: boolean } => {
+  const messageId = action.message.id || action.message.tid
+  if (!messageId) return { hasConflict: false, shouldSkip: false }
+
+  if (!pendingPollActionsMap[messageId]) {
+    return { hasConflict: false, shouldSkip: false }
+  }
+
+  // Check if deletePollVote comes and there's a pending addPollVote for same option - should skip both
+  if (action.type === 'DELETE_POLL_VOTE' && action.optionId) {
+    const hasPendingAdd = pendingPollActionsMap[messageId].some(
+      (pendingAction) => pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId
+    )
+    if (hasPendingAdd && pendingPollActionsMap[messageId].length === 1) {
+      return { hasConflict: true, shouldSkip: true }
+    }
+  }
+
+  // Check if addPollVote comes and there's a pending deletePollVote for same option - should remove pending delete
+  if (action.type === 'ADD_POLL_VOTE' && action.optionId) {
+    const hasPendingDelete = pendingPollActionsMap[messageId].some(
+      (pendingAction) => pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId
+    )
+    if (hasPendingDelete) {
+      return { hasConflict: true, shouldSkip: false }
+    }
+  }
+
+  return { hasConflict: false, shouldSkip: false }
+}
+
+export const setPendingPollAction = (action: PendingPollAction) => {
+  const messageId = action.message.id || action.message.tid
+  if (!messageId) return
+
+  if (!pendingPollActionsMap[messageId]) {
+    pendingPollActionsMap[messageId] = []
+  }
+
+  // Handle conflict resolution: if addPollVote is pending and deletePollVote comes, remove the pending addPollVote
+  if (action.type === 'DELETE_POLL_VOTE' && action.optionId) {
+    pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
+      (pendingAction) => !(pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId)
+    )
+    // If after filtering there are no more actions, skip adding this delete action
+    if (pendingPollActionsMap[messageId].length === 0) {
+      delete pendingPollActionsMap[messageId]
+      return
+    }
+  }
+
+  // Handle conflict: if deletePollVote is pending and addPollVote comes, remove the pending deletePollVote
+  if (action.type === 'ADD_POLL_VOTE' && action.optionId) {
+    pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
+      (pendingAction) => !(pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId)
+    )
+  }
+
+  pendingPollActionsMap[messageId].push(action)
+}
+
+export const getPendingPollActionsMap = () => pendingPollActionsMap
+
+export const clearPendingPollActionsMap = () => {
+  Object.keys(pendingPollActionsMap).forEach((messageId) => {
+    delete pendingPollActionsMap[messageId]
+  })
+}
+
+export const removePendingPollAction = (messageId: string, actionType: string, optionId?: string) => {
+  if (!pendingPollActionsMap[messageId]) return
+
+  pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
+    (action) => !(action.type === actionType && (!optionId || action.optionId === optionId))
+  )
+
+  if (pendingPollActionsMap[messageId].length === 0) {
+    delete pendingPollActionsMap[messageId]
+  }
+}

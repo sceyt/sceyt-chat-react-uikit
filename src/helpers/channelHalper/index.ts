@@ -243,7 +243,8 @@ export const query: any = {
   blockedMembersQuery: null,
   AttachmentByTypeQuery: null,
   AttachmentByTypeQueryForPopup: null,
-  ReactionsQuery: null
+  ReactionsQuery: null,
+  PollVotesQueries: {} // key format: pollId_optionId
 }
 
 const unreadScrollTo = {
