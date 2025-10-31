@@ -62,6 +62,7 @@ const OGMetadata = ({
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
   const {
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
@@ -126,6 +127,8 @@ const OGMetadata = ({
       } catch (error) {
         console.log('Failed to fetch OG metadata', url)
         handleMetadata(null)
+      } finally {
+        setMetadataLoaded(true)
       }
     }
     return null
@@ -145,6 +148,7 @@ const OGMetadata = ({
           })
           .catch(() => {
             ogMetadataQueryBuilder(url)
+            setMetadataLoaded(true)
           })
       }
     }
@@ -175,10 +179,14 @@ const OGMetadata = ({
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
   useEffect(() => {
-    if (metadata && metadataGetSuccessCallback && hasImage) {
-      metadataGetSuccessCallback(true)
+    if (metadataLoaded || oGMetadata?.[attachment?.url]) {
+      if (metadata && metadataGetSuccessCallback && hasImage) {
+        metadataGetSuccessCallback(true)
+      } else {
+        metadataGetSuccessCallback?.(false)
+      }
     }
-  }, [metadata, metadataGetSuccessCallback])
+  }, [metadata, metadataGetSuccessCallback, metadataLoaded, oGMetadata, attachment?.url, hasImage])
 
   const elements = useMemo(() => [
     hasImage
