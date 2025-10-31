@@ -126,13 +126,12 @@ const OGMetadata = ({
         }
       } catch (error) {
         console.log('Failed to fetch OG metadata', url)
-        handleMetadata(null)
       } finally {
         setMetadataLoaded(true)
       }
     }
     return null
-  }, [handleMetadata])
+  }, [])
 
   useEffect(() => {
     if (attachment?.id && attachment?.url && !metadata) {
@@ -152,7 +151,7 @@ const OGMetadata = ({
           })
       }
     }
-  }, [attachment, metadata, handleMetadata, ogMetadataQueryBuilder])
+  }, [attachment, metadata])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
