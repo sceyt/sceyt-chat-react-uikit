@@ -63,7 +63,7 @@ export const addAllMessages = (messages: IMessage[], direction: string) => {
   }
 }
 
-export const updateMessageOnAllMessages = (messageId: string, updatedParams: any, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption: { [key: string]: number } }) => {
+export const updateMessageOnAllMessages = (messageId: string, updatedParams: any, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (message.tid === messageId || message.id === messageId) {
       if (updatedParams.state === MESSAGE_STATUS.DELETE) {
@@ -78,7 +78,7 @@ export const updateMessageOnAllMessages = (messageId: string, updatedParams: any
               ...message.pollDetails, votes:
                 [...(message.pollDetails?.votes || []),
                 ...voteDetails.votes],
-              votesPerOption: voteDetails.votesPerOption
+              votesPerOption: voteDetails.votesPerOption,
             }
           } : {})
       }
@@ -89,6 +89,15 @@ export const updateMessageOnAllMessages = (messageId: string, updatedParams: any
             ...updatedMessage.pollDetails,
             votes: deleteVotesFromPollDetails(updatedMessage.pollDetails.votes, voteDetails.deletedVotes),
             votesPerOption: voteDetails.votesPerOption
+          }
+        }
+      }
+      if (voteDetails && voteDetails.closed && updatedMessage.pollDetails) {
+        updatedMessage = {
+          ...updatedMessage,
+          pollDetails: {
+            ...updatedMessage.pollDetails,
+            closed: voteDetails.closed
           }
         }
       }
@@ -184,7 +193,7 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 }
 
-export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption: { [key: string]: number } }) {
+export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
     if (
       updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
@@ -218,7 +227,7 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
           updatedMessageData = {
             ...mes,
             ...updatedMessage.params,
-            ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && mes.pollDetails ? { pollDetails: { ...mes.pollDetails, votes: [...(mes.pollDetails?.votes || []), ...voteDetails.votes], votesPerOption: voteDetails.votesPerOption } } : {})
+            ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && mes.pollDetails ? { pollDetails: { ...mes.pollDetails, votes: [...(mes.pollDetails?.votes || []), ...voteDetails.votes], votesPerOption: voteDetails.votesPerOption } } : {}),
           }
           if (voteDetails && voteDetails.deletedVotes && updatedMessageData.pollDetails) {
             updatedMessageData = {
@@ -227,6 +236,15 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
                 ...updatedMessageData.pollDetails,
                 votes: deleteVotesFromPollDetails(updatedMessageData.pollDetails.votes, voteDetails.deletedVotes),
                 votesPerOption: voteDetails.votesPerOption
+              }
+            }
+          }
+          if (voteDetails && voteDetails.closed && updatedMessageData.pollDetails) {
+            updatedMessageData = {
+              ...updatedMessageData,
+              pollDetails: {
+                ...updatedMessageData.pollDetails,
+                closed: voteDetails.closed
               }
             }
           }

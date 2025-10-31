@@ -1740,16 +1740,15 @@ const updatePollDetails = (
     if (allowMultipleVotes) {
       return {
         ...pollDetails,
-        votes: [...(pollDetails?.votes || []).filter((vote: IPollVote) => !(vote.optionId === optionId && vote.user.id === user.id))],
         votesPerOption: {
           ...pollDetails?.votesPerOption,
           [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
-        }
+        },
+        ownVotes: [...(pollDetails?.ownVotes || []).filter((vote: IPollVote) => vote.optionId !== optionId)]
       }
     }
     return {
       ...pollDetails,
-      votes: [...(pollDetails?.votes || []).filter((vote: IPollVote) => !(vote.optionId === optionId && vote.user.id === user.id))],
       votesPerOption: {
         ...pollDetails?.votesPerOption,
         [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) - 1
@@ -1820,12 +1819,22 @@ function* deletePollVote(action: IAction): any {
 function* closePoll(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, pollId, messageId } = payload
+    const { channelId, pollId, message } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const channel = yield call(getChannelFromMap, channelId)
+      // should update the poll details on the message
+      const pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
+      pollDetails.closed = true
+      pollDetails.closedAt = new Date().getTime()
+      updateMessageOnMap(channelId, {
+        messageId: message.id,
+        params: { pollDetails }
+      })
+      updateMessageOnAllMessages(message.id, { pollDetails })
+      yield put(updateMessageAC(message.id, { pollDetails }))
       if (channel) {
-        const poll = yield call(channel.closePoll, messageId, pollId)
+        const poll = yield call(channel.closePoll, message.id, pollId)
         console.log('poll closed', poll)
       }
     }

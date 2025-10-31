@@ -1067,7 +1067,6 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.POLL_ADDED: {
         const { channel, message } = args
         const pollDetails = message?.pollDetails || {}
-        console.log('POLL_UPDATED', pollDetails)
         const activeChannelId = getActiveChannelId()
         const addedVotes = pollDetails?.votes || []
         updateMessageOnMap(channel.id, {
@@ -1083,7 +1082,6 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.POLL_DELETED: {
         const { channel, message } = args
         const pollDetails = message?.pollDetails || {}
-        console.log('POLL_DELETED', pollDetails)
         const activeChannelId = getActiveChannelId()
         const deletedVotes = pollDetails?.votes || []
         updateMessageOnMap(channel.id, {
@@ -1100,7 +1098,6 @@ export default function* watchForEvents(): any {
       case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
         const { channel, message } = args
         const pollDetails = message?.pollDetails || {}
-        console.log('POLL_RETRACTED', pollDetails)
         const activeChannelId = getActiveChannelId()
         const retractedVotes = pollDetails?.votes || []
         updateMessageOnMap(channel.id, {
@@ -1116,11 +1113,17 @@ export default function* watchForEvents(): any {
       }
       case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
         const { channel, message } = args
-        const pollDetails = message?.pollDetails || {}
-        console.log('POLL_CLOSED', pollDetails)
         const activeChannelId = getActiveChannelId()
-        const closedVotes = pollDetails?.votes || []
-        console.log('closedVotes', closedVotes, channel, activeChannelId)
+        updateMessageOnMap(channel.id, {
+          messageId: message.id,
+          params: {},
+        }, { closed: true })
+
+        if (channel.id === activeChannelId) {
+          updateMessageOnAllMessages(message.id, {}, { closed: true })
+          yield put(updateMessageAC(message.id, {}, undefined, { closed: true }))
+          break
+        }
         break
       }
       case CHANNEL_EVENT_TYPES.REACTION_DELETED: {

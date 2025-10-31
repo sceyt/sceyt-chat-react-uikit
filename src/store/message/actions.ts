@@ -317,7 +317,7 @@ export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string)
   return updateMessageAttachment({ url, attachmentUrl })
 }
 
-export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption: { [key: string]: number } }) {
+export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
@@ -468,10 +468,10 @@ export function deletePollVoteAC(
   }
 }
 
-export function closePollAC(channelId: string, pollId: string, messageId: string) {
+export function closePollAC(channelId: string, pollId: string, message: IMessage) {
   return {
     type: CLOSE_POLL,
-    payload: { channelId, pollId, messageId }
+    payload: { channelId, pollId, message }
   }
 }
 

@@ -80,15 +80,15 @@ const VotesResultsPopup = ({ onClose, poll, initialCount = 5, onViewMoreOption }
                     {shownVotes.map((vote) => (
                       <VoterRow key={`${opt.id}_${vote.user.id}`}>
                         <Avatar
-                          image={vote.user.avatarUrl}
-                          name={vote.user.firstName || vote.user.id}
+                          image={vote.user.profile.avatar}
+                          name={vote.user.profile.firstName || vote.user.id}
                           size={28}
                           textSize={12}
                           setDefaultAvatar
                         />
                         <VoterInfo>
                           <VoterName color={textPrimary}>
-                            {vote.user.firstName || vote.user.id} {vote.user.lastName || ''}
+                            {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
                           </VoterName>
                           <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
                         </VoterInfo>

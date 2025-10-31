@@ -284,7 +284,7 @@ const Message = ({
 
   const endVote = () => {
     if (!message?.pollDetails?.id) return
-    dispatch(closePollAC(channel.id, message?.pollDetails?.id, message.id))
+    dispatch(closePollAC(channel.id, message?.pollDetails?.id, message))
     setShowEndVoteConfirmPopup(false)
   }
 

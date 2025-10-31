@@ -231,7 +231,8 @@ const messageSlice = createSlice({
         voteDetails?: {
           votes?: IPollVote[],
           deletedVotes?: IPollVote[],
-          votesPerOption: { [key: string]: number }
+          votesPerOption?: { [key: string]: number }
+          closed?: boolean
         }
       }>
     ) => {
@@ -260,7 +261,16 @@ const messageSlice = createSlice({
                 pollDetails: {
                   ...messageData.pollDetails,
                   votes: deleteVotesFromPollDetails(messageData.pollDetails.votes, voteDetails.deletedVotes),
-                  votesPerOption: voteDetails.votesPerOption
+                  votesPerOption: voteDetails.votesPerOption || {}
+                }
+              }
+            }
+            if (voteDetails && voteDetails.closed && messageData.pollDetails) {
+              messageData = {
+                ...messageData,
+                pollDetails: {
+                  ...messageData.pollDetails,
+                  closed: voteDetails.closed
                 }
               }
             }

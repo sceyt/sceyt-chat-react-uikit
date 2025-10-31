@@ -88,7 +88,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
               role='button'
             >
               <TopRow>
-                <Indicator>
+                <Indicator disabled={poll.closed}>
                   {selected ? <StyledCheck color={accent} /> : <EmptyCircle border={borderSecondary} />}
                 </Indicator>
                 <Title color={textPrimary}>{opt.name}</Title>
@@ -117,16 +117,18 @@ const PollMessage = ({ message }: PollMessageProps) => {
           )
         })}
       </Options>
-      <Button
-        type='button'
-        backgroundColor={background}
-        color={accent}
-        borderRadius='14px'
-        onClick={handleViewResults}
-        style={{ width: '100%', marginTop: 12 }}
-      >
-        View Results
-      </Button>
+      {!poll?.anonymous && (
+        <Button
+          type='button'
+          backgroundColor={background}
+          color={accent}
+          borderRadius='14px'
+          onClick={handleViewResults}
+          style={{ width: '100%', marginTop: 12 }}
+        >
+          View Results
+        </Button>
+      )}
       {showResults && <VotesResultsPopup onClose={() => setShowResults(false)} poll={poll as any} />}
     </Container>
   )
@@ -171,9 +173,10 @@ const Option = styled.div<{ background: string; hover: string; color: string }>`
 const TopRow = styled.div`
   display: flex;
   margin-bottom: 6px;
+  min-height: 22px;
 `
 
-const Indicator = styled.div`
+const Indicator = styled.div<{ disabled?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: center;
@@ -181,6 +184,9 @@ const Indicator = styled.div`
   min-width: 20px;
   height: 20px;
   margin-right: 8px;
+  opacity: ${(p) => (p.disabled ? 0.5 : 1)};
+  pointer-events: ${(p) => (p.disabled ? 'none' : 'auto')};
+  cursor: ${(p) => (p.disabled ? 'not-allowed' : 'pointer')};
 `
 
 const EmptyCircle = styled.span<{ border: string }>`
@@ -192,7 +198,7 @@ const EmptyCircle = styled.span<{ border: string }>`
   box-sizing: border-box;
 `
 
-const StyledCheck = styled(FilledCheckboxIcon)<{ color: string }>`
+const StyledCheck = styled(FilledCheckboxIcon) <{ color: string }>`
   color: ${(p) => p.color};
   width: 18.5px;
   height: 18.5px;
@@ -218,11 +224,12 @@ const Votes = styled.span<{ color: string }>`
 `
 
 const Bar = styled.div<{ track: string }>`
-  width: 100%;
+  width: calc(100% - 28px);
   height: 6px;
   border-radius: 6px;
   background: ${(p) => p.track};
   overflow: hidden;
+  margin-left: auto;
 `
 
 const Fill = styled.div`
