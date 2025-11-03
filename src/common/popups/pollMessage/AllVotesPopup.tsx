@@ -180,7 +180,7 @@ const LoadingText = styled.div<{ color: string }>`
   font-size: 14px;
 `
 const TitleWrapper = styled.div`
-  max-width: calc(100% - 100px);
+  max-width: calc(100% - 54px);
   margin: 0 auto;
 `
 
