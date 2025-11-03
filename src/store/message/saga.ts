@@ -77,7 +77,8 @@ import {
   addPollVoteAC,
   deletePollVoteAC,
   closePollAC,
-  retractPollVoteAC
+  retractPollVoteAC,
+  deletePollVotesFromListAC
 } from './actions'
 import {
   attachmentTypes,
@@ -1845,6 +1846,8 @@ function* addPollVote(action: IAction): any {
             pollDetails = JSON.parse(
               JSON.stringify(updatePollDetails(pollDetails, optionId, true, pollDetails?.allowMultipleVotes || false))
             )
+            const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
+            yield put(addPollVotesToListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], hasNext, message.id))
             updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
             updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
             yield put(updateMessageAC(message.id, { pollDetails }))
@@ -1939,6 +1942,7 @@ function* deletePollVote(action: IAction): any {
             const pollDetails = JSON.parse(
               JSON.stringify(updatePollDetails(currentMessage.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
             )
+            yield put(deletePollVotesFromListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], message.id))
             updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
             updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
             yield put(updateMessageAC(message.id, { pollDetails }))

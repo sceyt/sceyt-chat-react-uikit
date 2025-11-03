@@ -75,7 +75,9 @@ import {
   updateMessagesMarkers,
   setPollVotesList,
   addPollVotesToList,
-  setPollVotesLoadingState
+  setPollVotesLoadingState,
+  deletePollVotesFromList,
+  setPollVotesInitialCount
 } from './reducers'
 
 export function sendMessageAC(
@@ -513,10 +515,18 @@ export function setPollVotesListAC(pollId: string, optionId: string, votes: IPol
   return setPollVotesList({ pollId, optionId, votes, hasNext })
 }
 
-export function addPollVotesToListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean) {
-  return addPollVotesToList({ pollId, optionId, votes, hasNext })
+export function addPollVotesToListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean, previousVotes?: IPollVote[]) {
+  return addPollVotesToList({ pollId, optionId, votes, hasNext, previousVotes })
+}
+
+export function deletePollVotesFromListAC(pollId: string, optionId: string, votes: IPollVote[], messageId: string) {
+  return deletePollVotesFromList({ pollId, optionId, votes, messageId })
 }
 
 export function setPollVotesLoadingStateAC(pollId: string, optionId: string, loadingState: number | null) {
   return setPollVotesLoadingState({ pollId, optionId, loadingState })
+}
+
+export function setPollVotesInitialCountAC(initialCount: number) {
+  return setPollVotesInitialCount({ initialCount })
 }

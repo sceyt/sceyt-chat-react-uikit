@@ -11,6 +11,8 @@ import {
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
 import { deleteVotesFromPollDetails } from 'helpers/message'
+import store from 'store'
+import { getPollVotesAC } from './actions'
 
 export interface IMessageStore {
   messagesLoadingState: number | null
@@ -60,6 +62,7 @@ export interface IMessageStore {
   pollVotesList: { [key: string]: IPollVote[] } // key format: pollId_optionId
   pollVotesHasMore: { [key: string]: boolean }
   pollVotesLoadingState: { [key: string]: number | null }
+  pollVotesInitialCount: number | null
 }
 
 const initialState: IMessageStore = {
@@ -103,7 +106,8 @@ const initialState: IMessageStore = {
   messagesMarkersLoadingState: null,
   pollVotesList: {},
   pollVotesHasMore: {},
-  pollVotesLoadingState: {}
+  pollVotesLoadingState: {},
+  pollVotesInitialCount: null
 }
 
 const messageSlice = createSlice({
@@ -254,16 +258,16 @@ const messageSlice = createSlice({
             if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && message.pollDetails) {
               message.pollDetails.votes = [...(message.pollDetails.votes || []).filter((vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id)]
             }
-            let messageData: IMessage = { 
-              ...message, 
-              ...params, 
-              ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails ? { 
-                pollDetails: { 
-                  ...message.pollDetails, 
+            let messageData: IMessage = {
+              ...message,
+              ...params,
+              ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails ? {
+                pollDetails: {
+                  ...message.pollDetails,
                   votes: [...(message.pollDetails.votes || []), ...voteDetails.votes],
                   votesPerOption: voteDetails.votesPerOption
-                } 
-              } : {}) 
+                }
+              } : {})
             }
             if (voteDetails && voteDetails.deletedVotes && messageData.pollDetails) {
               messageData = {
@@ -629,20 +633,52 @@ const messageSlice = createSlice({
         pollId: string
         optionId: string
         votes: IPollVote[]
-        hasNext: boolean
+        hasNext: boolean,
+        previousVotes?: IPollVote[]
       }>
     ) => {
-      const { pollId, optionId, votes, hasNext } = action.payload
+      const { pollId, optionId, votes, hasNext, previousVotes } = action.payload
       const key = `${pollId}_${optionId}`
       state.pollVotesHasMore[key] = hasNext
-      const existing = state.pollVotesList[key] || []
+      const existing = state.pollVotesList[key]
+      if (!existing) {
+        return
+      }
+      
       // Deduplicate by user.id
       const existingIds = new Set(existing.map((v) => v.user.id))
       const newVotes = votes.filter((v) => !existingIds.has(v.user.id))
-      const merged = [...existing, ...newVotes]
+      const merged = [
+        ...(previousVotes && previousVotes.length > 0 ?
+          [...newVotes] : []),
+        ...existing, ...(!previousVotes || previousVotes.length === 0 ?
+          [...newVotes] : [])
+      ]
       // Sort by createdAt desc
       merged.sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt))
       state.pollVotesList[key] = merged
+    },
+
+    deletePollVotesFromList: (
+      state,
+      action: PayloadAction<{
+        pollId: string
+        optionId: string
+        votes: IPollVote[]
+        messageId: string
+      }>
+    ) => {
+      const { pollId, optionId, votes, messageId } = action.payload
+      const key = `${pollId}_${optionId}`
+      let existing = state.pollVotesList[key]
+      if (!existing || !existing?.length) {
+        return
+      }
+      state.pollVotesList[key] = state.pollVotesList[key].filter((v) => !votes.find((vote) => vote.user.id === v.user.id))
+
+      if(state.pollVotesList[key]?.length === 0) {
+        store.dispatch(getPollVotesAC(messageId, pollId, optionId, state.pollVotesInitialCount || 3))
+      }
     },
 
     setPollVotesLoadingState: (
@@ -656,6 +692,15 @@ const messageSlice = createSlice({
       const { pollId, optionId, loadingState } = action.payload
       const key = `${pollId}_${optionId}`
       state.pollVotesLoadingState[key] = loadingState
+    },
+
+    setPollVotesInitialCount: (
+      state,
+      action: PayloadAction<{
+        initialCount: number
+      }>
+    ) => {
+      state.pollVotesInitialCount = action.payload.initialCount
     }
   },
   extraReducers: (builder) => {
@@ -715,7 +760,9 @@ export const {
   updateMessagesMarkers,
   setPollVotesList,
   addPollVotesToList,
-  setPollVotesLoadingState
+  setPollVotesLoadingState,
+  deletePollVotesFromList,
+  setPollVotesInitialCount
 } = messageSlice.actions
 
 // Export reducer

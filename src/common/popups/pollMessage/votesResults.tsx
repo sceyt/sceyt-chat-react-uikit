@@ -7,7 +7,7 @@ import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
 import { IPollVote } from 'types'
 import { useDispatch, useSelector } from 'store/hooks'
-import { getPollVotesAC, loadMorePollVotesAC } from 'store/message/actions'
+import { getPollVotesAC, loadMorePollVotesAC, setPollVotesInitialCountAC } from 'store/message/actions'
 import { pollVotesListSelector, pollVotesHasMoreSelector, pollVotesLoadingStateSelector } from 'store/message/selector'
 import { LOADING_STATE } from 'helpers/constants'
 
@@ -26,7 +26,16 @@ interface VotesResultsPopupProps {
   onViewMoreOption?: (optionId: string) => void
 }
 
-const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 2, onViewMoreOption }: VotesResultsPopupProps) => {
+const VotesResultsPopup = ({ onClose, poll, messageId, initialCount, onViewMoreOption }: VotesResultsPopupProps) => {
+  const initialVotesCount = useMemo(() => {
+    return initialCount ? initialCount : poll?.options?.length >= 3 ? 2 : 4
+  }, [initialCount, poll?.options?.length])
+
+  useEffect(() => {
+    if (initialVotesCount){
+      dispatch(setPollVotesInitialCountAC(initialVotesCount))
+    }
+  }, [initialVotesCount])
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -51,7 +60,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 2, onViewM
       if (reduxVotes.length === 0) {
         const totalVotes = poll.votesPerOption?.[option.id] || 0
         if (totalVotes > 0) {
-          dispatch(getPollVotesAC(messageId, poll.id, option.id, initialCount))
+          dispatch(getPollVotesAC(messageId, poll.id, option.id, initialVotesCount))
         }
       }
     })

@@ -1,7 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
-import { IAttachment, IChannel, IMarker, IMember, IMessage, IReaction, IUser } from '../../types'
+import { IAttachment, IChannel, IMarker, IMember, IMessage, IPollDetails, IReaction, IUser } from '../../types'
 import { CHANNEL_EVENT_TYPES } from '../channel/constants'
 import {
   addChannelToAllChannels,
@@ -39,8 +39,10 @@ import {
 } from '../channel/actions'
 import {
   addMessageAC,
+  addPollVotesToListAC,
   addReactionToMessageAC,
   clearMessagesAC,
+  deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
@@ -223,47 +225,47 @@ export default function* watchForEvents(): any {
         }
       })
     }
-    channelListener.onPollAdded = (channel: IChannel, message: IMessage, user: IUser) => {
+    channelListener.onPollAdded = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
       if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.POLL_ADDED,
         args: {
           channel,
-          message,
-          user
+          pollDetails,
+          messageId
         }
       })
     }
-    channelListener.onPollRetracted = (channel: IChannel, message: IMessage, user: IUser) => {
+    channelListener.onPollRetracted = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
       if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.POLL_RETRACTED,
         args: {
           channel,
-          message,
-          user
+          pollDetails,
+          messageId
         }
       })
     }
-    channelListener.onPollDeleted = (channel: IChannel, message: IMessage, user: IUser) => {
+    channelListener.onPollDeleted = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
       if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.POLL_DELETED,
         args: {
           channel,
-          message,
-          user
+          pollDetails,
+          messageId
         }
       })
     }
-    channelListener.onPollClosed = (channel: IChannel, message: IMessage, user: IUser) => {
+    channelListener.onPollClosed = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
       if (shouldSkip(channel)) return
       emitter({
         type: CHANNEL_EVENT_TYPES.POLL_CLOSED,
         args: {
           channel,
-          message,
-          user
+          pollDetails,
+          messageId
         }
       })
     }
@@ -1065,8 +1067,7 @@ export default function* watchForEvents(): any {
         break
       }
       case CHANNEL_EVENT_TYPES.POLL_ADDED: {
-        const { channel, message } = args
-        const pollDetails = message?.pollDetails || {}
+        const { channel, pollDetails, messageId } = args
         const activeChannelId = getActiveChannelId()
         const addedVotes = pollDetails?.votes || []
         const obj = {
@@ -1074,59 +1075,75 @@ export default function* watchForEvents(): any {
           votesPerOption: pollDetails.votesPerOption || {},
           multipleVotes: pollDetails.allowMultipleVotes || false,
         }
+        
+        // Add first vote for each option to pollVotesList
+        if (pollDetails?.id && addedVotes.length > 0) {
+          const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollDetails.id] || false
+          // Add first vote for each option to pollVotesList
+          for (const vote of addedVotes) {
+            yield put(addPollVotesToListAC(pollDetails.id, vote.optionId, [vote], hasNext, undefined))
+          }
+        }
+        
         updateMessageOnMap(channel.id, {
-          messageId: message.id,
+          messageId: messageId,
           params: {},
         }, obj)
         if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(message.id, {}, obj)
-          yield put(updateMessageAC(message.id, {}, undefined, obj))
+          updateMessageOnAllMessages(messageId, {}, obj)
+          yield put(updateMessageAC(messageId, {}, undefined, obj))
           break
         }
       }
       case CHANNEL_EVENT_TYPES.POLL_DELETED: {
-        const { channel, message } = args
-        const pollDetails = message?.pollDetails || {}
+        const { channel, pollDetails, messageId } = args
         const activeChannelId = getActiveChannelId()
         const deletedVotes = pollDetails?.votes || []
+        
+        // Add first vote for each option to pollVotesList
+        if (pollDetails?.id && deletedVotes.length > 0) {
+          for (const vote of deletedVotes) {
+            yield put(deletePollVotesFromListAC(pollDetails.id, vote.optionId, [vote], messageId))
+          }
+        }
+        
         updateMessageOnMap(channel.id, {
-          messageId: message.id,
+          messageId: messageId,
           params: {},
         }, { deletedVotes, votesPerOption: pollDetails.votesPerOption })
         if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(message.id, {}, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} })
-          yield put(updateMessageAC(message.id, {}, undefined, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          updateMessageOnAllMessages(messageId, {}, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} })
+          yield put(updateMessageAC(messageId, {}, undefined, { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
           break
         }
         break
       }
       case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
-        const { channel, message } = args
-        const pollDetails = message?.pollDetails || {}
+        const { channel, pollDetails, messageId } = args
         const activeChannelId = getActiveChannelId()
         const retractedVotes = pollDetails?.votes || []
         updateMessageOnMap(channel.id, {
-          messageId: message.id,
+          messageId: messageId,
           params: {},
         }, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption })
         if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(message.id, {}, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} })
-          yield put(updateMessageAC(message.id, {}, undefined, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          updateMessageOnAllMessages(messageId, {}, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} })
+          yield put(updateMessageAC(messageId, {}, undefined, { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
           break
         }
         break
       }
       case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
-        const { channel, message } = args
+        const { channel, messageId } = args
         const activeChannelId = getActiveChannelId()
         updateMessageOnMap(channel.id, {
-          messageId: message.id,
+          messageId: messageId,
           params: {},
         }, { closed: true })
 
         if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(message.id, {}, { closed: true })
-          yield put(updateMessageAC(message.id, {}, undefined, { closed: true }))
+          updateMessageOnAllMessages(messageId, {}, { closed: true })
+          yield put(updateMessageAC(messageId, {}, undefined, { closed: true }))
           break
         }
         break
