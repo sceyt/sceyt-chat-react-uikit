@@ -297,7 +297,7 @@ export const isMessageUnsupported = (message: IMessage) => {
 export const deleteVotesFromPollDetails = (votes: IPollVote[], deletedVotes: IPollVote[]) => {
   const newVotes = [];
   for (const vote of votes) {
-    if (!deletedVotes.find((deletedVote: IPollVote) => deletedVote.optionId === vote.optionId)) {
+    if (!deletedVotes.find((deletedVote: IPollVote) => deletedVote.optionId === vote.optionId && deletedVote.user.id === vote.user.id)) {
       newVotes.push(vote);
     }
   }
