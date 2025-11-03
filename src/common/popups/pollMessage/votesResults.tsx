@@ -26,7 +26,7 @@ interface VotesResultsPopupProps {
   onViewMoreOption?: (optionId: string) => void
 }
 
-const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 5, onViewMoreOption }: VotesResultsPopupProps) => {
+const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 2, onViewMoreOption }: VotesResultsPopupProps) => {
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -120,8 +120,8 @@ const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 5, onViewM
                         <Avatar
                           image={vote.user.profile.avatar}
                           name={vote.user.profile.firstName || vote.user.id}
-                          size={28}
-                          textSize={12}
+                          size={40}
+                          textSize={16}
                           setDefaultAvatar
                         />
                         <VoterInfo>
@@ -134,7 +134,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, initialCount = 5, onViewM
                     ))}
                   </Voters>
                   {hasMore && (
-                    <Row justify='center' marginTop='8px'>
+                    <Row justify='center' paddingBottom='5px '>
                       <Button
                         type='button'
                         backgroundColor='transparent'
@@ -162,13 +162,15 @@ const OptionsList = styled.div`
   display: flex;
   flex-direction: column;
   gap: 16px;
+  overflow-y: auto;
+  max-height: 64vh;
 `
 
 const OptionBlock = styled.div<{ background: string; border: string }>`
   background: ${(p) => p.background};
   border-radius: 12px;
   border: 1px solid ${(p) => p.border}0F; /* subtle */
-  padding: 14px 16px;
+  padding: 14px 16px 0 16px;
 `
 
 const OptionHeader = styled.div`
@@ -180,8 +182,10 @@ const OptionHeader = styled.div`
 
 const OptionTitle = styled.div<{ color: string }>`
   color: ${(p) => p.color};
-  font-weight: 500;
-  font-size: 14px;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.4px;
 `
 
 const OptionCount = styled.div<{ color: string }>`
@@ -192,13 +196,14 @@ const OptionCount = styled.div<{ color: string }>`
 const Voters = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  margin-bottom: 5px;
 `
 
 const VoterRow = styled.div`
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  padding: 6px 0;
 `
 
 const VoterInfo = styled.div`
@@ -211,10 +216,16 @@ const VoterInfo = styled.div`
 
 const VoterName = styled.div<{ color: string }>`
   color: ${(p) => p.color};
-  font-size: 14px;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
 `
 
 const VotedAt = styled.div<{ color: string }>`
   color: ${(p) => p.color};
-  font-size: 13px;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
 `

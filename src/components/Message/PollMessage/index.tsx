@@ -249,6 +249,7 @@ const Bar = styled.div<{ track: string; closed?: boolean }>`
 const Fill = styled.div`
   height: 100%;
   border-radius: 6px;
+  transition: width 0.3s ease-in-out;
 `
 
 const UsersContainer = styled.div`
