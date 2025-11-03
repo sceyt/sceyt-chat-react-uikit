@@ -1069,13 +1069,18 @@ export default function* watchForEvents(): any {
         const pollDetails = message?.pollDetails || {}
         const activeChannelId = getActiveChannelId()
         const addedVotes = pollDetails?.votes || []
+        const obj = {
+          votes: addedVotes,
+          votesPerOption: pollDetails.votesPerOption || {},
+          multipleVotes: pollDetails.allowMultipleVotes || false,
+        }
         updateMessageOnMap(channel.id, {
           messageId: message.id,
           params: {},
-        }, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption })
+        }, obj)
         if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(message.id, {}, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption || {} })
-          yield put(updateMessageAC(message.id, {}, undefined, { votes: addedVotes, votesPerOption: pollDetails.votesPerOption || {} }))
+          updateMessageOnAllMessages(message.id, {}, obj)
+          yield put(updateMessageAC(message.id, {}, undefined, obj))
           break
         }
       }

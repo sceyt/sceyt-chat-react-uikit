@@ -12,7 +12,7 @@ import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
 import { ReactComponent as ReactionIcon } from '../../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
-import { ReactComponent as RetractVoteIcon } from '../../../assets/svg/retractVote.svg'
+// import { ReactComponent as RetractVoteIcon } from '../../../assets/svg/retractVote.svg'
 import { ReactComponent as EndVoteIcon } from '../../../assets/svg/endVote.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
@@ -43,7 +43,7 @@ export default function MessageActions({
   handleReportMessage,
   messageStatus,
   handleSelectMessage,
-  handleRetractVote,
+  // handleRetractVote,
   handleEndVote,
   handleReplyMessage,
   handleOpenInfoMessage,
@@ -65,7 +65,7 @@ export default function MessageActions({
   copyIcon,
   replyIcon,
   replyInThreadIcon,
-  retractVoteIcon,
+  // retractVoteIcon,
   endVoteIcon,
   deleteIcon,
   selectIcon,
@@ -256,7 +256,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {isPollMessage && (
+        {/* {isPollMessage && (
           <Action onClick={handleRetractVote} 
             iconColor={messageActionIconsColor || iconInactive}
             hoverBackgroundColor={backgroundHovered}
@@ -268,7 +268,7 @@ export default function MessageActions({
             </ItemNote>
             { retractVoteIcon || <RetractVoteIcon />}
           </Action>
-        )}
+        )} */}
 
         {!isPollMessage && (
           <Action onClick={handleEndVote} 

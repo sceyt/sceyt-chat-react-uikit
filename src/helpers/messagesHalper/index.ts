@@ -63,11 +63,14 @@ export const addAllMessages = (messages: IMessage[], direction: string) => {
   }
 }
 
-export const updateMessageOnAllMessages = (messageId: string, updatedParams: any, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) => {
+export const updateMessageOnAllMessages = (messageId: string, updatedParams: any, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean, multipleVotes?: boolean }) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (message.tid === messageId || message.id === messageId) {
       if (updatedParams.state === MESSAGE_STATUS.DELETE) {
         return { ...updatedParams }
+      }
+      if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && message.pollDetails) {
+        message.pollDetails.votes = [...(message.pollDetails.votes || []).filter((vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id)]
       }
       let updatedMessage = {
         ...message,
@@ -193,7 +196,7 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   }
 }
 
-export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
+export function updateMessageOnMap(channelId: string, updatedMessage: { messageId: string; params: any }, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean, multipleVotes?: boolean }) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
     if (
       updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
@@ -228,6 +231,9 @@ export function updateMessageOnMap(channelId: string, updatedMessage: { messageI
             ...mes,
             ...updatedMessage.params,
             ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && mes.pollDetails ? { pollDetails: { ...mes.pollDetails, votes: [...(mes.pollDetails?.votes || []), ...voteDetails.votes], votesPerOption: voteDetails.votesPerOption } } : {}),
+          }
+          if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && updatedMessageData.pollDetails) {
+            updatedMessageData.pollDetails.votes = [...(updatedMessageData.pollDetails.votes || []).filter((vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id)]
           }
           if (voteDetails && voteDetails.deletedVotes && updatedMessageData.pollDetails) {
             updatedMessageData = {

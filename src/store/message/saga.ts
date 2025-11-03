@@ -1836,8 +1836,14 @@ function* addPollVote(action: IAction): any {
             // Get the current message state (which has the delete applied)
             const currentMessage = getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) || message
             // Apply add on top (which effectively reverts the delete)
-            const pollDetails = JSON.parse(
-              JSON.stringify(updatePollDetails(currentMessage.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false))
+
+            const hasVotedAnotherOption = (currentMessage.pollDetails?.ownVotes || []).some((vote: IPollVote) => vote.optionId !== optionId)
+            let pollDetails = currentMessage.pollDetails
+            if (hasVotedAnotherOption && !pollDetails?.allowMultipleVotes) {
+              pollDetails = updatePollDetails(pollDetails, optionId, false, false)
+            }
+            pollDetails = JSON.parse(
+              JSON.stringify(updatePollDetails(pollDetails, optionId, true, pollDetails?.allowMultipleVotes || false))
             )
             updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
             updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))

@@ -51,7 +51,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   ])
   const [anonymous, setAnonymous] = useState(false)
   const [allowMultipleVotes, setAllowMultipleVotes] = useState(true)
-  const [allowVoteRetract, setAllowVoteRetract] = useState(false)
+  // const [allowVoteRetract, setAllowVoteRetract] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
@@ -123,7 +123,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       options: options.filter((o) => o.name.trim()),
       anonymous,
       allowMultipleVotes,
-      allowVoteRetract,
+      allowVoteRetract: true,
       id: uuidv4()
     }
     if (onCreate) onCreate(event, payload)
@@ -292,7 +292,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
               />
               Multiple votes
             </SettingItem>
-            <SettingItem color={textPrimary}>
+            {/* <SettingItem color={textPrimary}>
               <CustomCheckbox
                 index='allowVoteRetract'
                 state={!allowVoteRetract}
@@ -303,7 +303,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
                 size='18px'
               />
               Can't retract votes
-            </SettingItem>
+            </SettingItem> */}
           </Settings>
         </PopupBody>
 

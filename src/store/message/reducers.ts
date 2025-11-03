@@ -238,7 +238,8 @@ const messageSlice = createSlice({
           votes?: IPollVote[],
           deletedVotes?: IPollVote[],
           votesPerOption?: { [key: string]: number }
-          closed?: boolean
+          closed?: boolean,
+          multipleVotes?: boolean
         }
       }>
     ) => {
@@ -250,6 +251,9 @@ const messageSlice = createSlice({
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
+            if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && message.pollDetails) {
+              message.pollDetails.votes = [...(message.pollDetails.votes || []).filter((vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id)]
+            }
             let messageData: IMessage = { 
               ...message, 
               ...params, 

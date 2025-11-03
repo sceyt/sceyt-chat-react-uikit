@@ -51,7 +51,6 @@ const PollMessage = ({ message }: PollMessageProps) => {
     const hasVoted = ownVotedOptionIds.has(optionId)
 
     if (hasVoted) {
-      if (!poll.allowVoteRetract) return
       dispatch(deletePollVoteAC(channel.id, poll.id, optionId, message))
       return
     }
