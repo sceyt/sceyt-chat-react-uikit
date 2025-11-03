@@ -74,8 +74,12 @@ const OGMetadata = ({
 
 
   const metadata = useMemo(() => {
-    return oGMetadata?.[attachment?.url] || null
-  }, [oGMetadata, attachment])
+    const metadata = oGMetadata?.[attachment?.url] || null
+    if (metadata?.og?.title && metadata?.og?.description) {
+      return metadata
+    }
+    return null
+  }, [oGMetadata, attachment?.url])
 
   const [imageLoadError, setImageLoadError] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
