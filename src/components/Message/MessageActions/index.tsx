@@ -12,7 +12,7 @@ import { ReactComponent as ResendIcon } from '../../../assets/svg/resend.svg'
 import { ReactComponent as ReactionIcon } from '../../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../../assets/svg/replyIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
-// import { ReactComponent as RetractVoteIcon } from '../../../assets/svg/retractVote.svg'
+import { ReactComponent as RetractVoteIcon } from '../../../assets/svg/retractVote.svg'
 import { ReactComponent as EndVoteIcon } from '../../../assets/svg/endVote.svg'
 import { ReactComponent as CopyIcon } from '../../../assets/svg/copyIcon.svg'
 import { ReactComponent as ReplyThreadIcon } from '../../../assets/svg/replyInThreadIcon.svg'
@@ -43,7 +43,7 @@ export default function MessageActions({
   handleReportMessage,
   messageStatus,
   handleSelectMessage,
-  // handleRetractVote,
+  handleRetractVote,
   handleEndVote,
   handleReplyMessage,
   handleOpenInfoMessage,
@@ -65,7 +65,7 @@ export default function MessageActions({
   copyIcon,
   replyIcon,
   replyInThreadIcon,
-  // retractVoteIcon,
+  retractVoteIcon,
   endVoteIcon,
   deleteIcon,
   selectIcon,
@@ -151,7 +151,8 @@ export default function MessageActions({
   return (
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
       <EditMessageContainer backgroundColor={backgroundSections} className='message_actions_cont '>
-        {showMessageReaction && !isPollMessage &&
+        {showMessageReaction &&
+          !isPollMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           checkActionPermission('addMessageReaction') && (
             <Action
@@ -168,7 +169,8 @@ export default function MessageActions({
               {reactionIcon || <ReactionIcon />}
             </Action>
           )}
-        {showEditMessage && !isPollMessage &&
+        {showEditMessage &&
+          !isPollMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
@@ -256,8 +258,9 @@ export default function MessageActions({
           </Action>
         )}
 
-        {/* {isPollMessage && (
-          <Action onClick={handleRetractVote} 
+        {isPollMessage && (
+          <Action
+            onClick={handleRetractVote}
             iconColor={messageActionIconsColor || iconInactive}
             hoverBackgroundColor={backgroundHovered}
             hoverIconColor={accentColor}
@@ -266,12 +269,13 @@ export default function MessageActions({
               Retract Vote
               <ArrowDownIcon />
             </ItemNote>
-            { retractVoteIcon || <RetractVoteIcon />}
+            {retractVoteIcon || <RetractVoteIcon />}
           </Action>
-        )} */}
+        )}
 
         {!isPollMessage && (
-          <Action onClick={handleEndVote} 
+          <Action
+            onClick={handleEndVote}
             iconColor={messageActionIconsColor || iconInactive}
             hoverBackgroundColor={backgroundHovered}
             hoverIconColor={accentColor}
@@ -280,7 +284,7 @@ export default function MessageActions({
               End Vote
               <ArrowDownIcon />
             </ItemNote>
-            { endVoteIcon || <EndVoteIcon />}
+            {endVoteIcon || <EndVoteIcon />}
           </Action>
         )}
 

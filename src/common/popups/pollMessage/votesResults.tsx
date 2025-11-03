@@ -1,41 +1,23 @@
-import React, { useMemo, useEffect, useCallback } from 'react'
+import React, { useMemo, useState, useCallback } from 'react'
 import styled from 'styled-components'
 import PopupContainer from '../popupContainer'
 import { Popup, PopupBody, PopupName, CloseIcon, Row, Button } from 'UIHelper'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
-import { IPollVote } from 'types'
-import { useDispatch, useSelector } from 'store/hooks'
-import { getPollVotesAC, loadMorePollVotesAC, setPollVotesInitialCountAC } from 'store/message/actions'
-import { pollVotesListSelector, pollVotesHasMoreSelector, pollVotesLoadingStateSelector } from 'store/message/selector'
-import { LOADING_STATE } from 'helpers/constants'
+import { IPollDetails, IPollVote } from 'types'
+import AllVotesPopup from './AllVotesPopup'
 
 interface VotesResultsPopupProps {
   onClose: () => void
-  poll: {
-    id: string
-    name: string
-    options: { id: string; name: string }[]
-    votes: IPollVote[]
-    votesPerOption: Record<string, number>
-  }
+  poll: IPollDetails
   messageId: string | number
-  // Optional: number of voters to show initially per option
-  initialCount?: number
   onViewMoreOption?: (optionId: string) => void
 }
 
-const VotesResultsPopup = ({ onClose, poll, messageId, initialCount, onViewMoreOption }: VotesResultsPopupProps) => {
-  const initialVotesCount = useMemo(() => {
-    return initialCount ? initialCount : poll?.options?.length >= 3 ? 2 : 4
-  }, [initialCount, poll?.options?.length])
+const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: VotesResultsPopupProps) => {
+  const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (initialVotesCount){
-      dispatch(setPollVotesInitialCountAC(initialVotesCount))
-    }
-  }, [initialVotesCount])
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -45,47 +27,32 @@ const VotesResultsPopup = ({ onClose, poll, messageId, initialCount, onViewMoreO
     [THEME_COLORS.ACCENT]: accent
   } = useColor()
 
-  const dispatch = useDispatch()
-  const pollVotesList = useSelector(pollVotesListSelector)
-  const pollVotesHasMore = useSelector(pollVotesHasMoreSelector)
-  const pollVotesLoadingState = useSelector(pollVotesLoadingStateSelector)
-
-  // Default load: Load initial votes for all options when popup opens
-  useEffect(() => {
-    poll.options.forEach((option) => {
-      const key = `${poll.id}_${option.id}`
-      const reduxVotes = pollVotesList[key] || []
-      
-      // Load if we don't have Redux votes yet
-      if (reduxVotes.length === 0) {
-        const totalVotes = poll.votesPerOption?.[option.id] || 0
-        if (totalVotes > 0) {
-          dispatch(getPollVotesAC(messageId, poll.id, option.id, initialVotesCount))
-        }
+  const optionIdToVotes = useMemo(() => {
+    const votes: Record<string, IPollVote[]> = {}
+    poll.options.forEach((opt) => {
+      const allOptionVotes = (poll.votes || []).filter((vote) => vote.optionId === opt.id)
+      const ownVote = poll.ownVotes.find((vote) => vote.optionId === opt.id)
+      if (ownVote) {
+        allOptionVotes.push(ownVote)
       }
+      votes[opt.id] = allOptionVotes
     })
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    return votes
+  }, [poll.votes, poll.options, poll.ownVotes])
 
-  const handleViewMore = useCallback(
+  const handleShowAll = useCallback(
     (optionId: string) => {
       if (onViewMoreOption) {
         onViewMoreOption(optionId)
       }
-      dispatch(loadMorePollVotesAC(poll.id, optionId, 20))
+      setSelectedOptionId(optionId)
     },
-    [dispatch, poll.id, onViewMoreOption]
+    [onViewMoreOption]
   )
 
-  // Get votes from Redux only
-  const optionIdToVotes = useMemo(() => {
-    const votes: Record<string, IPollVote[]> = {}
-    poll.options.forEach((opt) => {
-      const key = `${poll.id}_${opt.id}`
-      votes[opt.id] = pollVotesList[key] || []
-    })
-    return votes
-  }, [pollVotesList, poll.id, poll.options])
+  const handleCloseAllVotes = useCallback(() => {
+    setSelectedOptionId(null)
+  }, [])
 
   const formatDate = (d: Date) => {
     try {
@@ -100,68 +67,76 @@ const VotesResultsPopup = ({ onClose, poll, messageId, initialCount, onViewMoreO
   }
 
   return (
-    <PopupContainer>
-      <Popup backgroundColor={background} maxWidth='560px' minWidth='560px' padding='0'>
-        <PopupBody paddingH='24px' paddingV='20px'>
-          <CloseIcon color={textSecondary} onClick={onClose} />
-          <PopupName color={textPrimary} marginBottom='16px'>
-            Vote results
-          </PopupName>
+    <div>
+      {!selectedOptionId && (
+        <PopupContainer>
+          <Popup backgroundColor={background} maxWidth='560px' minWidth='560px' padding='0'>
+            <PopupBody paddingH='24px' paddingV='20px'>
+              <CloseIcon color={textSecondary} onClick={onClose} />
+              <PopupName color={textPrimary} marginBottom='16px'>
+                Vote results
+              </PopupName>
 
-          <OptionsList>
-            {poll.options.map((opt) => {
-              const key = `${poll.id}_${opt.id}`
-              const allVotes = optionIdToVotes[opt.id] || []
-              const hasMore = pollVotesHasMore[key] ?? false
-              const isLoading = pollVotesLoadingState[key] === LOADING_STATE.LOADING
+              <OptionsList>
+                {poll.options.map((opt) => {
+                  const allVotes = optionIdToVotes[opt.id] || []
+                  const totalVotes = poll.votesPerOption?.[opt.id] || 0
 
-              return (
-                <OptionBlock key={opt.id} background={surface1} border={border}>
-                  <OptionHeader>
-                    <OptionTitle color={textPrimary}>{opt.name}</OptionTitle>
-                    <OptionCount color={textSecondary}>
-                      {(poll.votesPerOption && poll.votesPerOption[opt.id]) || allVotes.length} votes
-                    </OptionCount>
-                  </OptionHeader>
-                  <Voters>
-                    {allVotes.map((vote) => (
-                      <VoterRow key={`${opt.id}_${vote.user.id}`}>
-                        <Avatar
-                          image={vote.user.profile.avatar}
-                          name={vote.user.profile.firstName || vote.user.id}
-                          size={40}
-                          textSize={16}
-                          setDefaultAvatar
-                        />
-                        <VoterInfo>
-                          <VoterName color={textPrimary}>
-                            {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
-                          </VoterName>
-                          <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
-                        </VoterInfo>
-                      </VoterRow>
-                    ))}
-                  </Voters>
-                  {hasMore && (
-                    <Row justify='center' paddingBottom='5px '>
-                      <Button
-                        type='button'
-                        backgroundColor='transparent'
-                        color={accent}
-                        onClick={() => handleViewMore(opt.id)}
-                        disabled={isLoading}
-                      >
-                        {isLoading ? 'Loading...' : 'View More'}
-                      </Button>
-                    </Row>
-                  )}
-                </OptionBlock>
-              )
-            })}
-          </OptionsList>
-        </PopupBody>
-      </Popup>
-    </PopupContainer>
+                  return (
+                    <OptionBlock key={opt.id} background={surface1} border={border}>
+                      <OptionHeader>
+                        <OptionTitle color={textPrimary}>{opt.name}</OptionTitle>
+                        <OptionCount color={textSecondary}>{totalVotes} votes</OptionCount>
+                      </OptionHeader>
+                      <Voters>
+                        {allVotes.map((vote) => (
+                          <VoterRow key={`${opt.id}_${vote.user.id}`}>
+                            <Avatar
+                              image={vote.user.profile.avatar}
+                              name={vote.user.profile.firstName || vote.user.id}
+                              size={40}
+                              textSize={16}
+                              setDefaultAvatar
+                            />
+                            <VoterInfo>
+                              <VoterName color={textPrimary}>
+                                {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
+                              </VoterName>
+                              <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
+                            </VoterInfo>
+                          </VoterRow>
+                        ))}
+                      </Voters>
+                      {allVotes.length < totalVotes && (
+                        <Row justify='center' paddingBottom='5px '>
+                          <Button
+                            type='button'
+                            backgroundColor='transparent'
+                            color={accent}
+                            onClick={() => handleShowAll(opt.id)}
+                          >
+                            Show All
+                          </Button>
+                        </Row>
+                      )}
+                    </OptionBlock>
+                  )
+                })}
+              </OptionsList>
+            </PopupBody>
+          </Popup>
+        </PopupContainer>
+      )}
+      {selectedOptionId && (
+        <AllVotesPopup
+          onClose={handleCloseAllVotes}
+          poll={poll}
+          messageId={messageId}
+          optionId={selectedOptionId}
+          optionName={poll.options.find((opt) => opt.id === selectedOptionId)?.name || ''}
+        />
+      )}
+    </div>
   )
 }
 

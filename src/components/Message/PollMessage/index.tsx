@@ -62,7 +62,9 @@ const PollMessage = ({ message }: PollMessageProps) => {
   return (
     <Container>
       <Question color={textPrimary}>{poll.name}</Question>
-      <SubTitle color={textSecondary}>{poll.closed ? 'Poll finished' : poll.anonymous ? 'Anonymous poll' : 'Public poll'}</SubTitle>
+      <SubTitle color={textSecondary}>
+        {poll.closed ? 'Poll finished' : poll.anonymous ? 'Anonymous poll' : 'Public poll'}
+      </SubTitle>
       <Options>
         {(poll.options || []).map((opt: any) => {
           const votes = votesPerOption[opt.id] || 0
@@ -91,9 +93,11 @@ const PollMessage = ({ message }: PollMessageProps) => {
               disabled={poll?.closed}
             >
               <TopRow>
-                {!poll.closed && <Indicator disabled={poll?.closed}>
-                  {selected ? <StyledCheck color={accent} /> : <EmptyCircle border={borderSecondary} />}
-                </Indicator>}
+                {!poll.closed && (
+                  <Indicator disabled={poll?.closed}>
+                    {selected ? <StyledCheck color={accent} /> : <EmptyCircle border={borderSecondary} />}
+                  </Indicator>
+                )}
                 <Title color={textPrimary}>{opt.name}</Title>
                 {poll.anonymous ? null : (
                   <UsersContainer>
@@ -133,11 +137,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
         </Button>
       )}
       {showResults && (
-        <VotesResultsPopup
-          onClose={() => setShowResults(false)}
-          poll={poll as any}
-          messageId={message.id}
-        />
+        <VotesResultsPopup onClose={() => setShowResults(false)} poll={poll as any} messageId={message.id} />
       )}
     </Container>
   )
@@ -209,7 +209,7 @@ const EmptyCircle = styled.span<{ border: string }>`
   box-sizing: border-box;
 `
 
-const StyledCheck = styled(FilledCheckboxIcon) <{ color: string }>`
+const StyledCheck = styled(FilledCheckboxIcon)<{ color: string }>`
   color: ${(p) => p.color};
   width: 18.5px;
   height: 18.5px;
@@ -237,7 +237,7 @@ const Votes = styled.span<{ color: string }>`
 `
 
 const Bar = styled.div<{ track: string; closed?: boolean }>`
-  width: ${(p) => p.closed ? '100%' : `calc(100% - 28px)`};
+  width: ${(p) => (p.closed ? '100%' : `calc(100% - 28px)`)};
   height: 6px;
   border-radius: 6px;
   background: ${(p) => p.track};

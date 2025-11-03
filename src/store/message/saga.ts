@@ -190,19 +190,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-          ...(attachment.metadata
-            ? typeof attachment.metadata === 'string'
-              ? JSON.parse(attachment.metadata)
-              : attachment.metadata
-            : {}),
-          ...(thumbnailMetas &&
-            thumbnailMetas.thumbnail && {
-            tmb: thumbnailMetas.thumbnail,
-            szw: thumbnailMetas.imageWidth,
-            szh: thumbnailMetas.imageHeight,
-            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+            ...(attachment.metadata
+              ? typeof attachment.metadata === 'string'
+                ? JSON.parse(attachment.metadata)
+                : attachment.metadata
+              : {}),
+            ...(thumbnailMetas &&
+              thumbnailMetas.thumbnail && {
+                tmb: thumbnailMetas.thumbnail,
+                szw: thumbnailMetas.imageWidth,
+                szh: thumbnailMetas.imageHeight,
+                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+              })
           })
-        })
       const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -924,11 +924,11 @@ function* resendMessage(action: IAction): any {
                   : {}),
                 ...(thumbnailMetas &&
                   thumbnailMetas.thumbnail && {
-                  tmb: thumbnailMetas.thumbnail,
-                  szw: thumbnailMetas.imageWidth,
-                  szh: thumbnailMetas.imageHeight,
-                  ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-                })
+                    tmb: thumbnailMetas.thumbnail,
+                    szw: thumbnailMetas.imageWidth,
+                    szh: thumbnailMetas.imageHeight,
+                    ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+                  })
               })
             }
             log.info('attachmentMeta ... ', attachmentMeta)
@@ -1298,8 +1298,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-            result.messages.length > 0 &&
-            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+              result.messages.length > 0 &&
+              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
         setMessagesToMap(channel.id, result.messages)
@@ -1739,14 +1739,17 @@ const updatePollDetails = (
         ownVotes: [...(pollDetails?.ownVotes || []), vote]
       }
     }
-    const isVotedAlready = (pollDetails?.ownVotes?.length || 0) > 0;
+    const isVotedAlready = (pollDetails?.ownVotes?.length || 0) > 0
     return {
       ...pollDetails,
       votesPerOption: {
         ...pollDetails?.votesPerOption,
-        ...(isVotedAlready ? {
-          [String(pollDetails?.ownVotes?.[0]?.optionId)]: (pollDetails?.votesPerOption?.[String(pollDetails?.ownVotes?.[0]?.optionId)] || 0) - 1} : 
-          {}),
+        ...(isVotedAlready
+          ? {
+              [String(pollDetails?.ownVotes?.[0]?.optionId)]:
+                (pollDetails?.votesPerOption?.[String(pollDetails?.ownVotes?.[0]?.optionId)] || 0) - 1
+            }
+          : {}),
         [optionId]: (pollDetails?.votesPerOption?.[optionId] || 0) + 1
       },
       ownVotes: [vote]
@@ -1776,7 +1779,9 @@ const updatePollDetails = (
 function* executeAddPollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   const pollDetails = JSON.parse(
-    JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false))
+    JSON.stringify(
+      updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false)
+    )
   )
 
   updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
@@ -1794,9 +1799,11 @@ function* executeAddPollVote(channelId: string, pollId: string, optionId: string
 function* updateMessageOptimisticallyForAddPollVote(channelId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
-  
+
   const pollDetails = JSON.parse(
-    JSON.stringify(updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false))
+    JSON.stringify(
+      updatePollDetails(message.pollDetails, optionId, true, message.pollDetails?.allowMultipleVotes || false)
+    )
   )
 
   updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
@@ -1815,7 +1822,7 @@ function* addPollVote(action: IAction): any {
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const connectionState = sceytChatClient.connectionState
-      
+
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Check for conflicts before doing optimistic update
         const pendingAction = {
@@ -1826,7 +1833,7 @@ function* addPollVote(action: IAction): any {
           message
         }
         const conflictCheck = checkPendingPollActionConflict(pendingAction)
-        
+
         // If there's a conflicting pending delete, we need to revert its optimistic update
         if (conflictCheck.hasConflict && !conflictCheck.shouldSkip) {
           // Remove the conflicting pending delete action (which had an optimistic update)
@@ -1835,10 +1842,14 @@ function* addPollVote(action: IAction): any {
           const channel = yield call(getChannelFromMap, channelId)
           if (channel) {
             // Get the current message state (which has the delete applied)
-            const currentMessage = getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) || message
+            const currentMessage =
+              getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) ||
+              message
             // Apply add on top (which effectively reverts the delete)
 
-            const hasVotedAnotherOption = (currentMessage.pollDetails?.ownVotes || []).some((vote: IPollVote) => vote.optionId !== optionId)
+            const hasVotedAnotherOption = (currentMessage.pollDetails?.ownVotes || []).some(
+              (vote: IPollVote) => vote.optionId !== optionId
+            )
             let pollDetails = currentMessage.pollDetails
             if (hasVotedAnotherOption && !pollDetails?.allowMultipleVotes) {
               pollDetails = updatePollDetails(pollDetails, optionId, false, false)
@@ -1847,7 +1858,9 @@ function* addPollVote(action: IAction): any {
               JSON.stringify(updatePollDetails(pollDetails, optionId, true, pollDetails?.allowMultipleVotes || false))
             )
             const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
-            yield put(addPollVotesToListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], hasNext, message.id))
+            yield put(
+              addPollVotesToListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], hasNext, message.id)
+            )
             updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
             updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
             yield put(updateMessageAC(message.id, { pollDetails }))
@@ -1856,7 +1869,7 @@ function* addPollVote(action: IAction): any {
           // No conflict, update message optimistically so user sees their vote immediately
           yield* updateMessageOptimisticallyForAddPollVote(channelId, optionId, message)
         }
-        
+
         // Store as pending action to send when connected (if not skipped)
         if (!conflictCheck.shouldSkip) {
           setPendingPollAction(pendingAction)
@@ -1875,7 +1888,9 @@ function* addPollVote(action: IAction): any {
 function* executeDeletePollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   const pollDetails = JSON.parse(
-    JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
+    JSON.stringify(
+      updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false)
+    )
   )
   updateMessageOnMap(channel.id, {
     messageId: message.id,
@@ -1895,11 +1910,13 @@ function* executeDeletePollVote(channelId: string, pollId: string, optionId: str
 function* updateMessageOptimisticallyForDeletePollVote(channelId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
-  
+
   const pollDetails = JSON.parse(
-    JSON.stringify(updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
+    JSON.stringify(
+      updatePollDetails(message.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false)
+    )
   )
-  
+
   updateMessageOnMap(channel.id, {
     messageId: message.id,
     params: { pollDetails }
@@ -1919,7 +1936,7 @@ function* deletePollVote(action: IAction): any {
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const connectionState = sceytChatClient.connectionState
-      
+
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Check for conflicts before doing optimistic update
         const pendingAction = {
@@ -1930,19 +1947,30 @@ function* deletePollVote(action: IAction): any {
           message
         }
         const conflictCheck = checkPendingPollActionConflict(pendingAction)
-        
+
         // If there's a conflicting pending add and we should skip both, revert the add's optimistic update
         if (conflictCheck.hasConflict && conflictCheck.shouldSkip) {
           // Revert the optimistic update from the pending addPollVote
           const channel = yield call(getChannelFromMap, channelId)
           if (channel) {
             // Get the current message state (which has the add applied optimistically)
-            const currentMessage = getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) || message
+            const currentMessage =
+              getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) ||
+              message
             // Revert by applying delete (which removes the vote that was added optimistically)
             const pollDetails = JSON.parse(
-              JSON.stringify(updatePollDetails(currentMessage.pollDetails, optionId, false, message.pollDetails?.allowMultipleVotes || false))
+              JSON.stringify(
+                updatePollDetails(
+                  currentMessage.pollDetails,
+                  optionId,
+                  false,
+                  message.pollDetails?.allowMultipleVotes || false
+                )
+              )
             )
-            yield put(deletePollVotesFromListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], message.id))
+            yield put(
+              deletePollVotesFromListAC(pollId, optionId, [currentMessage.pollDetails?.ownVotes?.[0]], message.id)
+            )
             updateMessageOnMap(channel.id, { messageId: message.id, params: { pollDetails } })
             updateMessageOnAllMessages(message.id, JSON.parse(JSON.stringify({ pollDetails })))
             yield put(updateMessageAC(message.id, { pollDetails }))
@@ -1951,7 +1979,7 @@ function* deletePollVote(action: IAction): any {
           // No conflict or conflict that doesn't skip, update message optimistically so user sees vote removed immediately
           yield* updateMessageOptimisticallyForDeletePollVote(channelId, optionId, message)
         }
-        
+
         // Store as pending action (conflict resolution is handled in setPendingPollAction)
         if (!conflictCheck.shouldSkip) {
           setPendingPollAction(pendingAction)
@@ -1987,11 +2015,11 @@ function* executeClosePoll(channelId: string, pollId: string, message: IMessage)
 function* updateMessageOptimisticallyForClosePoll(channelId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
-  
+
   const pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
   pollDetails.closed = true
   pollDetails.closedAt = new Date().getTime()
-  
+
   updateMessageOnMap(channelId, {
     messageId: message.id,
     params: { pollDetails }
@@ -2007,11 +2035,11 @@ function* closePoll(action: IAction): any {
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const connectionState = sceytChatClient.connectionState
-      
+
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Update message optimistically so user sees poll closed immediately
         yield* updateMessageOptimisticallyForClosePoll(channelId, message)
-        
+
         // Store as pending action
         setPendingPollAction({
           type: 'CLOSE_POLL',
@@ -2055,7 +2083,7 @@ function* executeRetractPollVote(channelId: string, pollId: string, message: IMe
 function* updateMessageOptimisticallyForRetractPollVote(channelId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
-  
+
   let pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
   for (const vote of pollDetails.ownVotes) {
     pollDetails = updatePollDetails(pollDetails, vote.optionId, false, message.pollDetails?.allowMultipleVotes || false)
@@ -2080,11 +2108,11 @@ function* retractPollVote(action: IAction): any {
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const connectionState = sceytChatClient.connectionState
-      
+
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Update message optimistically so user sees votes retracted immediately
         yield* updateMessageOptimisticallyForRetractPollVote(channelId, message)
-        
+
         // Store as pending action
         setPendingPollAction({
           type: 'RETRACT_POLL_VOTE',
@@ -2108,7 +2136,7 @@ function* resendPendingPollActions(action: IAction): any {
     const { payload } = action
     const { connectionState } = payload
     const sceytChatClient = getClient()
-    
+
     if (!sceytChatClient || connectionState !== CONNECTION_STATUS.CONNECTED) {
       return
     }
@@ -2118,12 +2146,12 @@ function* resendPendingPollActions(action: IAction): any {
     clearPendingPollActionsMap()
 
     // Use a small delay similar to the message resend pattern
-    yield call(() => new Promise(resolve => setTimeout(resolve, 1000)))
+    yield call(() => new Promise((resolve) => setTimeout(resolve, 1000)))
 
     Object.keys(pendingPollActionsMapCopy).forEach((messageId: string) => {
       pendingPollActionsMapCopy[messageId].forEach((pendingAction: any) => {
         const { type, channelId, pollId, optionId, message } = pendingAction
-        
+
         switch (type) {
           case 'ADD_POLL_VOTE':
             if (optionId) {
@@ -2156,26 +2184,21 @@ function* getPollVotes(action: IAction): any {
     const { payload } = action
     const { messageId, pollId, optionId, limit } = payload
     const key = `${pollId}_${optionId}`
-    
-    yield put(
-      setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING)
-    )
+
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING))
 
     const SceytChatClient = getClient()
     if (!SceytChatClient || !SceytChatClient.PollVotesQueryBuilder) {
       throw new Error('SceytChatClient or PollVotesQueryBuilder not available')
     }
 
-    const queryBuilder = new SceytChatClient.PollVotesQueryBuilder(
-      messageId,
-      pollId
-    )
+    const queryBuilder = new SceytChatClient.PollVotesQueryBuilder(messageId, pollId)
     queryBuilder.setOptionId(optionId)
     queryBuilder.limit(limit || 20)
     const pollVotesQuery = yield call(queryBuilder.build)
 
     const result = yield call(pollVotesQuery.loadNext)
-    
+
     // Store query for later use
     if (!query.PollVotesQueries) {
       query.PollVotesQueries = {}
@@ -2203,18 +2226,12 @@ function* getPollVotes(action: IAction): any {
       }
     }))
 
-    yield put(
-      setPollVotesListAC(pollId, optionId, formattedVotes, result.hasNext || false)
-    )
+    yield put(setPollVotesListAC(pollId, optionId, formattedVotes, result.hasNext || false))
 
-    yield put(
-      setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED)
-    )
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED))
   } catch (e) {
     log.error('ERROR in get poll votes', e)
-    yield put(
-      setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED)
-    )
+    yield put(setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED))
   }
 }
 
@@ -2224,9 +2241,7 @@ function* loadMorePollVotes(action: IAction): any {
     const { pollId, optionId, limit } = payload
     const key = `${pollId}_${optionId}`
 
-    yield put(
-      setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING)
-    )
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING))
 
     if (!query.PollVotesQueries || !query.PollVotesQueries[key]) {
       throw new Error('Poll votes query not found')
@@ -2260,18 +2275,12 @@ function* loadMorePollVotes(action: IAction): any {
       }
     }))
 
-    yield put(
-      addPollVotesToListAC(pollId, optionId, formattedVotes, result.hasNext || false)
-    )
+    yield put(addPollVotesToListAC(pollId, optionId, formattedVotes, result.hasNext || false))
 
-    yield put(
-      setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED)
-    )
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED))
   } catch (e) {
     log.error('ERROR in load more poll votes', e)
-    yield put(
-      setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED)
-    )
+    yield put(setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED))
   }
 }
 

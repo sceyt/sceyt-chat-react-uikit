@@ -325,7 +325,17 @@ export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string)
   return updateMessageAttachment({ url, attachmentUrl })
 }
 
-export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean, voteDetails?: { votes?: IPollVote[], deletedVotes?: IPollVote[], votesPerOption?: { [key: string]: number }, closed?: boolean }) {
+export function updateMessageAC(
+  messageId: string,
+  params: any,
+  addIfNotExists?: boolean,
+  voteDetails?: {
+    votes?: IPollVote[]
+    deletedVotes?: IPollVote[]
+    votesPerOption?: { [key: string]: number }
+    closed?: boolean
+  }
+) {
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
@@ -452,24 +462,14 @@ export function setMessagesMarkersLoadingStateAC(state: number) {
   return setMessagesMarkersLoadingState({ state })
 }
 
-export function addPollVoteAC(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-) {
+export function addPollVoteAC(channelId: string, pollId: string, optionId: string, message: IMessage) {
   return {
     type: ADD_POLL_VOTE,
     payload: { channelId, pollId, optionId, message }
   }
 }
 
-export function deletePollVoteAC(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-) {
+export function deletePollVoteAC(channelId: string, pollId: string, optionId: string, message: IMessage) {
   return {
     type: DELETE_POLL_VOTE,
     payload: { channelId, pollId, optionId, message }
@@ -515,7 +515,13 @@ export function setPollVotesListAC(pollId: string, optionId: string, votes: IPol
   return setPollVotesList({ pollId, optionId, votes, hasNext })
 }
 
-export function addPollVotesToListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean, previousVotes?: IPollVote[]) {
+export function addPollVotesToListAC(
+  pollId: string,
+  optionId: string,
+  votes: IPollVote[],
+  hasNext: boolean,
+  previousVotes?: IPollVote[]
+) {
   return addPollVotesToList({ pollId, optionId, votes, hasNext, previousVotes })
 }
 

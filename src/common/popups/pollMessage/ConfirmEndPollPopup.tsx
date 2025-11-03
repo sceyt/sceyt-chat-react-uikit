@@ -1,5 +1,5 @@
-import React from "react"
-import ConfirmPopup from "../delete"
+import React from 'react'
+import ConfirmPopup from '../delete'
 
 interface ConfirmEndPollPopupProps {
   handleFunction: () => void
@@ -9,7 +9,13 @@ interface ConfirmEndPollPopupProps {
   title: string
 }
 
-export default function ConfirmEndPollPopup({ handleFunction, togglePopup, buttonText, description, title }: ConfirmEndPollPopupProps) {
+export default function ConfirmEndPollPopup({
+  handleFunction,
+  togglePopup,
+  buttonText,
+  description,
+  title
+}: ConfirmEndPollPopupProps) {
   return (
     <ConfirmPopup
       togglePopup={togglePopup}
