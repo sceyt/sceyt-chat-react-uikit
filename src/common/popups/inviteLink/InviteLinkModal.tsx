@@ -404,7 +404,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
                   </CopyButton>
                   {showCopiedToast && (
                     <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
-                      Copied
+                      Link copied
                     </CopiedTooltip>
                   )}
                 </CopyButtonWrapper>
