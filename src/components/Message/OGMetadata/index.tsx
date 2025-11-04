@@ -401,6 +401,7 @@ const OGMetadataContainer = styled.div<{
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
+  border-radius: 8px;
   background-color: ${({ showBackground, customBg, bgColor }) =>
     showBackground ? customBg ?? bgColor : 'transparent'};
   border-radius: ${({ borderRadius }) => (borderRadius !== undefined ? borderRadius : '8px')};
@@ -408,7 +409,7 @@ const OGMetadataContainer = styled.div<{
   // margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
   padding: ${({ padding }) => padding ?? '0'};
   text-decoration: none;
-  color: inherit;
+  // color: inherit;
   &:hover {
     opacity: 0.9;
     cursor: pointer;
@@ -428,6 +429,7 @@ const ImageContainer = styled.div<{
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   margin: 0 auto;
+  border-radius: 8px 8px 0 0;
   overflow: hidden;
   ${({ shouldAnimate, showOGMetadata, containerHeight }) =>
     shouldAnimate &&
@@ -453,9 +455,12 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
 
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
   ${sharedKeyframes}
-  font-weight: bold;
-  font-size: 13px;
-  line-height: 16px;
+  // font-family: Inter;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0px;
+  color: #111539;
   margin: 8px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
@@ -481,7 +486,7 @@ const Desc = styled.p<{
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
-  margin: 0 0 8px 0;
+  margin: 4px 0 8px 0;
   padding: ${({ padding }) => padding ?? '0'};
   color: ${({ color }) => color};
   display: -webkit-box;
@@ -528,6 +533,9 @@ const Img = styled.img<{ shouldAnimate: boolean }>`
   height: 100%;
   object-fit: cover;
   display: block;
+  // object-fit: cover;
+  // object-position: center;
+  // image-rendering: auto;
   border-radius: inherit;
   ${({ shouldAnimate }) =>
     shouldAnimate &&
