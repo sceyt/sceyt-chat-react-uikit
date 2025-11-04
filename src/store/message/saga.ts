@@ -466,7 +466,8 @@ function* sendMessage(action: IAction): any {
               metadata: messageResponse.metadata,
               parentMessage: messageResponse.parentMessage,
               repliedInThread: messageResponse.repliedInThread,
-              createdAt: messageResponse.createdAt
+              createdAt: messageResponse.createdAt,
+              channelId: channel.id
             }
             yield put(updateMessageAC(messageToSend.tid as string, JSON.parse(JSON.stringify(messageUpdateData))))
             updateMessageOnMap(channel.id, {
