@@ -708,19 +708,21 @@ const MessageBody = ({
             infoPadding={ogMetadataProps?.infoPadding}
           />
         )}
-        <span ref={messageTextRef}>
-          {MessageTextFormat({
-            text: message.body,
-            message,
-            contactsMap,
-            getFromContacts,
-            accentColor,
-            textSecondary,
-            onMentionNameClick: handleOpenUserProfile,
-            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-            unsupportedMessage
-          })}
-        </span>
+        {message.type !== MESSAGE_TYPE.POLL && (
+          <span ref={messageTextRef}>
+            {MessageTextFormat({
+              text: message.body,
+              message,
+              contactsMap,
+              getFromContacts,
+              accentColor,
+              textSecondary,
+              onMentionNameClick: handleOpenUserProfile,
+              shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+              unsupportedMessage
+            })}
+          </span>
+        )}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
@@ -850,7 +852,7 @@ const MessageBody = ({
         // </MessageAttachments>
       }
 
-      {message.type === 'poll' && <PollMessage message={message} />}
+      {message.type === MESSAGE_TYPE.POLL && <PollMessage message={message} />}
       {emojisPopupOpen && emojisPopupPosition && (
         <EmojiContainer
           id={`${message.id}_emoji_popup_container`}
