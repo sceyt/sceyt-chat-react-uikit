@@ -771,7 +771,8 @@ function* forwardMessage(action: IAction): any {
           metadata: messageResponse.metadata,
           parentMessage: messageResponse.parentMessage,
           repliedInThread: messageResponse.repliedInThread,
-          createdAt: messageResponse.createdAt
+          createdAt: messageResponse.createdAt,
+          channelId: channel.id
         }
         if (channelId === activeChannelId) {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData))))
@@ -976,7 +977,8 @@ function* resendMessage(action: IAction): any {
                 parentMessage: messageResponse.parentMessage,
                 repliedInThread: messageResponse.repliedInThread,
                 bodyAttributes: messageResponse.bodyAttributes,
-                createdAt: messageResponse.createdAt
+                createdAt: messageResponse.createdAt,
+                channelId: channel.id
               }
               removePendingMessageFromMap(channel.id, messageCopy.tid)
               yield put(updateMessageAC(messageCopy.tid, JSON.parse(JSON.stringify(messageUpdateData))))
@@ -1031,7 +1033,8 @@ function* resendMessage(action: IAction): any {
           parentMessage: messageResponse.parentMessage,
           repliedInThread: messageResponse.repliedInThread,
           bodyAttributes: messageResponse.bodyAttributes,
-          createdAt: messageResponse.createdAt
+          createdAt: messageResponse.createdAt,
+          channelId: channel.id
         }
         const isInActiveChannel = getMessagesFromMap(channelId)?.find(
           (message: IMessage) => message.id === messageCopy.tid
