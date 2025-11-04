@@ -1345,7 +1345,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const pendingMessagesMap = getPendingMessagesMap()
       const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
       clearPendingMessagesMap()
-      
       setTimeout(() => {
         Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
           pendingMessagesMapCopy[key].forEach((msg: IMessage) => {

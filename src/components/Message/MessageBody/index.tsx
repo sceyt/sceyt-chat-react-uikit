@@ -166,6 +166,7 @@ interface IMessageBodyProps {
   shouldOpenUserProfileForMention?: boolean
   ogMetadataProps?: OGMetadataProps
   unsupportedMessage: boolean
+  onInviteLinkClick?: (key: string) => void
 }
 
 const MessageBody = ({
@@ -297,7 +298,8 @@ const MessageBody = ({
   handleOpenUserProfile,
   shouldOpenUserProfileForMention,
   ogMetadataProps,
-  unsupportedMessage
+  unsupportedMessage,
+  onInviteLinkClick
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -704,7 +706,10 @@ const MessageBody = ({
               textSecondary,
               onMentionNameClick: handleOpenUserProfile,
               shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-              unsupportedMessage
+              unsupportedMessage,
+              target: ogMetadataProps?.target,
+              isInviteLink: ogMetadataProps?.isInviteLink || false,
+              onInviteLinkClick
             })}
           </span>
         )}

@@ -24,6 +24,7 @@ import {
 } from 'store/message/actions'
 import {
   createChannelAC,
+  getChannelByInviteKeyAC,
   markMessagesAsDeliveredAC,
   markMessagesAsReadAC,
   switchChannelInfoAC
@@ -578,6 +579,10 @@ const Message = ({
     return isMessageUnsupported(message)
   }, [message])
 
+  const onInviteLinkClick = (key: string) => {
+    dispatch(getChannelByInviteKeyAC(key))
+  }
+
   return (
     <MessageItem
       className='message_item'
@@ -679,9 +684,11 @@ const Message = ({
             isThreadMessage={isThreadMessage}
             handleOpenUserProfile={handleOpenUserProfile}
             unsupportedMessage={unsupportedMessage}
+            onInviteLinkClick={onInviteLinkClick}
           />
         ) : (
           <MessageBody
+            onInviteLinkClick={onInviteLinkClick}
             handleRetractVote={handleRetractVote}
             handleEndVote={handleEndVote}
             message={message}

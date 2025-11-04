@@ -12,8 +12,6 @@ import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
 import log from 'loglevel'
-import { getChannelByInviteKeyAC } from 'store/channel/actions'
-import { useDispatch } from 'store/hooks'
 
 const StatusText = styled.span<{ color: string; fontSize?: string }>`
   color: ${(props) => props.color};
@@ -157,7 +155,8 @@ const MessageTextFormat = ({
   shouldOpenUserProfileForMention,
   unsupportedMessage,
   target = '_blank',
-  isInviteLink = false
+  isInviteLink = false,
+  onInviteLinkClick
 }: {
   text: string
   message: any
@@ -172,11 +171,8 @@ const MessageTextFormat = ({
   unsupportedMessage?: boolean
   target?: string
   isInviteLink?: boolean
+  onInviteLinkClick?: (key: string) => void
 }) => {
-  const dispatch = useDispatch()
-  const onInviteLinkClick = (key: string) => {
-    dispatch(getChannelByInviteKeyAC(key))
-  }
   try {
     let messageText: any = []
     const linkify = new LinkifyIt()

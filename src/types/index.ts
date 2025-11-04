@@ -379,4 +379,5 @@ export interface OGMetadataProps {
   ogContainerBackground?: string
   infoPadding?: string
   isInviteLink?: boolean
+  target?: string
 }

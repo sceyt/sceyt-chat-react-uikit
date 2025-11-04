@@ -78,6 +78,7 @@ interface ICustomMessageItem {
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
   unsupportedMessage: boolean
+  onInviteLinkClick?: (key: string) => void
 }
 
 export interface IMessageProps {

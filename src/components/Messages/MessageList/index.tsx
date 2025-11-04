@@ -211,6 +211,7 @@ interface MessagesProps {
     handleOpenUserProfile: (user: IUser) => void
     isThreadMessage?: boolean
     unsupportedMessage: boolean
+    onInviteLinkClick?: (key: string) => void
   }>
   messageReaction?: boolean
   editMessage?: boolean
