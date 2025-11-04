@@ -427,43 +427,8 @@ function* sendMessage(action: IAction): any {
               messageToSend.attachments = [...attachmentsToSend]
             }
 
-            // LOG: Before sending - check for voice attachments
-            const voiceAttachments = messageToSend.attachments?.filter((att: IAttachment) => att.type === 'voice')
-            if (voiceAttachments && voiceAttachments.length > 0) {
-              log.info(
-                '🎤📤 [SEND] Voice attachment metadata before sending to SDK:',
-                voiceAttachments.map((att: IAttachment) => ({
-                  tid: att.tid,
-                  name: att.name,
-                  type: att.type,
-                  metadata: att.metadata,
-                  size: att.size
-                }))
-              )
-            }
-
             const messageResponse = yield call(channel.sendMessage, messageToSend)
 
-            // LOG: After receiving response - check for voice attachments
-            const voiceAttachmentsResponse = messageResponse.attachments?.filter(
-              (att: IAttachment) => att.type === 'voice'
-            )
-            if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
-              log.info(
-                '🎤📥 [RESPONSE] Voice attachment metadata after SDK response:',
-                voiceAttachmentsResponse.map((att: IAttachment) => ({
-                  id: att.id,
-                  name: att.name,
-                  type: att.type,
-                  metadata: att.metadata,
-                  metadataType: typeof att.metadata,
-                  metadataLength: typeof att.metadata === 'string' ? att.metadata.length : 'N/A',
-                  url: att.url
-                }))
-              )
-            }
-
-            log.info('🔍 [SAGA] Full messageResponse.attachments:', messageResponse.attachments)
             if (customUploader) {
               for (let k = 0; k < messageAttachment.length; k++) {
                 messageResponse.attachments[k] = {
@@ -516,14 +481,14 @@ function* sendMessage(action: IAction): any {
                   ) {
                     try {
                       parsedMetadata = JSON.parse(attachment.metadata)
-                      log.info('✅ [SAGA] Parsed attachment metadata string for tid:', attachment.tid, parsedMetadata)
+                      // log.info('Parsed attachment metadata string for tid:', attachment.tid, parsedMetadata)
                     } catch (e) {
-                      log.warn('❌ [SAGA] Failed to parse attachment metadata:', e)
+                      // log.warn('Failed to parse attachment metadata:', e)
                       // Keep original metadata if parsing fails
                       parsedMetadata = attachment.metadata
                     }
                   } else if (typeof attachment.metadata === 'string' && attachment.metadata.trim() === '') {
-                    log.warn('⚠️ [SAGA] Attachment metadata is empty string, keeping original')
+                    // log.warn('Attachment metadata is empty string, keeping original')
                     // Metadata is empty string - don't overwrite
                     parsedMetadata = attachment.metadata
                   }
@@ -545,7 +510,6 @@ function* sendMessage(action: IAction): any {
                   try {
                     parsedMetadata = JSON.parse(attachment.metadata)
                   } catch (e) {
-                    log.warn('❌ [SAGA] Failed to parse attachment metadata:', e)
                     parsedMetadata = attachment.metadata
                   }
                 }
@@ -684,19 +648,6 @@ function* sendTextMessage(action: IAction): any {
       yield call(addPendingMessage, message, pendingMessage, channel)
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
-      // LOG: Before sending - check for voice attachments
-      const voiceAttachments = messageToSend.attachments?.filter((att: IAttachment) => att.type === 'voice')
-      if (voiceAttachments && voiceAttachments.length > 0) {
-        log.info(
-          '🎤📤 [SEND_TEXT] Voice attachment metadata before sending to SDK:',
-          voiceAttachments.map((att: IAttachment) => ({
-            name: att.name,
-            type: att.type,
-            metadata: att.metadata
-          }))
-        )
-      }
-
       let messageResponse
       if (sendMessageHandler) {
         messageResponse = yield call(sendMessageHandler, messageToSend, channel.id)
@@ -711,28 +662,10 @@ function* sendTextMessage(action: IAction): any {
           if (typeof att.metadata === 'string' && att.metadata) {
             try {
               parsedMetadata = JSON.parse(att.metadata)
-              log.info('✅ [SAGA] Parsed attachment metadata in sendTextMessage')
-            } catch (e) {
-              log.warn('❌ [SAGA] Failed to parse attachment metadata in sendTextMessage:', e)
-            }
+            } catch (e) {}
           }
           return { ...att, metadata: parsedMetadata }
         }) || []
-
-      // LOG: After receiving response - check for voice attachments
-      const voiceAttachmentsResponse = parsedAttachments?.filter((att: IAttachment) => att.type === 'voice')
-      if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
-        log.info(
-          '🎤📥 [RESPONSE_TEXT] Voice attachment metadata after SDK response:',
-          voiceAttachmentsResponse.map((att: IAttachment) => ({
-            id: att.id,
-            name: att.name,
-            type: att.type,
-            metadata: att.metadata,
-            url: att.url
-          }))
-        )
-      }
 
       const messageUpdateData = {
         id: messageResponse.id,
@@ -895,10 +828,7 @@ function* forwardMessage(action: IAction): any {
             if (typeof att.metadata === 'string' && att.metadata) {
               try {
                 parsedMetadata = JSON.parse(att.metadata)
-                log.info('✅ [SAGA] Parsed attachment metadata in forwardMessage')
-              } catch (e) {
-                log.warn('❌ [SAGA] Failed to parse attachment metadata in forwardMessage:', e)
-              }
+              } catch (e) {}
             }
             return { ...att, metadata: parsedMetadata }
           }) || []
@@ -1107,34 +1037,7 @@ function* resendMessage(action: IAction): any {
             messageCopy.attachments = [attachmentToSend]
 
             if (connectionState === CONNECTION_STATUS.CONNECTED) {
-              // LOG: Before resending - check for voice attachments
-              if (attachmentToSend.type === 'voice') {
-                log.info('🎤📤 [RESEND] Voice attachment metadata before resending to SDK:', {
-                  tid: attachmentToSend.tid,
-                  name: attachmentToSend.name,
-                  type: attachmentToSend.type,
-                  metadata: attachmentToSend.metadata
-                })
-              }
-
               const messageResponse = yield call(channel.sendMessage, messageCopy)
-
-              // LOG: After receiving response - check for voice attachments
-              const voiceAttachmentsResponse = messageResponse.attachments?.filter(
-                (att: IAttachment) => att.type === 'voice'
-              )
-              if (voiceAttachmentsResponse && voiceAttachmentsResponse.length > 0) {
-                log.info(
-                  '🎤📥 [RESPONSE_RESEND] Voice attachment metadata after SDK response:',
-                  voiceAttachmentsResponse.map((att: IAttachment) => ({
-                    id: att.id,
-                    name: att.name,
-                    type: att.type,
-                    metadata: att.metadata,
-                    url: att.url
-                  }))
-                )
-              }
 
               deletePendingAttachment(messageAttachment.tid)
 

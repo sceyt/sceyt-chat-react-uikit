@@ -77,46 +77,52 @@ const OGMetadata = ({
   // const [faviconLoadError, setFaviconLoadError] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
-  const handleMetadata = useCallback((metadata: IOGMetadata | null) => {
-    if (metadata) {
-      dispatch(setOGMetadataAC(attachment?.url, metadata))
-    } else {
-      dispatch(setOGMetadataAC(attachment?.url, null))
-    }
-  }, [dispatch, attachment])
+  const handleMetadata = useCallback(
+    (metadata: IOGMetadata | null) => {
+      if (metadata) {
+        dispatch(setOGMetadataAC(attachment?.url, metadata))
+      } else {
+        dispatch(setOGMetadataAC(attachment?.url, null))
+      }
+    },
+    [dispatch, attachment]
+  )
 
-  const ogMetadataQueryBuilder = useCallback(async (url: string) => {
-    const client = getClient()
-    if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
-      try {
-        const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
-        const query = await queryBuilder.build()
-        const metadata = await query.loadOGData()
-        const image = new Image()
-        image.src = metadata?.og?.image?.[0]?.url
-        if (image.src) {
-          image.onload = async () => {
-            const imageWidth = image.width
-            const imageHeight = image.height
-            await storeMetadata(url, { ...metadata, imageWidth, imageHeight })
-            handleMetadata({ ...metadata, imageWidth, imageHeight })
-          }
-          image.onerror = async () => {
-            setImageLoadError(true)
+  const ogMetadataQueryBuilder = useCallback(
+    async (url: string) => {
+      const client = getClient()
+      if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
+        try {
+          const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
+          const query = await queryBuilder.build()
+          const metadata = await query.loadOGData()
+          const image = new Image()
+          image.src = metadata?.og?.image?.[0]?.url
+          if (image.src) {
+            image.onload = async () => {
+              const imageWidth = image.width
+              const imageHeight = image.height
+              await storeMetadata(url, { ...metadata, imageWidth, imageHeight })
+              handleMetadata({ ...metadata, imageWidth, imageHeight })
+            }
+            image.onerror = async () => {
+              setImageLoadError(true)
+              await storeMetadata(url, { ...metadata })
+              handleMetadata({ ...metadata })
+            }
+          } else {
             await storeMetadata(url, { ...metadata })
             handleMetadata({ ...metadata })
           }
-        } else {
-          await storeMetadata(url, { ...metadata })
-          handleMetadata({ ...metadata })
+        } catch (error) {
+          console.log('Failed to fetch OG metadata', url)
+          handleMetadata(null)
         }
-      } catch (error) {
-        console.log('Failed to fetch OG metadata', url)
-        handleMetadata(null)
       }
-    }
-    return null
-  }, [handleMetadata])
+      return null
+    },
+    [handleMetadata]
+  )
 
   useEffect(() => {
     if (attachment?.id && attachment?.url && !metadata) {
@@ -147,7 +153,14 @@ const OGMetadata = ({
   }, [attachment])
 
   const showOGMetadata = useMemo(() => {
-    return state !== 'deleted' && (metadata?.og?.title || metadata?.og?.description || metadata?.og?.image?.[0]?.url || metadata?.og?.favicon?.url) && metadata
+    return (
+      state !== 'deleted' &&
+      (metadata?.og?.title ||
+        metadata?.og?.description ||
+        metadata?.og?.image?.[0]?.url ||
+        metadata?.og?.favicon?.url) &&
+      metadata
+    )
   }, [state, metadata])
 
   const calculatedImageHeight = useMemo(() => {
@@ -157,103 +170,117 @@ const OGMetadata = ({
     return metadata?.imageHeight / (metadata?.imageWidth / maxWidth)
   }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
-  const hasImage = useMemo(() => metadata?.og?.image?.[0]?.url && !imageLoadError, [metadata?.og?.image?.[0]?.url, imageLoadError])
+  const hasImage = useMemo(
+    () => metadata?.og?.image?.[0]?.url && !imageLoadError,
+    [metadata?.og?.image?.[0]?.url, imageLoadError]
+  )
   const faviconUrl = useMemo(() => metadata?.og?.favicon?.url, [metadata?.og?.favicon?.url])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
-  const elements = useMemo(() => [
-    hasImage
-      ? {
-          key: 'image',
-          order: resolvedOrder?.image ?? 1,
-          render: (
-            <ImageContainer
-              showOGMetadata={!!showOGMetadata}
-              containerWidth={maxWidth}
-              containerHeight={calculatedImageHeight}
-              shouldAnimate={shouldAnimate}
-              maxWidth={maxWidth}
-              maxHeight={maxHeight || calculatedImageHeight}
-            >
-              <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
-            </ImageContainer>
+  const elements = useMemo(
+    () =>
+      [
+        hasImage
+          ? {
+              key: 'image',
+              order: resolvedOrder?.image ?? 1,
+              render: (
+                <ImageContainer
+                  showOGMetadata={!!showOGMetadata}
+                  containerWidth={maxWidth}
+                  containerHeight={calculatedImageHeight}
+                  shouldAnimate={shouldAnimate}
+                  maxWidth={maxWidth}
+                  maxHeight={maxHeight || calculatedImageHeight}
+                >
+                  <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
+                </ImageContainer>
+              )
+            }
+          : null,
+        {
+          key: 'title',
+          order: resolvedOrder?.title ?? 2,
+          render: ogShowTitle && metadata?.og?.title && (
+            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
+              <span>{metadata?.og?.title}</span>
+            </Title>
+          )
+        },
+        {
+          key: 'description',
+          order: resolvedOrder?.description ?? 3,
+          render: ogShowDescription && metadata?.og?.description && (
+            <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
+              {metadata?.og?.description}
+            </Desc>
+          )
+        },
+        {
+          key: 'link',
+          order: resolvedOrder?.link ?? 4,
+          render: ogShowUrl && (
+            <Url maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
+              {ogUrl}
+            </Url>
           )
         }
-      : null,
-    {
-      key: 'title',
-      order: resolvedOrder?.title ?? 2,
-      render: ogShowTitle && metadata?.og?.title && (
-        <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
-          <span>{metadata?.og?.title}</span>
-        </Title>
-      )
-    },
-    {
-      key: 'description',
-      order: resolvedOrder?.description ?? 3,
-      render: ogShowDescription && metadata?.og?.description && (
-        <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
-          {metadata?.og?.description}
-        </Desc>
-      )
-    },
-    {
-      key: 'link',
-      order: resolvedOrder?.link ?? 4,
-      render: ogShowUrl && (
-        <Url maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
-          {ogUrl}
-        </Url>
-      )
-    }
-  ]
-    .filter((el): el is { key: string; order: number; render: JSX.Element | false } => !!el)
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)), [
-    hasImage,
-    resolvedOrder,
-    showOGMetadata,
-    maxWidth,
-    calculatedImageHeight,
-    maxHeight,
-    metadata?.og?.image,
-    shouldAnimate,
-    ogShowTitle,
-    metadata?.og?.title,
-    infoPadding,
-    ogShowDescription,
-    metadata?.og?.description,
-    textSecondary,
-    ogShowUrl,
-    ogUrl
-  ])
+      ]
+        .filter((el): el is { key: string; order: number; render: JSX.Element | false } => !!el)
+        .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+    [
+      hasImage,
+      resolvedOrder,
+      showOGMetadata,
+      maxWidth,
+      calculatedImageHeight,
+      maxHeight,
+      metadata?.og?.image,
+      shouldAnimate,
+      ogShowTitle,
+      metadata?.og?.title,
+      infoPadding,
+      ogShowDescription,
+      metadata?.og?.description,
+      textSecondary,
+      ogShowUrl,
+      ogUrl
+    ]
+  )
 
-  const textContent = useMemo(() => (
-    <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
-      {elements
-        .filter((el) => el.key !== 'image')
-        .map((el) => (
-          <React.Fragment key={el.key}>{el.render}</React.Fragment>
-        ))}
-    </OGText>
-  ), [elements, shouldAnimate, ogContainerShowBackground])
+  const textContent = useMemo(
+    () => (
+      <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
+        {elements
+          .filter((el) => el.key !== 'image')
+          .map((el) => (
+            <React.Fragment key={el.key}>{el.render}</React.Fragment>
+          ))}
+      </OGText>
+    ),
+    [elements, shouldAnimate, ogContainerShowBackground]
+  )
 
-  const content = useMemo(() => hasImage ? (
-    <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
-      {elements.map((el) => (
-        <React.Fragment key={el.key}>{el.render}</React.Fragment>
-      ))}
-    </OGText>
-  ) : ogShowFavicon && faviconUrl ? (
-    <OGRow>
-      <OGTextWrapper>{textContent}</OGTextWrapper>
-      <FaviconContainer aria-hidden='true'>
-        <FaviconImg src={faviconUrl} alt='' />
-      </FaviconContainer>
-    </OGRow>
-  ) : (
-    textContent
-  ), [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent])
+  const content = useMemo(
+    () =>
+      hasImage ? (
+        <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
+          {elements.map((el) => (
+            <React.Fragment key={el.key}>{el.render}</React.Fragment>
+          ))}
+        </OGText>
+      ) : ogShowFavicon && faviconUrl ? (
+        <OGRow>
+          <OGTextWrapper>{textContent}</OGTextWrapper>
+          <FaviconContainer aria-hidden='true'>
+            <FaviconImg src={faviconUrl} alt='' />
+          </FaviconContainer>
+        </OGRow>
+      ) : (
+        textContent
+      ),
+    [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
+  )
 
   return (
     <div className='ogmetadata-container'>
@@ -266,7 +293,7 @@ const OGMetadata = ({
         padding={ogContainerPadding}
         className={ogContainerClassName}
         containerMargin={ogContainerMargin}
-        as="a"
+        as='a'
         href={attachment?.url}
         target={target}
         rel={target === '_blank' ? 'noopener noreferrer' : undefined}
@@ -356,7 +383,9 @@ const ImageContainer = styled.div<{
   margin: 0 auto;
   overflow: hidden;
   ${({ shouldAnimate, showOGMetadata, containerHeight }) =>
-    shouldAnimate && showOGMetadata && containerHeight &&
+    shouldAnimate &&
+    showOGMetadata &&
+    containerHeight &&
     `
     animation: expandHeight 0.3s ease-out forwards;
   `}
