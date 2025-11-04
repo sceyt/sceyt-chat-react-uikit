@@ -9,7 +9,8 @@ import {
   MessageInfoTab,
   ILabels,
   ITabsStyles,
-  IListItemStyles
+  IListItemStyles,
+  OGMetadataProps
 } from '../../types'
 import { IAttachmentProperties, IMessageStyles } from '../Message/Message.types'
 import { HiddenMessageProperty } from 'types/enum'
@@ -209,17 +210,7 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
-  ogMetadataProps?: {
-    maxWidth?: number
-    maxHeight?: number
-    ogLayoutOrder?: 'link-first' | 'og-first'
-    ogShowUrl?: boolean
-    ogShowTitle?: boolean
-    ogShowDescription?: boolean
-    ogShowFavicon?: boolean
-    order?: { image?: number; title?: number; description?: number; link?: number }
-    infoPadding?: string
-  }
+  ogMetadataProps?: OGMetadataProps
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -369,7 +360,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
     ogShowDescription: true,
     ogShowFavicon: true,
     order: { image: 1, title: 2, description: 3, link: 4 },
-    infoPadding: '0 8px'
+    infoPadding: '0 8px',
+    isInviteLink: false
   }
 }) => {
   return (

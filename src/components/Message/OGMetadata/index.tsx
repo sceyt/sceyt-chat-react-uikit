@@ -9,6 +9,7 @@ import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { CONNECTION_STATUS } from 'store/user/constants'
+import { getChannelByInviteKeyAC } from 'store/channel/actions'
 
 const validateUrl = (url: string) => {
   try {
@@ -38,6 +39,7 @@ const OGMetadata = ({
   infoPadding = '0 8px',
   ogContainerMargin,
   target = '_blank',
+  isInviteLink = false,
   metadataGetSuccessCallback
 }: {
   attachments: IAttachment[]
@@ -58,6 +60,7 @@ const OGMetadata = ({
   infoPadding?: string
   ogContainerMargin?: string
   target?: string
+  isInviteLink?: boolean
   metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean) => void
 }) => {
   const dispatch = useDispatch()
@@ -311,6 +314,14 @@ const OGMetadata = ({
     [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
   )
 
+  const getChannel = useCallback(() => {
+    const splitedKey = attachment?.url.split('/')
+    const key = splitedKey[splitedKey.length - 1]
+    if (key) {
+      dispatch(getChannelByInviteKeyAC(key))
+    }
+  }, [attachment?.url])
+
   return (
     <OGMetadataContainer
       showOGMetadata={!!showOGMetadata}
@@ -321,10 +332,19 @@ const OGMetadata = ({
       padding={ogContainerPadding}
       className={ogContainerClassName}
       containerMargin={ogContainerMargin}
-      as='a'
-      href={attachment?.url}
-      target={target}
-      rel={target === '_blank' ? 'noopener noreferrer' : undefined}
+      {...(isInviteLink
+        ? {
+            as: 'div',
+            onClick: () => {
+              getChannel()
+            }
+          }
+        : {
+            as: 'a',
+            href: attachment?.url,
+            target,
+            rel: target === '_blank' ? 'noopener noreferrer' : undefined
+          })}
     >
       {content}
     </OGMetadataContainer>

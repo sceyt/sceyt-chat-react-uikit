@@ -92,6 +92,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
 
           <TopAvatar>
             <Avatar
+              key={channel.id}
               name={channel.subject || ''}
               image={channel.avatar || ''}
               size={90}
@@ -106,7 +107,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
           {showMembersAvatars && (
             <MembersRow>
               {firstMembers.map((m, idx) => (
-                <MemberAvatar key={m.id} index={idx} borderColor={background}>
+                <MemberAvatar key={m.id || `member-${idx}`} index={idx} borderColor={background}>
                   <Avatar name={m.firstName || m.id} image={m.avatarUrl} size={40} textSize={12} setDefaultAvatar />
                 </MemberAvatar>
               ))}

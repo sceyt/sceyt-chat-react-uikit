@@ -12,6 +12,8 @@ import { getClient } from '../common/client'
 import { StyledText } from '../UIHelper'
 import { combineMessageAttributes, makeUsername } from '../helpers/message'
 import log from 'loglevel'
+import { getChannelByInviteKeyAC } from 'store/channel/actions'
+import { useDispatch } from 'store/hooks'
 
 const StatusText = styled.span<{ color: string; fontSize?: string }>`
   color: ${(props) => props.color};
@@ -84,22 +86,53 @@ const MessageStatusIcon = ({
   }
 }
 
-const linkifyTextPart = (textPart: string, match: any, target: string = '_blank') => {
+const linkifyTextPart = (
+  textPart: string,
+  match: any,
+  target: string = '_blank',
+  isInviteLink?: boolean,
+  onInviteLinkClick?: (key: string) => void
+) => {
   let newMessageText: any
   let prevMatchEnd = 0
   let lastFoundIndex = 0
+
   match.forEach((matchItem: any, index: number) => {
     const matchIndex = textPart.indexOf(matchItem.text, lastFoundIndex)
     lastFoundIndex = matchIndex + matchItem.text.length
     if (index === 0) {
       newMessageText = [
         textPart.substring(0, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target={target} rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a
+          draggable={false}
+          key={index}
+          href={isInviteLink ? undefined : matchItem.url}
+          target={target}
+          rel='noreferrer'
+          style={{ cursor: 'pointer' }}
+          {...(isInviteLink
+            ? {
+                onClick: () => {
+                  const splitedKey = matchItem.url.split('/')
+                  const key = splitedKey[splitedKey.length - 1]
+                  if (key) {
+                    onInviteLinkClick?.(key)
+                  }
+                }
+              }
+            : {})}
+        >{`${matchItem.text}`}</a>
       ]
     } else {
       newMessageText.push(
         textPart.substring(prevMatchEnd, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target={target} rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a
+          draggable={false}
+          key={index}
+          href={isInviteLink ? undefined : matchItem.url}
+          target={target}
+          rel='noreferrer'
+        >{`${matchItem.text}`}</a>
       )
     }
 
@@ -123,7 +156,8 @@ const MessageTextFormat = ({
   onMentionNameClick,
   shouldOpenUserProfileForMention,
   unsupportedMessage,
-  target = '_blank'
+  target = '_blank',
+  isInviteLink = false
 }: {
   text: string
   message: any
@@ -137,7 +171,12 @@ const MessageTextFormat = ({
   shouldOpenUserProfileForMention?: boolean
   unsupportedMessage?: boolean
   target?: string
+  isInviteLink?: boolean
 }) => {
+  const dispatch = useDispatch()
+  const onInviteLinkClick = (key: string) => {
+    dispatch(getChannelByInviteKeyAC(key))
+  }
   try {
     let messageText: any = []
     const linkify = new LinkifyIt()
@@ -159,12 +198,12 @@ const MessageTextFormat = ({
           const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
           if (!isLastMessage && !asSampleText && firstPartMatch) {
-            firstPart = linkifyTextPart(firstPart, firstPartMatch, target)
+            firstPart = linkifyTextPart(firstPart, firstPartMatch, target, isInviteLink, onInviteLinkClick)
           }
           let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
           const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
           if (!isLastMessage && !asSampleText && secondPartMatch) {
-            secondPart = linkifyTextPart(secondPart, secondPartMatch, target)
+            secondPart = linkifyTextPart(secondPart, secondPartMatch, target, isInviteLink, onInviteLinkClick)
           }
 
           if (attribute.type.includes('mention')) {
@@ -280,7 +319,7 @@ const MessageTextFormat = ({
       const match = linkify.match(text)
       if (!isLastMessage && !asSampleText && match) {
         // log.info('newMessageText ... . ', newMessageText)
-        messageText = linkifyTextPart(text, match, target)
+        messageText = linkifyTextPart(text, match, target, isInviteLink, onInviteLinkClick)
       }
     }
 

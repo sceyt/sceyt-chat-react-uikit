@@ -1459,6 +1459,7 @@ function* getChannelByInviteKey(action: IAction): any {
     const channel = yield call(SceytChatClient.Channel.getChannelByInviteKey, key)
     if (channel && channel.length > 0 && !channel[0]?.role) {
       yield put(setJoinableChannelAC(JSON.parse(JSON.stringify(channel[0]))))
+      window.history.pushState({}, '', window.location.pathname + '?join=' + key)
     } else if (channel && channel.length > 0 && channel[0]?.role) {
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(channel[0]))))
       window.history.pushState({}, '', window.location.pathname)

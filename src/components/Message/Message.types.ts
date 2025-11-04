@@ -7,7 +7,8 @@ import {
   ITabsStyles,
   IListItemStyles,
   ILabels,
-  MessageInfoTab
+  MessageInfoTab,
+  OGMetadataProps
 } from '../../types'
 import { FC } from 'react'
 
@@ -213,22 +214,7 @@ export interface IMessageProps {
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
-  ogMetadataProps?: {
-    maxWidth?: number
-    maxHeight?: number
-    ogLayoutOrder?: 'link-first' | 'og-first'
-    ogShowUrl?: boolean
-    ogShowTitle?: boolean
-    ogShowDescription?: boolean
-    ogShowFavicon?: boolean
-    order?: { image?: number; title?: number; description?: number; link?: number }
-    ogContainerBorderRadius?: string | number
-    ogContainerPadding?: string
-    ogContainerClassName?: string
-    ogContainerShowBackground?: boolean
-    ogContainerBackground?: string
-    infoPadding?: string
-  }
+  ogMetadataProps?: OGMetadataProps
   showInfoMessageProps?: {
     togglePopup?: () => void
     labels?: ILabels

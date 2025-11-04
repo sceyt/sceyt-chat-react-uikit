@@ -86,14 +86,16 @@ interface IChannelProps {
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
   return (
-    !!((lastMessage.attachments && lastMessage.attachments.length) || (lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL)) &&
-    (
-      lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL ? (
-        <React.Fragment>
-          <PollIcon />
-          {lastMessage.body ? '' : 'Poll'}
-        </React.Fragment>
-      ): lastMessage.attachments[0].type === attachmentTypes.image ? (
+    !!(
+      (lastMessage.attachments && lastMessage.attachments.length) ||
+      (lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL)
+    ) &&
+    (lastMessage?.pollDetails && lastMessage?.type === MESSAGE_TYPE.POLL ? (
+      <React.Fragment>
+        <PollIcon />
+        {lastMessage.body ? '' : 'Poll'}
+      </React.Fragment>
+    ) : lastMessage.attachments[0].type === attachmentTypes.image ? (
       <React.Fragment>
         <ImageIcon />
         {lastMessage.body ? '' : 'Photo'}
@@ -996,7 +998,7 @@ export const LastMessageDescription = styled.div<{ poll?: boolean }>`
   & > svg {
     width: 18px;
     height: 18px;
-    margin: ${props => props.poll ? '0 0 -3px 0' : '3px 0 -3px 0'};
+    margin: ${(props) => (props.poll ? '0 0 -3px 0' : '3px 0 -3px 0')};
     margin-right: 4px;
   }
 `

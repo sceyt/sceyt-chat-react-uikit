@@ -192,17 +192,7 @@ const Message = ({
   messageTextLineHeight,
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
-  ogMetadataProps = {
-    maxWidth: 400,
-    maxHeight: undefined,
-    ogLayoutOrder: 'link-first',
-    ogShowUrl: false,
-    ogShowTitle: true,
-    ogShowDescription: true,
-    ogShowFavicon: true,
-    order: { image: 1, title: 2, description: 3, link: 4 },
-    infoPadding: '0 8px'
-  },
+  ogMetadataProps,
   showInfoMessageProps = {}
 }: IMessageProps) => {
   const {

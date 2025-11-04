@@ -14,7 +14,7 @@ import { getSendAttachmentsAsSeparateMessages } from 'helpers/customUploader'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IAttachment, IChannel, IMessage, IUser } from 'types'
+import { IAttachment, IChannel, IMessage, IUser, OGMetadataProps } from 'types'
 // Components
 import MessageActions from '../MessageActions'
 import RepliedMessage from '../RepliedMessage'
@@ -164,22 +164,7 @@ interface IMessageBodyProps {
   messageTextRef: React.RefObject<HTMLSpanElement>
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
-  ogMetadataProps?: {
-    maxWidth?: number
-    maxHeight?: number
-    ogLayoutOrder?: 'link-first' | 'og-first'
-    ogShowUrl?: boolean
-    ogShowTitle?: boolean
-    ogShowDescription?: boolean
-    ogShowFavicon?: boolean
-    order?: { image?: number; title?: number; description?: number; link?: number }
-    ogContainerBorderRadius?: string | number
-    ogContainerPadding?: string
-    ogContainerClassName?: string
-    ogContainerShowBackground?: boolean
-    ogContainerBackground?: string
-    infoPadding?: string
-  }
+  ogMetadataProps?: OGMetadataProps
   unsupportedMessage: boolean
 }
 
@@ -746,6 +731,7 @@ const MessageBody = ({
             ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
             ogContainerBackground={ogMetadataProps?.ogContainerBackground}
             infoPadding={ogMetadataProps?.infoPadding}
+            isInviteLink={ogMetadataProps?.isInviteLink}
           />
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
