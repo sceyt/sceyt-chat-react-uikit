@@ -17,14 +17,14 @@ import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
 // Components
 import Waveform from 'components/Waveform'
 
-interface Recording {
-  recordingSeconds: number
-  recordingMilliseconds: number
-  initRecording: boolean
-  mediaStream: null | MediaStream
-  mediaRecorder: null | MediaRecorder
-  audio?: string
-}
+// interface Recording {
+//   recordingSeconds: number
+//   recordingMilliseconds: number
+//   initRecording: boolean
+//   mediaStream: null | MediaStream
+//   mediaRecorder: null | MediaRecorder
+//   audio?: string
+// }
 interface AudioPlayerProps {
   url: string
   file: IAttachment
