@@ -31,8 +31,6 @@ interface AudioPlayerProps {
   messagePlayed: boolean | undefined
   channelId?: string
   incoming?: boolean
-  recording?: Recording
-  onRecordingChange?: (recording: Recording) => void
 }
 
 const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, channelId, incoming }) => {
