@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
@@ -35,6 +35,11 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
   const poll = message?.pollDetails
   const [showResults, setShowResults] = useState(false)
+
+  const isHaveResults = useMemo(() => {
+    return (poll?.votes?.length ?? 0) > 0 || (poll?.ownVotes?.length ?? 0) > 0
+  }, [poll?.votes, poll?.ownVotes])
+
   if (!poll) {
     return null
   }
@@ -128,10 +133,12 @@ const PollMessage = ({ message }: PollMessageProps) => {
         <Button
           type='button'
           backgroundColor={background}
-          color={accent}
+          color={isHaveResults ? accent : textSecondary}
+          disabledOpacity={0.8}
           borderRadius='14px'
-          onClick={handleViewResults}
+          onClick={isHaveResults ? handleViewResults : undefined}
           style={{ width: '100%', marginTop: 10 }}
+          disabled={!isHaveResults}
         >
           View Results
         </Button>

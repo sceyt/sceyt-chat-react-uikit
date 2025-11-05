@@ -427,7 +427,7 @@ const Channel: React.FC<IChannelProps> = ({
         draftMessageText={draftMessageText}
         lastMessage={draftMessage || lastMessage}
         isDirectChannel={isDirectChannel}
-        unsupportedMessage={unsupportedMessage}
+        unsupportedMessage={unsupportedMessage && !getCustomLatestMessage}
       />
     )
   }, [

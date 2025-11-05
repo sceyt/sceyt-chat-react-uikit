@@ -382,6 +382,7 @@ export const Button = styled.button<{
   borderColor?: string
   borderRadius?: string
   disabled?: boolean
+  disabledOpacity?: number
   margin?: string
 }>`
   display: inline-block;
@@ -402,10 +403,10 @@ export const Button = styled.button<{
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 1)};
   &:hover,
   &:focus {
-    opacity: ${(props) => (props.disabled ? 0.5 : 0.8)};
+    opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 0.8)};
   }
 `
 
