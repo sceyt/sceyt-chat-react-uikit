@@ -37,17 +37,17 @@ const PollMessage = ({ message }: PollMessageProps) => {
   const [showResults, setShowResults] = useState(false)
 
   const isHaveResults = useMemo(() => {
-    return (poll?.votes?.length ?? 0) > 0 || (poll?.ownVotes?.length ?? 0) > 0
-  }, [poll?.votes, poll?.ownVotes])
+    return (poll?.voteDetails?.votes?.length ?? 0) > 0 || (poll?.voteDetails?.ownVotes?.length ?? 0) > 0
+  }, [poll?.voteDetails?.votes, poll?.voteDetails?.ownVotes])
 
   if (!poll) {
     return null
   }
 
-  const votesPerOption: Record<string, number> = poll.votesPerOption || {}
+  const votesPerOption: Record<string, number> = poll.voteDetails?.votesPerOption || {}
   const maxVotes = poll.options.reduce((acc, opt) => Math.max(acc, votesPerOption[opt.id] || 0), 0)
-  const ownVotedOptionIds = new Set((poll.ownVotes || []).map((v) => v.optionId))
-  const votesUsers = poll.votes || []
+  const ownVotedOptionIds = new Set((poll.voteDetails?.ownVotes || []).map((v) => v.optionId))
+  const votesUsers = poll.voteDetails?.votes || []
 
   const canVote = !poll.closed
 
@@ -77,7 +77,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
           const selected = ownVotedOptionIds.has(opt.id)
           const optionVotesUsers = votesUsers.filter((v: IPollVote) => v.optionId === opt.id).slice(0, 3)
           if (optionVotesUsers.length < 3) {
-            poll?.ownVotes?.forEach((vote: IPollVote) => {
+            poll?.voteDetails?.ownVotes?.forEach((vote: IPollVote) => {
               if (vote.optionId === opt.id) {
                 optionVotesUsers.push(vote)
               }

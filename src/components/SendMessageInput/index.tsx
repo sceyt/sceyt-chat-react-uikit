@@ -1829,7 +1829,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 {chooseFileAttachmentText ?? 'File'}
                               </DropdownOptionLi>
                             )}
-                            {pollOptions?.showAddPoll && !isDirectChannel && (
+                            {pollOptions?.showAddPoll && (
                               <DropdownOptionLi
                                 key={3}
                                 textColor={textPrimary}

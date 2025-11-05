@@ -37,17 +37,12 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
   const optionIdToVotes = useMemo(() => {
     const votes: Record<string, IPollVote[]> = {}
     poll.options.forEach((opt) => {
-      const allOptionVotes = (poll.votes || []).filter((vote) => vote.optionId === opt.id)
-      if (allOptionVotes.length < 5) {
-        const ownVote = poll.ownVotes.find((vote) => vote.optionId === opt.id)
-        if (ownVote) {
-          allOptionVotes.push(ownVote)
-        }
-      }
-      votes[opt.id] = allOptionVotes
+      const allOptionVotes = (poll.voteDetails?.votes || []).filter((vote) => vote.optionId === opt.id)
+      const ownVote = poll.voteDetails?.ownVotes.find((vote) => vote.optionId === opt.id)
+      votes[opt.id] = [...(ownVote ? [ownVote] : []), ...(allOptionVotes?.slice(0, ownVote ? 4 : 5) || [])]
     })
     return votes
-  }, [poll.votes, poll.options, poll.ownVotes])
+  }, [poll.voteDetails?.votes, poll.options, poll.voteDetails?.ownVotes])
 
   const handleShowAll = useCallback(
     (optionId: string) => {
@@ -89,7 +84,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
               <OptionsList>
                 {poll.options.map((opt) => {
                   const allVotes = optionIdToVotes[opt.id] || []
-                  const totalVotes = poll.votesPerOption?.[opt.id] || 0
+                  const totalVotes = poll.voteDetails?.votesPerOption?.[opt.id] || 0
 
                   return (
                     <OptionBlock key={opt.id} background={surface1} border={border}>

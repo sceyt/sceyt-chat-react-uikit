@@ -92,7 +92,6 @@ export interface IMarker {
   createdAt: Date
   user: IUser | null
 }
-
 export interface IPollOption {
   id: string
   name: string
@@ -122,6 +121,17 @@ export interface IPollVote {
   }
 }
 
+export interface IChangedVotes {
+  addedVotes: IPollVote[]
+  removedVotes: IPollVote[]
+}
+
+export interface IVoteDetails {
+  votesPerOption: { [key: string]: number }
+  votes: IPollVote[]
+  ownVotes: IPollVote[]
+}
+
 export interface IPollDetails {
   id: string
   name: string
@@ -130,25 +140,12 @@ export interface IPollDetails {
   anonymous: boolean
   allowMultipleVotes: boolean
   allowVoteRetract: boolean
-  votesPerOption: { [key: string]: number }
-  votes: IPollVote[]
-  ownVotes: IPollVote[]
+  changedVotes?: IChangedVotes
+  voteDetails: IVoteDetails
   createdAt: number
   updatedAt: number
   closedAt: number
   closed: boolean
-}
-
-export interface IPollVoteParams {
-  channelId: string
-  messageId: string
-  pollId: string
-  optionId: string[]
-}
-
-export interface IPollUpdateParams {
-  channelId: string
-  pollId: string
 }
 
 export interface IMessage {

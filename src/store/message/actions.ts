@@ -330,10 +330,9 @@ export function updateMessageAC(
   params: any,
   addIfNotExists?: boolean,
   voteDetails?: {
-    votes?: IPollVote[]
-    deletedVotes?: IPollVote[]
-    votesPerOption?: { [key: string]: number }
-    closed?: boolean
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+    vote?: IPollVote
+    incrementVotesPerOptionCount: number
   }
 ) {
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })

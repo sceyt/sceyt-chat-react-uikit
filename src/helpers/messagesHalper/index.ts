@@ -1,8 +1,8 @@
-import { IAttachment, IMessage, IPollVote, IReaction } from '../../types'
+import { IAttachment, IMessage, IPollDetails, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
-import { deleteVotesFromPollDetails } from '../message'
+import { handleVoteDetails } from '../message'
 export const MESSAGES_MAX_LENGTH = 80
 export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
@@ -67,11 +67,9 @@ export const updateMessageOnAllMessages = (
   messageId: string,
   updatedParams: any,
   voteDetails?: {
-    votes?: IPollVote[]
-    deletedVotes?: IPollVote[]
-    votesPerOption?: { [key: string]: number }
-    closed?: boolean
-    multipleVotes?: boolean
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+    vote?: IPollVote
+    incrementVotesPerOptionCount: number
   }
 ) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
@@ -79,43 +77,14 @@ export const updateMessageOnAllMessages = (
       if (updatedParams.state === MESSAGE_STATUS.DELETE) {
         return { ...updatedParams }
       }
-      if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && message.pollDetails) {
-        message.pollDetails.votes = [
-          ...(message.pollDetails.votes || []).filter(
-            (vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id
-          )
-        ]
-      }
       let updatedMessage = {
         ...message,
-        ...updatedParams,
-        ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails
-          ? {
-              pollDetails: {
-                ...message.pollDetails,
-                votes: [...(message.pollDetails?.votes || []), ...voteDetails.votes],
-                votesPerOption: voteDetails.votesPerOption
-              }
-            }
-          : {})
+        ...updatedParams
       }
-      if (voteDetails && voteDetails.deletedVotes && updatedMessage.pollDetails) {
+      if (voteDetails) {
         updatedMessage = {
           ...updatedMessage,
-          pollDetails: {
-            ...updatedMessage.pollDetails,
-            votes: deleteVotesFromPollDetails(updatedMessage.pollDetails.votes, voteDetails.deletedVotes),
-            votesPerOption: voteDetails.votesPerOption
-          }
-        }
-      }
-      if (voteDetails && voteDetails.closed && updatedMessage.pollDetails) {
-        updatedMessage = {
-          ...updatedMessage,
-          pollDetails: {
-            ...updatedMessage.pollDetails,
-            closed: voteDetails.closed
-          }
+          pollDetails: handleVoteDetails(voteDetails, updatedMessage)
         }
       }
       return updatedMessage
@@ -214,11 +183,9 @@ export function updateMessageOnMap(
   channelId: string,
   updatedMessage: { messageId: string; params: any },
   voteDetails?: {
-    votes?: IPollVote[]
-    deletedVotes?: IPollVote[]
-    votesPerOption?: { [key: string]: number }
-    closed?: boolean
-    multipleVotes?: boolean
+    vote?: IPollVote
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+    incrementVotesPerOptionCount: number
   }
 ) {
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
@@ -253,47 +220,15 @@ export function updateMessageOnMap(
         } else {
           updatedMessageData = {
             ...mes,
-            ...updatedMessage.params,
-            ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && mes.pollDetails
-              ? {
-                  pollDetails: {
-                    ...mes.pollDetails,
-                    votes: [...(mes.pollDetails?.votes || []), ...voteDetails.votes],
-                    votesPerOption: voteDetails.votesPerOption
-                  }
-                }
-              : {})
+            ...updatedMessage.params
           }
-          if (
-            voteDetails &&
-            voteDetails?.votes?.length &&
-            !voteDetails.multipleVotes &&
-            updatedMessageData.pollDetails
-          ) {
-            updatedMessageData.pollDetails.votes = [
-              ...(updatedMessageData.pollDetails.votes || []).filter(
-                (vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id
-              )
-            ]
+          let voteDetailsData: IPollDetails | undefined
+          if (voteDetails) {
+            voteDetailsData = handleVoteDetails(voteDetails, updatedMessageData)
           }
-          if (voteDetails && voteDetails.deletedVotes && updatedMessageData.pollDetails) {
-            updatedMessageData = {
-              ...updatedMessageData,
-              pollDetails: {
-                ...updatedMessageData.pollDetails,
-                votes: deleteVotesFromPollDetails(updatedMessageData.pollDetails.votes, voteDetails.deletedVotes),
-                votesPerOption: voteDetails.votesPerOption
-              }
-            }
-          }
-          if (voteDetails && voteDetails.closed && updatedMessageData.pollDetails) {
-            updatedMessageData = {
-              ...updatedMessageData,
-              pollDetails: {
-                ...updatedMessageData.pollDetails,
-                closed: voteDetails.closed
-              }
-            }
+          updatedMessageData = {
+            ...updatedMessageData,
+            pollDetails: voteDetailsData
           }
           messagesList.push({ ...mes, ...updatedMessageData })
           continue

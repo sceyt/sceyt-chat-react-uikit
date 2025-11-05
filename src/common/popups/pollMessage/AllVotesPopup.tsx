@@ -46,7 +46,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   const allVotes = pollVotesList[key] || []
   const hasMore = pollVotesHasMore[key] ?? false
   const isLoading = pollVotesLoadingState[key] === LOADING_STATE.LOADING
-  const totalVotes = poll.votesPerOption?.[optionId] || 0
+  const totalVotes = poll.voteDetails?.votesPerOption?.[optionId] || 0
   const isLoadingInitial = allVotes.length === 0 && (isLoading || totalVotes > 0)
 
   useEffect(() => {
@@ -86,8 +86,8 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   }
 
   const ownVote = useMemo(
-    () => poll?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId),
-    [poll?.ownVotes, optionId]
+    () => poll?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId),
+    [poll?.voteDetails?.ownVotes, optionId]
   )
 
   return (
