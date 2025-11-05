@@ -6,7 +6,12 @@ import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
 import { IPollDetails, IPollVote } from 'types'
+import { makeUsername } from 'helpers/message'
 import AllVotesPopup from './AllVotesPopup'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
+import { getClient } from 'common/client'
+import { useSelector } from 'store/hooks'
+import { contactsMapSelector } from 'store/user/selector'
 
 interface VotesResultsPopupProps {
   onClose: () => void
@@ -17,7 +22,9 @@ interface VotesResultsPopupProps {
 
 const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: VotesResultsPopupProps) => {
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
-
+  const getFromContacts = getShowOnlyContactUsers()
+  const user = getClient().user
+  const contactsMap = useSelector(contactsMapSelector)
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -31,9 +38,11 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
     const votes: Record<string, IPollVote[]> = {}
     poll.options.forEach((opt) => {
       const allOptionVotes = (poll.votes || []).filter((vote) => vote.optionId === opt.id)
-      const ownVote = poll.ownVotes.find((vote) => vote.optionId === opt.id)
-      if (ownVote) {
-        allOptionVotes.push(ownVote)
+      if (allOptionVotes.length < 5) {
+        const ownVote = poll.ownVotes.find((vote) => vote.optionId === opt.id)
+        if (ownVote) {
+          allOptionVotes.push(ownVote)
+        }
       }
       votes[opt.id] = allOptionVotes
     })
@@ -100,7 +109,25 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                             />
                             <VoterInfo>
                               <VoterName color={textPrimary}>
-                                {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
+                                {user.id === vote.user.id
+                                  ? 'You'
+                                  : makeUsername(
+                                      contactsMap[vote.user.id],
+                                      {
+                                        id: vote?.user?.id,
+                                        firstName: vote?.user?.profile?.firstName,
+                                        lastName: vote?.user?.profile?.lastName,
+                                        avatarUrl: vote?.user?.profile?.avatar,
+                                        state: vote?.user?.presence?.status,
+                                        blocked: false,
+                                        presence: {
+                                          state: vote?.user?.presence?.status,
+                                          status: vote?.user?.presence?.status,
+                                          lastActiveAt: new Date(vote?.user?.createdAt || '')
+                                        }
+                                      },
+                                      getFromContacts
+                                    )}
                               </VoterName>
                               <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
                             </VoterInfo>
@@ -147,7 +174,7 @@ const OptionsList = styled.div`
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  max-height: 64vh;
+  max-height: 585px;
 `
 
 const OptionBlock = styled.div<{ background: string; border: string }>`
