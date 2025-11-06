@@ -45,6 +45,7 @@ import {
   clearMessagesAC,
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
+  removePendingMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
   updateMessagesMarkersAC,
@@ -64,7 +65,6 @@ import {
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
-  removePendingMessageFromMap,
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
@@ -882,9 +882,9 @@ export default function* watchForEvents(): any {
             let updateLastMessage = false
             const markersMap: any = {}
             const activeChannelMessages = getMessagesFromMap(activeChannelId)
-            markerList.messageIds.forEach((messageId: string) => {
+            markerList.messageIds.forEach(function* (messageId: string) {
               if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
-                removePendingMessageFromMap(activeChannelId, messageId)
+                yield put(removePendingMessageAC(channelId, messageId))
               } else {
                 const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
                 if (isPendingMessage) {
@@ -1073,23 +1073,136 @@ export default function* watchForEvents(): any {
         }
         case CHANNEL_EVENT_TYPES.POLL_ADDED: {
           const { channel, pollDetails, messageId } = args
+          const pollDetailsData = pollDetails as IPollDetails
           const activeChannelId = yield call(getActiveChannelId)
-          const addedVotes = pollDetails?.votes || []
-          const obj = {
-            votes: addedVotes,
-            votesPerOption: pollDetails.votesPerOption || {},
-            multipleVotes: pollDetails.allowMultipleVotes || false
+          const addedVotes = pollDetailsData?.changedVotes?.addedVotes || []
+          const deletedVotes = pollDetailsData?.changedVotes?.removedVotes || []
+
+          const objs = []
+          for (const vote of deletedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+            })
+          }
+          for (const vote of addedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('addOwn' as const) : ('add' as const),
+              vote,
+              incrementVotesPerOptionCount: addedVotes?.length || 0
+            })
           }
 
           // Add first vote for each option to pollVotesList
-          if (pollDetails?.id && addedVotes.length > 0) {
-            const key = `${pollDetails.id}_${addedVotes[0].optionId}`
-            const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[key] || false
-            for (const vote of addedVotes) {
-              yield put(addPollVotesToListAC(pollDetails.id, vote.optionId, [vote], hasNext, undefined))
+          for (const obj of objs) {
+            if (pollDetailsData?.id && obj.vote) {
+              const key = `${pollDetailsData.id}_${obj.vote.optionId}`
+              const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[key] || false
+              if (obj.type === 'addOwn') {
+                yield put(addPollVotesToListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], hasNext, undefined))
+              } else {
+                yield put(deletePollVotesFromListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], messageId))
+              }
+            }
+          }
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              {
+                type: obj.type,
+                vote: obj.vote,
+                incrementVotesPerOptionCount: obj.incrementVotesPerOptionCount
+              }
+            )
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.POLL_DELETED: {
+          const { channel, pollDetails, messageId } = args
+          const pollDetailsData = pollDetails as IPollDetails
+          const activeChannelId = yield call(getActiveChannelId)
+          const deletedVotes = pollDetailsData?.changedVotes?.removedVotes || []
+          // Add first vote for each option to pollVotesList
+          const objs = []
+          for (const vote of deletedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+            })
+          }
+
+          for (const obj of objs) {
+            if (pollDetailsData?.id && obj.vote) {
+              yield put(deletePollVotesFromListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], messageId))
             }
           }
 
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              obj
+            )
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
+          const { channel, pollDetails, messageId } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          const pollDetailsData = pollDetails as IPollDetails
+          const retractedVotes = pollDetailsData?.changedVotes?.removedVotes || []
+          const objs = []
+          for (const vote of retractedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(retractedVotes?.length || 0)
+            })
+          }
+
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              obj
+            )
+            if (pollDetailsData?.id && retractedVotes.length > 0) {
+              for (const vote of retractedVotes) {
+                yield put(deletePollVotesFromListAC(pollDetailsData.id, vote.optionId, [vote], messageId))
+              }
+            }
+
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
+          const { channel, messageId } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          const obj = { type: 'close' as const, incrementVotesPerOptionCount: 0 }
           updateMessageOnMap(
             channel.id,
             {
@@ -1098,95 +1211,10 @@ export default function* watchForEvents(): any {
             },
             obj
           )
+
           if (channel.id === activeChannelId) {
             updateMessageOnAllMessages(messageId, {}, obj)
             yield put(updateMessageAC(messageId, {}, undefined, obj))
-          }
-          break
-        }
-        case CHANNEL_EVENT_TYPES.POLL_DELETED: {
-          const { channel, pollDetails, messageId } = args
-          const activeChannelId = yield call(getActiveChannelId)
-          const deletedVotes = pollDetails?.votes || []
-
-          // Add first vote for each option to pollVotesList
-          if (pollDetails?.id && deletedVotes.length > 0) {
-            for (const vote of deletedVotes) {
-              yield put(deletePollVotesFromListAC(pollDetails.id, vote.optionId, [vote], messageId))
-            }
-          }
-
-          updateMessageOnMap(
-            channel.id,
-            {
-              messageId,
-              params: {}
-            },
-            { deletedVotes, votesPerOption: pollDetails.votesPerOption }
-          )
-          if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(
-              messageId,
-              {},
-              { deletedVotes, votesPerOption: pollDetails.votesPerOption || {} }
-            )
-            yield put(
-              updateMessageAC(messageId, {}, undefined, {
-                deletedVotes,
-                votesPerOption: pollDetails.votesPerOption || {}
-              })
-            )
-          }
-          break
-        }
-        case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
-          const { channel, pollDetails, messageId } = args
-          const activeChannelId = yield call(getActiveChannelId)
-          const retractedVotes = pollDetails?.votes || []
-          updateMessageOnMap(
-            channel.id,
-            {
-              messageId,
-              params: {}
-            },
-            { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption }
-          )
-          if (pollDetails?.id && retractedVotes.length > 0) {
-            for (const vote of retractedVotes) {
-              yield put(deletePollVotesFromListAC(pollDetails.id, vote.optionId, [vote], messageId))
-            }
-          }
-
-          if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(
-              messageId,
-              {},
-              { deletedVotes: retractedVotes, votesPerOption: pollDetails.votesPerOption || {} }
-            )
-            yield put(
-              updateMessageAC(messageId, {}, undefined, {
-                deletedVotes: retractedVotes,
-                votesPerOption: pollDetails.votesPerOption || {}
-              })
-            )
-          }
-          break
-        }
-        case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
-          const { channel, messageId } = args
-          const activeChannelId = yield call(getActiveChannelId)
-          updateMessageOnMap(
-            channel.id,
-            {
-              messageId,
-              params: {}
-            },
-            { closed: true }
-          )
-
-          if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(messageId, {}, { closed: true })
-            yield put(updateMessageAC(messageId, {}, undefined, { closed: true }))
             break
           }
           break

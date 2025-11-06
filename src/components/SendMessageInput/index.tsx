@@ -28,8 +28,6 @@ import {
   deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
-  resendMessageAC,
-  resendPendingPollActionsAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessageForReplyAC,
@@ -76,13 +74,11 @@ import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
   checkDraftMessagesIsEmpty,
-  clearPendingMessagesMap,
   deletePendingMessage,
   deleteVideoThumb,
   draftMessagesMap,
   getAudioRecordingFromMap,
   getDraftMessageFromMap,
-  getPendingMessagesMap,
   removeDraftMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
@@ -100,7 +96,6 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame } from '../../helpers/getVideoFrame'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
-import { CONNECTION_STATUS } from '../../store/user/constants'
 
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
@@ -134,6 +129,7 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
+import { MESSAGE_TYPE } from 'types/enum'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -1340,24 +1336,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }, [mentionedUsers])
 
-  useEffect(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      const pendingMessagesMap = getPendingMessagesMap()
-      const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
-      clearPendingMessagesMap()
-      setTimeout(() => {
-        Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
-          pendingMessagesMapCopy[key].forEach((msg: IMessage) => {
-            dispatch(resendMessageAC(msg, key, connectionStatus))
-          })
-        })
-      }, 1000)
-
-      // Resend pending poll actions
-      dispatch(resendPendingPollActionsAC(connectionStatus))
-    }
-  }, [connectionStatus])
-
   useDidUpdate(() => {
     if (handleAttachmentSelected) {
       handleAttachmentSelected(!!attachments.length)
@@ -1499,6 +1477,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
+  const isPollMessageSelected = useMemo(() => {
+    return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
+  }, [selectedMessagesMap])
+
   return (
     <SendMessageWrapper backgroundColor={backgroundColor || background}>
       <Container
@@ -1517,15 +1499,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
-            <CustomButton
-              onClick={handleToggleForwardMessagePopup}
-              backgroundColor={backgroundHovered}
-              marginLeft='32px'
-              color={textPrimary}
-            >
-              <ForwardIcon />
-              Forward
-            </CustomButton>
+            {!isPollMessageSelected && (
+              <CustomButton
+                onClick={handleToggleForwardMessagePopup}
+                backgroundColor={backgroundHovered}
+                marginLeft='32px'
+                color={textPrimary}
+              >
+                <ForwardIcon />
+                Forward
+              </CustomButton>
+            )}
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
               color={errorColor}
@@ -1829,7 +1813,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 {chooseFileAttachmentText ?? 'File'}
                               </DropdownOptionLi>
                             )}
-                            {pollOptions?.showAddPoll && !isDirectChannel && (
+                            {pollOptions?.showAddPoll && (
                               <DropdownOptionLi
                                 key={3}
                                 textColor={textPrimary}

@@ -273,8 +273,8 @@ export const CustomSelectTrigger = styled.span<{ color: string }>`
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color: string; marginTop?: string }>`
-  display: inline-block;
+export const Label = styled.label<{ color: string; marginTop?: string; display?: string }>`
+  display: ${(props) => props.display || 'inline-block'};
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
@@ -309,6 +309,7 @@ export const CustomInput = styled.input<{
   errorColor: string
   borderColor: string
   disabledColor: string
+  padding?: string
 }>`
   height: 40px;
   width: 100%;
@@ -317,7 +318,7 @@ export const CustomInput = styled.input<{
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
-  padding: 11px 14px;
+  padding: ${(props) => props.padding || '11px 14px'};
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: normal;
@@ -382,6 +383,7 @@ export const Button = styled.button<{
   borderColor?: string
   borderRadius?: string
   disabled?: boolean
+  disabledOpacity?: number
   margin?: string
 }>`
   display: inline-block;
@@ -402,10 +404,10 @@ export const Button = styled.button<{
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 1)};
   &:hover,
   &:focus {
-    opacity: ${(props) => (props.disabled ? 0.5 : 0.8)};
+    opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 0.8)};
   }
 `
 

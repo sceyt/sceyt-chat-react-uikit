@@ -1,26 +1,25 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useMemo } from 'react'
 import styled from 'styled-components'
 import PopupContainer from '../popupContainer'
 import { Popup, PopupBody, PopupName, CloseIcon } from 'UIHelper'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
-import { IPollVote } from 'types'
+import { IPollDetails, IPollVote } from 'types'
 import { useDispatch, useSelector } from 'store/hooks'
 import { getPollVotesAC, loadMorePollVotesAC } from 'store/message/actions'
 import { pollVotesListSelector, pollVotesHasMoreSelector, pollVotesLoadingStateSelector } from 'store/message/selector'
 import { LOADING_STATE } from 'helpers/constants'
 import { ReactComponent as ArrowLeft } from '../../../assets/svg/arrowLeft.svg'
+import { makeUsername } from 'helpers/message'
+import { contactsMapSelector } from 'store/user/selector'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
+import { getClient } from 'common/client'
+import moment from 'moment'
 
 interface AllVotesPopupProps {
   onClose: () => void
-  poll: {
-    id: string
-    name: string
-    options: { id: string; name: string }[]
-    votes: IPollVote[]
-    votesPerOption: Record<string, number>
-  }
+  poll: IPollDetails
   messageId: string | number
   optionId: string
   optionName: string
@@ -35,6 +34,9 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_1]: surface1
   } = useColor()
+  const contactsMap = useSelector(contactsMapSelector)
+  const getFromContacts = getShowOnlyContactUsers()
+  const user = getClient().user
 
   const dispatch = useDispatch()
   const key = `${poll.id}_${optionId}`
@@ -45,7 +47,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   const allVotes = pollVotesList[key] || []
   const hasMore = pollVotesHasMore[key] ?? false
   const isLoading = pollVotesLoadingState[key] === LOADING_STATE.LOADING
-  const totalVotes = poll.votesPerOption?.[optionId] || 0
+  const totalVotes = poll.voteDetails?.votesPerOption?.[optionId] || 0
   const isLoadingInitial = allVotes.length === 0 && (isLoading || totalVotes > 0)
 
   useEffect(() => {
@@ -55,7 +57,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   }, [])
 
   useEffect(() => {
-    if (allVotes.length > 0 && hasMore && !isLoading && allVotes.length < POLL_VOTES_LIMIT) {
+    if (allVotes.length > 0 && hasMore && !isLoading && allVotes.length < POLL_VOTES_LIMIT - 1) {
       dispatch(loadMorePollVotesAC(poll.id, optionId, POLL_VOTES_LIMIT))
     }
   }, [allVotes.length, hasMore, isLoading, poll.id, optionId, dispatch])
@@ -74,15 +76,16 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
 
   const formatDate = (d: Date) => {
     try {
-      const date = new Date(d)
-      const month = date.toLocaleString(undefined, { month: 'short' })
-      const day = date.getDate()
-      const year = date.getFullYear()
-      return `${month} ${day}, ${year}`
+      return moment(d).format('DD.MM.YY  HH:mm')
     } catch {
       return ''
     }
   }
+
+  const ownVote = useMemo(
+    () => poll?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId),
+    [poll?.voteDetails?.ownVotes, optionId]
+  )
 
   return (
     <PopupContainer>
@@ -105,23 +108,44 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
               </LoaderContainer>
             ) : (
               <VotesList onScroll={handleScroll}>
-                {allVotes.map((vote: IPollVote) => (
-                  <VoterRow key={`${vote.optionId}_${vote.user.id}`}>
-                    <Avatar
-                      image={vote.user.profile.avatar}
-                      name={vote.user.profile.firstName || vote.user.id}
-                      size={40}
-                      textSize={16}
-                      setDefaultAvatar
-                    />
-                    <VoterInfo>
-                      <VoterName color={textPrimary}>
-                        {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
-                      </VoterName>
-                      <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
-                    </VoterInfo>
-                  </VoterRow>
-                ))}
+                {[...(ownVote ? [ownVote] : []), ...allVotes].map((vote: IPollVote) => {
+                  const contact = contactsMap[vote.user.id]
+                  return (
+                    <VoterRow key={`${vote.optionId}_${vote.user.id}`}>
+                      <Avatar
+                        image={vote.user.profile.avatar}
+                        name={vote.user.profile.firstName || vote.user.id}
+                        size={40}
+                        textSize={16}
+                        setDefaultAvatar
+                      />
+                      <VoterInfo>
+                        <VoterName color={textPrimary}>
+                          {user.id === vote.user.id
+                            ? 'You'
+                            : makeUsername(
+                                contact,
+                                {
+                                  id: vote?.user?.id,
+                                  firstName: vote?.user?.profile?.firstName,
+                                  lastName: vote?.user?.profile?.lastName,
+                                  avatarUrl: vote?.user?.profile?.avatar,
+                                  state: vote?.user?.presence?.status,
+                                  blocked: false,
+                                  presence: {
+                                    state: vote?.user?.presence?.status,
+                                    status: vote?.user?.presence?.status,
+                                    lastActiveAt: new Date(vote?.user?.createdAt || '')
+                                  }
+                                },
+                                getFromContacts
+                              )}
+                        </VoterName>
+                        <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
+                      </VoterInfo>
+                    </VoterRow>
+                  )
+                })}
                 {isLoading && allVotes.length > 0 && <LoadingText color={textSecondary}>Loading...</LoadingText>}
               </VotesList>
             )}
@@ -138,7 +162,7 @@ const VotesList = styled.div`
   display: flex;
   flex-direction: column;
   overflow-y: auto;
-  max-height: 60vh;
+  max-height: 500px;
   padding: 8px 0;
 `
 
@@ -163,6 +187,7 @@ const VoterName = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 120px);
 `
 
 const VotedAt = styled.div<{ color: string }>`

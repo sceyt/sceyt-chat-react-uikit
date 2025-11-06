@@ -4,13 +4,13 @@ import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_LENGTH,
-  removePendingMessageFromMap,
   setHasNextCached,
-  setHasPrevCached
+  setHasPrevCached,
+  PendingPollAction
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
-import { deleteVotesFromPollDetails } from 'helpers/message'
+import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
 import { getPollVotesAC } from './actions'
 
@@ -63,6 +63,8 @@ export interface IMessageStore {
   pollVotesHasMore: { [key: string]: boolean }
   pollVotesLoadingState: { [key: string]: number | null }
   pollVotesInitialCount: number | null
+  pendingPollActions: { [key: string]: PendingPollAction[] }
+  pendingMessagesMap: { [key: string]: IMessage[] }
 }
 
 const initialState: IMessageStore = {
@@ -107,7 +109,9 @@ const initialState: IMessageStore = {
   pollVotesList: {},
   pollVotesHasMore: {},
   pollVotesLoadingState: {},
-  pollVotesInitialCount: null
+  pollVotesInitialCount: null,
+  pendingPollActions: {},
+  pendingMessagesMap: {}
 }
 
 const messageSlice = createSlice({
@@ -239,11 +243,9 @@ const messageSlice = createSlice({
         params: IMessage
         addIfNotExists?: boolean
         voteDetails?: {
-          votes?: IPollVote[],
-          deletedVotes?: IPollVote[],
-          votesPerOption?: { [key: string]: number }
-          closed?: boolean,
-          multipleVotes?: boolean
+          type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+          vote?: IPollVote
+          incrementVotesPerOptionCount: number
         }
       }>
     ) => {
@@ -255,41 +257,27 @@ const messageSlice = createSlice({
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
-            if (voteDetails && voteDetails?.votes?.length && !voteDetails.multipleVotes && message.pollDetails) {
-              message.pollDetails.votes = [...(message.pollDetails.votes || []).filter((vote: IPollVote) => vote.user.id !== voteDetails?.votes?.[0]?.user?.id)]
-            }
             let messageData: IMessage = {
               ...message,
-              ...params,
-              ...(voteDetails && voteDetails.votes && voteDetails.votesPerOption && message.pollDetails ? {
-                pollDetails: {
-                  ...message.pollDetails,
-                  votes: [...(message.pollDetails.votes || []), ...voteDetails.votes],
-                  votesPerOption: voteDetails.votesPerOption
-                }
-              } : {})
+              ...params
             }
-            if (voteDetails && voteDetails.deletedVotes && messageData.pollDetails) {
+            if (voteDetails) {
               messageData = {
                 ...messageData,
-                pollDetails: {
-                  ...messageData.pollDetails,
-                  votes: deleteVotesFromPollDetails(messageData.pollDetails.votes, voteDetails.deletedVotes),
-                  votesPerOption: voteDetails.votesPerOption || {}
-                }
-              }
-            }
-            if (voteDetails && voteDetails.closed && messageData.pollDetails) {
-              messageData = {
-                ...messageData,
-                pollDetails: {
-                  ...messageData.pollDetails,
-                  closed: voteDetails.closed
-                }
+                pollDetails: handleVoteDetails(voteDetails, messageData)
               }
             }
             if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
-              removePendingMessageFromMap(messageData.channelId, messageData.tid || messageData.id)
+              const channelId = messageData.channelId
+              const messageId = messageData.tid || messageData.id
+              if (state.pendingMessagesMap[channelId]) {
+                state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
+                  (msg) => !(msg.id === messageId || msg.tid === messageId)
+                )
+                if (state.pendingMessagesMap[channelId].length === 0) {
+                  delete state.pendingMessagesMap[channelId]
+                }
+              }
             }
             return messageData
           }
@@ -633,7 +621,7 @@ const messageSlice = createSlice({
         pollId: string
         optionId: string
         votes: IPollVote[]
-        hasNext: boolean,
+        hasNext: boolean
         previousVotes?: IPollVote[]
       }>
     ) => {
@@ -644,15 +632,14 @@ const messageSlice = createSlice({
       if (!existing) {
         return
       }
-      
+
       // Deduplicate by user.id
       const existingIds = new Set(existing.map((v) => v.user.id))
       const newVotes = votes.filter((v) => !existingIds.has(v.user.id))
       const merged = [
-        ...(previousVotes && previousVotes.length > 0 ?
-          [...newVotes] : []),
-        ...existing, ...(!previousVotes || previousVotes.length === 0 ?
-          [...newVotes] : [])
+        ...(previousVotes && previousVotes.length > 0 ? [...newVotes] : []),
+        ...existing,
+        ...(!previousVotes || previousVotes.length === 0 ? [...newVotes] : [])
       ]
       // Sort by createdAt desc
       merged.sort((a: any, b: any) => +new Date(b.createdAt) - +new Date(a.createdAt))
@@ -670,13 +657,15 @@ const messageSlice = createSlice({
     ) => {
       const { pollId, optionId, votes, messageId } = action.payload
       const key = `${pollId}_${optionId}`
-      let existing = state.pollVotesList[key]
+      const existing = state.pollVotesList[key]
       if (!existing || !existing?.length) {
         return
       }
-      state.pollVotesList[key] = state.pollVotesList[key].filter((v) => !votes.find((vote) => vote.user.id === v.user.id))
+      state.pollVotesList[key] = state.pollVotesList[key].filter(
+        (v) => !votes.find((vote) => vote.user.id === v.user.id)
+      )
 
-      if(state.pollVotesList[key]?.length === 0) {
+      if (state.pollVotesList[key]?.length === 0) {
         store.dispatch(getPollVotesAC(messageId, pollId, optionId, state.pollVotesInitialCount || 3))
       }
     },
@@ -701,6 +690,66 @@ const messageSlice = createSlice({
       }>
     ) => {
       state.pollVotesInitialCount = action.payload.initialCount
+    },
+    removePendingPollAction: (
+      state,
+      action: PayloadAction<{ messageId: string; actionType: string; optionId?: string }>
+    ) => {
+      const { messageId, actionType, optionId } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        return
+      }
+      state.pendingPollActions[messageId] = state.pendingPollActions[messageId].filter(
+        (action) => !(action.type === actionType && (!optionId || action.optionId === optionId))
+      )
+      if (state.pendingPollActions[messageId].length === 0) {
+        delete state.pendingPollActions[messageId]
+      }
+    },
+    setPendingPollActionsMap: (state, action: PayloadAction<{ messageId: string; event: PendingPollAction }>) => {
+      const { messageId, event } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        state.pendingPollActions[messageId] = []
+      }
+      state.pendingPollActions[messageId] = [...state.pendingPollActions[messageId], event]
+    },
+    setPendingMessage: (state, action: PayloadAction<{ channelId: string; message: IMessage }>) => {
+      const { channelId, message } = action.payload
+      if (!state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = []
+      }
+      const existingIndex = state.pendingMessagesMap[channelId].findIndex((msg) => msg.tid === message.tid)
+      if (existingIndex === -1) {
+        state.pendingMessagesMap[channelId].push(message)
+      }
+    },
+    removePendingMessage: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
+      const { channelId, messageId } = action.payload
+      if (state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
+          (msg) => !(msg.id === messageId || msg.tid === messageId)
+        )
+        if (state.pendingMessagesMap[channelId].length === 0) {
+          delete state.pendingMessagesMap[channelId]
+        }
+      }
+    },
+    updatePendingMessage: (
+      state,
+      action: PayloadAction<{ channelId: string; messageId: string; updatedMessage: Partial<IMessage> }>
+    ) => {
+      const { channelId, messageId, updatedMessage } = action.payload
+      if (state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].map((msg) => {
+          if (msg.id === messageId || msg.tid === messageId) {
+            return { ...msg, ...updatedMessage }
+          }
+          return msg
+        })
+      }
+    },
+    clearPendingMessagesMap: (state) => {
+      state.pendingMessagesMap = {}
     }
   },
   extraReducers: (builder) => {
@@ -762,7 +811,13 @@ export const {
   addPollVotesToList,
   setPollVotesLoadingState,
   deletePollVotesFromList,
-  setPollVotesInitialCount
+  setPollVotesInitialCount,
+  removePendingPollAction,
+  setPendingPollActionsMap,
+  setPendingMessage,
+  removePendingMessage,
+  updatePendingMessage,
+  clearPendingMessagesMap
 } = messageSlice.actions
 
 // Export reducer

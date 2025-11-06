@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useMemo, useState } from 'react'
 import styled from 'styled-components'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
@@ -35,14 +35,19 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
   const poll = message?.pollDetails
   const [showResults, setShowResults] = useState(false)
+
+  const isHaveResults = useMemo(() => {
+    return (poll?.voteDetails?.votes?.length ?? 0) > 0 || (poll?.voteDetails?.ownVotes?.length ?? 0) > 0
+  }, [poll?.voteDetails?.votes, poll?.voteDetails?.ownVotes])
+
   if (!poll) {
     return null
   }
 
-  const votesPerOption: Record<string, number> = poll.votesPerOption || {}
+  const votesPerOption: Record<string, number> = poll.voteDetails?.votesPerOption || {}
   const maxVotes = poll.options.reduce((acc, opt) => Math.max(acc, votesPerOption[opt.id] || 0), 0)
-  const ownVotedOptionIds = new Set((poll.ownVotes || []).map((v) => v.optionId))
-  const votesUsers = poll.votes || []
+  const ownVotedOptionIds = new Set((poll.voteDetails?.ownVotes || []).map((v) => v.optionId))
+  const votesUsers = poll.voteDetails?.votes || []
 
   const canVote = !poll.closed
 
@@ -72,7 +77,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
           const selected = ownVotedOptionIds.has(opt.id)
           const optionVotesUsers = votesUsers.filter((v: IPollVote) => v.optionId === opt.id).slice(0, 3)
           if (optionVotesUsers.length < 3) {
-            poll?.ownVotes?.forEach((vote: IPollVote) => {
+            poll?.voteDetails?.ownVotes?.forEach((vote: IPollVote) => {
               if (vote.optionId === opt.id) {
                 optionVotesUsers.push(vote)
               }
@@ -128,10 +133,12 @@ const PollMessage = ({ message }: PollMessageProps) => {
         <Button
           type='button'
           backgroundColor={background}
-          color={accent}
+          color={isHaveResults ? accent : textSecondary}
+          disabledOpacity={0.8}
           borderRadius='14px'
-          onClick={handleViewResults}
+          onClick={isHaveResults ? handleViewResults : undefined}
           style={{ width: '100%', marginTop: 10 }}
+          disabled={!isHaveResults}
         >
           View Results
         </Button>
@@ -149,6 +156,7 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   min-width: 250px;
+  width: 100%;
 `
 
 const Question = styled.div<{ color: string }>`
@@ -223,6 +231,7 @@ const Title = styled.div<{ color: string }>`
   font-size: 14px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 80px);
 `
 
 const Votes = styled.span<{ color: string }>`
@@ -232,8 +241,6 @@ const Votes = styled.span<{ color: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   margin-left: 4px;
-  margin-top: auto;
-  margin-bottom: 1px;
 `
 
 const Bar = styled.div<{ track: string; closed?: boolean }>`
@@ -257,5 +264,4 @@ const UsersContainer = styled.div`
   margin-left: auto;
   padding-left: 16px;
   height: max-content;
-  margin-top: auto;
 `

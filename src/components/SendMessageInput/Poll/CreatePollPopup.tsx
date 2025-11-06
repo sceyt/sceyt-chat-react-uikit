@@ -36,7 +36,6 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.BORDER]: borderColor,
@@ -57,9 +56,11 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const optionsListRef = useRef<HTMLDivElement>(null)
   const optionInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const questionTextAreaRef = useRef<HTMLTextAreaElement>(null)
 
   const questionLimit = 200
   const optionLimit = 120
+  const maxOptions = 12
   const canCreate = useMemo(() => {
     const validOptions = options.map((o) => o.name.trim()).filter(Boolean)
     return question.trim().length > 0 && validOptions.length >= 2
@@ -71,17 +72,23 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     return hasQuestion || hasOptions
   }, [question, options])
 
-  const allowPaste = (e: React.ClipboardEvent<HTMLInputElement>, type: 'question' | 'option', id?: string) => {
+  const allowPaste = (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    type: 'question' | 'option',
+    id?: string
+  ) => {
     if (type === 'question') {
-      setQuestion((e.target as HTMLInputElement).value)
+      setQuestion((e.target as HTMLTextAreaElement).value)
     } else {
       setOptions(options.map((o) => (o.id === id ? { ...o, name: (e.target as HTMLInputElement).value } : o)))
     }
   }
 
   const addOption = () => {
+    if (options.length >= maxOptions) return
     const nextId = uuidv4()
     setOptions([...options, { id: nextId, name: '' }])
+    setTimeout(() => optionInputRefs.current[nextId]?.focus(), 0)
   }
 
   const removeOption = (id: string) => {
@@ -97,7 +104,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       const isLast = index === prev.length - 1
       const updated = prev.map((o, i) => (i === index ? { ...o, name: value } : o))
       const nowFilled = value.trim().length > 0
-      if (isLast && wasEmpty && nowFilled) {
+      if (isLast && wasEmpty && nowFilled && prev.length < maxOptions) {
         const nextId = uuidv4()
         return [...updated, { id: nextId, name: '' }]
       }
@@ -170,12 +177,26 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       const next = options[currentIndex + 1]
       if (next) {
         optionInputRefs.current[next.id]?.focus()
-      } else {
+      } else if (options.length < maxOptions) {
         const newId = uuidv4()
         setOptions((prev) => [...prev, { id: newId, name: '' }])
         setTimeout(() => optionInputRefs.current[newId]?.focus(), 0)
       }
     }, 0)
+  }
+
+  const adjustTextAreaHeight = () => {
+    const textarea = questionTextAreaRef.current
+    if (!textarea) return
+    if (!textarea?.value?.trim()) {
+      textarea.style.height = '40px'
+      return
+    }
+    if (textarea.scrollHeight >= 94) {
+      textarea.style.height = '94px'
+    } else {
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
   }
 
   return (
@@ -185,25 +206,29 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           <CloseIcon color={iconPrimary} onClick={handleCloseAttempt} />
           <PopupName color={textPrimary}>Create poll</PopupName>
 
-          <Label color={textSecondary}>Question</Label>
+          <Label color={textSecondary} display='flex'>
+            Question <TextCounter color={textSecondary}>{`${question.length}/${questionLimit}`}</TextCounter>
+          </Label>
           <QuestionInputWrapper>
-            <CustomInput
+            <CustomTextArea
+              ref={questionTextAreaRef}
+              padding='11px 14px'
               color={textPrimary}
-              placeholderColor={textFootnote}
+              placeholderColor={textSecondary}
               backgroundColor={surface1}
               borderColor={borderColor}
               errorColor={borderColor}
               disabledColor={surface1}
               maxLength={questionLimit}
               value={question}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 setQuestion(e.target.value)
+                adjustTextAreaHeight()
               }}
               placeholder='Add question'
-              onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => allowPaste(e, 'question')}
+              onPaste={(e: React.ClipboardEvent<HTMLTextAreaElement>) => allowPaste(e, 'question')}
               data-allow-paste='true'
             />
-            <TextCounter color={textFootnote}>{`${question.length}/${questionLimit}`}</TextCounter>
           </QuestionInputWrapper>
 
           <Label color={textSecondary}>Options</Label>
@@ -231,10 +256,10 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
                   setDragOverId(null)
                 }}
               >
-                <OptionsSvgIcon color={textFootnote} />
+                <OptionsSvgIcon color={textSecondary} />
                 <CustomInput
                   color={textPrimary}
-                  placeholderColor={textFootnote}
+                  placeholderColor={textSecondary}
                   backgroundColor={surface1}
                   borderColor={borderColor}
                   errorColor={borderColor}
@@ -262,7 +287,13 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
             ))}
           </OptionsList>
 
-          <AddOptionButton type='button' color={accentColor} onClick={addOption}>
+          <AddOptionButton
+            type='button'
+            color={accentColor}
+            onClick={addOption}
+            disabled={options.length >= maxOptions}
+            disabledColor={iconInactive}
+          >
             Add another option
           </AddOptionButton>
 
@@ -345,16 +376,60 @@ const QuestionInputWrapper = styled.div<{}>`
   position: relative;
 `
 
-const TextCounter = styled.span<{ color: string }>`
-  position: absolute;
-  top: 13px;
-  right: 12px;
-  font-size: 12px;
+const CustomTextArea = styled.textarea<{
+  error?: boolean
+  theme?: string
+  color: string
+  placeholderColor: string
+  backgroundColor: string
+  errorColor: string
+  borderColor: string
+  disabledColor: string
+  padding?: string
+}>`
+  height: 40px;
+  width: 100%;
+  background: ${(props) => props.backgroundColor};
+  border: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `1px solid ${props.borderColor}`)};
   color: ${(props) => props.color};
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: ${(props) => props.padding || '11px 14px'};
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 15px;
+  line-height: 18px;
+  opacity: 1;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+
+  &:focus {
+    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : 'transparent')};
+    outline: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `2px solid ${props.borderColor}`)};
+  }
+  &:disabled {
+    background-color: ${(props) => props.disabledColor};
+    opacity: 1;
+    color: #383b51;
+  }
+  &::placeholder {
+    opacity: 1;
+    color: ${(props) => props.placeholderColor};
+  }
+`
+
+const TextCounter = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
+  margin-left: auto;
 `
 
 const OptionsList = styled.div`
-  max-height: 240px;
+  max-height: 200px;
   overflow-y: auto;
   margin-top: 8px;
   padding-right: 6px;
@@ -383,15 +458,16 @@ const RemoveOptionIcon = styled(RemoveIcon)<{ color: string; width: string; heig
   opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `
 
-const AddOptionButton = styled.button<{ color: string }>`
+const AddOptionButton = styled.button<{ color: string; disabledColor?: string }>`
   margin: 16px 0 0 0;
   background: transparent;
   border: none;
-  color: ${(props) => props.color};
-  cursor: pointer;
+  color: ${(props) => (props.disabled ? props.disabledColor : props.color)};
+  cursor: ${(props) => (props.disabled ? 'not-allowed' : 'pointer')};
   width: 100%;
   text-align: left;
   padding-left: 32px;
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `
 
 const Settings = styled.div`

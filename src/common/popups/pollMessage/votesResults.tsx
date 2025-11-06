@@ -6,7 +6,13 @@ import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import Avatar from 'components/Avatar'
 import { IPollDetails, IPollVote } from 'types'
+import { makeUsername } from 'helpers/message'
 import AllVotesPopup from './AllVotesPopup'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
+import { getClient } from 'common/client'
+import { useSelector } from 'store/hooks'
+import { contactsMapSelector } from 'store/user/selector'
+import moment from 'moment'
 
 interface VotesResultsPopupProps {
   onClose: () => void
@@ -17,7 +23,9 @@ interface VotesResultsPopupProps {
 
 const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: VotesResultsPopupProps) => {
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null)
-
+  const getFromContacts = getShowOnlyContactUsers()
+  const user = getClient().user
+  const contactsMap = useSelector(contactsMapSelector)
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -30,15 +38,12 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
   const optionIdToVotes = useMemo(() => {
     const votes: Record<string, IPollVote[]> = {}
     poll.options.forEach((opt) => {
-      const allOptionVotes = (poll.votes || []).filter((vote) => vote.optionId === opt.id)
-      const ownVote = poll.ownVotes.find((vote) => vote.optionId === opt.id)
-      if (ownVote) {
-        allOptionVotes.push(ownVote)
-      }
-      votes[opt.id] = allOptionVotes
+      const allOptionVotes = (poll.voteDetails?.votes || []).filter((vote) => vote.optionId === opt.id)
+      const ownVote = poll.voteDetails?.ownVotes.find((vote) => vote.optionId === opt.id)
+      votes[opt.id] = [...(ownVote ? [ownVote] : []), ...(allOptionVotes?.slice(0, ownVote ? 4 : 5) || [])]
     })
     return votes
-  }, [poll.votes, poll.options, poll.ownVotes])
+  }, [poll.voteDetails?.votes, poll.options, poll.voteDetails?.ownVotes])
 
   const handleShowAll = useCallback(
     (optionId: string) => {
@@ -56,11 +61,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
 
   const formatDate = (d: Date) => {
     try {
-      const date = new Date(d)
-      const month = date.toLocaleString(undefined, { month: 'short' })
-      const day = date.getDate()
-      const year = date.getFullYear()
-      return `${month} ${day}, ${year}`
+      return moment(d).format('DD.MM.YY  HH:mm')
     } catch {
       return ''
     }
@@ -77,16 +78,21 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                 Vote results
               </PopupName>
 
+              <TitleWrapper background={surface1}>
+                <Question color={textPrimary}>{poll.name}</Question>
+              </TitleWrapper>
               <OptionsList>
                 {poll.options.map((opt) => {
                   const allVotes = optionIdToVotes[opt.id] || []
-                  const totalVotes = poll.votesPerOption?.[opt.id] || 0
+                  const totalVotes = poll.voteDetails?.votesPerOption?.[opt.id] || 0
 
                   return (
                     <OptionBlock key={opt.id} background={surface1} border={border}>
                       <OptionHeader>
                         <OptionTitle color={textPrimary}>{opt.name}</OptionTitle>
-                        <OptionCount color={textSecondary}>{totalVotes} votes</OptionCount>
+                        <OptionCount color={textPrimary}>
+                          {totalVotes} {totalVotes > 1 ? 'votes' : 'vote'}
+                        </OptionCount>
                       </OptionHeader>
                       <Voters>
                         {allVotes.map((vote) => (
@@ -100,7 +106,25 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                             />
                             <VoterInfo>
                               <VoterName color={textPrimary}>
-                                {vote.user.profile.firstName || vote.user.id} {vote.user.profile.lastName || ''}
+                                {user.id === vote.user.id
+                                  ? 'You'
+                                  : makeUsername(
+                                      contactsMap[vote.user.id],
+                                      {
+                                        id: vote?.user?.id,
+                                        firstName: vote?.user?.profile?.firstName,
+                                        lastName: vote?.user?.profile?.lastName,
+                                        avatarUrl: vote?.user?.profile?.avatar,
+                                        state: vote?.user?.presence?.status,
+                                        blocked: false,
+                                        presence: {
+                                          state: vote?.user?.presence?.status,
+                                          status: vote?.user?.presence?.status,
+                                          lastActiveAt: new Date(vote?.user?.createdAt || '')
+                                        }
+                                      },
+                                      getFromContacts
+                                    )}
                               </VoterName>
                               <VotedAt color={textSecondary}>{formatDate(new Date(vote.createdAt))}</VotedAt>
                             </VoterInfo>
@@ -147,12 +171,13 @@ const OptionsList = styled.div`
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  max-height: 64vh;
+  max-height: 504px;
+  border-radius: 10px;
 `
 
 const OptionBlock = styled.div<{ background: string; border: string }>`
   background: ${(p) => p.background};
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid ${(p) => p.border}0F; /* subtle */
   padding: 14px 16px 0 16px;
 `
@@ -166,7 +191,9 @@ const OptionHeader = styled.div`
 
 const OptionTitle = styled.div<{ color: string }>`
   color: ${(p) => p.color};
-  font-weight: 400;
+  max-width: calc(100% - 60px);
+  font-family: Inter;
+  font-weight: 500;
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.4px;
@@ -175,6 +202,11 @@ const OptionTitle = styled.div<{ color: string }>`
 const OptionCount = styled.div<{ color: string }>`
   color: ${(p) => p.color};
   font-size: 13px;
+  margin-bottom: auto;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.4px;
 `
 
 const Voters = styled.div`
@@ -204,6 +236,7 @@ const VoterName = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 120px);
 `
 
 const VotedAt = styled.div<{ color: string }>`
@@ -212,4 +245,20 @@ const VotedAt = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+`
+
+const TitleWrapper = styled.div<{ background: string }>`
+  margin: 0 auto;
+  border-radius: 10px;
+  padding: 16px;
+  background: ${(p) => p.background};
+  margin-bottom: 16px;
+`
+
+const Question = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.4px;
 `
