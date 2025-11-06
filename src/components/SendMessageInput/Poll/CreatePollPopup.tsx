@@ -36,7 +36,6 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.BORDER]: borderColor,
@@ -190,7 +189,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           <QuestionInputWrapper>
             <CustomInput
               color={textPrimary}
-              placeholderColor={textFootnote}
+              placeholderColor={textSecondary}
               backgroundColor={surface1}
               borderColor={borderColor}
               errorColor={borderColor}
@@ -204,7 +203,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
               onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => allowPaste(e, 'question')}
               data-allow-paste='true'
             />
-            <TextCounter color={textFootnote}>{`${question.length}/${questionLimit}`}</TextCounter>
+            <TextCounter color={textSecondary}>{`${question.length}/${questionLimit}`}</TextCounter>
           </QuestionInputWrapper>
 
           <Label color={textSecondary}>Options</Label>
@@ -232,10 +231,10 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
                   setDragOverId(null)
                 }}
               >
-                <OptionsSvgIcon color={textFootnote} />
+                <OptionsSvgIcon color={textSecondary} />
                 <CustomInput
                   color={textPrimary}
-                  placeholderColor={textFootnote}
+                  placeholderColor={textSecondary}
                   backgroundColor={surface1}
                   borderColor={borderColor}
                   errorColor={borderColor}
@@ -348,10 +347,12 @@ const QuestionInputWrapper = styled.div<{}>`
 
 const TextCounter = styled.span<{ color: string }>`
   position: absolute;
-  top: 13px;
+  top: 12px;
   right: 12px;
-  font-size: 12px;
   color: ${(props) => props.color};
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 20px;
 `
 
 const OptionsList = styled.div`

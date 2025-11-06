@@ -1,4 +1,5 @@
 import { put, call, takeLatest, takeEvery, select } from 'redux-saga/effects'
+import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -28,7 +29,7 @@ import {
   RESEND_PENDING_POLL_ACTIONS
 } from './constants'
 
-import { IAction, IAttachment, IChannel, IMessage, IPollVote } from '../../types'
+import { IAction, IAttachment, IChannel, IMessage, IPollOption, IPollVote } from '../../types'
 import { getClient } from '../../common/client'
 import {
   addChannelToAllChannels,
@@ -711,6 +712,22 @@ function* forwardMessage(action: IAction): any {
         attachments = [att]
       }
       const messageBuilder = channel.createMessageBuilder()
+      let pollDetails = null
+      if (message.pollDetails) {
+        // should make empty and new ids poll details
+        pollDetails = {
+          id: uuidv4(),
+          name: message.pollDetails.name,
+          description: message.pollDetails.description || '',
+          options: message.pollDetails.options.map((option: IPollOption) => ({
+            id: uuidv4(),
+            name: option.name
+          })),
+          anonymous: message.pollDetails.anonymous,
+          allowMultipleVotes: message.pollDetails.allowMultipleVotes,
+          allowVoteRetract: message.pollDetails.allowVoteRetract
+        }
+      }
       messageBuilder
         .setBody(message.body)
         .setBodyAttributes(message.bodyAttributes)
@@ -720,7 +737,7 @@ function* forwardMessage(action: IAction): any {
         .setDisableMentionsCount(getDisableFrowardMentionsCount())
         .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
-        .setPollDetails(message.pollDetails ? message.pollDetails : null)
+        .setPollDetails(pollDetails)
       const messageToSend = messageBuilder.create()
       const pendingMessage = JSON.parse(
         JSON.stringify({
