@@ -273,8 +273,8 @@ export const CustomSelectTrigger = styled.span<{ color: string }>`
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color: string; marginTop?: string }>`
-  display: inline-block;
+export const Label = styled.label<{ color: string; marginTop?: string; display?: string }>`
+  display: ${(props) => props.display || 'inline-block'};
   font-style: normal;
   font-weight: 500;
   font-size: 13px;

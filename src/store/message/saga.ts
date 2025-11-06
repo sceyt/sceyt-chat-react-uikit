@@ -1752,21 +1752,21 @@ function* executeAddPollVote(
       createdAt: new Date().getTime()
     }
   }
-  const objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number }[] = [
-    {
-      type: 'addOwn' as const,
-      vote,
-      incrementVotesPerOptionCount: 1
-    }
-  ]
-
-  if (!message.pollDetails?.allowMultipleVotes) {
+  const objs = []
+  if (!message.pollDetails?.allowMultipleVotes && message.pollDetails?.voteDetails?.ownVotes?.length > 0) {
     objs.push({
       type: 'deleteOwn' as const,
       vote: message.pollDetails?.voteDetails?.ownVotes?.[0],
       incrementVotesPerOptionCount: -1
     })
   }
+
+  objs.push({
+    type: 'addOwn' as const,
+    vote,
+    incrementVotesPerOptionCount: 1
+  })
+
   if (!isResend) {
     for (const obj of objs) {
       updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)

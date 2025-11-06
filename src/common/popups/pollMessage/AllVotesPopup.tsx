@@ -15,6 +15,7 @@ import { makeUsername } from 'helpers/message'
 import { contactsMapSelector } from 'store/user/selector'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { getClient } from 'common/client'
+import moment from 'moment'
 
 interface AllVotesPopupProps {
   onClose: () => void
@@ -75,11 +76,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
 
   const formatDate = (d: Date) => {
     try {
-      const date = new Date(d)
-      const month = date.toLocaleString(undefined, { month: 'short' })
-      const day = date.getDate()
-      const year = date.getFullYear()
-      return `${month} ${day}, ${year}`
+      return moment(d).format('DD.MM.YY  HH:mm')
     } catch {
       return ''
     }
@@ -190,6 +187,7 @@ const VoterName = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 120px);
 `
 
 const VotedAt = styled.div<{ color: string }>`

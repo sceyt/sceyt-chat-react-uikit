@@ -56,6 +56,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const optionsListRef = useRef<HTMLDivElement>(null)
   const optionInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
+  const questionTextAreaRef = useRef<HTMLTextAreaElement>(null)
 
   const questionLimit = 200
   const optionLimit = 120
@@ -71,9 +72,13 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     return hasQuestion || hasOptions
   }, [question, options])
 
-  const allowPaste = (e: React.ClipboardEvent<HTMLInputElement>, type: 'question' | 'option', id?: string) => {
+  const allowPaste = (
+    e: React.ClipboardEvent<HTMLInputElement | HTMLTextAreaElement>,
+    type: 'question' | 'option',
+    id?: string
+  ) => {
     if (type === 'question') {
-      setQuestion((e.target as HTMLInputElement).value)
+      setQuestion((e.target as HTMLTextAreaElement).value)
     } else {
       setOptions(options.map((o) => (o.id === id ? { ...o, name: (e.target as HTMLInputElement).value } : o)))
     }
@@ -180,6 +185,20 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     }, 0)
   }
 
+  const adjustTextAreaHeight = () => {
+    const textarea = questionTextAreaRef.current
+    if (!textarea) return
+    if (!textarea?.value?.trim()) {
+      textarea.style.height = '40px'
+      return
+    }
+    if (textarea.scrollHeight >= 94) {
+      textarea.style.height = '94px'
+    } else {
+      textarea.style.height = `${textarea.scrollHeight}px`
+    }
+  }
+
   return (
     <PopupContainer>
       <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' padding='0'>
@@ -187,10 +206,13 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           <CloseIcon color={iconPrimary} onClick={handleCloseAttempt} />
           <PopupName color={textPrimary}>Create poll</PopupName>
 
-          <Label color={textSecondary}>Question</Label>
+          <Label color={textSecondary} display='flex'>
+            Question <TextCounter color={textSecondary}>{`${question.length}/${questionLimit}`}</TextCounter>
+          </Label>
           <QuestionInputWrapper>
-            <CustomInput
-              padding='11px 80px 11px 14px'
+            <CustomTextArea
+              ref={questionTextAreaRef}
+              padding='11px 14px'
               color={textPrimary}
               placeholderColor={textSecondary}
               backgroundColor={surface1}
@@ -199,14 +221,14 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
               disabledColor={surface1}
               maxLength={questionLimit}
               value={question}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
+              onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => {
                 setQuestion(e.target.value)
+                adjustTextAreaHeight()
               }}
               placeholder='Add question'
-              onPaste={(e: React.ClipboardEvent<HTMLInputElement>) => allowPaste(e, 'question')}
+              onPaste={(e: React.ClipboardEvent<HTMLTextAreaElement>) => allowPaste(e, 'question')}
               data-allow-paste='true'
             />
-            <TextCounter color={textSecondary}>{`${question.length}/${questionLimit}`}</TextCounter>
           </QuestionInputWrapper>
 
           <Label color={textSecondary}>Options</Label>
@@ -354,18 +376,60 @@ const QuestionInputWrapper = styled.div<{}>`
   position: relative;
 `
 
+const CustomTextArea = styled.textarea<{
+  error?: boolean
+  theme?: string
+  color: string
+  placeholderColor: string
+  backgroundColor: string
+  errorColor: string
+  borderColor: string
+  disabledColor: string
+  padding?: string
+}>`
+  height: 40px;
+  width: 100%;
+  background: ${(props) => props.backgroundColor};
+  border: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `1px solid ${props.borderColor}`)};
+  color: ${(props) => props.color};
+  box-sizing: border-box;
+  border-radius: 8px;
+  padding: ${(props) => props.padding || '11px 14px'};
+  font-family: Inter, sans-serif;
+  font-style: normal;
+  font-weight: normal;
+  font-size: 15px;
+  line-height: 18px;
+  opacity: 1;
+  outline: none;
+  resize: none;
+  overflow: hidden;
+
+  &:focus {
+    border: 1px solid ${(props) => (props.error ? `1px solid ${props.errorColor}` : 'transparent')};
+    outline: ${(props) => (props.error ? `1px solid ${props.errorColor}` : `2px solid ${props.borderColor}`)};
+  }
+  &:disabled {
+    background-color: ${(props) => props.disabledColor};
+    opacity: 1;
+    color: #383b51;
+  }
+  &::placeholder {
+    opacity: 1;
+    color: ${(props) => props.placeholderColor};
+  }
+`
+
 const TextCounter = styled.span<{ color: string }>`
-  position: absolute;
-  top: 12px;
-  right: 12px;
   color: ${(props) => props.color};
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
+  margin-left: auto;
 `
 
 const OptionsList = styled.div`
-  max-height: 240px;
+  max-height: 200px;
   overflow-y: auto;
   margin-top: 8px;
   padding-right: 6px;

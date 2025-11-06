@@ -12,6 +12,7 @@ import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { getClient } from 'common/client'
 import { useSelector } from 'store/hooks'
 import { contactsMapSelector } from 'store/user/selector'
+import moment from 'moment'
 
 interface VotesResultsPopupProps {
   onClose: () => void
@@ -60,11 +61,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
 
   const formatDate = (d: Date) => {
     try {
-      const date = new Date(d)
-      const month = date.toLocaleString(undefined, { month: 'short' })
-      const day = date.getDate()
-      const year = date.getFullYear()
-      return `${month} ${day}, ${year}`
+      return moment(d).format('DD.MM.YY  HH:mm')
     } catch {
       return ''
     }
@@ -81,6 +78,9 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                 Vote results
               </PopupName>
 
+              <TitleWrapper background={surface1}>
+                <Question color={textPrimary}>{poll.name}</Question>
+              </TitleWrapper>
               <OptionsList>
                 {poll.options.map((opt) => {
                   const allVotes = optionIdToVotes[opt.id] || []
@@ -171,13 +171,13 @@ const OptionsList = styled.div`
   flex-direction: column;
   gap: 16px;
   overflow-y: auto;
-  max-height: 570px;
-  border-radius: 12px;
+  max-height: 504px;
+  border-radius: 10px;
 `
 
 const OptionBlock = styled.div<{ background: string; border: string }>`
   background: ${(p) => p.background};
-  border-radius: 12px;
+  border-radius: 10px;
   border: 1px solid ${(p) => p.border}0F; /* subtle */
   padding: 14px 16px 0 16px;
 `
@@ -236,6 +236,7 @@ const VoterName = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 120px);
 `
 
 const VotedAt = styled.div<{ color: string }>`
@@ -244,4 +245,20 @@ const VotedAt = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.2px;
+`
+
+const TitleWrapper = styled.div<{ background: string }>`
+  margin: 0 auto;
+  border-radius: 10px;
+  padding: 16px;
+  background: ${(p) => p.background};
+  margin-bottom: 16px;
+`
+
+const Question = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.4px;
 `

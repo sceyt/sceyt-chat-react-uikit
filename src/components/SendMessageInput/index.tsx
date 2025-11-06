@@ -129,6 +129,7 @@ import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
+import { MESSAGE_TYPE } from 'types/enum'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -1476,6 +1477,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
+  const isPollMessageSelected = useMemo(() => {
+    return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
+  }, [selectedMessagesMap])
+
   return (
     <SendMessageWrapper backgroundColor={backgroundColor || background}>
       <Container
@@ -1494,15 +1499,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
-            <CustomButton
-              onClick={handleToggleForwardMessagePopup}
-              backgroundColor={backgroundHovered}
-              marginLeft='32px'
-              color={textPrimary}
-            >
-              <ForwardIcon />
-              Forward
-            </CustomButton>
+            {!isPollMessageSelected && (
+              <CustomButton
+                onClick={handleToggleForwardMessagePopup}
+                backgroundColor={backgroundHovered}
+                marginLeft='32px'
+                color={textPrimary}
+              >
+                <ForwardIcon />
+                Forward
+              </CustomButton>
+            )}
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
               color={errorColor}
