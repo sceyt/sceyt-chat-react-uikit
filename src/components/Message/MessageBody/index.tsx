@@ -432,6 +432,11 @@ const MessageBody = ({
   )
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
 
+  const hasLongLinkAttachmentUrl = useMemo(() => {
+    if (!linkAttachment || !linkAttachment.url) return false
+    return linkAttachment.url.length > 100
+  }, [linkAttachment])
+
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     log.info('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
@@ -454,6 +459,8 @@ const MessageBody = ({
       incomingMessageStyles={incomingMessageStyles || { background: bubbleIncoming }}
       borderRadius={borderRadius}
       withAttachments={notLinkAttachment}
+      hasLinkAttachment={!!linkAttachment}
+      hasLongLinkAttachmentUrl={hasLongLinkAttachmentUrl}
       attachmentWidth={
         withAttachments
           ? mediaAttachment
@@ -469,7 +476,7 @@ const MessageBody = ({
                   // imageAttachmentMaxWidth,
                   // imageAttachmentMaxHeight
                 )[0]) ||
-              420
+              400
             : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
               message.attachments[0].type === attachmentTypes.voice
@@ -741,6 +748,7 @@ const MessageBody = ({
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
         !notLinkAttachment &&
+        !!linkAttachment &&
         (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
             message={message}
@@ -763,41 +771,44 @@ const MessageBody = ({
       </MessageText>
       {notLinkAttachment &&
         messageStatusAndTimePosition === 'onMessage' &&
-        (messageStatusVisible || messageTimeVisible) && (
-          <MessageStatusAndTime
-            message={message}
-            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-            messageStatusDisplayingType={messageStatusDisplayingType}
-            messageStatusSize={messageStatusSize}
-            messageStatusColor={
-              message.attachments[0].type === 'voice'
-                ? textSecondary
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary
-                  : messageStateColor || textSecondary
-            }
-            messageReadStatusColor={messageReadStatusColor}
-            messageStateFontSize={messageStateFontSize}
-            messageStateColor={messageStateColor}
-            messageTimeFontSize={messageTimeFontSize}
-            messageTimeColor={messageTimeColor}
-            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
-            messageTimeVisible={!!messageTimeVisible}
-            messageStatusVisible={!!messageStatusVisible}
-            withAttachment={withAttachments}
-            leftMargin
-            fileAttachment={
-              withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
-            }
-            messageTimeColorOnAttachment={
-              message.attachments[0].type === 'voice'
-                ? textSecondary
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary
-                  : textSecondary
-            }
-          />
-        )}
+        (messageStatusVisible || messageTimeVisible) &&
+        (() => {
+          const nonLinkAttachment = message.attachments.find((a: IAttachment) => a.type !== attachmentTypes.link)
+          const attachmentType = nonLinkAttachment?.type
+          return (
+            <MessageStatusAndTime
+              message={message}
+              showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+              messageStatusDisplayingType={messageStatusDisplayingType}
+              messageStatusSize={messageStatusSize}
+              messageStatusColor={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : messageStateColor || textSecondary
+              }
+              messageReadStatusColor={messageReadStatusColor}
+              messageStateFontSize={messageStateFontSize}
+              messageStateColor={messageStateColor}
+              messageTimeFontSize={messageTimeFontSize}
+              messageTimeColor={messageTimeColor}
+              messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+              messageTimeVisible={!!messageTimeVisible}
+              messageStatusVisible={!!messageStatusVisible}
+              withAttachment={withAttachments}
+              leftMargin
+              fileAttachment={withAttachments && (attachmentType === 'file' || attachmentType === 'voice')}
+              messageTimeColorOnAttachment={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : textSecondary
+              }
+            />
+          )
+        })()}
 
       {
         withAttachments &&
@@ -1053,6 +1064,8 @@ const MessageBodyContainer = styled.div<{
   rtlDirection?: boolean
   parentMessageIsVoice?: any
   attachmentWidth?: number
+  hasLinkAttachment?: boolean
+  hasLongLinkAttachmentUrl?: boolean
 }>`
   position: relative;
   background-color: ${(props: any) =>
@@ -1061,28 +1074,51 @@ const MessageBodyContainer = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   max-width: ${(props) =>
-    props.withAttachments
-      ? props.attachmentWidth && props.attachmentWidth < 420
-        ? props.attachmentWidth < 165
-          ? props.isReplyMessage
-            ? '210px'
-            : '165px'
-          : `${props.attachmentWidth}px`
-        : '420px'
-      : '100%'};
-  width: max-content;
+    props.hasLongLinkAttachmentUrl && !props.withAttachments
+      ? '454px'
+      : props.hasLinkAttachment && !props.hasLongLinkAttachmentUrl
+        ? '400px'
+        : props.withAttachments
+          ? props.attachmentWidth && props.attachmentWidth < 400
+            ? props.attachmentWidth < 165
+              ? props.isReplyMessage
+                ? '210px'
+                : '165px'
+              : `${props.attachmentWidth}px`
+            : '400px'
+          : '100%'};
+  width: ${(props) => (props.hasLongLinkAttachmentUrl && !props.withAttachments ? '470px' : 'max-content')};
+  overflow-wrap: break-word;
+  word-break: break-word;
+
+  ${(props) =>
+    props.hasLongLinkAttachmentUrl &&
+    `
+    & a {
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: normal;
+      display: -webkit-box;
+      -webkit-line-clamp: 5;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+      max-width: ${props.withAttachments ? '400px' : '470px'};
+    }
+  `}
   padding: ${(props) =>
     props.withAttachments
       ? props.isReplyMessage
         ? '1px 0 0 '
         : '0'
-      : props.isSelfMessage
-        ? props.outgoingMessageStyles?.background === 'inherit'
-          ? '0'
-          : '8px 12px'
-        : props.incomingMessageStyles?.background === 'inherit'
-          ? ' 0'
-          : '8px 12px'};
+      : props.hasLinkAttachment
+        ? '8px'
+        : props.isSelfMessage
+          ? props.outgoingMessageStyles?.background === 'inherit'
+            ? '0'
+            : '8px 12px'
+          : props.incomingMessageStyles?.background === 'inherit'
+            ? ' 0'
+            : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
   //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;

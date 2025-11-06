@@ -199,6 +199,13 @@ const OGMetadata = ({
   )
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
+  const MIN_IMAGE_HEIGHT = 180
+  const MAX_IMAGE_HEIGHT = 400
+
+  const showImage = useMemo(() => {
+    return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT && calculatedImageHeight <= MAX_IMAGE_HEIGHT
+  }, [hasImage, calculatedImageHeight])
+
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
       if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
@@ -212,7 +219,7 @@ const OGMetadata = ({
   const elements = useMemo(
     () =>
       [
-        hasImage
+        showImage
           ? {
               key: 'image',
               order: resolvedOrder?.image ?? 1,
@@ -332,6 +339,7 @@ const OGMetadata = ({
       padding={ogContainerPadding}
       className={ogContainerClassName}
       containerMargin={ogContainerMargin}
+      maxWidth={maxWidth}
       {...(isInviteLink
         ? {
             as: 'div',
@@ -395,9 +403,10 @@ const OGMetadataContainer = styled.div<{
   borderRadius?: string | number
   padding?: string
   containerMargin?: string
+  maxWidth?: number
 }>`
   min-width: inherit;
-  max-width: inherit;
+  max-width: ${({ maxWidth }) => (maxWidth ? `${maxWidth}px` : 'inherit')};
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
@@ -461,7 +470,7 @@ const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: str
   line-height: 18px;
   letter-spacing: 0px;
   color: #111539;
-  margin: 8px 0 0 0;
+  margin: 4px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
   ${({ maxWidth }) =>
@@ -548,6 +557,7 @@ const OGRow = styled.div`
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  padding: 0;
 `
 
 const OGTextWrapper = styled.div`
@@ -559,7 +569,7 @@ const FaviconContainer = styled.div`
   height: 52px;
   border-radius: 8px;
   overflow: hidden;
-  margin: 12px;
+  margin: 4px;
   flex: 0 0 52px;
 `
 
