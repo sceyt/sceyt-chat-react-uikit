@@ -240,8 +240,6 @@ const Votes = styled.span<{ color: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   margin-left: 4px;
-  margin-top: auto;
-  margin-bottom: 1px;
 `
 
 const Bar = styled.div<{ track: string; closed?: boolean }>`
@@ -265,5 +263,4 @@ const UsersContainer = styled.div`
   margin-left: auto;
   padding-left: 16px;
   height: max-content;
-  margin-top: auto;
 `
