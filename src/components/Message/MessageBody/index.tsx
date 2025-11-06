@@ -1075,7 +1075,7 @@ const MessageBodyContainer = styled.div<{
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   max-width: ${(props) =>
     props.hasLongLinkAttachmentUrl && !props.withAttachments
-      ? '454px'
+      ? '400px'
       : props.hasLinkAttachment && !props.hasLongLinkAttachmentUrl
         ? '400px'
         : props.withAttachments
@@ -1087,7 +1087,7 @@ const MessageBodyContainer = styled.div<{
               : `${props.attachmentWidth}px`
             : '400px'
           : '100%'};
-  width: ${(props) => (props.hasLongLinkAttachmentUrl && !props.withAttachments ? '470px' : 'max-content')};
+  width: ${(props) => (props.hasLongLinkAttachmentUrl && !props.withAttachments ? '416px' : 'max-content')};
   overflow-wrap: break-word;
   word-break: break-word;
 
@@ -1099,10 +1099,11 @@ const MessageBodyContainer = styled.div<{
       word-break: break-all;
       white-space: normal;
       display: -webkit-box;
-      -webkit-line-clamp: 5;
+      -webkit-line-clamp: 7;
       -webkit-box-orient: vertical;
       overflow: hidden;
-      max-width: ${props.withAttachments ? '400px' : '470px'};
+      text-overflow: ellipsis;
+      max-width: ${props.withAttachments ? '400px' : '416px'};
     }
   `}
   padding: ${(props) =>
