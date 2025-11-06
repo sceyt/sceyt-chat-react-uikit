@@ -230,6 +230,7 @@ const Title = styled.div<{ color: string }>`
   font-size: 14px;
   line-height: 20px;
   letter-spacing: -0.2px;
+  max-width: calc(100% - 80px);
 `
 
 const Votes = styled.span<{ color: string }>`
