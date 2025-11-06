@@ -82,6 +82,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   const addOption = () => {
     const nextId = uuidv4()
     setOptions([...options, { id: nextId, name: '' }])
+    setTimeout(() => optionInputRefs.current[nextId]?.focus(), 0)
   }
 
   const removeOption = (id: string) => {
