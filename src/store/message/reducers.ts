@@ -4,9 +4,9 @@ import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_LENGTH,
-  removePendingMessageFromMap,
   setHasNextCached,
-  setHasPrevCached
+  setHasPrevCached,
+  PendingPollAction
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
@@ -63,6 +63,8 @@ export interface IMessageStore {
   pollVotesHasMore: { [key: string]: boolean }
   pollVotesLoadingState: { [key: string]: number | null }
   pollVotesInitialCount: number | null
+  pendingPollActions: { [key: string]: PendingPollAction[] }
+  pendingMessagesMap: { [key: string]: IMessage[] }
 }
 
 const initialState: IMessageStore = {
@@ -107,7 +109,9 @@ const initialState: IMessageStore = {
   pollVotesList: {},
   pollVotesHasMore: {},
   pollVotesLoadingState: {},
-  pollVotesInitialCount: null
+  pollVotesInitialCount: null,
+  pendingPollActions: {},
+  pendingMessagesMap: {}
 }
 
 const messageSlice = createSlice({
@@ -264,7 +268,16 @@ const messageSlice = createSlice({
               }
             }
             if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
-              removePendingMessageFromMap(messageData.channelId, messageData.tid || messageData.id)
+              const channelId = messageData.channelId
+              const messageId = messageData.tid || messageData.id
+              if (state.pendingMessagesMap[channelId]) {
+                state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
+                  (msg) => !(msg.id === messageId || msg.tid === messageId)
+                )
+                if (state.pendingMessagesMap[channelId].length === 0) {
+                  delete state.pendingMessagesMap[channelId]
+                }
+              }
             }
             return messageData
           }
@@ -677,6 +690,66 @@ const messageSlice = createSlice({
       }>
     ) => {
       state.pollVotesInitialCount = action.payload.initialCount
+    },
+    removePendingPollAction: (
+      state,
+      action: PayloadAction<{ messageId: string; actionType: string; optionId?: string }>
+    ) => {
+      const { messageId, actionType, optionId } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        return
+      }
+      state.pendingPollActions[messageId] = state.pendingPollActions[messageId].filter(
+        (action) => !(action.type === actionType && (!optionId || action.optionId === optionId))
+      )
+      if (state.pendingPollActions[messageId].length === 0) {
+        delete state.pendingPollActions[messageId]
+      }
+    },
+    setPendingPollActionsMap: (state, action: PayloadAction<{ messageId: string; event: PendingPollAction }>) => {
+      const { messageId, event } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        state.pendingPollActions[messageId] = []
+      }
+      state.pendingPollActions[messageId] = [...state.pendingPollActions[messageId], event]
+    },
+    setPendingMessage: (state, action: PayloadAction<{ channelId: string; message: IMessage }>) => {
+      const { channelId, message } = action.payload
+      if (!state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = []
+      }
+      const existingIndex = state.pendingMessagesMap[channelId].findIndex((msg) => msg.tid === message.tid)
+      if (existingIndex === -1) {
+        state.pendingMessagesMap[channelId].push(message)
+      }
+    },
+    removePendingMessage: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
+      const { channelId, messageId } = action.payload
+      if (state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
+          (msg) => !(msg.id === messageId || msg.tid === messageId)
+        )
+        if (state.pendingMessagesMap[channelId].length === 0) {
+          delete state.pendingMessagesMap[channelId]
+        }
+      }
+    },
+    updatePendingMessage: (
+      state,
+      action: PayloadAction<{ channelId: string; messageId: string; updatedMessage: Partial<IMessage> }>
+    ) => {
+      const { channelId, messageId, updatedMessage } = action.payload
+      if (state.pendingMessagesMap[channelId]) {
+        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].map((msg) => {
+          if (msg.id === messageId || msg.tid === messageId) {
+            return { ...msg, ...updatedMessage }
+          }
+          return msg
+        })
+      }
+    },
+    clearPendingMessagesMap: (state) => {
+      state.pendingMessagesMap = {}
     }
   },
   extraReducers: (builder) => {
@@ -738,7 +811,13 @@ export const {
   addPollVotesToList,
   setPollVotesLoadingState,
   deletePollVotesFromList,
-  setPollVotesInitialCount
+  setPollVotesInitialCount,
+  removePendingPollAction,
+  setPendingPollActionsMap,
+  setPendingMessage,
+  removePendingMessage,
+  updatePendingMessage,
+  clearPendingMessagesMap
 } = messageSlice.actions
 
 // Export reducer

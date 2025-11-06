@@ -3,6 +3,15 @@ import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
 import { handleVoteDetails } from '../message'
+import store from 'store'
+import {
+  removePendingPollActionAC,
+  setPendingPollActionsMapAC,
+  setPendingMessageAC,
+  removePendingMessageAC,
+  updatePendingMessageAC,
+  clearPendingMessagesMapAC
+} from 'store/message/actions'
 export const MESSAGES_MAX_LENGTH = 80
 export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
@@ -22,10 +31,6 @@ type draftMessagesMap = {
 type audioRecordingMap = { [key: string]: any }
 type visibleMessagesMap = { [key: string]: { id: string } }
 
-type pendingMessagesMap = {
-  [key: string]: IMessage[]
-}
-
 type messagesMap = {
   [key: string]: IMessage[]
 }
@@ -41,7 +46,6 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
 const pendingAttachments: { [key: string]: { file: File; checksum: string; messageTid?: string; channelId: string } } =
   {}
 let messagesMap: messagesMap = {}
-const pendingMessagesMap: pendingMessagesMap = {}
 let activeChannelAllMessages: IMessage[] = []
 let prevCached: boolean = false
 let nextCached = false
@@ -188,24 +192,23 @@ export function updateMessageOnMap(
     incrementVotesPerOptionCount: number
   }
 ) {
+  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
   if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
     if (
       updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
       updatedMessage.params.state === MESSAGE_STATUS.UNMODIFIED
     ) {
-      pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
+      const updatedPendingMessages = pendingMessagesMap[channelId]?.map((msg: IMessage) => {
         if (msg.tid === updatedMessage.messageId) {
           return { ...msg, ...updatedMessage.params }
         }
         return msg
       })
+      updatedPendingMessages.forEach((msg: IMessage) => {
+        store.dispatch(updatePendingMessageAC(channelId, msg.tid || msg.id, msg))
+      })
     } else {
-      const filteredMessages = pendingMessagesMap[channelId].filter((msg) => msg.tid !== updatedMessage.messageId)
-      if (filteredMessages && filteredMessages.length && filteredMessages.length > 0) {
-        pendingMessagesMap[channelId] = filteredMessages
-      } else {
-        delete pendingMessagesMap[channelId]
-      }
+      store.dispatch(removePendingMessageAC(channelId, updatedMessage.messageId))
     }
   }
   let updatedMessageData = null
@@ -354,32 +357,17 @@ export function removeMessagesFromMap(channelId: string) {
 export function removeMessageFromMap(channelId: string, messageId: string) {
   messagesMap[channelId] = [...messagesMap[channelId]].filter((msg) => !(msg.id === messageId || msg.tid === messageId))
 
-  pendingMessagesMap[channelId] = [...pendingMessagesMap[channelId]].filter(
-    (msg) => !(msg.id === messageId || msg.tid === messageId)
-  )
-}
-export function removePendingMessageFromMap(channelId: string, messageId: string) {
-  if (pendingMessagesMap[channelId]) {
-    pendingMessagesMap[channelId] = [...pendingMessagesMap[channelId]].filter(
-      (msg) => !(msg.id === messageId || msg.tid === messageId)
-    )
-  }
+  store.dispatch(removePendingMessageAC(channelId, messageId))
 }
 
 export function updatePendingMessageOnMap(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
-  if (pendingMessagesMap[channelId]) {
-    pendingMessagesMap[channelId] = pendingMessagesMap[channelId].map((msg) => {
-      if (msg.id === messageId || msg.tid === messageId) {
-        return { ...msg, ...updatedMessage }
-      }
-      return msg
-    })
-  }
+  store.dispatch(updatePendingMessageAC(channelId, messageId, updatedMessage))
 }
 
 export function getMessageFromPendingMessagesMap(channelId: string, messageId: string) {
+  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
   if (pendingMessagesMap[channelId]) {
-    return pendingMessagesMap[channelId].find((msg) => msg.id === messageId || msg.tid === messageId)
+    return pendingMessagesMap[channelId].find((msg: IMessage) => msg.id === messageId || msg.tid === messageId)
   }
   return null
 }
@@ -440,25 +428,21 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
   removeMessageFromAllMessages(message.id || message.tid!)
 }
 
-export const getPendingMessages = (channelId: string) => pendingMessagesMap[channelId]
-
-export const setPendingMessage = (channelId: string, pendingMessage: IMessage) => {
-  const pendingMessages = getPendingMessages(channelId)
-  if (pendingMessages && pendingMessages?.length) {
-    if (!pendingMessages?.find((msg: IMessage) => msg.tid === pendingMessage.tid)) {
-      pendingMessages.push(pendingMessage)
-    }
-  } else {
-    pendingMessagesMap[channelId] = [pendingMessage]
-  }
+export const getPendingMessages = (channelId: string) => {
+  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
+  return pendingMessagesMap[channelId]
 }
 
-export const getPendingMessagesMap = () => pendingMessagesMap
+export const setPendingMessage = (channelId: string, pendingMessage: IMessage) => {
+  store.dispatch(setPendingMessageAC(channelId, pendingMessage))
+}
+
+export const getPendingMessagesMap = () => {
+  return store.getState().MessageReducer.pendingMessagesMap
+}
 
 export const clearPendingMessagesMap = () => {
-  Object.keys(pendingMessagesMap).forEach((channelId) => {
-    delete pendingMessagesMap[channelId]
-  })
+  store.dispatch(clearPendingMessagesMapAC())
 }
 
 export const draftMessagesMap: draftMessagesMap = {}
@@ -509,7 +493,7 @@ export const removeMessageFromVisibleMessagesMap = (message: IMessage) => {
   delete visibleMessagesMap[message.id]
 }
 
-type PendingPollAction = {
+export type PendingPollAction = {
   type: 'ADD_POLL_VOTE' | 'DELETE_POLL_VOTE' | 'CLOSE_POLL' | 'RETRACT_POLL_VOTE'
   channelId: string
   pollId: string
@@ -517,18 +501,12 @@ type PendingPollAction = {
   message: IMessage
 }
 
-type pendingPollActionsMap = {
-  [messageId: string]: PendingPollAction[]
-}
-
-const pendingPollActionsMap: pendingPollActionsMap = {}
-
 export const checkPendingPollActionConflict = (
   action: PendingPollAction
 ): { hasConflict: boolean; shouldSkip: boolean } => {
   const messageId = action.message.id || action.message.tid
   if (!messageId) return { hasConflict: false, shouldSkip: false }
-
+  const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
   if (!pendingPollActionsMap[messageId]) {
     return { hasConflict: false, shouldSkip: false }
   }
@@ -536,7 +514,8 @@ export const checkPendingPollActionConflict = (
   // Check if deletePollVote comes and there's a pending addPollVote for same option - should skip both
   if (action.type === 'DELETE_POLL_VOTE' && action.optionId) {
     const hasPendingAdd = pendingPollActionsMap[messageId].some(
-      (pendingAction) => pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId
+      (pendingAction: PendingPollAction) =>
+        pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId
     )
     if (hasPendingAdd && pendingPollActionsMap[messageId].length === 1) {
       return { hasConflict: true, shouldSkip: true }
@@ -546,7 +525,8 @@ export const checkPendingPollActionConflict = (
   // Check if addPollVote comes and there's a pending deletePollVote for same option - should remove pending delete
   if (action.type === 'ADD_POLL_VOTE' && action.optionId) {
     const hasPendingDelete = pendingPollActionsMap[messageId].some(
-      (pendingAction) => pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId
+      (pendingAction: PendingPollAction) =>
+        pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId
     )
     if (hasPendingDelete) {
       return { hasConflict: true, shouldSkip: false }
@@ -559,49 +539,35 @@ export const checkPendingPollActionConflict = (
 export const setPendingPollAction = (action: PendingPollAction) => {
   const messageId = action.message.id || action.message.tid
   if (!messageId) return
-
-  if (!pendingPollActionsMap[messageId]) {
-    pendingPollActionsMap[messageId] = []
+  const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
+  const pendingPollActionsMapCopy = JSON.parse(JSON.stringify(pendingPollActionsMap))
+  if (!pendingPollActionsMapCopy[messageId]) {
+    pendingPollActionsMapCopy[messageId] = []
   }
 
   // Handle conflict resolution: if addPollVote is pending and deletePollVote comes, remove the pending addPollVote
   if (action.type === 'DELETE_POLL_VOTE' && action.optionId) {
-    pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
-      (pendingAction) => !(pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId)
+    const isAddedPollVote = pendingPollActionsMapCopy[messageId].some(
+      (pendingAction: PendingPollAction) =>
+        pendingAction.type === 'ADD_POLL_VOTE' && pendingAction.optionId === action.optionId
     )
-    // If after filtering there are no more actions, skip adding this delete action
-    if (pendingPollActionsMap[messageId].length === 0) {
-      delete pendingPollActionsMap[messageId]
+    if (isAddedPollVote) {
+      store.dispatch(removePendingPollActionAC(messageId, 'ADD_POLL_VOTE', action.optionId))
       return
     }
   }
 
   // Handle conflict: if deletePollVote is pending and addPollVote comes, remove the pending deletePollVote
   if (action.type === 'ADD_POLL_VOTE' && action.optionId) {
-    pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
-      (pendingAction) => !(pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId)
+    const isDeletedPollVote = pendingPollActionsMapCopy[messageId].some(
+      (pendingAction: PendingPollAction) =>
+        pendingAction.type === 'DELETE_POLL_VOTE' && pendingAction.optionId === action.optionId
     )
+    if (isDeletedPollVote) {
+      store.dispatch(removePendingPollActionAC(messageId, 'DELETE_POLL_VOTE', action.optionId))
+      return
+    }
   }
 
-  pendingPollActionsMap[messageId].push(action)
-}
-
-export const getPendingPollActionsMap = () => pendingPollActionsMap
-
-export const clearPendingPollActionsMap = () => {
-  Object.keys(pendingPollActionsMap).forEach((messageId) => {
-    delete pendingPollActionsMap[messageId]
-  })
-}
-
-export const removePendingPollAction = (messageId: string, actionType: string, optionId?: string) => {
-  if (!pendingPollActionsMap[messageId]) return
-
-  pendingPollActionsMap[messageId] = pendingPollActionsMap[messageId].filter(
-    (action) => !(action.type === actionType && (!optionId || action.optionId === optionId))
-  )
-
-  if (pendingPollActionsMap[messageId].length === 0) {
-    delete pendingPollActionsMap[messageId]
-  }
+  store.dispatch(setPendingPollActionsMapAC(messageId, action))
 }

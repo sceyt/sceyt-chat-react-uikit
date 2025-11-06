@@ -77,8 +77,15 @@ import {
   addPollVotesToList,
   setPollVotesLoadingState,
   deletePollVotesFromList,
-  setPollVotesInitialCount
+  setPollVotesInitialCount,
+  removePendingPollAction,
+  setPendingPollActionsMap,
+  setPendingMessage,
+  removePendingMessage,
+  updatePendingMessage,
+  clearPendingMessagesMap
 } from './reducers'
+import { PendingPollAction } from 'helpers/messagesHalper'
 
 export function sendMessageAC(
   message: any,
@@ -461,17 +468,29 @@ export function setMessagesMarkersLoadingStateAC(state: number) {
   return setMessagesMarkersLoadingState({ state })
 }
 
-export function addPollVoteAC(channelId: string, pollId: string, optionId: string, message: IMessage) {
+export function addPollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  isResend?: boolean
+) {
   return {
     type: ADD_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message }
+    payload: { channelId, pollId, optionId, message, isResend }
   }
 }
 
-export function deletePollVoteAC(channelId: string, pollId: string, optionId: string, message: IMessage) {
+export function deletePollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  isResend?: boolean
+) {
   return {
     type: DELETE_POLL_VOTE,
-    payload: { channelId, pollId, optionId, message }
+    payload: { channelId, pollId, optionId, message, isResend }
   }
 }
 
@@ -482,10 +501,10 @@ export function closePollAC(channelId: string, pollId: string, message: IMessage
   }
 }
 
-export function retractPollVoteAC(channelId: string, pollId: string, message: IMessage) {
+export function retractPollVoteAC(channelId: string, pollId: string, message: IMessage, isResend?: boolean) {
   return {
     type: RETRACT_POLL_VOTE,
-    payload: { channelId, pollId, message }
+    payload: { channelId, pollId, message, isResend }
   }
 }
 
@@ -534,4 +553,28 @@ export function setPollVotesLoadingStateAC(pollId: string, optionId: string, loa
 
 export function setPollVotesInitialCountAC(initialCount: number) {
   return setPollVotesInitialCount({ initialCount })
+}
+
+export function removePendingPollActionAC(messageId: string, actionType: string, optionId?: string) {
+  return removePendingPollAction({ messageId, actionType, optionId })
+}
+
+export function setPendingPollActionsMapAC(messageId: string, event: PendingPollAction) {
+  return setPendingPollActionsMap({ messageId, event })
+}
+
+export function setPendingMessageAC(channelId: string, message: IMessage) {
+  return setPendingMessage({ channelId, message })
+}
+
+export function removePendingMessageAC(channelId: string, messageId: string) {
+  return removePendingMessage({ channelId, messageId })
+}
+
+export function updatePendingMessageAC(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
+  return updatePendingMessage({ channelId, messageId, updatedMessage })
+}
+
+export function clearPendingMessagesMapAC() {
+  return clearPendingMessagesMap()
 }

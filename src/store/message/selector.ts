@@ -41,3 +41,5 @@ export const messagesMarkersLoadingStateSelector = (store: any) => store.Message
 export const pollVotesListSelector = (store: any) => store.MessageReducer.pollVotesList
 export const pollVotesHasMoreSelector = (store: any) => store.MessageReducer.pollVotesHasMore
 export const pollVotesLoadingStateSelector = (store: any) => store.MessageReducer.pollVotesLoadingState
+export const pendingPollActionsSelector = (store: any) => store.MessageReducer.pendingPollActions
+export const pendingMessagesMapSelector = (store: any) => store.MessageReducer.pendingMessagesMap

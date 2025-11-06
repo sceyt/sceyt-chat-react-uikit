@@ -190,7 +190,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           <Label color={textSecondary}>Question</Label>
           <QuestionInputWrapper>
             <CustomInput
-              padding='11px 64px 11px 14px'
+              padding='11px 80px 11px 14px'
               color={textPrimary}
               placeholderColor={textSecondary}
               backgroundColor={surface1}

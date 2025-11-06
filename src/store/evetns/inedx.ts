@@ -45,6 +45,7 @@ import {
   clearMessagesAC,
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
+  removePendingMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
   updateMessagesMarkersAC,
@@ -64,7 +65,6 @@ import {
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
-  removePendingMessageFromMap,
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
@@ -882,9 +882,9 @@ export default function* watchForEvents(): any {
             let updateLastMessage = false
             const markersMap: any = {}
             const activeChannelMessages = getMessagesFromMap(activeChannelId)
-            markerList.messageIds.forEach((messageId: string) => {
+            markerList.messageIds.forEach(function* (messageId: string) {
               if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
-                removePendingMessageFromMap(activeChannelId, messageId)
+                yield put(removePendingMessageAC(channelId, messageId))
               } else {
                 const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
                 if (isPendingMessage) {
