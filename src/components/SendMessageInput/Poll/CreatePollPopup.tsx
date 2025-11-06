@@ -59,6 +59,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
 
   const questionLimit = 200
   const optionLimit = 120
+  const maxOptions = 12
   const canCreate = useMemo(() => {
     const validOptions = options.map((o) => o.name.trim()).filter(Boolean)
     return question.trim().length > 0 && validOptions.length >= 2
@@ -79,6 +80,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   }
 
   const addOption = () => {
+    if (options.length >= maxOptions) return
     const nextId = uuidv4()
     setOptions([...options, { id: nextId, name: '' }])
     setTimeout(() => optionInputRefs.current[nextId]?.focus(), 0)
@@ -97,7 +99,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       const isLast = index === prev.length - 1
       const updated = prev.map((o, i) => (i === index ? { ...o, name: value } : o))
       const nowFilled = value.trim().length > 0
-      if (isLast && wasEmpty && nowFilled) {
+      if (isLast && wasEmpty && nowFilled && prev.length < maxOptions) {
         const nextId = uuidv4()
         return [...updated, { id: nextId, name: '' }]
       }
@@ -170,7 +172,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
       const next = options[currentIndex + 1]
       if (next) {
         optionInputRefs.current[next.id]?.focus()
-      } else {
+      } else if (options.length < maxOptions) {
         const newId = uuidv4()
         setOptions((prev) => [...prev, { id: newId, name: '' }])
         setTimeout(() => optionInputRefs.current[newId]?.focus(), 0)
@@ -188,6 +190,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           <Label color={textSecondary}>Question</Label>
           <QuestionInputWrapper>
             <CustomInput
+              padding='11px 64px 11px 14px'
               color={textPrimary}
               placeholderColor={textSecondary}
               backgroundColor={surface1}
@@ -262,7 +265,13 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
             ))}
           </OptionsList>
 
-          <AddOptionButton type='button' color={accentColor} onClick={addOption}>
+          <AddOptionButton
+            type='button'
+            color={accentColor}
+            onClick={addOption}
+            disabled={options.length >= maxOptions}
+            disabledColor={iconInactive}
+          >
             Add another option
           </AddOptionButton>
 
@@ -385,15 +394,16 @@ const RemoveOptionIcon = styled(RemoveIcon)<{ color: string; width: string; heig
   opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `
 
-const AddOptionButton = styled.button<{ color: string }>`
+const AddOptionButton = styled.button<{ color: string; disabledColor?: string }>`
   margin: 16px 0 0 0;
   background: transparent;
   border: none;
-  color: ${(props) => props.color};
-  cursor: pointer;
+  color: ${(props) => (props.disabled ? props.disabledColor : props.color)};
+  cursor: ${(props) => (props.disabled ? 'not-allowed' : 'pointer')};
   width: 100%;
   text-align: left;
   padding-left: 32px;
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
 `
 
 const Settings = styled.div`
