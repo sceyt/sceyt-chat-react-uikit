@@ -380,6 +380,30 @@ const MessageBody = ({
     [mediaAttachment]
   )
 
+  const attachmentHeight = useMemo(() => {
+    if (!withAttachments || !mediaAttachment || !attachmentMetas) return undefined
+    if (attachmentMetas.szw && attachmentMetas.szh) {
+      const [, calculatedHeight] = calculateRenderedImageWidth(
+        attachmentMetas.szw,
+        attachmentMetas.szh,
+        mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
+        mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
+      )
+      return calculatedHeight
+    }
+    return mediaAttachment.type === attachmentTypes.image
+      ? imageAttachmentMaxHeight || 400
+      : videoAttachmentMaxHeight || 400
+  }, [
+    withAttachments,
+    mediaAttachment,
+    attachmentMetas,
+    imageAttachmentMaxWidth,
+    imageAttachmentMaxHeight,
+    videoAttachmentMaxWidth,
+    videoAttachmentMaxHeight
+  ])
+
   const fileAttachment = useMemo(() => {
     return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file)
   }, [message.attachments])
@@ -486,6 +510,7 @@ const MessageBody = ({
                 : undefined
           : undefined
       }
+      attachmentHeight={attachmentHeight}
       noBody={!message.body && !withAttachments}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -1064,6 +1089,7 @@ const MessageBodyContainer = styled.div<{
   rtlDirection?: boolean
   parentMessageIsVoice?: any
   attachmentWidth?: number
+  attachmentHeight?: number
   hasLinkAttachment?: boolean
   hasLongLinkAttachmentUrl?: boolean
 }>`
@@ -1098,9 +1124,13 @@ const MessageBodyContainer = styled.div<{
       overflow-wrap: anywhere;
       word-break: break-all;
       white-space: normal;
-      display: -webkit-box;
+      ${
+        props.withAttachments && props.attachmentHeight
+          ? `max-height: ${props.attachmentHeight}px;`
+          : `display: -webkit-box;
       -webkit-line-clamp: 7;
-      -webkit-box-orient: vertical;
+      -webkit-box-orient: vertical;`
+      }
       overflow: hidden;
       text-overflow: ellipsis;
       max-width: ${props.withAttachments ? '400px' : '416px'};
