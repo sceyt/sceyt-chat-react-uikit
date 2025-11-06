@@ -1124,15 +1124,8 @@ const MessageBodyContainer = styled.div<{
       overflow-wrap: anywhere;
       word-break: break-all;
       white-space: normal;
-      ${
-        props.withAttachments && props.attachmentHeight
-          ? `max-height: ${props.attachmentHeight}px;`
-          : `display: -webkit-box;
-      -webkit-line-clamp: 7;
-      -webkit-box-orient: vertical;`
-      }
-      overflow: hidden;
-      text-overflow: ellipsis;
+      ${props.withAttachments && props.attachmentHeight ? `max-height: ${props.attachmentHeight}px;` : ''}
+      ${props.withAttachments && props.attachmentHeight ? 'overflow: hidden;' : ''}
       max-width: ${props.withAttachments ? '400px' : '416px'};
     }
   `}
