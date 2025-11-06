@@ -156,6 +156,7 @@ const Container = styled.div`
   display: flex;
   flex-direction: column;
   min-width: 250px;
+  width: 100%;
 `
 
 const Question = styled.div<{ color: string }>`
