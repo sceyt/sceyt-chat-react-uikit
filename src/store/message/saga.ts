@@ -626,7 +626,7 @@ function* sendTextMessage(action: IAction): any {
         parentMessage: messageResponse.parentMessage,
         repliedInThread: messageResponse.repliedInThread,
         createdAt: messageResponse.createdAt,
-        pollDetails: messageResponse.pollDetails,
+        pollDetails: messageResponse?.pollDetails,
         channelId: channel.id
       }
       if (activeChannelId === channel.id) {
