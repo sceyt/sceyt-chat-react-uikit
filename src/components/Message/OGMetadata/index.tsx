@@ -61,7 +61,7 @@ const OGMetadata = ({
   ogContainerMargin?: string
   target?: string
   isInviteLink?: boolean
-  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean) => void
+  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean, metadata: IOGMetadata | null) => void
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -69,7 +69,8 @@ const OGMetadata = ({
   const {
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
   } = useColor()
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -104,9 +105,6 @@ const OGMetadata = ({
         const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
         const query = await queryBuilder.build()
         const metadata = await query.loadOGData()
-        if (url?.includes('https://liveball.sx')) {
-          console.log('metadata', metadata)
-        }
         const image = new Image()
         image.src = metadata?.og?.image?.[0]?.url
         if (image.src) {
@@ -154,6 +152,7 @@ const OGMetadata = ({
           .then(async (cachedMetadata) => {
             if (cachedMetadata) {
               handleMetadata(cachedMetadata)
+              setMetadataLoaded(true)
             }
             ogMetadataQueryBuilder(url)
           })
@@ -211,13 +210,13 @@ const OGMetadata = ({
 
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
-      if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
-        metadataGetSuccessCallback(attachment?.url, true, hasImage)
+      if (oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
+        metadataGetSuccessCallback(attachment?.url, true, showImage, metadata)
       } else {
-        metadataGetSuccessCallback?.(attachment?.url, false, false)
+        metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
     }
-  }, [metadata, metadataLoaded, oGMetadata, attachment?.url, hasImage])
+  }, [metadataLoaded, oGMetadata, attachment?.url, metadata])
 
   const elements = useMemo(
     () =>
@@ -244,7 +243,7 @@ const OGMetadata = ({
           key: 'title',
           order: resolvedOrder?.title ?? 2,
           render: ogShowTitle && metadata?.og?.title && (
-            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
+            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding} color={textPrimary}>
               <span>{metadata?.og?.title?.trim()}</span>
             </Title>
           )
@@ -465,14 +464,14 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
   ${({ margin }) => (margin ? '12px' : '0')};
 `
 
-const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
+const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
   ${sharedKeyframes}
   // font-family: Inter;
   font-weight: 500;
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0px;
-  color: #111539;
+  color: ${({ color }) => color};
   margin: 4px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
