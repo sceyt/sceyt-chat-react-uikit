@@ -755,7 +755,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
     if (limit) {
       channelQueryForward.limit = limit
     }
-    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING, true))
     const channelsData = yield call(channelQueryForward.loadNextPage)
     yield put(channelHasNextAC(channelsData.hasNext, true))
     const channelsToAdd = channelsData.channels.filter((channel: IChannel) =>
@@ -767,7 +767,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
     )
     const { channels: mappedChannels } = yield call(setChannelsInMap, channelsToAdd)
     yield put(addChannelsForForwardAC(mappedChannels))
-    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+    yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED, true))
   } catch (error) {
     log.error(error, 'Error in load more channels for forward')
     /* if (error.code !== 10008) {
