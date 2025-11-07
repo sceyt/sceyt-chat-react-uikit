@@ -104,6 +104,9 @@ const OGMetadata = ({
         const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
         const query = await queryBuilder.build()
         const metadata = await query.loadOGData()
+        if (url?.includes('https://liveball.sx')) {
+          console.log('metadata', metadata)
+        }
         const image = new Image()
         image.src = metadata?.og?.image?.[0]?.url
         if (image.src) {
@@ -143,7 +146,7 @@ const OGMetadata = ({
   }, [])
 
   useEffect(() => {
-    if (attachment?.id && attachment?.url && !metadata) {
+    if (attachment?.id && attachment?.url && !oGMetadata?.[attachment?.url]) {
       setShouldAnimate(true)
       const url = attachment?.url
       if (url) {
@@ -160,7 +163,7 @@ const OGMetadata = ({
           })
       }
     }
-  }, [attachment, metadata])
+  }, [attachment, oGMetadata?.[attachment?.url]])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -242,7 +245,7 @@ const OGMetadata = ({
           order: resolvedOrder?.title ?? 2,
           render: ogShowTitle && metadata?.og?.title && (
             <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
-              <span>{metadata?.og?.title}</span>
+              <span>{metadata?.og?.title?.trim()}</span>
             </Title>
           )
         },
@@ -251,7 +254,7 @@ const OGMetadata = ({
           order: resolvedOrder?.description ?? 3,
           render: ogShowDescription && metadata?.og?.description && (
             <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
-              {metadata?.og?.description}
+              {metadata?.og?.description?.trim()}
             </Desc>
           )
         },
@@ -495,7 +498,7 @@ const Desc = styled.p<{
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
-  margin: 4px 0 8px 0;
+  margin: 4px 0 4px 0;
   padding: ${({ padding }) => padding ?? '0'};
   color: ${({ color }) => color};
   display: -webkit-box;
@@ -569,7 +572,7 @@ const FaviconContainer = styled.div`
   height: 52px;
   border-radius: 8px;
   overflow: hidden;
-  margin: 4px;
+  margin: 8px;
   flex: 0 0 52px;
 `
 

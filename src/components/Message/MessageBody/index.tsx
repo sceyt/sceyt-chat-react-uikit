@@ -3,6 +3,7 @@ import React, { FC, useMemo } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
+import { useSelector } from '../../../store/hooks'
 // Assets
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 // Helpers
@@ -461,6 +462,46 @@ const MessageBody = ({
     return linkAttachment.url.length > 100
   }, [linkAttachment])
 
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+  const linkMetadata = useMemo(() => {
+    if (!linkAttachment?.url) return null
+    return oGMetadata?.[linkAttachment.url] || null
+  }, [oGMetadata, linkAttachment?.url])
+
+  const ogMetadataContainerWidth = useMemo(() => {
+    if (!linkMetadata || !linkAttachment) return ogMetadataProps?.maxWidth || 400
+
+    if (hasLongLinkAttachmentUrl) {
+      return 400
+    }
+
+    const hasImage = linkMetadata?.og?.image?.[0]?.url && linkMetadata?.imageWidth && linkMetadata?.imageHeight
+    const imageWidth = linkMetadata?.imageWidth
+    const imageHeight = linkMetadata?.imageHeight
+    const calculatedImageHeight =
+      imageWidth && imageHeight ? imageHeight / (imageWidth / (ogMetadataProps?.maxWidth || 400)) : 0
+    const showImage = hasImage && calculatedImageHeight >= 180 && calculatedImageHeight <= 400
+    const hasDescription = linkMetadata?.og?.description
+    const hasFavicon = ogMetadataProps?.ogShowFavicon && linkMetadata?.faviconLoaded && linkMetadata?.og?.favicon?.url
+
+    if (showImage) {
+      return 400
+    }
+    if (hasDescription && hasFavicon) {
+      return 336
+    }
+    if (hasDescription) {
+      return 356
+    }
+    return ogMetadataProps?.maxWidth || 400
+  }, [
+    linkMetadata,
+    linkAttachment,
+    ogMetadataProps?.maxWidth,
+    ogMetadataProps?.ogShowFavicon,
+    hasLongLinkAttachmentUrl
+  ])
+
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     log.info('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
@@ -511,6 +552,7 @@ const MessageBody = ({
           : undefined
       }
       attachmentHeight={attachmentHeight}
+      ogMetadataMaxWidth={ogMetadataContainerWidth}
       noBody={!message.body && !withAttachments}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -709,7 +751,7 @@ const MessageBody = ({
       >
         {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
-            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
@@ -752,7 +794,7 @@ const MessageBody = ({
         )}
         {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
-            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
@@ -1092,6 +1134,7 @@ const MessageBodyContainer = styled.div<{
   attachmentHeight?: number
   hasLinkAttachment?: boolean
   hasLongLinkAttachmentUrl?: boolean
+  ogMetadataMaxWidth?: number
 }>`
   position: relative;
   background-color: ${(props: any) =>
@@ -1100,9 +1143,11 @@ const MessageBodyContainer = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   max-width: ${(props) =>
-    props.hasLongLinkAttachmentUrl && !props.withAttachments
-      ? '400px'
-      : props.hasLinkAttachment && !props.hasLongLinkAttachmentUrl
+    props.hasLinkAttachment && !props.withAttachments
+      ? props.ogMetadataMaxWidth
+        ? `${props.ogMetadataMaxWidth}px`
+        : '416px'
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
         ? '400px'
         : props.withAttachments
           ? props.attachmentWidth && props.attachmentWidth < 400
@@ -1113,7 +1158,12 @@ const MessageBodyContainer = styled.div<{
               : `${props.attachmentWidth}px`
             : '400px'
           : '100%'};
-  width: ${(props) => (props.hasLongLinkAttachmentUrl && !props.withAttachments ? '416px' : 'max-content')};
+  width: ${(props) =>
+    props.hasLinkAttachment && !props.withAttachments && props.ogMetadataMaxWidth
+      ? `${props.ogMetadataMaxWidth}px`
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
+        ? '416px'
+        : 'max-content'};
   overflow-wrap: break-word;
   word-break: break-word;
 
@@ -1126,7 +1176,13 @@ const MessageBodyContainer = styled.div<{
       white-space: normal;
       ${props.withAttachments && props.attachmentHeight ? `max-height: ${props.attachmentHeight}px;` : ''}
       ${props.withAttachments && props.attachmentHeight ? 'overflow: hidden;' : ''}
-      max-width: ${props.withAttachments ? '400px' : '416px'};
+      max-width: ${
+        props.withAttachments
+          ? '400px'
+          : props.hasLinkAttachment && props.ogMetadataMaxWidth
+            ? `${props.ogMetadataMaxWidth}px`
+            : '416px'
+      };
     }
   `}
   padding: ${(props) =>
