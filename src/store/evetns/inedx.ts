@@ -882,7 +882,7 @@ export default function* watchForEvents(): any {
             let updateLastMessage = false
             const markersMap: any = {}
             const activeChannelMessages = getMessagesFromMap(activeChannelId)
-            markerList.messageIds.forEach(function* (messageId: string) {
+            for (const messageId of markerList.messageIds) {
               if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
                 yield put(removePendingMessageAC(channelId, messageId))
               } else {
@@ -902,7 +902,7 @@ export default function* watchForEvents(): any {
                 }
               }
               updateChannelOnAllChannels(channelId, {}, { id: messageId, deliveryStatus: markerList.name })
-            })
+            }
             if (updateLastMessage) {
               const lastMessage = {
                 ...channel.lastMessage,
