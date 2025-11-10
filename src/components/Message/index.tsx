@@ -439,7 +439,8 @@ const Message = ({
       if (
         message.userMarkers &&
         message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
+        message.incoming
       ) {
         dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
       }
