@@ -381,30 +381,6 @@ const MessageBody = ({
     [mediaAttachment]
   )
 
-  const attachmentHeight = useMemo(() => {
-    if (!withAttachments || !mediaAttachment || !attachmentMetas) return undefined
-    if (attachmentMetas.szw && attachmentMetas.szh) {
-      const [, calculatedHeight] = calculateRenderedImageWidth(
-        attachmentMetas.szw,
-        attachmentMetas.szh,
-        mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxWidth : videoAttachmentMaxWidth,
-        mediaAttachment.type === attachmentTypes.image ? imageAttachmentMaxHeight : videoAttachmentMaxHeight
-      )
-      return calculatedHeight
-    }
-    return mediaAttachment.type === attachmentTypes.image
-      ? imageAttachmentMaxHeight || 400
-      : videoAttachmentMaxHeight || 400
-  }, [
-    withAttachments,
-    mediaAttachment,
-    attachmentMetas,
-    imageAttachmentMaxWidth,
-    imageAttachmentMaxHeight,
-    videoAttachmentMaxWidth,
-    videoAttachmentMaxHeight
-  ])
-
   const fileAttachment = useMemo(() => {
     return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file)
   }, [message.attachments])
@@ -551,7 +527,6 @@ const MessageBody = ({
                 : undefined
           : undefined
       }
-      attachmentHeight={attachmentHeight}
       ogMetadataMaxWidth={ogMetadataContainerWidth}
       noBody={!message.body && !withAttachments}
       onMouseEnter={handleMouseEnter}
@@ -1131,7 +1106,6 @@ const MessageBodyContainer = styled.div<{
   rtlDirection?: boolean
   parentMessageIsVoice?: any
   attachmentWidth?: number
-  attachmentHeight?: number
   hasLinkAttachment?: boolean
   hasLongLinkAttachmentUrl?: boolean
   ogMetadataMaxWidth?: number
@@ -1174,8 +1148,6 @@ const MessageBodyContainer = styled.div<{
       overflow-wrap: anywhere;
       word-break: break-all;
       white-space: normal;
-      ${props.withAttachments && props.attachmentHeight ? `max-height: ${props.attachmentHeight}px;` : ''}
-      ${props.withAttachments && props.attachmentHeight ? 'overflow: hidden;' : ''}
       max-width: ${
         props.withAttachments
           ? '400px'

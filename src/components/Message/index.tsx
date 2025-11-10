@@ -420,6 +420,17 @@ const Message = ({
   }
 
   const handleSendReadMarker = () => {
+    if (!message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
+      if (
+        message.userMarkers &&
+        message.userMarkers.length &&
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
+        message.incoming
+      ) {
+        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
+      }
+    }
+
     if (
       isVisible &&
       message.incoming &&
@@ -433,17 +444,6 @@ const Message = ({
       connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
-    }
-
-    if (!message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
-      if (
-        message.userMarkers &&
-        message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
-        message.incoming
-      ) {
-        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
-      }
     }
   }
 

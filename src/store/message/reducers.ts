@@ -226,9 +226,28 @@ const messageSlice = createSlice({
       const markerName = name
       for (let index = 0; index < state.activeChannelMessages.length; index++) {
         if (
+          markerName === MESSAGE_DELIVERY_STATUS.DELIVERED &&
+          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
+            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+        ) {
+          continue
+        }
+        if (
+          markerName === MESSAGE_DELIVERY_STATUS.READ &&
+          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+        ) {
+          continue
+        }
+        if (
+          markerName === MESSAGE_DELIVERY_STATUS.PLAYED &&
+          state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED
+        ) {
+          continue
+        }
+        if (
           markersMap[state.activeChannelMessages[index].id] &&
-          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
-            markerName === MESSAGE_DELIVERY_STATUS.READ) &&
           state.activeChannelMessages[index].state !== 'Deleted'
         ) {
           state.activeChannelMessages[index].deliveryStatus = markerName
