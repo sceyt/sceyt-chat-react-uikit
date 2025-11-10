@@ -61,7 +61,7 @@ const OGMetadata = ({
   ogContainerMargin?: string
   target?: string
   isInviteLink?: boolean
-  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean) => void
+  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean, metadata: IOGMetadata | null) => void
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -69,7 +69,8 @@ const OGMetadata = ({
   const {
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
-    [THEME_COLORS.TEXT_SECONDARY]: textSecondary
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
+    [THEME_COLORS.TEXT_PRIMARY]: textPrimary
   } = useColor()
   const attachment = useMemo(() => {
     return attachments.find((attachment) => attachment.type === attachmentTypes.link)
@@ -143,7 +144,7 @@ const OGMetadata = ({
   }, [])
 
   useEffect(() => {
-    if (attachment?.id && attachment?.url && !metadata) {
+    if (attachment?.id && attachment?.url && !oGMetadata?.[attachment?.url]) {
       setShouldAnimate(true)
       const url = attachment?.url
       if (url) {
@@ -151,6 +152,7 @@ const OGMetadata = ({
           .then(async (cachedMetadata) => {
             if (cachedMetadata) {
               handleMetadata(cachedMetadata)
+              setMetadataLoaded(true)
             }
             ogMetadataQueryBuilder(url)
           })
@@ -160,7 +162,7 @@ const OGMetadata = ({
           })
       }
     }
-  }, [attachment, metadata])
+  }, [attachment, oGMetadata?.[attachment?.url]])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -199,20 +201,27 @@ const OGMetadata = ({
   )
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
+  const MIN_IMAGE_HEIGHT = 180
+  const MAX_IMAGE_HEIGHT = 400
+
+  const showImage = useMemo(() => {
+    return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT && calculatedImageHeight <= MAX_IMAGE_HEIGHT
+  }, [hasImage, calculatedImageHeight])
+
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
-      if (metadata && metadataGetSuccessCallback && (hasImage || faviconUrl)) {
-        metadataGetSuccessCallback(attachment?.url, true, hasImage)
+      if (oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
+        metadataGetSuccessCallback(attachment?.url, true, showImage, metadata)
       } else {
-        metadataGetSuccessCallback?.(attachment?.url, false, false)
+        metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
     }
-  }, [metadata, metadataLoaded, oGMetadata, attachment?.url, hasImage])
+  }, [metadataLoaded, oGMetadata, attachment?.url, metadata])
 
   const elements = useMemo(
     () =>
       [
-        hasImage
+        showImage
           ? {
               key: 'image',
               order: resolvedOrder?.image ?? 1,
@@ -234,8 +243,8 @@ const OGMetadata = ({
           key: 'title',
           order: resolvedOrder?.title ?? 2,
           render: ogShowTitle && metadata?.og?.title && (
-            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
-              <span>{metadata?.og?.title}</span>
+            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding} color={textPrimary}>
+              <span>{metadata?.og?.title?.trim()}</span>
             </Title>
           )
         },
@@ -244,7 +253,7 @@ const OGMetadata = ({
           order: resolvedOrder?.description ?? 3,
           render: ogShowDescription && metadata?.og?.description && (
             <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
-              {metadata?.og?.description}
+              {metadata?.og?.description?.trim()}
             </Desc>
           )
         },
@@ -332,6 +341,7 @@ const OGMetadata = ({
       padding={ogContainerPadding}
       className={ogContainerClassName}
       containerMargin={ogContainerMargin}
+      maxWidth={maxWidth}
       {...(isInviteLink
         ? {
             as: 'div',
@@ -395,12 +405,14 @@ const OGMetadataContainer = styled.div<{
   borderRadius?: string | number
   padding?: string
   containerMargin?: string
+  maxWidth?: number
 }>`
   min-width: inherit;
-  max-width: inherit;
+  max-width: ${({ maxWidth }) => (maxWidth ? `${maxWidth}px` : 'inherit')};
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
+  border-radius: 8px;
   background-color: ${({ showBackground, customBg, bgColor }) =>
     showBackground ? customBg ?? bgColor : 'transparent'};
   border-radius: ${({ borderRadius }) => (borderRadius !== undefined ? borderRadius : '8px')};
@@ -408,7 +420,7 @@ const OGMetadataContainer = styled.div<{
   // margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
   padding: ${({ padding }) => padding ?? '0'};
   text-decoration: none;
-  color: inherit;
+  // color: inherit;
   &:hover {
     opacity: 0.9;
     cursor: pointer;
@@ -428,6 +440,7 @@ const ImageContainer = styled.div<{
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   margin: 0 auto;
+  border-radius: 8px 8px 0 0;
   overflow: hidden;
   ${({ shouldAnimate, showOGMetadata, containerHeight }) =>
     shouldAnimate &&
@@ -451,12 +464,15 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
   ${({ margin }) => (margin ? '12px' : '0')};
 `
 
-const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
+const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
   ${sharedKeyframes}
-  font-weight: bold;
-  font-size: 13px;
-  line-height: 16px;
-  margin: 8px 0 0 0;
+  // font-family: Inter;
+  font-weight: 500;
+  font-size: 14px;
+  line-height: 18px;
+  letter-spacing: 0px;
+  color: ${({ color }) => color};
+  margin: 4px 0 0 0;
   padding: ${({ padding }) => padding ?? '0'};
   box-sizing: border-box;
   ${({ maxWidth }) =>
@@ -481,7 +497,7 @@ const Desc = styled.p<{
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
-  margin: 0 0 8px 0;
+  margin: 4px 0 4px 0;
   padding: ${({ padding }) => padding ?? '0'};
   color: ${({ color }) => color};
   display: -webkit-box;
@@ -528,6 +544,9 @@ const Img = styled.img<{ shouldAnimate: boolean }>`
   height: 100%;
   object-fit: cover;
   display: block;
+  // object-fit: cover;
+  // object-position: center;
+  // image-rendering: auto;
   border-radius: inherit;
   ${({ shouldAnimate }) =>
     shouldAnimate &&
@@ -540,6 +559,7 @@ const OGRow = styled.div`
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
+  padding: 0;
 `
 
 const OGTextWrapper = styled.div`
@@ -551,7 +571,7 @@ const FaviconContainer = styled.div`
   height: 52px;
   border-radius: 8px;
   overflow: hidden;
-  margin: 12px;
+  margin: 8px;
   flex: 0 0 52px;
 `
 

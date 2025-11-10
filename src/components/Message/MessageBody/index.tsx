@@ -3,6 +3,7 @@ import React, { FC, useMemo } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
+import { useSelector } from '../../../store/hooks'
 // Assets
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
 // Helpers
@@ -432,6 +433,51 @@ const MessageBody = ({
   )
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
 
+  const hasLongLinkAttachmentUrl = useMemo(() => {
+    if (!linkAttachment || !linkAttachment.url) return false
+    return linkAttachment.url.length > 100
+  }, [linkAttachment])
+
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+  const linkMetadata = useMemo(() => {
+    if (!linkAttachment?.url) return null
+    return oGMetadata?.[linkAttachment.url] || null
+  }, [oGMetadata, linkAttachment?.url])
+
+  const ogMetadataContainerWidth = useMemo(() => {
+    if (!linkMetadata || !linkAttachment) return ogMetadataProps?.maxWidth || 400
+
+    if (hasLongLinkAttachmentUrl) {
+      return 400
+    }
+
+    const hasImage = linkMetadata?.og?.image?.[0]?.url && linkMetadata?.imageWidth && linkMetadata?.imageHeight
+    const imageWidth = linkMetadata?.imageWidth
+    const imageHeight = linkMetadata?.imageHeight
+    const calculatedImageHeight =
+      imageWidth && imageHeight ? imageHeight / (imageWidth / (ogMetadataProps?.maxWidth || 400)) : 0
+    const showImage = hasImage && calculatedImageHeight >= 180 && calculatedImageHeight <= 400
+    const hasDescription = linkMetadata?.og?.description
+    const hasFavicon = ogMetadataProps?.ogShowFavicon && linkMetadata?.faviconLoaded && linkMetadata?.og?.favicon?.url
+
+    if (showImage) {
+      return 400
+    }
+    if (hasDescription && hasFavicon) {
+      return 336
+    }
+    if (hasDescription) {
+      return 356
+    }
+    return ogMetadataProps?.maxWidth || 400
+  }, [
+    linkMetadata,
+    linkAttachment,
+    ogMetadataProps?.maxWidth,
+    ogMetadataProps?.ogShowFavicon,
+    hasLongLinkAttachmentUrl
+  ])
+
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     log.info('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
@@ -454,6 +500,8 @@ const MessageBody = ({
       incomingMessageStyles={incomingMessageStyles || { background: bubbleIncoming }}
       borderRadius={borderRadius}
       withAttachments={notLinkAttachment}
+      hasLinkAttachment={!!linkAttachment}
+      hasLongLinkAttachmentUrl={hasLongLinkAttachmentUrl}
       attachmentWidth={
         withAttachments
           ? mediaAttachment
@@ -469,7 +517,7 @@ const MessageBody = ({
                   // imageAttachmentMaxWidth,
                   // imageAttachmentMaxHeight
                 )[0]) ||
-              420
+              400
             : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
               message.attachments[0].type === attachmentTypes.voice
@@ -479,6 +527,7 @@ const MessageBody = ({
                 : undefined
           : undefined
       }
+      ogMetadataMaxWidth={ogMetadataContainerWidth}
       noBody={!message.body && !withAttachments}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -677,7 +726,7 @@ const MessageBody = ({
       >
         {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
-            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
@@ -720,7 +769,7 @@ const MessageBody = ({
         )}
         {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
           <OGMetadata
-            maxWidth={ogMetadataProps?.maxWidth || 400}
+            maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
             attachments={[linkAttachment]}
             state={message.state}
@@ -741,6 +790,7 @@ const MessageBody = ({
         )}
         {messageStatusAndTimePosition === 'onMessage' &&
         !notLinkAttachment &&
+        !!linkAttachment &&
         (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
             message={message}
@@ -763,41 +813,44 @@ const MessageBody = ({
       </MessageText>
       {notLinkAttachment &&
         messageStatusAndTimePosition === 'onMessage' &&
-        (messageStatusVisible || messageTimeVisible) && (
-          <MessageStatusAndTime
-            message={message}
-            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-            messageStatusDisplayingType={messageStatusDisplayingType}
-            messageStatusSize={messageStatusSize}
-            messageStatusColor={
-              message.attachments[0].type === 'voice'
-                ? textSecondary
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary
-                  : messageStateColor || textSecondary
-            }
-            messageReadStatusColor={messageReadStatusColor}
-            messageStateFontSize={messageStateFontSize}
-            messageStateColor={messageStateColor}
-            messageTimeFontSize={messageTimeFontSize}
-            messageTimeColor={messageTimeColor}
-            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
-            messageTimeVisible={!!messageTimeVisible}
-            messageStatusVisible={!!messageStatusVisible}
-            withAttachment={withAttachments}
-            leftMargin
-            fileAttachment={
-              withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
-            }
-            messageTimeColorOnAttachment={
-              message.attachments[0].type === 'voice'
-                ? textSecondary
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary
-                  : textSecondary
-            }
-          />
-        )}
+        (messageStatusVisible || messageTimeVisible) &&
+        (() => {
+          const nonLinkAttachment = message.attachments.find((a: IAttachment) => a.type !== attachmentTypes.link)
+          const attachmentType = nonLinkAttachment?.type
+          return (
+            <MessageStatusAndTime
+              message={message}
+              showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+              messageStatusDisplayingType={messageStatusDisplayingType}
+              messageStatusSize={messageStatusSize}
+              messageStatusColor={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : messageStateColor || textSecondary
+              }
+              messageReadStatusColor={messageReadStatusColor}
+              messageStateFontSize={messageStateFontSize}
+              messageStateColor={messageStateColor}
+              messageTimeFontSize={messageTimeFontSize}
+              messageTimeColor={messageTimeColor}
+              messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+              messageTimeVisible={!!messageTimeVisible}
+              messageStatusVisible={!!messageStatusVisible}
+              withAttachment={withAttachments}
+              leftMargin
+              fileAttachment={withAttachments && (attachmentType === 'file' || attachmentType === 'voice')}
+              messageTimeColorOnAttachment={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : textSecondary
+              }
+            />
+          )
+        })()}
 
       {
         withAttachments &&
@@ -1053,6 +1106,9 @@ const MessageBodyContainer = styled.div<{
   rtlDirection?: boolean
   parentMessageIsVoice?: any
   attachmentWidth?: number
+  hasLinkAttachment?: boolean
+  hasLongLinkAttachmentUrl?: boolean
+  ogMetadataMaxWidth?: number
 }>`
   position: relative;
   background-color: ${(props: any) =>
@@ -1061,28 +1117,60 @@ const MessageBodyContainer = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   max-width: ${(props) =>
-    props.withAttachments
-      ? props.attachmentWidth && props.attachmentWidth < 420
-        ? props.attachmentWidth < 165
-          ? props.isReplyMessage
-            ? '210px'
-            : '165px'
-          : `${props.attachmentWidth}px`
-        : '420px'
-      : '100%'};
-  width: max-content;
+    props.hasLinkAttachment && !props.withAttachments
+      ? props.ogMetadataMaxWidth
+        ? `${props.ogMetadataMaxWidth}px`
+        : '416px'
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
+        ? '400px'
+        : props.withAttachments
+          ? props.attachmentWidth && props.attachmentWidth < 400
+            ? props.attachmentWidth < 165
+              ? props.isReplyMessage
+                ? '210px'
+                : '165px'
+              : `${props.attachmentWidth}px`
+            : '400px'
+          : '100%'};
+  width: ${(props) =>
+    props.hasLinkAttachment && !props.withAttachments && props.ogMetadataMaxWidth
+      ? `${props.ogMetadataMaxWidth}px`
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
+        ? '416px'
+        : 'max-content'};
+  overflow-wrap: break-word;
+  word-break: break-word;
+
+  ${(props) =>
+    props.hasLongLinkAttachmentUrl &&
+    `
+    & a {
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: normal;
+      max-width: ${
+        props.withAttachments
+          ? '400px'
+          : props.hasLinkAttachment && props.ogMetadataMaxWidth
+            ? `${props.ogMetadataMaxWidth}px`
+            : '416px'
+      };
+    }
+  `}
   padding: ${(props) =>
     props.withAttachments
       ? props.isReplyMessage
         ? '1px 0 0 '
         : '0'
-      : props.isSelfMessage
-        ? props.outgoingMessageStyles?.background === 'inherit'
-          ? '0'
-          : '8px 12px'
-        : props.incomingMessageStyles?.background === 'inherit'
-          ? ' 0'
-          : '8px 12px'};
+      : props.hasLinkAttachment
+        ? '8px'
+        : props.isSelfMessage
+          ? props.outgoingMessageStyles?.background === 'inherit'
+            ? '0'
+            : '8px 12px'
+          : props.incomingMessageStyles?.background === 'inherit'
+            ? ' 0'
+            : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
   //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
