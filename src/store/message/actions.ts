@@ -33,6 +33,7 @@ import {
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setUnreadScrollTo,
   setMessages,
   addMessages,
   updateMessagesStatus,
@@ -297,6 +298,10 @@ export function scrollToNewMessageAC(
 
 export function showScrollToNewMessageButtonAC(state: boolean) {
   return setShowScrollToNewMessageButton({ state })
+}
+
+export function setUnreadScrollToAC(state: boolean) {
+  return setUnreadScrollTo({ state })
 }
 
 export function loadMoreMessagesAC(

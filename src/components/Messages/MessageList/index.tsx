@@ -12,7 +12,8 @@ import {
   resendPendingPollActionsAC,
   scrollToNewMessageAC,
   setScrollToMessagesAC,
-  showScrollToNewMessageButtonAC
+  showScrollToNewMessageButtonAC,
+  setUnreadScrollToAC
 } from '../../../store/message/actions'
 import {
   activeChannelMessagesSelector,
@@ -28,7 +29,8 @@ import {
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
   pendingPollActionsSelector,
-  pendingMessagesMapSelector
+  pendingMessagesMapSelector,
+  unreadScrollToSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { themeSelector } from '../../../store/theme/selector'
@@ -42,7 +44,6 @@ import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.
 import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
 // Helpers
-import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
 import {
   clearMessagesMap,
   clearVisibleMessagesMap,
@@ -505,6 +506,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
+  const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
@@ -523,6 +525,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const pollPendingPollActions = useSelector(pendingPollActionsSelector, shallowEqual)
   const pendingMessagesMap = useSelector(pendingMessagesMapSelector, shallowEqual)
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
+  const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
   const [unreadMessageId, setUnreadMessageId] = useState('')
   const [mediaFile, setMediaFile] = useState<any>(null)
@@ -1099,6 +1102,8 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [messagesLoading, messages, lastVisibleMessageId])
 
   useEffect(() => {
+    let interval: any = null
+    log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
       Object.keys(pendingMessagesMap).forEach((key: any) => {
         pendingMessagesMap[key].forEach((msg: IMessage) => {
@@ -1109,43 +1114,62 @@ const MessageList: React.FC<MessagesProps> = ({
       if (Object.keys(pollPendingPollActions).length > 0) {
         dispatch(resendPendingPollActionsAC(connectionStatus))
       }
+      let count = 0
+      interval = setInterval(() => {
+        if (count > 20) {
+          clearInterval(interval)
+        }
+        count++
+        if (
+          channel.id &&
+          Object.keys(pollPendingPollActions).length === 0 &&
+          Object.keys(pendingMessagesMap).length === 0
+        ) {
+          clearInterval(interval)
+          loadingRef.current = false
+          prevDisableRef.current = false
+          nextDisableRef.current = false
+          clearMessagesMap()
+          removeAllMessages()
+          dispatch(getMessagesAC(channel))
+        }
+      }, 100)
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval)
+      }
     }
   }, [connectionStatus])
 
   useEffect(() => {
-    log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (
-        channel.id &&
-        Object.keys(pollPendingPollActions).length === 0 &&
-        Object.keys(pendingMessagesMap).length === 0
-      ) {
-        loadingRef.current = false
-        prevDisableRef.current = false
-        nextDisableRef.current = false
-        clearMessagesMap()
-        removeAllMessages()
-        dispatch(getMessagesAC(channel))
-      }
-    }
-  }, [connectionStatus, pollPendingPollActions, pendingMessagesMap])
-
-  useEffect(() => {
-    const unreadScrollTo = getUnreadScrollTo()
     if (channel.newMessageCount && channel.newMessageCount > 0 && unreadScrollTo) {
-      if (scrollRef.current) {
-        scrollRef.current.style.scrollBehavior = 'inherit'
+      const scrollElement = document.getElementById('scrollableDiv')
+      if (scrollElement) {
+        scrollElement.style.scrollBehavior = 'inherit'
       }
       const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
-      if (lastReadMessageNode) {
-        scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
-        if (scrollRef.current) {
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }
-        setUnreadScrollTo(false)
+      if (lastReadMessageNode && scrollElement) {
+        scrollElement.scrollTo({
+          top: lastReadMessageNode.offsetTop - 200,
+          behavior: 'smooth'
+        })
+        setScrollIntoView(true)
+        setTimeout(() => {
+          dispatch(setUnreadScrollToAC(false))
+          setScrollIntoView(false)
+        }, 100)
       }
     }
-  }, [channel.id, channel.newMessageCount, channel.lastDisplayedMessageId])
+  }, [
+    channel.id,
+    channel.newMessageCount,
+    scrollRef.current,
+    unreadScrollTo,
+    channel.lastDisplayedMessageId,
+    scrollIntoView,
+    messages.length
+  ])
 
   // Cleanup hideTopDate timeout on unmount
   useEffect(() => {

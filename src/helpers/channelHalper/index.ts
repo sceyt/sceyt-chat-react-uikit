@@ -247,18 +247,6 @@ export const query: any = {
   PollVotesQueries: {} // key format: pollId_optionId
 }
 
-const unreadScrollTo = {
-  isScrolled: true
-}
-
-export function getUnreadScrollTo() {
-  return unreadScrollTo.isScrolled
-}
-
-export function setUnreadScrollTo(state: boolean) {
-  unreadScrollTo.isScrolled = state
-}
-
 export function getUploadImageIcon() {
   return UploadImageIcon
 }

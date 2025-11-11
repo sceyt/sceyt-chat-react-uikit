@@ -6,7 +6,8 @@ import {
   MESSAGES_MAX_LENGTH,
   setHasNextCached,
   setHasPrevCached,
-  PendingPollAction
+  PendingPollAction,
+  updateMessageDeliveryStatusAndMarkers
 } from '../../helpers/messagesHalper'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
@@ -65,6 +66,7 @@ export interface IMessageStore {
   pollVotesInitialCount: number | null
   pendingPollActions: { [key: string]: PendingPollAction[] }
   pendingMessagesMap: { [key: string]: IMessage[] }
+  unreadScrollTo: boolean
 }
 
 const initialState: IMessageStore = {
@@ -111,7 +113,8 @@ const initialState: IMessageStore = {
   pollVotesLoadingState: {},
   pollVotesInitialCount: null,
   pendingPollActions: {},
-  pendingMessagesMap: {}
+  pendingMessagesMap: {},
+  unreadScrollTo: true
 }
 
 const messageSlice = createSlice({
@@ -160,6 +163,10 @@ const messageSlice = createSlice({
 
     setShowScrollToNewMessageButton: (state, action: PayloadAction<{ state: boolean }>) => {
       state.showScrollToNewMessageButton = action.payload.state
+    },
+
+    setUnreadScrollTo: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.unreadScrollTo = action.payload.state
     },
 
     setMessages: (state, action: PayloadAction<{ messages: IMessage[] }>) => {
@@ -225,32 +232,13 @@ const messageSlice = createSlice({
       const { name, markersMap } = action.payload
       const markerName = name
       for (let index = 0; index < state.activeChannelMessages.length; index++) {
-        if (
-          markerName === MESSAGE_DELIVERY_STATUS.DELIVERED &&
-          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
-            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
-            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
-        ) {
+        if (!markersMap[state.activeChannelMessages[index].id]) {
           continue
         }
-        if (
-          markerName === MESSAGE_DELIVERY_STATUS.READ &&
-          (state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
-            state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
-        ) {
-          continue
-        }
-        if (
-          markerName === MESSAGE_DELIVERY_STATUS.PLAYED &&
-          state.activeChannelMessages[index].deliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED
-        ) {
-          continue
-        }
-        if (
-          markersMap[state.activeChannelMessages[index].id] &&
-          state.activeChannelMessages[index].state !== 'Deleted'
-        ) {
-          state.activeChannelMessages[index].deliveryStatus = markerName
+        if (state.activeChannelMessages[index].state !== 'Deleted') {
+          const message = state.activeChannelMessages[index]
+          const { markerTotals, deliveryStatus } = updateMessageDeliveryStatusAndMarkers(message, markerName)
+          state.activeChannelMessages[index] = { ...message, markerTotals, deliveryStatus }
         }
       }
     },
@@ -276,14 +264,20 @@ const messageSlice = createSlice({
           if (params.state === MESSAGE_STATUS.DELETE) {
             return { ...params }
           } else {
-            let messageData: IMessage = {
-              ...message,
-              ...params
+            let statusUpdatedMessage = null
+            if (params?.deliveryStatus) {
+              statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, params.deliveryStatus)
             }
+            const messageOldData: IMessage = {
+              ...message,
+              ...params,
+              ...statusUpdatedMessage
+            }
+            let messageData = { ...messageOldData }
             if (voteDetails) {
               messageData = {
-                ...messageData,
-                pollDetails: handleVoteDetails(voteDetails, messageData)
+                ...messageOldData,
+                pollDetails: handleVoteDetails(voteDetails, messageOldData)
               }
             }
             if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
@@ -786,6 +780,7 @@ export const {
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setUnreadScrollTo,
   setMessages,
   addMessages,
   updateMessagesStatus,

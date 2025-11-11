@@ -18,6 +18,86 @@ export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
 }
+
+/**
+ * Checks if a message should be skipped when updating delivery status.
+ * Returns true if the message already has a status that is equal or higher than the new marker name.
+ * @param markerName - The new delivery status marker name (SENT, DELIVERED, READ, PLAYED)
+ * @param currentDeliveryStatus - The current delivery status of the message
+ * @returns true if the update should be skipped, false otherwise
+ */
+export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDeliveryStatus: string): boolean => {
+  if (
+    markerName === MESSAGE_DELIVERY_STATUS.SENT &&
+    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+  ) {
+    return true
+  }
+  if (
+    markerName === MESSAGE_DELIVERY_STATUS.DELIVERED &&
+    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+  ) {
+    return true
+  }
+  if (
+    markerName === MESSAGE_DELIVERY_STATUS.READ &&
+    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ || currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+  ) {
+    return true
+  }
+  if (markerName === MESSAGE_DELIVERY_STATUS.PLAYED && currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Updates a message's delivery status and markerTotals array.
+ * If the marker doesn't exist in markerTotals, it adds it with count 1.
+ * If it exists, it increments the count.
+ * @param message - The message object to update
+ * @param markerName - The new delivery status marker name (SENT, DELIVERED, READ, PLAYED)
+ * @returns A new message object with updated deliveryStatus and markerTotals
+ */
+export const updateMessageDeliveryStatusAndMarkers = (
+  message: IMessage,
+  markerName: string
+): { markerTotals: { name: string; count: number }[]; deliveryStatus: string } => {
+  if (shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) {
+    return {
+      markerTotals: message.markerTotals,
+      deliveryStatus: message.deliveryStatus
+    }
+  }
+  const markerInMarkersTotal = message?.markerTotals?.find(
+    (marker: { name: string; count: number }) => marker.name === markerName
+  )
+  if (!markerInMarkersTotal) {
+    return {
+      markerTotals: [
+        ...(message.markerTotals || []),
+        {
+          name: markerName,
+          count: 1
+        }
+      ],
+      deliveryStatus: markerName
+    }
+  } else {
+    return {
+      markerTotals: message.markerTotals.map((marker: { name: string; count: number }) =>
+        marker.name === markerName ? { ...marker, count: marker.count + 1 } : marker
+      ),
+      deliveryStatus: markerName
+    }
+  }
+}
+
 export type IAttachmentMeta = {
   thumbnail?: string
   imageWidth?: number
@@ -81,9 +161,11 @@ export const updateMessageOnAllMessages = (
       if (updatedParams.state === MESSAGE_STATUS.DELETE) {
         return { ...updatedParams }
       }
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, updatedParams.deliveryStatus)
       let updatedMessage = {
         ...message,
-        ...updatedParams
+        ...updatedParams,
+        ...statusUpdatedMessage
       }
       if (voteDetails) {
         updatedMessage = {
@@ -97,6 +179,16 @@ export const updateMessageOnAllMessages = (
   })
 }
 
+export const updateMessageStatusOnAllMessages = (name: string, markersMap: any) => {
+  activeChannelAllMessages = activeChannelAllMessages.map((message) => {
+    if (markersMap[message.id]) {
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name)
+      return { ...message, ...statusUpdatedMessage }
+    }
+    return message
+  })
+}
+
 export const removeMessageFromAllMessages = (messageId: string) => {
   activeChannelAllMessages = [...activeChannelAllMessages].filter(
     (msg) => !(msg.id === messageId || msg.tid === messageId)
@@ -105,13 +197,11 @@ export const removeMessageFromAllMessages = (messageId: string) => {
 
 export const updateMarkersOnAllMessages = (markersMap: any, name: string) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
-    if (
-      markersMap[message.id] &&
-      (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT || name === MESSAGE_DELIVERY_STATUS.READ)
-    ) {
-      return { ...message, deliveryStatus: name }
+    if (!markersMap[message.id]) {
+      return message
     }
-    return message
+    const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name)
+    return { ...message, ...statusUpdatedMessage }
   })
 }
 
@@ -200,7 +290,12 @@ export function updateMessageOnMap(
     ) {
       const updatedPendingMessages = pendingMessagesMap[channelId]?.map((msg: IMessage) => {
         if (msg.tid === updatedMessage.messageId) {
-          return { ...msg, ...updatedMessage.params }
+          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(msg, updatedMessage.params.deliveryStatus)
+          return {
+            ...msg,
+            ...updatedMessage.params,
+            ...statusUpdatedMessage
+          }
         }
         return msg
       })
@@ -221,9 +316,11 @@ export function updateMessageOnMap(
           messagesList.push({ ...mes, ...updatedMessageData })
           continue
         } else {
+          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params.deliveryStatus)
           updatedMessageData = {
             ...mes,
-            ...updatedMessage.params
+            ...updatedMessage.params,
+            ...statusUpdatedMessage
           }
           let voteDetailsData: IPollDetails | undefined
           if (voteDetails) {
@@ -335,13 +432,11 @@ export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: 
     messagesMap[channelId] = messagesMap[channelId].map((mes) => {
       const { name } = newMarkers
       const { markersMap } = newMarkers
-      if (
-        markersMap[mes.id] &&
-        (mes.deliveryStatus === MESSAGE_DELIVERY_STATUS.SENT || name === MESSAGE_DELIVERY_STATUS.READ)
-      ) {
-        return { ...mes, deliveryStatus: name }
+      if (!markersMap[mes.id]) {
+        return mes
       }
-      return mes
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(mes, name)
+      return { ...mes, ...statusUpdatedMessage }
     })
   }
 }

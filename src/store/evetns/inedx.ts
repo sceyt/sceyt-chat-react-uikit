@@ -70,6 +70,7 @@ import {
   updateMarkersOnAllMessages,
   updateMessageOnAllMessages,
   updateMessageOnMap,
+  updateMessageStatusOnAllMessages,
   updateMessageStatusOnMap,
   updatePendingMessageOnMap
 } from '../../helpers/messagesHalper'
@@ -772,9 +773,7 @@ export default function* watchForEvents(): any {
               }
             }
 
-            if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
-              addMessageToMap(channel.id, message)
-            }
+            addMessageToMap(channel.id, message)
             yield put(
               updateChannelDataAC(channel.id, {
                 messageCount: channelForAdd.messageCount,
@@ -912,13 +911,13 @@ export default function* watchForEvents(): any {
               updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
               yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
             }
-
             if (activeChannelId === channelId) {
               yield put(updateMessagesStatusAC(markerList.name, markersMap))
               updateMarkersOnAllMessages(markersMap, markerList.name)
             }
 
             updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
+            updateMessageStatusOnAllMessages(markerList.name, markersMap)
             yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
           }
 

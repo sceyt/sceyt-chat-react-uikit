@@ -657,7 +657,6 @@ function* sendTextMessage(action: IAction): any {
       throw new Error('Connection required to send message')
     }
 
-    yield put(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
@@ -1355,16 +1354,20 @@ function* getMessagesQuery(action: IAction): any {
           result.messages = [...secondResult.messages, ...result.messages]
           result.hasNext = secondResult.hasNext
         }
-        const updatedMessages: IMessage[] = []
+        let updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
           const updatedMessage = updateMessageOnMap(channel.id, { messageId: msg.id, params: msg })
           updateMessageOnAllMessages(msg.id, updatedMessage || msg)
           updatedMessages.push(updatedMessage || msg)
         })
+        const lastMessageId = updatedMessages[updatedMessages.length - 1].id
+        const allMessages = getAllMessages()
+        const allMessagesAfterLastMessage = allMessages.filter((msg: IMessage) => msg.id > lastMessageId)
+        updatedMessages = [...updatedMessages, ...allMessagesAfterLastMessage]
         setMessagesToMap(channel.id, updatedMessages)
-        setAllMessages([...updatedMessages])
+        setAllMessages(updatedMessages)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
-        yield put(setMessagesHasPrevAC(result.hasNext))
+        yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
       }
 

@@ -54,7 +54,7 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
-import { scrollToNewMessageSelector } from 'store/message/selector'
+import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
 import { isMessageUnsupported } from 'helpers/message'
@@ -223,7 +223,7 @@ const Message = ({
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
-
+  const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount =
@@ -441,7 +441,8 @@ const Message = ({
       ) &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      !unreadScrollTo
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
@@ -495,7 +496,7 @@ const Message = ({
   }
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message.id)
       }

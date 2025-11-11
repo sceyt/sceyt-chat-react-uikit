@@ -67,7 +67,6 @@ import {
   getActiveChannelId,
   getChannelFromMap,
   setActiveChannelId,
-  setUnreadScrollTo,
   removeChannelFromMap,
   getLastChannelFromMap,
   checkChannelExists,
@@ -89,6 +88,7 @@ import {
   clearMessagesAC,
   clearSelectedMessagesAC,
   sendTextMessageAC,
+  setUnreadScrollToAC,
   // clearMessagesAC,
   updateMessageAC
 } from '../message/actions'
@@ -894,7 +894,7 @@ function* switchChannel(action: IAction): any {
     }
     if (updateActiveChannel) {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
-      yield call(setUnreadScrollTo, true)
+      yield put(setUnreadScrollToAC(true))
       yield call(setActiveChannelId, channel && channel.id)
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
