@@ -828,9 +828,32 @@ const MessageList: React.FC<MessagesProps> = ({
   const handleDropOutside = (e: any) => {
     e.preventDefault()
     e.stopPropagation()
+
+    const target = e.target as HTMLElement
+    const isDropOnAttachmentArea = target.closest('[data-attachment-area]')
+
+    if (isDropOnAttachmentArea) {
+      return
+    }
+
     setIsDragging(null)
     dispatch(setIsDraggingAC(false))
     dispatch(setDraggedAttachmentsAC([], ''))
+
+    if (e.dataTransfer) {
+      e.dataTransfer.clearData()
+    }
+  }
+
+  const handleClickOutside = (e: any) => {
+    const target = e.target as HTMLElement
+    const container = document.getElementById('draggingContainer')
+
+    if (container && (target === container || target.id === 'draggingContainer')) {
+      setIsDragging(null)
+      dispatch(setIsDraggingAC(false))
+      dispatch(setDraggedAttachmentsAC([], ''))
+    }
   }
 
   useEffect(() => {
@@ -1181,6 +1204,7 @@ const MessageList: React.FC<MessagesProps> = ({
             e.stopPropagation()
           }}
           onDrop={handleDropOutside}
+          onClick={handleClickOutside}
           topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
           backgroundColor={backgroundColor || background}
@@ -1188,6 +1212,7 @@ const MessageList: React.FC<MessagesProps> = ({
           {/* {isDragging === 'media' ? ( */}
           {/*  <React.Fragment> */}
           <DropAttachmentArea
+            data-attachment-area='file'
             backgroundColor={outgoingMessageBackground}
             color={textPrimary}
             margin='32px 32px 12px'
@@ -1206,6 +1231,7 @@ const MessageList: React.FC<MessagesProps> = ({
           </DropAttachmentArea>
           {isDragging === 'media' && (
             <DropAttachmentArea
+              data-attachment-area='media'
               backgroundColor={outgoingMessageBackground}
               color={textPrimary}
               iconBackgroundColor={background}
