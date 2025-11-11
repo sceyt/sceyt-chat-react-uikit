@@ -1199,7 +1199,7 @@ const MessageList: React.FC<MessagesProps> = ({
           id='draggingContainer'
           draggable
           onDragLeave={handleDragOut}
-          onDragOver={(e) => {
+          onDragOver={(e: any) => {
             e.preventDefault()
             e.stopPropagation()
           }}

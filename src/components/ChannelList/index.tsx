@@ -468,13 +468,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }
 
-  const readDroppedFiles = (e: DragEvent) =>
-    new Promise<File[]>((resolve) => {
-      const fileList: File[] = Array.from(e.dataTransfer?.files || [])
-      resolve(fileList)
-    })
-
   const processFilesFromItems = async (items: DataTransferItemList) => {
+    if (filesProcessedRef.current) return
+
     const files: File[] = []
     const filePromises: Promise<void>[] = []
 
@@ -494,11 +490,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
     await Promise.all(filePromises)
 
-    if (files.length > 0) {
+    if (files.length > 0 && !filesProcessedRef.current) {
       const attachmentsFiles = await readDroppedFilesForAttachments(files)
-      dispatch(setIsDraggingAC(true))
-      dispatch(setDraggedAttachmentsAC(attachmentsFiles as any, ''))
-      filesProcessedRef.current = true
+      if (!filesProcessedRef.current) {
+        dispatch(setIsDraggingAC(true))
+        dispatch(setDraggedAttachmentsAC(attachmentsFiles as any, ''))
+        filesProcessedRef.current = true
+      }
     }
   }
 
@@ -519,6 +517,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
       if (hasFiles) {
         setIsDraggingOverList(true)
         setDraggedChannelId(channelId)
+        filesProcessedRef.current = false
 
         if (autoOpenTimeoutRef.current) {
           clearTimeout(autoOpenTimeoutRef.current)
@@ -665,19 +664,23 @@ const ChannelList: React.FC<IChannelListProps> = ({
     e.preventDefault()
     e.stopPropagation()
 
+    filesProcessedRef.current = true
+
     setDraggedChannelId(null)
     setIsDraggingOverList(false)
     pendingChannelIdRef.current = null
     pendingDataTransferItemsRef.current = null
-    filesProcessedRef.current = false
 
     if (autoOpenTimeoutRef.current) {
       clearTimeout(autoOpenTimeoutRef.current)
       autoOpenTimeoutRef.current = null
     }
 
+    // When dropping on channel name in ChannelList, clear any existing drag UI immediately
+    dispatch(setIsDraggingAC(false))
+    dispatch(setDraggedAttachmentsAC([], ''))
+
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const files = await readDroppedFiles(e.nativeEvent)
       const channel =
         channels.find((c: IChannel) => c.id === channelId) ||
         searchedChannels.chats_groups?.find((c: IChannel) => c.id === channelId) ||
@@ -688,15 +691,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
         if (channelWasNotActive) {
           setSelectedChannel(channel)
         }
-
-        const delay = channelWasNotActive ? 150 : 0
-
-        setTimeout(async () => {
-          const attachmentsFiles = await readDroppedFilesForAttachments(files)
-
-          dispatch(setIsDraggingAC(true))
-          dispatch(setDraggedAttachmentsAC(attachmentsFiles as any, ''))
-        }, delay)
       }
     }
 
