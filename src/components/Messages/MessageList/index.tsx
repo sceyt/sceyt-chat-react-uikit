@@ -812,7 +812,6 @@ const MessageList: React.FC<MessagesProps> = ({
     setIsDragging(false)
     dispatch(setIsDraggingAC(false))
 
-    // Check if files are in dataTransfer (normal drag) or in store (dropped on channel)
     if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       readDroppedFiles(e)
         .then((result) => {
@@ -823,7 +822,6 @@ const MessageList: React.FC<MessagesProps> = ({
         })
       e.dataTransfer.clearData()
     } else if (draggedAttachments && draggedAttachments.length > 0) {
-      // Files were dropped on channel, use stored attachments
       dispatch(setDraggedAttachmentsAC(draggedAttachments as any, 'media'))
     }
   }
@@ -831,7 +829,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const handleDropOutside = (e: any) => {
     e.preventDefault()
     e.stopPropagation()
-    // Clear drag UI when files are dropped outside file/media sections
     setIsDragging(null)
     dispatch(setIsDraggingAC(false))
     dispatch(setDraggedAttachmentsAC([], ''))
@@ -850,14 +847,11 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }, [messages, channel?.lastMessage?.id, scrollRef?.current?.scrollTop, showScrollToNewMessageButton])
 
-  // Detect dragged attachments from store (when files are dropped on channel)
   useEffect(() => {
     if (draggedAttachments && draggedAttachments.length > 0) {
-      // Check if attachments have been assigned a type (user selected file/media)
       const hasType = draggedAttachments[0]?.attachmentType && draggedAttachments[0].attachmentType !== ''
 
       if (!hasType && !isDragging) {
-        // Files were dropped on channel, show drag UI
         let hasMediaFiles = false
         draggedAttachments.forEach((attachment: any) => {
           const fileType = attachment.type?.split('/')[0]
@@ -865,16 +859,13 @@ const MessageList: React.FC<MessagesProps> = ({
             hasMediaFiles = true
           }
         })
-        // Set dragging state to show both file and media options if media files exist
         setIsDragging(hasMediaFiles ? 'media' : 'file')
         dispatch(setIsDraggingAC(true))
       } else if (hasType) {
-        // User selected file or media, hide drag UI
         setIsDragging(null)
         dispatch(setIsDraggingAC(false))
       }
     } else if ((!draggedAttachments || draggedAttachments.length === 0) && isDragging && !draggingSelector) {
-      // Clear dragging state when attachments are cleared
       setIsDragging(null)
       dispatch(setIsDraggingAC(false))
     }
