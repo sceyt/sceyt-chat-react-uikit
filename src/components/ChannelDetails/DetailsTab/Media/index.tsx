@@ -87,8 +87,8 @@ const Container = styled.div<any>`
   flex-wrap: wrap;
 `
 const MediaItem = styled.div`
-  width: 125px;
-  height: 125px;
+  width: 124px;
+  height: 124px;
   box-sizing: border-box;
   //border: 1px solid #ccc;
   border: 0.5px solid rgba(0, 0, 0, 0.1);
