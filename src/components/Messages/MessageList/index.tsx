@@ -801,7 +801,6 @@ const MessageList: React.FC<MessagesProps> = ({
         })
       e.dataTransfer.clearData()
     } else if (draggedAttachments && draggedAttachments.length > 0) {
-      // Files were dropped on channel, use stored attachments
       dispatch(setDraggedAttachmentsAC(draggedAttachments as any, 'file'))
     }
   }
