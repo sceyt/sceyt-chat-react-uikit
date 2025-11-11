@@ -35,7 +35,9 @@ import {
   setCloseSearchChannelsAC,
   setSearchedChannelsAC,
   switchChannelActionAC,
-  switchChannelInfoAC
+  switchChannelInfoAC,
+  setDraggedAttachmentsAC,
+  setIsDraggingAC
 } from '../../store/channel/actions'
 import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
@@ -236,7 +238,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
   } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
@@ -260,6 +264,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const [listWidthIsSet, setListWidthIsSet] = useState(false)
   const [profileIsOpen, setProfileIsOpen] = useState(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const [draggedChannelId, setDraggedChannelId] = useState<string | null>(null)
+  const [isDraggingOverList, setIsDraggingOverList] = useState(false)
+  const autoOpenTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingChannelIdRef = useRef<string | null>(null)
+  const filesProcessedRef = useRef<boolean>(false)
+  const pendingDataTransferItemsRef = useRef<DataTransferItemList | null>(null)
 
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
@@ -451,12 +461,261 @@ const ChannelList: React.FC<IChannelListProps> = ({
   }, [contactsMap]) */
 
   const setSelectedChannel = (channel: IChannel) => {
-    if (activeChannel.id !== channel.id) {
+    if (!activeChannel || !activeChannel.id || activeChannel.id !== channel.id) {
       dispatch(sendTypingAC(false))
       dispatch(clearMessagesAC())
       dispatch(switchChannelActionAC(channel))
     }
   }
+
+  const readDroppedFiles = (e: DragEvent) =>
+    new Promise<File[]>((resolve) => {
+      const fileList: File[] = Array.from(e.dataTransfer?.files || [])
+      resolve(fileList)
+    })
+
+  const processFilesFromItems = async (items: DataTransferItemList) => {
+    const files: File[] = []
+    const filePromises: Promise<void>[] = []
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+      if (item.kind === 'file') {
+        const filePromise = new Promise<void>((resolve) => {
+          const file = item.getAsFile()
+          if (file) {
+            files.push(file)
+          }
+          resolve()
+        })
+        filePromises.push(filePromise)
+      }
+    }
+
+    await Promise.all(filePromises)
+
+    if (files.length > 0) {
+      const attachmentsFiles = await readDroppedFilesForAttachments(files)
+      dispatch(setIsDraggingAC(true))
+      dispatch(setDraggedAttachmentsAC(attachmentsFiles as any, ''))
+      filesProcessedRef.current = true
+    }
+  }
+
+  const handleDragEnter = (e: React.DragEvent, channelId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
+      let hasFiles = false
+
+      fileList.forEach((item) => {
+        if (item.kind === 'file') {
+          hasFiles = true
+        }
+      })
+
+      if (hasFiles) {
+        setIsDraggingOverList(true)
+        setDraggedChannelId(channelId)
+
+        if (autoOpenTimeoutRef.current) {
+          clearTimeout(autoOpenTimeoutRef.current)
+          autoOpenTimeoutRef.current = null
+        }
+
+        if (!activeChannel || activeChannel.id !== channelId) {
+          pendingChannelIdRef.current = channelId
+          pendingDataTransferItemsRef.current = e.dataTransfer.items
+          autoOpenTimeoutRef.current = setTimeout(async () => {
+            const channel =
+              channels.find((c: IChannel) => c.id === channelId) ||
+              searchedChannels.chats_groups?.find((c: IChannel) => c.id === channelId) ||
+              searchedChannels.channels?.find((c: IChannel) => c.id === channelId)
+
+            if (channel && (!activeChannel || activeChannel.id !== channel.id)) {
+              setSelectedChannel(channel)
+
+              setTimeout(async () => {
+                if (pendingDataTransferItemsRef.current && !filesProcessedRef.current) {
+                  await processFilesFromItems(pendingDataTransferItemsRef.current)
+                }
+              }, 150)
+            }
+          }, 800)
+        } else {
+          if (!filesProcessedRef.current) {
+            processFilesFromItems(e.dataTransfer.items)
+          }
+        }
+      }
+    }
+  }
+
+  const handleListDragEnter = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      setIsDraggingOverList(true)
+    }
+  }
+
+  const handleListDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const relatedTarget = e.relatedTarget as HTMLElement
+    if (!relatedTarget) {
+      setIsDraggingOverList(false)
+    }
+  }
+
+  const handleListDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    const relatedTarget = e.relatedTarget as HTMLElement
+    if (!relatedTarget) {
+      setDraggedChannelId(null)
+      setIsDraggingOverList(false)
+      pendingChannelIdRef.current = null
+      pendingDataTransferItemsRef.current = null
+      filesProcessedRef.current = false
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current)
+        autoOpenTimeoutRef.current = null
+      }
+      dispatch(setIsDraggingAC(false))
+      dispatch(setDraggedAttachmentsAC([], ''))
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent, channelId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
+      const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
+      let hasFiles = false
+
+      fileList.forEach((item) => {
+        if (item.kind === 'file') {
+          hasFiles = true
+        }
+      })
+
+      if (hasFiles) {
+        setDraggedChannelId(channelId)
+
+        if (pendingChannelIdRef.current === channelId) {
+          pendingDataTransferItemsRef.current = e.dataTransfer.items
+        }
+
+        if (activeChannel && activeChannel.id === channelId && !filesProcessedRef.current) {
+          processFilesFromItems(e.dataTransfer.items)
+        }
+      }
+    }
+  }
+
+  const readDroppedFilesForAttachments = (files: File[]) =>
+    new Promise<any[]>((resolve) => {
+      const attachmentsFiles: any[] = []
+      let readFiles = 0
+      let errorCount = 0
+
+      if (files.length === 0) {
+        resolve([])
+        return
+      }
+
+      files.forEach((file) => {
+        const fileReader = new FileReader()
+
+        fileReader.onload = (event: any) => {
+          const fileData = event.target.result
+          attachmentsFiles.push({ name: file.name, data: fileData, type: file.type })
+          readFiles++
+
+          if (readFiles + errorCount === files.length) {
+            resolve(attachmentsFiles)
+          }
+        }
+
+        fileReader.onerror = () => {
+          errorCount++
+
+          if (readFiles + errorCount === files.length) {
+            resolve(attachmentsFiles)
+          }
+        }
+
+        fileReader.readAsDataURL(file)
+      })
+    })
+
+  const handleDrop = async (e: React.DragEvent, channelId: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+
+    setDraggedChannelId(null)
+    setIsDraggingOverList(false)
+    pendingChannelIdRef.current = null
+    pendingDataTransferItemsRef.current = null
+    filesProcessedRef.current = false
+
+    if (autoOpenTimeoutRef.current) {
+      clearTimeout(autoOpenTimeoutRef.current)
+      autoOpenTimeoutRef.current = null
+    }
+
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      const files = await readDroppedFiles(e.nativeEvent)
+      const channel =
+        channels.find((c: IChannel) => c.id === channelId) ||
+        searchedChannels.chats_groups?.find((c: IChannel) => c.id === channelId) ||
+        searchedChannels.channels?.find((c: IChannel) => c.id === channelId)
+
+      if (channel) {
+        const channelWasNotActive = !activeChannel || !activeChannel.id || activeChannel.id !== channel.id
+        if (channelWasNotActive) {
+          setSelectedChannel(channel)
+        }
+
+        const delay = channelWasNotActive ? 150 : 0
+
+        setTimeout(async () => {
+          const attachmentsFiles = await readDroppedFilesForAttachments(files)
+
+          dispatch(setIsDraggingAC(true))
+          dispatch(setDraggedAttachmentsAC(attachmentsFiles as any, ''))
+        }, delay)
+      }
+    }
+
+    e.dataTransfer.clearData()
+  }
+
+  const handleListDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setIsDraggingOverList(false)
+  }
+
+  useEffect(() => {
+    return () => {
+      if (autoOpenTimeoutRef.current) {
+        clearTimeout(autoOpenTimeoutRef.current)
+      }
+    }
+  }, [])
 
   return (
     <Container
@@ -465,6 +724,13 @@ const ChannelList: React.FC<IChannelListProps> = ({
       ref={channelListRef}
       borderColor={borderColor}
       backgroundColor={backgroundColor || background}
+      isDraggingOverList={isDraggingOverList}
+      accentColor={accentColor}
+      backgroundHovered={backgroundHovered}
+      onDragEnter={handleListDragEnter}
+      onDragLeave={handleListDragLeave}
+      onDragOver={handleListDragOver}
+      onDrop={handleListDrop}
     >
       <ChannelListHeader
         withCustomList={!!List}
@@ -560,6 +826,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     getCustomLatestMessage={getCustomLatestMessage as any}
                     doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                     showPhoneNumber={showPhoneNumber}
+                    isDraggedOver={draggedChannelId === channel.id}
+                    onDragEnter={(e) => handleDragEnter(e, channel.id)}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={(e) => handleDragOver(e, channel.id)}
+                    onDrop={(e) => handleDrop(e, channel.id)}
                   />
                 )
               )}
@@ -608,6 +879,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
+                            isDraggedOver={draggedChannelId === channel.id}
+                            onDragEnter={(e) => handleDragEnter(e, channel.id)}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={(e) => handleDragOver(e, channel.id)}
+                            onDrop={(e) => handleDrop(e, channel.id)}
                           />
                         )
                       )}
@@ -692,6 +968,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                             getCustomLatestMessage={getCustomLatestMessage as any}
                             doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                             showPhoneNumber={showPhoneNumber}
+                            isDraggedOver={draggedChannelId === channel.id}
+                            onDragEnter={(e) => handleDragEnter(e, channel.id)}
+                            onDragLeave={handleDragLeave}
+                            onDragOver={(e) => handleDragOver(e, channel.id)}
+                            onDrop={(e) => handleDrop(e, channel.id)}
                           />
                         )
                       )}
@@ -754,6 +1035,11 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     getCustomLatestMessage={getCustomLatestMessage as any}
                     doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
                     showPhoneNumber={showPhoneNumber}
+                    isDraggedOver={draggedChannelId === channel.id}
+                    onDragEnter={(e) => handleDragEnter(e, channel.id)}
+                    onDragLeave={handleDragLeave}
+                    onDragOver={(e) => handleDragOver(e, channel.id)}
+                    onDrop={(e) => handleDrop(e, channel.id)}
                   />
                 )
               )}
@@ -882,7 +1168,15 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
 export default ChannelList
 
-const Container = styled.div<{ borderColor: string; withCustomList?: boolean; ref?: any; backgroundColor?: string }>`
+const Container = styled.div<{
+  borderColor: string
+  withCustomList?: boolean
+  ref?: any
+  backgroundColor?: string
+  isDraggingOverList?: boolean
+  accentColor?: string
+  backgroundHovered?: string
+}>`
   position: relative;
   display: flex;
   flex-direction: column;
@@ -892,6 +1186,15 @@ const Container = styled.div<{ borderColor: string; withCustomList?: boolean; re
   border-right: ${(props) => (props.withCustomList ? '' : `1px solid ${props.borderColor}`)};
   background-color: ${(props) => props.backgroundColor};
   height: 100%;
+  transition: all 0.2s ease;
+
+  ${(props) =>
+    props.isDraggingOverList &&
+    `
+    background-color: ${props.backgroundHovered || props.backgroundColor || '#f5f5f5'};
+    box-shadow: inset 0 0 0 2px ${props.accentColor || 'rgba(0, 123, 255, 0.3)'};
+  `}
+
   ${(props) =>
     props.withCustomList
       ? ''

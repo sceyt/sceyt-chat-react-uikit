@@ -79,6 +79,11 @@ interface IChannelProps {
   }) => any
   doNotShowMessageDeliveryTypes: string[]
   showPhoneNumber?: boolean
+  isDraggedOver?: boolean
+  onDragEnter?: (e: React.DragEvent) => void
+  onDragLeave?: (e: React.DragEvent) => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDrop?: (e: React.DragEvent) => void
 }
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
@@ -283,7 +288,12 @@ const Channel: React.FC<IChannelProps> = ({
   setSelectedChannel,
   getCustomLatestMessage,
   doNotShowMessageDeliveryTypes,
-  showPhoneNumber
+  showPhoneNumber,
+  isDraggedOver = false,
+  onDragEnter,
+  onDragLeave,
+  onDragOver,
+  onDrop
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -515,6 +525,11 @@ const Channel: React.FC<IChannelProps> = ({
       channelsMargin={channelsMargin}
       onClick={() => setSelectedChannel(channel)}
       hoverBackground={channelHoverBackground || backgroundHovered}
+      isDraggedOver={isDraggedOver}
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
     >
       {showAvatar && (
         <AvatarWrapper>
@@ -838,12 +853,18 @@ const Container = styled.div<{
   selectedChannelBorderRadius?: string
   theme?: string
   hoverBackground?: string
+  isDraggedOver?: boolean
 }>`
   position: relative;
   display: flex;
   align-items: center;
   cursor: pointer;
-  background-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : 'inherit')};
+  background-color: ${(props) =>
+    props.selectedChannel
+      ? props.selectedBackgroundColor
+      : props.isDraggedOver
+        ? props.hoverBackground || props.selectedBackgroundColor
+        : 'inherit'};
   border-left: ${(props) => (props.selectedChannel ? props.selectedChannelLeftBorder : null)};
   // padding: selectedChannel ? '8px 16px 8px 13px' : '8px 16px'
   padding: ${(props) =>
@@ -852,8 +873,17 @@ const Container = styled.div<{
       : props.channelsPaddings || '8px'};
   margin: ${(props) => props.channelsMargin || '0 8px'};
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
+  transition: all 0.2s ease;
 
-  transition: all 0.2s;
+  ${({ isDraggedOver, selectedChannel, hoverBackground }) =>
+    isDraggedOver &&
+    !selectedChannel &&
+    `
+    background-color: ${hoverBackground};
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+    z-index: 10;
+  `}
+
   &:hover {
     ${({ selectedChannel, hoverBackground }) =>
       !selectedChannel &&

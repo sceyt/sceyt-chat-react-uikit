@@ -26,9 +26,14 @@ import {
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector
 } from '../../../store/message/selector'
-import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
+import { setDraggedAttachmentsAC, setIsDraggingAC } from '../../../store/channel/actions'
 import { themeSelector } from '../../../store/theme/selector'
-import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
+import {
+  activeChannelSelector,
+  isDraggingSelector,
+  tabIsActiveSelector,
+  draggedAttachmentsSelector
+} from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
@@ -503,6 +508,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
   const messagesLoading = useSelector(messagesLoadingState)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
+  const draggedAttachments = useSelector(draggedAttachmentsSelector, shallowEqual)
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
   const [unreadMessageId, setUnreadMessageId] = useState('')
@@ -739,8 +745,12 @@ const MessageList: React.FC<MessagesProps> = ({
     if (e.target.classList.contains('dragover')) {
       e.target.classList.remove('dragover')
     }
-    if (!e.relatedTarget || !e.relatedTarget.draggable) {
-      setIsDragging(false)
+    const relatedTarget = e.relatedTarget as HTMLElement
+    const draggingContainer = document.getElementById('draggingContainer')
+    if (relatedTarget && draggingContainer && !draggingContainer.contains(relatedTarget)) {
+      setIsDragging(null)
+      dispatch(setIsDraggingAC(false))
+      dispatch(setDraggedAttachmentsAC([], ''))
     }
   }
   const readDroppedFiles = (e: any) =>
@@ -779,7 +789,9 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    dispatch(setIsDraggingAC(false))
+
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       readDroppedFiles(e)
         .then((result) => {
           dispatch(setDraggedAttachmentsAC(result as any, 'file'))
@@ -788,6 +800,9 @@ const MessageList: React.FC<MessagesProps> = ({
           console.error('Error in handleDropFile:', error)
         })
       e.dataTransfer.clearData()
+    } else if (draggedAttachments && draggedAttachments.length > 0) {
+      // Files were dropped on channel, use stored attachments
+      dispatch(setDraggedAttachmentsAC(draggedAttachments as any, 'file'))
     }
   }
 
@@ -795,7 +810,10 @@ const MessageList: React.FC<MessagesProps> = ({
     e.preventDefault()
     e.stopPropagation()
     setIsDragging(false)
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+    dispatch(setIsDraggingAC(false))
+
+    // Check if files are in dataTransfer (normal drag) or in store (dropped on channel)
+    if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       readDroppedFiles(e)
         .then((result) => {
           dispatch(setDraggedAttachmentsAC(result as any, 'media'))
@@ -804,7 +822,19 @@ const MessageList: React.FC<MessagesProps> = ({
           console.error('Error in handleDropMedia:', error)
         })
       e.dataTransfer.clearData()
+    } else if (draggedAttachments && draggedAttachments.length > 0) {
+      // Files were dropped on channel, use stored attachments
+      dispatch(setDraggedAttachmentsAC(draggedAttachments as any, 'media'))
     }
+  }
+
+  const handleDropOutside = (e: any) => {
+    e.preventDefault()
+    e.stopPropagation()
+    // Clear drag UI when files are dropped outside file/media sections
+    setIsDragging(null)
+    dispatch(setIsDraggingAC(false))
+    dispatch(setDraggedAttachmentsAC([], ''))
   }
 
   useEffect(() => {
@@ -819,6 +849,36 @@ const MessageList: React.FC<MessagesProps> = ({
       prevDisableRef.current = false
     }
   }, [messages, channel?.lastMessage?.id, scrollRef?.current?.scrollTop, showScrollToNewMessageButton])
+
+  // Detect dragged attachments from store (when files are dropped on channel)
+  useEffect(() => {
+    if (draggedAttachments && draggedAttachments.length > 0) {
+      // Check if attachments have been assigned a type (user selected file/media)
+      const hasType = draggedAttachments[0]?.attachmentType && draggedAttachments[0].attachmentType !== ''
+
+      if (!hasType && !isDragging) {
+        // Files were dropped on channel, show drag UI
+        let hasMediaFiles = false
+        draggedAttachments.forEach((attachment: any) => {
+          const fileType = attachment.type?.split('/')[0]
+          if (fileType === 'image' || fileType === 'video') {
+            hasMediaFiles = true
+          }
+        })
+        // Set dragging state to show both file and media options if media files exist
+        setIsDragging(hasMediaFiles ? 'media' : 'file')
+        dispatch(setIsDraggingAC(true))
+      } else if (hasType) {
+        // User selected file or media, hide drag UI
+        setIsDragging(null)
+        dispatch(setIsDraggingAC(false))
+      }
+    } else if ((!draggedAttachments || draggedAttachments.length === 0) && isDragging && !draggingSelector) {
+      // Clear dragging state when attachments are cleared
+      setIsDragging(null)
+      dispatch(setIsDraggingAC(false))
+    }
+  }, [draggedAttachments, isDragging, draggingSelector])
 
   useEffect(() => {
     if (scrollToRepliedMessage) {
@@ -1126,6 +1186,11 @@ const MessageList: React.FC<MessagesProps> = ({
           id='draggingContainer'
           draggable
           onDragLeave={handleDragOut}
+          onDragOver={(e) => {
+            e.preventDefault()
+            e.stopPropagation()
+          }}
+          onDrop={handleDropOutside}
           topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
           height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
           backgroundColor={backgroundColor || background}
@@ -1139,6 +1204,7 @@ const MessageList: React.FC<MessagesProps> = ({
             iconBackgroundColor={background}
             draggable
             onDrop={handleDropFile}
+            onClick={handleDropFile}
             onDragOver={handleDragOver}
             borderColor={border}
             draggedBorderColor={accentColor}
@@ -1155,6 +1221,7 @@ const MessageList: React.FC<MessagesProps> = ({
               iconBackgroundColor={background}
               draggable
               onDrop={handleDropMedia}
+              onClick={handleDropMedia}
               onDragOver={handleDragOver}
               borderColor={border}
               draggedBorderColor={accentColor}
@@ -1597,6 +1664,7 @@ export const DropAttachmentArea = styled.div<{
   letter-spacing: -0.2px;
   color: ${(props) => props.color};
   transition: all 0.1s;
+  cursor: pointer;
 
   &.dragover {
     background-color: ${(props) => props.backgroundColor};
