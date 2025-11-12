@@ -1339,6 +1339,7 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesNextCompleteAC(true)) */
       } else {
+        const previousAllMessages = getAllMessages()
         setMessagesToMap(channel.id, [])
         setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
@@ -1362,8 +1363,17 @@ function* getMessagesQuery(action: IAction): any {
         })
         const lastMessageId = updatedMessages[updatedMessages.length - 1].id
         const allMessages = getAllMessages()
-        const allMessagesAfterLastMessage = allMessages.filter((msg: IMessage) => msg.id > lastMessageId)
-        updatedMessages = [...updatedMessages, ...allMessagesAfterLastMessage]
+        const setMappedAllMessages: { [key: string]: IMessage } = {}
+        previousAllMessages.forEach((msg: IMessage) => {
+          setMappedAllMessages[msg.id] = msg
+        })
+        allMessages.forEach((msg: IMessage) => {
+          setMappedAllMessages[msg.id] = msg
+        })
+        const allMessagesAfterLastMessage = Object.values(setMappedAllMessages)?.filter(
+          (msg: IMessage) => msg.id > lastMessageId
+        )
+        updatedMessages = [...updatedMessages, ...(allMessagesAfterLastMessage || [])]
         setMessagesToMap(channel.id, updatedMessages)
         setAllMessages(updatedMessages)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))

@@ -1148,13 +1148,13 @@ const MessageList: React.FC<MessagesProps> = ({
       if (scrollElement) {
         scrollElement.style.scrollBehavior = 'inherit'
       }
+      setScrollIntoView(true)
       const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
       if (lastReadMessageNode && scrollElement) {
         scrollElement.scrollTo({
           top: lastReadMessageNode.offsetTop - 200,
-          behavior: 'smooth'
+          behavior: 'auto'
         })
-        setScrollIntoView(true)
         setTimeout(() => {
           dispatch(setUnreadScrollToAC(false))
           setScrollIntoView(false)

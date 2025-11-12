@@ -425,7 +425,8 @@ const Message = ({
         message.userMarkers &&
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
-        message.incoming
+        message.incoming &&
+        !unreadScrollTo
       ) {
         dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
       }
@@ -514,7 +515,7 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible])
+  }, [isVisible, unreadScrollTo])
 
   useDidUpdate(() => {
     if (tabIsActive) {
