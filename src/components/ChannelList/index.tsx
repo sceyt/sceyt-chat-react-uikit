@@ -1183,13 +1183,6 @@ const Container = styled.div<{
   transition: all 0.2s ease;
 
   ${(props) =>
-    props.isDraggingOverList &&
-    `
-    background-color: ${props.backgroundHovered || props.backgroundColor || '#f5f5f5'};
-    box-shadow: inset 0 0 0 2px ${props.accentColor || 'rgba(0, 123, 255, 0.3)'};
-  `}
-
-  ${(props) =>
     props.withCustomList
       ? ''
       : `
