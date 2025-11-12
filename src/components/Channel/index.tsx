@@ -239,7 +239,7 @@ const ChannelMessageText = ({
                     : lastMessage.body === 'LG'
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
-                        ? 'Joined via invite link'
+                        ? 'joined via invite link'
                         : ''
           }`
         ) : (
