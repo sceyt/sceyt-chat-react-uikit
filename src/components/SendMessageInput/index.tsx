@@ -131,13 +131,13 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 
-function AutoFocusPlugin({ messageForReply }: any) {
+function AutoFocusPlugin({ messageForReply, focusTrigger }: any) {
   const [editor] = useLexicalComposerContext()
 
   useEffect(() => {
     // Focus the editor when the effect fires!
     editor.focus()
-  }, [editor, messageForReply])
+  }, [editor, messageForReply, focusTrigger])
 
   return null
 }
@@ -406,6 +406,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [inTypingState, setInTypingState] = useState(false)
   const [sendMessageIsActive, setSendMessageIsActive] = useState(false)
   const [attachments, setAttachments]: any = useState([])
+  const [focusTrigger, setFocusTrigger] = useState(0)
 
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [deletePopupOpen, setDeletePopupOpen] = useState(false)
@@ -1159,6 +1160,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       })
       dispatch(setDraggedAttachmentsAC([], ''))
+      // Trigger focus after dragged files are ready to upload
+      setTimeout(() => {
+        setFocusTrigger((prev) => prev + 1)
+      }, 100)
     }
   }, [draggedAttachments])
 
@@ -1852,7 +1857,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         color={textPrimary}
                       >
                         <LexicalComposer initialConfig={initialConfig}>
-                          <AutoFocusPlugin messageForReply={messageForReply} />
+                          <AutoFocusPlugin messageForReply={messageForReply} focusTrigger={focusTrigger} />
                           <ClearEditorPlugin
                             shouldClearEditor={shouldClearEditor}
                             setEditorCleared={() => setShouldClearEditor({ clear: false })}
