@@ -1,4 +1,4 @@
-import { IAttachment, IMarker, IMessage, IPollDetails, IPollVote, IReaction } from '../../types'
+import { IAttachment, IMessage, IPollDetails, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
@@ -430,11 +430,17 @@ export const removeReactionOnAllMessages = (message: IMessage, reaction: IReacti
 
 export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
   if (messagesMap[channelId] && newMarkers && newMarkers.markersMap) {
-    newMarkers.markersMap.forEach((marker: IMarker) => {
-      const messageShouldBeUpdated = messagesMap[channelId][marker.messageId]
+    const messageIds: string[] = []
+    Object.keys(newMarkers.markersMap).forEach((messageId) => {
+      if (newMarkers.markersMap[messageId]) {
+        messageIds.push(messageId)
+      }
+    })
+    messageIds.forEach((messageId: string) => {
+      const messageShouldBeUpdated = messagesMap[channelId][messageId]
       if (messageShouldBeUpdated) {
-        const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, marker.name)
-        messagesMap[channelId][marker.messageId] = {
+        const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
+        messagesMap[channelId][messageId] = {
           ...messageShouldBeUpdated,
           ...statusUpdatedMessage
         }
