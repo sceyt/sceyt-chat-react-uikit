@@ -1,7 +1,7 @@
 import { call, put, select, take } from 'redux-saga/effects'
 import { eventChannel } from 'redux-saga'
 import { getClient } from '../../common/client'
-import { IAttachment, IChannel, IMarker, IMember, IMessage, IReaction, IUser } from '../../types'
+import { IAttachment, IChannel, IMarker, IMember, IMessage, IPollDetails, IReaction, IUser } from '../../types'
 import { CHANNEL_EVENT_TYPES } from '../channel/constants'
 import {
   addChannelToAllChannels,
@@ -23,6 +23,7 @@ import {
   addChannelAC,
   markMessagesAsDeliveredAC,
   removeChannelAC,
+  removeChannelCachesAC,
   setActiveChannelAC,
   setAddedToChannelAC,
   setChannelToAddAC,
@@ -39,9 +40,12 @@ import {
 } from '../channel/actions'
 import {
   addMessageAC,
+  addPollVotesToListAC,
   addReactionToMessageAC,
   clearMessagesAC,
+  deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
+  removePendingMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
   updateMessagesMarkersAC,
@@ -61,12 +65,12 @@ import {
   MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
-  removePendingMessageFromMap,
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
   updateMessageOnAllMessages,
   updateMessageOnMap,
+  updateMessageStatusOnAllMessages,
   updateMessageStatusOnMap,
   updatePendingMessageOnMap
 } from '../../helpers/messagesHalper'
@@ -220,6 +224,50 @@ export default function* watchForEvents(): any {
           user,
           message,
           reaction
+        }
+      })
+    }
+    channelListener.onPollAdded = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_ADDED,
+        args: {
+          channel,
+          pollDetails,
+          messageId
+        }
+      })
+    }
+    channelListener.onPollRetracted = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_RETRACTED,
+        args: {
+          channel,
+          pollDetails,
+          messageId
+        }
+      })
+    }
+    channelListener.onPollDeleted = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_DELETED,
+        args: {
+          channel,
+          pollDetails,
+          messageId
+        }
+      })
+    }
+    channelListener.onPollClosed = (channel: IChannel, pollDetails: IPollDetails, messageId: string) => {
+      if (shouldSkip(channel)) return
+      emitter({
+        type: CHANNEL_EVENT_TYPES.POLL_CLOSED,
+        args: {
+          channel,
+          pollDetails,
+          messageId
         }
       })
     }
@@ -453,71 +501,178 @@ export default function* watchForEvents(): any {
   })
 
   while (true) {
-    const { type, args } = yield take(chan)
-    switch (type) {
-      case CHANNEL_EVENT_TYPES.CREATE: {
-        const { createdChannel } = args
-        log.info('CHANNEL_EVENT_CREATE ... ', createdChannel)
-        const channelFilterTypes = getChannelTypesFilter()
-        if (channelFilterTypes?.length ? channelFilterTypes.includes(createdChannel.type) : true) {
-          const getFromContacts = getShowOnlyContactUsers()
-          const channelExists = checkChannelExists(createdChannel.id)
-          if (!channelExists) {
-            if (getFromContacts) {
-              yield put(getContactsAC())
+    try {
+      const { type, args } = yield take(chan)
+      switch (type) {
+        case CHANNEL_EVENT_TYPES.CREATE: {
+          const { createdChannel } = args
+          log.info('CHANNEL_EVENT_CREATE ... ', createdChannel)
+          const channelFilterTypes = getChannelTypesFilter()
+          if (channelFilterTypes?.length ? channelFilterTypes.includes(createdChannel.type) : true) {
+            const getFromContacts = getShowOnlyContactUsers()
+            const channelExists = checkChannelExists(createdChannel.id)
+            if (!channelExists) {
+              if (getFromContacts) {
+                yield put(getContactsAC())
+              }
+              yield call(setChannelInMap, createdChannel)
+              yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
             }
-            yield call(setChannelInMap, createdChannel)
-            yield put(setChannelToAddAC(JSON.parse(JSON.stringify(createdChannel))))
+            const chan = getChannelFromAllChannels(createdChannel.id)
+            if (!chan) {
+              addChannelToAllChannels(createdChannel)
+            }
           }
-          const chan = getChannelFromAllChannels(createdChannel.id)
+          break
+        }
+        case CHANNEL_EVENT_TYPES.JOIN: {
+          // const { channel, joinedMember } = args
+          const { channel } = args
+          log.info('channel JOIN ... . ', channel)
+          const activeChannelId = yield call(getActiveChannelId)
+          if (activeChannelId === channel.id) {
+            // yield put(addMembersToListAC([joinedMember]));
+          }
+          const chan = getChannelFromAllChannels(channel.id)
           if (!chan) {
-            addChannelToAllChannels(createdChannel)
+            addChannelToAllChannels(channel)
           }
-        }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.JOIN: {
-        // const { channel, joinedMember } = args
-        const { channel } = args
-        log.info('channel JOIN ... . ', channel)
-        const activeChannelId = yield call(getActiveChannelId)
-        if (activeChannelId === channel.id) {
-          // yield put(addMembersToListAC([joinedMember]));
-        }
-        const chan = getChannelFromAllChannels(channel.id)
-        if (!chan) {
-          addChannelToAllChannels(channel)
-        }
-        // TODO notification
-        /* const not = {
+          // TODO notification
+          /* const not = {
           id: createId(),
           title: 'Member Joined',
           message: `${joinedMember.firstName || joinedMember.id} joined to ${channel.subject}`,
         };
         yield put(setNotification(not)); */
-        break
-      }
-      case CHANNEL_EVENT_TYPES.LEAVE: {
-        // const { channel, member } = args
-        const { channel, member } = args
+          break
+        }
+        case CHANNEL_EVENT_TYPES.LEAVE: {
+          // const { channel, member } = args
+          const { channel, member } = args
 
-        log.info('channel LEAVE ... ', channel, member)
-        const channelExists = checkChannelExists(channel.id)
-        const activeChannelId = yield call(getActiveChannelId)
+          log.info('channel LEAVE ... ', channel, member)
+          const channelExists = checkChannelExists(channel.id)
+          const activeChannelId = yield call(getActiveChannelId)
 
-        if (member.id === SceytChatClient.user.id) {
-          yield put(removeChannelAC(channel.id))
-          removeChannelFromMap(channel.id)
-          deleteChannelFromAllChannels(channel.id)
-        } else {
-          const groupName = getChannelGroupName(channel)
+          if (member.id === SceytChatClient.user.id) {
+            yield put(switchChannelActionAC(null))
+            yield put(removeChannelAC(channel.id))
+            removeChannelFromMap(channel.id)
+            deleteChannelFromAllChannels(channel.id)
+            yield put(setChannelToRemoveAC(channel))
+            yield put(removeChannelCachesAC(channel.id))
+          } else {
+            const groupName = getChannelGroupName(channel)
+            if (channelExists) {
+              let updateChannelData = {}
+              if (activeChannelId === channel.id) {
+                yield put(removeMemberFromListAC([member]))
+                updateChannelData = yield call(updateActiveChannelMembersRemove, [member]) || {}
+              }
+
+              yield put(
+                updateChannelDataAC(channel.id, {
+                  memberCount: channel.memberCount,
+                  muted: channel.muted,
+                  mutedTill: channel.mutedTill,
+                  ...updateChannelData
+                })
+              )
+            }
+            yield put(
+              updateSearchedChannelDataAC(
+                channel.id,
+                { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
+                groupName
+              )
+            )
+            updateChannelOnAllChannels(channel.id, {
+              memberCount: channel.memberCount,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
+          }
+          // TODO notification
+          /* const not = {
+          id: createId(),
+          title: 'Member Leave',
+          message: `${member.firstName || member.id} left from ${channel.subject}`,
+        };
+        yield put(setNotification(not)); */
+          break
+        }
+        case CHANNEL_EVENT_TYPES.BLOCK: {
+          log.info('channel BLOCK ... ')
+          const { channel } = args
+          const channelExists = checkChannelExists(channel.id)
+          if (channelExists) {
+            yield put(removeChannelAC(channel.id))
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.UNBLOCK: {
+          log.info('channel UNBLOCK ... ')
+          break
+        }
+        case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
+          const { channel, removedMembers } = args
+          log.info('channel KICK_MEMBERS ... ', removedMembers)
+          const activeChannelId = yield call(getActiveChannelId)
+
+          const channelExists = checkChannelExists(channel.id)
+          if (channelExists) {
+            if (removedMembers.find((mem: IMember) => mem.id === SceytChatClient.user.id)) {
+              removeChannelFromMap(channel.id)
+              yield put(removeChannelAC(channel.id))
+              const activeChannel = yield call(getLastChannelFromMap)
+              if (activeChannel) {
+                yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
+              }
+            } else {
+              let updateChannelData = {}
+              if (activeChannelId === channel.id) {
+                yield put(removeMemberFromListAC(removedMembers))
+                updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
+              }
+
+              const groupName = getChannelGroupName(channel)
+              yield put(
+                updateSearchedChannelDataAC(
+                  channel.id,
+                  { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
+                  groupName
+                )
+              )
+              yield put(
+                updateChannelDataAC(channel.id, {
+                  memberCount: channel.memberCount,
+                  muted: channel.muted,
+                  mutedTill: channel.mutedTill,
+                  ...updateChannelData
+                })
+              )
+            }
+          }
+
+          updateChannelOnAllChannels(channel.id, {
+            memberCount: channel.memberCount,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
+          break
+        }
+        case CHANNEL_EVENT_TYPES.ADD_MEMBERS: {
+          // const { channel, addedMembers } = args
+          const { channel, addedMembers } = args
+          log.info('channel ADD_MEMBERS ... ', addedMembers)
+          const activeChannelId = yield call(getActiveChannelId)
+          const channelExists = checkChannelExists(channel.id)
           if (channelExists) {
             let updateChannelData = {}
             if (activeChannelId === channel.id) {
-              yield put(removeMemberFromListAC([member]))
-              updateChannelData = yield call(updateActiveChannelMembersRemove, [member]) || {}
+              yield put(addMembersToListAC(addedMembers))
+              updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
             }
-
             yield put(
               updateChannelDataAC(channel.id, {
                 memberCount: channel.memberCount,
@@ -526,7 +681,12 @@ export default function* watchForEvents(): any {
                 ...updateChannelData
               })
             )
+          } else {
+            yield call(setChannelInMap, channel)
+            yield put(setAddedToChannelAC(JSON.parse(JSON.stringify(channel))))
           }
+
+          const groupName = getChannelGroupName(channel)
           yield put(
             updateSearchedChannelDataAC(
               channel.id,
@@ -539,213 +699,83 @@ export default function* watchForEvents(): any {
             muted: channel.muted,
             mutedTill: channel.mutedTill
           })
+          break
         }
-        // TODO notification
-        /* const not = {
-          id: createId(),
-          title: 'Member Leave',
-          message: `${member.firstName || member.id} left from ${channel.subject}`,
-        };
-        yield put(setNotification(not)); */
-        break
-      }
-      case CHANNEL_EVENT_TYPES.BLOCK: {
-        log.info('channel BLOCK ... ')
-        const { channel } = args
-        const channelExists = checkChannelExists(channel.id)
-        if (channelExists) {
-          yield put(removeChannelAC(channel.id))
-        }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UNBLOCK: {
-        log.info('channel UNBLOCK ... ')
-        break
-      }
-      case CHANNEL_EVENT_TYPES.KICK_MEMBERS: {
-        const { channel, removedMembers } = args
-        log.info('channel KICK_MEMBERS ... ', removedMembers)
-        const activeChannelId = yield call(getActiveChannelId)
-
-        const channelExists = checkChannelExists(channel.id)
-        if (channelExists) {
-          if (removedMembers.find((mem: IMember) => mem.id === SceytChatClient.user.id)) {
-            removeChannelFromMap(channel.id)
-            yield put(removeChannelAC(channel.id))
-            const activeChannel = yield call(getLastChannelFromMap)
-            if (activeChannel) {
-              yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
-            }
-          } else {
-            let updateChannelData = {}
-            if (activeChannelId === channel.id) {
-              yield put(removeMemberFromListAC(removedMembers))
-              updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
-            }
-
-            const groupName = getChannelGroupName(channel)
+        case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
+          log.info('channel UPDATE_CHANNEL ... ')
+          const { updatedChannel } = args
+          const channelExists = checkChannelExists(updatedChannel.id)
+          const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
+          if (channelExists) {
             yield put(
-              updateSearchedChannelDataAC(
-                channel.id,
-                { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
-                groupName
-              )
-            )
-            yield put(
-              updateChannelDataAC(channel.id, {
-                memberCount: channel.memberCount,
-                muted: channel.muted,
-                mutedTill: channel.mutedTill,
-                ...updateChannelData
+              updateChannelDataAC(updatedChannel.id, {
+                subject,
+                avatarUrl,
+                muted,
+                mutedTill
               })
             )
-          }
-        }
 
-        updateChannelOnAllChannels(channel.id, {
-          memberCount: channel.memberCount,
-          muted: channel.muted,
-          mutedTill: channel.mutedTill
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.ADD_MEMBERS: {
-        // const { channel, addedMembers } = args
-        const { channel, addedMembers } = args
-        log.info('channel ADD_MEMBERS ... ', addedMembers)
-        const activeChannelId = yield call(getActiveChannelId)
-        const channelExists = checkChannelExists(channel.id)
-        if (channelExists) {
-          let updateChannelData = {}
-          if (activeChannelId === channel.id) {
-            yield put(addMembersToListAC(addedMembers))
-            updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
-          }
-          yield put(
-            updateChannelDataAC(channel.id, {
-              memberCount: channel.memberCount,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill,
-              ...updateChannelData
-            })
-          )
-        } else {
-          yield call(setChannelInMap, channel)
-          yield put(setAddedToChannelAC(JSON.parse(JSON.stringify(channel))))
-        }
-
-        const groupName = getChannelGroupName(channel)
-        yield put(
-          updateSearchedChannelDataAC(
-            channel.id,
-            { memberCount: channel.memberCount, muted: channel.muted, mutedTill: channel.mutedTill },
-            groupName
-          )
-        )
-        updateChannelOnAllChannels(channel.id, {
-          memberCount: channel.memberCount,
-          muted: channel.muted,
-          mutedTill: channel.mutedTill
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
-        log.info('channel UPDATE_CHANNEL ... ')
-        const { updatedChannel } = args
-        const channelExists = checkChannelExists(updatedChannel.id)
-        const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
-        if (channelExists) {
-          yield put(
-            updateChannelDataAC(updatedChannel.id, {
-              subject,
-              avatarUrl,
-              muted,
-              mutedTill
-            })
-          )
-
-          const activeChannelId = yield call(getActiveChannelId)
-          if (activeChannelId === updatedChannel.id) {
-            yield put(
-              setActiveChannelAC({ ...updatedChannel, metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata })
-            )
-          }
-        }
-
-        const groupName = getChannelGroupName(updatedChannel)
-        yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl, muted, mutedTill }, groupName))
-        updateChannelOnAllChannels(updatedChannel.id, {
-          subject,
-          avatarUrl,
-          muted,
-          mutedTill,
-          metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.MESSAGE: {
-        const { channel, message } = args
-        log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
-        const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
-        const channelFilterTypes = getChannelTypesFilter()
-        if (
-          messageToHandle &&
-          channel &&
-          (channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
-        ) {
-          channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
-          const activeChannelId = yield call(getActiveChannelId)
-          const channelExists = checkChannelExists(channel.id)
-          const channelForAdd = JSON.parse(JSON.stringify(channel))
-
-          yield put(addChannelAC(channelForAdd))
-          if (!channelExists) {
-            yield call(setChannelInMap, channel)
-          } else if (!message.repliedInThread) {
-            yield put(updateChannelLastMessageAC(message, channelForAdd))
-          }
-
-          if (channel.id === activeChannelId) {
-            if (!getHasNextCached()) {
-              yield put(addMessageAC(message))
-            }
-            addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-            // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-            // }
-            if (message.user.id !== SceytChatClient.user.id) {
-              // yield put(markMessagesAsReadAC(channel.id, [message.id]))
-            }
-            const hasNextMessage = store.getState().MessageReducer.messagesHasNext
-            if (!getHasNextCached() && !hasNextMessage) {
-              yield put(scrollToNewMessageAC(true, false, true))
+            const activeChannelId = yield call(getActiveChannelId)
+            if (activeChannelId === updatedChannel.id) {
+              yield put(
+                setActiveChannelAC({ ...updatedChannel, metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata })
+              )
             }
           }
 
-          if (getMessagesFromMap(channel.id) && getMessagesFromMap(channel.id).length) {
+          const groupName = getChannelGroupName(updatedChannel)
+          yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl, muted, mutedTill }, groupName))
+          updateChannelOnAllChannels(updatedChannel.id, {
+            subject,
+            avatarUrl,
+            muted,
+            mutedTill,
+            metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
+          })
+          break
+        }
+        case CHANNEL_EVENT_TYPES.MESSAGE: {
+          const { channel, message } = args
+          log.info('channel MESSAGE ... id : ', message.id, ', channel.id: ', channel.id)
+          const messageToHandle = handleNewMessages ? handleNewMessages(message, channel) : message
+          const channelFilterTypes = getChannelTypesFilter()
+          if (
+            messageToHandle &&
+            channel &&
+            (channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
+          ) {
+            channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
+            const activeChannelId = yield call(getActiveChannelId)
+            const channelExists = checkChannelExists(channel.id)
+            const channelForAdd = JSON.parse(JSON.stringify(channel))
+
+            yield put(addChannelAC(channelForAdd))
+            if (!channelExists) {
+              yield call(setChannelInMap, channel)
+            } else if (!message.repliedInThread) {
+              yield put(updateChannelLastMessageAC(message, channelForAdd))
+            }
+
+            if (channel.id === activeChannelId) {
+              if (!getHasNextCached()) {
+                yield put(addMessageAC(message))
+              }
+              addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
+              // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
+              // }
+              if (message.user.id !== SceytChatClient.user.id) {
+                // yield put(markMessagesAsReadAC(channel.id, [message.id]))
+              }
+              const hasNextMessage = store.getState().MessageReducer.messagesHasNext
+              if (!getHasNextCached() && !hasNextMessage) {
+                yield put(scrollToNewMessageAC(true, false, true))
+              }
+            }
+
             addMessageToMap(channel.id, message)
-          }
-          yield put(
-            updateChannelDataAC(channel.id, {
-              messageCount: channelForAdd.messageCount,
-              unread: channelForAdd.unread,
-              newMessageCount: channelForAdd.newMessageCount,
-              newMentionCount: channelForAdd.newMentionCount,
-              newReactedMessageCount: channelForAdd.newReactedMessageCount,
-              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
-              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
-              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
-              lastMessage: channelForAdd.lastMessage,
-              messages: channelForAdd.messages,
-              newReactions: channelForAdd.newReactions,
-              userMessageReactions: [],
-              lastReactedMessage: null
-            })
-          )
-          const groupName = getChannelGroupName(channel)
-          yield put(
-            updateSearchedChannelDataAC(
-              channel.id,
-              {
+            yield put(
+              updateChannelDataAC(channel.id, {
                 messageCount: channelForAdd.messageCount,
                 unread: channelForAdd.unread,
                 newMessageCount: channelForAdd.newMessageCount,
@@ -759,15 +789,235 @@ export default function* watchForEvents(): any {
                 newReactions: channelForAdd.newReactions,
                 userMessageReactions: [],
                 lastReactedMessage: null
-              },
-              groupName
+              })
             )
+            const groupName = getChannelGroupName(channel)
+            yield put(
+              updateSearchedChannelDataAC(
+                channel.id,
+                {
+                  messageCount: channelForAdd.messageCount,
+                  unread: channelForAdd.unread,
+                  newMessageCount: channelForAdd.newMessageCount,
+                  newMentionCount: channelForAdd.newMentionCount,
+                  newReactedMessageCount: channelForAdd.newReactedMessageCount,
+                  lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+                  lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+                  messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+                  lastMessage: channelForAdd.lastMessage,
+                  messages: channelForAdd.messages,
+                  newReactions: channelForAdd.newReactions,
+                  userMessageReactions: [],
+                  lastReactedMessage: null
+                },
+                groupName
+              )
+            )
+            const showNotifications = getShowNotifications()
+            if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
+              if (Notification.permission === 'granted') {
+                const tabIsActive = yield select(browserTabIsActiveSelector)
+                if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
+                  const contactsMap = yield select(contactsMapSelector)
+                  const getFromContacts = getShowOnlyContactUsers()
+                  const state = store.getState()
+                  const theme = state.ThemeReducer.theme || 'light'
+                  const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
+                  const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
+                  const messageBody = MessageTextFormat({
+                    text: message.body,
+                    message,
+                    contactsMap,
+                    getFromContacts,
+                    isLastMessage: false,
+                    asSampleText: true,
+                    accentColor,
+                    textSecondary
+                  })
+                  setNotification(
+                    messageBody,
+                    message.user,
+                    channel,
+                    undefined,
+                    message.attachments && message.attachments.length
+                      ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
+                      : undefined
+                  )
+                }
+              }
+            }
+            if (message.repliedInThread && message.parentMessage.id) {
+              yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
+            } else {
+              yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
+            }
+
+            updateChannelOnAllChannels(channel.id, {
+              messageCount: channelForAdd.messageCount,
+              unread: channelForAdd.unread,
+              newMessageCount: channelForAdd.newMessageCount,
+              newMentionCount: channelForAdd.newMentionCount,
+              newReactedMessageCount: channelForAdd.newReactedMessageCount,
+              lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
+              lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
+              messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
+              lastMessage: channelForAdd.lastMessage,
+              messages: channelForAdd.messages,
+              newReactions: channelForAdd.newReactions,
+              lastReactedMessage: channel.lastReactedMessage,
+              userMessageReactions: channel.userMessageReactions
+            })
+            updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
+          const { channelId, markerList } = args
+          const channel = yield call(getChannelFromMap, channelId)
+          log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
+
+          if (channel) {
+            const activeChannelId = yield call(getActiveChannelId)
+            let updateLastMessage = false
+            const markersMap: any = {}
+            const activeChannelMessages = getMessagesFromMap(activeChannelId)
+            for (const messageId of markerList.messageIds) {
+              if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
+                yield put(removePendingMessageAC(channelId, messageId))
+              } else {
+                const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
+                if (isPendingMessage) {
+                  updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+                }
+              }
+              markersMap[messageId] = true
+              if (channel) {
+                if (
+                  channel.lastMessage &&
+                  messageId === channel.lastMessage.id &&
+                  channel.lastMessage.deliveryStatus !== MESSAGE_DELIVERY_STATUS.READ
+                ) {
+                  updateLastMessage = true
+                }
+              }
+              updateChannelOnAllChannels(channelId, {}, { id: messageId, deliveryStatus: markerList.name })
+            }
+            if (updateLastMessage) {
+              const lastMessage = {
+                ...channel.lastMessage,
+                deliveryStatus: markerList.name
+              }
+
+              updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
+              yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
+            }
+            if (activeChannelId === channelId) {
+              yield put(updateMessagesStatusAC(markerList.name, markersMap))
+              updateMarkersOnAllMessages(markersMap, markerList.name)
+            }
+
+            updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
+            updateMessageStatusOnAllMessages(markerList.name, markersMap)
+            yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
+          }
+
+          break
+        }
+        case CHANNEL_EVENT_TYPES.DELETE: {
+          const { channelId } = args
+          log.info('channel DELETE ... ')
+          const channel = getChannelFromMap(channelId)
+          yield put(setChannelToRemoveAC(channel))
+          deleteChannelFromAllChannels(channelId)
+          break
+        }
+        case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
+          const { channel, /* user, */ deletedMessage } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          log.info('channel DELETE_MESSAGE ... ')
+          const channelExists = checkChannelExists(channel.id)
+
+          if (channel.id === activeChannelId) {
+            updateMessageOnAllMessages(deletedMessage.id, deletedMessage)
+            yield put(updateMessageAC(deletedMessage.id, deletedMessage))
+          }
+          updateMessageOnMap(channel.id, {
+            messageId: deletedMessage.id,
+            params: deletedMessage
+          })
+          if (channelExists) {
+            yield put(
+              updateChannelDataAC(channel.id, {
+                newMessageCount: channel.newMessageCount,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
+              })
+            )
+            if (channel.lastMessage.id === deletedMessage.id) {
+              yield put(updateChannelLastMessageAC(deletedMessage, channel))
+            }
+          }
+          updateChannelOnAllChannels(
+            channel.id,
+            {
+              newMessageCount: channel.newMessageCount,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            },
+            deletedMessage
           )
-          const showNotifications = getShowNotifications()
-          if (showNotifications && !message.silent && message.user.id !== SceytChatClient.user.id && !channel.muted) {
-            if (Notification.permission === 'granted') {
-              const tabIsActive = yield select(browserTabIsActiveSelector)
-              if (document.visibilityState !== 'visible' || !tabIsActive || channel.id !== activeChannelId) {
+          break
+        }
+        case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
+          const { channel, /* user, */ message } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          const channelExists = checkChannelExists(channel.id)
+          if (channel.id === activeChannelId) {
+            yield put(
+              updateMessageAC(message.id, {
+                body: message.body,
+                state: message.state,
+                attachments: message.attachments,
+                bodyAttributes: message.bodyAttributes,
+                mentionedUsers: message.mentionedUsers,
+                updatedAt: message.updatedAt
+              })
+            )
+            updateMessageOnAllMessages(message.id, {
+              body: message.body,
+              state: message.state,
+              attachments: message.attachments,
+              bodyAttributes: message.bodyAttributes,
+              mentionedUsers: message.mentionedUsers,
+              updatedAt: message.updatedAt
+            })
+          }
+          if (channelExists) {
+            if (channel.lastMessage.id === message.id) {
+              yield put(updateChannelLastMessageAC(message, channel))
+            }
+          }
+          if (checkChannelExistsOnMessagesMap(channel.id)) {
+            updateMessageOnMap(channel.id, {
+              messageId: message.id,
+              params: message
+            })
+          }
+          updateChannelOnAllChannels(channel.id, {}, message)
+          break
+        }
+        case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
+          const { channel, user, message, reaction } = args
+          const isSelf = user.id === SceytChatClient.user.id
+          const activeChannelId = yield call(getActiveChannelId)
+
+          if (channel.id === activeChannelId) {
+            yield put(addReactionToMessageAC(message, reaction, isSelf))
+            addReactionOnAllMessages(message, reaction, true)
+          }
+          if (message.user.id === SceytChatClient.user.id) {
+            if (!isSelf && Notification.permission === 'granted') {
+              if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
                 const contactsMap = yield select(contactsMapSelector)
                 const getFromContacts = getShowOnlyContactUsers()
                 const state = store.getState()
@@ -786,262 +1036,210 @@ export default function* watchForEvents(): any {
                 })
                 setNotification(
                   messageBody,
-                  message.user,
+                  reaction.user,
                   channel,
-                  undefined,
+                  reaction.key,
                   message.attachments && message.attachments.length
                     ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
                     : undefined
                 )
               }
             }
-          }
-          if (message.repliedInThread && message.parentMessage.id) {
-            yield put(markMessagesAsDeliveredAC(message.parentMessage.id, [message.id]))
-          } else {
-            yield put(markMessagesAsDeliveredAC(channel.id, [message.id]))
-          }
 
-          updateChannelOnAllChannels(channel.id, {
-            messageCount: channelForAdd.messageCount,
-            unread: channelForAdd.unread,
-            newMessageCount: channelForAdd.newMessageCount,
-            newMentionCount: channelForAdd.newMentionCount,
-            newReactedMessageCount: channelForAdd.newReactedMessageCount,
-            lastReceivedMsgId: channelForAdd.lastReceivedMsgId,
-            lastDisplayedMessageId: channelForAdd.lastDisplayedMessageId,
-            messageRetentionPeriod: channelForAdd.messageRetentionPeriod,
-            lastMessage: channelForAdd.lastMessage,
-            messages: channelForAdd.messages,
-            newReactions: channelForAdd.newReactions,
-            lastReactedMessage: channel.lastReactedMessage,
-            userMessageReactions: channel.userMessageReactions
-          })
-          updateChannelLastMessageOnAllChannels(channel.id, channel.lastMessage)
-        }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.MESSAGE_MARKERS_RECEIVED: {
-        const { channelId, markerList } = args
-        const channel = yield call(getChannelFromMap, channelId)
-        log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
-
-        if (channel) {
-          const activeChannelId = yield call(getActiveChannelId)
-          let updateLastMessage = false
-          const markersMap: any = {}
-          const activeChannelMessages = getMessagesFromMap(activeChannelId)
-          markerList.messageIds.forEach((messageId: string) => {
-            if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
-              removePendingMessageFromMap(activeChannelId, messageId)
-            } else {
-              const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
-              if (isPendingMessage) {
-                updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+            if (channel.newReactions && channel.newReactions.length) {
+              const channelUpdateParams = {
+                userMessageReactions: channel.newReactions,
+                lastReactedMessage: message,
+                newReactions: channel.newReactions,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
               }
+              yield put(updateChannelDataAC(channel.id, channelUpdateParams))
             }
-            markersMap[messageId] = true
-            if (channel) {
-              if (
-                channel.lastMessage &&
-                messageId === channel.lastMessage.id &&
-                channel.lastMessage.deliveryStatus !== MESSAGE_DELIVERY_STATUS.READ
-              ) {
-                updateLastMessage = true
-              }
-            }
-            updateChannelOnAllChannels(channelId, {}, { id: messageId, deliveryStatus: markerList.name })
-          })
-          if (updateLastMessage) {
-            const lastMessage = {
-              ...channel.lastMessage,
-              deliveryStatus: markerList.name
-            }
-
-            updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
-            yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
-          }
-
-          if (activeChannelId === channelId) {
-            yield put(updateMessagesStatusAC(markerList.name, markersMap))
-            updateMarkersOnAllMessages(markersMap, markerList.name)
-          }
-
-          updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
-          yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
-        }
-
-        break
-      }
-      case CHANNEL_EVENT_TYPES.DELETE: {
-        const { channelId } = args
-        log.info('channel DELETE ... ')
-        const channel = getChannelFromMap(channelId)
-        yield put(setChannelToRemoveAC(channel))
-        deleteChannelFromAllChannels(channelId)
-        break
-      }
-      case CHANNEL_EVENT_TYPES.DELETE_MESSAGE: {
-        const { channel, /* user, */ deletedMessage } = args
-        const activeChannelId = getActiveChannelId()
-        log.info('channel DELETE_MESSAGE ... ')
-        const channelExists = checkChannelExists(channel.id)
-
-        if (channel.id === activeChannelId) {
-          updateMessageOnAllMessages(deletedMessage.id, deletedMessage)
-          yield put(updateMessageAC(deletedMessage.id, deletedMessage))
-        }
-        updateMessageOnMap(channel.id, {
-          messageId: deletedMessage.id,
-          params: deletedMessage
-        })
-        if (channelExists) {
-          yield put(
-            updateChannelDataAC(channel.id, {
-              newMessageCount: channel.newMessageCount,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            })
-          )
-          if (channel.lastMessage.id === deletedMessage.id) {
-            yield put(updateChannelLastMessageAC(deletedMessage, channel))
-          }
-        }
-        updateChannelOnAllChannels(
-          channel.id,
-          {
-            newMessageCount: channel.newMessageCount,
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
-          },
-          deletedMessage
-        )
-        break
-      }
-      case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
-        const { channel, /* user, */ message } = args
-        const activeChannelId = getActiveChannelId()
-        const channelExists = checkChannelExists(channel.id)
-        if (channel.id === activeChannelId) {
-          yield put(
-            updateMessageAC(message.id, {
-              body: message.body,
-              state: message.state,
-              attachments: message.attachments,
-              bodyAttributes: message.bodyAttributes,
-              mentionedUsers: message.mentionedUsers,
-              updatedAt: message.updatedAt
-            })
-          )
-          updateMessageOnAllMessages(message.id, {
-            body: message.body,
-            state: message.state,
-            attachments: message.attachments,
-            bodyAttributes: message.bodyAttributes,
-            mentionedUsers: message.mentionedUsers,
-            updatedAt: message.updatedAt
-          })
-        }
-        if (channelExists) {
-          if (channel.lastMessage.id === message.id) {
-            yield put(updateChannelLastMessageAC(message, channel))
-          }
-        }
-        if (checkChannelExistsOnMessagesMap(channel.id)) {
-          updateMessageOnMap(channel.id, {
-            messageId: message.id,
-            params: message
-          })
-        }
-        updateChannelOnAllChannels(channel.id, {}, message)
-        break
-      }
-      case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
-        const { channel, user, message, reaction } = args
-        const isSelf = user.id === SceytChatClient.user.id
-        const activeChannelId = getActiveChannelId()
-
-        if (channel.id === activeChannelId) {
-          yield put(addReactionToMessageAC(message, reaction, isSelf))
-          addReactionOnAllMessages(message, reaction, true)
-        }
-        if (message.user.id === SceytChatClient.user.id) {
-          if (!isSelf && Notification.permission === 'granted') {
-            if (document.visibilityState !== 'visible' || channel.id !== activeChannelId) {
-              const contactsMap = yield select(contactsMapSelector)
-              const getFromContacts = getShowOnlyContactUsers()
-              const state = store.getState()
-              const theme = state.ThemeReducer.theme || 'light'
-              const accentColor = state.ThemeReducer.newTheme?.colors?.accent?.[theme] || '#3B82F6'
-              const textSecondary = state.ThemeReducer.newTheme?.colors?.textSecondary?.[theme] || '#6B7280'
-              const messageBody = MessageTextFormat({
-                text: message.body,
-                message,
-                contactsMap,
-                getFromContacts,
-                isLastMessage: false,
-                asSampleText: true,
-                accentColor,
-                textSecondary
-              })
-              setNotification(
-                messageBody,
-                reaction.user,
-                channel,
-                reaction.key,
-                message.attachments && message.attachments.length
-                  ? message.attachments.find((att: IAttachment) => att.type !== attachmentTypes.link)
-                  : undefined
-              )
-            }
-          }
-
-          if (channel.newReactions && channel.newReactions.length) {
-            const channelUpdateParams = {
+            updateChannelOnAllChannels(channel.id, {
               userMessageReactions: channel.newReactions,
               lastReactedMessage: message,
               newReactions: channel.newReactions,
               muted: channel.muted,
               mutedTill: channel.mutedTill
-            }
-            yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+            })
           }
-          updateChannelOnAllChannels(channel.id, {
-            userMessageReactions: channel.newReactions,
-            lastReactedMessage: message,
-            newReactions: channel.newReactions,
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
-          })
-        }
 
-        if (checkChannelExistsOnMessagesMap(channel.id)) {
-          addReactionToMessageOnMap(channel.id, message, reaction, true)
+          if (checkChannelExistsOnMessagesMap(channel.id)) {
+            addReactionToMessageOnMap(channel.id, message, reaction, true)
+          }
+          break
         }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
-        const { channel, user, message, reaction } = args
-        log.info('channel REACTION_DELETED ... ', channel)
-        const channelFromMap = getChannelFromMap(channel.id)
-        const isSelf = user.id === SceytChatClient.user.id
-        const activeChannelId = getActiveChannelId()
+        case CHANNEL_EVENT_TYPES.POLL_ADDED: {
+          const { channel, pollDetails, messageId } = args
+          const pollDetailsData = pollDetails as IPollDetails
+          const activeChannelId = yield call(getActiveChannelId)
+          const addedVotes = pollDetailsData?.changedVotes?.addedVotes || []
+          const deletedVotes = pollDetailsData?.changedVotes?.removedVotes || []
 
-        if (channel.id === activeChannelId) {
-          yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
-          removeReactionOnAllMessages(message, reaction, true)
+          const objs = []
+          for (const vote of deletedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+            })
+          }
+          for (const vote of addedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('addOwn' as const) : ('add' as const),
+              vote,
+              incrementVotesPerOptionCount: addedVotes?.length || 0
+            })
+          }
+
+          // Add first vote for each option to pollVotesList
+          for (const obj of objs) {
+            if (pollDetailsData?.id && obj.vote) {
+              const key = `${pollDetailsData.id}_${obj.vote.optionId}`
+              const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[key] || false
+              if (obj.type === 'addOwn') {
+                yield put(addPollVotesToListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], hasNext, undefined))
+              } else {
+                yield put(deletePollVotesFromListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], messageId))
+              }
+            }
+          }
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              {
+                type: obj.type,
+                vote: obj.vote,
+                incrementVotesPerOptionCount: obj.incrementVotesPerOptionCount
+              }
+            )
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
         }
-        const channelUpdateParams = JSON.parse(JSON.stringify(channel))
-        if (
-          channelFromMap &&
-          channelFromMap.lastReactedMessage &&
-          channelFromMap.lastReactedMessage.id === message.id
-        ) {
-          channelUpdateParams.lastReactedMessage = null
+        case CHANNEL_EVENT_TYPES.POLL_DELETED: {
+          const { channel, pollDetails, messageId } = args
+          const pollDetailsData = pollDetails as IPollDetails
+          const activeChannelId = yield call(getActiveChannelId)
+          const deletedVotes = pollDetailsData?.changedVotes?.removedVotes || []
+          // Add first vote for each option to pollVotesList
+          const objs = []
+          for (const vote of deletedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+            })
+          }
+
+          for (const obj of objs) {
+            if (pollDetailsData?.id && obj.vote) {
+              yield put(deletePollVotesFromListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], messageId))
+            }
+          }
+
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              obj
+            )
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
         }
-        yield put(updateChannelDataAC(channel.id, channelUpdateParams))
-        updateChannelOnAllChannels(channel.id, channelUpdateParams)
-        /* if (!(channel.newReactions && channel.newReactions.length)) {
+        case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
+          const { channel, pollDetails, messageId } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          const pollDetailsData = pollDetails as IPollDetails
+          const retractedVotes = pollDetailsData?.changedVotes?.removedVotes || []
+          const objs = []
+          for (const vote of retractedVotes) {
+            objs.push({
+              type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
+              vote,
+              incrementVotesPerOptionCount: -(retractedVotes?.length || 0)
+            })
+          }
+
+          for (const obj of objs) {
+            updateMessageOnMap(
+              channel.id,
+              {
+                messageId,
+                params: {}
+              },
+              obj
+            )
+            if (pollDetailsData?.id && retractedVotes.length > 0) {
+              for (const vote of retractedVotes) {
+                yield put(deletePollVotesFromListAC(pollDetailsData.id, vote.optionId, [vote], messageId))
+              }
+            }
+
+            if (channel.id === activeChannelId) {
+              updateMessageOnAllMessages(messageId, {}, obj)
+              yield put(updateMessageAC(messageId, {}, undefined, obj))
+            }
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
+          const { channel, messageId } = args
+          const activeChannelId = yield call(getActiveChannelId)
+          const obj = { type: 'close' as const, incrementVotesPerOptionCount: 0 }
+          updateMessageOnMap(
+            channel.id,
+            {
+              messageId,
+              params: {}
+            },
+            obj
+          )
+
+          if (channel.id === activeChannelId) {
+            updateMessageOnAllMessages(messageId, {}, obj)
+            yield put(updateMessageAC(messageId, {}, undefined, obj))
+            break
+          }
+          break
+        }
+        case CHANNEL_EVENT_TYPES.REACTION_DELETED: {
+          const { channel, user, message, reaction } = args
+          log.info('channel REACTION_DELETED ... ', channel)
+          const channelFromMap = getChannelFromMap(channel.id)
+          const isSelf = user.id === SceytChatClient.user.id
+          const activeChannelId = yield call(getActiveChannelId)
+
+          if (channel.id === activeChannelId) {
+            yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
+            removeReactionOnAllMessages(message, reaction, true)
+          }
+          const channelUpdateParams = JSON.parse(JSON.stringify(channel))
+          if (
+            channelFromMap &&
+            channelFromMap.lastReactedMessage &&
+            channelFromMap.lastReactedMessage.id === message.id
+          ) {
+            channelUpdateParams.lastReactedMessage = null
+          }
+          yield put(updateChannelDataAC(channel.id, channelUpdateParams))
+          updateChannelOnAllChannels(channel.id, channelUpdateParams)
+          /* if (!(channel.newReactions && channel.newReactions.length)) {
           const channelUpdateParams = {
             userMessageReactions: [],
             lastReactedMessage: null
@@ -1049,185 +1247,185 @@ export default function* watchForEvents(): any {
           yield put(updateChannelDataAC(channel.id, channelUpdateParams))
           updateChannelOnAllChannels(channel.id, channelUpdateParams)
         } */
-        if (checkChannelExistsOnMessagesMap(channel.id)) {
-          removeReactionToMessageOnMap(channel.id, message, reaction, true)
+          if (checkChannelExistsOnMessagesMap(channel.id)) {
+            removeReactionToMessageOnMap(channel.id, message, reaction, true)
+          }
+          break
         }
-        break
-      }
 
-      case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
-        const { channel } = args
-        // const { channel, channelUnreadCount } = args
-        // log.info('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
-        // log.info('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
-        // log.info('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
-        // yield put(setChannelUnreadCount(0, channel.id));
-        if (channel) {
-          const updatedChannel = JSON.parse(JSON.stringify(channel))
+        case CHANNEL_EVENT_TYPES.UNREAD_MESSAGES_INFO: {
+          const { channel } = args
+          // const { channel, channelUnreadCount } = args
+          // log.info('channel UNREAD_MESSAGES_INFO .unreadChannels', unreadChannels)
+          // log.info('channel UNREAD_MESSAGES_INFO .totalUnread', totalUnread)
+          // log.info('channel UNREAD_MESSAGES_INFO .channelUnreadCount', channelUnreadCount, 'channel: ', channel)
+          // yield put(setChannelUnreadCount(0, channel.id));
+          if (channel) {
+            const updatedChannel = JSON.parse(JSON.stringify(channel))
+            yield put(
+              updateChannelDataAC(channel.id, {
+                lastMessage: channel.lastMessage,
+                newMessageCount: channel.newMessageCount,
+                newMentionCount: channel.newMentionCount,
+                unread: channel.unread,
+                newReactedMessageCount: channel.newReactedMessageCount,
+                newReactions: channel.newReactions,
+                lastReactedMessage: channel.lastReactedMessage,
+                lastReceivedMsgId: channel.lastReceivedMsgId,
+                lastDisplayedMessageId: channel.lastDisplayedMessageId,
+                messageRetentionPeriod: channel.messageRetentionPeriod
+              })
+            )
+            updateChannelOnAllChannels(channel.id, updatedChannel)
+          }
+          break
+        }
+
+        case CHANNEL_EVENT_TYPES.CLEAR_HISTORY: {
+          const { channel } = args
+          log.info('CLEAR_HISTORY: ', channel)
+          const activeChannelId = yield call(getActiveChannelId)
+          const channelExist = yield call(checkChannelExists, channel.id)
+          if (channel.id === activeChannelId) {
+            yield put(clearMessagesAC())
+            removeAllMessages()
+          }
+          removeMessagesFromMap(channel.id)
+          if (channelExist) {
+            yield put(
+              updateChannelDataAC(channel.id, {
+                lastMessage: null,
+                newMessageCount: 0,
+                newMentionCount: 0,
+                muted: channel.muted,
+                mutedTill: channel.mutedTill
+              })
+            )
+          }
+          updateChannelOnAllChannels(channel.id, {
+            lastMessage: null,
+            newMessageCount: 0,
+            newMentionCount: 0,
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
+          break
+        }
+        case CHANNEL_EVENT_TYPES.MUTE: {
+          const { channel } = args
+          log.info('channel MUTE ... ')
+
           yield put(
             updateChannelDataAC(channel.id, {
-              lastMessage: channel.lastMessage,
-              newMessageCount: channel.newMessageCount,
-              newMentionCount: channel.newMentionCount,
-              unread: channel.unread,
-              newReactedMessageCount: channel.newReactedMessageCount,
-              newReactions: channel.newReactions,
-              lastReactedMessage: channel.lastReactedMessage,
-              lastReceivedMsgId: channel.lastReceivedMsgId,
-              lastDisplayedMessageId: channel.lastDisplayedMessageId,
-              messageRetentionPeriod: channel.messageRetentionPeriod
-            })
-          )
-          updateChannelOnAllChannels(channel.id, updatedChannel)
-        }
-        break
-      }
-
-      case CHANNEL_EVENT_TYPES.CLEAR_HISTORY: {
-        const { channel } = args
-        log.info('CLEAR_HISTORY: ', channel)
-        const activeChannelId = yield call(getActiveChannelId)
-        const channelExist = yield call(checkChannelExists, channel.id)
-        if (channel.id === activeChannelId) {
-          yield put(clearMessagesAC())
-          removeAllMessages()
-        }
-        removeMessagesFromMap(channel.id)
-        if (channelExist) {
-          yield put(
-            updateChannelDataAC(channel.id, {
-              lastMessage: null,
-              newMessageCount: 0,
-              newMentionCount: 0,
               muted: channel.muted,
               mutedTill: channel.mutedTill
             })
           )
+          updateChannelOnAllChannels(channel.id, {
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
+          break
         }
-        updateChannelOnAllChannels(channel.id, {
-          lastMessage: null,
-          newMessageCount: 0,
-          newMentionCount: 0,
-          muted: channel.muted,
-          mutedTill: channel.mutedTill
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.MUTE: {
-        const { channel } = args
-        log.info('channel MUTE ... ')
+        case CHANNEL_EVENT_TYPES.UNMUTE: {
+          const { channel } = args
+          log.info('channel UNMUTE ... ')
 
-        yield put(
-          updateChannelDataAC(channel.id, {
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
-          })
-        )
-        updateChannelOnAllChannels(channel.id, {
-          muted: channel.muted,
-          mutedTill: channel.mutedTill
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UNMUTE: {
-        const { channel } = args
-        log.info('channel UNMUTE ... ')
-
-        yield put(
-          updateChannelDataAC(channel.id, {
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
-          })
-        )
-        updateChannelOnAllChannels(channel.id, {
-          muted: channel.muted,
-          mutedTill: channel.mutedTill
-        })
-
-        break
-      }
-      case CHANNEL_EVENT_TYPES.PINED: {
-        const { channel } = args
-        log.info('channel PINED ... ')
-
-        yield put(
-          updateChannelDataAC(
-            channel.id,
-            {
-              pinnedAt: channel.pinnedAt
-            },
-            true
+          yield put(
+            updateChannelDataAC(channel.id, {
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
           )
-        )
-        updateChannelOnAllChannels(channel.id, {
-          pinnedAt: channel.pinnedAt
-        })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UNPINED: {
-        const { channel } = args
-        log.info('channel UNPINED ... ')
+          updateChannelOnAllChannels(channel.id, {
+            muted: channel.muted,
+            mutedTill: channel.mutedTill
+          })
 
-        yield put(
-          updateChannelDataAC(
-            channel.id,
-            {
-              pinnedAt: channel.pinnedAt
-            },
-            false,
-            true
+          break
+        }
+        case CHANNEL_EVENT_TYPES.PINED: {
+          const { channel } = args
+          log.info('channel PINED ... ')
+
+          yield put(
+            updateChannelDataAC(
+              channel.id,
+              {
+                pinnedAt: channel.pinnedAt
+              },
+              true
+            )
           )
-        )
-        updateChannelOnAllChannels(channel.id, {
-          pinnedAt: channel.pinnedAt
-        })
-
-        break
-      }
-      case CHANNEL_EVENT_TYPES.HIDE: {
-        const { channel } = args
-        log.info('channel HIDE ... ')
-        yield put(setChannelToHideAC(channel))
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UNHIDE: {
-        const { channel } = args
-        log.info('channel UNHIDE ... ')
-        yield put(setChannelToUnHideAC(channel))
-        break
-      }
-      case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
-        const { channel } = args
-        // log.info('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
-        yield put(
-          updateChannelDataAC(channel.id, {
-            unread: channel.unread,
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
+          updateChannelOnAllChannels(channel.id, {
+            pinnedAt: channel.pinnedAt
           })
-        )
-        const groupName = getChannelGroupName(channel)
-        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
+          break
+        }
+        case CHANNEL_EVENT_TYPES.UNPINED: {
+          const { channel } = args
+          log.info('channel UNPINED ... ')
 
-        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
-        break
-      }
-      case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
-        const { channel } = args
-        // log.info('channel CHANNEL_MARKED_AS_READ ... ', channel)
-        yield put(
-          updateChannelDataAC(channel.id, {
-            unread: channel.unread,
-            muted: channel.muted,
-            mutedTill: channel.mutedTill
+          yield put(
+            updateChannelDataAC(
+              channel.id,
+              {
+                pinnedAt: channel.pinnedAt
+              },
+              false,
+              true
+            )
+          )
+          updateChannelOnAllChannels(channel.id, {
+            pinnedAt: channel.pinnedAt
           })
-        )
-        const groupName = getChannelGroupName(channel)
-        yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
-        updateChannelOnAllChannels(channel.id, { unread: channel.unread })
-        break
-      }
-      /*
+
+          break
+        }
+        case CHANNEL_EVENT_TYPES.HIDE: {
+          const { channel } = args
+          log.info('channel HIDE ... ')
+          yield put(setChannelToHideAC(channel))
+          break
+        }
+        case CHANNEL_EVENT_TYPES.UNHIDE: {
+          const { channel } = args
+          log.info('channel UNHIDE ... ')
+          yield put(setChannelToUnHideAC(channel))
+          break
+        }
+        case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_UNREAD: {
+          const { channel } = args
+          // log.info('channel CHANNEL_MARKED_AS_UNREAD ... ', channel)
+          yield put(
+            updateChannelDataAC(channel.id, {
+              unread: channel.unread,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
+          )
+          const groupName = getChannelGroupName(channel)
+          yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
+
+          updateChannelOnAllChannels(channel.id, { unread: channel.unread })
+          break
+        }
+        case CHANNEL_EVENT_TYPES.CHANNEL_MARKED_AS_READ: {
+          const { channel } = args
+          // log.info('channel CHANNEL_MARKED_AS_READ ... ', channel)
+          yield put(
+            updateChannelDataAC(channel.id, {
+              unread: channel.unread,
+              muted: channel.muted,
+              mutedTill: channel.mutedTill
+            })
+          )
+          const groupName = getChannelGroupName(channel)
+          yield put(updateSearchedChannelDataAC(channel.id, { unread: channel.unread }, groupName))
+          updateChannelOnAllChannels(channel.id, { unread: channel.unread })
+          break
+        }
+        /*
       case CHANNEL_EVENT_TYPES.CHANGE_OWNER: {
           const { channel, newOwner, oldOwner } = args;
           antMessage.success(
@@ -1244,43 +1442,43 @@ export default function* watchForEvents(): any {
           );
           break;
       } */
-      case CHANNEL_EVENT_TYPES.CHANGE_ROLE: {
-        const { channel, members } = args
-        log.info('channel CHANGE_ROLE  channel ... ', channel)
-        log.info('channel CHANGE_ROLE  member ... ', members)
-        const activeChannelId = yield call(getActiveChannelId)
-        if (channel.id === activeChannelId) {
-          yield put(updateMembersAC(members))
-        }
-        for (let i = 0; i < members.length; i++) {
-          if (members[i].id === SceytChatClient.user.id) {
-            yield put(
-              updateChannelDataAC(channel.id, {
+        case CHANNEL_EVENT_TYPES.CHANGE_ROLE: {
+          const { channel, members } = args
+          log.info('channel CHANGE_ROLE  channel ... ', channel)
+          log.info('channel CHANGE_ROLE  member ... ', members)
+          const activeChannelId = yield call(getActiveChannelId)
+          if (channel.id === activeChannelId) {
+            yield put(updateMembersAC(members))
+          }
+          for (let i = 0; i < members.length; i++) {
+            if (members[i].id === SceytChatClient.user.id) {
+              yield put(
+                updateChannelDataAC(channel.id, {
+                  userRole: members[i].role,
+                  muted: channel.muted,
+                  mutedTill: channel.mutedTill
+                })
+              )
+              updateChannelOnAllChannels(channel.id, {
                 userRole: members[i].role,
                 muted: channel.muted,
                 mutedTill: channel.mutedTill
               })
-            )
-            updateChannelOnAllChannels(channel.id, {
-              userRole: members[i].role,
-              muted: channel.muted,
-              mutedTill: channel.mutedTill
-            })
+            }
           }
+          break
         }
-        break
-      }
-      case CHANNEL_EVENT_TYPES.FROZEN: {
-        const { channel } = args
-        log.info('channel frozen  channel ... ', channel)
-        break
-      }
-      case CHANNEL_EVENT_TYPES.UNFROZEN: {
-        const { channel } = args
-        log.info('channel unfrozen  channel ... ', channel)
-        break
-      }
-      /* case CHANNEL_EVENT_TYPES.MEMBER_BLOCKED: {
+        case CHANNEL_EVENT_TYPES.FROZEN: {
+          const { channel } = args
+          log.info('channel frozen  channel ... ', channel)
+          break
+        }
+        case CHANNEL_EVENT_TYPES.UNFROZEN: {
+          const { channel } = args
+          log.info('channel unfrozen  channel ... ', channel)
+          break
+        }
+        /* case CHANNEL_EVENT_TYPES.MEMBER_BLOCKED: {
                 const { channel, removedMembers } = args;
                 antMessage.success(
                     `${removedMembers[0].firstName ||
@@ -1310,65 +1508,69 @@ export default function* watchForEvents(): any {
                 );
                 break;
             } */
-      /* case CONNECTION_EVENT_TYPES.TOKEN_WILL_EXPIRE: {
+        /* case CONNECTION_EVENT_TYPES.TOKEN_WILL_EXPIRE: {
         const { expireTime } = args
         log.info('user TOKEN_WILL_EXPIRE ... ', expireTime)
         break
       } */
 
-      case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
-        const { channelId, from, name } = args
-        // const { user, channelId, name } = args
-        log.info('channel event received >>>... . . . . . ', args)
-        if (from.id === SceytChatClient.user.id) {
+        case CHANNEL_EVENT_TYPES.CHANNEL_EVENT: {
+          const { channelId, from, name } = args
+          // const { user, channelId, name } = args
+          log.info('channel event received >>>... . . . . . ', args)
+          if (from.id === SceytChatClient.user.id) {
+            break
+          }
+          if (name === 'start_typing') {
+            if (!usersTimeout[channelId]) {
+              usersTimeout[channelId] = {}
+            }
+            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout[channelId][from.id])
+            }
+            usersTimeout[channelId][from.id] = setTimeout(() => {
+              channelListener.onReceivedChannelEvent(channelId, from, 'stop_typing')
+            }, 5000)
+            yield put(switchTypingIndicatorAC(true, channelId, from))
+          } else if (name === 'stop_typing') {
+            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout[channelId][from.id])
+            }
+            yield put(switchTypingIndicatorAC(false, channelId, from))
+          } else if (name === 'start_recording') {
+            if (!usersTimeout[channelId]) {
+              usersTimeout[channelId] = {}
+            }
+            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout[channelId][from.id])
+            }
+            usersTimeout[channelId][from.id] = setTimeout(() => {
+              channelListener.onReceivedChannelEvent(channelId, from, 'stop_recording')
+            }, 5000)
+            yield put(switchRecordingIndicatorAC(true, channelId, from))
+          } else if (name === 'stop_recording') {
+            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout[channelId][from.id])
+            }
+            yield put(switchRecordingIndicatorAC(false, channelId, from))
+          }
           break
         }
-        if (name === 'start_typing') {
-          if (!usersTimeout[channelId]) {
-            usersTimeout[channelId] = {}
+        case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
+          const { status } = args
+          log.info('connection status changed . . . . . ', status)
+          yield put(setConnectionStatusAC(status))
+          if (status === CONNECTION_STATUS.CONNECTED) {
+            yield put(getRolesAC())
           }
-          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-            clearTimeout(usersTimeout[channelId][from.id])
-          }
-          usersTimeout[channelId][from.id] = setTimeout(() => {
-            channelListener.onReceivedChannelEvent(channelId, from, 'stop_typing')
-          }, 5000)
-          yield put(switchTypingIndicatorAC(true, channelId, from))
-        } else if (name === 'stop_typing') {
-          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-            clearTimeout(usersTimeout[channelId][from.id])
-          }
-          yield put(switchTypingIndicatorAC(false, channelId, from))
-        } else if (name === 'start_recording') {
-          if (!usersTimeout[channelId]) {
-            usersTimeout[channelId] = {}
-          }
-          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-            clearTimeout(usersTimeout[channelId][from.id])
-          }
-          usersTimeout[channelId][from.id] = setTimeout(() => {
-            channelListener.onReceivedChannelEvent(channelId, from, 'stop_recording')
-          }, 5000)
-          yield put(switchRecordingIndicatorAC(true, channelId, from))
-        } else if (name === 'stop_recording') {
-          if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-            clearTimeout(usersTimeout[channelId][from.id])
-          }
-          yield put(switchRecordingIndicatorAC(false, channelId, from))
+          break
         }
-        break
+        default:
+          log.warn('UNHANDLED EVENT FROM REDUX-SAGA EVENT-CHANNEL')
       }
-      case CONNECTION_EVENT_TYPES.CONNECTION_STATUS_CHANGED: {
-        const { status } = args
-        log.info('connection status changed . . . . . ', status)
-        yield put(setConnectionStatusAC(status))
-        if (status === CONNECTION_STATUS.CONNECTED) {
-          yield put(getRolesAC())
-        }
-        break
-      }
-      default:
-        log.warn('UNHANDLED EVENT FROM REDUX-SAGA EVENT-CHANNEL')
+    } catch (error) {
+      log.error('Error in watchForEvents:', error)
+      // Continue the loop to keep listening for events even if one fails
     }
   }
 }

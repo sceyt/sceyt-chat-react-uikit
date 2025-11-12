@@ -419,7 +419,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      if (!activeChannel?.mentionsIds) {
+      if (!activeChannel?.mentionsIds && activeChannel?.id) {
         dispatch(getChannelMentionsAC(activeChannel.id))
       }
       getSelectedChannel(activeChannel)
@@ -728,7 +728,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     >
       <ChannelListHeader
         withCustomList={!!List}
-        maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
+        maxWidth='100%'
         borderColor={borderColor}
         padding={searchChannelsPadding}
       >
@@ -1257,7 +1257,7 @@ const LoadingWrapper = styled.div`
   top: calc(50% - 20px);
 `
 const ChannelListHeader = styled.div<{
-  maxWidth?: number
+  maxWidth?: string
   withoutProfile?: any
   withCustomList?: boolean
   borderColor?: string
@@ -1268,12 +1268,12 @@ const ChannelListHeader = styled.div<{
   flex-direction: row;
   justify-content: space-between;
   max-width: ${(props: {
-    maxWidth?: number
+    maxWidth?: string
     withoutProfile?: any
     withCustomList?: boolean
     borderColor?: string
     padding?: string
-  }) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
+  }) => (props.maxWidth ? `${props.maxWidth}` : 'inherit')};
   padding: ${(props) => props.padding || '12px'};
   box-sizing: border-box;
   padding-left: ${(props) => props.withoutProfile && '52px'};

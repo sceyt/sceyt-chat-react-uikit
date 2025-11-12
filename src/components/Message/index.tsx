@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
@@ -8,6 +8,7 @@ import {
   addReactionAC,
   addSelectedMessageAC,
   clearSelectedMessagesAC,
+  closePollAC,
   deleteMessageAC,
   deleteMessageFromListAC,
   deleteReactionAC,
@@ -18,9 +19,16 @@ import {
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
   setMessagesLoadingStateAC,
-  setMessageToEditAC
+  setMessageToEditAC,
+  retractPollVoteAC
 } from 'store/message/actions'
-import { createChannelAC, markMessagesAsReadAC, switchChannelInfoAC } from 'store/channel/actions'
+import {
+  createChannelAC,
+  getChannelByInviteKeyAC,
+  markMessagesAsDeliveredAC,
+  markMessagesAsReadAC,
+  switchChannelInfoAC
+} from 'store/channel/actions'
 import { CONNECTION_STATUS } from 'store/user/constants'
 // Hooks
 import { useDidUpdate, useOnScreen, useColor } from 'hooks'
@@ -46,8 +54,11 @@ import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
-import { scrollToNewMessageSelector } from 'store/message/selector'
+import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
+import { MESSAGE_TYPE } from 'types/enum'
+import { isMessageUnsupported } from 'helpers/message'
+import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
 
 const Message = ({
   message,
@@ -106,6 +117,8 @@ const Message = ({
   starIcon,
   staredIcon,
   reportIcon,
+  retractVoteIcon,
+  endVoteIcon,
   reactionIconOrder,
   openFrequentlyUsedReactions = true,
   editIconOrder,
@@ -180,8 +193,9 @@ const Message = ({
   messageTextLineHeight,
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
+  ogMetadataProps,
   showInfoMessageProps = {}
-}: IMessageProps) => {   
+}: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
@@ -201,6 +215,7 @@ const Message = ({
   const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [infoPopupOpen, setInfoPopupOpen] = useState(false)
   const [messageActionsShow, setMessageActionsShow] = useState(false)
+  const [showEndVoteConfirmPopup, setShowEndVoteConfirmPopup] = useState(false)
   const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
   const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
   const [reactionsPopupOpen, setReactionsPopupOpen] = useState(false)
@@ -208,7 +223,7 @@ const Message = ({
   const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
   const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
-
+  const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount =
@@ -221,7 +236,7 @@ const Message = ({
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === 'system' ||
+    prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
     unreadMessageId === prevMessage.id
 
   const messageTimeVisible = showMessageTime && (showMessageTimeForEachMessage || !nextMessage)
@@ -244,6 +259,24 @@ const Message = ({
   const toggleEditMode = () => {
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
+  }
+
+  const handleRetractVote = () => {
+    if (message?.pollDetails?.id) {
+      dispatch(retractPollVoteAC(channel.id, message?.pollDetails?.id, message))
+      setMessageActionsShow(false)
+    }
+  }
+
+  const handleEndVote = () => {
+    setShowEndVoteConfirmPopup(true)
+    setMessageActionsShow(false)
+  }
+
+  const endVote = () => {
+    if (!message?.pollDetails?.id) return
+    dispatch(closePollAC(channel.id, message?.pollDetails?.id, message))
+    setShowEndVoteConfirmPopup(false)
   }
 
   const handleToggleDeleteMessagePopup = () => {
@@ -387,6 +420,17 @@ const Message = ({
   }
 
   const handleSendReadMarker = () => {
+    if (!message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
+      if (
+        message.userMarkers &&
+        message.userMarkers.length &&
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
+        message.incoming
+      ) {
+        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
+      }
+    }
+
     if (
       isVisible &&
       message.incoming &&
@@ -397,7 +441,8 @@ const Message = ({
       ) &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      !unreadScrollTo
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
@@ -451,7 +496,7 @@ const Message = ({
   }
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message.id)
       }
@@ -532,6 +577,14 @@ const Message = ({
     }
   }
 
+  const unsupportedMessage = useMemo(() => {
+    return isMessageUnsupported(message)
+  }, [message])
+
+  const onInviteLinkClick = (key: string) => {
+    dispatch(getChannelByInviteKeyAC(key))
+  }
+
   return (
     <MessageItem
       className='message_item'
@@ -546,7 +599,7 @@ const Message = ({
           : ''
       }
       topMargin={
-        prevMessage?.type === 'system'
+        prevMessage?.type === MESSAGE_TYPE.SYSTEM
           ? '0'
           : prevMessage && unreadMessageId === prevMessage.id
             ? '16px'
@@ -611,6 +664,8 @@ const Message = ({
             messageTextRef={messageTextRef}
             emojisPopupPosition={emojisPopupPosition}
             handleSetMessageForEdit={toggleEditMode}
+            handleRetractVote={handleRetractVote}
+            handleEndVote={handleEndVote}
             handleResendMessage={handleResendMessage}
             handleOpenInfoMessage={handleToggleInfoMessagePopupOpen}
             handleOpenDeleteMessage={handleToggleDeleteMessagePopup}
@@ -630,9 +685,14 @@ const Message = ({
             handleMediaItemClick={handleMediaItemClick}
             isThreadMessage={isThreadMessage}
             handleOpenUserProfile={handleOpenUserProfile}
+            unsupportedMessage={unsupportedMessage}
+            onInviteLinkClick={onInviteLinkClick}
           />
         ) : (
           <MessageBody
+            onInviteLinkClick={onInviteLinkClick}
+            handleRetractVote={handleRetractVote}
+            handleEndVote={handleEndVote}
             message={message}
             channel={channel}
             MessageActionsMenu={MessageActionsMenu}
@@ -682,6 +742,8 @@ const Message = ({
             starIcon={starIcon}
             staredIcon={staredIcon}
             reportIcon={reportIcon}
+            retractVoteIcon={retractVoteIcon}
+            endVoteIcon={endVoteIcon}
             reactionIconOrder={reactionIconOrder}
             editIconOrder={editIconOrder}
             copyIconOrder={copyIconOrder}
@@ -758,6 +820,8 @@ const Message = ({
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
             handleOpenUserProfile={handleOpenUserProfile}
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+            ogMetadataProps={ogMetadataProps}
+            unsupportedMessage={unsupportedMessage}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
@@ -897,6 +961,15 @@ const Message = ({
           handleOpenUserProfile={handleOpenUserProfile}
         />
       )}
+      {showEndVoteConfirmPopup && (
+        <ConfirmEndPollPopup
+          handleFunction={endVote}
+          togglePopup={() => setShowEndVoteConfirmPopup(false)}
+          title='End Poll'
+          buttonText='End Poll'
+          description='Are you sure you want to end this poll? People will no longer be able to vote.'
+        />
+      )}
     </MessageItem>
   )
 }
@@ -912,6 +985,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.message.attachments === nextProps.message.attachments &&
     prevProps.message.metadata === nextProps.message.metadata &&
     prevProps.message.userMarkers === nextProps.message.userMarkers &&
+    prevProps.message.pollDetails === nextProps.message.pollDetails &&
     prevProps.prevMessage === nextProps.prevMessage &&
     prevProps.nextMessage === nextProps.nextMessage &&
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&

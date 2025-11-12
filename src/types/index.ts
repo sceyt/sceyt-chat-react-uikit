@@ -7,6 +7,7 @@ export interface IAction {
 
 export interface IUser {
   id: string
+  avatar?: string
   firstName: string
   lastName: string
   avatarUrl?: string
@@ -91,6 +92,61 @@ export interface IMarker {
   createdAt: Date
   user: IUser | null
 }
+export interface IPollOption {
+  id: string
+  name: string
+}
+
+export interface IPollVote {
+  optionId: string
+  createdAt: number
+  user: {
+    id: string
+    presence: {
+      status: string
+    }
+    profile: {
+      avatar: string
+      firstName: string
+      lastName: string
+      metadata: string
+      metadataMap: {
+        [key: string]: string
+      }
+      updatedAt: number
+      username: string
+      createdAt: number
+    }
+    createdAt: number
+  }
+}
+
+export interface IChangedVotes {
+  addedVotes: IPollVote[]
+  removedVotes: IPollVote[]
+}
+
+export interface IVoteDetails {
+  votesPerOption: { [key: string]: number }
+  votes: IPollVote[]
+  ownVotes: IPollVote[]
+}
+
+export interface IPollDetails {
+  id: string
+  name: string
+  description: string
+  options: IPollOption[]
+  anonymous: boolean
+  allowMultipleVotes: boolean
+  allowVoteRetract: boolean
+  changedVotes?: IChangedVotes
+  voteDetails: IVoteDetails
+  createdAt: number
+  updatedAt: number
+  closedAt: number
+  closed: boolean
+}
 
 export interface IMessage {
   id: string
@@ -132,6 +188,7 @@ export interface IMessage {
     messageId: string
     user: IUser
   }
+  pollDetails?: IPollDetails
 }
 
 export interface IMember extends IUser {
@@ -301,4 +358,23 @@ export interface ILabels {
   playedBy?: string
   receivedBy?: string
   displayedBy?: string
+}
+
+export interface OGMetadataProps {
+  maxWidth?: number
+  maxHeight?: number
+  ogLayoutOrder?: 'link-first' | 'og-first'
+  ogShowUrl?: boolean
+  ogShowTitle?: boolean
+  ogShowDescription?: boolean
+  ogShowFavicon?: boolean
+  order?: { image?: number; title?: number; description?: number; link?: number }
+  ogContainerBorderRadius?: string | number
+  ogContainerPadding?: string
+  ogContainerClassName?: string
+  ogContainerShowBackground?: boolean
+  ogContainerBackground?: string
+  infoPadding?: string
+  isInviteLink?: boolean
+  target?: string
 }

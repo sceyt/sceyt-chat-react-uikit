@@ -1,8 +1,9 @@
 import { attachmentTypes } from './constants'
-import { IBodyAttribute, IContact, IUser } from '../types'
+import { IBodyAttribute, IContact, IMessage, IPollDetails, IPollVote, IUser, IVoteDetails } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
+import { MESSAGE_TYPE } from 'types/enum'
 export const typingTextFormat = ({
   text,
   formatAttributes,
@@ -280,5 +281,90 @@ export const EditorTheme: EditorThemeClasses = {
     superscript: 'text_superscript',
     underline: 'text_underline',
     underlineStrikethrough: 'text_underlineStrikethrough'
+  }
+}
+
+export const isMessageUnsupported = (message: IMessage) => {
+  return (
+    message?.type !== MESSAGE_TYPE.TEXT &&
+    message?.type !== MESSAGE_TYPE.MEDIA &&
+    message?.type !== MESSAGE_TYPE.FILE &&
+    message?.type !== MESSAGE_TYPE.LINK &&
+    message?.type !== MESSAGE_TYPE.POLL &&
+    message?.type !== MESSAGE_TYPE.DELETED &&
+    message?.type !== MESSAGE_TYPE.SYSTEM
+  )
+}
+
+export const deleteVoteFromPollDetails = (votes: IPollVote[], deletedVote: IPollVote) => {
+  const newVotes = []
+  for (const vote of votes) {
+    if (deletedVote.optionId !== vote.optionId || deletedVote.user.id !== vote.user.id) {
+      newVotes.push(vote)
+    }
+  }
+  return newVotes
+}
+
+export const handleVoteDetails = (
+  voteDetails?: {
+    vote?: IPollVote
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+    incrementVotesPerOptionCount: number
+  },
+  message?: IMessage
+): IPollDetails | undefined => {
+  if (!voteDetails || !message?.pollDetails) {
+    return undefined
+  }
+
+  const existingPollDetails = message.pollDetails
+  const existingVoteDetails = existingPollDetails.voteDetails || {
+    votesPerOption: {},
+    votes: [],
+    ownVotes: []
+  }
+
+  if (voteDetails.type === 'close') {
+    return {
+      ...existingPollDetails,
+      closed: true
+    }
+  }
+
+  if (!voteDetails.vote) {
+    return existingPollDetails
+  }
+
+  const vote = voteDetails.vote
+  const optionId = vote.optionId
+  const currentVotesPerOption = existingVoteDetails.votesPerOption || {}
+  const newVotesPerOption = {
+    ...currentVotesPerOption,
+    [optionId]: (currentVotesPerOption[optionId] || 0) + voteDetails.incrementVotesPerOptionCount
+  }
+
+  let newVotes: IPollVote[] = existingVoteDetails.votes || []
+  let newOwnVotes: IPollVote[] = existingVoteDetails.ownVotes || []
+
+  if (voteDetails.type === 'add') {
+    newVotes = [...newVotes, vote]
+  } else if (voteDetails.type === 'delete') {
+    newVotes = deleteVoteFromPollDetails(newVotes, vote)
+  } else if (voteDetails.type === 'addOwn') {
+    newOwnVotes = [...newOwnVotes, vote]
+  } else if (voteDetails.type === 'deleteOwn') {
+    newOwnVotes = deleteVoteFromPollDetails(newOwnVotes, vote)
+  }
+
+  const newVoteDetails: IVoteDetails = {
+    votesPerOption: newVotesPerOption,
+    votes: newVotes,
+    ownVotes: newOwnVotes
+  }
+
+  return {
+    ...existingPollDetails,
+    voteDetails: newVoteDetails
   }
 }

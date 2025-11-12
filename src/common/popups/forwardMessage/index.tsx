@@ -83,7 +83,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (channelsLoading === LOADING_STATE.LOADED && channelsHasNext && !loadingRef.current) {
         loadingRef.current = true
-        dispatch(loadMoreChannelsForForward(15))
+        dispatch(loadMoreChannelsForForward(20))
         const timeout = setTimeout(() => {
           loadingRef.current = false
           clearTimeout(timeout)
