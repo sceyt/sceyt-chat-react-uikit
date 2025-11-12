@@ -1365,10 +1365,14 @@ function* getMessagesQuery(action: IAction): any {
         const allMessages = getAllMessages()
         const setMappedAllMessages: { [key: string]: IMessage } = {}
         previousAllMessages.forEach((msg: IMessage) => {
-          setMappedAllMessages[msg.id] = msg
+          if (msg.channelId === channel.id) {
+            setMappedAllMessages[msg.id] = msg
+          }
         })
         allMessages.forEach((msg: IMessage) => {
-          setMappedAllMessages[msg.id] = msg
+          if (msg.channelId === channel.id) {
+            setMappedAllMessages[msg.id] = msg
+          }
         })
         const allMessagesAfterLastMessage = Object.values(setMappedAllMessages)?.filter(
           (msg: IMessage) => msg.id > lastMessageId
