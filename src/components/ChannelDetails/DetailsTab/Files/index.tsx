@@ -7,12 +7,10 @@ import { CircularProgressbar } from 'react-circular-progressbar'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 // Assets
-import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
+import { ReactComponent as FileIcon } from '../../../../assets/svg/document_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
 // Helpers
 import { bytesToSize, downloadFile, formatLargeText } from '../../../../helpers'
-import { isJSON } from '../../../../helpers/message'
-import { base64ToToDataURL } from '../../../../helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
@@ -85,18 +83,6 @@ const Files = ({
     <Container>
       {attachments.map(
         (file: IAttachment) => {
-          const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-          let withPrefix = true
-          let attachmentThumb = ''
-
-          if (metas && metas.tmb) {
-            if (metas.tmb.length < 70) {
-              attachmentThumb = base64ToToDataURL(metas.tmb)
-              withPrefix = false
-            } else {
-              attachmentThumb = metas.tmb
-            }
-          }
           return (
             <FileItem
               key={file.id}
@@ -104,18 +90,14 @@ const Files = ({
               // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
               hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
             >
-              {metas && metas.tmb ? (
-                <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
-              ) : (
-                <React.Fragment>
-                  <FileIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewIcon || <FileIcon />}
-                  </FileIconCont>
-                  <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewHoverIcon || <FileIcon />}
-                  </FileHoverIconCont>
-                </React.Fragment>
-              )}
+              <React.Fragment>
+                <FileIconCont iconColor={accentColor} fillColor={surface1}>
+                  {filePreviewIcon || <FileIcon />}
+                </FileIconCont>
+                <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
+                  {filePreviewHoverIcon || <FileIcon />}
+                </FileHoverIconCont>
+              </React.Fragment>
               <div>
                 <AttachmentPreviewTitle
                   fontSize={fileNameFontSize}
@@ -230,29 +212,25 @@ const ProgressWrapper = styled.span`
 
 const FileIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: inline-flex;
-
   & > svg {
     width: 40px;
     height: 40px;
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const FileHoverIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: none;
   & > svg {
-    color: ${(props) => props.iconColor};
     width: 40px;
     height: 40px;
-    fill: ${(props) => props.fillColor};
+    color: ${(props) => props.iconColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
-`
-const FileThumb = styled.img`
-  width: 40px;
-  height: 40px;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  object-fit: cover;
 `
 const FileItem = styled.div<{ hoverBackgroundColor: string }>`
   position: relative;

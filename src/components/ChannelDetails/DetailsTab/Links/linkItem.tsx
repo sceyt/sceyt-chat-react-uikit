@@ -78,14 +78,18 @@ const LinkIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: inline-flex;
   > svg {
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const LinkHoverIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: none;
   > svg {
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const LinkInfoCont = styled.div`
