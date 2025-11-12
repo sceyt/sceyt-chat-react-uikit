@@ -1151,6 +1151,7 @@ const MessageList: React.FC<MessagesProps> = ({
       setScrollIntoView(true)
       const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
       if (lastReadMessageNode && scrollElement) {
+        dispatch(scrollToNewMessageAC(false))
         scrollElement.scrollTo({
           top: lastReadMessageNode.offsetTop - 200,
           behavior: 'auto'
