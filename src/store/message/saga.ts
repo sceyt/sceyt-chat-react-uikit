@@ -1053,9 +1053,7 @@ function* resendMessage(action: IAction): any {
           createdAt: messageResponse.createdAt,
           channelId: channel.id
         }
-        const isInActiveChannel = getMessagesFromMap(channelId)?.find(
-          (message: IMessage) => message.id === messageCopy.tid
-        )
+        const isInActiveChannel = getMessagesFromMap(channelId)[messageCopy.tid]
         if (isInActiveChannel) {
           yield put(removePendingMessageAC(channel.id, messageCopy.tid || messageCopy.id))
         }
@@ -1199,7 +1197,9 @@ function* getMessagesQuery(action: IAction): any {
       messageQueryBuilder.reverse(true)
       const messageQuery = yield call(messageQueryBuilder.build)
       query.messageQuery = messageQuery
-      const cachedMessages = getMessagesFromMap(channel.id)
+      const cachedMessages = Object.values(getMessagesFromMap(channel.id) || {}).sort(
+        (a: IMessage, b: IMessage) => Number(a.id) - Number(b.id)
+      )
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
       if (loadWithLastMessage) {
         const allMessages = getAllMessages()
@@ -1374,7 +1374,7 @@ function* getMessagesQuery(action: IAction): any {
             setMappedAllMessages[msg.id] = msg
           }
         })
-        const allMessagesAfterLastMessage = Object.values(setMappedAllMessages)?.filter(
+        const allMessagesAfterLastMessage = Object.values(setMappedAllMessages || {})?.filter(
           (msg: IMessage) => msg.id > lastMessageId
         )
         updatedMessages = [...updatedMessages, ...(allMessagesAfterLastMessage || [])]
@@ -1457,6 +1457,7 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.PREV)
+          setMessagesToMap(channelId, result.messages)
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
@@ -1469,6 +1470,7 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadNextMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.NEXT)
+          setMessagesToMap(channelId, result.messages)
         }
         yield put(setMessagesHasNextAC(result.hasNext))
       }
@@ -1862,8 +1864,9 @@ function* addPollVote(action: IAction): any {
           if (channel) {
             // Get the current message state (which has the delete applied)
             const currentMessage =
-              getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) ||
-              message
+              Object.values(getMessagesFromMap(channelId) || {})?.find(
+                (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+              ) || message
             // Apply add on top (which effectively reverts the delete)
 
             const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
@@ -1974,8 +1977,9 @@ function* deletePollVote(action: IAction): any {
           if (channel) {
             // Get the current message state (which has the add applied optimistically)
             const currentMessage =
-              getMessagesFromMap(channelId)?.find((msg: IMessage) => msg.id === message.id || msg.tid === message.id) ||
-              message
+              Object.values(getMessagesFromMap(channelId) || {})?.find(
+                (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+              ) || message
             // Revert by applying delete (which removes the vote that was added optimistically)
 
             yield put(

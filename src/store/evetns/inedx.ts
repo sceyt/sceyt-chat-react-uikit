@@ -882,7 +882,7 @@ export default function* watchForEvents(): any {
             const markersMap: any = {}
             const activeChannelMessages = getMessagesFromMap(activeChannelId)
             for (const messageId of markerList.messageIds) {
-              if (activeChannelMessages?.find((message: IMessage) => message.id === messageId)) {
+              if (activeChannelMessages?.[messageId]) {
                 yield put(removePendingMessageAC(channelId, messageId))
               } else {
                 const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)

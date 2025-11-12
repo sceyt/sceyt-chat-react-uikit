@@ -887,6 +887,9 @@ const MessageList: React.FC<MessagesProps> = ({
             behavior: 'smooth'
           })
         }
+        setTimeout(() => {
+          dispatch(scrollToNewMessageAC(false, false, false))
+        }, 800)
       } else {
         nextDisableRef.current = true
         prevDisableRef.current = true
@@ -897,6 +900,7 @@ const MessageList: React.FC<MessagesProps> = ({
         dispatch(showScrollToNewMessageButtonAC(false))
         setTimeout(() => {
           prevDisableRef.current = false
+          dispatch(scrollToNewMessageAC(false, false, false))
         }, 800)
       }
     }
