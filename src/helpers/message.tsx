@@ -1,4 +1,4 @@
-import { attachmentTypes } from './constants'
+import { attachmentTypes, MESSAGE_STATUS } from './constants'
 import { IBodyAttribute, IContact, IMessage, IPollDetails, IPollVote, IUser, IVoteDetails } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
@@ -291,7 +291,7 @@ export const isMessageUnsupported = (message: IMessage) => {
     message?.type !== MESSAGE_TYPE.FILE &&
     message?.type !== MESSAGE_TYPE.LINK &&
     message?.type !== MESSAGE_TYPE.POLL &&
-    message?.type !== MESSAGE_TYPE.DELETED &&
+    !(message?.type === MESSAGE_TYPE.DELETED && message.state === MESSAGE_STATUS.DELETE) &&
     message?.type !== MESSAGE_TYPE.SYSTEM
   )
 }
