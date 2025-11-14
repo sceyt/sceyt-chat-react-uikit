@@ -112,7 +112,7 @@ function App() {
               logLevel='silent'
               // useInviteLink={true}
               // baseUrlForInviteMembers='http://localhost:3001/invite'
-              embeddedPopup={false}
+              embeddedJoinGroupPopup={false}
             >
               <ChannelList />
               <Chat>
