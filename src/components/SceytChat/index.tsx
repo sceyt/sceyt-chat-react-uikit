@@ -74,7 +74,8 @@ const SceytChat = ({
   autoSelectFirstChannel = false,
   memberCount,
   disableFrowardMentionsCount = false,
-  chatMinWidth
+  chatMinWidth,
+  embeddedPopup = false
 }: IChatClientProps) => {
   const useInviteLink = getUseInviteLink()
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
@@ -327,6 +328,11 @@ const SceytChat = ({
     dispatch(setJoinableChannelAC(null as unknown as IChannel))
   }
 
+  const joinPopup =
+    joinableChannel && getUseInviteLink() ? (
+      <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
+    ) : null
+
   return (
     <React.Fragment>
       {SceytChatClient ? (
@@ -341,13 +347,12 @@ const SceytChat = ({
           chatMinWidth={chatMinWidth}
         >
           {children}
+          {embeddedPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
         </ChatContainer>
       ) : (
         ''
       )}
-      {joinableChannel && getUseInviteLink() && (
-        <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
-      )}
+      {!embeddedPopup && joinPopup}
     </React.Fragment>
   )
 }
@@ -370,6 +375,7 @@ const ChatContainer = styled.div<{
   max-height: 100vh;
   min-width: ${(props) => props.withChannelsList && (props.chatMinWidth || '1200px')};
   background-color: ${(props) => props.backgroundColor};
+  position: relative;
 
   /* Global highlighted background styles */
   ::selection {
@@ -387,5 +393,28 @@ const ChatContainer = styled.div<{
 
   *::-moz-selection {
     background-color: ${(props) => props.highlightedBackground};
+  }
+`
+
+const EmbeddedPopupWrapper = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+
+  > * {
+    pointer-events: all;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 `
