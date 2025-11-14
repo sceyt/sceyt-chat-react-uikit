@@ -121,6 +121,7 @@ export interface IChatClientProps {
   baseUrlForInviteMembers?: string
   useInviteLink?: boolean
   inviteLinkOptions?: InviteLinkOptions | null
+  embeddedJoinGroupPopup?: boolean
 }
 
 const SceytChatContainer = ({
@@ -152,7 +153,8 @@ const SceytChatContainer = ({
     JoinGroupPopup: {},
     InviteLinkModal: {},
     ResetLinkConfirmModal: {}
-  }
+  },
+  embeddedJoinGroupPopup = false
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -190,6 +192,7 @@ const SceytChatContainer = ({
         memberCount={memberCount}
         disableFrowardMentionsCount={disableFrowardMentionsCount}
         chatMinWidth={chatMinWidth}
+        embeddedJoinGroupPopup={embeddedJoinGroupPopup}
       />
     </Provider>
   )

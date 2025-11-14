@@ -1,4 +1,4 @@
-import SceytChat, { SceytChatUIKitTheme, ThemeMode } from './ChatContainer'
+import SceytChat, { SceytChatUIKitTheme, ThemeMode, IChatClientProps } from './ChatContainer'
 import ChannelList from './ChannelList'
 import Channel from './Channel'
 import Chat from './Chat'
@@ -48,6 +48,7 @@ export {
   FrequentlyEmojis,
   SceytChatUIKitTheme,
   ThemeMode,
+  IChatClientProps,
   THEME_COLORS,
   MESSAGE_TYPE,
   handleSendMessage,
