@@ -75,7 +75,7 @@ const SceytChat = ({
   memberCount,
   disableFrowardMentionsCount = false,
   chatMinWidth,
-  embeddedPopup = false
+  embeddedJoinGroupPopup = false
 }: IChatClientProps) => {
   const useInviteLink = getUseInviteLink()
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
@@ -347,12 +347,12 @@ const SceytChat = ({
           chatMinWidth={chatMinWidth}
         >
           {children}
-          {embeddedPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
+          {embeddedJoinGroupPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
         </ChatContainer>
       ) : (
         ''
       )}
-      {!embeddedPopup && joinPopup}
+      {!embeddedJoinGroupPopup && joinPopup}
     </React.Fragment>
   )
 }
