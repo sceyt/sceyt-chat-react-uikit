@@ -24,7 +24,9 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
 
@@ -123,7 +125,13 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
           {showMembersLine && membersLine && <MembersText color={textSecondary}>{membersLine}</MembersText>}
 
           <Center>
-            <Button type='button' color={'#fff'} backgroundColor={'#0DBD8B'} borderRadius='8px' onClick={onJoin}>
+            <Button
+              type='button'
+              color={textOnPrimary}
+              backgroundColor={accentColor}
+              borderRadius='8px'
+              onClick={onJoin}
+            >
               {joinButtonText}
             </Button>
           </Center>
