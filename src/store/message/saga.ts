@@ -506,8 +506,7 @@ function* sendMessage(action: IAction): any {
             yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
             updateChannelOnAllChannels(channel.id, channelUpdateParam)
           } else {
-            // eslint-disable-next-line
-            throw Error('Network error')
+            throw new Error('Connection required to send message')
           }
         } catch (e) {
           log.error('Error on uploading attachment', messageToSend.tid, e)
