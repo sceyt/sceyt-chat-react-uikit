@@ -1165,6 +1165,9 @@ const MessageList: React.FC<MessagesProps> = ({
           setScrollIntoView(false)
         }, 100)
       }
+    } else {
+      dispatch(setUnreadScrollToAC(false))
+      setScrollIntoView(false)
     }
   }, [
     channel.id,

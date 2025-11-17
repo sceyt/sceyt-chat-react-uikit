@@ -499,7 +499,7 @@ const Message = ({
   }
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message.id)
       }
@@ -517,7 +517,7 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible])
+  }, [isVisible, unreadScrollTo])
 
   useDidUpdate(() => {
     if (tabIsActive) {
