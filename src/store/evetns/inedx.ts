@@ -79,7 +79,7 @@ import { getShowNotifications, setNotification } from '../../helpers/notificatio
 import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { attachmentTypes, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
+import { attachmentTypes } from '../../helpers/constants'
 import { MessageTextFormat } from '../../messageUtils'
 import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
@@ -893,11 +893,7 @@ export default function* watchForEvents(): any {
               }
               markersMap[messageId] = true
               if (channel) {
-                if (
-                  channel.lastMessage &&
-                  messageId === channel.lastMessage.id &&
-                  channel.lastMessage.deliveryStatus !== MESSAGE_DELIVERY_STATUS.READ
-                ) {
+                if (channel.lastMessage && messageId === channel.lastMessage.id) {
                   updateLastMessage = true
                 }
               }
