@@ -68,6 +68,7 @@ import {
   removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
   updateMarkersOnAllMessages,
+  updateMessageDeliveryStatusAndMarkers,
   updateMessageOnAllMessages,
   updateMessageOnMap,
   updateMessageStatusOnAllMessages,
@@ -905,7 +906,7 @@ export default function* watchForEvents(): any {
             if (updateLastMessage) {
               const lastMessage = {
                 ...channel.lastMessage,
-                deliveryStatus: markerList.name
+                ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerList.name)
               }
 
               updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
