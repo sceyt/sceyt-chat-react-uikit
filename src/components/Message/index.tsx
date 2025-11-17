@@ -20,7 +20,8 @@ import {
   setMessageMenuOpenedAC,
   setMessagesLoadingStateAC,
   setMessageToEditAC,
-  retractPollVoteAC
+  retractPollVoteAC,
+  setReactionsListAC
 } from 'store/message/actions'
 import {
   createChannelAC,
@@ -368,6 +369,7 @@ const Message = ({
       left: reactionsContainer ? reactionsContainer.getBoundingClientRect().left : 0,
       right: reactionsContPos ? window.innerWidth - reactionsContPos.left - reactionsContPos.width : 0
     })
+    dispatch(setReactionsListAC([], false))
     setReactionsPopupOpen(!reactionsPopupOpen)
   }
 
