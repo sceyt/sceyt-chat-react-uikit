@@ -19,7 +19,7 @@ import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
 // Shared Components & Hooks
-import { MonthHeader, useGroupedAttachments } from '../shared'
+import MonthHeader from '../shared/MonthHeader'
 
 interface IProps {
   channelId: string
@@ -83,104 +83,101 @@ const Files = ({
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
   }, [channelId, dispatch])
 
-  const groupedAttachments = useGroupedAttachments(attachments)
-
   return (
     <Container>
-      {groupedAttachments.map((group) => (
-        <React.Fragment key={group.monthKey}>
-          <MonthHeader month={group.monthHeader} />
-          {group.files.map((file: IAttachment) => {
-            const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-            let withPrefix = true
-            let attachmentThumb = ''
+      {attachments.map((file: IAttachment, index: number) => {
+        const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+        let withPrefix = true
+        let attachmentThumb = ''
 
-            if (metas && metas.tmb) {
-              if (metas.tmb.length < 70) {
-                attachmentThumb = base64ToToDataURL(metas.tmb)
-                withPrefix = false
-              } else {
-                attachmentThumb = metas.tmb
-              }
-            }
-            return (
-              <FileItem
-                key={file.id}
-                // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-                // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-                hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
-              >
-                {metas && metas.tmb ? (
-                  <FileThumb
-                    draggable={false}
-                    src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`}
-                  />
-                ) : (
-                  <React.Fragment>
-                    <FileIconCont iconColor={accentColor} fillColor={surface1}>
-                      {filePreviewIcon || <FileIcon />}
-                    </FileIconCont>
-                    <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
-                      {filePreviewHoverIcon || <FileIcon />}
-                    </FileHoverIconCont>
-                  </React.Fragment>
-                )}
-                <div>
-                  <AttachmentPreviewTitle
-                    fontSize={fileNameFontSize}
-                    lineHeight={fileNameLineHeight}
-                    color={filePreviewTitleColor || textPrimary}
-                  >
-                    {formatLargeText(file.name, nameMaxLength)}
-                  </AttachmentPreviewTitle>
-                  <FileSizeAndDate
-                    fontSize={fileSizeFontSize}
-                    lineHeight={fileSizeLineHeight}
-                    color={filePreviewSizeColor || textSecondary}
-                  >
-                    {file.size
-                      ? `${bytesToSize(file.size)} • ${formatChannelDetailsFullDate(file.createdAt)}`
-                      : formatChannelDetailsFullDate(file.createdAt)}
-                  </FileSizeAndDate>
-                </div>
-                <DownloadWrapper
-                  visible={!!downloadingFilesMap[file.id!]}
-                  iconColor={accentColor}
-                  onClick={() => handleDownloadFile(file)}
+        if (metas && metas.tmb) {
+          if (metas.tmb.length < 70) {
+            attachmentThumb = base64ToToDataURL(metas.tmb)
+            withPrefix = false
+          } else {
+            attachmentThumb = metas.tmb
+          }
+        }
+
+        const fileDate = new Date(file.createdAt)
+        const prevFileDate = index > 0 ? new Date(attachments[index - 1].createdAt) : null
+        const shouldShowMonthHeader = index === 0 || (prevFileDate && fileDate.getMonth() !== prevFileDate.getMonth())
+
+        const monthComponent = shouldShowMonthHeader ? (
+          <MonthHeader month={fileDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} />
+        ) : null
+
+        return (
+          <React.Fragment key={file.id}>
+            {monthComponent}
+            <FileItem hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}>
+              {metas && metas.tmb ? (
+                <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
+              ) : (
+                <React.Fragment>
+                  <FileIconCont iconColor={accentColor} fillColor={surface1}>
+                    {filePreviewIcon || <FileIcon />}
+                  </FileIconCont>
+                  <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
+                    {filePreviewHoverIcon || <FileIcon />}
+                  </FileHoverIconCont>
+                </React.Fragment>
+              )}
+              <div>
+                <AttachmentPreviewTitle
+                  fontSize={fileNameFontSize}
+                  lineHeight={fileNameLineHeight}
+                  color={filePreviewTitleColor || textPrimary}
                 >
-                  {downloadingFilesMap[file.id!] ? (
-                    <ProgressWrapper>
-                      <CircularProgressbar
-                        minValue={0}
-                        maxValue={100}
-                        value={downloadingFilesMap[file.id!].uploadPercent || 0}
-                        backgroundPadding={6}
-                        background={true}
-                        text=''
-                        styles={{
-                          background: {
-                            fill: `${overlayBackground2}66`
-                          },
-                          path: {
-                            stroke: accentColor,
-                            strokeLinecap: 'butt',
-                            strokeWidth: '6px',
-                            transition: 'stroke-dashoffset 0.5s ease 0s',
-                            transform: 'rotate(0turn)',
-                            transformOrigin: 'center center'
-                          }
-                        }}
-                      />
-                    </ProgressWrapper>
-                  ) : (
-                    filePreviewDownloadIcon || <Download />
-                  )}
-                </DownloadWrapper>
-              </FileItem>
-            )
-          })}
-        </React.Fragment>
-      ))}
+                  {formatLargeText(file.name, nameMaxLength)}
+                </AttachmentPreviewTitle>
+                <FileSizeAndDate
+                  fontSize={fileSizeFontSize}
+                  lineHeight={fileSizeLineHeight}
+                  color={filePreviewSizeColor || textSecondary}
+                >
+                  {file.size
+                    ? `${bytesToSize(file.size)} • ${formatChannelDetailsFullDate(file.createdAt)}`
+                    : formatChannelDetailsFullDate(file.createdAt)}
+                </FileSizeAndDate>
+              </div>
+              <DownloadWrapper
+                visible={!!downloadingFilesMap[file.id!]}
+                iconColor={accentColor}
+                onClick={() => handleDownloadFile(file)}
+              >
+                {downloadingFilesMap[file.id!] ? (
+                  <ProgressWrapper>
+                    <CircularProgressbar
+                      minValue={0}
+                      maxValue={100}
+                      value={downloadingFilesMap[file.id!].uploadPercent || 0}
+                      backgroundPadding={6}
+                      background={true}
+                      text=''
+                      styles={{
+                        background: {
+                          fill: `${overlayBackground2}66`
+                        },
+                        path: {
+                          stroke: accentColor,
+                          strokeLinecap: 'butt',
+                          strokeWidth: '6px',
+                          transition: 'stroke-dashoffset 0.5s ease 0s',
+                          transform: 'rotate(0turn)',
+                          transformOrigin: 'center center'
+                        }
+                      }}
+                    />
+                  </ProgressWrapper>
+                ) : (
+                  filePreviewDownloadIcon || <Download />
+                )}
+              </DownloadWrapper>
+            </FileItem>
+          </React.Fragment>
+        )
+      })}
     </Container>
   )
 }

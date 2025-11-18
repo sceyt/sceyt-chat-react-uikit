@@ -11,7 +11,7 @@ import { channelDetailsTabs } from '../../../../helpers/constants'
 // Components
 import LinkItem from './linkItem'
 // Shared Components & Hooks
-import { MonthHeader, useGroupedAttachments } from '../shared'
+import MonthHeader from '../shared/MonthHeader'
 
 interface IProps {
   channelId: string
@@ -37,16 +37,21 @@ const Links = ({
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link))
   }, [channelId, dispatch])
 
-  const groupedAttachments = useGroupedAttachments(attachments)
-
   return (
     <Container>
-      {groupedAttachments.map((group) => (
-        <React.Fragment key={group.monthKey}>
-          <MonthHeader month={group.monthHeader} />
-          {group.files.map((file: IAttachment) => (
+      {attachments.map((file: IAttachment, index: number) => {
+        const fileDate = new Date(file.createdAt)
+        const prevFileDate = index > 0 ? new Date(attachments[index - 1].createdAt) : null
+        const shouldShowMonthHeader = index === 0 || (prevFileDate && fileDate.getMonth() !== prevFileDate.getMonth())
+
+        const monthComponent = shouldShowMonthHeader ? (
+          <MonthHeader month={fileDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} />
+        ) : null
+
+        return (
+          <React.Fragment key={file.id}>
+            {monthComponent}
             <LinkItem
-              key={file.id}
               link={file.url}
               linkPreviewColor={linkPreviewColor}
               linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
@@ -54,9 +59,9 @@ const Links = ({
               linkPreviewTitleColor={linkPreviewTitleColor}
               linkPreviewIcon={linkPreviewIcon}
             />
-          ))}
-        </React.Fragment>
-      ))}
+          </React.Fragment>
+        )
+      })}
     </Container>
   )
 }

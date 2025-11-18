@@ -5,7 +5,3 @@ export interface GroupedAttachment {
   monthHeader: string
   files: IAttachment[]
 }
-
-export interface UseGroupedAttachmentsResult {
-  groupedAttachments: GroupedAttachment[]
-}

@@ -9,7 +9,7 @@ import { getAttachmentsAC } from '../../../../store/message/actions'
 import VoiceItem from './voiceItem'
 import { isJSON } from '../../../../helpers/message'
 // Shared Components & Hooks
-import { MonthHeader, useGroupedAttachments } from '../shared'
+import MonthHeader from '../shared/MonthHeader'
 
 interface IProps {
   channelId: string
@@ -39,16 +39,21 @@ const Voices = ({
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice))
   }, [channelId, dispatch])
 
-  const groupedAttachments = useGroupedAttachments(attachments)
-
   return (
     <Container>
-      {groupedAttachments.map((group) => (
-        <React.Fragment key={group.monthKey}>
-          <MonthHeader month={group.monthHeader} />
-          {group.files.map((file: IAttachment) => (
+      {attachments.map((file: IAttachment, index: number) => {
+        const fileDate = new Date(file.createdAt)
+        const prevFileDate = index > 0 ? new Date(attachments[index - 1].createdAt) : null
+        const shouldShowMonthHeader = index === 0 || (prevFileDate && fileDate.getMonth() !== prevFileDate.getMonth())
+
+        const monthComponent = shouldShowMonthHeader ? (
+          <MonthHeader month={fileDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })} />
+        ) : null
+
+        return (
+          <React.Fragment key={file.id}>
+            {monthComponent}
             <VoiceItem
-              key={file.id}
               file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
               voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
               voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
@@ -58,9 +63,9 @@ const Voices = ({
               voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
               voicePreviewTitleColor={voicePreviewTitleColor}
             />
-          ))}
-        </React.Fragment>
-      ))}
+          </React.Fragment>
+        )
+      })}
     </Container>
   )
 }

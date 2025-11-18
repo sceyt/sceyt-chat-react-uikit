@@ -15,7 +15,7 @@ import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 // Shared Components & Hooks
-import { MonthHeader, useGroupedAttachments } from '../shared'
+import MonthHeader from '../shared/MonthHeader'
 
 interface IProps {
   channel: IChannel
@@ -34,52 +34,71 @@ const Media = ({ channel }: IProps) => {
     dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media))
   }, [channel.id, dispatch])
 
-  const groupedAttachments = useGroupedAttachments(attachments)
-
   return (
     <Container>
-      {groupedAttachments.map((group) => (
-        <React.Fragment key={group.monthKey}>
-          <MonthHeader month={group.monthHeader} leftPadding={6} />
-          <MediaGroup>
-            {group.files.map((file: IAttachment) => (
-              <MediaItem key={file.id}>
-                {file.type === 'image' ? (
-                  <Attachment
-                    attachment={{
-                      ...file,
-                      metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-                    }}
-                    handleMediaItemClick={handleMediaItemClick}
-                    backgroundColor={background}
-                    borderRadius='8px'
-                    isDetailsView
-                  />
-                ) : (
-                  // <img src={file.url} alt='' />
+      {attachments.map((file: IAttachment, index: number) => {
+        const fileDate = new Date(file.createdAt)
+        const prevFileDate = index > 0 ? new Date(attachments[index - 1].createdAt) : null
+        const shouldShowMonthHeader = index === 0 || (prevFileDate && fileDate.getMonth() !== prevFileDate.getMonth())
 
-                  <Attachment
-                    attachment={{
-                      ...file,
-                      metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-                    }}
-                    handleMediaItemClick={handleMediaItemClick}
-                    backgroundColor={background}
-                    borderRadius='8px'
-                    isDetailsView
-                  />
-                  /* <video>
+        if (!shouldShowMonthHeader) {
+          return null
+        }
+
+        const monthFiles = attachments.filter((f: IAttachment) => {
+          const fDate = new Date(f.createdAt)
+          return fDate.getMonth() === fileDate.getMonth() && fDate.getFullYear() === fileDate.getFullYear()
+        })
+
+        const monthComponent = (
+          <MonthHeader
+            month={fileDate.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            leftPadding={6}
+          />
+        )
+
+        return (
+          <React.Fragment key={`month-${fileDate.getMonth()}-${fileDate.getFullYear()}`}>
+            {monthComponent}
+            <MediaGroup>
+              {monthFiles.map((file: IAttachment) => (
+                <MediaItem key={file.id}>
+                  {file.type === 'image' ? (
+                    <Attachment
+                      attachment={{
+                        ...file,
+                        metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+                      }}
+                      handleMediaItemClick={handleMediaItemClick}
+                      backgroundColor={background}
+                      borderRadius='8px'
+                      isDetailsView
+                    />
+                  ) : (
+                    // <img src={file.url} alt='' />
+                    <Attachment
+                      attachment={{
+                        ...file,
+                        metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+                      }}
+                      handleMediaItemClick={handleMediaItemClick}
+                      backgroundColor={background}
+                      borderRadius='8px'
+                      isDetailsView
+                    />
+                    /* <video>
                     <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
                     <source src={file.url} type='video/ogg' />
                     <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
                     Your browser does not support the video tag.
                   </video> */
-                )}
-              </MediaItem>
-            ))}
-          </MediaGroup>
-        </React.Fragment>
-      ))}
+                  )}
+                </MediaItem>
+              ))}
+            </MediaGroup>
+          </React.Fragment>
+        )
+      })}
       {mediaFile && (
         <SliderPopup
           channel={channel}
