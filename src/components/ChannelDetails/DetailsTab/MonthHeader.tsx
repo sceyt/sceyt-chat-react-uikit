@@ -35,7 +35,7 @@ const MonthHeader = ({ currentCreatedAt, previousCreatedAt, isFirst, padding, fu
 export default MonthHeader
 
 const MonthHeaderContainer = styled.div<{ color: string; padding?: string; fullWidth?: boolean }>`
-  padding: ${(props) => props.padding || '11px 16px'};
+  padding: ${(props) => props.padding || '9px 12px'};
   width: ${(props) => (props.fullWidth ? '100%' : 'auto')};
   font-style: normal;
   font-weight: 500;
