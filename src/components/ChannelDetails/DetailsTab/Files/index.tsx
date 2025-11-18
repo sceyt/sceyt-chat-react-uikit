@@ -105,7 +105,7 @@ const Files = ({
                 currentCreatedAt={file.createdAt}
                 previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
                 isFirst={index === 0}
-                padding='12px 14px'
+                padding='14px 14px 0'
               />
               <FileItem
                 // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}

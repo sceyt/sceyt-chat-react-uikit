@@ -47,7 +47,7 @@ const Voices = ({
               currentCreatedAt={file.createdAt}
               previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
               isFirst={index === 0}
-              padding='7px 14px'
+              padding='7px 14px 2px'
             />
             <VoiceItem
               file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
