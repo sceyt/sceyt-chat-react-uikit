@@ -14,13 +14,14 @@ import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channel: IChannel
 }
 
 const Media = ({ channel }: IProps) => {
-  const { [THEME_COLORS.BACKGROUND]: background, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const { [THEME_COLORS.BACKGROUND]: background } = useColor()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -34,28 +35,9 @@ const Media = ({ channel }: IProps) => {
   return (
     <Container>
       {attachments.map((file: IAttachment, index: number) => {
-        let monthComponent: React.ReactNode = null
-
-        if (index === 0) {
-          monthComponent = (
-            <MonthHeader color={textSecondary}>
-              {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </MonthHeader>
-          )
-        } else if (
-          index > 0 &&
-          new Date(file.createdAt).getMonth() !== new Date(attachments[index - 1].createdAt).getMonth()
-        ) {
-          monthComponent = (
-            <MonthHeader color={textSecondary}>
-              {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-            </MonthHeader>
-          )
-        }
-
         return (
           <React.Fragment key={file.id}>
-            {monthComponent}
+            <MonthHeader file={file} index={index} attachments={attachments} padding='11px 6px' fullWidth />
             <MediaItem>
               {file.type === 'image' ? (
                 <Attachment
@@ -119,14 +101,4 @@ const MediaItem = styled.div`
   border-radius: 8px;
   overflow: hidden;
   margin: 2px;
-`
-const MonthHeader = styled.div<{ color: string }>`
-  width: 100%;
-  padding: 11px 6px;
-  font-style: normal;
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 16px;
-  color: ${(props) => props.color};
-  text-transform: uppercase;
 `

@@ -18,6 +18,7 @@ import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channelId: string
@@ -98,28 +99,9 @@ const Files = ({
             }
           }
 
-          let monthComponent: React.ReactNode = null
-
-          if (index === 0) {
-            monthComponent = (
-              <MonthHeader color={textSecondary}>
-                {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </MonthHeader>
-            )
-          } else if (
-            index > 0 &&
-            new Date(file.createdAt).getMonth() !== new Date(attachments[index - 1].createdAt).getMonth()
-          ) {
-            monthComponent = (
-              <MonthHeader color={textSecondary}>
-                {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-              </MonthHeader>
-            )
-          }
-
           return (
             <React.Fragment key={file.id}>
-              {monthComponent}
+              <MonthHeader file={file} index={index} attachments={attachments} padding='11px 16px' />
               <FileItem
                 // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
                 // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
@@ -316,13 +298,4 @@ const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string; co
   line-height: ${(props) => props.lineHeight || '16px'};
   color: ${(props) => props.color};
   margin-top: 2px;
-`
-const MonthHeader = styled.div<{ color: string }>`
-  padding: 11px 16px;
-  font-style: normal;
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 16px;
-  color: ${(props) => props.color};
-  text-transform: uppercase;
 `
