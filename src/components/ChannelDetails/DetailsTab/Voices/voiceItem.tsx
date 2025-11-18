@@ -12,7 +12,7 @@ import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePre
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 // Helpers
 import { getCustomDownloader } from '../../../../helpers/customUploader'
-import { formatAudioVideoTime, formatChannelDetailsDate } from '../../../../helpers'
+import { formatAudioVideoTime, formatChannelDetailsFullDate } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
@@ -142,7 +142,7 @@ const VoiceItem = ({
             (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor || textSecondary}>
-          {formatChannelDetailsDate(file.createdAt)}
+          {formatChannelDetailsFullDate(file.createdAt)}
         </AudioDate>
         <AudioSendTime color={textSecondary}>
           {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur) : '')}

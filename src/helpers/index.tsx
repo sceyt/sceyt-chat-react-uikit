@@ -149,6 +149,41 @@ export const formatChannelDetailsDate = (date: Date | number | string): string =
   return momentDate.isValid() ? momentDate.format('DD.MM.YY, HH:mm') : ''
 }
 
+/**
+ * Format: DD MMM YYYY, HH:mm (e.g., "25 Nov 2025, 22:00")
+ * Supports localization based on user's browser locale and timezone
+ * @param date - Date object, timestamp, or date string
+ * @returns Formatted date string localized according to browser settings
+ */
+export const formatChannelDetailsFullDate = (date: Date | number | string): string => {
+  if (!date) return ''
+  const momentDate = moment(date)
+  return momentDate.isValid() ? momentDate.format('DD.MM.YY, HH:mm') : ''
+}
+
+/**
+ * Format: MMMM YYYY (e.g., "November 2025")
+ * Supports localization based on user's browser locale and timezone
+ * @param date - Date object, timestamp, or date string
+ * @returns Formatted month header string localized according to browser settings
+ */
+export const formatMonthHeader = (date: Date | number | string): string => {
+  if (!date) return ''
+  const momentDate = moment(date)
+  return momentDate.isValid() ? momentDate.format('MMMM YYYY') : ''
+}
+
+/**
+ * Get month key for grouping (YYYY-MM format)
+ * @param date - Date object, timestamp, or date string
+ * @returns Month key string (e.g., "2025-11")
+ */
+export const getMonthKey = (date: Date | number | string): string => {
+  if (!date) return ''
+  const momentDate = moment(date)
+  return momentDate.isValid() ? momentDate.format('YYYY-MM') : ''
+}
+
 export const userLastActiveDateFormat = (date: Date) => {
   // check for the last hour
   const formattingDate = moment(date).format()

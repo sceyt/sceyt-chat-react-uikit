@@ -8,6 +8,8 @@ import { IAttachment } from '../../../../types'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 import VoiceItem from './voiceItem'
 import { isJSON } from '../../../../helpers/message'
+// Shared Components & Hooks
+import { MonthHeader, useGroupedAttachments } from '../shared'
 
 interface IProps {
   channelId: string
@@ -35,22 +37,29 @@ const Voices = ({
 
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice))
-  }, [channelId])
+  }, [channelId, dispatch])
+
+  const groupedAttachments = useGroupedAttachments(attachments)
 
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <VoiceItem
-          key={file.id}
-          file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-          voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
-          voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
-          voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
-          voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
-          voicePreviewPauseIcon={voicePreviewPauseIcon}
-          voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
-          voicePreviewTitleColor={voicePreviewTitleColor}
-        />
+      {groupedAttachments.map((group) => (
+        <React.Fragment key={group.monthKey}>
+          <MonthHeader month={group.monthHeader} />
+          {group.files.map((file: IAttachment) => (
+            <VoiceItem
+              key={file.id}
+              file={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+              voicePreviewDateAndTimeColor={voicePreviewDateAndTimeColor}
+              voicePreviewHoverBackgroundColor={voicePreviewHoverBackgroundColor}
+              voicePreviewPlayHoverIcon={voicePreviewPlayIcon}
+              voicePreviewPlayIcon={voicePreviewPlayHoverIcon}
+              voicePreviewPauseIcon={voicePreviewPauseIcon}
+              voicePreviewPauseHoverIcon={voicePreviewPauseHoverIcon}
+              voicePreviewTitleColor={voicePreviewTitleColor}
+            />
+          ))}
+        </React.Fragment>
       ))}
     </Container>
   )
@@ -60,7 +69,7 @@ export default Voices
 
 const Container = styled.ul`
   margin: 0;
-  padding: 11px 0 0;
+  padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
   list-style: none;

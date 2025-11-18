@@ -14,6 +14,8 @@ import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+// Shared Components & Hooks
+import { MonthHeader, useGroupedAttachments } from '../shared'
 
 interface IProps {
   channel: IChannel
@@ -30,37 +32,53 @@ const Media = ({ channel }: IProps) => {
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
     dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media))
-  }, [channel.id])
+  }, [channel.id, dispatch])
+
+  const groupedAttachments = useGroupedAttachments(attachments)
+
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.id}>
-          {file.type === 'image' ? (
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-          ) : (
-            // <img src={file.url} alt='' />
+      {groupedAttachments.map((group) => (
+        <React.Fragment key={group.monthKey}>
+          <MonthHeader month={group.monthHeader} leftPadding={6} />
+          <MediaGroup>
+            {group.files.map((file: IAttachment) => (
+              <MediaItem key={file.id}>
+                {file.type === 'image' ? (
+                  <Attachment
+                    attachment={{
+                      ...file,
+                      metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+                    }}
+                    handleMediaItemClick={handleMediaItemClick}
+                    backgroundColor={background}
+                    borderRadius='8px'
+                    isDetailsView
+                  />
+                ) : (
+                  // <img src={file.url} alt='' />
 
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-            /* <video>
-              <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
-              <source src={file.url} type='video/ogg' />
-              <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-              Your browser does not support the video tag.
-            </video> */
-          )}
-        </MediaItem>
+                  <Attachment
+                    attachment={{
+                      ...file,
+                      metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+                    }}
+                    handleMediaItemClick={handleMediaItemClick}
+                    backgroundColor={background}
+                    borderRadius='8px'
+                    isDetailsView
+                  />
+                  /* <video>
+                    <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
+                    <source src={file.url} type='video/ogg' />
+                    <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
+                    Your browser does not support the video tag.
+                  </video> */
+                )}
+              </MediaItem>
+            ))}
+          </MediaGroup>
+        </React.Fragment>
       ))}
       {mediaFile && (
         <SliderPopup
@@ -77,14 +95,17 @@ const Media = ({ channel }: IProps) => {
 export default Media
 
 const Container = styled.div<any>`
-  padding: 6px 4px;
+  padding: 0;
   overflow-x: hidden;
   overflow-y: auto;
   list-style: none;
   transition: all 0.2s;
-  align-items: flex-start;
+`
+const MediaGroup = styled.div`
+  padding: 0 4px;
   display: flex;
   flex-wrap: wrap;
+  align-items: flex-start;
 `
 const MediaItem = styled.div`
   width: calc(33.3333% - 4px);
