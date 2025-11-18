@@ -44,7 +44,7 @@ const Links = ({
               currentCreatedAt={file.createdAt}
               previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
               isFirst={index === 0}
-              padding='9px 16px'
+              padding='9px 14px'
             />
             <LinkItem
               link={file.url}

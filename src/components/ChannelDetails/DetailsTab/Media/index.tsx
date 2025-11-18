@@ -41,7 +41,7 @@ const Media = ({ channel }: IProps) => {
               currentCreatedAt={file.createdAt}
               previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
               isFirst={index === 0}
-              padding='11px 6px'
+              padding='9px 6px'
               fullWidth
             />
             <MediaItem>
