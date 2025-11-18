@@ -3,34 +3,53 @@ import { IAttachment } from '../../../../types'
 import { formatMonthHeader, getMonthKey } from '../../../../helpers'
 import { GroupedAttachment } from './types'
 
-/**
- * Custom hook to group attachments by month
- * @returns Grouped attachments sorted by month (newest first)
- */
 export const useGroupedAttachments = (attachments: IAttachment[]): GroupedAttachment[] => {
   return useMemo(() => {
-    if (!attachments || attachments.length === 0) {
+    const length = attachments?.length
+    if (!length) {
+      return []
+    }
+    const groupsMap = new Map<string, { files: IAttachment[]; firstFile: IAttachment }>()
+
+    for (let i = 0; i < length; i++) {
+      const file = attachments[i]
+      const monthKey = getMonthKey(file.createdAt)
+
+      if (!monthKey) continue
+
+      const existing = groupsMap.get(monthKey)
+      if (existing) {
+        existing.files.push(file)
+      } else {
+        groupsMap.set(monthKey, {
+          files: [file],
+          firstFile: file
+        })
+      }
+    }
+
+    const groupCount = groupsMap.size
+    if (groupCount === 0) {
       return []
     }
 
-    const groups: { [key: string]: IAttachment[] } = {}
+    const entries = Array.from(groupsMap.entries())
 
-    attachments.forEach((file: IAttachment) => {
-      const monthKey = getMonthKey(file.createdAt)
-      if (!monthKey) return
-
-      if (!groups[monthKey]) {
-        groups[monthKey] = []
-      }
-      groups[monthKey].push(file)
+    entries.sort(([keyA], [keyB]) => {
+      return keyA > keyB ? -1 : keyA < keyB ? 1 : 0
     })
 
-    return Object.keys(groups)
-      .sort((a, b) => b.localeCompare(a))
-      .map((monthKey) => ({
+    const result: GroupedAttachment[] = new Array(groupCount)
+
+    for (let i = 0; i < groupCount; i++) {
+      const [monthKey, { files, firstFile }] = entries[i]
+      result[i] = {
         monthKey,
-        monthHeader: formatMonthHeader(groups[monthKey][0].createdAt),
-        files: groups[monthKey]
-      }))
+        monthHeader: formatMonthHeader(firstFile.createdAt),
+        files
+      }
+    }
+
+    return result
   }, [attachments])
 }
