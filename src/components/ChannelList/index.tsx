@@ -1,4 +1,4 @@
-import React, { FC, useEffect, useRef, useState } from 'react'
+import React, { FC, useCallback, useEffect, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -63,7 +63,7 @@ import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
 import { clearMessagesAC } from 'store/message/actions'
-
+import { pendingMessagesMapSelector, pendingPollActionsSelector } from 'store/message/selector'
 interface IChannelListProps {
   List?: FC<{
     channels: IChannel[]
@@ -270,7 +270,9 @@ const ChannelList: React.FC<IChannelListProps> = ({
   const pendingChannelIdRef = useRef<string | null>(null)
   const filesProcessedRef = useRef<boolean>(false)
   const pendingDataTransferItemsRef = useRef<DataTransferItemList | null>(null)
-
+  const pendingMessagesMap = useSelector(pendingMessagesMapSelector, shallowEqual)
+  const pollPendingPollActions = useSelector(pendingPollActionsSelector, shallowEqual)
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
   const handleSetChannelList = (updatedChannels: IChannel[], isRemove?: boolean): any => {
     if (isRemove) {
       const channelsMap: any = {}
@@ -354,11 +356,34 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }, [deletedChannel])
 
-  useEffect(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+  const checkPendingMessagesAndPollPendingPollActions = useCallback(() => {
+    if (Object.keys(pendingMessagesMap).length === 0 && Object.keys(pollPendingPollActions).length === 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
       dispatch(getChannelsAC({ filter, limit, sort, search: '', memberCount: getChannelMembersCount() }, false))
     }
-  }, [connectionStatus])
+  }, [pendingMessagesMap, pollPendingPollActions, filter, limit, sort, dispatch])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+
+      intervalRef.current = setInterval(() => {
+        checkPendingMessagesAndPollPendingPollActions()
+      }, 100)
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [connectionStatus, checkPendingMessagesAndPollPendingPollActions])
 
   useDidUpdate(() => {
     if (addedChannel) {
@@ -451,14 +476,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     } else {
       setListWidthIsSet(false)
     }
-    // log.info('channels. ...........................', channels)
   }, [channels])
-
-  /* useEffect(() => {
-    if (contactsMap) {
-      log.info('contactsMap.>>>...', contactsMap)
-    }
-  }, [contactsMap]) */
 
   const setSelectedChannel = (channel: IChannel) => {
     if (!activeChannel || !activeChannel.id || activeChannel.id !== channel.id) {

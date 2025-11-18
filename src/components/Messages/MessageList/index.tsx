@@ -8,8 +8,6 @@ import {
   clearSelectedMessagesAC,
   getMessagesAC,
   loadMoreMessagesAC,
-  resendMessageAC,
-  resendPendingPollActionsAC,
   scrollToNewMessageAC,
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC,
@@ -28,8 +26,6 @@ import {
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
-  pendingPollActionsSelector,
-  pendingMessagesMapSelector,
   unreadScrollToSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC, setIsDraggingAC } from '../../../store/channel/actions'
@@ -50,14 +46,12 @@ import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedi
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
 // Helpers
 import {
-  clearMessagesMap,
   clearVisibleMessagesMap,
   getHasNextCached,
   getHasPrevCached,
   getVisibleMessagesMap,
   LOAD_MAX_MESSAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
-  removeAllMessages,
   setHasNextCached,
   setHasPrevCached
 } from '../../../helpers/messagesHalper'
@@ -85,7 +79,6 @@ import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
-import log from 'loglevel'
 
 // moved to component-scoped refs below
 
@@ -528,8 +521,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const messagesLoading = useSelector(messagesLoadingState)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const draggedAttachments = useSelector(draggedAttachmentsSelector, shallowEqual)
-  const pollPendingPollActions = useSelector(pendingPollActionsSelector, shallowEqual)
-  const pendingMessagesMap = useSelector(pendingMessagesMapSelector, shallowEqual)
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
@@ -1177,47 +1168,6 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
   }, [messagesLoading, messages, lastVisibleMessageId])
-
-  useEffect(() => {
-    let interval: any = null
-    log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      Object.keys(pendingMessagesMap).forEach((key: any) => {
-        pendingMessagesMap[key].forEach((msg: IMessage) => {
-          dispatch(resendMessageAC(msg, key, connectionStatus))
-        })
-      })
-      // Resend pending poll actions
-      if (Object.keys(pollPendingPollActions).length > 0) {
-        dispatch(resendPendingPollActionsAC(connectionStatus))
-      }
-      let count = 0
-      interval = setInterval(() => {
-        if (count > 20) {
-          clearInterval(interval)
-        }
-        count++
-        if (
-          channel.id &&
-          Object.keys(pollPendingPollActions).length === 0 &&
-          Object.keys(pendingMessagesMap).length === 0
-        ) {
-          clearInterval(interval)
-          loadingRef.current = false
-          prevDisableRef.current = false
-          nextDisableRef.current = false
-          clearMessagesMap()
-          removeAllMessages()
-          dispatch(getMessagesAC(channel))
-        }
-      }, 100)
-    }
-    return () => {
-      if (interval) {
-        clearInterval(interval)
-      }
-    }
-  }, [connectionStatus])
 
   useEffect(() => {
     if (channel.newMessageCount && channel.newMessageCount > 0 && unreadScrollTo) {

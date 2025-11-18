@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -13,7 +13,7 @@ import {
   watchForEventsAC
 } from '../../store/channel/actions'
 import { channelListWidthSelector, isDraggingSelector, joinableChannelSelector } from '../../store/channel/selector'
-import { contactsMapSelector } from '../../store/user/selector'
+import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { getRolesFailSelector } from '../../store/member/selector'
 // Hooks
@@ -30,7 +30,9 @@ import {
   setHandleNewMessages,
   setOpenChatOnUserInteraction,
   setDisableFrowardMentionsCount,
-  getUseInviteLink
+  getUseInviteLink,
+  getActiveChannelId,
+  getChannelFromAllChannels
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
@@ -43,7 +45,7 @@ import {
   initializeNotifications,
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
-import { IChannel, IContactsMap } from '../../types'
+import { IChannel, IContactsMap, IMessage } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
@@ -53,6 +55,9 @@ import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
 import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
+import { getMessagesAC, resendMessageAC, resendPendingPollActionsAC } from 'store/message/actions'
+import { CONNECTION_STATUS } from 'store/user/constants'
+import { pendingMessagesMapSelector, pendingPollActionsSelector } from 'store/message/selector'
 
 const SceytChat = ({
   client,
@@ -86,9 +91,14 @@ const SceytChat = ({
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
   const joinableChannel = useSelector(joinableChannelSelector, shallowEqual)
+  const pendingMessagesMap = useSelector(pendingMessagesMapSelector, shallowEqual)
+  const pollPendingPollActions = useSelector(pendingPollActionsSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const [tabIsActive, setTabIsActive] = useState(true)
-
+  const intervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pollPendingPollActionsIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const pendingMessagesIntervalRef = useRef<NodeJS.Timeout | null>(null)
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -333,6 +343,142 @@ const SceytChat = ({
       <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
     ) : null
 
+  const checkPendingMessages = useCallback(
+    (connectionStatus: string) => {
+      if (Object.keys(pendingMessagesMap).length > 0) {
+        if (pendingMessagesIntervalRef.current) {
+          clearInterval(pendingMessagesIntervalRef.current)
+        }
+        pendingMessagesIntervalRef.current = null
+        Object.keys(pendingMessagesMap).forEach((key: any) => {
+          pendingMessagesMap[key].forEach((msg: IMessage) => {
+            dispatch(resendMessageAC(msg, key, connectionStatus))
+          })
+        })
+      } else {
+        if (pendingMessagesIntervalRef.current) {
+          clearInterval(pendingMessagesIntervalRef.current)
+          pendingMessagesIntervalRef.current = null
+        }
+      }
+    },
+    [pendingMessagesMap, dispatch]
+  )
+
+  const checkPollPendingPollActions = useCallback(
+    (connectionStatus: string) => {
+      if (Object.keys(pollPendingPollActions).length > 0) {
+        if (pollPendingPollActionsIntervalRef.current) {
+          clearInterval(pollPendingPollActionsIntervalRef.current)
+        }
+        pollPendingPollActionsIntervalRef.current = null
+        dispatch(resendPendingPollActionsAC(connectionStatus))
+      } else {
+        if (pollPendingPollActionsIntervalRef.current) {
+          clearInterval(pollPendingPollActionsIntervalRef.current)
+          pollPendingPollActionsIntervalRef.current = null
+        }
+      }
+    },
+    [pollPendingPollActions, dispatch]
+  )
+
+  const checkPendingMessagesAndPollActions = useCallback(() => {
+    const activeChannelId = getActiveChannelId()
+    if (
+      activeChannelId &&
+      Object.keys(pollPendingPollActions).length === 0 &&
+      Object.keys(pendingMessagesMap).length === 0
+    ) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      clearMessagesMap()
+      removeAllMessages()
+      if (activeChannelId) {
+        const channel = getChannelFromAllChannels(activeChannelId)
+        if (channel) {
+          dispatch(getMessagesAC(channel))
+        }
+      }
+    } else if (!activeChannelId && intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+  }, [pollPendingPollActions, pendingMessagesMap, dispatch])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      let count = 0
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+      intervalRef.current = setInterval(() => {
+        if (count > 20) {
+          if (intervalRef.current) {
+            clearInterval(intervalRef.current)
+            intervalRef.current = null
+          }
+          return
+        }
+        count++
+        checkPendingMessagesAndPollActions()
+      }, 1000)
+    } else if (intervalRef.current) {
+      clearInterval(intervalRef.current)
+      intervalRef.current = null
+    }
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current)
+        intervalRef.current = null
+      }
+    }
+  }, [connectionStatus, checkPendingMessagesAndPollActions])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (pendingMessagesIntervalRef.current) {
+        clearInterval(pendingMessagesIntervalRef.current)
+        pendingMessagesIntervalRef.current = null
+      }
+      pendingMessagesIntervalRef.current = setInterval(() => {
+        checkPendingMessages(connectionStatus)
+      }, 1000)
+    } else if (pendingMessagesIntervalRef.current) {
+      clearInterval(pendingMessagesIntervalRef.current)
+      pendingMessagesIntervalRef.current = null
+    }
+    return () => {
+      if (pendingMessagesIntervalRef.current) {
+        clearInterval(pendingMessagesIntervalRef.current)
+        pendingMessagesIntervalRef.current = null
+      }
+    }
+  }, [connectionStatus, checkPendingMessages])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (pollPendingPollActionsIntervalRef.current) {
+        clearInterval(pollPendingPollActionsIntervalRef.current)
+        pollPendingPollActionsIntervalRef.current = null
+      }
+      pollPendingPollActionsIntervalRef.current = setInterval(() => {
+        checkPollPendingPollActions(connectionStatus)
+      }, 1000)
+    } else if (pollPendingPollActionsIntervalRef.current) {
+      clearInterval(pollPendingPollActionsIntervalRef.current)
+      pollPendingPollActionsIntervalRef.current = null
+    }
+    return () => {
+      if (pollPendingPollActionsIntervalRef.current) {
+        clearInterval(pollPendingPollActionsIntervalRef.current)
+        pollPendingPollActionsIntervalRef.current = null
+      }
+    }
+  }, [connectionStatus, checkPollPendingPollActions])
   return (
     <React.Fragment>
       {SceytChatClient ? (
