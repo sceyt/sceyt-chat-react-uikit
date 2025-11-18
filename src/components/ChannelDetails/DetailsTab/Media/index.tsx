@@ -20,7 +20,7 @@ interface IProps {
 }
 
 const Media = ({ channel }: IProps) => {
-  const { [THEME_COLORS.BACKGROUND]: background } = useColor()
+  const { [THEME_COLORS.BACKGROUND]: background, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
@@ -33,35 +33,59 @@ const Media = ({ channel }: IProps) => {
   }, [channel.id])
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.id}>
-          {file.type === 'image' ? (
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-          ) : (
-            // <img src={file.url} alt='' />
+      {attachments.map((file: IAttachment, index: number) => {
+        let monthComponent: React.ReactNode = null
 
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-            /* <video>
-              <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
-              <source src={file.url} type='video/ogg' />
-              <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-              Your browser does not support the video tag.
-            </video> */
-          )}
-        </MediaItem>
-      ))}
+        if (index === 0) {
+          monthComponent = (
+            <MonthHeader color={textSecondary}>
+              {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </MonthHeader>
+          )
+        } else if (
+          index > 0 &&
+          new Date(file.createdAt).getMonth() !== new Date(attachments[index - 1].createdAt).getMonth()
+        ) {
+          monthComponent = (
+            <MonthHeader color={textSecondary}>
+              {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+            </MonthHeader>
+          )
+        }
+
+        return (
+          <React.Fragment key={file.id}>
+            {monthComponent}
+            <MediaItem>
+              {file.type === 'image' ? (
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+              ) : (
+                // <img src={file.url} alt='' />
+
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+                /* <video>
+                  <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
+                  <source src={file.url} type='video/ogg' />
+                  <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
+                  Your browser does not support the video tag.
+                </video> */
+              )}
+            </MediaItem>
+          </React.Fragment>
+        )
+      })}
       {mediaFile && (
         <SliderPopup
           channel={channel}
@@ -95,4 +119,14 @@ const MediaItem = styled.div`
   border-radius: 8px;
   overflow: hidden;
   margin: 2px;
+`
+const MonthHeader = styled.div<{ color: string }>`
+  width: 100%;
+  padding: 11px 6px;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  color: ${(props) => props.color};
+  text-transform: uppercase;
 `

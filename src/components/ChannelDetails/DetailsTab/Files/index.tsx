@@ -84,7 +84,7 @@ const Files = ({
   return (
     <Container>
       {attachments.map(
-        (file: IAttachment) => {
+        (file: IAttachment, index: number) => {
           const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
           let withPrefix = true
           let attachmentThumb = ''
@@ -97,77 +97,102 @@ const Files = ({
               attachmentThumb = metas.tmb
             }
           }
+
+          let monthComponent: React.ReactNode = null
+
+          if (index === 0) {
+            monthComponent = (
+              <MonthHeader color={textSecondary}>
+                {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </MonthHeader>
+            )
+          } else if (
+            index > 0 &&
+            new Date(file.createdAt).getMonth() !== new Date(attachments[index - 1].createdAt).getMonth()
+          ) {
+            monthComponent = (
+              <MonthHeader color={textSecondary}>
+                {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+              </MonthHeader>
+            )
+          }
+
           return (
-            <FileItem
-              key={file.id}
-              // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-              // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-              hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
-            >
-              {metas && metas.tmb ? (
-                <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
-              ) : (
-                <React.Fragment>
-                  <FileIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewIcon || <FileIcon />}
-                  </FileIconCont>
-                  <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewHoverIcon || <FileIcon />}
-                  </FileHoverIconCont>
-                </React.Fragment>
-              )}
-              <div>
-                <AttachmentPreviewTitle
-                  fontSize={fileNameFontSize}
-                  lineHeight={fileNameLineHeight}
-                  color={filePreviewTitleColor || textPrimary}
-                >
-                  {formatLargeText(file.name, nameMaxLength)}
-                </AttachmentPreviewTitle>
-                <FileSizeAndDate
-                  fontSize={fileSizeFontSize}
-                  lineHeight={fileSizeLineHeight}
-                  color={filePreviewSizeColor || textSecondary}
-                >
-                  {file.size
-                    ? `${bytesToSize(file.size)} • ${formatChannelDetailsDate(file.createdAt)}`
-                    : formatChannelDetailsDate(file.createdAt)}
-                </FileSizeAndDate>
-              </div>
-              <DownloadWrapper
-                visible={!!downloadingFilesMap[file.id!]}
-                iconColor={accentColor}
-                onClick={() => handleDownloadFile(file)}
+            <React.Fragment key={file.id}>
+              {monthComponent}
+              <FileItem
+                // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
+                // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
+                hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
               >
-                {downloadingFilesMap[file.id!] ? (
-                  <ProgressWrapper>
-                    <CircularProgressbar
-                      minValue={0}
-                      maxValue={100}
-                      value={downloadingFilesMap[file.id!].uploadPercent || 0}
-                      backgroundPadding={6}
-                      background={true}
-                      text=''
-                      styles={{
-                        background: {
-                          fill: `${overlayBackground2}66`
-                        },
-                        path: {
-                          stroke: accentColor,
-                          strokeLinecap: 'butt',
-                          strokeWidth: '6px',
-                          transition: 'stroke-dashoffset 0.5s ease 0s',
-                          transform: 'rotate(0turn)',
-                          transformOrigin: 'center center'
-                        }
-                      }}
-                    />
-                  </ProgressWrapper>
+                {metas && metas.tmb ? (
+                  <FileThumb
+                    draggable={false}
+                    src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`}
+                  />
                 ) : (
-                  filePreviewDownloadIcon || <Download />
+                  <React.Fragment>
+                    <FileIconCont iconColor={accentColor} fillColor={surface1}>
+                      {filePreviewIcon || <FileIcon />}
+                    </FileIconCont>
+                    <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
+                      {filePreviewHoverIcon || <FileIcon />}
+                    </FileHoverIconCont>
+                  </React.Fragment>
                 )}
-              </DownloadWrapper>
-            </FileItem>
+                <div>
+                  <AttachmentPreviewTitle
+                    fontSize={fileNameFontSize}
+                    lineHeight={fileNameLineHeight}
+                    color={filePreviewTitleColor || textPrimary}
+                  >
+                    {formatLargeText(file.name, nameMaxLength)}
+                  </AttachmentPreviewTitle>
+                  <FileSizeAndDate
+                    fontSize={fileSizeFontSize}
+                    lineHeight={fileSizeLineHeight}
+                    color={filePreviewSizeColor || textSecondary}
+                  >
+                    {file.size
+                      ? `${bytesToSize(file.size)} • ${formatChannelDetailsDate(file.createdAt)}`
+                      : formatChannelDetailsDate(file.createdAt)}
+                  </FileSizeAndDate>
+                </div>
+                <DownloadWrapper
+                  visible={!!downloadingFilesMap[file.id!]}
+                  iconColor={accentColor}
+                  onClick={() => handleDownloadFile(file)}
+                >
+                  {downloadingFilesMap[file.id!] ? (
+                    <ProgressWrapper>
+                      <CircularProgressbar
+                        minValue={0}
+                        maxValue={100}
+                        value={downloadingFilesMap[file.id!].uploadPercent || 0}
+                        backgroundPadding={6}
+                        background={true}
+                        text=''
+                        styles={{
+                          background: {
+                            fill: `${overlayBackground2}66`
+                          },
+                          path: {
+                            stroke: accentColor,
+                            strokeLinecap: 'butt',
+                            strokeWidth: '6px',
+                            transition: 'stroke-dashoffset 0.5s ease 0s',
+                            transform: 'rotate(0turn)',
+                            transformOrigin: 'center center'
+                          }
+                        }}
+                      />
+                    </ProgressWrapper>
+                  ) : (
+                    filePreviewDownloadIcon || <Download />
+                  )}
+                </DownloadWrapper>
+              </FileItem>
+            </React.Fragment>
           )
         }
         // <FileItemWrapper >
@@ -291,4 +316,13 @@ const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string; co
   line-height: ${(props) => props.lineHeight || '16px'};
   color: ${(props) => props.color};
   margin-top: 2px;
+`
+const MonthHeader = styled.div<{ color: string }>`
+  padding: 11px 16px;
+  font-style: normal;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  color: ${(props) => props.color};
+  text-transform: uppercase;
 `
