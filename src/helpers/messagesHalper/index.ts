@@ -112,7 +112,7 @@ type audioRecordingMap = { [key: string]: any }
 type visibleMessagesMap = { [key: string]: { id: string } }
 
 type messagesMap = {
-  [key: string]: IMessage[]
+  [key: string]: { [key: string]: IMessage }
 }
 
 // eslint-disable-next-line no-unused-vars
@@ -255,18 +255,19 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
 }
 
 export function setMessagesToMap(channelId: string, messages: IMessage[]) {
-  messagesMap[channelId] = messages
+  if (!messagesMap[channelId]) {
+    messagesMap[channelId] = {}
+  }
+  messages.forEach((msg: IMessage) => {
+    messagesMap[channelId][msg.id] = msg
+  })
 }
 
 export function addMessageToMap(channelId: string, message: IMessage) {
-  if (messagesMap[channelId] && messagesMap[channelId].length >= MESSAGES_MAX_LENGTH) {
-    messagesMap[channelId].shift()
+  if (!messagesMap[channelId]) {
+    messagesMap[channelId] = {}
   }
-  if (messagesMap[channelId]) {
-    messagesMap[channelId].push(message)
-  } else {
-    messagesMap[channelId] = [message]
-  }
+  messagesMap[channelId][message.id] = message
 
   if (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
     setPendingMessage(channelId, message)
@@ -309,7 +310,7 @@ export function updateMessageOnMap(
   let updatedMessageData = null
   if (messagesMap[channelId]) {
     const messagesList: IMessage[] = []
-    for (const mes of messagesMap[channelId]) {
+    for (const mes of Object.values(messagesMap[channelId] || {})) {
       if (mes.tid === updatedMessage.messageId || mes.id === updatedMessage.messageId) {
         if (updatedMessage.params.state === MESSAGE_STATUS.DELETE) {
           updatedMessageData = { ...updatedMessage.params }
@@ -336,7 +337,12 @@ export function updateMessageOnMap(
       }
       messagesList.push(mes)
     }
-    messagesMap[channelId] = messagesList
+    messagesList.forEach((msg) => {
+      if (!messagesMap[channelId]) {
+        messagesMap[channelId] = {}
+      }
+      messagesMap[channelId][msg.id] = msg
+    })
   }
 
   return updatedMessageData
@@ -344,24 +350,21 @@ export function updateMessageOnMap(
 
 export function addReactionToMessageOnMap(channelId: string, message: IMessage, reaction: IReaction, isSelf: boolean) {
   if (messagesMap[channelId]) {
-    messagesMap[channelId] = messagesMap[channelId].map((msg) => {
-      if (msg.id === message.id) {
-        let slfReactions = [...msg.userReactions]
-        if (isSelf) {
-          if (slfReactions) {
-            slfReactions.push(reaction)
-          } else {
-            slfReactions = [reaction]
-          }
-        }
-        return {
-          ...msg,
-          userReactions: slfReactions,
-          reactionTotals: message.reactionTotals
-        }
+    const messageShouldBeUpdated = messagesMap[channelId][message.id]
+
+    let slfReactions = [...messageShouldBeUpdated.userReactions]
+    if (isSelf) {
+      if (slfReactions) {
+        slfReactions.push(reaction)
+      } else {
+        slfReactions = [reaction]
       }
-      return msg
-    })
+    }
+    messagesMap[channelId][message.id] = {
+      ...messageShouldBeUpdated,
+      userReactions: slfReactions,
+      reactionTotals: message.reactionTotals
+    }
   }
 }
 
@@ -393,20 +396,18 @@ export function removeReactionToMessageOnMap(
   isSelf: boolean
 ) {
   if (messagesMap[channelId]) {
-    messagesMap[channelId] = messagesMap[channelId].map((msg) => {
-      if (msg.id === message.id) {
-        let { userReactions } = msg
-        if (isSelf) {
-          userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
-        }
-        return {
-          ...msg,
-          reactionTotals: message.reactionTotals,
-          userReactions
-        }
-      }
-      return msg
-    })
+    const messageShouldBeUpdated = messagesMap[channelId][message.id]
+    let { userReactions } = messageShouldBeUpdated
+    if (isSelf) {
+      userReactions = messageShouldBeUpdated.userReactions.filter(
+        (selfReaction: IReaction) => selfReaction.key !== reaction.key
+      )
+    }
+    messagesMap[channelId][message.id] = {
+      ...messageShouldBeUpdated,
+      reactionTotals: message.reactionTotals,
+      userReactions
+    }
   }
 }
 
@@ -429,14 +430,21 @@ export const removeReactionOnAllMessages = (message: IMessage, reaction: IReacti
 
 export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
   if (messagesMap[channelId] && newMarkers && newMarkers.markersMap) {
-    messagesMap[channelId] = messagesMap[channelId].map((mes) => {
-      const { name } = newMarkers
-      const { markersMap } = newMarkers
-      if (!markersMap[mes.id]) {
-        return mes
+    const messageIds: string[] = []
+    Object.keys(newMarkers.markersMap).forEach((messageId) => {
+      if (newMarkers.markersMap[messageId]) {
+        messageIds.push(messageId)
       }
-      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(mes, name)
-      return { ...mes, ...statusUpdatedMessage }
+    })
+    messageIds.forEach((messageId: string) => {
+      const messageShouldBeUpdated = messagesMap[channelId][messageId]
+      if (messageShouldBeUpdated) {
+        const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
+        messagesMap[channelId][messageId] = {
+          ...messageShouldBeUpdated,
+          ...statusUpdatedMessage
+        }
+      }
     })
   }
 }
@@ -450,7 +458,7 @@ export function removeMessagesFromMap(channelId: string) {
 }
 
 export function removeMessageFromMap(channelId: string, messageId: string) {
-  messagesMap[channelId] = [...messagesMap[channelId]].filter((msg) => !(msg.id === messageId || msg.tid === messageId))
+  delete messagesMap[channelId][messageId]
 
   store.dispatch(removePendingMessageAC(channelId, messageId))
 }

@@ -110,6 +110,9 @@ function App() {
             <SceytChat
               client={client}
               logLevel='silent'
+              // useInviteLink={true}
+              // baseUrlForInviteMembers='http://localhost:3001/invite'
+              embeddedJoinGroupPopup={false}
             >
               <ChannelList />
               <Chat>

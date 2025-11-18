@@ -20,7 +20,8 @@ import {
   setMessageMenuOpenedAC,
   setMessagesLoadingStateAC,
   setMessageToEditAC,
-  retractPollVoteAC
+  retractPollVoteAC,
+  setReactionsListAC
 } from 'store/message/actions'
 import {
   createChannelAC,
@@ -368,6 +369,7 @@ const Message = ({
       left: reactionsContainer ? reactionsContainer.getBoundingClientRect().left : 0,
       right: reactionsContPos ? window.innerWidth - reactionsContPos.left - reactionsContPos.width : 0
     })
+    dispatch(setReactionsListAC([], false))
     setReactionsPopupOpen(!reactionsPopupOpen)
   }
 
@@ -425,7 +427,8 @@ const Message = ({
         message.userMarkers &&
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
-        message.incoming
+        message.incoming &&
+        !unreadScrollTo
       ) {
         dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
       }
@@ -514,7 +517,7 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible])
+  }, [isVisible, unreadScrollTo])
 
   useDidUpdate(() => {
     if (tabIsActive) {

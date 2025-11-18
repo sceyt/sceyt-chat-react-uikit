@@ -1699,6 +1699,34 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         {messageForReply.attachments && messageForReply.attachments.length ? (
                           messageForReply.attachments[0].type === attachmentTypes.voice ? (
                             'Voice'
+                          ) : messageForReply.body &&
+                            messageForReply.bodyAttributes &&
+                            messageForReply.bodyAttributes.length > 0 ? (
+                            MessageTextFormat({
+                              text: messageForReply.body,
+                              message: {
+                                ...messageForReply,
+                                mentionedUsers:
+                                  messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
+                                    ? messageForReply.mentionedUsers
+                                    : activeChannelMembers &&
+                                        messageForReply.bodyAttributes &&
+                                        messageForReply.bodyAttributes.length > 0
+                                      ? messageForReply.bodyAttributes
+                                          .filter((attr: any) => attr.type.includes('mention'))
+                                          .map((attr: any) => {
+                                            const member = activeChannelMembers.find((m: any) => m.id === attr.metadata)
+                                            return member || null
+                                          })
+                                          .filter((m: IMember | null): m is IMember => m !== null)
+                                      : messageForReply.mentionedUsers || [],
+                                channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
+                              },
+                              contactsMap,
+                              getFromContacts,
+                              accentColor,
+                              textSecondary
+                            })
                           ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
                             <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
                           ) : messageForReply.attachments[0].type === attachmentTypes.video ? (

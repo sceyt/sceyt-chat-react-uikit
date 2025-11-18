@@ -10,7 +10,7 @@ import { getAttachmentsAC } from '../../../../store/message/actions'
 import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
 // Helpers
-import { bytesToSize, downloadFile, formatLargeText } from '../../../../helpers'
+import { bytesToSize, downloadFile, formatLargeText, formatChannelDetailsDate } from '../../../../helpers'
 import { isJSON } from '../../../../helpers/message'
 import { base64ToToDataURL } from '../../../../helpers/resizeImage'
 import { IAttachment } from '../../../../types'
@@ -129,7 +129,9 @@ const Files = ({
                   lineHeight={fileSizeLineHeight}
                   color={filePreviewSizeColor || textSecondary}
                 >
-                  {file.size ? bytesToSize(file.size) : ''}
+                  {file.size
+                    ? `${bytesToSize(file.size)} • ${formatChannelDetailsDate(file.createdAt)}`
+                    : formatChannelDetailsDate(file.createdAt)}
                 </FileSizeAndDate>
               </div>
               <DownloadWrapper

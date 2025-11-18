@@ -68,7 +68,8 @@ const PollMessage = ({ message }: PollMessageProps) => {
     <Container>
       <Question color={textPrimary}>{poll.name}</Question>
       <SubTitle color={textSecondary}>
-        {poll.closed ? 'Poll finished' : poll.anonymous ? 'Anonymous poll' : 'Public poll'}
+        {poll.anonymous ? 'Anonymous poll · ' : ''}
+        {poll.allowMultipleVotes ? 'Multiple Votes' : 'Single Vote'}
       </SubTitle>
       <Options>
         {(poll.options || []).map((opt: any) => {
@@ -165,6 +166,7 @@ const Question = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.4px;
+  word-break: break-word;
 `
 
 const SubTitle = styled.div<{ color: string }>`
@@ -174,6 +176,7 @@ const SubTitle = styled.div<{ color: string }>`
   font-size: 13px;
   line-height: 16px;
   letter-spacing: -0.08px;
+  word-break: break-word;
 `
 
 const Options = styled.div`
@@ -232,6 +235,7 @@ const Title = styled.div<{ color: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
   max-width: calc(100% - 80px);
+  word-break: break-word;
 `
 
 const Votes = styled.span<{ color: string }>`
