@@ -101,7 +101,12 @@ const Files = ({
 
           return (
             <React.Fragment key={file.id}>
-              <MonthHeader file={file} index={index} attachments={attachments} padding='11px 16px' />
+              <MonthHeader
+                currentCreatedAt={file.createdAt}
+                previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
+                isFirst={index === 0}
+                padding='12px 14px'
+              />
               <FileItem
                 // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
                 // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}

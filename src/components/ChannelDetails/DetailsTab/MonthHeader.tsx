@@ -1,40 +1,35 @@
-import React from 'react'
+import React, { useMemo } from 'react'
 import styled from 'styled-components'
-import { IAttachment } from '../../../types'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 
 interface IProps {
-  file: IAttachment
-  index: number
-  attachments: IAttachment[]
+  currentCreatedAt: string | number | Date
+  previousCreatedAt?: string | number | Date
+  isFirst: boolean
   padding?: string
   fullWidth?: boolean
 }
 
-const MonthHeader = ({ file, index, attachments, padding, fullWidth }: IProps) => {
+const MonthHeader = ({ currentCreatedAt, previousCreatedAt, isFirst, padding, fullWidth }: IProps) => {
   const { [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
 
-  let monthComponent: React.ReactNode = null
+  const monthComponent = useMemo(() => {
+    const shouldShowHeader =
+      isFirst || (previousCreatedAt && new Date(currentCreatedAt).getMonth() !== new Date(previousCreatedAt).getMonth())
 
-  if (index === 0) {
-    monthComponent = (
+    if (!shouldShowHeader) {
+      return null
+    }
+
+    return (
       <MonthHeaderContainer color={textSecondary} padding={padding} fullWidth={fullWidth}>
-        {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+        {new Date(currentCreatedAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
       </MonthHeaderContainer>
     )
-  } else if (
-    index > 0 &&
-    new Date(file.createdAt).getMonth() !== new Date(attachments[index - 1].createdAt).getMonth()
-  ) {
-    monthComponent = (
-      <MonthHeaderContainer color={textSecondary} padding={padding} fullWidth={fullWidth}>
-        {new Date(file.createdAt).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
-      </MonthHeaderContainer>
-    )
-  }
+  }, [currentCreatedAt, previousCreatedAt, isFirst, textSecondary, padding, fullWidth])
 
-  return <>{monthComponent}</>
+  return monthComponent
 }
 
 export default MonthHeader
