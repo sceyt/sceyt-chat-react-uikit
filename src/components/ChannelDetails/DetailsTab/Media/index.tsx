@@ -102,7 +102,7 @@ const Container = styled.div<any>`
   transition: all 0.2s;
 `
 const MediaGroup = styled.div`
-  padding: 0 4px;
+  padding: 9px 2px 0;
   display: flex;
   flex-wrap: wrap;
   align-items: flex-start;
