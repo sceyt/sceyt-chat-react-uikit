@@ -436,7 +436,7 @@ const SceytChat = ({
         intervalRef.current = null
       }
     }
-  }, [connectionStatus, checkPendingMessagesAndPollActions])
+  }, [connectionStatus])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -457,7 +457,7 @@ const SceytChat = ({
         pendingMessagesIntervalRef.current = null
       }
     }
-  }, [connectionStatus, checkPendingMessages])
+  }, [connectionStatus])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
@@ -478,7 +478,7 @@ const SceytChat = ({
         pollPendingPollActionsIntervalRef.current = null
       }
     }
-  }, [connectionStatus, checkPollPendingPollActions])
+  }, [connectionStatus])
   return (
     <React.Fragment>
       {SceytChatClient ? (
