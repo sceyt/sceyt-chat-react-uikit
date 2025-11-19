@@ -7,12 +7,12 @@ import { CircularProgressbar } from 'react-circular-progressbar'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 // Assets
-import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
+import { ReactComponent as FileIcon } from '../../../../assets/svg/document_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
 // Helpers
 import { bytesToSize, downloadFile, formatLargeText, formatChannelDetailsDate } from '../../../../helpers'
-import { isJSON } from '../../../../helpers/message'
-import { base64ToToDataURL } from '../../../../helpers/resizeImage'
+import { isJSON } from 'helpers/message'
+import { base64ToDataURL } from 'helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
@@ -92,7 +92,7 @@ const Files = ({
 
           if (metas && metas.tmb) {
             if (metas.tmb.length < 70) {
-              attachmentThumb = base64ToToDataURL(metas.tmb)
+              attachmentThumb = base64ToDataURL(metas.tmb)
               withPrefix = false
             } else {
               attachmentThumb = metas.tmb
@@ -244,21 +244,24 @@ const ProgressWrapper = styled.span`
 
 const FileIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: inline-flex;
-
   & > svg {
     width: 40px;
     height: 40px;
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const FileHoverIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: none;
   & > svg {
-    color: ${(props) => props.iconColor};
     width: 40px;
     height: 40px;
-    fill: ${(props) => props.fillColor};
+    color: ${(props) => props.iconColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const FileThumb = styled.img`
@@ -268,6 +271,7 @@ const FileThumb = styled.img`
   border-radius: 8px;
   object-fit: cover;
 `
+
 const FileItem = styled.div<{ hoverBackgroundColor: string }>`
   position: relative;
   padding: 11px 16px;

@@ -137,7 +137,7 @@ export const base64ToBinary = (base64: any) => {
 
 const binaryThumbHashToDataURL = (binaryThumbHash: Uint8Array) => thumbHashToDataURL(binaryThumbHash)
 
-export const base64ToToDataURL = (base64: any) => {
+export const base64ToDataURL = (base64: any) => {
   try {
     const thumbHashFromBase64 = base64ToBinary(base64)
 

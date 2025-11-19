@@ -39,7 +39,7 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
-import { base64ToToDataURL } from '../../helpers/resizeImage'
+import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
@@ -183,7 +183,7 @@ const Attachment = ({
   ) {
     try {
       if (attachmentMetadata.tmb.length < 70) {
-        attachmentThumb = base64ToToDataURL(attachmentMetadata.tmb)
+        attachmentThumb = base64ToDataURL(attachmentMetadata.tmb)
         withPrefix = false
       } else {
         attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
@@ -789,7 +789,7 @@ const Attachment = ({
           {attachmentThumb ? (
             <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
           ) : (
-            // <FileThumbnail src={base64ToToDataURL(attachmentMetadata.tmb)} />
+            // <FileThumbnail src={base64ToDataURL(attachmentMetadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
