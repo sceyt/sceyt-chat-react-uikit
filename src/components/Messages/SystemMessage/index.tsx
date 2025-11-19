@@ -109,6 +109,7 @@ const Message = ({
 
   return (
     <Container
+      id={message.id || message.tid}
       ref={messageItemRef}
       marginTop={differentUserMessageSpacing || '16px'}
       marginBottom={
