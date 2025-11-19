@@ -655,7 +655,7 @@ const Channel: React.FC<IChannelProps> = ({
                     </LastMessageAuthor>
                   ) : null
                 ) : draftMessageText ? (
-                  <DraftMessageTitle color={warningColor}>Draft</DraftMessageTitle>
+                  <DraftMessageTitle color={warningColor}>Draft:</DraftMessageTitle>
                 ) : channel.lastReactedMessage && channel.newReactions && channel.newReactions[0] ? (
                   lastMessage.state !== MESSAGE_STATUS.DELETE &&
                   ((channel.newReactions[0].user && channel.newReactions[0].user.id === user.id) || !isDirectChannel) &&
@@ -707,7 +707,9 @@ const Channel: React.FC<IChannelProps> = ({
                       (lastMessage &&
                         lastMessage.state !== MESSAGE_STATUS.DELETE &&
                         lastMessage.type !== 'system')) && (
-                    <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
+                    <Points color={(draftMessageText && warningColor) || textPrimary}>
+                      {draftMessageText ? ' ' : ': '}
+                    </Points>
                   )}
                 <LastMessageText
                   color={textSecondary}
@@ -919,6 +921,7 @@ const Container = styled.div<{
 
 export const DraftMessageTitle = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  margin-right: 4px;
 `
 export const DraftMessageText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
