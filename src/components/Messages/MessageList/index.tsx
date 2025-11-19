@@ -8,9 +8,12 @@ import {
   clearSelectedMessagesAC,
   getMessagesAC,
   loadMoreMessagesAC,
+  resendMessageAC,
+  resendPendingPollActionsAC,
   scrollToNewMessageAC,
   setScrollToMessagesAC,
-  showScrollToNewMessageButtonAC
+  showScrollToNewMessageButtonAC,
+  setUnreadScrollToAC
 } from '../../../store/message/actions'
 import {
   activeChannelMessagesSelector,
@@ -24,7 +27,10 @@ import {
   scrollToMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
-  showScrollToNewMessageButtonSelector
+  showScrollToNewMessageButtonSelector,
+  pendingPollActionsSelector,
+  pendingMessagesMapSelector,
+  unreadScrollToSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { themeSelector } from '../../../store/theme/selector'
@@ -38,7 +44,6 @@ import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.
 import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
 // Helpers
-import { getUnreadScrollTo, setUnreadScrollTo } from '../../../helpers/channelHalper'
 import {
   clearMessagesMap,
   clearVisibleMessagesMap,
@@ -63,7 +68,8 @@ import {
   ILabels,
   MessageInfoTab,
   ITabsStyles,
-  IListItemStyles
+  IListItemStyles,
+  OGMetadataProps
 } from '../../../types'
 import { LOADING_STATE } from '../../../helpers/constants'
 // Components
@@ -72,7 +78,7 @@ import SliderPopup from '../../../common/popups/sliderPopup'
 import SystemMessage from '../SystemMessage'
 import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
-import { HiddenMessageProperty } from 'types/enum'
+import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
 
@@ -169,6 +175,8 @@ interface MessagesProps {
     handleReportMessage?: () => void
     handleOpenEmojis?: () => void
     handleReplyMessage?: () => void
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
 
     isThreadMessage?: boolean
     rtlDirection?: boolean
@@ -187,6 +195,8 @@ interface MessagesProps {
     messageTextRef: any
     emojisPopupPosition: string
     handleSetMessageForEdit?: () => void
+    handleRetractVote?: () => void
+    handleEndVote?: () => void
     handleResendMessage?: () => void
     handleOpenDeleteMessage?: () => void
     handleOpenForwardMessage?: () => void
@@ -205,6 +215,8 @@ interface MessagesProps {
     handleMediaItemClick?: (attachment: IAttachment) => void
     handleOpenUserProfile: (user: IUser) => void
     isThreadMessage?: boolean
+    unsupportedMessage: boolean
+    onInviteLinkClick?: (key: string) => void
   }>
   messageReaction?: boolean
   editMessage?: boolean
@@ -226,6 +238,8 @@ interface MessagesProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   messageStatusSize?: string
   messageStatusColor?: string
   messageReadStatusColor?: string
@@ -328,6 +342,7 @@ interface MessagesProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  ogMetadataProps?: OGMetadataProps
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -370,6 +385,8 @@ const MessageList: React.FC<MessagesProps> = ({
   forwardIcon,
   deleteIcon,
   selectIcon,
+  retractVoteIcon,
+  endVoteIcon,
   allowEditDeleteIncomingMessage = true,
   starIcon,
   staredIcon,
@@ -465,7 +482,8 @@ const MessageList: React.FC<MessagesProps> = ({
   messageStatusAndTimeLineHeight,
   hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  ogMetadataProps
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -488,6 +506,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const dispatch = useDispatch()
   const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
+  const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
@@ -503,7 +522,10 @@ const MessageList: React.FC<MessagesProps> = ({
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
   const messagesLoading = useSelector(messagesLoadingState)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
+  const pollPendingPollActions = useSelector(pendingPollActionsSelector, shallowEqual)
+  const pendingMessagesMap = useSelector(pendingMessagesMapSelector, shallowEqual)
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
+  const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
   const [unreadMessageId, setUnreadMessageId] = useState('')
   const [mediaFile, setMediaFile] = useState<any>(null)
@@ -865,6 +887,9 @@ const MessageList: React.FC<MessagesProps> = ({
             behavior: 'smooth'
           })
         }
+        setTimeout(() => {
+          dispatch(scrollToNewMessageAC(false, false, false))
+        }, 800)
       } else {
         nextDisableRef.current = true
         prevDisableRef.current = true
@@ -875,6 +900,7 @@ const MessageList: React.FC<MessagesProps> = ({
         dispatch(showScrollToNewMessageButtonAC(false))
         setTimeout(() => {
           prevDisableRef.current = false
+          dispatch(scrollToNewMessageAC(false, false, false))
         }, 800)
       }
     }
@@ -1080,35 +1106,78 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [messagesLoading, messages, lastVisibleMessageId])
 
   useEffect(() => {
+    let interval: any = null
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      loadingRef.current = false
-      prevDisableRef.current = false
-      nextDisableRef.current = false
-      clearMessagesMap()
-      removeAllMessages()
-      if (channel.id) {
-        dispatch(getMessagesAC(channel))
+      Object.keys(pendingMessagesMap).forEach((key: any) => {
+        pendingMessagesMap[key].forEach((msg: IMessage) => {
+          dispatch(resendMessageAC(msg, key, connectionStatus))
+        })
+      })
+      // Resend pending poll actions
+      if (Object.keys(pollPendingPollActions).length > 0) {
+        dispatch(resendPendingPollActionsAC(connectionStatus))
+      }
+      let count = 0
+      interval = setInterval(() => {
+        if (count > 20) {
+          clearInterval(interval)
+        }
+        count++
+        if (
+          channel.id &&
+          Object.keys(pollPendingPollActions).length === 0 &&
+          Object.keys(pendingMessagesMap).length === 0
+        ) {
+          clearInterval(interval)
+          loadingRef.current = false
+          prevDisableRef.current = false
+          nextDisableRef.current = false
+          clearMessagesMap()
+          removeAllMessages()
+          dispatch(getMessagesAC(channel))
+        }
+      }, 100)
+    }
+    return () => {
+      if (interval) {
+        clearInterval(interval)
       }
     }
   }, [connectionStatus])
 
   useEffect(() => {
-    const unreadScrollTo = getUnreadScrollTo()
     if (channel.newMessageCount && channel.newMessageCount > 0 && unreadScrollTo) {
-      if (scrollRef.current) {
-        scrollRef.current.style.scrollBehavior = 'inherit'
+      const scrollElement = document.getElementById('scrollableDiv')
+      if (scrollElement) {
+        scrollElement.style.scrollBehavior = 'inherit'
       }
+      setScrollIntoView(true)
       const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
-      if (lastReadMessageNode) {
-        scrollRef.current.scrollTop = lastReadMessageNode.offsetTop
-        if (scrollRef.current) {
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }
-        setUnreadScrollTo(false)
+      if (lastReadMessageNode && scrollElement) {
+        dispatch(scrollToNewMessageAC(false))
+        scrollElement.scrollTo({
+          top: lastReadMessageNode.offsetTop - 200,
+          behavior: 'auto'
+        })
+        setTimeout(() => {
+          dispatch(setUnreadScrollToAC(false))
+          setScrollIntoView(false)
+        }, 100)
       }
+    } else {
+      dispatch(setUnreadScrollToAC(false))
+      setScrollIntoView(false)
     }
-  }, [channel.id, channel.newMessageCount, channel.lastDisplayedMessageId])
+  }, [
+    channel.id,
+    channel.newMessageCount,
+    scrollRef.current,
+    unreadScrollTo,
+    channel.lastDisplayedMessageId,
+    scrollIntoView,
+    messages.length
+  ])
 
   // Cleanup hideTopDate timeout on unmount
   useEffect(() => {
@@ -1216,7 +1285,10 @@ const MessageList: React.FC<MessagesProps> = ({
                     <CreateMessageDateDivider
                       // lastIndex={index === 0}
                       noMargin={
-                        !isUnreadMessage && prevMessage && prevMessage.type === 'system' && message.type !== 'system'
+                        !isUnreadMessage &&
+                        prevMessage &&
+                        prevMessage.type === MESSAGE_TYPE.SYSTEM &&
+                        message.type !== MESSAGE_TYPE.SYSTEM
                       }
                       theme={theme}
                       lastIndex={false}
@@ -1230,11 +1302,13 @@ const MessageList: React.FC<MessagesProps> = ({
                       chatBackgroundColor={backgroundColor || themeBackgroundColor}
                       dateDividerBorderRadius={dateDividerBorderRadius}
                       marginBottom={
-                        prevMessage && prevMessage.type === 'system' && message.type !== 'system' ? '16px' : '0'
+                        prevMessage && prevMessage.type === MESSAGE_TYPE.SYSTEM && message.type !== MESSAGE_TYPE.SYSTEM
+                          ? '16px'
+                          : '0'
                       }
                       marginTop={differentUserMessageSpacing}
                     />
-                    {message.type === 'system' ? (
+                    {message.type === MESSAGE_TYPE.SYSTEM ? (
                       <SystemMessage
                         key={message.id || message.tid}
                         channel={channel}
@@ -1311,6 +1385,8 @@ const MessageList: React.FC<MessagesProps> = ({
                           forwardIcon={forwardIcon}
                           deleteIcon={deleteIcon}
                           selectIcon={selectIcon}
+                          retractVoteIcon={retractVoteIcon}
+                          endVoteIcon={endVoteIcon}
                           forwardMessage={forwardMessage}
                           starIcon={starIcon}
                           staredIcon={staredIcon}
@@ -1389,6 +1465,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                           showInfoMessageProps={showInfoMessageProps}
+                          ogMetadataProps={ogMetadataProps}
                         />
                       </MessageWrapper>
                     )}
@@ -1404,8 +1481,8 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                        marginTop={message.type === 'system' ? '0px' : ''}
-                        marginBottom={message.type === 'system' ? '16px' : '0'}
+                        marginTop={message.type === MESSAGE_TYPE.SYSTEM ? '0px' : ''}
+                        marginBottom={message.type === MESSAGE_TYPE.SYSTEM ? '16px' : '0'}
                         chatBackgroundColor={backgroundColor || themeBackgroundColor}
                         unread
                       />

@@ -136,6 +136,19 @@ export const calculateRenderedImageWidth = (width: number, height: number, maxWi
   }
 }
 
+/**
+ * Format: DD.MM.YY, HH:mm (e.g., "25.09.16, 22:00")
+ * Supports localization based on user's browser locale and timezone
+ * Uses the exact sent/uploaded time from createdAt
+ * @param date - Date object, timestamp, or date string
+ * @returns Formatted date string localized according to browser settings
+ */
+export const formatChannelDetailsDate = (date: Date | number | string): string => {
+  if (!date) return ''
+  const momentDate = moment(date)
+  return momentDate.isValid() ? momentDate.format('DD.MM.YY, HH:mm') : ''
+}
+
 export const userLastActiveDateFormat = (date: Date) => {
   // check for the last hour
   const formattingDate = moment(date).format()

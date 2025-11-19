@@ -244,7 +244,7 @@ const VideoPreview = memo(function VideoPreview({
           isLoaded={!loading}
         />
       )} */}
-      {videoCurrentTime && !isRepliedMessage && (
+      {videoCurrentTime && !isRepliedMessage && (!isDetailsView || !loading) && (
         <VideoControls>
           {!isPreview && !!videoCurrentTime && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>

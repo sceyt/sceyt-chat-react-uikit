@@ -13,6 +13,7 @@ export const THEME_COLORS = {
   TEXT_FOOTNOTE: 'textFootnote',
   TEXT_ON_PRIMARY: 'textOnPrimary',
   BORDER: 'border',
+  BORDER_SECONDARY: 'borderSecondary',
   ICON_INACTIVE: 'iconInactive',
   ICON_PRIMARY: 'iconPrimary',
   BACKGROUND: 'background',
@@ -118,6 +119,11 @@ export const defaultTheme = {
     [THEME_COLORS.BORDER]: {
       light: '#E4E6EE',
       dark: '#303032'
+    },
+    // 15. border secondary colors
+    [THEME_COLORS.BORDER_SECONDARY]: {
+      light: '#D0D8E3',
+      dark: '#33393C'
     },
     // 15. icon primary colors
     [THEME_COLORS.ICON_PRIMARY]: {

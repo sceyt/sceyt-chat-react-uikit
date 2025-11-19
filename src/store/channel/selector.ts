@@ -26,3 +26,5 @@ export const isDraggingSelector = (store: any) => store.ChannelReducer.isDraggin
 export const draggedAttachmentsSelector = (store: any) => store.ChannelReducer.draggedAttachments
 export const tabIsActiveSelector = (store: any) => store.ChannelReducer.tabIsActive
 export const channelMessageDraftIsRemovedSelector = (store: any) => store.ChannelReducer.draftIsRemoved
+export const channelInviteKeysSelector = (store: any) => store.ChannelReducer.channelInviteKeys
+export const joinableChannelSelector = (store: any) => store.ChannelReducer.joinableChannel

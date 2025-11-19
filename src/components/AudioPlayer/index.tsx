@@ -16,6 +16,7 @@ import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
 import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
+import AudioVisualization from './AudioVisualization'
 
 interface Recording {
   recordingSeconds: number
@@ -55,6 +56,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   const [playAudio, setPlayAudio] = useState<any>(false)
 
   const [currentTime, setCurrentTime] = useState<any>('')
+  const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0)
+  const [duration, setDuration] = useState<number>(0)
   const [audioRate, setAudioRate] = useState<any>(1)
 
   const wavesurfer = useRef<any>(null)
@@ -88,6 +91,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(formatAudioVideoTime(currentTime))
+            setCurrentTimeSeconds(currentTime)
           }
         }, 10)
       } else {
@@ -156,18 +160,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
         try {
           wavesurfer.current = WaveSurfer.create({
             container: wavesurferContainer.current,
-            waveColor: textSecondary,
-            progressColor: accentColor,
-            // audioContext,
-            // cursorColor: 'transparent',
-            // splitChannels: true,
-            // barWidth: 1.5,
+            waveColor: 'transparent',
+            progressColor: 'transparent',
             audioRate,
-            // barHeight: 3,
-
             barWidth: 1,
             barHeight: 1,
-
             hideScrollbar: true,
             barRadius: 1.5,
             cursorWidth: 0,
@@ -177,6 +174,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
           let peaks
           if (file.metadata) {
             if (file.metadata.dur) {
+              setDuration(file.metadata.dur)
               setCurrentTime(formatAudioVideoTime(file.metadata.dur))
             }
             if (file.metadata.tmb) {
@@ -195,6 +193,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
 
           wavesurfer.current.on('ready', () => {
             const audioDuration = wavesurfer.current.getDuration()
+            setDuration(audioDuration)
             setCurrentTime(formatAudioVideoTime(audioDuration))
 
             wavesurfer.current.drawBuffer = (d: any) => {
@@ -208,8 +207,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             setPlayAudio(false)
             wavesurfer.current.seekTo(0)
             const audioDuration = wavesurfer.current.getDuration()
-            // const currentTime = wavesurfer.current.getCurrentTime()
-            setCurrentTime(formatAudioVideoTime(audioDuration))
+            setDuration(audioDuration)
+            setCurrentTime(formatAudioVideoTime(0))
+            setCurrentTimeSeconds(0)
             if (playingAudioId === file.id) {
               dispatch(setPlayingAudioIdAC(null))
             }
@@ -228,6 +228,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             // const audioDuration = wavesurfer.current.getDuration()
             const currentTime = wavesurfer.current.getCurrentTime()
             setCurrentTime(formatAudioVideoTime(currentTime))
+            setCurrentTimeSeconds(currentTime)
           })
           if (url !== '_') {
             setIsRendered(true)
@@ -256,13 +257,31 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
         {playAudio ? <PauseIcon /> : <PlayIcon />}
       </PlayPause>
       <WaveContainer>
-        <AudioVisualization ref={wavesurferContainer} />
+        <VisualizationWrapper>
+          <AudioVisualizationPlaceholder
+            ref={wavesurferContainer}
+            hidden={!!(file.metadata?.tmb && Array.isArray(file.metadata.tmb))}
+          />
+          {file.metadata?.tmb && Array.isArray(file.metadata.tmb) && (
+            <AudioVisualization
+              tmb={file.metadata.tmb}
+              duration={duration || file.metadata.dur || 0}
+              currentTime={currentTimeSeconds}
+              waveColor={textSecondary}
+              progressColor={accentColor}
+              height={20}
+              barWidth={1}
+              barGap={2}
+              barRadius={1.5}
+            />
+          )}
+        </VisualizationWrapper>
         <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundSections}>
           {audioRate}
           <span>X</span>
         </AudioRate>
       </WaveContainer>
-      <Timer color={textSecondary}>{currentTime}</Timer>
+      <Timer color={textSecondary}>{currentTime || formatAudioVideoTime(file.metadata?.dur || 0)}</Timer>
     </Container>
   )
 }
@@ -288,8 +307,18 @@ const PlayPause = styled.div<{ iconColor: string }>`
   }
 `
 
-const AudioVisualization = styled.div`
+const VisualizationWrapper = styled.div`
   width: 100%;
+  display: flex;
+  align-items: center;
+  position: relative;
+`
+
+const AudioVisualizationPlaceholder = styled.div<{ hidden?: boolean }>`
+  width: 100%;
+  position: ${(props) => (props.hidden ? 'absolute' : 'relative')};
+  opacity: ${(props) => (props.hidden ? 0 : 1)};
+  pointer-events: ${(props) => (props.hidden ? 'none' : 'auto')};
 `
 const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   display: flex;
