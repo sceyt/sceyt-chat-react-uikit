@@ -14,6 +14,7 @@ import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channel: IChannel
@@ -33,35 +34,46 @@ const Media = ({ channel }: IProps) => {
   }, [channel.id])
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.id}>
-          {file.type === 'image' ? (
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
+      {attachments.map((file: IAttachment, index: number) => {
+        return (
+          <React.Fragment key={file.id}>
+            <MonthHeader
+              currentCreatedAt={file.createdAt}
+              previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
+              isFirst={index === 0}
+              padding='9px 6px'
+              fullWidth
             />
-          ) : (
-            // <img src={file.url} alt='' />
+            <MediaItem>
+              {file.type === 'image' ? (
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+              ) : (
+                // <img src={file.url} alt='' />
 
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-            /* <video>
-              <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
-              <source src={file.url} type='video/ogg' />
-              <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-              Your browser does not support the video tag.
-            </video> */
-          )}
-        </MediaItem>
-      ))}
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+                /* <video>
+                  <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
+                  <source src={file.url} type='video/ogg' />
+                  <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
+                  Your browser does not support the video tag.
+                </video> */
+              )}
+            </MediaItem>
+          </React.Fragment>
+        )
+      })}
       {mediaFile && (
         <SliderPopup
           channel={channel}
