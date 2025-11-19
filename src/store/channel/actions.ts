@@ -31,7 +31,9 @@ import {
   setChannelListWidth,
   setTabIsActive,
   setHideChannelList,
-  setDraftIsRemoved
+  setDraftIsRemoved,
+  setChannelInviteKeys,
+  setJoinableChannel
 } from './reducers'
 
 // Import saga action constants
@@ -65,7 +67,13 @@ import {
   TURN_ON_NOTIFICATION,
   UPDATE_CHANNEL,
   WATCH_FOR_EVENTS,
-  GET_CHANNEL_MENTIONS
+  GET_CHANNEL_MENTIONS,
+  CREATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_INVITE_KEYS,
+  REGENERATE_CHANNEL_INVITE_KEY,
+  UPDATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_BY_INVITE_KEY,
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -78,6 +86,11 @@ export const createChannelAC = (
 ) => ({
   type: CREATE_CHANNEL,
   payload: { channelData, dontCreateIfNotExists, callback }
+})
+
+export const getChannelByInviteKeyAC = (key: string) => ({
+  type: GET_CHANNEL_BY_INVITE_KEY,
+  payload: { key }
 })
 
 export const getChannelsAC = (params: ChannelQueryParams, isJoinChannel?: boolean) => ({
@@ -264,6 +277,8 @@ export const updateUserStatusOnChannelAC = (usersMap: { [key: string]: IUser }) 
 
 export const setChannelListWithAC = (width: number) => setChannelListWidth({ width })
 
+export const setJoinableChannelAC = (channel: IChannel | null) => setJoinableChannel({ channel })
+
 export const clearHistoryAC = (channelId: string) => ({
   type: CLEAR_HISTORY,
   payload: { channelId }
@@ -302,4 +317,50 @@ export const destroySession = () => ({
 export const getChannelMentionsAC = (channelId: string) => ({
   type: GET_CHANNEL_MENTIONS,
   payload: { channelId }
+})
+
+export const createChannelInviteKeyAC = (
+  channelId: string,
+  accessPriorHistory: boolean = true,
+  expiresAt: number = 0,
+  maxUses: number = 0
+) => ({
+  type: CREATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, accessPriorHistory, expiresAt, maxUses }
+})
+
+export const setChannelInviteKeysAC = (
+  channelId: string,
+  inviteKeys: {
+    key: string
+    maxUses: number
+    expiresAt: number
+    accessPriorHistory: boolean
+  }[]
+) => setChannelInviteKeys({ channelId, inviteKeys })
+
+export const getChannelInviteKeysAC = (channelId: string) => ({
+  type: GET_CHANNEL_INVITE_KEYS,
+  payload: { channelId }
+})
+
+export const regenerateChannelInviteKeyAC = (channelId: string, key: string) => ({
+  type: REGENERATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, key }
+})
+
+export const updateChannelInviteKeyAC = (
+  channelId: string,
+  key: string,
+  accessPriorHistory: boolean,
+  expiresAt: number = 0,
+  maxUses: number = 0
+) => ({
+  type: UPDATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, key, accessPriorHistory, expiresAt, maxUses }
+})
+
+export const joinChannelWithInviteKeyAC = (key: string) => ({
+  type: JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  payload: { key }
 })

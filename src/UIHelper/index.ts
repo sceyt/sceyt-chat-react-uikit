@@ -171,12 +171,7 @@ export function generateAvatarColor(itemName: any, theme: 'light' | 'dark') {
   if (itemName && itemName !== '') {
     const hash = md5(itemName).toString().padStart(32, '0').slice(-6)
     const hashInt = parseInt(hash, 16)
-    // if (itemName === 't😀') {
-    // }
     const colorIndex = hashInt % avatarColors.length
-    // if (colorIndex >= avatarColors.length) {
-    //   colorIndex -= avatarColors.length
-    // }
     return avatarColors[colorIndex]
   }
   return null
@@ -278,13 +273,13 @@ export const CustomSelectTrigger = styled.span<{ color: string }>`
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color: string }>`
-  display: inline-block;
+export const Label = styled.label<{ color: string; marginTop?: string; display?: string }>`
+  display: ${(props) => props.display || 'inline-block'};
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
-  margin-top: 20px;
+  margin-top: ${(props) => props.marginTop || '20px'};
   margin-bottom: 4px;
   color: ${(props) => props.color};
 `
@@ -314,6 +309,7 @@ export const CustomInput = styled.input<{
   errorColor: string
   borderColor: string
   disabledColor: string
+  padding?: string
 }>`
   height: 40px;
   width: 100%;
@@ -322,7 +318,7 @@ export const CustomInput = styled.input<{
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
-  padding: 11px 14px;
+  padding: ${(props) => props.padding || '11px 14px'};
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: normal;
@@ -387,6 +383,7 @@ export const Button = styled.button<{
   borderColor?: string
   borderRadius?: string
   disabled?: boolean
+  disabledOpacity?: number
   margin?: string
 }>`
   display: inline-block;
@@ -407,10 +404,10 @@ export const Button = styled.button<{
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 1)};
   &:hover,
   &:focus {
-    opacity: ${(props) => (props.disabled ? 0.5 : 0.8)};
+    opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 0.8)};
   }
 `
 
@@ -745,6 +742,8 @@ export const MessageText = styled.pre<{
   incomingMessageStyles?: IMessageStyles
   incoming: boolean
   linkColor: string
+  unsupportedMessage?: boolean
+  unsupportedMessageColor?: string
 }>`
   display: flow-root;
   position: relative;
@@ -776,7 +775,12 @@ export const MessageText = styled.pre<{
     props.color};
   user-select: text;
   //overflow: hidden;
-
+  ${(props) =>
+    props.unsupportedMessage &&
+    `
+      color: ${props.unsupportedMessageColor || '#757D8B'};
+      font-style: italic;
+    `}
   ${(props) =>
     props.isRepliedMessage &&
     `
@@ -1023,4 +1027,33 @@ export const AttachmentPreviewTitle = styled.span<{ color: string; fontSize?: st
   line-height: ${(props) => props.lineHeight || '20px'};
   height: ${(props) => props.lineHeight || '20px'};
   color: ${(props) => props.color};
+`
+
+export const CopiedTooltip = styled.span<{ background: string; color: string }>`
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 6px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: slideDownFadeIn 0.3s ease-out;
+  background-color: ${(p) => p.background};
+  color: ${(p) => p.color};
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+
+  @keyframes slideDownFadeIn {
+    from {
+      transform: translateX(-50%) translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  }
 `

@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 import styled from 'styled-components'
-import moment from 'moment/moment'
 // Store
 import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
 import { playingAudioIdSelector } from '../../../../store/message/selector'
@@ -13,7 +12,7 @@ import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePre
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 // Helpers
 import { getCustomDownloader } from '../../../../helpers/customUploader'
-import { formatAudioVideoTime } from '../../../../helpers'
+import { formatAudioVideoTime, formatChannelDetailsDate } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
@@ -143,7 +142,7 @@ const VoiceItem = ({
             (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor || textSecondary}>
-          {moment(file.createdAt).format('DD MMMM, YYYY')}
+          {formatChannelDetailsDate(file.createdAt)}
         </AudioDate>
         <AudioSendTime color={textSecondary}>
           {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur) : '')}
@@ -231,7 +230,7 @@ const AudioDate = styled.span<{ color: string }>`
   max-width: calc(100% - 72px);
   font-style: normal;
   font-weight: normal;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   color: ${(props) => props.color};
 `

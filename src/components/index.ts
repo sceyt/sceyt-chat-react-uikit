@@ -17,12 +17,14 @@ import FrequentlyEmojis from './Emojis/frequentlyEmojis'
 import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
+import PollMessage from './Message/PollMessage'
 import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
   handleSendMessage,
   handleGetMessage
 } from 'helpers/methods'
+import { MESSAGE_TYPE } from 'types/enum'
 
 export {
   SceytChat,
@@ -40,12 +42,14 @@ export {
   Avatar,
   DropDown,
   Attachment,
+  PollMessage,
   OGMetadata,
   EmojisPopup,
   FrequentlyEmojis,
   SceytChatUIKitTheme,
   ThemeMode,
   THEME_COLORS,
+  MESSAGE_TYPE,
   handleSendMessage,
   handleGetMessage,
   createOrGetDirectChannel,
