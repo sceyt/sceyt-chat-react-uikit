@@ -532,6 +532,16 @@ const Channel: React.FC<IChannelProps> = ({
     [doNotShowMessageDeliveryTypes]
   )
 
+  const handleDragEnter = useCallback(
+    (e: React.DragEvent) => {
+      if (e.dataTransfer.types.includes('Files') && activeChannel.id !== channel.id) {
+        e.preventDefault()
+        setSelectedChannel(channel)
+      }
+    },
+    [channel, activeChannel.id, setSelectedChannel]
+  )
+
   return (
     <Container
       // ref={channelItemRef}
@@ -544,6 +554,7 @@ const Channel: React.FC<IChannelProps> = ({
       selectedChannelBorderRadius={selectedChannelBorderRadius}
       channelsMargin={channelsMargin}
       onClick={() => setSelectedChannel(channel)}
+      onDragEnter={handleDragEnter}
       hoverBackground={channelHoverBackground || backgroundHovered}
     >
       {showAvatar && (
