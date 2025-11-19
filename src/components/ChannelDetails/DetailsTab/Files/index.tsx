@@ -10,9 +10,9 @@ import { getAttachmentsAC } from '../../../../store/message/actions'
 import { ReactComponent as FileIcon } from '../../../../assets/svg/document_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
 // Helpers
-import { isJSON } from 'helpers/message'
-import { base64ToToDataURL } from 'helpers/resizeImage'
 import { bytesToSize, downloadFile, formatLargeText, formatChannelDetailsDate } from '../../../../helpers'
+import { isJSON } from 'helpers/message'
+import { base64ToDataURL } from 'helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
@@ -92,7 +92,7 @@ const Files = ({
 
           if (metas && metas.tmb) {
             if (metas.tmb.length < 70) {
-              attachmentThumb = base64ToToDataURL(metas.tmb)
+              attachmentThumb = base64ToDataURL(metas.tmb)
               withPrefix = false
             } else {
               attachmentThumb = metas.tmb
