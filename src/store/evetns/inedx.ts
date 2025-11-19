@@ -90,7 +90,10 @@ export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
   const channelListener = new (SceytChatClient.ChannelListener as any)()
   const connectionListener = new (SceytChatClient.ConnectionListener as any)()
-  const usersTimeout: { [key: string]: any } = {}
+  const usersTimeout: { [key: string]: any } = {
+    recordingTimeout: {},
+    typingTimeout: {}
+  }
   const chan = eventChannel((emitter) => {
     const shouldSkip = (channel: IChannel) => {
       const channelTypesFilter = getChannelTypesFilter()
@@ -747,13 +750,13 @@ export default function* watchForEvents(): any {
             (channelFilterTypes?.length ? channelFilterTypes.includes(channel.type) : true)
           ) {
             channel.metadata = isJSON(channel.metadata) ? JSON.parse(channel.metadata) : channel.metadata
-            const activeChannelId = yield call(getActiveChannelId)
+            const activeChannelId = getActiveChannelId()
             const channelExists = checkChannelExists(channel.id)
             const channelForAdd = JSON.parse(JSON.stringify(channel))
 
             yield put(addChannelAC(channelForAdd))
             if (!channelExists) {
-              yield call(setChannelInMap, channel)
+              setChannelInMap(channel)
             } else if (!message.repliedInThread) {
               yield put(updateChannelLastMessageAC(message, channelForAdd))
             }
@@ -1519,35 +1522,35 @@ export default function* watchForEvents(): any {
             break
           }
           if (name === 'start_typing') {
-            if (!usersTimeout[channelId]) {
-              usersTimeout[channelId] = {}
+            if (!usersTimeout.typingTimeout[channelId]) {
+              usersTimeout.typingTimeout[channelId] = {}
             }
-            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-              clearTimeout(usersTimeout[channelId][from.id])
+            if (usersTimeout.typingTimeout[channelId] && usersTimeout.typingTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout.typingTimeout[channelId][from.id])
             }
-            usersTimeout[channelId][from.id] = setTimeout(() => {
+            usersTimeout.typingTimeout[channelId][from.id] = setTimeout(() => {
               channelListener.onReceivedChannelEvent(channelId, from, 'stop_typing')
             }, 5000)
             yield put(switchTypingIndicatorAC(true, channelId, from))
           } else if (name === 'stop_typing') {
-            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-              clearTimeout(usersTimeout[channelId][from.id])
+            if (usersTimeout.typingTimeout[channelId] && usersTimeout.typingTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout.typingTimeout[channelId][from.id])
             }
             yield put(switchTypingIndicatorAC(false, channelId, from))
           } else if (name === 'start_recording') {
-            if (!usersTimeout[channelId]) {
-              usersTimeout[channelId] = {}
+            if (!usersTimeout.recordingTimeout[channelId]) {
+              usersTimeout.recordingTimeout[channelId] = {}
             }
-            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-              clearTimeout(usersTimeout[channelId][from.id])
+            if (usersTimeout.recordingTimeout[channelId] && usersTimeout.recordingTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout.recordingTimeout[channelId][from.id])
             }
-            usersTimeout[channelId][from.id] = setTimeout(() => {
+            usersTimeout.recordingTimeout[channelId][from.id] = setTimeout(() => {
               channelListener.onReceivedChannelEvent(channelId, from, 'stop_recording')
             }, 5000)
             yield put(switchRecordingIndicatorAC(true, channelId, from))
           } else if (name === 'stop_recording') {
-            if (usersTimeout[channelId] && usersTimeout[channelId][from.id]) {
-              clearTimeout(usersTimeout[channelId][from.id])
+            if (usersTimeout.recordingTimeout[channelId] && usersTimeout.recordingTimeout[channelId][from.id]) {
+              clearTimeout(usersTimeout.recordingTimeout[channelId][from.id])
             }
             yield put(switchRecordingIndicatorAC(false, channelId, from))
           }
