@@ -259,7 +259,10 @@ export function setMessagesToMap(channelId: string, messages: IMessage[]) {
     messagesMap[channelId] = {}
   }
   messages.forEach((msg: IMessage) => {
-    messagesMap[channelId][msg.id] = msg
+    if (msg.tid && messagesMap[channelId][msg.tid]) {
+      delete messagesMap[channelId][msg.tid]
+    }
+    messagesMap[channelId][msg.id || msg.tid!] = msg
   })
 }
 
@@ -267,11 +270,10 @@ export function addMessageToMap(channelId: string, message: IMessage) {
   if (!messagesMap[channelId]) {
     messagesMap[channelId] = {}
   }
-  messagesMap[channelId][message.id] = message
-
-  if (message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-    setPendingMessage(channelId, message)
+  if (message.tid && messagesMap[channelId][message.tid]) {
+    delete messagesMap[channelId][message.tid]
   }
+  messagesMap[channelId][message.id || message.tid!] = message
 }
 
 export function updateMessageOnMap(
@@ -341,7 +343,10 @@ export function updateMessageOnMap(
       if (!messagesMap[channelId]) {
         messagesMap[channelId] = {}
       }
-      messagesMap[channelId][msg.id] = msg
+      if (msg.tid && messagesMap[channelId][msg.tid]) {
+        delete messagesMap[channelId][msg.tid]
+      }
+      messagesMap[channelId][msg.id || msg.tid!] = msg
     })
   }
 
@@ -360,7 +365,10 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
         slfReactions = [reaction]
       }
     }
-    messagesMap[channelId][message.id] = {
+    if (message.tid && messagesMap[channelId][message.tid]) {
+      delete messagesMap[channelId][message.tid]
+    }
+    messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
       userReactions: slfReactions,
       reactionTotals: message.reactionTotals
@@ -403,7 +411,10 @@ export function removeReactionToMessageOnMap(
         (selfReaction: IReaction) => selfReaction.key !== reaction.key
       )
     }
-    messagesMap[channelId][message.id] = {
+    if (message.tid && messagesMap[channelId][message.tid]) {
+      delete messagesMap[channelId][message.tid]
+    }
+    messagesMap[channelId][message.id || message.tid!] = {
       ...messageShouldBeUpdated,
       reactionTotals: message.reactionTotals,
       userReactions
@@ -440,6 +451,9 @@ export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: 
       const messageShouldBeUpdated = messagesMap[channelId][messageId]
       if (messageShouldBeUpdated) {
         const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(messageShouldBeUpdated, newMarkers.name)
+        if (messageShouldBeUpdated.tid && messagesMap[channelId][messageShouldBeUpdated.tid]) {
+          delete messagesMap[channelId][messageShouldBeUpdated.tid]
+        }
         messagesMap[channelId][messageId] = {
           ...messageShouldBeUpdated,
           ...statusUpdatedMessage

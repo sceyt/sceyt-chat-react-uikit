@@ -340,7 +340,7 @@ function* getChannels(action: IAction): any {
       }
     }
   } catch (e) {
-    log.error(e, 'Error on get channels')
+    log.error(JSON.stringify(e), 'Error on get channels')
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }

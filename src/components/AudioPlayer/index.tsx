@@ -151,8 +151,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
     return () => clearInterval(recordingInterval)
   }, [recording.initRecording])
 
-  console.log('file', file?.metadata)
-
   useEffect(() => {
     if (url) {
       if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
