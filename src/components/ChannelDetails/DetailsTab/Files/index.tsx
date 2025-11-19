@@ -7,17 +7,18 @@ import { CircularProgressbar } from 'react-circular-progressbar'
 import { activeTabAttachmentsSelector } from '../../../../store/message/selector'
 import { getAttachmentsAC } from '../../../../store/message/actions'
 // Assets
-import { ReactComponent as FileIcon } from '../../../../assets/svg/file_icon.svg'
+import { ReactComponent as FileIcon } from '../../../../assets/svg/document_icon.svg'
 import { ReactComponent as Download } from '../../../../assets/svg/downloadFile.svg'
 // Helpers
-import { bytesToSize, downloadFile, formatLargeText } from '../../../../helpers'
-import { isJSON } from '../../../../helpers/message'
-import { base64ToToDataURL } from '../../../../helpers/resizeImage'
+import { bytesToSize, downloadFile, formatLargeText, formatChannelDetailsDate } from '../../../../helpers'
+import { isJSON } from 'helpers/message'
+import { base64ToDataURL } from 'helpers/resizeImage'
 import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channelId: string
@@ -84,88 +85,101 @@ const Files = ({
   return (
     <Container>
       {attachments.map(
-        (file: IAttachment) => {
+        (file: IAttachment, index: number) => {
           const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
           let withPrefix = true
           let attachmentThumb = ''
 
           if (metas && metas.tmb) {
             if (metas.tmb.length < 70) {
-              attachmentThumb = base64ToToDataURL(metas.tmb)
+              attachmentThumb = base64ToDataURL(metas.tmb)
               withPrefix = false
             } else {
               attachmentThumb = metas.tmb
             }
           }
+
           return (
-            <FileItem
-              key={file.id}
-              // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-              // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-              hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
-            >
-              {metas && metas.tmb ? (
-                <FileThumb draggable={false} src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`} />
-              ) : (
-                <React.Fragment>
-                  <FileIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewIcon || <FileIcon />}
-                  </FileIconCont>
-                  <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
-                    {filePreviewHoverIcon || <FileIcon />}
-                  </FileHoverIconCont>
-                </React.Fragment>
-              )}
-              <div>
-                <AttachmentPreviewTitle
-                  fontSize={fileNameFontSize}
-                  lineHeight={fileNameLineHeight}
-                  color={filePreviewTitleColor || textPrimary}
-                >
-                  {formatLargeText(file.name, nameMaxLength)}
-                </AttachmentPreviewTitle>
-                <FileSizeAndDate
-                  fontSize={fileSizeFontSize}
-                  lineHeight={fileSizeLineHeight}
-                  color={filePreviewSizeColor || textSecondary}
-                >
-                  {file.size ? bytesToSize(file.size) : ''}
-                </FileSizeAndDate>
-              </div>
-              <DownloadWrapper
-                visible={!!downloadingFilesMap[file.id!]}
-                iconColor={accentColor}
-                onClick={() => handleDownloadFile(file)}
+            <React.Fragment key={file.id}>
+              <MonthHeader
+                currentCreatedAt={file.createdAt}
+                previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
+                isFirst={index === 0}
+                padding='14px 14px 0'
+              />
+              <FileItem
+                // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
+                // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
+                hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
               >
-                {downloadingFilesMap[file.id!] ? (
-                  <ProgressWrapper>
-                    <CircularProgressbar
-                      minValue={0}
-                      maxValue={100}
-                      value={downloadingFilesMap[file.id!].uploadPercent || 0}
-                      backgroundPadding={6}
-                      background={true}
-                      text=''
-                      styles={{
-                        background: {
-                          fill: `${overlayBackground2}66`
-                        },
-                        path: {
-                          stroke: accentColor,
-                          strokeLinecap: 'butt',
-                          strokeWidth: '6px',
-                          transition: 'stroke-dashoffset 0.5s ease 0s',
-                          transform: 'rotate(0turn)',
-                          transformOrigin: 'center center'
-                        }
-                      }}
-                    />
-                  </ProgressWrapper>
+                {metas && metas.tmb ? (
+                  <FileThumb
+                    draggable={false}
+                    src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`}
+                  />
                 ) : (
-                  filePreviewDownloadIcon || <Download />
+                  <React.Fragment>
+                    <FileIconCont iconColor={accentColor} fillColor={surface1}>
+                      {filePreviewIcon || <FileIcon />}
+                    </FileIconCont>
+                    <FileHoverIconCont iconColor={accentColor} fillColor={surface1}>
+                      {filePreviewHoverIcon || <FileIcon />}
+                    </FileHoverIconCont>
+                  </React.Fragment>
                 )}
-              </DownloadWrapper>
-            </FileItem>
+                <div>
+                  <AttachmentPreviewTitle
+                    fontSize={fileNameFontSize}
+                    lineHeight={fileNameLineHeight}
+                    color={filePreviewTitleColor || textPrimary}
+                  >
+                    {formatLargeText(file.name, nameMaxLength)}
+                  </AttachmentPreviewTitle>
+                  <FileSizeAndDate
+                    fontSize={fileSizeFontSize}
+                    lineHeight={fileSizeLineHeight}
+                    color={filePreviewSizeColor || textSecondary}
+                  >
+                    {file.size
+                      ? `${bytesToSize(file.size)} • ${formatChannelDetailsDate(file.createdAt)}`
+                      : formatChannelDetailsDate(file.createdAt)}
+                  </FileSizeAndDate>
+                </div>
+                <DownloadWrapper
+                  visible={!!downloadingFilesMap[file.id!]}
+                  iconColor={accentColor}
+                  onClick={() => handleDownloadFile(file)}
+                >
+                  {downloadingFilesMap[file.id!] ? (
+                    <ProgressWrapper>
+                      <CircularProgressbar
+                        minValue={0}
+                        maxValue={100}
+                        value={downloadingFilesMap[file.id!].uploadPercent || 0}
+                        backgroundPadding={6}
+                        background={true}
+                        text=''
+                        styles={{
+                          background: {
+                            fill: `${overlayBackground2}66`
+                          },
+                          path: {
+                            stroke: accentColor,
+                            strokeLinecap: 'butt',
+                            strokeWidth: '6px',
+                            transition: 'stroke-dashoffset 0.5s ease 0s',
+                            transform: 'rotate(0turn)',
+                            transformOrigin: 'center center'
+                          }
+                        }}
+                      />
+                    </ProgressWrapper>
+                  ) : (
+                    filePreviewDownloadIcon || <Download />
+                  )}
+                </DownloadWrapper>
+              </FileItem>
+            </React.Fragment>
           )
         }
         // <FileItemWrapper >
@@ -230,21 +244,24 @@ const ProgressWrapper = styled.span`
 
 const FileIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: inline-flex;
-
   & > svg {
     width: 40px;
     height: 40px;
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const FileHoverIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: none;
   & > svg {
-    color: ${(props) => props.iconColor};
     width: 40px;
     height: 40px;
-    fill: ${(props) => props.fillColor};
+    color: ${(props) => props.iconColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const FileThumb = styled.img`
@@ -254,6 +271,7 @@ const FileThumb = styled.img`
   border-radius: 8px;
   object-fit: cover;
 `
+
 const FileItem = styled.div<{ hoverBackgroundColor: string }>`
   position: relative;
   padding: 11px 16px;

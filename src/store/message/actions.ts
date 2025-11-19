@@ -16,9 +16,16 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS
+  GET_MESSAGE_MARKERS,
+  DELETE_POLL_VOTE,
+  CLOSE_POLL,
+  ADD_POLL_VOTE,
+  RETRACT_POLL_VOTE,
+  GET_POLL_VOTES,
+  LOAD_MORE_POLL_VOTES,
+  RESEND_PENDING_POLL_ACTIONS
 } from './constants'
-import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IReaction } from '../../types'
+import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
   addMessage,
   deleteMessageFromList,
@@ -26,6 +33,7 @@ import {
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
+  setUnreadScrollTo,
   setMessages,
   addMessages,
   updateMessagesStatus,
@@ -65,26 +73,51 @@ import {
   updateOGMetadata,
   setMessageMarkers,
   setMessagesMarkersLoadingState,
-  updateMessagesMarkers
+  updateMessagesMarkers,
+  setPollVotesList,
+  addPollVotesToList,
+  setPollVotesLoadingState,
+  deletePollVotesFromList,
+  setPollVotesInitialCount,
+  removePendingPollAction,
+  setPendingPollActionsMap,
+  setPendingMessage,
+  removePendingMessage,
+  updatePendingMessage,
+  clearPendingMessagesMap
 } from './reducers'
+import { PendingPollAction } from 'helpers/messagesHalper'
 
 export function sendMessageAC(
   message: any,
   channelId: string,
   connectionState: string,
   sendAttachmentsAsSeparateMessage?: boolean,
-  isResend?: boolean
+  isResend?: boolean,
+  isAddToPendingMessagesMap: boolean = true
 ) {
   return {
     type: SEND_MESSAGE,
-    payload: { message, channelId, connectionState, sendAttachmentsAsSeparateMessage, isResend }
+    payload: {
+      message,
+      channelId,
+      connectionState,
+      sendAttachmentsAsSeparateMessage,
+      isResend,
+      isAddToPendingMessagesMap
+    }
   }
 }
 
-export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
+export function sendTextMessageAC(
+  message: any,
+  channelId: string,
+  connectionState: string,
+  isAddToPendingMessagesMap: boolean = true
+) {
   return {
     type: SEND_TEXT_MESSAGE,
-    payload: { message, channelId, connectionState }
+    payload: { message, channelId, connectionState, isAddToPendingMessagesMap }
   }
 }
 
@@ -95,10 +128,16 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
-export function forwardMessageAC(message: any, channelId: string, connectionState: string) {
+export function forwardMessageAC(
+  message: any,
+  channelId: string,
+  connectionState: string,
+  isForward: boolean = true,
+  isAddToPendingMessagesMap: boolean = true
+) {
   return {
     type: FORWARD_MESSAGE,
-    payload: { message, channelId, connectionState }
+    payload: { message, channelId, connectionState, isForward, isAddToPendingMessagesMap }
   }
 }
 
@@ -280,6 +319,10 @@ export function showScrollToNewMessageButtonAC(state: boolean) {
   return setShowScrollToNewMessageButton({ state })
 }
 
+export function setUnreadScrollToAC(state: boolean) {
+  return setUnreadScrollTo({ state })
+}
+
 export function loadMoreMessagesAC(
   channelId: string,
   limit: number,
@@ -313,8 +356,17 @@ export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string)
   return updateMessageAttachment({ url, attachmentUrl })
 }
 
-export function updateMessageAC(messageId: string, params: any, addIfNotExists?: boolean) {
-  return updateMessage({ messageId, params, addIfNotExists })
+export function updateMessageAC(
+  messageId: string,
+  params: any,
+  addIfNotExists?: boolean,
+  voteDetails?: {
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+    vote?: IPollVote
+    incrementVotesPerOptionCount: number
+  }
+) {
+  return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
 export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }) {
@@ -438,4 +490,115 @@ export function updateMessagesMarkersAC(channelId: string, deliveryStatus: strin
 
 export function setMessagesMarkersLoadingStateAC(state: number) {
   return setMessagesMarkersLoadingState({ state })
+}
+
+export function addPollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  isResend?: boolean
+) {
+  return {
+    type: ADD_POLL_VOTE,
+    payload: { channelId, pollId, optionId, message, isResend }
+  }
+}
+
+export function deletePollVoteAC(
+  channelId: string,
+  pollId: string,
+  optionId: string,
+  message: IMessage,
+  isResend?: boolean
+) {
+  return {
+    type: DELETE_POLL_VOTE,
+    payload: { channelId, pollId, optionId, message, isResend }
+  }
+}
+
+export function closePollAC(channelId: string, pollId: string, message: IMessage) {
+  return {
+    type: CLOSE_POLL,
+    payload: { channelId, pollId, message }
+  }
+}
+
+export function retractPollVoteAC(channelId: string, pollId: string, message: IMessage, isResend?: boolean) {
+  return {
+    type: RETRACT_POLL_VOTE,
+    payload: { channelId, pollId, message, isResend }
+  }
+}
+
+export function resendPendingPollActionsAC(connectionState: string) {
+  return {
+    type: RESEND_PENDING_POLL_ACTIONS,
+    payload: { connectionState }
+  }
+}
+
+export function getPollVotesAC(messageId: string | number, pollId: string, optionId: string, limit?: number) {
+  return {
+    type: GET_POLL_VOTES,
+    payload: { messageId, pollId, optionId, limit }
+  }
+}
+
+export function loadMorePollVotesAC(pollId: string, optionId: string, limit?: number) {
+  return {
+    type: LOAD_MORE_POLL_VOTES,
+    payload: { pollId, optionId, limit }
+  }
+}
+
+export function setPollVotesListAC(pollId: string, optionId: string, votes: IPollVote[], hasNext: boolean) {
+  return setPollVotesList({ pollId, optionId, votes, hasNext })
+}
+
+export function addPollVotesToListAC(
+  pollId: string,
+  optionId: string,
+  votes: IPollVote[],
+  hasNext: boolean,
+  previousVotes?: IPollVote[]
+) {
+  return addPollVotesToList({ pollId, optionId, votes, hasNext, previousVotes })
+}
+
+export function deletePollVotesFromListAC(pollId: string, optionId: string, votes: IPollVote[], messageId: string) {
+  return deletePollVotesFromList({ pollId, optionId, votes, messageId })
+}
+
+export function setPollVotesLoadingStateAC(pollId: string, optionId: string, loadingState: number | null) {
+  return setPollVotesLoadingState({ pollId, optionId, loadingState })
+}
+
+export function setPollVotesInitialCountAC(initialCount: number) {
+  return setPollVotesInitialCount({ initialCount })
+}
+
+export function removePendingPollActionAC(messageId: string, actionType: string, optionId?: string) {
+  return removePendingPollAction({ messageId, actionType, optionId })
+}
+
+export function setPendingPollActionsMapAC(messageId: string, event: PendingPollAction) {
+  return setPendingPollActionsMap({ messageId, event })
+}
+
+export function setPendingMessageAC(channelId: string, message: IMessage) {
+  return setPendingMessage({ channelId, message })
+}
+
+export function removePendingMessageAC(channelId: string, messageId: string) {
+  return removePendingMessage({ channelId, messageId })
+}
+
+export function updatePendingMessageAC(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
+  return updatePendingMessage({ channelId, messageId, updatedMessage })
+}
+
+export function clearPendingMessagesMapAC() {
+  return clearPendingMessagesMap()
 }

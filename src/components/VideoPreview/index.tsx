@@ -7,7 +7,7 @@ import { IAttachment } from '../../types'
 // import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
 import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
-import { base64ToToDataURL } from '../../helpers/resizeImage'
+import { base64ToDataURL } from '../../helpers/resizeImage'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 // import { CircularProgressbar } from 'react-circular-progressbar'
@@ -68,7 +68,7 @@ const VideoPreview = memo(function VideoPreview({
 
   if (file.metadata && file.metadata.tmb) {
     if (file.metadata.tmb.length < 70) {
-      attachmentThumb = base64ToToDataURL(file.metadata.tmb)
+      attachmentThumb = base64ToDataURL(file.metadata.tmb)
       withPrefix = false
     } else {
       attachmentThumb = file.metadata && file.metadata.tmb
@@ -244,7 +244,7 @@ const VideoPreview = memo(function VideoPreview({
           isLoaded={!loading}
         />
       )} */}
-      {videoCurrentTime && !isRepliedMessage && (
+      {videoCurrentTime && !isRepliedMessage && (!isDetailsView || !loading) && (
         <VideoControls>
           {!isPreview && !!videoCurrentTime && !isRepliedMessage && !uploading && !isDetailsView && (
             // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>

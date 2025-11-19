@@ -17,6 +17,7 @@ import { getClient } from '../../../common/client'
 import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
 import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
 import { scrollToNewMessageSelector } from 'store/message/selector'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -108,9 +109,12 @@ const Message = ({
 
   return (
     <Container
+      id={message.id || message.tid}
       ref={messageItemRef}
       marginTop={differentUserMessageSpacing || '16px'}
-      marginBottom={nextMessage && nextMessage.type !== 'system' ? differentUserMessageSpacing || '16px' : ''}
+      marginBottom={
+        nextMessage && nextMessage.type !== MESSAGE_TYPE.SYSTEM ? differentUserMessageSpacing || '16px' : ''
+      }
       fontSize={fontSize}
       textColor={textColor || textOnPrimary}
       border={border}
@@ -158,7 +162,9 @@ const Message = ({
                   }`
                 : message.body === 'LG'
                   ? ' left the group'
-                  : ''}
+                  : message.body === 'JL'
+                    ? ` joined via invite link`
+                    : ''}
       </span>
     </Container>
   )

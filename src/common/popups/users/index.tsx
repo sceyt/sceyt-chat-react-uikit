@@ -33,11 +33,16 @@ import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { useDidUpdate, useColor } from '../../../hooks'
-import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
+import {
+  getChannelTypesMemberDisplayTextMap,
+  getDefaultRolesByChannelTypesMap,
+  getUseInviteLink
+} from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
 import log from 'loglevel'
+import AddMembersListItemInviteLink from '../inviteLink/AddMembersListItemInviteLink'
 
 interface ISelectedUserData {
   id: string
@@ -58,6 +63,7 @@ interface IProps {
   creatChannelSelectedMembers?: any[]
   popupWidth?: string
   popupHeight?: string
+  handleOpenInviteModal?: () => void
 }
 
 const UsersPopup = ({
@@ -69,7 +75,8 @@ const UsersPopup = ({
   creatChannelSelectedMembers,
   popupHeight,
   selectIsRequired,
-  popupWidth
+  popupWidth,
+  handleOpenInviteModal
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -293,6 +300,7 @@ const UsersPopup = ({
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
   }, [])
+
   return (
     <PopupContainer theme={theme}>
       <Popup
@@ -309,7 +317,7 @@ const UsersPopup = ({
           <CloseIcon color={textSecondary} onClick={handleClosePopup} />
 
           <PopupName color={textPrimary} padding='0 12px'>
-            {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
+            {actionType === 'createChat' ? 'Create a new chat' : popupTitleText}
           </PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg color={iconInactive} />
@@ -358,6 +366,9 @@ const UsersPopup = ({
             onMouseLeave={() => setIsScrolling(false)}
             thumbColor={surface2}
           >
+            {actionType === 'addMembers' && getUseInviteLink() && (
+              <AddMembersListItemInviteLink onClick={handleOpenInviteModal} />
+            )}
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
                 return null

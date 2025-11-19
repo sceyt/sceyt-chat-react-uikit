@@ -84,22 +84,53 @@ const MessageStatusIcon = ({
   }
 }
 
-const linkifyTextPart = (textPart: string, match: any) => {
+const linkifyTextPart = (
+  textPart: string,
+  match: any,
+  target: string = '_blank',
+  isInviteLink?: boolean,
+  onInviteLinkClick?: (key: string) => void
+) => {
   let newMessageText: any
   let prevMatchEnd = 0
   let lastFoundIndex = 0
+
   match.forEach((matchItem: any, index: number) => {
     const matchIndex = textPart.indexOf(matchItem.text, lastFoundIndex)
     lastFoundIndex = matchIndex + matchItem.text.length
     if (index === 0) {
       newMessageText = [
         textPart.substring(0, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a
+          draggable={false}
+          key={index}
+          href={isInviteLink ? undefined : matchItem.url}
+          target={target}
+          rel='noreferrer'
+          style={{ cursor: 'pointer' }}
+          {...(isInviteLink
+            ? {
+                onClick: () => {
+                  const splitedKey = matchItem.url.split('/')
+                  const key = splitedKey[splitedKey.length - 1]
+                  if (key) {
+                    onInviteLinkClick?.(key)
+                  }
+                }
+              }
+            : {})}
+        >{`${matchItem.text}`}</a>
       ]
     } else {
       newMessageText.push(
         textPart.substring(prevMatchEnd, matchIndex),
-        <a draggable={false} key={index} href={matchItem.url} target='_blank' rel='noreferrer'>{`${matchItem.text}`}</a>
+        <a
+          draggable={false}
+          key={index}
+          href={isInviteLink ? undefined : matchItem.url}
+          target={target}
+          rel='noreferrer'
+        >{`${matchItem.text}`}</a>
       )
     }
 
@@ -121,7 +152,11 @@ const MessageTextFormat = ({
   accentColor,
   textSecondary,
   onMentionNameClick,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  unsupportedMessage,
+  target = '_blank',
+  isInviteLink = false,
+  onInviteLinkClick
 }: {
   text: string
   message: any
@@ -133,11 +168,18 @@ const MessageTextFormat = ({
   textSecondary: string
   onMentionNameClick?: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  unsupportedMessage?: boolean
+  target?: string
+  isInviteLink?: boolean
+  onInviteLinkClick?: (key: string) => void
 }) => {
   try {
     let messageText: any = []
     const linkify = new LinkifyIt()
     const messageBodyAttributes = message.bodyAttributes && JSON.parse(JSON.stringify(message.bodyAttributes))
+    if (unsupportedMessage) {
+      return 'This message is not supported. Update your app to view this message.'
+    }
     if (message.body && messageBodyAttributes && messageBodyAttributes.length > 0) {
       const combinedAttributesList = combineMessageAttributes(messageBodyAttributes)
       const textPart = text
@@ -152,12 +194,12 @@ const MessageTextFormat = ({
           const firstPartMatch = firstPart ? linkify.match(firstPart) : ''
 
           if (!isLastMessage && !asSampleText && firstPartMatch) {
-            firstPart = linkifyTextPart(firstPart, firstPartMatch)
+            firstPart = linkifyTextPart(firstPart, firstPartMatch, target, isInviteLink, onInviteLinkClick)
           }
           let secondPart = `${textPart ? textPart?.substring(attributeOffset + attribute.length) : ''}`
           const secondPartMatch = secondPart ? linkify.match(secondPart) : ''
           if (!isLastMessage && !asSampleText && secondPartMatch) {
-            secondPart = linkifyTextPart(secondPart, secondPartMatch)
+            secondPart = linkifyTextPart(secondPart, secondPartMatch, target, isInviteLink, onInviteLinkClick)
           }
 
           if (attribute.type.includes('mention')) {
@@ -273,7 +315,7 @@ const MessageTextFormat = ({
       const match = linkify.match(text)
       if (!isLastMessage && !asSampleText && match) {
         // log.info('newMessageText ... . ', newMessageText)
-        messageText = linkifyTextPart(text, match)
+        messageText = linkifyTextPart(text, match, target, isInviteLink, onInviteLinkClick)
       }
     }
 

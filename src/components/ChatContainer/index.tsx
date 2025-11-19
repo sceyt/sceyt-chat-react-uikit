@@ -5,6 +5,13 @@ import store from '../../store'
 import SceytChat from '../SceytChat'
 import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
+
+import {
+  InviteLinkOptions,
+  setBaseUrlForInviteMembers,
+  setInviteLinkOptions,
+  setUseInviteLink
+} from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
   total: number
@@ -111,6 +118,10 @@ export interface IChatClientProps {
   memberCount?: number
   disableFrowardMentionsCount?: boolean
   chatMinWidth?: string
+  baseUrlForInviteMembers?: string
+  useInviteLink?: boolean
+  inviteLinkOptions?: InviteLinkOptions | null
+  embeddedJoinGroupPopup?: boolean
 }
 
 const SceytChatContainer = ({
@@ -134,10 +145,28 @@ const SceytChatContainer = ({
   logLevel = 'silent',
   memberCount,
   disableFrowardMentionsCount,
-  chatMinWidth
+  chatMinWidth,
+  baseUrlForInviteMembers,
+  useInviteLink = false,
+  inviteLinkOptions = {
+    ListItemInviteLink: {},
+    JoinGroupPopup: {},
+    InviteLinkModal: {},
+    ResetLinkConfirmModal: {}
+  },
+  embeddedJoinGroupPopup = false
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
+    if (baseUrlForInviteMembers) {
+      setBaseUrlForInviteMembers(baseUrlForInviteMembers)
+    }
+    if (useInviteLink) {
+      setUseInviteLink(useInviteLink)
+    }
+    if (inviteLinkOptions) {
+      setInviteLinkOptions(inviteLinkOptions)
+    }
   }, [])
 
   return (
@@ -163,6 +192,7 @@ const SceytChatContainer = ({
         memberCount={memberCount}
         disableFrowardMentionsCount={disableFrowardMentionsCount}
         chatMinWidth={chatMinWidth}
+        embeddedJoinGroupPopup={embeddedJoinGroupPopup}
       />
     </Provider>
   )
