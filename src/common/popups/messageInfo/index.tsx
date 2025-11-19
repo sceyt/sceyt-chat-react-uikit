@@ -103,6 +103,9 @@ const MessageInfo = ({
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
   const [ready, setReady] = useState<boolean>(false)
   const [flipLocked, setFlipLocked] = useState<boolean>(false)
+  const [verticalOffset, setVerticalOffset] = useState<number>(8)
+  const [transformY, setTransformY] = useState<number>(0)
+  const initializingRef = useRef<boolean>(true)
   const getFromContacts = useMemo(() => getShowOnlyContactUsers(), [])
 
   const activeMarkers = useMemo(() => {
@@ -176,24 +179,69 @@ const MessageInfo = ({
       const availableAbove = anchorRect.top - containerRect.top - 8
       const nextFlip = Boolean(flipTarget > availableBelow && flipTarget <= availableAbove)
       setFlipAbove(nextFlip)
+
+      // Calculate initial vertical offset and transform to keep popup within container boundaries
+      const offset = 8
+      let transform = 0
+
+      if (nextFlip) {
+        const naturalPopupBottom = anchorRect.top - offset
+        const naturalPopupTop = naturalPopupBottom - flipTarget
+        if (naturalPopupTop < containerRect.top) {
+          transform = containerRect.top - naturalPopupTop
+        } else if (naturalPopupBottom > containerRect.bottom) {
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+      } else {
+        const naturalPopupTop = anchorRect.bottom + offset
+        const naturalPopupBottom = naturalPopupTop + flipTarget
+        if (naturalPopupBottom > containerRect.bottom) {
+          transform = containerRect.bottom - naturalPopupBottom
+        } else if (naturalPopupTop < containerRect.top) {
+          transform = containerRect.top - naturalPopupTop
+        }
+      }
+
+      setVerticalOffset(offset)
+      setTransformY(transform)
     }
     setIsTransitioning(true)
     setOpen(true)
     setReady(true)
     setFlipLocked(true)
+    // Mark initialization as complete after a brief delay to allow DOM to settle
+    setTimeout(() => {
+      initializingRef.current = false
+    }, 150)
   }, [])
 
+  // Reset initialization flag when popup closes
   useEffect(() => {
+    if (!open) {
+      initializingRef.current = true
+    }
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !ready) return
+
     const onDown = (e: MouseEvent) => {
+      // Don't close during initialization phase
+      if (initializingRef.current) return
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         togglePopup()
       }
     }
-    document.addEventListener('mousedown', onDown)
+    // Add a small delay to prevent immediate closing on initial open
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', onDown)
+    }, 100)
+
     return () => {
+      clearTimeout(timeoutId)
       document.removeEventListener('mousedown', onDown)
     }
-  }, [])
+  }, [open, ready, togglePopup])
 
   // Recalculate dropdown position to keep it within #scrollableDiv
   useEffect(() => {
@@ -219,18 +267,71 @@ const MessageInfo = ({
       const availableAbove = anchorRect.top - containerRect.top - 8
       const overflowBelow = dropdownHeight > availableBelow
       const overflowAbove = dropdownHeight > availableAbove
+
+      let nextFlip = flipAbove
       if (!isTransitioning && !flipLocked) {
         setFlipAbove((prev) => {
           // If currently above, only switch to below when above overflows and below fits
           if (prev) {
-            if (overflowAbove && !overflowBelow) return false
+            if (overflowAbove && !overflowBelow) {
+              nextFlip = false
+              return false
+            }
+            nextFlip = true
             return true
           }
           // If currently below, only switch to above when below overflows and above fits
-          if (overflowBelow && !overflowAbove) return true
+          if (overflowBelow && !overflowAbove) {
+            nextFlip = true
+            return true
+          }
+          nextFlip = false
           return false
         })
+      } else {
+        nextFlip = flipAbove
       }
+
+      // Calculate vertical offset and transform to keep popup within container boundaries
+      const offset = 8
+      let transform = 0
+
+      if (nextFlip) {
+        // When flipped above: bottom = calc(100% + offset) means popup bottom is at anchor top - offset
+        // Calculate where popup would naturally be positioned
+        const naturalPopupBottom = anchorRect.top - offset
+        const naturalPopupTop = naturalPopupBottom - dropdownHeight
+
+        // Check if popup would overflow container top
+        if (naturalPopupTop < containerRect.top) {
+          // Shift popup down so its top aligns with container top
+          transform = containerRect.top - naturalPopupTop
+        }
+        // Check if popup would overflow container bottom (unlikely when above, but check anyway)
+        else if (naturalPopupBottom > containerRect.bottom) {
+          // Shift popup up so its bottom aligns with container bottom
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+      } else {
+        // When below: top = calc(100% + offset) means popup top is at anchor bottom + offset
+        // Calculate where popup would naturally be positioned
+        const naturalPopupTop = anchorRect.bottom + offset
+        const naturalPopupBottom = naturalPopupTop + dropdownHeight
+
+        // Check if popup would overflow container bottom
+        if (naturalPopupBottom > containerRect.bottom) {
+          // Shift popup up so its bottom aligns with container bottom
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+        // Check if popup would overflow container top (unlikely when below, but check anyway)
+        else if (naturalPopupTop < containerRect.top) {
+          // Shift popup down so its top aligns with container top
+          transform = containerRect.top - naturalPopupTop
+        }
+      }
+
+      setVerticalOffset(offset)
+      setTransformY(transform)
     }
 
     if (open) {
@@ -261,7 +362,17 @@ const MessageInfo = ({
         window.removeEventListener('resize', recalc)
       }
     }
-  }, [open, ready, message.id, panelHeightPx, isTransitioning, flipLocked, height])
+  }, [
+    open,
+    ready,
+    message.id,
+    panelHeightPx,
+    isTransitioning,
+    flipLocked,
+    height,
+    flipAbove,
+    messagesMarkersLoadingState
+  ])
 
   // Measure content on relevant changes and animate height; decide flip before animating (layout phase)
   useLayoutEffect(() => {
@@ -290,24 +401,58 @@ const MessageInfo = ({
     const availableAbove = anchorRect.top - containerRect.top - 8
     // Lock flip during this update; set correct flip before painting
     setFlipLocked(true)
+    let currentFlip = flipAbove
     if (messagesMarkersLoadingState !== LOADING_STATE.LOADING) {
       const overflowBelow = nextHeight > availableBelow
       const overflowAbove = nextHeight > availableAbove
       setFlipAbove((prev) => {
         if (prev) {
-          if (overflowAbove && !overflowBelow) return false
+          if (overflowAbove && !overflowBelow) {
+            currentFlip = false
+            return false
+          }
+          currentFlip = true
           return true
         }
-        if (overflowBelow && !overflowAbove) return true
+        if (overflowBelow && !overflowAbove) {
+          currentFlip = true
+          return true
+        }
+        currentFlip = false
         return false
       })
     }
+
+    // Calculate vertical offset and transform to keep popup within container boundaries
+    const offset = 8
+    let transform = 0
+
+    if (currentFlip) {
+      const naturalPopupBottom = anchorRect.top - offset
+      const naturalPopupTop = naturalPopupBottom - nextHeight
+      if (naturalPopupTop < containerRect.top) {
+        transform = containerRect.top - naturalPopupTop
+      } else if (naturalPopupBottom > containerRect.bottom) {
+        transform = containerRect.bottom - naturalPopupBottom
+      }
+    } else {
+      const naturalPopupTop = anchorRect.bottom + offset
+      const naturalPopupBottom = naturalPopupTop + nextHeight
+      if (naturalPopupBottom > containerRect.bottom) {
+        transform = containerRect.bottom - naturalPopupBottom
+      } else if (naturalPopupTop < containerRect.top) {
+        transform = containerRect.top - naturalPopupTop
+      }
+    }
+
+    setVerticalOffset(offset)
+    setTransformY(transform)
 
     if (panelHeightPx !== nextHeight) {
       setIsTransitioning(true)
       setPanelHeightPx(nextHeight)
     }
-  }, [ready, panelHeightPx, activeMarkers.length, messagesMarkersLoadingState, height])
+  }, [ready, panelHeightPx, activeMarkers.length, messagesMarkersLoadingState, height, flipAbove])
 
   // Lock flip while loading; unlock after load completes (transition end handler will also unlock if needed)
   useEffect(() => {
@@ -341,6 +486,10 @@ const MessageInfo = ({
     }
   }, [activeTab, message.id, message.channelId])
 
+  if ((messagesMarkersLoadingState === LOADING_STATE.LOADING || messagesMarkersLoadingState == null) && !markers) {
+    return null
+  }
+
   return (
     <DropdownRoot
       ref={rootRef}
@@ -348,6 +497,8 @@ const MessageInfo = ({
       backgroundColor={backgroundSections}
       flip={flipAbove}
       ready={ready}
+      verticalOffset={verticalOffset}
+      transformY={transformY}
     >
       <Panel
         ref={panelRef}
@@ -496,11 +647,19 @@ const Empty = styled.div<{ color: string }>`
   overflow: hidden;
 `
 
-const DropdownRoot = styled.div<{ rtl: boolean; backgroundColor: string; flip: boolean; ready: boolean }>`
+const DropdownRoot = styled.div<{
+  rtl: boolean
+  backgroundColor: string
+  flip: boolean
+  ready: boolean
+  verticalOffset: number
+  transformY: number
+}>`
   position: absolute;
-  top: ${(p) => (p.flip ? 'auto' : 'calc(100% + 8px)')};
-  bottom: ${(p) => (p.flip ? 'calc(100% + 8px)' : 'auto')};
+  top: ${(p) => (p.flip ? 'auto' : `calc(100% + ${p.verticalOffset}px)`)};
+  bottom: ${(p) => (p.flip ? `calc(100% + ${p.verticalOffset}px)` : 'auto')};
   ${(p) => (p.rtl ? 'left: 4%;' : 'right: 4%;')}
+  transform: ${(p) => (p.transformY !== 0 ? `translateY(${p.transformY}px)` : 'none')};
   z-index: 15;
   background: ${({ backgroundColor }) => backgroundColor};
   box-shadow: 0px 0px 24px 0px #11153929;

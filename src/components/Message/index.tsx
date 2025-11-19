@@ -519,6 +519,12 @@ const Message = ({
     }
   }, [isVisible, unreadScrollTo])
 
+  useEffect(() => {
+    if (!isVisible && infoPopupOpen) {
+      setInfoPopupOpen(false)
+    }
+  }, [isVisible, infoPopupOpen])
+
   useDidUpdate(() => {
     if (tabIsActive) {
       handleSendReadMarker()
