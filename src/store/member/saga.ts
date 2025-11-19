@@ -8,7 +8,12 @@ import {
   getRolesFailAC,
   getRolesSuccessAC
 } from './actions'
-import { getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
+import {
+  getChannelFromMap,
+  getDisableFrowardMentionsCount,
+  query,
+  updateChannelOnAllChannels
+} from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 
 import {
@@ -103,7 +108,7 @@ function* addMembers(action: IAction): any {
         const messageToSend: any = {
           metadata: { m: membersIds },
           body: 'AM',
-          mentionedUsers: addedMembers,
+          mentionedUsers: getDisableFrowardMentionsCount() ? [] : addedMembers,
           attachments: [],
           type: 'system'
         }
