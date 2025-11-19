@@ -20,11 +20,6 @@ const validateUrl = (url: string) => {
   }
 }
 
-const isDescriptionOnlySymbol = (description: string | undefined): boolean => {
-  const trimmed = description?.trim()
-  return !!trimmed && !/[a-zA-Z0-9]/.test(trimmed)
-}
-
 const OGMetadata = ({
   attachments,
   state,
@@ -247,7 +242,7 @@ const OGMetadata = ({
         {
           key: 'title',
           order: resolvedOrder?.title ?? 2,
-          render: ogShowTitle && metadata?.og?.title && !isDescriptionOnlySymbol(metadata?.og?.description) && (
+          render: ogShowTitle && metadata?.og?.title && (
             <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding} color={textPrimary}>
               <span>{metadata?.og?.title?.trim()}</span>
             </Title>
@@ -256,13 +251,11 @@ const OGMetadata = ({
         {
           key: 'description',
           order: resolvedOrder?.description ?? 3,
-          render: ogShowDescription &&
-            metadata?.og?.description &&
-            !isDescriptionOnlySymbol(metadata?.og?.description) && (
-              <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
-                {metadata?.og?.description?.trim()}
-              </Desc>
-            )
+          render: ogShowDescription && metadata?.og?.description && (
+            <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
+              {metadata?.og?.description?.trim()}
+            </Desc>
+          )
         },
         {
           key: 'link',
@@ -291,7 +284,6 @@ const OGMetadata = ({
       ogShowDescription,
       metadata?.og?.description,
       textSecondary,
-      textPrimary,
       ogShowUrl,
       ogUrl
     ]
@@ -475,7 +467,7 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
   ${sharedKeyframes}
   // font-family: Inter;
-  font-weight: bold;
+  font-weight: 500;
   font-size: 14px;
   line-height: 18px;
   letter-spacing: 0px;
