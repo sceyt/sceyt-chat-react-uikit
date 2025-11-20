@@ -64,6 +64,13 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
   const handleViewResults = () => setShowResults(true)
 
+  const handleResultsClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isHaveResults) {
+      handleViewResults()
+    }
+  }
+
   return (
     <Container>
       <Question color={textPrimary}>{poll.name}</Question>
@@ -106,22 +113,27 @@ const PollMessage = ({ message }: PollMessageProps) => {
                 )}
                 <Title color={textPrimary}>{opt.name}</Title>
                 {poll.anonymous ? null : (
-                  <UsersContainer>
+                  <UsersContainer onClick={handleResultsClick}>
                     {optionVotesUsers.map((vote: IPollVote) => (
-                      <Avatar
-                        key={vote?.user?.id}
-                        image={vote?.user?.profile?.avatar}
-                        name={vote?.user?.profile?.firstName}
-                        size={18}
-                        textSize={12}
-                        setDefaultAvatar
-                        marginAuto='0 0 0 -10px'
-                        border={`2px solid ${message.incoming ? incomingMessageBackground : outgoingMessageBackground}`}
-                      />
+                      <AvatarWrapper key={vote?.user?.id}>
+                        <Avatar
+                          image={vote?.user?.profile?.avatar}
+                          name={vote?.user?.profile?.firstName}
+                          size={18}
+                          textSize={12}
+                          setDefaultAvatar
+                          marginAuto='0 0 0 -10px'
+                          border={`2px solid ${
+                            message.incoming ? incomingMessageBackground : outgoingMessageBackground
+                          }`}
+                        />
+                      </AvatarWrapper>
                     ))}
                   </UsersContainer>
                 )}
-                <Votes color={textPrimary}>{votes}</Votes>
+                <Votes color={textPrimary} onClick={!poll.anonymous ? handleResultsClick : undefined}>
+                  {votes}
+                </Votes>
               </TopRow>
               <Bar track={borderSecondary} closed={poll.closed}>
                 <Fill style={{ width: `${pct}%`, background: accent }} />
@@ -238,13 +250,14 @@ const Title = styled.div<{ color: string }>`
   word-break: break-word;
 `
 
-const Votes = styled.span<{ color: string }>`
+const Votes = styled.span<{ color: string; onClick?: (e: React.MouseEvent) => void }>`
   color: ${(p) => p.color};
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
   letter-spacing: -0.2px;
   margin-left: 4px;
+  cursor: ${(p) => (p.onClick ? 'pointer' : 'default')};
 `
 
 const Bar = styled.div<{ track: string; closed?: boolean }>`
@@ -268,4 +281,12 @@ const UsersContainer = styled.div`
   margin-left: auto;
   padding-left: 16px;
   height: max-content;
+  cursor: pointer;
+`
+
+const AvatarWrapper = styled.div`
+  margin-left: -10px;
+  &:first-child {
+    margin-left: 0;
+  }
 `
