@@ -13,7 +13,7 @@ import {
   watchForEventsAC
 } from '../../store/channel/actions'
 import { channelListWidthSelector, isDraggingSelector, joinableChannelSelector } from '../../store/channel/selector'
-import { contactsMapSelector } from '../../store/user/selector'
+import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { getRolesFailSelector } from '../../store/member/selector'
 // Hooks
@@ -53,6 +53,7 @@ import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
 import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 const SceytChat = ({
   client,
@@ -87,8 +88,8 @@ const SceytChat = ({
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
   const joinableChannel = useSelector(joinableChannelSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const [tabIsActive, setTabIsActive] = useState(true)
-
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -149,10 +150,6 @@ const SceytChat = ({
 
       dispatch(watchForEventsAC())
       dispatch(setConnectionStatusAC(client.connectionState))
-      if (showOnlyContactUsers) {
-        dispatch(getContactsAC())
-      }
-      dispatch(getRolesAC())
     } else {
       clearMessagesMap()
       removeAllMessages()
@@ -168,6 +165,15 @@ const SceytChat = ({
       setTabIsActive(true)
     }
   }, [client])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (showOnlyContactUsers) {
+        dispatch(getContactsAC())
+      }
+      dispatch(getRolesAC())
+    }
+  }, [connectionStatus, showOnlyContactUsers])
 
   const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }

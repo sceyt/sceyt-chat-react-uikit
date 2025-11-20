@@ -249,6 +249,9 @@ function* getChannels(action: IAction): any {
     const { payload } = action
     const { params } = payload
     const SceytChatClient = getClient()
+    if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     const channelTypesFilter = getChannelTypesFilter()

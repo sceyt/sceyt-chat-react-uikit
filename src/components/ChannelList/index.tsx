@@ -409,12 +409,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      if (!activeChannel?.mentionsIds && activeChannel?.id) {
+      if (!activeChannel?.mentionsIds && activeChannel?.id && connectionStatus === CONNECTION_STATUS.CONNECTED) {
         dispatch(getChannelMentionsAC(activeChannel.id))
       }
       getSelectedChannel(activeChannel)
     }
-  }, [activeChannel, activeChannel?.members, activeChannel?.members?.length, activeChannel?.id])
+  }, [activeChannel, activeChannel?.members, activeChannel?.members?.length, activeChannel?.id, connectionStatus])
 
   useDidUpdate(() => {
     if (closeSearchChannels) {
@@ -441,14 +441,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     } else {
       setListWidthIsSet(false)
     }
-    // log.info('channels. ...........................', channels)
   }, [channels])
-
-  /* useEffect(() => {
-    if (contactsMap) {
-      log.info('contactsMap.>>>...', contactsMap)
-    }
-  }, [contactsMap]) */
 
   const setSelectedChannel = (channel: IChannel) => {
     if (activeChannel.id !== channel.id) {
