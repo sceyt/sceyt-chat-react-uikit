@@ -82,11 +82,7 @@ const OGMetadata = ({
   }, [attachments])
 
   const metadata = useMemo(() => {
-    const metadata = oGMetadata?.[attachment?.url] || null
-    if (metadata?.og?.title && metadata?.og?.description) {
-      return metadata
-    }
-    return null
+    return oGMetadata?.[attachment?.url] || null
   }, [oGMetadata, attachment?.url])
 
   const [imageLoadError, setImageLoadError] = useState(false)
@@ -178,7 +174,20 @@ const OGMetadata = ({
     return url
   }, [attachment])
 
+  const shouldShowTitle = useMemo(() => {
+    return ogShowTitle && metadata?.og?.title && !isDescriptionOnlySymbol(metadata?.og?.description)
+  }, [ogShowTitle, metadata?.og?.title, metadata?.og?.description])
+
+  const shouldShowDescription = useMemo(() => {
+    return ogShowDescription && metadata?.og?.description && !isDescriptionOnlySymbol(metadata?.og?.description)
+  }, [ogShowDescription, metadata?.og?.description])
+
   const showOGMetadata = useMemo(() => {
+    const descriptionIsSymbol = isDescriptionOnlySymbol(metadata?.og?.description)
+    if (descriptionIsSymbol && !shouldShowTitle && !shouldShowDescription) {
+      return false
+    }
+
     return (
       state !== 'deleted' &&
       (metadata?.og?.title ||
@@ -187,7 +196,7 @@ const OGMetadata = ({
         metadata?.og?.favicon?.url) &&
       metadata
     )
-  }, [state, metadata])
+  }, [state, metadata, shouldShowTitle, shouldShowDescription])
 
   const calculatedImageHeight = useMemo(() => {
     if (!metadata?.imageWidth || !metadata?.imageHeight) {
@@ -215,13 +224,13 @@ const OGMetadata = ({
 
   useEffect(() => {
     if (metadataLoaded || oGMetadata?.[attachment?.url]) {
-      if (oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
+      if (showOGMetadata && oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
         metadataGetSuccessCallback(attachment?.url, true, showImage, metadata)
       } else {
         metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
     }
-  }, [metadataLoaded, oGMetadata, attachment?.url, metadata])
+  }, [metadataLoaded, oGMetadata, attachment?.url, metadata, showOGMetadata, showImage, metadataGetSuccessCallback])
 
   const elements = useMemo(
     () =>
@@ -247,7 +256,7 @@ const OGMetadata = ({
         {
           key: 'title',
           order: resolvedOrder?.title ?? 2,
-          render: ogShowTitle && metadata?.og?.title && !isDescriptionOnlySymbol(metadata?.og?.description) && (
+          render: shouldShowTitle && (
             <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding} color={textPrimary}>
               <span>{metadata?.og?.title?.trim()}</span>
             </Title>
@@ -256,13 +265,11 @@ const OGMetadata = ({
         {
           key: 'description',
           order: resolvedOrder?.description ?? 3,
-          render: ogShowDescription &&
-            metadata?.og?.description &&
-            !isDescriptionOnlySymbol(metadata?.og?.description) && (
-              <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
-                {metadata?.og?.description?.trim()}
-              </Desc>
-            )
+          render: shouldShowDescription && (
+            <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
+              {metadata?.og?.description?.trim()}
+            </Desc>
+          )
         },
         {
           key: 'link',
@@ -285,10 +292,10 @@ const OGMetadata = ({
       maxHeight,
       metadata?.og?.image,
       shouldAnimate,
-      ogShowTitle,
+      shouldShowTitle,
       metadata?.og?.title,
       infoPadding,
-      ogShowDescription,
+      shouldShowDescription,
       metadata?.og?.description,
       textSecondary,
       ogShowUrl,
@@ -337,6 +344,11 @@ const OGMetadata = ({
       dispatch(getChannelByInviteKeyAC(key))
     }
   }, [attachment?.url])
+
+  // If we shouldn't show OG metadata, return null to render as default message
+  if (!showOGMetadata) {
+    return null
+  }
 
   return (
     <OGMetadataContainer
