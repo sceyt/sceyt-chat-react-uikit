@@ -183,14 +183,11 @@ const EditChannel = ({
       src: {},
       url: ''
     })
-    // Optimistically update the channel data immediately for instant UI update
     dispatch(updateChannelDataAC(channel.id, { avatarUrl: '' }))
     updateChannelOnAllChannels(channel.id, { avatarUrl: '' })
-    // Clear cached avatar if it exists
     if (oldAvatarUrl) {
       removeAttachmentFromCache(oldAvatarUrl)
     }
-    // Update channel via API
     handleUpdateChannel({ avatarUrl: '' })
   }
 
