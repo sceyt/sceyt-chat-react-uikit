@@ -33,6 +33,7 @@ import { sendTextMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
 import log from 'loglevel'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from './helpers'
+import store from 'store'
 
 function* getMembers(action: IAction): any {
   try {
@@ -229,6 +230,9 @@ function* getRoles(action: IAction): any {
   } = action
   try {
     const SceytChatClient = getClient()
+    if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
     const roles = yield call(SceytChatClient.getRoles)
     yield put(getRolesSuccessAC(roles))
     yield put(getRolesFailAC())

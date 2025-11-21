@@ -85,7 +85,6 @@ import {
   sendMessageAC,
   sendTextMessageAC,
   forwardMessageAC,
-  resendMessageAC,
   resendPendingPollActionsAC
 } from './actions'
 import {
@@ -978,7 +977,6 @@ function* editMessage(action: IAction): any {
 }
 
 function* getMessagesQuery(action: IAction): any {
-  console.log('getMessagesQuery')
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior } =
@@ -1224,7 +1222,7 @@ function* getMessagesQuery(action: IAction): any {
         const pendingMessagesMap = getPendingMessagesMap()
         for (const channelId in pendingMessagesMap) {
           for (const msg of pendingMessagesMap[channelId]) {
-            yield put(resendMessageAC(msg, channelId, connectionState))
+            yield call(sendMessage, { type: RESEND_MESSAGE, payload: { message: msg, connectionState, channelId } })
           }
         }
 
