@@ -20,7 +20,9 @@ const validateUrl = (url: string) => {
   }
 }
 
-const isDescriptionOnlySymbol = (description: string | undefined): boolean => {
+export const isDescriptionOnlySymbol = (description: string | undefined): boolean => {
+  if (!description) return true
+
   const trimmed = description?.trim()
   return !!trimmed && !/[a-zA-Z0-9]/.test(trimmed)
 }
@@ -184,7 +186,7 @@ const OGMetadata = ({
 
   const showOGMetadata = useMemo(() => {
     const descriptionIsSymbol = isDescriptionOnlySymbol(metadata?.og?.description)
-    if (descriptionIsSymbol && !shouldShowTitle && !shouldShowDescription) {
+    if (descriptionIsSymbol) {
       return false
     }
 
