@@ -169,6 +169,7 @@ export default function ChatHeader({
         <AvatarWrapper>
           {(activeChannel.subject || (isDirectChannel && (directChannelUser || isSelfChannel))) && (
             <Avatar
+              key={`avatar-header-${activeChannel.id}-${activeChannel.avatarUrl || 'no-avatar'}`}
               borderRadius={avatarBorderRadius}
               name={
                 activeChannel.subject ||

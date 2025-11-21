@@ -66,7 +66,7 @@ const Avatar: React.FC<IProps> = ({
 
   useEffect(() => {
     let isCancelled = false
-    if (!image) {
+    if (!image || image === '') {
       setResolvedImageSrc(null)
       return
     }

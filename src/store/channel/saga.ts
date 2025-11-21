@@ -1160,16 +1160,17 @@ function* updateChannel(action: IAction): any {
       paramsToUpdate.avatarUrl = ''
     }
     const { subject, avatarUrl, metadata } = yield call(channel.update, paramsToUpdate)
+    const finalAvatarUrl = config.avatarUrl === '' ? '' : avatarUrl
     yield put(
       updateChannelDataAC(channelId, {
         subject,
-        avatarUrl,
+        avatarUrl: finalAvatarUrl,
         metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
       })
     )
     updateChannelOnAllChannels(channelId, {
       subject,
-      avatarUrl,
+      avatarUrl: finalAvatarUrl,
       metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
     })
   } catch (e) {

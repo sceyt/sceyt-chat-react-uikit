@@ -335,6 +335,7 @@ const Details = ({
         <DetailsHeader borderColor={bordersColor || borderThemeColor} ref={detailsHeaderRef}>
           <ChannelAvatarAndName direction={avatarAndNameDirection}>
             <Avatar
+              key={`avatar-details-${activeChannel?.id || ''}-${activeChannel?.avatarUrl || 'no-avatar'}`}
               image={
                 (activeChannel && activeChannel.avatarUrl) ||
                 (directChannelUser && directChannelUser.avatarUrl) ||

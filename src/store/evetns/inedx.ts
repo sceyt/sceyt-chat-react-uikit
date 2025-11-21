@@ -710,11 +710,16 @@ export default function* watchForEvents(): any {
           const { updatedChannel } = args
           const channelExists = checkChannelExists(updatedChannel.id)
           const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
+          const currentChannel = channelExists
+            ? getChannelFromMap(updatedChannel.id)
+            : getChannelFromAllChannels(updatedChannel.id)
+          const finalAvatarUrl = currentChannel?.avatarUrl === '' ? '' : avatarUrl
+
           if (channelExists) {
             yield put(
               updateChannelDataAC(updatedChannel.id, {
                 subject,
-                avatarUrl,
+                avatarUrl: finalAvatarUrl,
                 muted,
                 mutedTill
               })
@@ -723,16 +728,26 @@ export default function* watchForEvents(): any {
             const activeChannelId = yield call(getActiveChannelId)
             if (activeChannelId === updatedChannel.id) {
               yield put(
-                setActiveChannelAC({ ...updatedChannel, metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata })
+                setActiveChannelAC({
+                  ...updatedChannel,
+                  avatarUrl: finalAvatarUrl,
+                  metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
+                })
               )
             }
           }
 
           const groupName = getChannelGroupName(updatedChannel)
-          yield put(updateSearchedChannelDataAC(updatedChannel.id, { subject, avatarUrl, muted, mutedTill }, groupName))
+          yield put(
+            updateSearchedChannelDataAC(
+              updatedChannel.id,
+              { subject, avatarUrl: finalAvatarUrl, muted, mutedTill },
+              groupName
+            )
+          )
           updateChannelOnAllChannels(updatedChannel.id, {
             subject,
-            avatarUrl,
+            avatarUrl: finalAvatarUrl,
             muted,
             mutedTill,
             metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata

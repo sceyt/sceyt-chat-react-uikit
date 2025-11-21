@@ -2,7 +2,7 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import { updateChannelAC } from '../../../store/channel/actions'
+import { updateChannelAC, updateChannelDataAC } from '../../../store/channel/actions'
 import { channelEditModeSelector } from '../../../store/channel/selector'
 // Hooks
 import { useDidUpdate, useStateComplex, useColor } from '../../../hooks'
@@ -12,7 +12,8 @@ import { ReactComponent as PictureIcon } from '../../../assets/svg/picture.svg'
 import { ReactComponent as DeleteIcon } from '../../../assets/svg/deleteChannel.svg'
 // Helpers
 import { resizeImage } from '../../../helpers/resizeImage'
-import { getUploadImageIcon } from '../../../helpers/channelHalper'
+import { getUploadImageIcon, updateChannelOnAllChannels } from '../../../helpers/channelHalper'
+import { removeAttachmentFromCache } from '../../../helpers/attachmentsCache'
 import {
   Button,
   ButtonBlock,
@@ -177,10 +178,19 @@ const EditChannel = ({
   }
 
   const handleRemoveAvatar = () => {
+    const oldAvatarUrl = channel.avatarUrl
     setNewAvatar({
       src: {},
       url: ''
     })
+    // Optimistically update the channel data immediately for instant UI update
+    dispatch(updateChannelDataAC(channel.id, { avatarUrl: '' }))
+    updateChannelOnAllChannels(channel.id, { avatarUrl: '' })
+    // Clear cached avatar if it exists
+    if (oldAvatarUrl) {
+      removeAttachmentFromCache(oldAvatarUrl)
+    }
+    // Update channel via API
     handleUpdateChannel({ avatarUrl: '' })
   }
 

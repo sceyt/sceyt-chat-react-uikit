@@ -560,6 +560,7 @@ const Channel: React.FC<IChannelProps> = ({
       {showAvatar && (
         <AvatarWrapper>
           <Avatar
+            key={`avatar-${channel.id}-${channel.avatarUrl || 'no-avatar'}`}
             // customAvatarColors={userAvatarColors}
             name={avatarName}
             borderRadius={avatarBorderRadius}
