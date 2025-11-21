@@ -1,4 +1,4 @@
-import { IAttachment, IMessage, IPollDetails, IPollVote, IReaction } from '../../types'
+import { IAttachment, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
@@ -325,7 +325,7 @@ export function updateMessageOnMap(
             ...updatedMessage.params,
             ...statusUpdatedMessage
           }
-          let voteDetailsData: IPollDetails | undefined
+          let voteDetailsData = mes?.pollDetails
           if (voteDetails) {
             voteDetailsData = handleVoteDetails(voteDetails, updatedMessageData)
           }
