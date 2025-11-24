@@ -1224,7 +1224,15 @@ function* getMessagesQuery(action: IAction): any {
         const pendingMessagesMap = getPendingMessagesMap()
         for (const channelId in pendingMessagesMap) {
           for (const msg of pendingMessagesMap[channelId]) {
-            yield call(sendMessage, { type: RESEND_MESSAGE, payload: { message: msg, connectionState, channelId } })
+            const attachments = msg.attachments?.filter((att: IAttachment) => att.type !== attachmentTypes.link)
+            if (attachments && attachments.length > 0) {
+              yield call(sendMessage, { type: RESEND_MESSAGE, payload: { message: msg, connectionState, channelId } })
+            } else {
+              yield call(sendTextMessage, {
+                type: RESEND_MESSAGE,
+                payload: { message: msg, connectionState, channelId }
+              })
+            }
           }
         }
 
