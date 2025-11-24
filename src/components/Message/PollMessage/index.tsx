@@ -113,7 +113,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
                 )}
                 <Title color={textPrimary}>{opt.name}</Title>
                 {poll.anonymous ? null : (
-                  <UsersContainer onClick={handleResultsClick}>
+                  <UsersContainer onClick={handleResultsClick} cursor={poll.anonymous ? 'default' : 'pointer'}>
                     {optionVotesUsers.map((vote: IPollVote) => (
                       <Avatar
                         key={vote?.user?.id}
@@ -272,11 +272,11 @@ const Fill = styled.div`
   transition: width 0.3s ease-in-out;
 `
 
-const UsersContainer = styled.div`
+const UsersContainer = styled.div<{ cursor: string }>`
   display: flex;
   align-items: center;
   margin-left: auto;
   padding-left: 16px;
   height: max-content;
-  cursor: pointer;
+  cursor: ${(p) => p.cursor};
 `
