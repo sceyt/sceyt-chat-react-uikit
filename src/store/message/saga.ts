@@ -648,9 +648,9 @@ function* sendTextMessage(action: IAction): any {
     }
     if (activeChannelId === channel.id) {
       if (isAddToPendingMessagesMap) {
-        yield call(addPendingMessage, message, pendingMessage, channel)
+        yield call(addPendingMessage, { ...message, attachments: message?.attachments }, pendingMessage, channel)
       } else {
-        updatePendingMessage(message, channel, pendingMessage)
+        updatePendingMessage({ ...message, attachments: message?.attachments }, channel, pendingMessage)
       }
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
