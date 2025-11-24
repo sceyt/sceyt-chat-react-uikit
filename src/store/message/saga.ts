@@ -637,6 +637,7 @@ function* sendTextMessage(action: IAction): any {
     const pendingMessage = JSON.parse(
       JSON.stringify({
         ...messageToSend,
+        attachments: message?.attachments,
         createdAt: new Date(Date.now()),
         mentionedUsers: message.mentionedUsers,
         parentMessage: message.parentMessage
@@ -648,9 +649,9 @@ function* sendTextMessage(action: IAction): any {
     }
     if (activeChannelId === channel.id) {
       if (isAddToPendingMessagesMap) {
-        yield call(addPendingMessage, { ...message, attachments: message?.attachments }, pendingMessage, channel)
+        yield call(addPendingMessage, message, pendingMessage, channel)
       } else {
-        updatePendingMessage({ ...message, attachments: message?.attachments }, channel, pendingMessage)
+        updatePendingMessage(message, channel, pendingMessage)
       }
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
