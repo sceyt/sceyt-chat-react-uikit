@@ -380,6 +380,11 @@ function* getChannels(action: IAction): any {
       for (let i = 0; i <= 4; i++) {
         if (hasNext) {
           try {
+            const connectionStatus = store.getState().UserReducer.connectionStatus
+            if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+              log.warn('[getChannels] connection not ready, aborting. Status:', connectionStatus)
+              break
+            }
             log.info('[getChannels] loading all channels page:', i + 1)
             const allChannelsData = yield call(allChannelsQuery.loadNextPage)
             hasNext = allChannelsData.hasNext
@@ -398,6 +403,7 @@ function* getChannels(action: IAction): any {
             log.info('[getChannels] total all channels added so far:', totalAllChannelsAdded)
           } catch (e) {
             log.error(e, 'Error on get all channels page:', i + 1)
+            break
           }
         } else {
           log.info('[getChannels] no more pages available, stopping at iteration:', i)
@@ -750,22 +756,53 @@ function* searchChannelsForForward(action: IAction): any {
 }
 
 function* channelsLoadMore(action: IAction): any {
+  log.info('[channelsLoadMore] start load more channels')
   try {
     const { payload } = action
     const { limit } = payload
+    log.info('[channelsLoadMore] input payload:', JSON.stringify({ limit }))
     const { channelQuery } = query
+    log.info('[channelsLoadMore] channelQuery exists:', !!channelQuery)
+    if (!channelQuery) {
+      log.error('[channelsLoadMore] channelQuery is null or undefined, cannot load more')
+      return
+    }
     if (limit) {
+      log.info('[channelsLoadMore] setting query limit to:', limit)
       channelQuery.limit = limit
+    } else {
+      log.info('[channelsLoadMore] no limit provided, using existing query limit')
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
+    log.info('[channelsLoadMore] loading next page...')
     const channelsData = yield call(channelQuery.loadNextPage)
+    const channelList = channelsData.channels
+    log.info(
+      '[channelsLoadMore] channelsData received:',
+      JSON.stringify({
+        channelsCount: channelList?.length || 0,
+        hasNext: channelsData.hasNext
+      })
+    )
     yield put(channelHasNextAC(channelsData.hasNext))
+    log.info('[channelsLoadMore] hasNext set to:', channelsData.hasNext)
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
       setChannelsInMap,
       channelsData.channels
     )
+    log.info(
+      '[channelsLoadMore] setChannelsInMap result:',
+      JSON.stringify({
+        mappedChannelsCount: mappedChannels?.length || 0,
+        channelsForUpdateLastReactionMessageCount: channelsForUpdateLastReactionMessage?.length || 0
+      })
+    )
 
-    if (channelsForUpdateLastReactionMessage.length) {
+    if (channelsForUpdateLastReactionMessage?.length) {
+      log.info(
+        '[channelsLoadMore] processing channels for reaction message update:',
+        channelsForUpdateLastReactionMessage?.length
+      )
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
         return await Promise.all(
@@ -776,27 +813,48 @@ function* channelsLoadMore(action: IAction): any {
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
                   channelMessageMap[channel.id] = messages[0]
+                  log.info('[channelsLoadMore] successfully fetched reaction message for channel:', channel?.id)
                   resolve(true)
                 })
                 .catch((e) => {
-                  log.error(e, 'Error on getMessagesById')
+                  log.error(e, 'Error on getMessagesById for channel:', channel?.id)
                   resolve(true)
                 })
             })
           })
         )
       })
+      log.info(
+        '[channelsLoadMore] reaction messages fetched:',
+        channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
+      )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
         if (channelMessageMap[channel.id]) {
           channel.lastReactedMessage = channelMessageMap[channel.id]
         }
         return channel
       })
+      log.info(
+        '[channelsLoadMore] mappedChannels updated with reaction messages, final count:',
+        mappedChannels?.length || 0
+      )
+    } else {
+      log.info('[channelsLoadMore] no channels need reaction message update')
     }
+    log.info('[channelsLoadMore] adding channels to state, count:', mappedChannels?.length || 0)
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
+    log.info('[channelsLoadMore] completed successfully. Total channels added:', mappedChannels?.length || 0)
   } catch (error) {
-    log.error(error, 'Error in load more channels')
+    log.error('[channelsLoadMore] error occurred:', error)
+    log.error(
+      '[channelsLoadMore] error details:',
+      JSON.stringify({
+        message: error?.message,
+        code: error?.code,
+        stack: error?.stack
+      })
+    )
     /* if (error.code !== 10008) {
       yield put(setErrorNotification(error.message));
     } */

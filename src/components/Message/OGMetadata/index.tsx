@@ -232,7 +232,7 @@ const OGMetadata = ({
         metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
     }
-  }, [metadataLoaded, oGMetadata, attachment?.url, metadata, showOGMetadata, showImage, metadataGetSuccessCallback])
+  }, [metadataLoaded, oGMetadata, attachment?.url, metadata, showOGMetadata, showImage])
 
   const elements = useMemo(
     () =>
