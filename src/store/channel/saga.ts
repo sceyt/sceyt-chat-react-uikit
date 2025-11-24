@@ -245,16 +245,22 @@ function* createChannel(action: IAction): any {
 }
 
 function* getChannels(action: IAction): any {
+  log.info('[getChannels] start get channels')
   try {
     const { payload } = action
     const { params } = payload
+    log.info('[getChannels] input params:', JSON.stringify(params))
     const SceytChatClient = getClient()
-    if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    const connectionStatus = store.getState().UserReducer.connectionStatus
+    log.info('[getChannels] connection status:', connectionStatus)
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      log.warn('[getChannels] connection not ready, aborting. Status:', connectionStatus)
       return
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     const channelTypesFilter = getChannelTypesFilter()
+    log.info('[getChannels] channelTypesFilter:', JSON.stringify(channelTypesFilter))
     let types: string[] = []
     if (channelTypesFilter?.length) {
       types = channelTypesFilter
@@ -262,24 +268,51 @@ function* getChannels(action: IAction): any {
     if (params?.filter?.channelType) {
       types.push(params.filter.channelType)
     }
+    log.info('[getChannels] final types array:', JSON.stringify(types))
     if (types?.length) {
       channelQueryBuilder.types(types)
     }
     if (params.memberCount) {
+      log.info('[getChannels] setting memberCount filter:', params?.memberCount)
       channelQueryBuilder.memberCount(params.memberCount)
     }
     channelQueryBuilder.order('lastMessage')
-    channelQueryBuilder.limit(params.limit || 50)
+    const limit = params.limit || 50
+    log.info('[getChannels] query limit:', limit)
+    channelQueryBuilder.limit(limit)
     const channelQuery = yield call(channelQueryBuilder.build)
+    log.info('[getChannels] query built successfully')
     const channelsData = yield call(channelQuery.loadNextPage)
     const channelList = channelsData.channels
+    log.info(
+      '[getChannels] channelsData received:',
+      JSON.stringify({
+        channelsCount: channelList?.length || 0,
+        hasNext: channelsData.hasNext
+      })
+    )
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
+    log.info('[getChannels] active channelId:', channelId)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
+    log.info('[getChannels] activeChannel from map:', activeChannel ? activeChannel?.id : 'null')
     yield call(destroyChannelsMap)
+    log.info('[getChannels] channels map destroyed')
 
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
-    if (channelsForUpdateLastReactionMessage.length) {
+    log.info(
+      '[getChannels] setChannelsInMap result:',
+      JSON.stringify({
+        mappedChannelsCount: mappedChannels?.length || 0,
+        channelsForUpdateLastReactionMessageCount: channelsForUpdateLastReactionMessage?.length || 0
+      })
+    )
+    log.info('channelsForUpdateLastReactionMessage', channelsForUpdateLastReactionMessage?.length)
+    if (channelsForUpdateLastReactionMessage?.length) {
+      log.info(
+        '[getChannels] processing channels for reaction message update:',
+        channelsForUpdateLastReactionMessage?.length
+      )
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
         return await Promise.all(
@@ -290,60 +323,98 @@ function* getChannels(action: IAction): any {
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
                   channelMessageMap[channel.id] = messages[0]
+                  log.info('[getChannels] successfully fetched reaction message for channel:', channel?.id)
                   resolve(true)
                 })
                 .catch((e) => {
-                  log.error(e, 'Error on getMessagesById')
+                  log.error(e, 'Error on getMessagesById for channel:', channel?.id)
                   resolve(true)
                 })
             })
           })
         )
       })
+      log.info(
+        '[getChannels] reaction messages fetched:',
+        channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
+      )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
         if (channelMessageMap[channel.id]) {
           channel.lastReactedMessage = channelMessageMap[channel.id]
         }
         return channel
       })
+      log.info('[getChannels] mappedChannels updated with reaction messages, final count:', mappedChannels?.length || 0)
     }
+    log.info('[getChannels] setting channels in state, count:', mappedChannels?.length || 0)
     yield put(setChannelsAC(mappedChannels))
     if (!channelId) {
       ;[activeChannel] = channelList
+      log.info('[getChannels] no active channelId, setting first channel as active:', activeChannel?.id)
     }
     query.channelQuery = channelQuery
     if (activeChannel && getAutoSelectFitsChannel()) {
+      log.info('[getChannels] auto-selecting channel:', activeChannel?.id)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
     const hiddenList = store.getState().ChannelReducer.hideChannelList
+    log.info('[getChannels] hiddenList state:', hiddenList)
     if (!hiddenList) {
+      log.info('[getChannels] starting all channels query (hiddenList is false)')
       const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       allChannelsQueryBuilder.order('lastMessage')
       if (channelTypesFilter?.length) {
         allChannelsQueryBuilder.types(channelTypesFilter)
+        log.info('[getChannels] allChannelsQuery types:', JSON.stringify(channelTypesFilter))
       }
       if (params?.memberCount) {
         allChannelsQueryBuilder.memberCount(params.memberCount)
+        log.info('[getChannels] allChannelsQuery memberCount:', params?.memberCount)
       }
       allChannelsQueryBuilder.limit(50)
       const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
+      log.info('[getChannels] allChannelsQuery built')
       let hasNext = true
+      let totalAllChannelsAdded = 0
       for (let i = 0; i <= 4; i++) {
         if (hasNext) {
           try {
+            log.info('[getChannels] loading all channels page:', i + 1)
             const allChannelsData = yield call(allChannelsQuery.loadNextPage)
             hasNext = allChannelsData.hasNext
             const allChannelList = allChannelsData.channels
+            log.info(
+              '[getChannels] all channels page',
+              i + 1,
+              'loaded:',
+              JSON.stringify({
+                channelsCount: allChannelList?.length || 0,
+                hasNext
+              })
+            )
             addChannelsToAllChannels(allChannelList)
+            totalAllChannelsAdded += allChannelList?.length || 0
+            log.info('[getChannels] total all channels added so far:', totalAllChannelsAdded)
           } catch (e) {
-            log.error(e, 'Error on get all channels')
+            log.error(e, 'Error on get all channels page:', i + 1)
           }
+        } else {
+          log.info('[getChannels] no more pages available, stopping at iteration:', i)
         }
       }
+      log.info('[getChannels] all channels query completed, total channels added:', totalAllChannelsAdded)
+    } else {
+      log.info('[getChannels] skipping all channels query (hiddenList is true)')
     }
+    log.info('[getChannels] completed successfully. Final mapped channels count:', mappedChannels?.length || 0)
   } catch (e) {
-    log.error(JSON.stringify(e), 'Error on get channels')
+    log.error('[getChannels] error occurred:', JSON.stringify(e), 'Error on get channels')
+    log.error('[getChannels] error details:', {
+      message: e.message,
+      code: e.code,
+      stack: e.stack
+    })
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }

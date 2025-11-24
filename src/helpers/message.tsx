@@ -339,9 +339,10 @@ export const handleVoteDetails = (
   const vote = voteDetails.vote
   const optionId = vote.optionId
   const currentVotesPerOption = existingVoteDetails.votesPerOption || {}
+  const optionVotesCount = (currentVotesPerOption[optionId] || 0) + voteDetails.incrementVotesPerOptionCount
   const newVotesPerOption = {
     ...currentVotesPerOption,
-    [optionId]: (currentVotesPerOption[optionId] || 0) + voteDetails.incrementVotesPerOptionCount
+    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
   }
 
   let newVotes: IPollVote[] = existingVoteDetails.votes || []

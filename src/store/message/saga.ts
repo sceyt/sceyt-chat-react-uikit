@@ -787,7 +787,9 @@ function* forwardMessage(action: IAction): any {
         .setMentionUserIds(mentionedUserIds)
         .setType(message.type)
         .setDisableMentionsCount(getDisableFrowardMentionsCount())
-        .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
+        .setMetadata(
+          message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
+        )
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
         .setPollDetails(pollDetails)
       const messageToSend = messageBuilder.create()

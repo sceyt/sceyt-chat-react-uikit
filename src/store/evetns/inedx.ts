@@ -1082,14 +1082,14 @@ export default function* watchForEvents(): any {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
               vote,
-              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+              incrementVotesPerOptionCount: -1
             })
           }
           for (const vote of addedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('addOwn' as const) : ('add' as const),
               vote,
-              incrementVotesPerOptionCount: addedVotes?.length || 0
+              incrementVotesPerOptionCount: 1
             })
           }
 
@@ -1136,10 +1136,9 @@ export default function* watchForEvents(): any {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
               vote,
-              incrementVotesPerOptionCount: -(deletedVotes?.length || 0)
+              incrementVotesPerOptionCount: -1
             })
           }
-
           for (const obj of objs) {
             if (pollDetailsData?.id && obj.vote) {
               yield put(deletePollVotesFromListAC(pollDetailsData.id, obj.vote.optionId, [obj.vote], messageId))
@@ -1172,10 +1171,9 @@ export default function* watchForEvents(): any {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
               vote,
-              incrementVotesPerOptionCount: -(retractedVotes?.length || 0)
+              incrementVotesPerOptionCount: -1
             })
           }
-
           for (const obj of objs) {
             updateMessageOnMap(
               channel.id,
