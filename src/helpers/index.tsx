@@ -666,3 +666,79 @@ export const hashString = async (str: string) => {
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
 }
+
+/**
+ * Formats disappearing message period from milliseconds to human-readable string
+ * @param periodInMilliseconds - Period in milliseconds (or 0/null for "Off")
+ * @returns Formatted string like "1 hour", "1 week", "2 days", etc., or "Off"
+ */
+export const formatDisappearingMessageTime = (periodInMilliseconds: number | null | undefined): string => {
+  if (!periodInMilliseconds || periodInMilliseconds === 0) {
+    return 'Off'
+  }
+
+  // Convert milliseconds to seconds
+  const periodInSeconds = periodInMilliseconds / 1000
+
+  // Fixed timer options (in seconds)
+  const FIXED_TIMER_OPTIONS: Record<string, number> = {
+    '1hour': 60 * 60,
+    '1day': 60 * 60 * 24,
+    '1week': 60 * 60 * 24 * 7
+  }
+
+  // Custom options (in seconds)
+  const CUSTOM_OPTIONS = [
+    { label: '1 day', seconds: 60 * 60 * 24 },
+    { label: '2 days', seconds: 60 * 60 * 24 * 2 },
+    { label: '3 days', seconds: 60 * 60 * 24 * 3 },
+    { label: '4 days', seconds: 60 * 60 * 24 * 4 },
+    { label: '5 days', seconds: 60 * 60 * 24 * 5 },
+    { label: '1 week', seconds: 60 * 60 * 24 * 7 },
+    { label: '2 weeks', seconds: 60 * 60 * 24 * 14 },
+    { label: '1 month', seconds: 60 * 60 * 24 * 30 }
+  ]
+
+  // Check fixed options first
+  if (periodInSeconds === FIXED_TIMER_OPTIONS['1hour']) {
+    return '1 hour'
+  }
+  if (periodInSeconds === FIXED_TIMER_OPTIONS['1day']) {
+    return '1 day'
+  }
+  if (periodInSeconds === FIXED_TIMER_OPTIONS['1week']) {
+    return '1 week'
+  }
+
+  // Check custom options
+  const customMatch = CUSTOM_OPTIONS.find((option) => option.seconds === periodInSeconds)
+  if (customMatch) {
+    return customMatch.label
+  }
+
+  // Fallback: calculate and format dynamically
+  const days = Math.floor(periodInSeconds / (60 * 60 * 24))
+  const weeks = Math.floor(days / 7)
+  const months = Math.floor(days / 30)
+  const hours = Math.floor(periodInSeconds / (60 * 60))
+
+  if (months > 0) {
+    return `${months} ${months === 1 ? 'month' : 'months'}`
+  }
+  if (weeks > 0) {
+    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
+  }
+  if (days > 0) {
+    return `${days} ${days === 1 ? 'day' : 'days'}`
+  }
+  if (hours > 0) {
+    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+  }
+
+  const minutes = Math.floor(periodInSeconds / 60)
+  if (minutes > 0) {
+    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+  }
+
+  return `${periodInSeconds} ${periodInSeconds === 1 ? 'second' : 'seconds'}`
+}

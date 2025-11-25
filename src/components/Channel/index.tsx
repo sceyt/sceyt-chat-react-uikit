@@ -20,10 +20,11 @@ import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.sv
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
 import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
 import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
+import { ReactComponent as BadgeIcon } from '../../assets/svg/badge.svg'
 // Components
 import Avatar from '../Avatar'
 // Helpers
-import { systemMessageUserName } from '../../helpers'
+import { systemMessageUserName, formatDisappearingMessageTime } from '../../helpers'
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
@@ -240,7 +241,11 @@ const ChannelMessageText = ({
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
-                        : ''
+                        : lastMessage.body === 'DM'
+                          ? `set disappearing message time to ${formatDisappearingMessageTime(
+                              lastMessageMetas?.autoDeletePeriod
+                            )}`
+                          : ''
           }`
         ) : (
           <React.Fragment>
@@ -571,6 +576,11 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
+          {!!channel?.messageRetentionPeriod && (
+            <DisappearingMessagesBadge>
+              <BadgeIcon color={accentColor} size='16px' />
+            </DisappearingMessagesBadge>
+          )}
           {isDirectChannel &&
             directChannelUser &&
             hideUserPresence &&
@@ -859,6 +869,23 @@ export const AvatarWrapper = styled.div`
   display: flex;
   align-items: center;
   position: relative;
+`
+
+export const DisappearingMessagesBadge = styled.span`
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+
+  & > svg {
+    width: 20px;
+    height: 20px;
+  }
 `
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`

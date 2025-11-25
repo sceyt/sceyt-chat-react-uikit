@@ -73,7 +73,8 @@ import {
   REGENERATE_CHANNEL_INVITE_KEY,
   UPDATE_CHANNEL_INVITE_KEY,
   GET_CHANNEL_BY_INVITE_KEY,
-  JOIN_TO_CHANNEL_WITH_INVITE_KEY
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  SET_MESSAGE_RETENTION_PERIOD
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -363,4 +364,9 @@ export const updateChannelInviteKeyAC = (
 export const joinChannelWithInviteKeyAC = (key: string) => ({
   type: JOIN_TO_CHANNEL_WITH_INVITE_KEY,
   payload: { key }
+})
+
+export const setMessageRetentionPeriodAC = (channelId: string, periodInSeconds: number | null) => ({
+  type: SET_MESSAGE_RETENTION_PERIOD,
+  payload: { channelId, periodInSeconds }
 })

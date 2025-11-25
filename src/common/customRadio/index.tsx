@@ -1,5 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
+import { ReactComponent as TickIcon } from '../../assets/svg/tick.svg'
 
 interface IProps {
   onChange: (e: any) => void
@@ -34,7 +35,9 @@ const CustomRadio = ({
         border={border}
         borderRadius={borderRadius}
         htmlFor={`radio-${index}`}
-      />
+      >
+        {state && <TickIcon />}
+      </CustomLabel>
 
       <Radio
         disabled={disabled}
@@ -65,22 +68,14 @@ const CustomLabel = styled.label<{
   width: ${(props) => props.size || '12px'};
   height: ${(props) => props.size || '12px'};
   cursor: pointer;
-  border: ${(props) =>
-    props.isChecked ? `2px solid ${props.checkedBorderColor}` : props.border || `1px solid ${props.borderColor}`};
+  border: ${(props) => (props.isChecked ? 'none' : props.border || `1px solid ${props.borderColor}`)};
   border-radius: ${(props) => props.borderRadius || '50%'};
+  background-color: ${(props) => (props.isChecked ? props.checkedBorderColor : 'transparent')};
 
-  ${(props) =>
-    props.isChecked &&
-    `
-    &::after {
-    content: '';
-    position: absolute;
-    width: calc(100% - 3px);
-    height: calc(100% - 3px);
-    border-radius: 50%;
-    background-color: ${props.checkedBorderColor};
+  & > svg {
+    width: calc(100% - 4px);
+    height: calc(100% - 4px);
   }
-  `}
 `
 
 const Radio = styled.input`
