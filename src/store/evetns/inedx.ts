@@ -13,6 +13,7 @@ import {
   getChannelGroupName,
   getChannelTypesFilter,
   getLastChannelFromMap,
+  getOnUpdateChannel,
   handleNewMessages,
   removeChannelFromMap,
   setChannelInMap,
@@ -706,10 +707,33 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.UPDATE_CHANNEL: {
+          const onUpdateChannel = getOnUpdateChannel()
           log.info('channel UPDATE_CHANNEL ... ')
           const { updatedChannel } = args
           const channelExists = checkChannelExists(updatedChannel.id)
           const { subject, avatarUrl, muted, mutedTill, metadata } = updatedChannel
+          const channel = getChannelFromMap(updatedChannel.id)
+          const fields = []
+          if (channel) {
+            if (channel.subject !== subject) {
+              fields.push('subject')
+            }
+            if (channel.avatarUrl !== avatarUrl) {
+              fields.push('avatarUrl')
+            }
+            if (channel.muted !== muted) {
+              fields.push('muted')
+            }
+            if (channel.mutedTill !== mutedTill) {
+              fields.push('mutedTill')
+            }
+            if (channel.metadata !== isJSON(metadata) ? JSON.parse(metadata) : metadata) {
+              fields.push('metadata')
+            }
+          }
+          if (onUpdateChannel) {
+            onUpdateChannel(updatedChannel, fields)
+          }
           if (channelExists) {
             yield put(
               updateChannelDataAC(updatedChannel.id, {

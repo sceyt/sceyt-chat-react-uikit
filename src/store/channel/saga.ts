@@ -79,7 +79,8 @@ import {
   getChannelGroupName,
   getAutoSelectFitsChannel,
   getChannelTypesFilter,
-  addChannelToAllChannels
+  addChannelToAllChannels,
+  getOnUpdateChannel
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -1289,6 +1290,7 @@ function* updateChannel(action: IAction): any {
       paramsToUpdate.avatarUrl = ''
     }
     const { subject, avatarUrl, metadata } = yield call(channel.update, paramsToUpdate)
+
     yield put(
       updateChannelDataAC(channelId, {
         subject,
@@ -1301,6 +1303,21 @@ function* updateChannel(action: IAction): any {
       avatarUrl,
       metadata: isJSON(metadata) ? JSON.parse(metadata) : metadata
     })
+    const onUpdateChannel = getOnUpdateChannel()
+    if (onUpdateChannel) {
+      const fields = []
+      if (channel?.subject !== subject) {
+        fields.push('subject')
+      }
+      if (channel?.avatarUrl !== avatarUrl) {
+        fields.push('avatarUrl')
+      }
+      if (JSON.stringify(channel?.metadata) !== metadata) {
+        fields.push('metadata')
+      }
+      const updatedChannel = yield call(getChannelFromMap, channelId)
+      onUpdateChannel(updatedChannel, fields)
+    }
   } catch (e) {
     log.error('ERROR in update channel', e.message)
     // yield put(setErrorNotification(e.message))
