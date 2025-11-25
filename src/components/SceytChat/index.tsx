@@ -151,7 +151,6 @@ const SceytChat = ({
       } */
 
       dispatch(watchForEventsAC())
-      dispatch(setConnectionStatusAC(client.connectionState))
     } else {
       clearMessagesMap()
       removeAllMessages()
@@ -167,6 +166,10 @@ const SceytChat = ({
       setTabIsActive(true)
     }
   }, [client])
+
+  useEffect(() => {
+    dispatch(setConnectionStatusAC(client.connectionState))
+  }, [client?.connectionState])
 
   useEffect(() => {
     if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
