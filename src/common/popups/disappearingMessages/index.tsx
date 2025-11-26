@@ -108,10 +108,10 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
 
             {(
               [
-                { key: 'off', label: 'off' },
-                { key: '1day', label: '1day' },
-                { key: '1week', label: '1week' },
-                { key: '1month', label: '1month' }
+                { key: 'off', label: 'Off' },
+                { key: '1day', label: '1 day' },
+                { key: '1week', label: '1 week' },
+                { key: '1month', label: '1 month' }
               ] as TimerOptionItem[]
             ).map((option: TimerOptionItem) => (
               <TimerOptionItem key={option.key} color={textPrimary} onClick={() => setSelectedOption(option.key)}>
