@@ -578,9 +578,7 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
-          {!!channel?.messageRetentionPeriod && (
-            <DisappearingMessagesBadge color={accentColor} strokeColor={background} />
-          )}
+          {!!channel?.messageRetentionPeriod && <DisappearingMessagesBadge color={accentColor} />}
           {isDirectChannel &&
             directChannelUser &&
             hideUserPresence &&
@@ -712,11 +710,11 @@ const Channel: React.FC<IChannelProps> = ({
                           lastMessage.state !== MESSAGE_STATUS.DELETE &&
                           (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                             ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
-                            : lastMessage.user.id === user.id)))
+                            : lastMessage.user.id === user.id && lastMessage.type !== MESSAGE_TYPE.SYSTEM)))
                     : draftMessageText ||
                       (lastMessage &&
                         lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                        lastMessage.type !== 'system')) && (
+                        lastMessage.type !== MESSAGE_TYPE.SYSTEM)) && (
                     <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
                   )}
                 <LastMessageText
@@ -871,7 +869,7 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; strokeColor: string }>`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string }>`
   position: absolute;
   top: -3px;
   right: -3px;
