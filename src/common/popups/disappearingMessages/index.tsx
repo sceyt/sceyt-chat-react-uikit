@@ -33,6 +33,13 @@ type TimerOptionItem = {
   label: string
 }
 
+const TIMER_OPTIONS: TimerOptionItem[] = [
+  { key: 'off', label: 'Off' },
+  { key: '1day', label: '1 day' },
+  { key: '1week', label: '1 week' },
+  { key: '1month', label: '1 month' }
+]
+
 function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, currentTimer }: IProps) {
   const colors = useColor()
   const {
@@ -106,14 +113,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
               Auto-delete after
             </Label>
 
-            {(
-              [
-                { key: 'off', label: 'Off' },
-                { key: '1day', label: '1 day' },
-                { key: '1week', label: '1 week' },
-                { key: '1month', label: '1 month' }
-              ] as TimerOptionItem[]
-            ).map((option: TimerOptionItem) => (
+            {TIMER_OPTIONS.map((option: TimerOptionItem) => (
               <TimerOptionItem key={option.key} color={textPrimary} onClick={() => setSelectedOption(option.key)}>
                 <CustomRadio
                   index={option.key}
