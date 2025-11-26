@@ -19,6 +19,7 @@ import CustomRadio from '../../customRadio'
 import PopupContainer from '../popupContainer'
 import { useColor } from '../../../hooks'
 import DropDown from '../../dropdown'
+import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS, CUSTOM_SECONDS_MAP, TimerOption } from '../../../helpers/constants'
 
 interface IProps {
   theme?: string
@@ -27,28 +28,10 @@ interface IProps {
   currentTimer?: number | null
 }
 
-type TimerOption = 'off' | '1day' | '1week' | '1month' | 'custom'
-
-const FIXED_TIMER_OPTIONS: Record<TimerOption, number | null> = {
-  off: 0,
-  '1day': 60 * 60 * 24,
-  '1week': 60 * 60 * 24 * 7,
-  '1month': 60 * 60 * 24 * 30,
-  custom: 60 * 60 * 24 * 2
+type TimerOptionItem = {
+  key: TimerOption
+  label: string
 }
-
-const CUSTOM_OPTIONS = [
-  { label: '1 day', value: '1day', seconds: 60 * 60 * 24 },
-  { label: '2 days', value: '2days', seconds: 60 * 60 * 24 * 2 },
-  { label: '3 days', value: '3days', seconds: 60 * 60 * 24 * 3 },
-  { label: '4 days', value: '4days', seconds: 60 * 60 * 24 * 4 },
-  { label: '5 days', value: '5days', seconds: 60 * 60 * 24 * 5 },
-  { label: '1 week', value: '1week', seconds: 60 * 60 * 24 * 7 },
-  { label: '2 weeks', value: '2weeks', seconds: 60 * 60 * 24 * 14 },
-  { label: '1 month', value: '1month', seconds: 60 * 60 * 24 * 30 }
-]
-
-const CUSTOM_SECONDS_MAP = Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.value, o.seconds]))
 
 function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, currentTimer }: IProps) {
   const colors = useColor()
@@ -106,19 +89,11 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
 
   return (
     <PopupContainer>
-      <Popup
-        theme={theme}
-        backgroundColor={background}
-        maxWidth='522px'
-        minWidth='522px'
-        width={selectedOption === 'custom' ? '522px' : undefined}
-        height={selectedOption === 'custom' ? '491px' : undefined}
-        padding='0'
-      >
-        <PopupBody paddingH='24px' paddingV='24px'>
+      <Popup theme={theme} backgroundColor={background} maxWidth='522px' minWidth='522px' width='100%' padding='0'>
+        <PopupBody paddingH='24px' paddingV='24px' marginBottom='0'>
           <CloseIcon color={iconPrimary} onClick={togglePopup} />
 
-          <PopupName color={textPrimary} marginBottom='20px'>
+          <PopupName color={textPrimary} marginBottom='20px' lineHeight='24px'>
             Set a default message timer
           </PopupName>
 
@@ -127,22 +102,30 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
           </PopupDescription>
 
           <TimerOptionsSection marginTop='20px'>
-            <Label color={textSecondary} marginTop='0'>
+            <Label color={textPrimary} marginTop='0'>
               Auto-delete after
             </Label>
 
-            {(['off', '1day', '1week', '1month'] as TimerOption[]).map((option) => (
-              <TimerOptionItem key={option} color={textPrimary} onClick={() => setSelectedOption(option)}>
+            {(
+              [
+                { key: 'off', label: 'off' },
+                { key: '1day', label: '1day' },
+                { key: '1week', label: '1week' },
+                { key: '1month', label: '1month' }
+              ] as TimerOptionItem[]
+            ).map((option: TimerOptionItem) => (
+              <TimerOptionItem key={option.key} color={textPrimary} onClick={() => setSelectedOption(option.key)}>
                 <CustomRadio
-                  index={option}
+                  index={option.key}
                   size='18px'
-                  state={selectedOption === option}
-                  onChange={() => setSelectedOption(option)}
+                  state={selectedOption === option.key}
+                  onChange={() => setSelectedOption(option.key)}
                   checkedBorderColor={accentColor}
                   borderColor={iconInactive}
                   borderRadius='4px'
+                  variant='checkbox'
                 />
-                {option === 'off' ? 'Off' : option === '1day' ? '1 day' : option === '1week' ? '1 week' : '1 month'}
+                {option.label}
               </TimerOptionItem>
             ))}
 
@@ -155,13 +138,14 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                 checkedBorderColor={accentColor}
                 borderColor={iconInactive}
                 borderRadius='4px'
+                variant='checkbox'
               />
               Custom
             </TimerOptionItem>
 
             {selectedOption === 'custom' && (
               <CustomTimerSection>
-                <Label color={textSecondary} marginTop='12px'>
+                <Label color={textPrimary} marginTop='0'>
                   Auto-delete after
                 </Label>
 
@@ -237,10 +221,11 @@ const TimerOptionItem = styled.div<{ color: string }>`
   display: flex;
   align-items: center;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 160%;
   color: ${(props) => props.color};
-  margin-bottom: 12px;
+  padding: 10px 0;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
 
   & > label {
     margin-right: 10px;
@@ -248,7 +233,7 @@ const TimerOptionItem = styled.div<{ color: string }>`
 `
 
 const CustomTimerSection = styled.div`
-  margin: 0 auto;
+  margin: 16px auto 0 auto;
 `
 
 const CustomSelectWrapper = styled.div<{ accentColor: string }>`

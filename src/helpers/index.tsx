@@ -3,6 +3,7 @@ import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 import log from 'loglevel'
+import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS } from './constants'
 
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
@@ -679,25 +680,6 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
 
   // Convert milliseconds to seconds
   const periodInSeconds = periodInMilliseconds / 1000
-
-  // Fixed timer options (in seconds)
-  const FIXED_TIMER_OPTIONS: Record<string, number> = {
-    '1day': 60 * 60 * 24,
-    '1week': 60 * 60 * 24 * 7,
-    '1month': 60 * 60 * 24 * 30
-  }
-
-  // Custom options (in seconds)
-  const CUSTOM_OPTIONS = [
-    { label: '1 day', seconds: 60 * 60 * 24 },
-    { label: '2 days', seconds: 60 * 60 * 24 * 2 },
-    { label: '3 days', seconds: 60 * 60 * 24 * 3 },
-    { label: '4 days', seconds: 60 * 60 * 24 * 4 },
-    { label: '5 days', seconds: 60 * 60 * 24 * 5 },
-    { label: '1 week', seconds: 60 * 60 * 24 * 7 },
-    { label: '2 weeks', seconds: 60 * 60 * 24 * 14 },
-    { label: '1 month', seconds: 60 * 60 * 24 * 30 }
-  ]
 
   // Check fixed options first
   if (periodInSeconds === FIXED_TIMER_OPTIONS['1day']) {

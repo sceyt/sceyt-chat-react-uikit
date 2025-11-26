@@ -12,6 +12,7 @@ interface IProps {
   borderRadius?: string
   size?: string
   disabled?: boolean
+  variant?: 'radio' | 'checkbox'
 }
 
 const CustomRadio = ({
@@ -23,9 +24,10 @@ const CustomRadio = ({
   border,
   borderRadius,
   size,
-  disabled
+  disabled,
+  variant = 'radio'
 }: IProps) => {
-  const isCheckboxStyle = borderRadius && borderRadius !== '50%'
+  const isCheckboxStyle = variant === 'checkbox'
 
   return (
     <React.Fragment>
@@ -36,6 +38,7 @@ const CustomRadio = ({
         borderColor={borderColor}
         border={border}
         borderRadius={borderRadius}
+        isCheckboxStyle={isCheckboxStyle}
         htmlFor={`radio-${index}`}
       >
         {state && isCheckboxStyle && <TickIcon />}
@@ -61,6 +64,7 @@ const CustomLabel = styled.label<{
   checkedBorderColor: string
   borderRadius?: string
   isChecked: boolean
+  isCheckboxStyle: boolean
 }>`
   position: relative;
   display: flex;
@@ -73,10 +77,10 @@ const CustomLabel = styled.label<{
   border: ${(props) =>
     props.isChecked ? `2px solid ${props.checkedBorderColor}` : props.border || `1px solid ${props.borderColor}`};
   border-radius: ${(props) => props.borderRadius || '50%'};
-  // background-color: ${(props) => (props.isChecked ? props.checkedBorderColor : 'transparent')};
 
   ${(props) =>
     props.isChecked &&
+    !props.isCheckboxStyle &&
     `
     &::after {
     content: '';
@@ -88,23 +92,19 @@ const CustomLabel = styled.label<{
     }
   `}
 
-  ${(props) => {
-    const isCheckboxStyle = props.borderRadius && props.borderRadius !== '50%'
-    if (isCheckboxStyle) {
-      return `
-        background-color: ${props.isChecked ? props.checkedBorderColor : 'transparent'};
-        border: ${props.isChecked ? 'none' : props.border || `1px solid ${props.borderColor}`};
-        &::after {
-          display: none;
-        }
-        & > svg {
-          width: calc(100% - 4px);
-          height: calc(100% - 4px);
-        }
-      `
+  ${(props) =>
+    props.isCheckboxStyle &&
+    `
+    background-color: ${props.isChecked ? props.checkedBorderColor : 'transparent'};
+    border: ${props.isChecked ? 'none' : props.border || `1px solid ${props.borderColor}`};
+    &::after {
+      display: none;
     }
-    return ''
-  }}
+    & > svg {
+      width: calc(100% - 4px);
+      height: calc(100% - 4px);
+    }
+  `}
 `
 
 const Radio = styled.input`

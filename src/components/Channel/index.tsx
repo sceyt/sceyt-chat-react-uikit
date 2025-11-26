@@ -580,7 +580,7 @@ const Channel: React.FC<IChannelProps> = ({
           />
           {!!channel?.messageRetentionPeriod && (
             <DisappearingMessagesBadge>
-              <BadgeIcon color={accentColor} size='16px' />
+              <BadgeIcon color={accentColor} />
             </DisappearingMessagesBadge>
           )}
           {isDirectChannel &&
