@@ -579,9 +579,7 @@ const Channel: React.FC<IChannelProps> = ({
             setDefaultAvatar={isDirectChannel}
           />
           {!!channel?.messageRetentionPeriod && (
-            <DisappearingMessagesBadge>
-              <BadgeIcon color={accentColor} />
-            </DisappearingMessagesBadge>
+            <DisappearingMessagesBadge color={accentColor} strokeColor={background} />
           )}
           {isDirectChannel &&
             directChannelUser &&
@@ -873,21 +871,17 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const DisappearingMessagesBadge = styled.span`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; strokeColor: string }>`
   position: absolute;
-  top: 0;
-  right: 0;
+  top: -3px;
+  right: -3px;
   width: 20px;
   height: 20px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
-
-  & > svg {
-    width: 20px;
-    height: 20px;
-  }
+  color: ${(props) => props.color};
 `
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
