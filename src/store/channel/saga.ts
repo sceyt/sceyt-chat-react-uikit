@@ -1653,7 +1653,7 @@ function* setMessageRetentionPeriod(action: IAction): any {
     }
 
     if (channel) {
-      const periodInMilliseconds = periodInSeconds !== null ? periodInSeconds * 1000 : null
+      const periodInMilliseconds = periodInSeconds !== null ? periodInSeconds * 1000 : 0
 
       yield call(channel.setMessageRetentionPeriod, periodInSeconds)
 
