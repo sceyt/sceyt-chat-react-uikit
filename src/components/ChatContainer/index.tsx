@@ -122,6 +122,7 @@ export interface IChatClientProps {
   useInviteLink?: boolean
   inviteLinkOptions?: InviteLinkOptions | null
   embeddedJoinGroupPopup?: boolean
+  onUpdateChannel?: (channel: IChannel, updatedFields: string[]) => void
 }
 
 const SceytChatContainer = ({
@@ -154,7 +155,8 @@ const SceytChatContainer = ({
     InviteLinkModal: {},
     ResetLinkConfirmModal: {}
   },
-  embeddedJoinGroupPopup = false
+  embeddedJoinGroupPopup = false,
+  onUpdateChannel
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -193,6 +195,7 @@ const SceytChatContainer = ({
         disableFrowardMentionsCount={disableFrowardMentionsCount}
         chatMinWidth={chatMinWidth}
         embeddedJoinGroupPopup={embeddedJoinGroupPopup}
+        onUpdateChannel={onUpdateChannel}
       />
     </Provider>
   )

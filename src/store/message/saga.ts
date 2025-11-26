@@ -151,6 +151,7 @@ import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
+import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -637,6 +638,7 @@ function* sendTextMessage(action: IAction): any {
     const pendingMessage = JSON.parse(
       JSON.stringify({
         ...messageToSend,
+        attachments: message?.attachments,
         createdAt: new Date(Date.now()),
         mentionedUsers: message.mentionedUsers,
         parentMessage: message.parentMessage
@@ -1220,7 +1222,9 @@ function* getMessagesQuery(action: IAction): any {
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
       }
 
-      if (connectionState === CONNECTION_STATUS.CONNECTED) {
+      const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
+      if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
+        yield put(setWaitToSendPendingMessagesAC(false))
         const pendingMessagesMap = getPendingMessagesMap()
         for (const channelId in pendingMessagesMap) {
           for (const msg of pendingMessagesMap[channelId]) {
@@ -1241,6 +1245,7 @@ function* getMessagesQuery(action: IAction): any {
           yield put(resendPendingPollActionsAC(connectionState))
         }
       }
+      yield put(setWaitToSendPendingMessagesAC(false))
       // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));
     } else if (channel.isMockChannel) {
       yield put(setMessagesAC([]))

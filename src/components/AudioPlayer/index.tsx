@@ -208,7 +208,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             wavesurfer.current.seekTo(0)
             const audioDuration = wavesurfer.current.getDuration()
             setDuration(audioDuration)
-            setCurrentTime(formatAudioVideoTime(0))
+            setCurrentTime(formatAudioVideoTime(audioDuration))
             setCurrentTimeSeconds(0)
             if (playingAudioId === file.id) {
               dispatch(setPlayingAudioIdAC(null))
