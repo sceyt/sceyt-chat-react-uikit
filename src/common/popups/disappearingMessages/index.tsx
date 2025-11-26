@@ -81,6 +81,15 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
     setInitialRender(false)
   }, [currentTimer])
 
+  const selectedTimerValue = useMemo(() => {
+    return selectedOption === 'custom' ? CUSTOM_SECONDS_MAP[customValue] : FIXED_TIMER_OPTIONS[selectedOption]
+  }, [selectedOption, customValue])
+
+  const isValueUnchanged = useMemo(() => {
+    if (initialRender) return true
+    return (currentTimer ?? null) === (selectedTimerValue ?? null)
+  }, [currentTimer, selectedTimerValue, initialRender])
+
   const handleSet = useCallback(() => {
     if (selectedOption === 'custom') {
       handleSetTimer(CUSTOM_SECONDS_MAP[customValue])
@@ -201,7 +210,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
             color={textOnPrimary}
             borderRadius='8px'
             onClick={handleSet}
-            disabled={initialRender}
+            disabled={isValueUnchanged}
           >
             Set
           </SetButton>

@@ -1653,23 +1653,6 @@ function* setMessageRetentionPeriod(action: IAction): any {
     }
 
     if (channel) {
-      const currentPeriod = channel.messageRetentionPeriod ?? null
-      const currentPeriodNormalized = currentPeriod === null ? 0 : currentPeriod
-      const newPeriodNormalized = periodInSeconds === null ? 0 : periodInSeconds
-
-      if (currentPeriodNormalized === newPeriodNormalized) {
-        yield call(channel.setMessageRetentionPeriod, periodInSeconds)
-        yield put(
-          updateChannelDataAC(channelId, {
-            messageRetentionPeriod: periodInSeconds
-          })
-        )
-        updateChannelOnAllChannels(channelId, {
-          messageRetentionPeriod: periodInSeconds
-        })
-        return
-      }
-
       const periodInMilliseconds = periodInSeconds !== null ? periodInSeconds * 1000 : null
 
       yield call(channel.setMessageRetentionPeriod, periodInSeconds)
