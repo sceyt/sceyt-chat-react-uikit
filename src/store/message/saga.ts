@@ -399,8 +399,7 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-          const messageCopy = { ...messageToSend, createdAt: new Date(Date.now()) }
-          pendingMessages.push({ ...messageCopy, attachments: message.attachments })
+          pendingMessages.push({ ...messageToSend, attachments: message.attachments })
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -415,12 +414,12 @@ function* sendMessage(action: IAction): any {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           const activeChannelId = getActiveChannelId()
           if (action.type !== RESEND_MESSAGE) {
-            addMessageToMap(channel.id, messageToSend)
+            addMessageToMap(channel.id, { ...messageToSend, createdAt: new Date(Date.now()) })
             if (activeChannelId === channel.id) {
-              addAllMessages([messageToSend], MESSAGE_LOAD_DIRECTION.NEXT)
+              addAllMessages([{ ...messageToSend, createdAt: new Date(Date.now()) }], MESSAGE_LOAD_DIRECTION.NEXT)
             }
             if (activeChannelId === channel.id) {
-              store.dispatch(addMessageAC(messageToSend))
+              store.dispatch(addMessageAC({ ...messageToSend, createdAt: new Date(Date.now()) }))
             }
             store.dispatch(scrollToNewMessageAC(true))
           }
@@ -609,16 +608,17 @@ function* sendTextMessage(action: IAction): any {
     if (message.repliedInThread) {
       messageBuilder.setReplyInThread()
     }
-    const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-    pendingMessage = JSON.parse(
-      JSON.stringify({
-        ...messageToSend,
-        attachments: message?.attachments,
-        createdAt: new Date(Date.now()),
-        mentionedUsers: message.mentionedUsers,
-        parentMessage: message.parentMessage
-      })
-    )
+    const createdMessage = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
+    const messageToSend = {
+      ...createdMessage,
+      ...(action.type === RESEND_MESSAGE ? { attachments: message?.attachments } : {})
+    }
+    pendingMessage = {
+      ...messageToSend,
+      createdAt: new Date(Date.now()),
+      mentionedUsers: message.mentionedUsers,
+      parentMessage: message.parentMessage
+    }
     sendMessageTid = messageToSend.tid
     if (pendingMessage && pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
