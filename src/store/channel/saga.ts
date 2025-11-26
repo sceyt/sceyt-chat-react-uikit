@@ -1668,7 +1668,7 @@ function* setMessageRetentionPeriod(action: IAction): any {
 
       const messageToSend: any = {
         metadata: { autoDeletePeriod: periodInMilliseconds.toString() },
-        body: 'ATM',
+        body: 'ADM',
         mentionedUsers: [],
         attachments: [],
         type: 'system'

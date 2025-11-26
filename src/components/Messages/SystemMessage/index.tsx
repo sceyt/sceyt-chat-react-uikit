@@ -164,7 +164,7 @@ const Message = ({
                   ? ' left the group'
                   : message.body === 'JL'
                     ? ` joined via invite link`
-                    : message.body === 'ATM'
+                    : message.body === 'ADM'
                       ? !Number(messageMetas?.autoDeletePeriod)
                         ? ' disabled disappearing messages'
                         : ` set disappearing message time to ${formatDisappearingMessageTime(
