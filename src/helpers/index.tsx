@@ -673,7 +673,7 @@ export const hashString = async (str: string) => {
  * @returns Formatted string like "1 hour", "1 week", "2 days", etc., or "Off"
  */
 export const formatDisappearingMessageTime = (periodInMilliseconds: number | null | undefined): string => {
-  if (!periodInMilliseconds || periodInMilliseconds === 0) {
+  if (!periodInMilliseconds) {
     return 'Off'
   }
 
@@ -682,9 +682,9 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
 
   // Fixed timer options (in seconds)
   const FIXED_TIMER_OPTIONS: Record<string, number> = {
-    '1hour': 60 * 60,
     '1day': 60 * 60 * 24,
-    '1week': 60 * 60 * 24 * 7
+    '1week': 60 * 60 * 24 * 7,
+    '1month': 60 * 60 * 24 * 30
   }
 
   // Custom options (in seconds)
@@ -700,14 +700,14 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
   ]
 
   // Check fixed options first
-  if (periodInSeconds === FIXED_TIMER_OPTIONS['1hour']) {
-    return '1 hour'
-  }
   if (periodInSeconds === FIXED_TIMER_OPTIONS['1day']) {
     return '1 day'
   }
   if (periodInSeconds === FIXED_TIMER_OPTIONS['1week']) {
     return '1 week'
+  }
+  if (periodInSeconds === FIXED_TIMER_OPTIONS['1month']) {
+    return '1 month'
   }
 
   // Check custom options

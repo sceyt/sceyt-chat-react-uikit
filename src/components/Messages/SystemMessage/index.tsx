@@ -165,9 +165,11 @@ const Message = ({
                   : message.body === 'JL'
                     ? ` joined via invite link`
                     : message.body === 'DM'
-                      ? ` set disappearing message time to ${formatDisappearingMessageTime(
-                          messageMetas?.autoDeletePeriod
-                        )}`
+                      ? !messageMetas?.autoDeletePeriod
+                        ? ' disabled disappearing messages'
+                        : ` set disappearing message time to ${formatDisappearingMessageTime(
+                            messageMetas?.autoDeletePeriod
+                          )}`
                       : ''}
       </span>
     </Container>

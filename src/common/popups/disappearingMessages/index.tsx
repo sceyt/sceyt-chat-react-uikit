@@ -27,13 +27,13 @@ interface IProps {
   currentTimer?: number | null
 }
 
-type TimerOption = 'off' | '1hour' | '1day' | '1week' | 'custom'
+type TimerOption = 'off' | '1day' | '1week' | '1month' | 'custom'
 
 const FIXED_TIMER_OPTIONS: Record<TimerOption, number | null> = {
   off: 0,
-  '1hour': 60 * 60,
   '1day': 60 * 60 * 24,
   '1week': 60 * 60 * 24 * 7,
+  '1month': 60 * 60 * 24 * 30,
   custom: 60 * 60 * 24 * 2
 }
 
@@ -131,7 +131,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
               Auto-delete after
             </Label>
 
-            {(['off', '1hour', '1day', '1week'] as TimerOption[]).map((option) => (
+            {(['off', '1day', '1week', '1month'] as TimerOption[]).map((option) => (
               <TimerOptionItem key={option} color={textPrimary} onClick={() => setSelectedOption(option)}>
                 <CustomRadio
                   index={option}
@@ -142,7 +142,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                   borderColor={iconInactive}
                   borderRadius='4px'
                 />
-                {option === 'off' ? 'Off' : option === '1hour' ? '1 hour' : option === '1day' ? '1 day' : '1 week'}
+                {option === 'off' ? 'Off' : option === '1day' ? '1 day' : option === '1week' ? '1 week' : '1 month'}
               </TimerOptionItem>
             ))}
 

@@ -242,9 +242,11 @@ const ChannelMessageText = ({
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
                         : lastMessage.body === 'DM'
-                          ? `set disappearing message time to ${formatDisappearingMessageTime(
-                              lastMessageMetas?.autoDeletePeriod
-                            )}`
+                          ? !lastMessageMetas?.autoDeletePeriod
+                            ? 'disabled disappearing messages'
+                            : `set disappearing message time to ${formatDisappearingMessageTime(
+                                lastMessageMetas?.autoDeletePeriod
+                              )}`
                           : ''
           }`
         ) : (

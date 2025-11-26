@@ -232,6 +232,9 @@ const Actions = ({
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const disableAction = directChannelUser && !isSelfChannel && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
+  const hasPermissiontoSetDM = channel.userRole === 'admin' || channel.userRole === 'owner'
+  const canToggleDisappearingMessages = isDirectChannel || hasPermissiontoSetDM
+
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
   }
@@ -499,6 +502,7 @@ const Actions = ({
           </ActionItem>
         )}
         {!channel.isMockChannel &&
+          canToggleDisappearingMessages &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
             <ActionItem
               key={1.5}
