@@ -1,4 +1,4 @@
-import { put, call, takeLatest, takeEvery } from 'redux-saga/effects'
+import { put, call, spawn, takeLatest, takeEvery } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
@@ -229,17 +229,9 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
     mentionedUsers: message.mentionedUsers,
     parentMessage: message.parentMessage
   }
-  addMessageToMap(channel.id, messageToAdd)
-  const activeChannelId = getActiveChannelId()
-  if (activeChannelId === channel.id) {
-    addAllMessages([messageToAdd], MESSAGE_LOAD_DIRECTION.NEXT)
-  }
   setPendingMessage(channel.id, messageToAdd)
   if (!messageToAdd?.forwardingDetails) {
     store.dispatch(scrollToNewMessageAC(true))
-  }
-  if (activeChannelId === channel.id) {
-    store.dispatch(addMessageAC(messageToAdd))
   }
 }
 
@@ -372,7 +364,8 @@ function* sendMessage(action: IAction): any {
             })
             const messageForSend = {
               ...messageToSend,
-              attachments: [messageAttachment]
+              attachments: [messageAttachment],
+              createdAt: new Date(Date.now())
             }
 
             messagesToSend.push(messageForSend)
@@ -406,7 +399,7 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-          const messageCopy = messageToSend
+          const messageCopy = { ...messageToSend, createdAt: new Date(Date.now()) }
           pendingMessages.push({ ...messageCopy, attachments: message.attachments })
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
@@ -416,12 +409,21 @@ function* sendMessage(action: IAction): any {
 
       for (let i = 0; i < messagesToSend.length; i++) {
         const messageAttachment = messagesToSend[i].attachments
-        const messageToSend = messagesToSend[i]
+        let messageToSend = messagesToSend[i]
 
         try {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
-          store.dispatch(scrollToNewMessageAC(true))
-
+          const activeChannelId = getActiveChannelId()
+          if (action.type !== RESEND_MESSAGE) {
+            addMessageToMap(channel.id, messageToSend)
+            if (activeChannelId === channel.id) {
+              addAllMessages([messageToSend], MESSAGE_LOAD_DIRECTION.NEXT)
+            }
+            if (activeChannelId === channel.id) {
+              store.dispatch(addMessageAC(messageToSend))
+            }
+            store.dispatch(scrollToNewMessageAC(true))
+          }
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             let attachmentsToSend = messageAttachment
             if (customUploader) {
@@ -436,9 +438,9 @@ function* sendMessage(action: IAction): any {
                 .create()
             }
             if (linkAttachmentToSend) {
-              messageToSend.attachments = [...attachmentsToSend, linkAttachmentToSend]
+              messageToSend = { ...messageToSend, attachments: [...attachmentsToSend, linkAttachmentToSend] }
             } else {
-              messageToSend.attachments = [...attachmentsToSend]
+              messageToSend = { ...messageToSend, attachments: [...attachmentsToSend] }
             }
 
             const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -468,7 +470,9 @@ function* sendMessage(action: IAction): any {
                 deletePendingAttachment(messageAttachment[k].tid!)
               }
             }
-            message.tid && store.dispatch(removePendingMessageAC(channel.id, message.tid!))
+            if (action.type === RESEND_MESSAGE) {
+              messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
+            }
             let attachmentsToUpdate = []
             if (messageResponse.attachments && messageResponse.attachments.length > 0) {
               const currentAttachmentsMap: { [key: string]: IAttachment } = {}
@@ -619,7 +623,17 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage && pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    store.dispatch(scrollToNewMessageAC(true))
+    if (action.type !== RESEND_MESSAGE && pendingMessage) {
+      const activeChannelId = getActiveChannelId()
+      addMessageToMap(channel.id, pendingMessage)
+      if (activeChannelId === channel.id) {
+        addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
+      }
+      if (activeChannelId === channel.id) {
+        store.dispatch(addMessageAC(pendingMessage))
+      }
+      store.dispatch(scrollToNewMessageAC(true))
+    }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
       if (sendMessageHandler) {
@@ -667,11 +681,8 @@ function* sendTextMessage(action: IAction): any {
         yield put(markChannelAsReadAC(channel.id))
       }
       channel.lastMessage = messageToUpdate
-      if (!isAddToPendingMessagesMap) {
-        message.tid && store.dispatch(removePendingMessageAC(channel.id, message.tid!))
-        message.id && store.dispatch(removePendingMessageAC(channel.id, message.id!))
-        messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid!))
-        messageToSend.id && store.dispatch(removePendingMessageAC(channel.id, messageToSend.id!))
+      if (action.type === RESEND_MESSAGE) {
+        messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
       }
     } else {
       // eslint-disable-next-line
@@ -796,6 +807,15 @@ function* forwardMessage(action: IAction): any {
           }
         }
       }
+      if (action.type !== RESEND_MESSAGE) {
+        addMessageToMap(channel.id, pendingMessage!)
+        if (activeChannelId === channel.id) {
+          addAllMessages([pendingMessage!], MESSAGE_LOAD_DIRECTION.NEXT)
+        }
+        if (activeChannelId === channel.id) {
+          store.dispatch(addMessageAC(pendingMessage!))
+        }
+      }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
         const messageUpdateData = {
@@ -816,7 +836,9 @@ function* forwardMessage(action: IAction): any {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData))))
           updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
         }
-        message.tid && store.dispatch(removePendingMessageAC(channel.id, message.tid))
+        if (action.type === RESEND_MESSAGE) {
+          messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
+        }
 
         updateMessageOnMap(channel.id, {
           messageId: !isAddToPendingMessagesMap ? message.tid : messageToSend.tid,
@@ -962,6 +984,49 @@ function* editMessage(action: IAction): any {
   } catch (e) {
     log.error('ERROR in edit message', e.message)
     // yield put(setErrorNotification(e.message))
+  }
+}
+
+const sendPendingMessages = function* (connectionState: string) {
+  const pendingMessagesMap = { ...getPendingMessagesMap() }
+  for (const channelId in pendingMessagesMap) {
+    for (const msg of pendingMessagesMap[channelId]) {
+      const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
+
+      try {
+        if (msg?.forwardingDetails) {
+          yield call(forwardMessage, {
+            type: RESEND_MESSAGE,
+            payload: { message: msg, connectionState, channelId, isForward: true, isAddToPendingMessagesMap: false }
+          })
+        } else if (attachments && attachments.length > 0) {
+          yield call(sendMessage, {
+            type: RESEND_MESSAGE,
+            payload: {
+              message: msg,
+              connectionState,
+              channelId,
+              sendAttachmentsAsSeparateMessage: false,
+              isResend: true,
+              isAddToPendingMessagesMap: false
+            }
+          })
+        } else {
+          yield call(sendTextMessage, {
+            type: RESEND_MESSAGE,
+            payload: { message: msg, connectionState, channelId, isAddToPendingMessagesMap: false }
+          })
+        }
+      } catch (error) {
+        log.error(`Failed to send pending message ${msg.tid || msg.id}:`, error)
+        // Continue with next message even if this one fails
+      }
+    }
+  }
+
+  const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
+  if (pendingPollActionsMap && Object.keys(pendingPollActionsMap).length > 0) {
+    yield put(resendPendingPollActionsAC(connectionState))
   }
 }
 
@@ -1210,32 +1275,8 @@ function* getMessagesQuery(action: IAction): any {
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
         yield put(setWaitToSendPendingMessagesAC(false))
-        const pendingMessagesMap = getPendingMessagesMap()
-        for (const channelId in pendingMessagesMap) {
-          for (const msg of pendingMessagesMap[channelId]) {
-            const attachments = msg.attachments?.filter((att: IAttachment) => att.type !== attachmentTypes.link)
-            if (msg?.forwardingDetails) {
-              yield call(forwardMessage, {
-                type: RESEND_MESSAGE,
-                payload: { message: msg, connectionState, channelId }
-              })
-            } else if (attachments && attachments.length > 0) {
-              yield call(sendMessage, { type: RESEND_MESSAGE, payload: { message: msg, connectionState, channelId } })
-            } else {
-              yield call(sendTextMessage, {
-                type: RESEND_MESSAGE,
-                payload: { message: msg, connectionState, channelId }
-              })
-            }
-          }
-        }
-
-        const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
-        if (pendingPollActionsMap && Object.keys(pendingPollActionsMap).length > 0) {
-          yield put(resendPendingPollActionsAC(connectionState))
-        }
+        yield spawn(sendPendingMessages, connectionState)
       }
-      yield put(setWaitToSendPendingMessagesAC(false))
       // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));
     } else if (channel.isMockChannel) {
       yield put(setMessagesAC([]))
