@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Popup,
   PopupDescription,
@@ -60,8 +60,16 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   const [customValue, setCustomValue] = useState('2days')
   const [initialRender, setInitialRender] = useState(true)
   const [isDropdownOpen, setDropdownOpen] = useState(false)
+  const previousTimerRef = useRef<number | null | undefined>(currentTimer)
+  const hasInitializedRef = useRef(false)
 
   useEffect(() => {
+    if (previousTimerRef.current !== currentTimer) {
+      setInitialRender(true)
+      hasInitializedRef.current = false
+      previousTimerRef.current = currentTimer
+    }
+
     if (!currentTimer) {
       setSelectedOption('off')
     } else {
@@ -77,9 +85,14 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
         setCustomValue(customMatch?.value || '2days')
       }
     }
-
-    setInitialRender(false)
   }, [currentTimer])
+
+  useEffect(() => {
+    if (!hasInitializedRef.current && initialRender) {
+      hasInitializedRef.current = true
+      setInitialRender(false)
+    }
+  }, [initialRender])
 
   const selectedTimerValue = useMemo(() => {
     return selectedOption === 'custom' ? CUSTOM_SECONDS_MAP[customValue] : FIXED_TIMER_OPTIONS[selectedOption]
@@ -87,7 +100,11 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
 
   const isValueUnchanged = useMemo(() => {
     if (initialRender) return true
-    return (currentTimer ?? null) === (selectedTimerValue ?? null)
+
+    const normalizedCurrent = currentTimer === 0 ? null : currentTimer ?? null
+    const normalizedSelected = selectedTimerValue === 0 ? null : selectedTimerValue ?? null
+
+    return normalizedCurrent === normalizedSelected
   }, [currentTimer, selectedTimerValue, initialRender])
 
   const handleSet = useCallback(() => {
