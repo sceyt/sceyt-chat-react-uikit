@@ -674,53 +674,50 @@ export const hashString = async (str: string) => {
  * @returns Formatted string like "1 hour", "1 week", "2 days", etc., or "Off"
  */
 export const formatDisappearingMessageTime = (periodInMilliseconds: number | null | undefined): string => {
-  if (!periodInMilliseconds) {
-    return 'Off'
-  }
+  if (!periodInMilliseconds) return 'Off'
 
-  // Convert milliseconds to seconds
   const periodInSeconds = periodInMilliseconds / 1000
 
-  // Check fixed options first
-  if (periodInSeconds === FIXED_TIMER_OPTIONS['1day']) {
-    return '1 day'
-  }
-  if (periodInSeconds === FIXED_TIMER_OPTIONS['1week']) {
-    return '1 week'
-  }
-  if (periodInSeconds === FIXED_TIMER_OPTIONS['1month']) {
-    return '1 month'
+  // Check fixed options using switch case
+  switch (periodInSeconds) {
+    case FIXED_TIMER_OPTIONS['1day']:
+      return '1 day'
+    case FIXED_TIMER_OPTIONS['1week']:
+      return '1 week'
+    case FIXED_TIMER_OPTIONS['1month']:
+      return '1 month'
+    default:
+      break
   }
 
   // Check custom options
   const customMatch = CUSTOM_OPTIONS.find((option) => option.seconds === periodInSeconds)
-  if (customMatch) {
-    return customMatch.label
-  }
+  if (customMatch) return customMatch.label
 
-  // Fallback: calculate and format dynamically
-  const days = Math.floor(periodInSeconds / (60 * 60 * 24))
-  const weeks = Math.floor(days / 7)
-  const months = Math.floor(days / 30)
-  const hours = Math.floor(periodInSeconds / (60 * 60))
+  const SECONDS_PER_MINUTE = 60
+  const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60
+  const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24
+  const DAYS_PER_WEEK = 7
+  const DAYS_PER_MONTH = 30
 
-  if (months > 0) {
-    return `${months} ${months === 1 ? 'month' : 'months'}`
-  }
-  if (weeks > 0) {
-    return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
-  }
-  if (days > 0) {
-    return `${days} ${days === 1 ? 'day' : 'days'}`
-  }
-  if (hours > 0) {
-    return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
-  }
+  const days = Math.floor(periodInSeconds / SECONDS_PER_DAY)
+  const weeks = Math.floor(days / DAYS_PER_WEEK)
+  const months = Math.floor(days / DAYS_PER_MONTH)
+  const hours = Math.floor(periodInSeconds / SECONDS_PER_HOUR)
+  const minutes = Math.floor(periodInSeconds / SECONDS_PER_MINUTE)
 
-  const minutes = Math.floor(periodInSeconds / 60)
-  if (minutes > 0) {
-    return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+  switch (true) {
+    case months > 0:
+      return `${months} ${months === 1 ? 'month' : 'months'}`
+    case weeks > 0:
+      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
+    case days > 0:
+      return `${days} ${days === 1 ? 'day' : 'days'}`
+    case hours > 0:
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+    case minutes > 0:
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+    default:
+      return `${periodInSeconds} ${periodInSeconds === 1 ? 'second' : 'seconds'}`
   }
-
-  return `${periodInSeconds} ${periodInSeconds === 1 ? 'second' : 'seconds'}`
 }
