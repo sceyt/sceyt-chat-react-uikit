@@ -26,7 +26,7 @@ let showChannelDetails: boolean = false
 let channelTypesFilter: string[] = []
 let memberCount: number = 10
 let disableFrowardMentionsCount: boolean = false
-
+let onUpdateChannel: (channel: IChannel, updatedFields: string[]) => void = () => {}
 let useInviteLink: boolean = false
 
 export type InviteLinkListItemRenderParams = {
@@ -293,6 +293,14 @@ export function setDisableFrowardMentionsCount(disable: boolean) {
 
 export function getDisableFrowardMentionsCount() {
   return disableFrowardMentionsCount
+}
+
+export function setOnUpdateChannel(callback: (channel: IChannel, updatedFields: string[]) => void) {
+  onUpdateChannel = callback
+}
+
+export function getOnUpdateChannel() {
+  return onUpdateChannel
 }
 
 // eslint-disable-next-line no-unused-vars

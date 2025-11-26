@@ -424,7 +424,7 @@ const MentionsList = styled.ul<{
   theme: string
 }>`
   position: absolute;
-  bottom: 100%;
+  bottom: 5px;
   width: 300px;
   transition: all 0.2s;
   overflow: auto;

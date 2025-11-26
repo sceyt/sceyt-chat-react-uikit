@@ -64,6 +64,13 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
   const handleViewResults = () => setShowResults(true)
 
+  const handleResultsClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isHaveResults && !poll.anonymous) {
+      handleViewResults()
+    }
+  }
+
   return (
     <Container>
       <Question color={textPrimary}>{poll.name}</Question>
@@ -106,7 +113,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
                 )}
                 <Title color={textPrimary}>{opt.name}</Title>
                 {poll.anonymous ? null : (
-                  <UsersContainer>
+                  <UsersContainer onClick={handleResultsClick} cursor={poll.anonymous ? 'default' : 'pointer'}>
                     {optionVotesUsers.map((vote: IPollVote) => (
                       <Avatar
                         key={vote?.user?.id}
@@ -121,7 +128,9 @@ const PollMessage = ({ message }: PollMessageProps) => {
                     ))}
                   </UsersContainer>
                 )}
-                <Votes color={textPrimary}>{votes}</Votes>
+                <Votes color={textPrimary} onClick={handleResultsClick} cursor={poll.anonymous ? 'default' : 'pointer'}>
+                  {votes}
+                </Votes>
               </TopRow>
               <Bar track={borderSecondary} closed={poll.closed}>
                 <Fill style={{ width: `${pct}%`, background: accent }} />
@@ -137,7 +146,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
           color={isHaveResults ? accent : textSecondary}
           disabledOpacity={0.8}
           borderRadius='14px'
-          onClick={isHaveResults ? handleViewResults : undefined}
+          onClick={handleViewResults}
           style={{ width: '100%', marginTop: 10 }}
           disabled={!isHaveResults}
         >
@@ -238,13 +247,14 @@ const Title = styled.div<{ color: string }>`
   word-break: break-word;
 `
 
-const Votes = styled.span<{ color: string }>`
+const Votes = styled.span<{ color: string; cursor: string }>`
   color: ${(p) => p.color};
   font-weight: 400;
   font-size: 14px;
   line-height: 20px;
   letter-spacing: -0.2px;
   margin-left: 4px;
+  cursor: ${(p) => p.cursor};
 `
 
 const Bar = styled.div<{ track: string; closed?: boolean }>`
@@ -262,10 +272,11 @@ const Fill = styled.div`
   transition: width 0.3s ease-in-out;
 `
 
-const UsersContainer = styled.div`
+const UsersContainer = styled.div<{ cursor: string }>`
   display: flex;
   align-items: center;
   margin-left: auto;
   padding-left: 16px;
   height: max-content;
+  cursor: ${(p) => p.cursor};
 `

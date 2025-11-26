@@ -28,7 +28,7 @@ import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import PollMessage from '../PollMessage'
 import log from 'loglevel'
-import { OGMetadata } from '../OGMetadata'
+import { isDescriptionOnlySymbol, OGMetadata } from '../OGMetadata'
 import { MESSAGE_TYPE } from 'types/enum'
 
 interface IMessageBodyProps {
@@ -445,7 +445,7 @@ const MessageBody = ({
   }, [oGMetadata, linkAttachment?.url])
 
   const ogMetadataContainerWidth = useMemo(() => {
-    if (!linkMetadata || !linkAttachment) return ogMetadataProps?.maxWidth || 400
+    if (!linkMetadata || !linkAttachment) return undefined
 
     if (hasLongLinkAttachmentUrl) {
       return 400
@@ -457,9 +457,13 @@ const MessageBody = ({
     const calculatedImageHeight =
       imageWidth && imageHeight ? imageHeight / (imageWidth / (ogMetadataProps?.maxWidth || 400)) : 0
     const showImage = hasImage && calculatedImageHeight >= 180 && calculatedImageHeight <= 400
-    const hasDescription = linkMetadata?.og?.description
+    const hasDescription =
+      !isDescriptionOnlySymbol(linkMetadata?.og?.description) && linkMetadata?.og?.description?.trim()
     const hasFavicon = ogMetadataProps?.ogShowFavicon && linkMetadata?.faviconLoaded && linkMetadata?.og?.favicon?.url
 
+    if (!hasDescription) {
+      return undefined
+    }
     if (showImage) {
       return 400
     }
