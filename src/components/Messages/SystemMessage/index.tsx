@@ -16,7 +16,7 @@ import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
 import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
-import { scrollToNewMessageSelector } from 'store/message/selector'
+import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 
 interface ISystemMessageProps {
@@ -32,6 +32,7 @@ interface ISystemMessageProps {
   backgroundColor?: string
   borderRadius?: string
   tabIsActive?: boolean
+  setLastVisibleMessageId?: (messageId: string) => void
 }
 
 const Message = ({
@@ -46,7 +47,8 @@ const Message = ({
   border,
   backgroundColor,
   borderRadius,
-  contactsMap
+  contactsMap,
+  setLastVisibleMessageId
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -57,6 +59,7 @@ const Message = ({
   const getFromContacts = getShowOnlyContactUsers()
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
+  const unreadScrollTo = useSelector(unreadScrollToSelector)
 
   const messageMetas = useMemo(() => {
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
@@ -71,14 +74,20 @@ const Message = ({
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED
+      channel.newMessageCount &&
+      channel.newMessageCount > 0 &&
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      !unreadScrollTo
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !unreadScrollTo) {
+      if (setLastVisibleMessageId) {
+        setLastVisibleMessageId(message.id)
+      }
       handleSendReadMarker()
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
@@ -93,7 +102,7 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible])
+  }, [isVisible, unreadScrollTo])
 
   useDidUpdate(() => {
     if (tabIsActive) {

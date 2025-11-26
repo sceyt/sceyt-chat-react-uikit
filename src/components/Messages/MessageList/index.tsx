@@ -1288,6 +1288,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         border={dateDividerBorder}
                         backgroundColor={dateDividerBackgroundColor}
                         borderRadius={dateDividerBorderRadius}
+                        setLastVisibleMessageId={setLastVisibleMessageId}
                       />
                     ) : (
                       <MessageWrapper
