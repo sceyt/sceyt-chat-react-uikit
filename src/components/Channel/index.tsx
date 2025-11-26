@@ -241,7 +241,7 @@ const ChannelMessageText = ({
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
-                        : lastMessage.body === 'DM'
+                        : lastMessage.body === 'ATM'
                           ? !lastMessageMetas?.autoDeletePeriod
                             ? 'disabled disappearing messages'
                             : `set disappearing message time to ${formatDisappearingMessageTime(
