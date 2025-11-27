@@ -235,6 +235,27 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
   }
 }
 
+const updateMessage = async (
+  actionType: string,
+  pending: IMessage,
+  channel: IChannel,
+  scrollToNewMessage: boolean = true
+) => {
+  const activeChannelId = getActiveChannelId()
+  if (actionType !== RESEND_MESSAGE) {
+    addMessageToMap(channel.id, pending)
+    if (activeChannelId === channel.id) {
+      addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
+    }
+    if (activeChannelId === channel.id) {
+      store.dispatch(addMessageAC(pending))
+    }
+    if (scrollToNewMessage) {
+      store.dispatch(scrollToNewMessageAC(true))
+    }
+  }
+}
+
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
   const { payload } = action
@@ -369,7 +390,9 @@ function* sendMessage(action: IAction): any {
             }
 
             messagesToSend.push(messageForSend)
-            pendingMessages.push({ ...messageForSend, attachments: [attachment] })
+            const pending = { ...messageForSend, attachments: [attachment], createdAt: new Date(Date.now()) }
+            pendingMessages.push(pending)
+            updateMessage(action.type, pending, channel)
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -399,7 +422,9 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-          pendingMessages.push({ ...messageToSend, attachments: message.attachments })
+          const pending = { ...messageToSend, attachments: message.attachments, createdAt: new Date(Date.now()) }
+          pendingMessages.push(pending)
+          updateMessage(action.type, pending, channel)
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -412,17 +437,6 @@ function* sendMessage(action: IAction): any {
 
         try {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
-          const activeChannelId = getActiveChannelId()
-          if (action.type !== RESEND_MESSAGE) {
-            addMessageToMap(channel.id, { ...messageToSend, createdAt: new Date(Date.now()) })
-            if (activeChannelId === channel.id) {
-              addAllMessages([{ ...messageToSend, createdAt: new Date(Date.now()) }], MESSAGE_LOAD_DIRECTION.NEXT)
-            }
-            if (activeChannelId === channel.id) {
-              store.dispatch(addMessageAC({ ...messageToSend, createdAt: new Date(Date.now()) }))
-            }
-            store.dispatch(scrollToNewMessageAC(true))
-          }
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
             let attachmentsToSend = messageAttachment
             if (customUploader) {
@@ -623,16 +637,8 @@ function* sendTextMessage(action: IAction): any {
     if (pendingMessage && pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    if (action.type !== RESEND_MESSAGE && pendingMessage) {
-      const activeChannelId = getActiveChannelId()
-      addMessageToMap(channel.id, pendingMessage)
-      if (activeChannelId === channel.id) {
-        addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
-      }
-      if (activeChannelId === channel.id) {
-        store.dispatch(addMessageAC(pendingMessage))
-      }
-      store.dispatch(scrollToNewMessageAC(true))
+    if (pendingMessage) {
+      updateMessage(action.type, pendingMessage, channel)
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
@@ -807,14 +813,8 @@ function* forwardMessage(action: IAction): any {
           }
         }
       }
-      if (action.type !== RESEND_MESSAGE) {
-        addMessageToMap(channel.id, pendingMessage!)
-        if (activeChannelId === channel.id) {
-          addAllMessages([pendingMessage!], MESSAGE_LOAD_DIRECTION.NEXT)
-        }
-        if (activeChannelId === channel.id) {
-          store.dispatch(addMessageAC(pendingMessage!))
-        }
+      if (pendingMessage) {
+        updateMessage(action.type, pendingMessage, channel, false)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
