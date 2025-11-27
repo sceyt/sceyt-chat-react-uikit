@@ -1,5 +1,6 @@
 import React from 'react'
 import styled from 'styled-components'
+import { ReactComponent as TickIcon } from '../../assets/svg/tick.svg'
 
 interface IProps {
   onChange: (e: any) => void
@@ -11,6 +12,7 @@ interface IProps {
   borderRadius?: string
   size?: string
   disabled?: boolean
+  variant?: 'radio' | 'checkbox'
 }
 
 const CustomRadio = ({
@@ -22,8 +24,11 @@ const CustomRadio = ({
   border,
   borderRadius,
   size,
-  disabled
+  disabled,
+  variant = 'radio'
 }: IProps) => {
+  const isCheckboxStyle = variant === 'checkbox'
+
   return (
     <React.Fragment>
       <CustomLabel
@@ -33,8 +38,11 @@ const CustomRadio = ({
         borderColor={borderColor}
         border={border}
         borderRadius={borderRadius}
+        isCheckboxStyle={isCheckboxStyle}
         htmlFor={`radio-${index}`}
-      />
+      >
+        {state && isCheckboxStyle && <TickIcon />}
+      </CustomLabel>
 
       <Radio
         disabled={disabled}
@@ -56,6 +64,7 @@ const CustomLabel = styled.label<{
   checkedBorderColor: string
   borderRadius?: string
   isChecked: boolean
+  isCheckboxStyle: boolean
 }>`
   position: relative;
   display: flex;
@@ -71,6 +80,7 @@ const CustomLabel = styled.label<{
 
   ${(props) =>
     props.isChecked &&
+    !props.isCheckboxStyle &&
     `
     &::after {
     content: '';
@@ -79,7 +89,21 @@ const CustomLabel = styled.label<{
     height: calc(100% - 3px);
     border-radius: 50%;
     background-color: ${props.checkedBorderColor};
-  }
+    }
+  `}
+
+  ${(props) =>
+    props.isCheckboxStyle &&
+    `
+    background-color: ${props.isChecked ? props.checkedBorderColor : 'transparent'};
+    border: ${props.isChecked ? 'none' : props.border || `1px solid ${props.borderColor}`};
+    &::after {
+      display: none;
+    }
+    & > svg {
+      width: calc(100% - 4px);
+      height: calc(100% - 4px);
+    }
   `}
 `
 

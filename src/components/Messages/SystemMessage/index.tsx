@@ -8,7 +8,7 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { useColor, useDidUpdate, useOnScreen } from '../../../hooks'
 // Helpers
 import { isJSON, makeUsername } from '../../../helpers/message'
-import { systemMessageUserName } from '../../../helpers'
+import { systemMessageUserName, formatDisappearingMessageTime } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
@@ -173,7 +173,13 @@ const Message = ({
                   ? ' left the group'
                   : message.body === 'JL'
                     ? ` joined via invite link`
-                    : ''}
+                    : message.body === 'ADM'
+                      ? !Number(messageMetas?.autoDeletePeriod)
+                        ? ' disabled disappearing messages'
+                        : ` set disappearing message time to ${formatDisappearingMessageTime(
+                            messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
+                          )}`
+                      : ''}
       </span>
     </Container>
   )

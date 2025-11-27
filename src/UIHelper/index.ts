@@ -417,11 +417,12 @@ export const PopupName = styled.h3<{
   padding?: string
   isDelete?: boolean
   color: string
+  lineHeight?: string
 }>`
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
-  line-height: 23px;
+  line-height: ${(props) => props.lineHeight || '23px'};
   color: ${(props) => props.color};
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
@@ -507,9 +508,14 @@ export const Popup = styled.div<{
     `};
 `
 
-export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; paddingV?: string }>`
+export const PopupBody = styled.div<{
+  withFooter?: boolean
+  paddingH?: string
+  paddingV?: string
+  marginBottom?: string
+}>`
   padding: ${(props) => `${props.paddingV || 0} ${props.paddingH || 0}`};
-  margin-bottom: 8px;
+  margin-bottom: ${(props) => props.marginBottom || '8px'};
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 

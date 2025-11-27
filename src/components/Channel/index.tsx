@@ -20,10 +20,11 @@ import { ReactComponent as MentionIcon } from '../../assets/svg/unreadMention.sv
 import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNotifications.svg'
 import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
 import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
+import { ReactComponent as BadgeIcon } from '../../assets/svg/badge.svg'
 // Components
 import Avatar from '../Avatar'
 // Helpers
-import { systemMessageUserName } from '../../helpers'
+import { systemMessageUserName, formatDisappearingMessageTime } from '../../helpers'
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
@@ -240,7 +241,13 @@ const ChannelMessageText = ({
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
-                        : ''
+                        : lastMessage.body === 'ADM'
+                          ? !lastMessageMetas?.autoDeletePeriod
+                            ? 'disabled disappearing messages'
+                            : `set disappearing message time to ${formatDisappearingMessageTime(
+                                lastMessageMetas?.autoDeletePeriod
+                              )}`
+                          : ''
           }`
         ) : (
           <React.Fragment>
@@ -546,6 +553,7 @@ const Channel: React.FC<IChannelProps> = ({
     <Container
       // ref={channelItemRef}
       theme={theme}
+      backgroundColor={background}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
       selectedBackgroundColor={selectedChannelBackground || backgroundFocused}
@@ -571,6 +579,9 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
+          {!!channel?.messageRetentionPeriod && (
+            <DisappearingMessagesBadge color={accentColor} className='disappearing-messages-badge' />
+          )}
           {isDirectChannel &&
             directChannelUser &&
             hideUserPresence &&
@@ -702,11 +713,11 @@ const Channel: React.FC<IChannelProps> = ({
                           lastMessage.state !== MESSAGE_STATUS.DELETE &&
                           (channel.lastReactedMessage && channel.newReactions && channel.newReactions[0]
                             ? channel.newReactions[0].user && channel.newReactions[0].user.id === user.id
-                            : lastMessage.user.id === user.id)))
+                            : lastMessage.user.id === user.id && lastMessage.type !== MESSAGE_TYPE.SYSTEM)))
                     : draftMessageText ||
                       (lastMessage &&
                         lastMessage.state !== MESSAGE_STATUS.DELETE &&
-                        lastMessage.type !== 'system')) && (
+                        lastMessage.type !== MESSAGE_TYPE.SYSTEM)) && (
                     <Points color={(draftMessageText && warningColor) || textPrimary}>: </Points>
                   )}
                 <LastMessageText
@@ -861,6 +872,19 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ strokeColor: string }>`
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  color: ${(props) => props.color};
+`
+
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
   position: absolute;
   width: 12px;
@@ -882,6 +906,7 @@ const Container = styled.div<{
   selectedChannelBorderRadius?: string
   theme?: string
   hoverBackground?: string
+  backgroundColor?: string
 }>`
   position: relative;
   display: flex;
@@ -898,6 +923,16 @@ const Container = styled.div<{
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
 
   transition: all 0.2s;
+  .disappearing-messages-badge {
+    & > path:nth-child(1) {
+      stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.backgroundColor)};
+    }
+    g {
+      path {
+        stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.backgroundColor)};
+      }
+    }
+  }
   &:hover {
     ${({ selectedChannel, hoverBackground }) =>
       !selectedChannel &&
@@ -906,6 +941,16 @@ const Container = styled.div<{
     `}
     ${UserStatus} {
       border-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+    }
+    .disappearing-messages-badge {
+      & > path:nth-child(1) {
+        stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+      }
+      g {
+        path {
+          stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+        }
+      }
     }
   }
   ${UserStatus} {

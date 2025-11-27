@@ -58,7 +58,8 @@ import {
   REGENERATE_CHANNEL_INVITE_KEY,
   UPDATE_CHANNEL_INVITE_KEY,
   GET_CHANNEL_BY_INVITE_KEY,
-  JOIN_TO_CHANNEL_WITH_INVITE_KEY
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  SET_MESSAGE_RETENTION_PERIOD
 } from './constants'
 import {
   destroyChannelsMap,
@@ -1642,6 +1643,44 @@ function* joinChannelWithInviteKey(action: IAction): any {
   }
 }
 
+function* setMessageRetentionPeriod(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, periodInSeconds } = payload
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+    }
+
+    if (channel) {
+      const periodInMilliseconds = periodInSeconds !== null ? periodInSeconds * 1000 : 0
+
+      yield call(channel.setMessageRetentionPeriod, periodInSeconds)
+
+      yield put(
+        updateChannelDataAC(channelId, {
+          messageRetentionPeriod: periodInSeconds
+        })
+      )
+      updateChannelOnAllChannels(channelId, {
+        messageRetentionPeriod: periodInSeconds
+      })
+
+      const messageToSend: any = {
+        metadata: { autoDeletePeriod: periodInMilliseconds.toString() },
+        body: 'ADM',
+        mentionedUsers: [],
+        attachments: [],
+        type: 'system'
+      }
+      yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
+    }
+  } catch (e) {
+    log.error('ERROR in set message retention period', e)
+    // yield put(setErrorNotification(e.message))
+  }
+}
+
 export default function* ChannelsSaga() {
   yield takeLatest(CREATE_CHANNEL, createChannel)
   yield takeLatest(GET_CHANNELS, getChannels)
@@ -1683,4 +1722,5 @@ export default function* ChannelsSaga() {
   // yield takeLatest(GET_REVOKED_CHANNEL_INVITE_KEYS, getRevokedChannelInviteKeys)
   yield takeLatest(GET_CHANNEL_BY_INVITE_KEY, getChannelByInviteKey)
   yield takeLatest(JOIN_TO_CHANNEL_WITH_INVITE_KEY, joinChannelWithInviteKey)
+  yield takeLatest(SET_MESSAGE_RETENTION_PERIOD, setMessageRetentionPeriod)
 }

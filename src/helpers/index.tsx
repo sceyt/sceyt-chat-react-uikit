@@ -3,6 +3,7 @@ import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 import log from 'loglevel'
+import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS } from './constants'
 
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
@@ -665,4 +666,58 @@ export const hashString = async (str: string) => {
   }
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Formats disappearing message period from milliseconds to human-readable string
+ * @param periodInMilliseconds - Period in milliseconds (or 0/null for "Off")
+ * @returns Formatted string like "1 hour", "1 week", "2 days", etc., or "Off"
+ */
+export const formatDisappearingMessageTime = (periodInMilliseconds: number | null | undefined): string => {
+  if (!periodInMilliseconds) return 'Off'
+
+  const periodInSeconds = periodInMilliseconds / 1000
+
+  // Check fixed options using switch case
+  switch (periodInSeconds) {
+    case FIXED_TIMER_OPTIONS['1day']:
+      return '1 day'
+    case FIXED_TIMER_OPTIONS['1week']:
+      return '1 week'
+    case FIXED_TIMER_OPTIONS['1month']:
+      return '1 month'
+    default:
+      break
+  }
+
+  // Check custom options
+  const customMatch = CUSTOM_OPTIONS.find((option) => option.seconds === periodInSeconds)
+  if (customMatch) return customMatch.label
+
+  const SECONDS_PER_MINUTE = 60
+  const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60
+  const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24
+  const DAYS_PER_WEEK = 7
+  const DAYS_PER_MONTH = 30
+
+  const days = Math.floor(periodInSeconds / SECONDS_PER_DAY)
+  const weeks = Math.floor(days / DAYS_PER_WEEK)
+  const months = Math.floor(days / DAYS_PER_MONTH)
+  const hours = Math.floor(periodInSeconds / SECONDS_PER_HOUR)
+  const minutes = Math.floor(periodInSeconds / SECONDS_PER_MINUTE)
+
+  switch (true) {
+    case months > 0:
+      return `${months} ${months === 1 ? 'month' : 'months'}`
+    case weeks > 0:
+      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
+    case days > 0:
+      return `${days} ${days === 1 ? 'day' : 'days'}`
+    case hours > 0:
+      return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
+    case minutes > 0:
+      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
+    default:
+      return `${periodInSeconds} ${periodInSeconds === 1 ? 'second' : 'seconds'}`
+  }
 }
