@@ -19,7 +19,8 @@ import CustomRadio from '../../customRadio'
 import PopupContainer from '../popupContainer'
 import { useColor } from '../../../hooks'
 import DropDown from '../../dropdown'
-import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS, CUSTOM_SECONDS_MAP, TimerOption } from '../../../helpers/constants'
+import { FIXED_TIMER_OPTIONS, TimerOption } from '../../../helpers/constants'
+import { getDisappearingSettings } from 'helpers/channelHalper'
 
 interface IProps {
   theme?: string
@@ -62,6 +63,14 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   const [isDropdownOpen, setDropdownOpen] = useState(false)
   const previousTimerRef = useRef<number | null | undefined>(currentTimer)
   const hasInitializedRef = useRef(false)
+
+  const CUSTOM_OPTIONS = useMemo(() => {
+    return getDisappearingSettings()?.customOptions || []
+  }, [])
+
+  const CUSTOM_SECONDS_MAP = useMemo(() => {
+    return Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.value, o.seconds]))
+  }, [CUSTOM_OPTIONS])
 
   useEffect(() => {
     if (previousTimerRef.current !== currentTimer) {
@@ -118,7 +127,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
 
   const selectedCustomLabel = useMemo(() => {
     return CUSTOM_OPTIONS.find((o) => o.value === customValue)?.label || '2 days'
-  }, [customValue])
+  }, [customValue, CUSTOM_OPTIONS])
 
   return (
     <PopupContainer>
@@ -155,19 +164,21 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
               </TimerOptionItem>
             ))}
 
-            <TimerOptionItem color={textPrimary} onClick={() => setSelectedOption('custom')}>
-              <CustomRadio
-                index='custom'
-                size='18px'
-                state={selectedOption === 'custom'}
-                onChange={() => setSelectedOption('custom')}
-                checkedBorderColor={accentColor}
-                borderColor={iconInactive}
-                borderRadius='4px'
-                variant='checkbox'
-              />
-              Custom
-            </TimerOptionItem>
+            {CUSTOM_OPTIONS.length > 0 && (
+              <TimerOptionItem color={textPrimary} onClick={() => setSelectedOption('custom')}>
+                <CustomRadio
+                  index='custom'
+                  size='18px'
+                  state={selectedOption === 'custom'}
+                  onChange={() => setSelectedOption('custom')}
+                  checkedBorderColor={accentColor}
+                  borderColor={iconInactive}
+                  borderRadius='4px'
+                  variant='checkbox'
+                />
+                Custom
+              </TimerOptionItem>
+            )}
 
             {selectedOption === 'custom' && (
               <CustomTimerSection>

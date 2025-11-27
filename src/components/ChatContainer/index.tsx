@@ -11,7 +11,7 @@ import {
   setBaseUrlForInviteMembers,
   setInviteLinkOptions,
   setUseInviteLink,
-  setEnableDisappearingMessages
+  setDisappearingSettings
 } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
@@ -124,7 +124,14 @@ export interface IChatClientProps {
   inviteLinkOptions?: InviteLinkOptions | null
   embeddedJoinGroupPopup?: boolean
   onUpdateChannel?: (channel: IChannel, updatedFields: string[]) => void
-  enableDisappearingMessages?: boolean
+  disappearingSettings?: {
+    show?: boolean
+    customOptions?: {
+      label: string
+      value: string
+      seconds: number
+    }[]
+  } | null
 }
 
 const SceytChatContainer = ({
@@ -159,21 +166,35 @@ const SceytChatContainer = ({
   },
   embeddedJoinGroupPopup = false,
   onUpdateChannel,
-  enableDisappearingMessages = false
+  disappearingSettings = null
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
+  }, [logLevel])
+
+  useEffect(() => {
     if (baseUrlForInviteMembers) {
       setBaseUrlForInviteMembers(baseUrlForInviteMembers)
     }
+  }, [baseUrlForInviteMembers])
+
+  useEffect(() => {
     if (useInviteLink) {
       setUseInviteLink(useInviteLink)
     }
+  }, [useInviteLink])
+
+  useEffect(() => {
     if (inviteLinkOptions) {
       setInviteLinkOptions(inviteLinkOptions)
     }
-    setEnableDisappearingMessages(enableDisappearingMessages)
-  }, [baseUrlForInviteMembers, useInviteLink, inviteLinkOptions, enableDisappearingMessages])
+  }, [inviteLinkOptions])
+
+  useEffect(() => {
+    if (disappearingSettings) {
+      setDisappearingSettings(disappearingSettings)
+    }
+  }, [disappearingSettings])
 
   return (
     <Provider store={store} context={SceytReduxContext}>

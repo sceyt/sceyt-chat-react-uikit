@@ -539,8 +539,12 @@ function* sendMessage(action: IAction): any {
         } catch (e) {
           const pendingMessage = pendingMessages?.find((pendingMessage) => pendingMessage.tid === messageToSend.tid)
           if (channel && pendingMessage && action.type !== RESEND_MESSAGE) {
-            if (isAddToPendingMessagesMap) {
+            const connectionIsDisconnected =
+              store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+            if (isAddToPendingMessagesMap && connectionIsDisconnected) {
               yield call(addPendingMessage, message, pendingMessage, channel)
+            } else {
+              yield put(removePendingMessageAC(channel.id, pendingMessage.tid!))
             }
           }
           log.error('Error on uploading attachment', messageToSend.tid, e)
@@ -699,8 +703,11 @@ function* sendTextMessage(action: IAction): any {
     // messageForCatch = messageToSend
   } catch (e) {
     if (activeChannelId === channel.id && pendingMessage && action.type !== RESEND_MESSAGE) {
-      if (isAddToPendingMessagesMap) {
+      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
         yield call(addPendingMessage, message, pendingMessage, channel)
+      } else {
+        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
       }
     }
     log.error('error on send text message ... ', e)
@@ -861,8 +868,11 @@ function* forwardMessage(action: IAction): any {
     }
   } catch (e) {
     if (pendingMessage && channel && action.type !== RESEND_MESSAGE) {
-      if (isAddToPendingMessagesMap) {
+      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
         yield call(addPendingMessage, message, pendingMessage, channel)
+      } else {
+        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
       }
     }
     if (channel && messageTid) {

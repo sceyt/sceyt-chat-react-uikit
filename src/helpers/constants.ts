@@ -121,16 +121,3 @@ export const FIXED_TIMER_OPTIONS: Record<TimerOption, number | null> = {
   '1month': 60 * 60 * 24 * 30,
   custom: 60 * 60 * 24 * 2
 }
-
-export const CUSTOM_OPTIONS = [
-  { label: '1 day', value: '1day', seconds: 60 * 60 * 24 },
-  { label: '2 days', value: '2days', seconds: 60 * 60 * 24 * 2 },
-  { label: '3 days', value: '3days', seconds: 60 * 60 * 24 * 3 },
-  { label: '4 days', value: '4days', seconds: 60 * 60 * 24 * 4 },
-  { label: '5 days', value: '5days', seconds: 60 * 60 * 24 * 5 },
-  { label: '1 week', value: '1week', seconds: 60 * 60 * 24 * 7 },
-  { label: '2 weeks', value: '2weeks', seconds: 60 * 60 * 24 * 14 },
-  { label: '1 month', value: '1month', seconds: 60 * 60 * 24 * 30 }
-]
-
-export const CUSTOM_SECONDS_MAP = Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.value, o.seconds]))
