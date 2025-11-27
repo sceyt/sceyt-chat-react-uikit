@@ -578,7 +578,9 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
-          {!!channel?.messageRetentionPeriod && <DisappearingMessagesBadge color={accentColor} />}
+          {!!channel?.messageRetentionPeriod && (
+            <DisappearingMessagesBadge strokeColor={background} $isLightMode={background === '#FFFFFF'} />
+          )}
           {isDirectChannel &&
             directChannelUser &&
             hideUserPresence &&
@@ -869,7 +871,7 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string }>`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ strokeColor: string; $isLightMode: boolean }>`
   position: absolute;
   top: -3px;
   right: -3px;
@@ -880,6 +882,10 @@ export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string }>`
   justify-content: center;
   z-index: 1;
   color: ${(props) => props.color};
+
+  path.badge-white-stroke {
+    stroke: ${(props) => (props.$isLightMode ? '#FFFFFF' : 'transparent')} !important;
+  }
 `
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`

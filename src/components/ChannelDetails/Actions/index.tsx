@@ -201,7 +201,8 @@ const Actions = ({
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
-    [THEME_COLORS.WARNING]: warningColor
+    [THEME_COLORS.WARNING]: warningColor,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -513,7 +514,7 @@ const Actions = ({
               fontSize={actionItemsFontSize}
             >
               <React.Fragment>
-                <DefaultWatchIcon />
+                <DefaultWatchIcon $isLightMode={backgroundColor === '#FFFFFF'} />
                 Disappearing messages
                 <DisappearingMessagesStatusWrapper>
                   <DisappearingMessagesStatus color={textSecondary}>
@@ -985,9 +986,14 @@ const DefaultClearIcon = styled(ClearIcon)``
 const DefaultDeleteChannelIcon = styled(DeleteChannelIconD)``
 const DefaultBottomIcon = styled(BottomIcon)``
 const DefaultMarkAsReadIcon = styled(LeaveIcon)``
-const DefaultWatchIcon = styled(WatchIcon)`
-  width: 20px;
-  height: 20px;
+const DefaultWatchIcon = styled(WatchIcon)<{ $isLightMode: boolean }>`
+  width: 24px;
+  height: 24px;
+
+  path.watch-ticks,
+  path:nth-child(2) {
+    fill: ${(props) => (props.$isLightMode ? '#FFFFFF' : '#000000')} !important;
+  }
 `
 
 const ActionItem = styled.li<{
