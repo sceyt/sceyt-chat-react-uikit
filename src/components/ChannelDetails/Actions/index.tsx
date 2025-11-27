@@ -365,7 +365,8 @@ const Actions = ({
   }
 
   const handleSetDisappearingMessagesTimer = (timerInSeconds: number | null) => {
-    dispatch(setMessageRetentionPeriodAC(channel.id, timerInSeconds))
+    const periodInMilliseconds = timerInSeconds ? timerInSeconds * 1000 : 0
+    dispatch(setMessageRetentionPeriodAC(channel.id, periodInMilliseconds))
   }
 
   const containerRef = useRef<any>(null)

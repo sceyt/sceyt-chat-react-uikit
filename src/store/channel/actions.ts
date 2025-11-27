@@ -366,7 +366,7 @@ export const joinChannelWithInviteKeyAC = (key: string) => ({
   payload: { key }
 })
 
-export const setMessageRetentionPeriodAC = (channelId: string, periodInSeconds: number | null) => ({
+export const setMessageRetentionPeriodAC = (channelId: string, periodInMilliseconds: number | null) => ({
   type: SET_MESSAGE_RETENTION_PERIOD,
-  payload: { channelId, periodInSeconds }
+  payload: { channelId, periodInMilliseconds }
 })

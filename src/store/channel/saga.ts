@@ -1646,24 +1646,22 @@ function* joinChannelWithInviteKey(action: IAction): any {
 function* setMessageRetentionPeriod(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, periodInSeconds } = payload
+    const { channelId, periodInMilliseconds } = payload
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
     }
 
     if (channel) {
-      const periodInMilliseconds = periodInSeconds !== null ? periodInSeconds * 1000 : 0
-
-      yield call(channel.setMessageRetentionPeriod, periodInSeconds)
+      yield call(channel.setMessageRetentionPeriod, periodInMilliseconds)
 
       yield put(
         updateChannelDataAC(channelId, {
-          messageRetentionPeriod: periodInSeconds
+          messageRetentionPeriod: periodInMilliseconds
         })
       )
       updateChannelOnAllChannels(channelId, {
-        messageRetentionPeriod: periodInSeconds
+        messageRetentionPeriod: periodInMilliseconds
       })
 
       const messageToSend: any = {
