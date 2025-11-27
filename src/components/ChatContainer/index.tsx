@@ -128,7 +128,6 @@ export interface IChatClientProps {
     show?: boolean
     customOptions?: {
       label: string
-      value: string
       seconds: number
     }[]
   } | null

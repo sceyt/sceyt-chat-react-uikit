@@ -58,7 +58,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   } = colors
 
   const [selectedOption, setSelectedOption] = useState<TimerOption>('off')
-  const [customValue, setCustomValue] = useState('2days')
+  const [customValue, setCustomValue] = useState<string>('')
   const [initialRender, setInitialRender] = useState(true)
   const [isDropdownOpen, setDropdownOpen] = useState(false)
   const previousTimerRef = useRef<number | null | undefined>(currentTimer)
@@ -68,8 +68,14 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
     return getDisappearingSettings()?.customOptions || []
   }, [])
 
+  useEffect(() => {
+    if (CUSTOM_OPTIONS.length > 0 && CUSTOM_OPTIONS[0]?.label) {
+      setCustomValue(CUSTOM_OPTIONS[0]?.label || '')
+    }
+  }, [CUSTOM_OPTIONS])
+
   const CUSTOM_SECONDS_MAP = useMemo(() => {
-    return Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.value, o.seconds]))
+    return Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.label, o.seconds]))
   }, [CUSTOM_OPTIONS])
 
   useEffect(() => {
@@ -91,7 +97,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
       } else {
         const customMatch = CUSTOM_OPTIONS.find((o) => o.seconds * 1000 === currentTimer)
         setSelectedOption('custom')
-        setCustomValue(customMatch?.value || '2days')
+        setCustomValue(customMatch?.label || '2days')
       }
     }
   }, [currentTimer])
@@ -110,10 +116,13 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   const isValueUnchanged = useMemo(() => {
     if (initialRender) return true
 
-    const normalizedCurrent = currentTimer === 0 ? null : currentTimer ?? null
-    const normalizedSelected = selectedTimerValue === 0 ? null : selectedTimerValue ?? null
+    if (!selectedTimerValue && !selectedTimerValue) {
+      return true
+    } else if (selectedTimerValue * 1000 === currentTimer) {
+      return true
+    }
 
-    return normalizedCurrent === normalizedSelected
+    return false
   }, [currentTimer, selectedTimerValue, initialRender])
 
   const handleSet = useCallback(() => {
@@ -126,7 +135,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   }, [selectedOption, customValue, handleSetTimer, togglePopup])
 
   const selectedCustomLabel = useMemo(() => {
-    return CUSTOM_OPTIONS.find((o) => o.value === customValue)?.label || '2 days'
+    return CUSTOM_OPTIONS.find((o) => o.label === customValue)?.label || '2 days'
   }, [customValue, CUSTOM_OPTIONS])
 
   return (
@@ -211,8 +220,8 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                         {CUSTOM_OPTIONS.map((o) => (
                           <CustomDropdownOptionLi
                             hoverBackground={backgroundHovered}
-                            key={o.value}
-                            onClick={() => setCustomValue(o.value)}
+                            key={o.label}
+                            onClick={() => setCustomValue(o.label)}
                             textColor={textPrimary}
                           >
                             {o.label}
