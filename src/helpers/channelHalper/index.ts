@@ -28,6 +28,7 @@ let memberCount: number = 10
 let disableFrowardMentionsCount: boolean = false
 let onUpdateChannel: (channel: IChannel, updatedFields: string[]) => void = () => {}
 let useInviteLink: boolean = false
+let enableDisappearingMessages: boolean = true
 
 export type InviteLinkListItemRenderParams = {
   onClick?: () => void
@@ -413,6 +414,12 @@ export const setShowChannelDetails = (state: boolean) => {
 }
 
 export const getShowChannelDetails = () => showChannelDetails
+
+export const setEnableDisappearingMessages = (state: boolean) => {
+  enableDisappearingMessages = state
+}
+
+export const getEnableDisappearingMessages = () => enableDisappearingMessages
 
 export const sortChannelByLastMessage = (channels: IChannel[]) => {
   return channels.sort((a, b) => {

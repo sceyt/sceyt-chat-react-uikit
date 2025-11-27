@@ -10,7 +10,8 @@ import {
   InviteLinkOptions,
   setBaseUrlForInviteMembers,
   setInviteLinkOptions,
-  setUseInviteLink
+  setUseInviteLink,
+  setEnableDisappearingMessages
 } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
@@ -123,6 +124,7 @@ export interface IChatClientProps {
   inviteLinkOptions?: InviteLinkOptions | null
   embeddedJoinGroupPopup?: boolean
   onUpdateChannel?: (channel: IChannel, updatedFields: string[]) => void
+  enableDisappearingMessages?: boolean
 }
 
 const SceytChatContainer = ({
@@ -156,7 +158,8 @@ const SceytChatContainer = ({
     ResetLinkConfirmModal: {}
   },
   embeddedJoinGroupPopup = false,
-  onUpdateChannel
+  onUpdateChannel,
+  enableDisappearingMessages = false
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -169,7 +172,8 @@ const SceytChatContainer = ({
     if (inviteLinkOptions) {
       setInviteLinkOptions(inviteLinkOptions)
     }
-  }, [])
+    setEnableDisappearingMessages(enableDisappearingMessages)
+  }, [baseUrlForInviteMembers, useInviteLink, inviteLinkOptions, enableDisappearingMessages])
 
   return (
     <Provider store={store} context={SceytReduxContext}>

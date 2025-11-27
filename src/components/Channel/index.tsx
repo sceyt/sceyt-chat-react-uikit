@@ -28,7 +28,7 @@ import { systemMessageUserName, formatDisappearingMessageTime } from '../../help
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
-import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
+import { updateChannelOnAllChannels, getEnableDisappearingMessages } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -241,7 +241,7 @@ const ChannelMessageText = ({
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
-                        : lastMessage.body === 'ADM'
+                        : lastMessage.body === 'ADM' && getEnableDisappearingMessages()
                           ? !lastMessageMetas?.autoDeletePeriod
                             ? 'disabled disappearing messages'
                             : `set disappearing message time to ${formatDisappearingMessageTime(
@@ -578,7 +578,7 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
-          {!!channel?.messageRetentionPeriod && (
+          {getEnableDisappearingMessages() && !!channel?.messageRetentionPeriod && (
             <DisappearingMessagesBadge strokeColor={background} $isLightMode={background === '#FFFFFF'} />
           )}
           {isDirectChannel &&
