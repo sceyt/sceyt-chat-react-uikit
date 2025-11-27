@@ -176,7 +176,7 @@ const Message = ({
                     : message.body === 'ADM'
                       ? !Number(messageMetas?.autoDeletePeriod)
                         ? ' disabled disappearing messages'
-                        : ` set disappearing message time to ${formatDisappearingMessageTime(
+                        : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
                             messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
                           )}`
                       : ''}

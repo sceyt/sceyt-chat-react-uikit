@@ -564,6 +564,8 @@ function* sendMessage(action: IAction): any {
   } catch (e) {
     log.error('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -699,7 +701,6 @@ function* sendTextMessage(action: IAction): any {
       throw new Error('Connection required to send message')
     }
 
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
     if (activeChannelId === channel.id && pendingMessage && action.type !== RESEND_MESSAGE) {
@@ -719,8 +720,9 @@ function* sendTextMessage(action: IAction): any {
       updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
       yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -885,10 +887,10 @@ function* forwardMessage(action: IAction): any {
         yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
       }
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     log.error('error on forward message ... ', e)
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
-  yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
 }
 
 function* resendMessage(action: IAction): any {
@@ -1043,8 +1045,16 @@ const sendPendingMessages = function* (connectionState: string) {
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior } =
-      action.payload
+    const {
+      channel,
+      loadWithLastMessage,
+      messageId,
+      limit,
+      withDeliveredMessages,
+      highlight,
+      behavior,
+      scrollToMessage
+    } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
@@ -1108,7 +1118,7 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesHasNextAC(false))
         setHasNextCached(false)
-        if (messageId) {
+        if (messageId && scrollToMessage) {
           yield put(setScrollToMessagesAC(messageId, highlight, behavior))
         }
       } else if (messageId) {
@@ -1151,7 +1161,9 @@ function* getMessagesQuery(action: IAction): any {
           setHasNextCached(false)
         }
         yield put(setMessagesHasNextAC(true))
-        yield put(setScrollToMessagesAC(messageId, true, behavior))
+        if (scrollToMessage) {
+          yield put(setScrollToMessagesAC(messageId, true, behavior))
+        }
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
         setMessagesToMap(channel.id, [])

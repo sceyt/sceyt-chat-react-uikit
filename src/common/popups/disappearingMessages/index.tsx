@@ -83,13 +83,13 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
       setSelectedOption('off')
     } else {
       const fixedMatch = (Object.keys(FIXED_TIMER_OPTIONS) as TimerOption[]).find(
-        (key) => FIXED_TIMER_OPTIONS[key] === currentTimer
+        (key) => (FIXED_TIMER_OPTIONS[key] || 0) * 1000 === currentTimer
       )
 
       if (fixedMatch) {
         setSelectedOption(fixedMatch)
       } else {
-        const customMatch = CUSTOM_OPTIONS.find((o) => o.seconds === currentTimer)
+        const customMatch = CUSTOM_OPTIONS.find((o) => o.seconds * 1000 === currentTimer)
         setSelectedOption('custom')
         setCustomValue(customMatch?.value || '2days')
       }

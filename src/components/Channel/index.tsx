@@ -244,7 +244,7 @@ const ChannelMessageText = ({
                         : lastMessage.body === 'ADM'
                           ? !Number(lastMessageMetas?.autoDeletePeriod)
                             ? 'disabled disappearing messages'
-                            : `set disappearing message time to ${formatDisappearingMessageTime(
+                            : `set the disappearing messages timer to ${formatDisappearingMessageTime(
                                 lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
                               )}`
                           : ''

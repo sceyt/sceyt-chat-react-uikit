@@ -170,11 +170,21 @@ export function getMessagesAC(
   limit?: number,
   withDeliveredMessages?: boolean,
   highlight = true,
-  behavior?: 'smooth' | 'instant' | 'auto'
+  behavior?: 'smooth' | 'instant' | 'auto',
+  scrollToMessage: boolean = true
 ) {
   return {
     type: GET_MESSAGES,
-    payload: { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior }
+    payload: {
+      channel,
+      loadWithLastMessage,
+      messageId,
+      limit,
+      withDeliveredMessages,
+      highlight,
+      behavior,
+      scrollToMessage
+    }
   }
 }
 
