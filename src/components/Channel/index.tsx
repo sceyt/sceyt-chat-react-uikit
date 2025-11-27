@@ -553,6 +553,7 @@ const Channel: React.FC<IChannelProps> = ({
     <Container
       // ref={channelItemRef}
       theme={theme}
+      backgroundColor={background}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
       selectedBackgroundColor={selectedChannelBackground || backgroundFocused}
@@ -578,8 +579,8 @@ const Channel: React.FC<IChannelProps> = ({
             textSize={channelAvatarTextSize || 16}
             setDefaultAvatar={isDirectChannel}
           />
-          {getEnableDisappearingMessages() && !!channel?.messageRetentionPeriod && (
-            <DisappearingMessagesBadge strokeColor={background} $isLightMode={background === '#FFFFFF'} />
+          {!!channel?.messageRetentionPeriod && (
+            <DisappearingMessagesBadge color={accentColor} className='disappearing-messages-badge' />
           )}
           {isDirectChannel &&
             directChannelUser &&
@@ -871,21 +872,17 @@ export const AvatarWrapper = styled.div`
   position: relative;
 `
 
-export const DisappearingMessagesBadge = styled(BadgeIcon)<{ strokeColor: string; $isLightMode: boolean }>`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ strokeColor: string }>`
   position: absolute;
-  top: -3px;
-  right: -3px;
-  width: 20px;
-  height: 20px;
+  top: -7px;
+  right: -7px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1;
   color: ${(props) => props.color};
-
-  path.badge-white-stroke {
-    stroke: ${(props) => (props.$isLightMode ? '#FFFFFF' : 'transparent')} !important;
-  }
 `
 
 export const UserStatus = styled.span<{ backgroundColor?: string; borderColor?: string }>`
@@ -909,6 +906,7 @@ const Container = styled.div<{
   selectedChannelBorderRadius?: string
   theme?: string
   hoverBackground?: string
+  backgroundColor?: string
 }>`
   position: relative;
   display: flex;
@@ -925,6 +923,16 @@ const Container = styled.div<{
   border-radius: ${(props) => props.selectedChannelBorderRadius || '12px'};
 
   transition: all 0.2s;
+  .disappearing-messages-badge {
+    & > path:nth-child(1) {
+      stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.backgroundColor)};
+    }
+    g {
+      path {
+        stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.backgroundColor)};
+      }
+    }
+  }
   &:hover {
     ${({ selectedChannel, hoverBackground }) =>
       !selectedChannel &&
@@ -933,6 +941,16 @@ const Container = styled.div<{
     `}
     ${UserStatus} {
       border-color: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+    }
+    .disappearing-messages-badge {
+      & > path:nth-child(1) {
+        stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+      }
+      g {
+        path {
+          stroke: ${(props) => (props.selectedChannel ? props.selectedBackgroundColor : props.hoverBackground)};
+        }
+      }
     }
   }
   ${UserStatus} {
