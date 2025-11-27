@@ -28,7 +28,7 @@ import { systemMessageUserName, formatDisappearingMessageTime } from '../../help
 import { isJSON, isMessageUnsupported, lastMessageDateFormat, makeUsername } from '../../helpers/message'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getAudioRecordingFromMap, getDraftMessageFromMap } from '../../helpers/messagesHalper'
-import { updateChannelOnAllChannels } from '../../helpers/channelHalper'
+import { updateChannelOnAllChannels, getEnableDisappearingMessages } from '../../helpers/channelHalper'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_STATUS, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -241,11 +241,11 @@ const ChannelMessageText = ({
                       ? 'Left this group'
                       : lastMessage.body === 'JL'
                         ? 'joined via invite link'
-                        : lastMessage.body === 'ADM'
-                          ? !lastMessageMetas?.autoDeletePeriod
+                        : lastMessage.body === 'ADM' && getEnableDisappearingMessages()
+                          ? !Number(lastMessageMetas?.autoDeletePeriod)
                             ? 'disabled disappearing messages'
                             : `set disappearing message time to ${formatDisappearingMessageTime(
-                                lastMessageMetas?.autoDeletePeriod
+                                lastMessageMetas?.autoDeletePeriod ? Number(lastMessageMetas.autoDeletePeriod) : null
                               )}`
                           : ''
           }`
