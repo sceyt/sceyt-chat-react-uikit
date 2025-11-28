@@ -40,33 +40,27 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
     })
   }, [tmb, height])
 
-  const progressPercentage = duration > 0 ? (currentTime / duration) * 100 : 0
-
-  // Find the index of the last played bar (the bar currently being played)
-  const lastPlayedBarIndex = useMemo(() => {
-    if (progressPercentage === 0) return -1
-    const barIndex = Math.floor((progressPercentage / 100) * normalizedBars.length)
-    return Math.min(barIndex, normalizedBars.length - 1)
-  }, [progressPercentage, normalizedBars.length])
+  const exactIndex = duration > 0 ? (currentTime / duration) * normalizedBars.length : 0
+  const floorIndex = Math.floor(exactIndex)
+  const fractionalPart = exactIndex - floorIndex
 
   return (
     <Container height={height}>
       {normalizedBars.map((barHeight, index) => {
-        const barPosition = (index / normalizedBars.length) * 100
-        const isPlayed = barPosition < progressPercentage
-        const isLastPlayed = index === lastPlayedBarIndex
-
-        const finalHeight = isLastPlayed ? Math.min(barHeight * 1.3, height) : barHeight
+        const progressRatio = index < floorIndex ? 1 : index === floorIndex ? fractionalPart : 0
+        const barOpacity = progressRatio > 0 ? 0.8 + progressRatio * 0.2 : 0.8
 
         return (
           <Bar
             key={index}
-            height={finalHeight}
+            height={barHeight}
             width={barWidth}
             gap={barGap}
             radius={barRadius}
-            color={isPlayed ? progressColor : waveColor}
-            isBold={isLastPlayed}
+            waveColor={waveColor}
+            progressColor={progressColor}
+            progressRatio={progressRatio}
+            barOpacity={barOpacity}
           />
         )
       })}
@@ -89,24 +83,30 @@ const Bar = styled.div<{
   width: number
   gap: number
   radius: number
-  color: string
-  isBold?: boolean
+  waveColor: string
+  progressColor: string
+  progressRatio: number
+  barOpacity: number
 }>`
+  position: relative;
   width: ${(props) => props.width}px;
   height: ${(props) => props.height}px;
-  background-color: ${(props) => props.color};
   border-radius: ${(props) => props.radius}px;
   min-height: 2px;
-  transition:
-    background-color 0.1s ease,
-    height 0.1s ease,
-    opacity 0.1s ease;
-  opacity: ${(props) => (props.isBold ? 1 : 0.8)};
-  ${(props) =>
-    props.isBold
-      ? `
-    box-shadow: 0 0 4px ${props.color};
-    filter: brightness(1.2);
-  `
-      : ''}
+  overflow: hidden;
+  background-color: ${(props) => props.waveColor};
+  opacity: ${(props) => props.barOpacity};
+
+  &::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: ${(props) => props.progressRatio * 100}%;
+    height: 100%;
+    background-color: ${(props) => props.progressColor};
+    border-radius: inherit;
+    will-change: width;
+    transform: translateZ(0);
+  }
 `
