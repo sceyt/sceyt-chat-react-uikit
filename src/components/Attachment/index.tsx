@@ -959,7 +959,14 @@ const AttachmentImgCont = styled.div<{
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
   max-width: 100%;
   height: ${(props) =>
-    props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+    props.fitTheContainer
+      ? '100%'
+      : props.isRepliedMessage
+        ? '40px'
+        : props.width && props.height
+          ? 'auto'
+          : props.height && `${props.height}px`};
+  ${(props) => props.width && props.height && `aspect-ratio: ${props.width} / ${props.height};`}
   max-height: 400px;
   min-height: ${(props) => props.height && '165px'};
   cursor: pointer;
@@ -1163,23 +1170,29 @@ export const AttachmentImg = styled.img<{
   padding: ${(props) => (props.isRepliedMessage ? '0.5px' : props.withBorder && `2px`)};
   box-sizing: border-box;
   max-width: 100%;
-  max-height: ${(props) => props.imageMaxHeight || '400px'};
-  width: ${(props) =>
-    props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
-  height: ${(props) =>
-    props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
-  min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
-      ? '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
-  min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
-      ? props.imageMinWidth || '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
+  max-height: 100%;
+  width: ${(props) => {
+    if (props.isRepliedMessage) return '40px'
+    if (props.isPreview) return '48px'
+    return '100%'
+  }};
+  height: ${(props) => {
+    if (props.isRepliedMessage) return '40px'
+    if (props.isPreview) return '48px'
+    return '100%'
+  }};
+  min-height: ${(props) => {
+    if (props.isRepliedMessage) return '40px'
+    if (!props.isRepliedMessage && !props.isPreview && !props.fitTheContainer) return '165px'
+    return ''
+  }};
+  min-width: ${(props) => {
+    if (props.isRepliedMessage) return '40px'
+    if (!props.isRepliedMessage && !props.isPreview && !props.fitTheContainer) {
+      return props.imageMinWidth || '165px'
+    }
+    return ''
+  }};
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;
