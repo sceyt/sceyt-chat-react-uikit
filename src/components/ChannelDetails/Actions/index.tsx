@@ -39,6 +39,7 @@ import { ReactComponent as ChevronRightIcon } from '../../../assets/svg/chevronB
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getDisappearingSettings } from '../../../helpers/channelHalper'
+import { formatDisappearingMessageTime } from '../../../helpers'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
@@ -521,7 +522,7 @@ const Actions = ({
                 Disappearing messages
                 <DisappearingMessagesStatusWrapper>
                   <DisappearingMessagesStatus color={textSecondary}>
-                    {channel.messageRetentionPeriod ? 'On' : 'Off'}
+                    {formatDisappearingMessageTime(channel.messageRetentionPeriod)}
                   </DisappearingMessagesStatus>
                   <ChevronRightIconWrapper>
                     <ChevronRightIcon color={iconPrimary} />
@@ -1046,7 +1047,11 @@ const DisappearingMessagesStatusWrapper = styled.div`
 
 const DisappearingMessagesStatus = styled.span<{ color: string }>`
   color: ${(props) => props.color};
-  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
 `
 
 const ChevronRightIconWrapper = styled.span`
