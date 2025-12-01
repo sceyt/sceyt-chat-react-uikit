@@ -1055,7 +1055,6 @@ const updateMessages = function* (channel: IChannel, updatedMessages: IMessage[]
   messages = [...messages, ...(allMessagesAfterLastMessage || [])]
   setMessagesToMap(channel.id, messages)
   setAllMessages(messages)
-  calculateAndUpdateLoadedRanges(channel.id, messages[messages.length - 1].id, messages[0].id)
   yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
 }
 
@@ -1249,7 +1248,6 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesNextCompleteAC(true)) */
       } else {
-        const previousAllMessages = getAllMessages()
         setMessagesToMap(channel.id, [])
         setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
