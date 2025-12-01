@@ -334,7 +334,7 @@ const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   color: ${(props) => props.color};
   height: 18px;
   box-sizing: border-box;
-  margin-left: 14px;
+  margin-left: auto;
   cursor: pointer;
 
   & > span {
