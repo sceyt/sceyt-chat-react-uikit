@@ -1107,7 +1107,7 @@ const MessageList: React.FC<MessagesProps> = ({
       nextDisableRef.current = false
       clearMessagesMap()
       removeAllMessages()
-      dispatch(getMessagesAC(channel))
+      dispatch(getMessagesAC(channel, false, lastVisibleMessageId, 0, false, false, 'instant', false))
     }
   }, [connectionStatus])
 

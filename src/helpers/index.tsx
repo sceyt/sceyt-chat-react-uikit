@@ -3,7 +3,8 @@ import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 import log from 'loglevel'
-import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS } from './constants'
+import { FIXED_TIMER_OPTIONS } from './constants'
+import { getDisappearingSettings } from './channelHalper'
 
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
@@ -691,7 +692,8 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
   }
 
   // Check custom options
-  const customMatch = CUSTOM_OPTIONS.find((option) => option.seconds === periodInSeconds)
+  const customOptions = getDisappearingSettings()?.customOptions || []
+  const customMatch = customOptions.find((option) => option.seconds === periodInSeconds)
   if (customMatch) return customMatch.label
 
   const SECONDS_PER_MINUTE = 60

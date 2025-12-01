@@ -230,17 +230,14 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
     parentMessage: message.parentMessage
   }
   setPendingMessage(channel.id, messageToAdd)
-  if (!messageToAdd?.forwardingDetails) {
-    store.dispatch(scrollToNewMessageAC(true))
-  }
 }
 
-const updateMessage = async (
+const updateMessage = function* (
   actionType: string,
   pending: IMessage,
   channel: IChannel,
   scrollToNewMessage: boolean = true
-) => {
+) {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
     addMessageToMap(channel.id, pending)
@@ -248,10 +245,10 @@ const updateMessage = async (
       addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
     }
     if (activeChannelId === channel.id) {
-      store.dispatch(addMessageAC(pending))
+      yield put(addMessageAC(pending))
     }
     if (scrollToNewMessage) {
-      store.dispatch(scrollToNewMessageAC(true))
+      yield put(scrollToNewMessageAC(true, true))
     }
   }
 }
@@ -392,7 +389,7 @@ function* sendMessage(action: IAction): any {
             messagesToSend.push(messageForSend)
             const pending = { ...messageForSend, attachments: [attachment], createdAt: new Date(Date.now()) }
             pendingMessages.push(pending)
-            updateMessage(action.type, pending, channel)
+            yield call(updateMessage, action.type, pending, channel)
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -424,7 +421,7 @@ function* sendMessage(action: IAction): any {
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
           const pending = { ...messageToSend, attachments: message.attachments, createdAt: new Date(Date.now()) }
           pendingMessages.push(pending)
-          updateMessage(action.type, pending, channel)
+          yield call(updateMessage, action.type, pending, channel)
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -539,8 +536,12 @@ function* sendMessage(action: IAction): any {
         } catch (e) {
           const pendingMessage = pendingMessages?.find((pendingMessage) => pendingMessage.tid === messageToSend.tid)
           if (channel && pendingMessage && action.type !== RESEND_MESSAGE) {
-            if (isAddToPendingMessagesMap) {
+            const connectionIsDisconnected =
+              store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+            if (isAddToPendingMessagesMap && connectionIsDisconnected) {
               yield call(addPendingMessage, message, pendingMessage, channel)
+            } else {
+              yield put(removePendingMessageAC(channel.id, pendingMessage.tid!))
             }
           }
           log.error('Error on uploading attachment', messageToSend.tid, e)
@@ -560,6 +561,8 @@ function* sendMessage(action: IAction): any {
   } catch (e) {
     log.error('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -638,7 +641,7 @@ function* sendTextMessage(action: IAction): any {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
     if (pendingMessage) {
-      updateMessage(action.type, pendingMessage, channel)
+      yield call(updateMessage, action.type, pendingMessage, channel)
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
@@ -695,12 +698,14 @@ function* sendTextMessage(action: IAction): any {
       throw new Error('Connection required to send message')
     }
 
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
     if (activeChannelId === channel.id && pendingMessage && action.type !== RESEND_MESSAGE) {
-      if (isAddToPendingMessagesMap) {
+      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
         yield call(addPendingMessage, message, pendingMessage, channel)
+      } else {
+        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
       }
     }
     log.error('error on send text message ... ', e)
@@ -712,8 +717,9 @@ function* sendTextMessage(action: IAction): any {
       updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
       yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -814,7 +820,7 @@ function* forwardMessage(action: IAction): any {
         }
       }
       if (pendingMessage) {
-        updateMessage(action.type, pendingMessage, channel, false)
+        yield call(updateMessage, action.type, pendingMessage, channel, false)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -861,8 +867,11 @@ function* forwardMessage(action: IAction): any {
     }
   } catch (e) {
     if (pendingMessage && channel && action.type !== RESEND_MESSAGE) {
-      if (isAddToPendingMessagesMap) {
+      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
+      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
         yield call(addPendingMessage, message, pendingMessage, channel)
+      } else {
+        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
       }
     }
     if (channel && messageTid) {
@@ -875,10 +884,10 @@ function* forwardMessage(action: IAction): any {
         yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
       }
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     log.error('error on forward message ... ', e)
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
-  yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
 }
 
 function* resendMessage(action: IAction): any {
@@ -1030,11 +1039,38 @@ const sendPendingMessages = function* (connectionState: string) {
   }
 }
 
+const updateMessages = function* (channel: IChannel, updatedMessages: IMessage[]) {
+  const previousAllMessages = getAllMessages()
+  let messages = [...updatedMessages]
+  const lastMessageId = messages[messages.length - 1]?.id
+  const setMappedAllMessages: { [key: string]: IMessage } = {}
+  previousAllMessages.forEach((msg: IMessage) => {
+    if (msg.channelId === channel.id) {
+      setMappedAllMessages[msg.id || msg.tid || ''] = msg
+    }
+  })
+  const allMessagesAfterLastMessage = lastMessageId
+    ? Object.values(setMappedAllMessages || {})?.filter((msg: IMessage) => msg.id > lastMessageId || !msg.id)
+    : Object.values(setMappedAllMessages || {})
+  messages = [...messages, ...(allMessagesAfterLastMessage || [])]
+  setMessagesToMap(channel.id, messages)
+  setAllMessages(messages)
+  yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+}
+
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior } =
-      action.payload
+    const {
+      channel,
+      loadWithLastMessage,
+      messageId,
+      limit,
+      withDeliveredMessages,
+      highlight,
+      behavior,
+      scrollToMessage
+    } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     if (channel.id && !channel.isMockChannel) {
       const SceytChatClient = getClient()
@@ -1098,7 +1134,7 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesHasNextAC(false))
         setHasNextCached(false)
-        if (messageId) {
+        if (messageId && scrollToMessage) {
           yield put(setScrollToMessagesAC(messageId, highlight, behavior))
         }
       } else if (messageId) {
@@ -1141,7 +1177,9 @@ function* getMessagesQuery(action: IAction): any {
           setHasNextCached(false)
         }
         yield put(setMessagesHasNextAC(true))
-        yield put(setScrollToMessagesAC(messageId, true, behavior))
+        if (scrollToMessage) {
+          yield put(setScrollToMessagesAC(messageId, true, behavior))
+        }
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
         setMessagesToMap(channel.id, [])
@@ -1210,7 +1248,6 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesNextCompleteAC(true)) */
       } else {
-        const previousAllMessages = getAllMessages()
         setMessagesToMap(channel.id, [])
         setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
@@ -1232,32 +1269,13 @@ function* getMessagesQuery(action: IAction): any {
           result.messages = [...secondResult.messages, ...result.messages]
           result.hasNext = secondResult.hasNext
         }
-        let updatedMessages: IMessage[] = []
+        const updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
           const updatedMessage = updateMessageOnMap(channel.id, { messageId: msg.id, params: msg })
           updateMessageOnAllMessages(msg.id, updatedMessage || msg)
           updatedMessages.push(updatedMessage || msg)
         })
-        const lastMessageId = updatedMessages[updatedMessages.length - 1]?.id
-        const allMessages = getAllMessages()
-        const setMappedAllMessages: { [key: string]: IMessage } = {}
-        previousAllMessages.forEach((msg: IMessage) => {
-          if (msg.channelId === channel.id) {
-            setMappedAllMessages[msg.id] = msg
-          }
-        })
-        allMessages.forEach((msg: IMessage) => {
-          if (msg.channelId === channel.id) {
-            setMappedAllMessages[msg.id] = msg
-          }
-        })
-        const allMessagesAfterLastMessage = lastMessageId
-          ? Object.values(setMappedAllMessages || {})?.filter((msg: IMessage) => msg.id > lastMessageId)
-          : Object.values(setMappedAllMessages || {})
-        updatedMessages = [...updatedMessages, ...(allMessagesAfterLastMessage || [])]
-        setMessagesToMap(channel.id, updatedMessages)
-        setAllMessages(updatedMessages)
-        yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
+        yield call(updateMessages, channel, updatedMessages)
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
       }

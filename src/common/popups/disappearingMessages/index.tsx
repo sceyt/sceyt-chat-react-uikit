@@ -19,7 +19,8 @@ import CustomRadio from '../../customRadio'
 import PopupContainer from '../popupContainer'
 import { useColor } from '../../../hooks'
 import DropDown from '../../dropdown'
-import { FIXED_TIMER_OPTIONS, CUSTOM_OPTIONS, CUSTOM_SECONDS_MAP, TimerOption } from '../../../helpers/constants'
+import { FIXED_TIMER_OPTIONS, TimerOption } from '../../../helpers/constants'
+import { getDisappearingSettings } from 'helpers/channelHalper'
 
 interface IProps {
   theme?: string
@@ -57,11 +58,25 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   } = colors
 
   const [selectedOption, setSelectedOption] = useState<TimerOption>('off')
-  const [customValue, setCustomValue] = useState('2days')
+  const [customValue, setCustomValue] = useState<string>('')
   const [initialRender, setInitialRender] = useState(true)
   const [isDropdownOpen, setDropdownOpen] = useState(false)
   const previousTimerRef = useRef<number | null | undefined>(currentTimer)
   const hasInitializedRef = useRef(false)
+
+  const CUSTOM_OPTIONS = useMemo(() => {
+    return getDisappearingSettings()?.customOptions || []
+  }, [])
+
+  useEffect(() => {
+    if (CUSTOM_OPTIONS.length > 0 && CUSTOM_OPTIONS[0]?.label) {
+      setCustomValue(CUSTOM_OPTIONS[0]?.label || '')
+    }
+  }, [CUSTOM_OPTIONS])
+
+  const CUSTOM_SECONDS_MAP = useMemo(() => {
+    return Object.fromEntries(CUSTOM_OPTIONS.map((o) => [o.label, o.seconds]))
+  }, [CUSTOM_OPTIONS])
 
   useEffect(() => {
     if (previousTimerRef.current !== currentTimer) {
@@ -74,15 +89,15 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
       setSelectedOption('off')
     } else {
       const fixedMatch = (Object.keys(FIXED_TIMER_OPTIONS) as TimerOption[]).find(
-        (key) => FIXED_TIMER_OPTIONS[key] === currentTimer
+        (key) => (FIXED_TIMER_OPTIONS[key] || 0) * 1000 === currentTimer
       )
 
       if (fixedMatch) {
         setSelectedOption(fixedMatch)
       } else {
-        const customMatch = CUSTOM_OPTIONS.find((o) => o.seconds === currentTimer)
+        const customMatch = CUSTOM_OPTIONS.find((o) => o.seconds * 1000 === currentTimer)
         setSelectedOption('custom')
-        setCustomValue(customMatch?.value || '2days')
+        setCustomValue(customMatch?.label || '2days')
       }
     }
   }, [currentTimer])
@@ -101,10 +116,11 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   const isValueUnchanged = useMemo(() => {
     if (initialRender) return true
 
-    const normalizedCurrent = currentTimer === 0 ? null : currentTimer ?? null
-    const normalizedSelected = selectedTimerValue === 0 ? null : selectedTimerValue ?? null
+    if ((selectedTimerValue || 0) * 1000 === (currentTimer || 0)) {
+      return true
+    }
 
-    return normalizedCurrent === normalizedSelected
+    return false
   }, [currentTimer, selectedTimerValue, initialRender])
 
   const handleSet = useCallback(() => {
@@ -117,8 +133,8 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   }, [selectedOption, customValue, handleSetTimer, togglePopup])
 
   const selectedCustomLabel = useMemo(() => {
-    return CUSTOM_OPTIONS.find((o) => o.value === customValue)?.label || '2 days'
-  }, [customValue])
+    return CUSTOM_OPTIONS.find((o) => o.label === customValue)?.label || '2 days'
+  }, [customValue, CUSTOM_OPTIONS])
 
   return (
     <PopupContainer>
@@ -155,19 +171,21 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
               </TimerOptionItem>
             ))}
 
-            <TimerOptionItem color={textPrimary} onClick={() => setSelectedOption('custom')}>
-              <CustomRadio
-                index='custom'
-                size='18px'
-                state={selectedOption === 'custom'}
-                onChange={() => setSelectedOption('custom')}
-                checkedBorderColor={accentColor}
-                borderColor={iconInactive}
-                borderRadius='4px'
-                variant='checkbox'
-              />
-              Custom
-            </TimerOptionItem>
+            {CUSTOM_OPTIONS.length > 0 && (
+              <TimerOptionItem color={textPrimary} onClick={() => setSelectedOption('custom')}>
+                <CustomRadio
+                  index='custom'
+                  size='18px'
+                  state={selectedOption === 'custom'}
+                  onChange={() => setSelectedOption('custom')}
+                  checkedBorderColor={accentColor}
+                  borderColor={iconInactive}
+                  borderRadius='4px'
+                  variant='checkbox'
+                />
+                Custom
+              </TimerOptionItem>
+            )}
 
             {selectedOption === 'custom' && (
               <CustomTimerSection>
@@ -200,8 +218,8 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                         {CUSTOM_OPTIONS.map((o) => (
                           <CustomDropdownOptionLi
                             hoverBackground={backgroundHovered}
-                            key={o.value}
-                            onClick={() => setCustomValue(o.value)}
+                            key={o.label}
+                            onClick={() => setCustomValue(o.label)}
                             textColor={textPrimary}
                           >
                             {o.label}

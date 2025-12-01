@@ -38,7 +38,7 @@ import { ReactComponent as WatchIcon } from '../../../assets/svg/watch.svg'
 import { ReactComponent as ChevronRightIcon } from '../../../assets/svg/chevronBottom.svg'
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
-import { getEnableDisappearingMessages } from '../../../helpers/channelHalper'
+import { getDisappearingSettings } from '../../../helpers/channelHalper'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
@@ -504,7 +504,7 @@ const Actions = ({
             <React.Fragment>{staredMessagesIcon || <DefaultStarIcon />} Starred messages </React.Fragment>
           </ActionItem>
         )}
-        {getEnableDisappearingMessages() &&
+        {getDisappearingSettings()?.show &&
           !channel.isMockChannel &&
           canToggleDisappearingMessages &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
