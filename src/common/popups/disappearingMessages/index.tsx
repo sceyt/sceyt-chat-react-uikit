@@ -116,9 +116,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   const isValueUnchanged = useMemo(() => {
     if (initialRender) return true
 
-    if (!selectedTimerValue && !selectedTimerValue) {
-      return true
-    } else if (selectedTimerValue * 1000 === currentTimer) {
+    if ((selectedTimerValue || 0) * 1000 === (currentTimer || 0)) {
       return true
     }
 
