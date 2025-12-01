@@ -230,17 +230,14 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channel: I
     parentMessage: message.parentMessage
   }
   setPendingMessage(channel.id, messageToAdd)
-  if (!messageToAdd?.forwardingDetails) {
-    store.dispatch(scrollToNewMessageAC(true))
-  }
 }
 
-const updateMessage = async (
+const updateMessage = function* (
   actionType: string,
   pending: IMessage,
   channel: IChannel,
   scrollToNewMessage: boolean = true
-) => {
+) {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
     addMessageToMap(channel.id, pending)
@@ -248,10 +245,10 @@ const updateMessage = async (
       addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
     }
     if (activeChannelId === channel.id) {
-      store.dispatch(addMessageAC(pending))
+      yield put(addMessageAC(pending))
     }
     if (scrollToNewMessage) {
-      store.dispatch(scrollToNewMessageAC(true))
+      yield put(scrollToNewMessageAC(true, true))
     }
   }
 }
@@ -392,7 +389,7 @@ function* sendMessage(action: IAction): any {
             messagesToSend.push(messageForSend)
             const pending = { ...messageForSend, attachments: [attachment], createdAt: new Date(Date.now()) }
             pendingMessages.push(pending)
-            updateMessage(action.type, pending, channel)
+            yield call(updateMessage, action.type, pending, channel)
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -424,7 +421,7 @@ function* sendMessage(action: IAction): any {
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
           const pending = { ...messageToSend, attachments: message.attachments, createdAt: new Date(Date.now()) }
           pendingMessages.push(pending)
-          updateMessage(action.type, pending, channel)
+          yield call(updateMessage, action.type, pending, channel)
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -644,7 +641,7 @@ function* sendTextMessage(action: IAction): any {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
     if (pendingMessage) {
-      updateMessage(action.type, pendingMessage, channel)
+      yield call(updateMessage, action.type, pendingMessage, channel)
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
@@ -823,7 +820,7 @@ function* forwardMessage(action: IAction): any {
         }
       }
       if (pendingMessage) {
-        updateMessage(action.type, pendingMessage, channel, false)
+        yield call(updateMessage, action.type, pendingMessage, channel, false)
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -1042,6 +1039,26 @@ const sendPendingMessages = function* (connectionState: string) {
   }
 }
 
+const updateMessages = function* (channel: IChannel, updatedMessages: IMessage[]) {
+  const previousAllMessages = getAllMessages()
+  let messages = [...updatedMessages]
+  const lastMessageId = messages[messages.length - 1]?.id
+  const setMappedAllMessages: { [key: string]: IMessage } = {}
+  previousAllMessages.forEach((msg: IMessage) => {
+    if (msg.channelId === channel.id) {
+      setMappedAllMessages[msg.id || msg.tid || ''] = msg
+    }
+  })
+  const allMessagesAfterLastMessage = lastMessageId
+    ? Object.values(setMappedAllMessages || {})?.filter((msg: IMessage) => msg.id > lastMessageId || !msg.id)
+    : Object.values(setMappedAllMessages || {})
+  messages = [...messages, ...(allMessagesAfterLastMessage || [])]
+  setMessagesToMap(channel.id, messages)
+  setAllMessages(messages)
+  calculateAndUpdateLoadedRanges(channel.id, messages[messages.length - 1].id, messages[0].id)
+  yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+}
+
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
@@ -1254,32 +1271,13 @@ function* getMessagesQuery(action: IAction): any {
           result.messages = [...secondResult.messages, ...result.messages]
           result.hasNext = secondResult.hasNext
         }
-        let updatedMessages: IMessage[] = []
+        const updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
           const updatedMessage = updateMessageOnMap(channel.id, { messageId: msg.id, params: msg })
           updateMessageOnAllMessages(msg.id, updatedMessage || msg)
           updatedMessages.push(updatedMessage || msg)
         })
-        const lastMessageId = updatedMessages[updatedMessages.length - 1]?.id
-        const allMessages = getAllMessages()
-        const setMappedAllMessages: { [key: string]: IMessage } = {}
-        previousAllMessages.forEach((msg: IMessage) => {
-          if (msg.channelId === channel.id) {
-            setMappedAllMessages[msg.id] = msg
-          }
-        })
-        allMessages.forEach((msg: IMessage) => {
-          if (msg.channelId === channel.id) {
-            setMappedAllMessages[msg.id] = msg
-          }
-        })
-        const allMessagesAfterLastMessage = lastMessageId
-          ? Object.values(setMappedAllMessages || {})?.filter((msg: IMessage) => msg.id > lastMessageId)
-          : Object.values(setMappedAllMessages || {})
-        updatedMessages = [...updatedMessages, ...(allMessagesAfterLastMessage || [])]
-        setMessagesToMap(channel.id, updatedMessages)
-        setAllMessages(updatedMessages)
-        yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
+        yield call(updateMessages, channel, updatedMessages)
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
       }
