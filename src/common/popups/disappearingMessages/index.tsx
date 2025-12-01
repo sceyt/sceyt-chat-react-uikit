@@ -21,6 +21,10 @@ import { useColor } from '../../../hooks'
 import DropDown from '../../dropdown'
 import { FIXED_TIMER_OPTIONS, TimerOption } from '../../../helpers/constants'
 import { getDisappearingSettings } from 'helpers/channelHalper'
+import { useSelector } from 'store/hooks'
+import { connectionStatusSelector } from '../../../store/user/selector'
+import { CONNECTION_STATUS } from '../../../store/user/constants'
+import NetworkErrorPopup from '../networkError'
 
 interface IProps {
   theme?: string
@@ -57,10 +61,12 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
     [THEME_COLORS.BORDER]: borderColor
   } = colors
 
+  const connectionStatus = useSelector(connectionStatusSelector)
   const [selectedOption, setSelectedOption] = useState<TimerOption>('off')
   const [customValue, setCustomValue] = useState<string>('')
   const [initialRender, setInitialRender] = useState(true)
   const [isDropdownOpen, setDropdownOpen] = useState(false)
+  const [showNetworkError, setShowNetworkError] = useState(false)
   const previousTimerRef = useRef<number | null | undefined>(currentTimer)
   const hasInitializedRef = useRef(false)
 
@@ -124,17 +130,28 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
   }, [currentTimer, selectedTimerValue, initialRender])
 
   const handleSet = useCallback(() => {
+    if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      setShowNetworkError(true)
+      return
+    }
+
     if (selectedOption === 'custom') {
       handleSetTimer(CUSTOM_SECONDS_MAP[customValue])
     } else {
       handleSetTimer(FIXED_TIMER_OPTIONS[selectedOption])
     }
     togglePopup()
-  }, [selectedOption, customValue, handleSetTimer, togglePopup])
+  }, [selectedOption, customValue, handleSetTimer, togglePopup, connectionStatus])
+
+  const handleCloseNetworkError = useCallback(() => {
+    setShowNetworkError(false)
+  }, [])
 
   const selectedCustomLabel = useMemo(() => {
     return CUSTOM_OPTIONS.find((o) => o.label === customValue)?.label || '2 days'
   }, [customValue, CUSTOM_OPTIONS])
+
+  if (showNetworkError) return <NetworkErrorPopup theme={theme} togglePopup={handleCloseNetworkError} />
 
   return (
     <PopupContainer>
