@@ -321,9 +321,6 @@ const AudioVisualizationPlaceholder = styled.div<{ hidden?: boolean }>`
   pointer-events: ${(props) => (props.hidden ? 'none' : 'auto')};
 `
 const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
-  position: absolute;
-  top: 10px;
-  right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -337,7 +334,7 @@ const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   color: ${(props) => props.color};
   height: 18px;
   box-sizing: border-box;
-  margin-left: 14px;
+  margin-left: auto;
   cursor: pointer;
 
   & > span {
