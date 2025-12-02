@@ -231,10 +231,10 @@ const Members = ({
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
-    if (channel.id) {
+    if (channel?.id) {
       dispatch(getMembersAC(channel.id))
     }
-  }, [channel])
+  }, [channel?.id])
 
   const currentUserRole = members.find((member) => member.id === user.id)?.role
 

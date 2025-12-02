@@ -8,7 +8,8 @@ import {
   removeMemberFromList,
   setMembersLoadingState,
   getRolesSuccess,
-  getRolesFail
+  getRolesFail,
+  setMembersHasNext
 } from './reducers'
 
 // Import saga action constants
@@ -84,3 +85,5 @@ export const removeMemberFromListAC = (members: IMember[]) => removeMemberFromLi
 export const getRolesSuccessAC = (roles: IRole[]) => getRolesSuccess({ roles })
 
 export const getRolesFailAC = (timeout?: number, attempts?: number) => getRolesFail({ timeout, attempts })
+
+export const setMembersHasNextAC = (hasNext: boolean) => setMembersHasNext({ hasNext })
