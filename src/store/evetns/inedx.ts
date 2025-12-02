@@ -802,6 +802,14 @@ export default function* watchForEvents(): any {
             }
 
             addMessageToMap(channel.id, message)
+
+            if (message.type === 'system' && message.body === 'ADM' && message.metadata) {
+              const messageMetadata = isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
+              if (messageMetadata.autoDeletePeriod !== undefined) {
+                channelForAdd.messageRetentionPeriod = Number(messageMetadata.autoDeletePeriod) || null
+              }
+            }
+
             yield put(
               updateChannelDataAC(channel.id, {
                 messageCount: channelForAdd.messageCount,
