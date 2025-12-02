@@ -99,6 +99,10 @@ const memberSlice = createSlice({
       } else {
         state.getRolesFail = undefined
       }
+    },
+
+    setMembersHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
+      state.membersHasNext = action.payload.hasNext
     }
   },
   extraReducers: (builder) => {
@@ -118,7 +122,8 @@ export const {
   removeMemberFromList,
   setMembersLoadingState,
   getRolesSuccess,
-  getRolesFail
+  getRolesFail,
+  setMembersHasNext
 } = memberSlice.actions
 
 // Export reducer

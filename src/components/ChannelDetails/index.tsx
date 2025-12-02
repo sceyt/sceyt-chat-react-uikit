@@ -7,7 +7,7 @@ import { activeChannelSelector, channelEditModeSelector } from '../../store/chan
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
 import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
 import { loadMoreMembersAC } from '../../store/member/actions'
-import { membersLoadingStateSelector } from '../../store/member/selector'
+import { membersHasNextSelector, membersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
@@ -180,6 +180,7 @@ const Details = ({
   const activeChannel = useSelector(activeChannelSelector, shallowEqual)
   const [checkActionPermission] = usePermissions(activeChannel ? activeChannel.userRole : '')
   const membersLoading = useSelector(membersLoadingStateSelector)
+  const membersHasNext = useSelector(membersHasNextSelector)
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -225,7 +226,7 @@ const Details = ({
     } */
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (activeTab === channelDetailsTabs.member) {
-        if (membersLoading === LOADING_STATE.LOADED) {
+        if (membersLoading === LOADING_STATE.LOADED && membersHasNext) {
           dispatch(loadMoreMembersAC(15, activeChannel.id))
         }
       } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {

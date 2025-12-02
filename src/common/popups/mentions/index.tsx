@@ -2,7 +2,11 @@ import styled from 'styled-components'
 import React, { useEffect, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
-import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../store/member/selector'
+import {
+  activeChannelMembersSelector,
+  membersHasNextSelector,
+  membersLoadingStateSelector
+} from '../../../store/member/selector'
 import { LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IMember } from '../../../types'
@@ -50,10 +54,11 @@ export default function MentionMembersPopup({
   const membersListRef = useRef<HTMLElement>()
   const user = getClient().user
   const membersLoading = useSelector(membersLoadingStateSelector, shallowEqual) || {}
+  const membersHasNext = useSelector(membersHasNextSelector, shallowEqual) || {}
   const dispatch = useDispatch()
   const handleMembersListScroll = (event: any) => {
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
-      if (membersLoading === LOADING_STATE.LOADED) {
+      if (membersLoading === LOADING_STATE.LOADED && membersHasNext) {
         dispatch(loadMoreMembersAC(15, channelId))
       }
     }
@@ -138,7 +143,9 @@ export default function MentionMembersPopup({
     }
   }
   useEffect(() => {
-    dispatch(getMembersAC(channelId))
+    if (channelId) {
+      dispatch(getMembersAC(channelId))
+    }
   }, [channelId])
 
   useEffect(() => {

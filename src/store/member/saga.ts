@@ -6,7 +6,8 @@ import {
   addMembersToListAC,
   setMembersToListAC,
   getRolesFailAC,
-  getRolesSuccessAC
+  getRolesSuccessAC,
+  setMembersHasNextAC
 } from './actions'
 import {
   getChannelFromMap,
@@ -37,6 +38,7 @@ import store from 'store'
 
 function* getMembers(action: IAction): any {
   try {
+    yield put(setMembersHasNextAC(true))
     const { payload } = action
     const { channelId } = payload
     if (!channelId) {
@@ -50,8 +52,11 @@ function* getMembers(action: IAction): any {
 
     query.membersQuery = membersQuery
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
-    const { members } = yield call(membersQuery.loadNextPage)
+    const { members, hasNext } = yield call(membersQuery.loadNextPage)
     yield put(setMembersToListAC(members))
+    yield put(setMembersHasNextAC(hasNext))
+    const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
+    yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
@@ -74,12 +79,11 @@ function* loadMoreMembers(action: IAction): any {
     }
 
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
-    const { members } = yield call((membersQuery as any).loadNextPage)
-
+    const { members, hasNext } = yield call((membersQuery as any).loadNextPage)
     yield put(addMembersToListAC(members))
-
+    yield put(setMembersHasNextAC(hasNext))
     const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
-    yield put(updateChannelDataAC(channelId, { ...updateChannelData }))
+    yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
