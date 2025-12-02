@@ -52,12 +52,13 @@ function* getMembers(action: IAction): any {
     yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
     const { members } = yield call(membersQuery.loadNextPage)
     yield put(setMembersToListAC(members))
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -76,7 +77,6 @@ function* loadMoreMembers(action: IAction): any {
     const { members } = yield call((membersQuery as any).loadNextPage)
 
     yield put(addMembersToListAC(members))
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
 
     const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
     yield put(updateChannelDataAC(channelId, { ...updateChannelData }))
@@ -84,6 +84,8 @@ function* loadMoreMembers(action: IAction): any {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 

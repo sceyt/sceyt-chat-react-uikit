@@ -247,7 +247,9 @@ const Members = ({
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
-    dispatch(getMembersAC(channel.id))
+    if (channel.id) {
+      dispatch(getMembersAC(channel.id))
+    }
   }, [channel])
 
   const currentUserRole = members.find((member) => member.id === user.id)?.role

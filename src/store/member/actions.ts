@@ -75,7 +75,7 @@ export const updateMembersAC = (members: IMember[]) => updateMembers({ members }
 
 export const updateMembersPresenceAC = (usersMap: { [key: string]: IUser }) => updateMembersPresence({ usersMap })
 
-export const setMembersLoadingStateAC = (state: number) => setMembersLoadingState({ state: !!state })
+export const setMembersLoadingStateAC = (state: number) => setMembersLoadingState({ state })
 
 export const clearMembersAC = () => clearMembers()
 

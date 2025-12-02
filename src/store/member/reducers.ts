@@ -2,7 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { IMember, IRole, IUser } from '../../types'
 
 export interface IMembersStore {
-  membersLoadingState: boolean
+  membersLoadingState: number
   membersHasNext: boolean
   roles: IRole[]
   rolesMap: { [key: string]: IRole }
@@ -11,7 +11,7 @@ export interface IMembersStore {
 }
 
 const initialState: IMembersStore = {
-  membersLoadingState: false,
+  membersLoadingState: 0,
   membersHasNext: true,
   activeChannelMembers: [],
   roles: [],
@@ -78,7 +78,7 @@ const memberSlice = createSlice({
       }
     },
 
-    setMembersLoadingState: (state, action: PayloadAction<{ state: boolean }>) => {
+    setMembersLoadingState: (state, action: PayloadAction<{ state: number }>) => {
       state.membersLoadingState = action.payload.state
     },
 
