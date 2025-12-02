@@ -2,14 +2,8 @@ import styled from 'styled-components'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import {
-  blockMemberAC,
-  changeMemberRoleAC,
-  getMembersAC,
-  kickMemberAC,
-  loadMoreMembersAC
-} from '../../../../store/member/actions'
-import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
+import { blockMemberAC, changeMemberRoleAC, getMembersAC, kickMemberAC } from '../../../../store/member/actions'
+import { activeChannelMembersSelector } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -24,7 +18,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -98,7 +92,6 @@ const Members = ({
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
-  const membersLoading = useSelector(membersLoadingStateSelector) || {}
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -112,15 +105,6 @@ const Members = ({
     !checkActionPermission('changeMemberRole') &&
     !checkActionPermission('kickAndBlockMember') &&
     !checkActionPermission('kickMember')
-
-  const handleMembersListScroll = (event: any) => {
-    // setCloseMenu(true)
-    if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
-      if (membersLoading === LOADING_STATE.LOADED) {
-        dispatch(loadMoreMembersAC(15, channel.id))
-      }
-    }
-  }
 
   const watchDropdownState = (state: boolean, memberId: string) => {
     if (state) {
@@ -257,7 +241,7 @@ const Members = ({
   return (
     <Container theme={theme}>
       <ActionsMenu>
-        <MembersList onScroll={handleMembersListScroll}>
+        <MembersList>
           {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
             <MemberItem
               key={1}
