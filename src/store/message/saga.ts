@@ -81,9 +81,6 @@ import {
   retractPollVoteAC,
   deletePollVotesFromListAC,
   removePendingPollActionAC,
-  sendMessageAC,
-  sendTextMessageAC,
-  forwardMessageAC,
   resendPendingPollActionsAC,
   removePendingMessageAC
 } from './actions'
@@ -152,6 +149,7 @@ import { getFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { queuedChannelCall } from '../../helpers/channelQueue'
+import { isResendableError } from 'helpers/error'
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -540,17 +538,22 @@ function* sendMessage(action: IAction): any {
             throw new Error('Connection required to send message')
           }
         } catch (e) {
-          log.error('Error on uploading attachment', messageToSend.tid, e)
-          if (messageToSend.attachments && messageToSend.attachments.length) {
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
-          }
+          const isErrorResendable = isResendableError(e?.type)
+          if (!isErrorResendable) {
+            yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
+          } else {
+            log.error('Error on uploading attachment', messageToSend.tid, e)
+            if (messageToSend.attachments && messageToSend.attachments.length) {
+              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
+            }
 
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid!,
-            params: { state: MESSAGE_STATUS.FAILED }
-          })
-          updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
-          yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid!,
+              params: { state: MESSAGE_STATUS.FAILED }
+            })
+            updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
+            yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+          }
         }
       }
     }
@@ -576,7 +579,7 @@ function* sendTextMessage(action: IAction): any {
     }
   }
 
-  let sendMessageTid
+  let sendMessageTid: string | null = null
   let pendingMessage: IMessage | null = null
 
   try {
@@ -693,15 +696,20 @@ function* sendTextMessage(action: IAction): any {
 
     // messageForCatch = messageToSend
   } catch (e) {
-    log.error('error on send text message ... ', e)
-    updateMessageOnMap(channel.id, {
-      messageId: sendMessageTid,
-      params: { state: MESSAGE_STATUS.FAILED }
-    })
-    const activeChannelId = getActiveChannelId()
-    if (activeChannelId === channel.id) {
-      updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
-      yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+    log.error('error on send text message ... ', e?.type)
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable && channel.id && sendMessageTid) {
+      yield put(removePendingMessageAC(channel.id, sendMessageTid!))
+    } else if (channel.id && sendMessageTid) {
+      updateMessageOnMap(channel.id, {
+        messageId: sendMessageTid,
+        params: { state: MESSAGE_STATUS.FAILED }
+      })
+      const activeChannelId = getActiveChannelId()
+      if (activeChannelId === channel.id) {
+        updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
+        yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+      }
     }
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   } finally {
@@ -849,15 +857,20 @@ function* forwardMessage(action: IAction): any {
       }
     }
   } catch (e) {
-    if (channel && messageTid) {
-      updateMessageOnMap(channel.id, {
-        messageId: messageTid!,
-        params: { state: MESSAGE_STATUS.FAILED }
-      })
-      const activeChannelId = getActiveChannelId()
-      if (activeChannelId === channel.id) {
-        updateMessageOnAllMessages(messageTid!, { state: MESSAGE_STATUS.FAILED })
-        yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable) {
+      yield put(removePendingMessageAC(channel!.id, messageTid!))
+    } else {
+      if (channel && messageTid) {
+        updateMessageOnMap(channel.id, {
+          messageId: messageTid!,
+          params: { state: MESSAGE_STATUS.FAILED }
+        })
+        const activeChannelId = getActiveChannelId()
+        if (activeChannelId === channel.id) {
+          updateMessageOnAllMessages(messageTid!, { state: MESSAGE_STATUS.FAILED })
+          yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
+        }
       }
     }
     log.error('error on forward message ... ', e)
@@ -869,16 +882,30 @@ function* forwardMessage(action: IAction): any {
 function* resendMessage(action: IAction): any {
   const { payload } = action
   const { message, connectionState, channelId } = payload
+  const attachments = message?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
+
   if (message.forwardingDetails) {
-    store.dispatch(forwardMessageAC(message, channelId, connectionState, false))
-  } else if (message.attachments && message.attachments.length) {
+    yield call(forwardMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId, isForward: false }
+    })
+  } else if (attachments && attachments.length) {
     const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
     const isVoiceMessage = message.attachments[0].type === attachmentTypes.voice
-    store.dispatch(
-      sendMessageAC(message, channelId, connectionState, isVoiceMessage ? false : sendAttachmentsAsSeparateMessage)
-    )
+    yield call(sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message,
+        connectionState,
+        channelId,
+        sendAttachmentsAsSeparateMessage: isVoiceMessage ? false : sendAttachmentsAsSeparateMessage
+      }
+    })
   } else {
-    store.dispatch(sendTextMessageAC(message, channelId, connectionState))
+    yield call(sendTextMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId }
+    })
   }
 }
 

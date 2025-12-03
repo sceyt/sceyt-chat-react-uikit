@@ -39,14 +39,13 @@ import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.
 // Helpers
 import {
   deletePendingMessage,
-  getPendingAttachment,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IAttachment, IReaction } from 'types'
+import { IReaction } from 'types'
 // Components
 import Avatar from '../Avatar'
 import ConfirmPopup from 'common/popups/delete'
@@ -342,15 +341,7 @@ const Message = ({
   }
 
   const handleResendMessage = () => {
-    const messageToResend = { ...message }
-    if (message.attachments && message.attachments.length) {
-      messageToResend.attachments = (message.attachments as IAttachment[]).map((att) => {
-        const pendingAttachment = getPendingAttachment(att.tid!)
-        return { ...att, data: new File([pendingAttachment.file], att.data.name) }
-      })
-    }
-
-    dispatch(resendMessageAC(messageToResend, channel.id, connectionStatus))
+    dispatch(resendMessageAC(message, channel.id, connectionStatus))
 
     setMessageActionsShow(false)
   }
@@ -652,7 +643,7 @@ const Message = ({
         className='messageContent'
       >
         {message.state === MESSAGE_STATUS.FAILED && (
-          <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
+          <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming} onClick={handleResendMessage}>
             <ErrorIconWrapper />
           </FailedMessageIcon>
         )}
@@ -1089,6 +1080,7 @@ const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   right: ${(props) => props.rtl && '-24px'};
   width: 20px;
   height: 20px;
+  cursor: pointer;
 `
 const ErrorIconWrapper = styled(ErrorIcon)`
   width: 20px;

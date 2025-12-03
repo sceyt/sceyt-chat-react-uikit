@@ -708,27 +708,49 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
 
   // Build the formatted string with all non-zero units
   const parts: string[] = []
-
+  let partCount = 0
   if (years > 0) {
-    parts.push(`${years} ${years === 1 ? 'year' : 'years'}`)
+    partCount++
   }
   if (months > 0) {
-    parts.push(`${months} ${months === 1 ? 'month' : 'months'}`)
+    partCount++
   }
   if (weeks > 0) {
-    parts.push(`${weeks} ${weeks === 1 ? 'week' : 'weeks'}`)
+    partCount++
   }
   if (days > 0) {
-    parts.push(`${days} ${days === 1 ? 'day' : 'days'}`)
+    partCount++
   }
   if (hours > 0) {
-    parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`)
+    partCount++
   }
   if (minutes > 0) {
-    parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`)
+    partCount++
   }
   if (seconds > 0) {
-    parts.push(`${seconds} ${seconds === 1 ? 'second' : 'seconds'}`)
+    partCount++
+  }
+
+  if (years > 0) {
+    parts.push(`${years}${partCount > 1 ? 'y' : years === 1 ? ' year' : ' years'}`)
+  }
+  if (months > 0) {
+    parts.push(`${months}${partCount > 1 ? 'm' : months === 1 ? ' month' : ' months'}`)
+  }
+  if (weeks > 0) {
+    parts.push(`${weeks}${partCount > 1 ? 'w' : weeks === 1 ? ' week' : ' weeks'}`)
+  }
+  if (days > 0) {
+    parts.push(`${days}${partCount > 1 ? 'd' : days === 1 ? ' day' : ' days'}`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}${partCount > 1 ? 'h' : hours === 1 ? ' hour' : ' hours'}`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}${partCount > 1 ? 'm' : minutes === 1 ? ' minute' : ' minutes'}`)
+  }
+  if (seconds > 0) {
+    parts.push(`${seconds}${partCount > 1 ? 's' : seconds === 1 ? ' second' : ' seconds'}`)
   }
 
   // If no parts, return 0 seconds
