@@ -1118,7 +1118,21 @@ const MessageList: React.FC<MessagesProps> = ({
         scrollElement.style.scrollBehavior = 'inherit'
       }
       setScrollIntoView(true)
-      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
+      let lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId) || null
+      let newLastDisplayedMessageId = channel.lastDisplayedMessageId
+      if (!lastReadMessageNode) {
+        for (let index = 0; index < messages.length; index++) {
+          const message = messages[index]
+          if (
+            channel.lastDisplayedMessageId >= message.id &&
+            (messages.length < index + 2 || channel.lastDisplayedMessageId <= messages[index + 1].id)
+          ) {
+            newLastDisplayedMessageId = message.id
+            lastReadMessageNode = document.getElementById(newLastDisplayedMessageId)
+            break
+          }
+        }
+      }
       if (lastReadMessageNode && scrollElement) {
         dispatch(scrollToNewMessageAC(false))
         scrollElement.scrollTo({

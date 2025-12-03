@@ -93,8 +93,7 @@ export function sendMessageAC(
   channelId: string,
   connectionState: string,
   sendAttachmentsAsSeparateMessage?: boolean,
-  isResend?: boolean,
-  isAddToPendingMessagesMap: boolean = true
+  isResend?: boolean
 ) {
   return {
     type: SEND_MESSAGE,
@@ -103,21 +102,15 @@ export function sendMessageAC(
       channelId,
       connectionState,
       sendAttachmentsAsSeparateMessage,
-      isResend,
-      isAddToPendingMessagesMap
+      isResend
     }
   }
 }
 
-export function sendTextMessageAC(
-  message: any,
-  channelId: string,
-  connectionState: string,
-  isAddToPendingMessagesMap: boolean = true
-) {
+export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
   return {
     type: SEND_TEXT_MESSAGE,
-    payload: { message, channelId, connectionState, isAddToPendingMessagesMap }
+    payload: { message, channelId, connectionState }
   }
 }
 
@@ -128,16 +121,10 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
-export function forwardMessageAC(
-  message: any,
-  channelId: string,
-  connectionState: string,
-  isForward: boolean = true,
-  isAddToPendingMessagesMap: boolean = true
-) {
+export function forwardMessageAC(message: any, channelId: string, connectionState: string, isForward: boolean = true) {
   return {
     type: FORWARD_MESSAGE,
-    payload: { message, channelId, connectionState, isForward, isAddToPendingMessagesMap }
+    payload: { message, channelId, connectionState, isForward }
   }
 }
 

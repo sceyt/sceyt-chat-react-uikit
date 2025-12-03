@@ -516,6 +516,7 @@ const Actions = ({
               color={textPrimary}
               hoverColor={textPrimary}
               fontSize={actionItemsFontSize}
+              flexWrap='wrap'
             >
               <React.Fragment>
                 <DefaultWatchIcon $isLightMode={backgroundColor === '#FFFFFF'} />
@@ -1007,6 +1008,7 @@ const ActionItem = styled.li<{
   iconColor: string
   hoverColor: string
   order?: number
+  flexWrap?: string
 }>`
   position: relative;
   display: flex;
@@ -1017,7 +1019,7 @@ const ActionItem = styled.li<{
   cursor: pointer;
   order: ${(props) => props.order};
   pointer-events: ${(props) => props.disableEvent && 'none'};
-
+  ${(props) => props.flexWrap && `flex-wrap: ${props.flexWrap};`}
   & > div {
     margin-left: auto;
   }

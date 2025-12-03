@@ -3,8 +3,6 @@ import FileSaver from 'file-saver'
 import moment from 'moment'
 import { getCustomDownloader, getCustomUploader } from './customUploader'
 import log from 'loglevel'
-import { FIXED_TIMER_OPTIONS } from './constants'
-import { getDisappearingSettings } from './channelHalper'
 
 // eslint-disable-next-line
 export const urlRegex = /(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})/gi
@@ -679,47 +677,64 @@ export const formatDisappearingMessageTime = (periodInMilliseconds: number | nul
 
   const periodInSeconds = periodInMilliseconds / 1000
 
-  // Check fixed options using switch case
-  switch (periodInSeconds) {
-    case FIXED_TIMER_OPTIONS['1day']:
-      return '1 day'
-    case FIXED_TIMER_OPTIONS['1week']:
-      return '1 week'
-    case FIXED_TIMER_OPTIONS['1month']:
-      return '1 month'
-    default:
-      break
-  }
-
-  // Check custom options
-  const customOptions = getDisappearingSettings()?.customOptions || []
-  const customMatch = customOptions.find((option) => option.seconds === periodInSeconds)
-  if (customMatch) return customMatch.label
-
   const SECONDS_PER_MINUTE = 60
   const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60
   const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24
   const DAYS_PER_WEEK = 7
   const DAYS_PER_MONTH = 30
+  const DAYS_PER_YEAR = 365
 
-  const days = Math.floor(periodInSeconds / SECONDS_PER_DAY)
-  const weeks = Math.floor(days / DAYS_PER_WEEK)
-  const months = Math.floor(days / DAYS_PER_MONTH)
-  const hours = Math.floor(periodInSeconds / SECONDS_PER_HOUR)
-  const minutes = Math.floor(periodInSeconds / SECONDS_PER_MINUTE)
+  // Calculate all time units
+  let remainingSeconds = Math.floor(periodInSeconds)
+  const years = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_YEAR))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_YEAR
 
-  switch (true) {
-    case months > 0:
-      return `${months} ${months === 1 ? 'month' : 'months'}`
-    case weeks > 0:
-      return `${weeks} ${weeks === 1 ? 'week' : 'weeks'}`
-    case days > 0:
-      return `${days} ${days === 1 ? 'day' : 'days'}`
-    case hours > 0:
-      return `${hours} ${hours === 1 ? 'hour' : 'hours'}`
-    case minutes > 0:
-      return `${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`
-    default:
-      return `${periodInSeconds} ${periodInSeconds === 1 ? 'second' : 'seconds'}`
+  const months = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_MONTH))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_MONTH
+
+  const weeks = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_WEEK))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_WEEK
+
+  const days = Math.floor(remainingSeconds / SECONDS_PER_DAY)
+  remainingSeconds %= SECONDS_PER_DAY
+
+  const hours = Math.floor(remainingSeconds / SECONDS_PER_HOUR)
+  remainingSeconds %= SECONDS_PER_HOUR
+
+  const minutes = Math.floor(remainingSeconds / SECONDS_PER_MINUTE)
+  remainingSeconds %= SECONDS_PER_MINUTE
+
+  const seconds = remainingSeconds
+
+  // Build the formatted string with all non-zero units
+  const parts: string[] = []
+
+  if (years > 0) {
+    parts.push(`${years} ${years === 1 ? 'year' : 'years'}`)
   }
+  if (months > 0) {
+    parts.push(`${months} ${months === 1 ? 'month' : 'months'}`)
+  }
+  if (weeks > 0) {
+    parts.push(`${weeks} ${weeks === 1 ? 'week' : 'weeks'}`)
+  }
+  if (days > 0) {
+    parts.push(`${days} ${days === 1 ? 'day' : 'days'}`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours} ${hours === 1 ? 'hour' : 'hours'}`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes} ${minutes === 1 ? 'minute' : 'minutes'}`)
+  }
+  if (seconds > 0) {
+    parts.push(`${seconds} ${seconds === 1 ? 'second' : 'seconds'}`)
+  }
+
+  // If no parts, return 0 seconds
+  if (parts.length === 0) {
+    return '0 seconds'
+  }
+
+  return parts.join(' ')
 }

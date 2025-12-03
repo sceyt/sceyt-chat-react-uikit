@@ -255,7 +255,7 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
 }
 
 export function setMessagesToMap(channelId: string, messages: IMessage[]) {
-  if (!messagesMap[channelId]) {
+  if (!messagesMap[channelId] || messages.length === 0) {
     messagesMap[channelId] = {}
   }
   messages.forEach((msg: IMessage) => {
@@ -305,8 +305,6 @@ export function updateMessageOnMap(
       updatedPendingMessages.forEach((msg: IMessage) => {
         store.dispatch(updatePendingMessageAC(channelId, msg.tid || msg.id, msg))
       })
-    } else {
-      store.dispatch(removePendingMessageAC(channelId, updatedMessage.messageId))
     }
   }
   let updatedMessageData = null

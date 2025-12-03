@@ -369,3 +369,76 @@ export const handleVoteDetails = (
     voteDetails: newVoteDetails
   }
 }
+
+export const checkIsTypeKeyPressed = (code?: string) => {
+  return !(
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'CapsLock' ||
+    code === 'Shift' ||
+    code === 'ShiftLeft' ||
+    code === 'ShiftRight' ||
+    code === 'Control' ||
+    code === 'ControlLeft' ||
+    code === 'ControlRight' ||
+    code === 'Alt' ||
+    code === 'AltLeft' ||
+    code === 'AltRight' ||
+    code === 'MetaLeft' ||
+    code === 'MetaRight' ||
+    code === 'Space' ||
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'Shift'
+  )
+}

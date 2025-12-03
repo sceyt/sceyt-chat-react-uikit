@@ -61,6 +61,7 @@ import { themeSelector } from '../../store/theme/selector'
 
 // Helpers
 import {
+  checkIsTypeKeyPressed,
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
@@ -447,7 +448,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     onError
   }
 
-  const handleSendTypingState = (typingState: boolean) => {
+  const handleSendTypingState = (typingState: boolean, code?: string) => {
+    if (code) {
+      const isTypeKeyPressed = checkIsTypeKeyPressed(code)
+      if (!isTypeKeyPressed) {
+        return
+      }
+    }
     if (typingState) {
       setInTypingStateTimout(
         setTimeout(() => {
@@ -613,11 +620,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } else {
       if (typingTimout) {
         if (!inTypingStateTimout) {
-          handleSendTypingState(true)
+          handleSendTypingState(true, code)
         }
         clearTimeout(typingTimout)
       } else {
-        handleSendTypingState(true)
+        handleSendTypingState(true, code)
       }
 
       setTypingTimout(
