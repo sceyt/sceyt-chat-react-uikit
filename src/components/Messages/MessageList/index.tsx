@@ -576,7 +576,8 @@ const MessageList: React.FC<MessagesProps> = ({
   // @ts-ignore
   const handleMessagesListScroll = useCallback(async () => {
     const target = scrollRef.current
-    if (!target) return
+    const messageBox = document.getElementById('messageBox')
+    if (!target || !messageBox) return
     if (scrollToMentionedMessage) {
       if (target.scrollTop <= -50 || channel.lastMessage.id !== messages[messages.length - 1].id) {
         dispatch(showScrollToNewMessageButtonAC(true))
@@ -592,8 +593,11 @@ const MessageList: React.FC<MessagesProps> = ({
     // }, 1000)
     renderTopDate()
     let forceLoadPrevMessages = false
-    if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
+    if (-target.scrollTop + target.offsetHeight + 100 > messageBox.scrollHeight) {
       forceLoadPrevMessages = true
+    }
+    if (unreadScrollTo) {
+      return
     }
     if (
       target.scrollTop === 0 &&
@@ -614,7 +618,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
     const hasIndex = typeof currentIndex === 'number'
-    if ((hasIndex && currentIndex < 15) || forceLoadPrevMessages) {
+    if ((hasIndex && currentIndex < 5) || forceLoadPrevMessages) {
       if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
         if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || prevDisableRef.current) {
           shouldLoadMessagesRef.current = 'prev'
@@ -631,7 +635,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
       }
     }
-    if ((hasIndex && currentIndex >= messages.length - 15) || target.scrollTop === 0) {
+    if ((hasIndex && currentIndex >= messages.length - 5) || target.scrollTop > -100) {
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !scrollToNewMessage.scrollToBottom &&
@@ -1252,6 +1256,7 @@ const MessageList: React.FC<MessagesProps> = ({
               replyMessage={messageForReply && messageForReply.id}
               attachmentsSelected={attachmentsSelected}
               className='messageBox'
+              id='messageBox'
             >
               {messages.map((message: any, index: number) => {
                 const prevMessage = messages[index - 1]

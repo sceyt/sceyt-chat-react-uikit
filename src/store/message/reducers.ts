@@ -3,7 +3,7 @@ import { IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../type
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
-  MESSAGES_MAX_LENGTH,
+  MESSAGES_MAX_PAGE_COUNT,
   setHasNextCached,
   setHasPrevCached,
   PendingPollAction,
@@ -188,18 +188,20 @@ const messageSlice = createSlice({
       )
 
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && newMessagesLength > 0) {
-        if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_LENGTH) {
+        if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
           setHasNextCached(true)
           if (newMessagesLength > 0) {
-            if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+            if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
               state.activeChannelMessages.splice(-newMessagesLength)
             } else {
-              state.activeChannelMessages.splice(-(newMessagesLength - (MESSAGES_MAX_LENGTH - currentMessagesLength)))
+              state.activeChannelMessages.splice(
+                -(newMessagesLength - (MESSAGES_MAX_PAGE_COUNT - currentMessagesLength))
+              )
             }
           }
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
-          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
+        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
+          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_PAGE_COUNT
           setHasNextCached(true)
           state.activeChannelMessages.splice(-sliceElementCount)
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
@@ -207,12 +209,12 @@ const messageSlice = createSlice({
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         }
       } else if (direction === 'next' && newMessagesLength > 0) {
-        if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+        if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, messagesIsNotIncludeInActiveChannelMessages.length)
           state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
-          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
+        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
+          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_PAGE_COUNT
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, sliceElementCount)
           state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
