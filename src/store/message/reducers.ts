@@ -238,6 +238,7 @@ const messageSlice = createSlice({
           state.activeChannelMessages[index] = { ...message, markerTotals, deliveryStatus }
         }
       }
+      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
     },
 
     updateMessage: (
@@ -297,6 +298,7 @@ const messageSlice = createSlice({
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }
+      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
     },
 
     updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {

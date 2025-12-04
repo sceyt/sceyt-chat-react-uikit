@@ -155,10 +155,10 @@ export function getMessagesAC(
   loadWithLastMessage?: boolean,
   messageId?: string,
   limit?: number,
-  withDeliveredMessages?: boolean,
   highlight = true,
   behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage: boolean = true
+  scrollToMessage: boolean = true,
+  networkChanged: boolean = false
 ) {
   return {
     type: GET_MESSAGES,
@@ -167,10 +167,10 @@ export function getMessagesAC(
       loadWithLastMessage,
       messageId,
       limit,
-      withDeliveredMessages,
       highlight,
       behavior,
-      scrollToMessage
+      scrollToMessage,
+      networkChanged
     }
   }
 }

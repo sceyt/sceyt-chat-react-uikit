@@ -87,7 +87,7 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
         }
       }
     } else {
-      dispatch(getMessagesAC(channel, true, messageId, undefined, undefined, false))
+      dispatch(getMessagesAC(channel, true, messageId, undefined, false, 'smooth', true))
     }
   }
 

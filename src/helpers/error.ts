@@ -56,6 +56,9 @@ export const fromValue = (value: string | null | undefined): SDKErrorType | null
  * @returns true if the error type is resendable, false otherwise
  */
 export const isResendableError = (value: string | null | undefined): boolean => {
+  if (!value) {
+    return true
+  }
   const errorType = fromValue(value)
   return errorType?.isResendable ?? true
 }

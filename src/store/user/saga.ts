@@ -1,6 +1,14 @@
 import { call, put, takeLatest } from 'redux-saga/effects'
 import { getClient } from '../../common/client'
-import { BLOCK_USERS, GET_CONTACTS, GET_USERS, LOAD_MORE_USERS, UNBLOCK_USERS, UPDATE_PROFILE } from './constants'
+import {
+  BLOCK_USERS,
+  CONNECTION_STATUS,
+  GET_CONTACTS,
+  GET_USERS,
+  LOAD_MORE_USERS,
+  UNBLOCK_USERS,
+  UPDATE_PROFILE
+} from './constants'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 import {
   addUsersAC,
@@ -18,9 +26,11 @@ import log from 'loglevel'
 function* getContacts(): any {
   try {
     const SceytChatClient = getClient()
-    const contactsData = yield call(SceytChatClient.getAllContacts)
-    yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
-    yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
+    if (SceytChatClient.connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      const contactsData = yield call(SceytChatClient.getAllContacts)
+      yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
+      yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
+    }
   } catch (e) {
     log.error('ERROR in get contacts - :', e.message)
     if (e.code !== 10008) {
@@ -152,6 +162,9 @@ function* getUsers(action: IAction): any {
     const { payload } = action
     const { params } = payload
     const SceytChatClient = getClient()
+    if (SceytChatClient.connectionState !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
     const usersQueryBuilder = new SceytChatClient.UserListQueryBuilder()
 
     if (params.query) {

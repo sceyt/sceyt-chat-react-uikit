@@ -713,12 +713,12 @@ const MessageList: React.FC<MessagesProps> = ({
         )
       }
     } else {
-      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, true, 'smooth', true))
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, true, 'smooth', true))
     }
   }
 
   const handleLoadMoreMessages = (direction: string, limit: number) => {
-    if (scrollToMentionedMessage) {
+    if (scrollToMentionedMessage || scrollToNewMessage.scrollToBottom) {
       return
     }
     const lastMessageId = messages.length && messages[messages.length - 1].id
@@ -885,9 +885,6 @@ const MessageList: React.FC<MessagesProps> = ({
             behavior: 'smooth'
           })
         }
-        setTimeout(() => {
-          dispatch(scrollToNewMessageAC(false, false, false))
-        }, 800)
       } else {
         nextDisableRef.current = true
         prevDisableRef.current = true
@@ -896,10 +893,6 @@ const MessageList: React.FC<MessagesProps> = ({
           behavior: 'smooth'
         })
         dispatch(showScrollToNewMessageButtonAC(false))
-        setTimeout(() => {
-          prevDisableRef.current = false
-          dispatch(scrollToNewMessageAC(false, false, false))
-        }, 800)
       }
     }
   }, [scrollToNewMessage])
@@ -931,7 +924,7 @@ const MessageList: React.FC<MessagesProps> = ({
       const visibleMessages = getVisibleMessagesMap()
       const visibleMessagesIds = Object.keys(visibleMessages)
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, undefined, 'instant'))
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, 'instant'))
       setUnreadMessageId(messageId)
     } else {
       if (!channel.isLinkedChannel) {
@@ -1105,13 +1098,13 @@ const MessageList: React.FC<MessagesProps> = ({
 
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && channel?.id) {
       loadingRef.current = false
       prevDisableRef.current = false
       nextDisableRef.current = false
       clearMessagesMap()
       removeAllMessages()
-      dispatch(getMessagesAC(channel, false, lastVisibleMessageId, 0, false, false, 'instant', false))
+      dispatch(getMessagesAC(channel, false, lastVisibleMessageId, 0, false, 'instant', false, true))
     }
   }, [connectionStatus])
 
