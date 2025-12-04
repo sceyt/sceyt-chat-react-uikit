@@ -618,7 +618,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
     const hasIndex = typeof currentIndex === 'number'
-    if ((hasIndex && currentIndex < 5) || forceLoadPrevMessages) {
+    if ((hasIndex && currentIndex < 10) || forceLoadPrevMessages) {
       if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
         if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || prevDisableRef.current) {
           shouldLoadMessagesRef.current = 'prev'
@@ -635,7 +635,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
       }
     }
-    if ((hasIndex && currentIndex >= messages.length - 5) || target.scrollTop > -100) {
+    if ((hasIndex && currentIndex >= messages.length - 10) || target.scrollTop > -100) {
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !scrollToNewMessage.scrollToBottom &&
@@ -713,7 +713,7 @@ const MessageList: React.FC<MessagesProps> = ({
         )
       }
     } else {
-      dispatch(getMessagesAC(channel, undefined, messageId))
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, true, 'smooth', true))
     }
   }
 

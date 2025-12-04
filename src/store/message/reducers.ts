@@ -188,27 +188,22 @@ const messageSlice = createSlice({
       )
 
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && newMessagesLength > 0) {
-        if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
+        if (currentMessagesLength + newMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
           setHasNextCached(true)
           if (newMessagesLength > 0) {
             if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
               state.activeChannelMessages.splice(-newMessagesLength)
             } else {
               state.activeChannelMessages.splice(
-                -(newMessagesLength - (MESSAGES_MAX_PAGE_COUNT - currentMessagesLength))
+                -(currentMessagesLength - currentMessagesLength + newMessagesLength - MESSAGES_MAX_PAGE_COUNT)
               )
             }
           }
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
-          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_PAGE_COUNT
-          setHasNextCached(true)
-          state.activeChannelMessages.splice(-sliceElementCount)
-          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         } else {
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         }
-      } else if (direction === 'next' && newMessagesLength > 0) {
+      } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && newMessagesLength > 0) {
         if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, messagesIsNotIncludeInActiveChannelMessages.length)
