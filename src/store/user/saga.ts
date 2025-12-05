@@ -26,7 +26,7 @@ import log from 'loglevel'
 function* getContacts(): any {
   try {
     const SceytChatClient = getClient()
-    if (SceytChatClient.connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (SceytChatClient.connectionState === CONNECTION_STATUS.CONNECTED) {
       const contactsData = yield call(SceytChatClient.getAllContacts)
       yield put(setContactsAC(JSON.parse(JSON.stringify(contactsData))))
       yield put(setContactsLoadingStateAC(LOADING_STATE.LOADED))
