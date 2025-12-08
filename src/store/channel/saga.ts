@@ -1545,7 +1545,7 @@ function* getChannelInviteKeys(action: IAction): any {
 function* regenerateChannelInviteKey(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, key } = payload
+    const { channelId, key, deletePermanently } = payload
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
@@ -1553,7 +1553,8 @@ function* regenerateChannelInviteKey(action: IAction): any {
     if (channel) {
       const inviteKey = yield call(channel.regenerateInviteKey, {
         key,
-        channelId
+        channelId,
+        deletePermanently
       })
       yield put(setChannelInviteKeysAC(channelId, [inviteKey]))
     }

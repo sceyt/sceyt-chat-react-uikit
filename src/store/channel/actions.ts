@@ -345,9 +345,9 @@ export const getChannelInviteKeysAC = (channelId: string) => ({
   payload: { channelId }
 })
 
-export const regenerateChannelInviteKeyAC = (channelId: string, key: string) => ({
+export const regenerateChannelInviteKeyAC = (channelId: string, key: string, deletePermanently: boolean) => ({
   type: REGENERATE_CHANNEL_INVITE_KEY,
-  payload: { channelId, key }
+  payload: { channelId, key, deletePermanently }
 })
 
 export const updateChannelInviteKeyAC = (
