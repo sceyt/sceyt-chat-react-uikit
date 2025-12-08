@@ -84,7 +84,8 @@ import {
   setPendingMessage,
   removePendingMessage,
   updatePendingMessage,
-  clearPendingMessagesMap
+  clearPendingMessagesMap,
+  updatePendingPollAction
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 
@@ -582,6 +583,10 @@ export function removePendingPollActionAC(messageId: string, actionType: string,
 
 export function setPendingPollActionsMapAC(messageId: string, event: PendingPollAction) {
   return setPendingPollActionsMap({ messageId, event })
+}
+
+export function updatePendingPollActionAC(messageId: string, message: IMessage) {
+  return updatePendingPollAction({ messageId, message })
 }
 
 export function setPendingMessageAC(channelId: string, message: IMessage) {

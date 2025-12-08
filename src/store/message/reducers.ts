@@ -725,6 +725,15 @@ const messageSlice = createSlice({
       }
       state.pendingPollActions[messageId] = [...state.pendingPollActions[messageId], event]
     },
+    updatePendingPollAction: (state, action: PayloadAction<{ messageId: string; message: IMessage }>) => {
+      const { messageId, message } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        return
+      }
+      state.pendingPollActions[messageId] = state.pendingPollActions[messageId].map((action) => {
+        return action.message?.id === messageId || action.message?.tid === messageId ? { ...action, message } : action
+      })
+    },
     setPendingMessage: (state, action: PayloadAction<{ channelId: string; message: IMessage }>) => {
       const { channelId, message } = action.payload
       if (!state.pendingMessagesMap[channelId]) {
@@ -830,7 +839,8 @@ export const {
   setPendingMessage,
   removePendingMessage,
   updatePendingMessage,
-  clearPendingMessagesMap
+  clearPendingMessagesMap,
+  updatePendingPollAction
 } = messageSlice.actions
 
 // Export reducer
