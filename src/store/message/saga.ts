@@ -264,7 +264,7 @@ const updateMessage = function* (
             })
           }
         }
-      } else {
+      } else if (channel?.id) {
         yield put(getMessagesAC(channel, false, channel?.lastMessage?.id, undefined, false, 'smooth', true))
       }
     }

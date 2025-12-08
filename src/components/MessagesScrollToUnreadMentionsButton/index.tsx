@@ -140,7 +140,7 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
           repliedMessage.classList.remove('highlight')
         }, 1500)
       }
-    } else {
+    } else if (channel?.id) {
       // await handleGetMessages(undefined, messageId)
       dispatch(getMessagesAC(channel, undefined, messageId))
     }

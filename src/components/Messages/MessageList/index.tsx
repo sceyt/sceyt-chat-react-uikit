@@ -603,7 +603,8 @@ const MessageList: React.FC<MessagesProps> = ({
       target.scrollTop === 0 &&
       scrollToNewMessage.scrollToBottom &&
       scrollToNewMessage.updateMessageList &&
-      messagesLoading !== LOADING_STATE.LOADING
+      messagesLoading !== LOADING_STATE.LOADING &&
+      channel?.id
     ) {
       dispatch(getMessagesAC(channel, true))
     }
@@ -712,7 +713,7 @@ const MessageList: React.FC<MessagesProps> = ({
           1000 + positiveValue * 0.1
         )
       }
-    } else {
+    } else if (channel?.id) {
       dispatch(getMessagesAC(channel, undefined, messageId, undefined, true, 'smooth', true))
     }
   }
@@ -920,7 +921,7 @@ const MessageList: React.FC<MessagesProps> = ({
     prevDisableRef.current = false
     shouldLoadMessagesRef.current = ''
     loadingRef.current = false
-    if (channel.backToLinkedChannel) {
+    if (channel.backToLinkedChannel && channel?.id) {
       const visibleMessages = getVisibleMessagesMap()
       const visibleMessagesIds = Object.keys(visibleMessages)
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
@@ -930,7 +931,7 @@ const MessageList: React.FC<MessagesProps> = ({
       if (!channel.isLinkedChannel) {
         clearVisibleMessagesMap()
       }
-      if (channel) {
+      if (channel && channel?.id) {
         dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
       }
       if (channel.id) {
