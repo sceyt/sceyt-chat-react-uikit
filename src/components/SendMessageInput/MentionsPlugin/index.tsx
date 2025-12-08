@@ -427,7 +427,7 @@ const MentionsList = styled.ul<{
   position: absolute;
   bottom: 47px;
   width: 340px;
-  max-height: 260px;
+  max-height: 268px;
   transition: all 0.2s;
   overflow-x: hidden;
   overflow-y: auto;
