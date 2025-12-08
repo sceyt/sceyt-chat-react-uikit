@@ -302,6 +302,7 @@ function MentionsContainer({
           />
         ))}
       </MentionsList>
+      <Handle backgroundColor={background} />
     </MentionsContainerWrapper>
   )
 }
@@ -424,13 +425,16 @@ const MentionsList = styled.ul<{
   theme: string
 }>`
   position: absolute;
-  bottom: 5px;
-  width: 300px;
+  bottom: 47px;
+  width: 340px;
+  max-height: 260px;
   transition: all 0.2s;
-  overflow: auto;
-  max-height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  left: -60px;
   z-index: 200;
-  padding: 2px 0 0;
+  padding: 0;
+  margin: 0;
   background: ${(props) => props.backgroundColor};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
@@ -438,13 +442,47 @@ const MentionsList = styled.ul<{
     props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: #37393c;
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: #37393c;
+  }
+`
+
+const Handle = styled.div<{
+  backgroundColor: string
+}>`
+  position: absolute;
+  bottom: 39px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 8px;
+  background: ${(props) => props.backgroundColor};
+  z-index: 201;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
 `
 
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
+  width: 340px;
+  height: 52px;
   font-size: 15px;
-  padding: 6px 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
   transition: all 0.2s;
   cursor: pointer;
   background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
