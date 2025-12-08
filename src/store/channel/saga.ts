@@ -324,7 +324,7 @@ function* getChannels(action: IAction): any {
               channel
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
-                  channelMessageMap[channel.id] = messages[0]
+                  channelMessageMap[channel?.id] = messages[0]
                   log.info('[getChannels] successfully fetched reaction message for channel:', channel?.id)
                   resolve(true)
                 })
@@ -341,8 +341,8 @@ function* getChannels(action: IAction): any {
         channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
       )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
-        if (channelMessageMap[channel.id]) {
-          channel.lastReactedMessage = channelMessageMap[channel.id]
+        if (channelMessageMap[channel?.id]) {
+          channel.lastReactedMessage = channelMessageMap[channel?.id]
         }
         return channel
       })

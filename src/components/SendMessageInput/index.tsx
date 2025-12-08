@@ -1332,7 +1332,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
+  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes, messageToEdit])
 
   useDidUpdate(() => {
     if (mentionedUsers && mentionedUsers.length) {
@@ -1776,7 +1776,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                  {showRecording || getAudioRecordingFromMap(activeChannel.id) ? (
+                  {(showRecording || getAudioRecordingFromMap(activeChannel.id)) && !messageToEdit ? (
                     <AudioCont />
                   ) : (
                     <MessageInputWrapper
@@ -1962,7 +1962,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </MessageInputWrapper>
                   )}
 
-                  {sendMessageIsActive || !voiceMessage || messageToEdit ? (
+                  {sendMessageIsActive ||
+                  (!voiceMessage && !getAudioRecordingFromMap(activeChannel?.id)?.file) ||
+                  messageToEdit ? (
                     <SendMessageButton
                       isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
