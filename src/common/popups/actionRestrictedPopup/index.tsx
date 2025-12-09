@@ -40,20 +40,20 @@ const ActionRestrictedPopup = ({ fromChannel }: { fromChannel: boolean }) => {
           </PopupDescription>
         </PopupBody>
         <PopupFooter backgroundColor={surface1}>
-          <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleClose}>
-            Cancel
-          </Button>
           {fromChannel && (
-            <Button
-              type='button'
-              backgroundColor={accentColor}
-              color={textOnPrimary}
-              borderRadius='8px'
-              onClick={handleInvite}
-            >
-              Invite
+            <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleClose}>
+              Cancel
             </Button>
           )}
+          <Button
+            type='button'
+            backgroundColor={accentColor}
+            color={textOnPrimary}
+            borderRadius='8px'
+            onClick={fromChannel ? handleInvite : handleClose}
+          >
+            {fromChannel ? 'Invite' : 'Cancel'}
+          </Button>
         </PopupFooter>
       </Popup>
     </PopupContainer>
