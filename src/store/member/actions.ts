@@ -9,7 +9,9 @@ import {
   setMembersLoadingState,
   getRolesSuccess,
   getRolesFail,
-  setMembersHasNext
+  setMembersHasNext,
+  setActionIsRestricted,
+  setOpenInviteModal
 } from './reducers'
 
 // Import saga action constants
@@ -87,3 +89,8 @@ export const getRolesSuccessAC = (roles: IRole[]) => getRolesSuccess({ roles })
 export const getRolesFailAC = (timeout?: number, attempts?: number) => getRolesFail({ timeout, attempts })
 
 export const setMembersHasNextAC = (hasNext: boolean) => setMembersHasNext({ hasNext })
+
+export const setActionIsRestrictedAC = (isRestricted: boolean, fromChannel: boolean) =>
+  setActionIsRestricted({ isRestricted, fromChannel })
+
+export const setOpenInviteModalAC = (open: boolean) => setOpenInviteModal({ open })

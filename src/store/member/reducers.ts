@@ -8,6 +8,11 @@ export interface IMembersStore {
   rolesMap: { [key: string]: IRole }
   getRolesFail: { attempts: number; timeout: number } | undefined
   activeChannelMembers: IMember[]
+  restricted: {
+    isRestricted: boolean
+    fromChannel: boolean
+  }
+  openInviteModal: boolean
 }
 
 const initialState: IMembersStore = {
@@ -16,7 +21,12 @@ const initialState: IMembersStore = {
   activeChannelMembers: [],
   roles: [],
   getRolesFail: undefined,
-  rolesMap: {}
+  rolesMap: {},
+  restricted: {
+    isRestricted: false,
+    fromChannel: false
+  },
+  openInviteModal: false
 }
 
 const memberSlice = createSlice({
@@ -103,6 +113,16 @@ const memberSlice = createSlice({
 
     setMembersHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
       state.membersHasNext = action.payload.hasNext
+    },
+
+    setActionIsRestricted: (state, action: PayloadAction<{ isRestricted: boolean; fromChannel: boolean }>) => {
+      const { isRestricted, fromChannel } = action.payload
+      state.restricted.isRestricted = isRestricted
+      state.restricted.fromChannel = fromChannel
+    },
+
+    setOpenInviteModal: (state, action: PayloadAction<{ open: boolean }>) => {
+      state.openInviteModal = action.payload.open
     }
   },
   extraReducers: (builder) => {
@@ -123,7 +143,9 @@ export const {
   setMembersLoadingState,
   getRolesSuccess,
   getRolesFail,
-  setMembersHasNext
+  setMembersHasNext,
+  setActionIsRestricted,
+  setOpenInviteModal
 } = memberSlice.actions
 
 // Export reducer

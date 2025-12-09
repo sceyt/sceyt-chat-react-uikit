@@ -102,7 +102,7 @@ import {
   updateMessageOnAllMessages,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
-import { updateMembersPresenceAC } from '../member/actions'
+import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -241,6 +241,9 @@ function* createChannel(action: IAction): any {
       yield call(setActiveChannelId, createdChannel.id)
     }
   } catch (e) {
+    if (e.code === 1041) {
+      yield put(setActionIsRestrictedAC(true, false))
+    }
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
   }

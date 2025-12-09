@@ -2,8 +2,14 @@ import styled from 'styled-components'
 import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import { blockMemberAC, changeMemberRoleAC, getMembersAC, kickMemberAC } from '../../../../store/member/actions'
-import { activeChannelMembersSelector } from '../../../../store/member/selector'
+import {
+  blockMemberAC,
+  changeMemberRoleAC,
+  getMembersAC,
+  kickMemberAC,
+  setOpenInviteModalAC
+} from '../../../../store/member/actions'
+import { activeChannelMembersSelector, openInviteModalSelector } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -88,10 +94,10 @@ const Members = ({
   const [makeAdminPopup, setMakeAdminPopup] = useState(false)
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
-  const [openInviteModal, setOpenInviteModal] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
+  const openInviteModal = useSelector(openInviteModalSelector)
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -223,7 +229,7 @@ const Members = ({
   }
 
   const handleOpenInviteModal = () => {
-    setOpenInviteModal(true)
+    dispatch(setOpenInviteModalAC(true))
     setAddMemberPopupOpen(false)
   }
 
@@ -482,7 +488,7 @@ const Members = ({
       )}
       {openInviteModal && (
         <InviteLinkModal
-          onClose={() => setOpenInviteModal(false)}
+          onClose={() => dispatch(setOpenInviteModalAC(false))}
           SVGOrPNGLogoIcon={QRCodeIcon}
           channelId={channel.id}
         />
