@@ -55,6 +55,7 @@ export interface IChannelState {
     }[]
   }
   joinableChannel: IChannel | null
+  channelInviteKeyAvailable: boolean
 }
 
 const initialState: IChannelState = {
@@ -89,7 +90,8 @@ const initialState: IChannelState = {
   draggedAttachments: [],
   draftIsRemoved: '',
   channelInviteKeys: {},
-  joinableChannel: null
+  joinableChannel: null,
+  channelInviteKeyAvailable: true
 }
 
 const channelSlice = createSlice({
@@ -483,6 +485,10 @@ const channelSlice = createSlice({
 
     setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
       state.joinableChannel = action.payload.channel
+    },
+
+    setChannelInviteKeyAvailable: (state, action: PayloadAction<{ available: boolean }>) => {
+      state.channelInviteKeyAvailable = action.payload.available
     }
   },
   extraReducers: (builder) => {
@@ -528,7 +534,8 @@ export const {
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,
-  setJoinableChannel
+  setJoinableChannel,
+  setChannelInviteKeyAvailable
 } = channelSlice.actions
 
 // Export reducer

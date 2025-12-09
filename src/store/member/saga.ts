@@ -135,7 +135,7 @@ function* addMembers(action: IAction): any {
     }
   } catch (e) {
     if (e.code === 1041) {
-      yield put(setActionIsRestrictedAC(true, true))
+      yield put(setActionIsRestrictedAC(true, true, action?.payload?.members || []))
     }
     log.error('error on add members... ', e)
     // yield put(setErrorNotification(e.message))

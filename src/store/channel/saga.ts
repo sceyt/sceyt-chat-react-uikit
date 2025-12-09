@@ -18,6 +18,7 @@ import {
   setSearchedChannelsAC,
   setSearchedChannelsForForwardAC,
   switchChannelActionAC,
+  setChannelInviteKeyAvailableAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC,
   updateUserStatusOnChannelAC,
@@ -242,7 +243,7 @@ function* createChannel(action: IAction): any {
     }
   } catch (e) {
     if (e.code === 1041) {
-      yield put(setActionIsRestrictedAC(true, false))
+      yield put(setActionIsRestrictedAC(true, false, null))
     }
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
@@ -1619,6 +1620,9 @@ function* getChannelByInviteKey(action: IAction): any {
       window.history.pushState({}, '', window.location.pathname)
     }
   } catch (e) {
+    if (e.code === 1109) {
+      yield put(setChannelInviteKeyAvailableAC(false))
+    }
     log.error('ERROR in get channel by invite key', e)
   }
 }

@@ -33,7 +33,8 @@ import {
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,
-  setJoinableChannel
+  setJoinableChannel,
+  setChannelInviteKeyAvailable
 } from './reducers'
 
 // Import saga action constants
@@ -186,6 +187,8 @@ export const switchChannelActionAC = (channel: IChannel | null, updateActiveChan
   type: SWITCH_CHANNEL,
   payload: { channel, updateActiveChannel }
 })
+
+export const setChannelInviteKeyAvailableAC = (available: boolean) => setChannelInviteKeyAvailable({ available })
 
 export const updateChannelAC = (channelId: string, config: any) => ({
   type: UPDATE_CHANNEL,

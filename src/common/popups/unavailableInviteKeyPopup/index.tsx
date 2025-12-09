@@ -4,9 +4,9 @@ import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, Popup
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 import PopupContainer from '../popupContainer'
-import { setActionIsRestrictedAC, setOpenInviteModalAC } from '../../../store/member/actions'
+import { setChannelInviteKeyAvailableAC } from 'store/channel/actions'
 
-const ActionRestrictedPopup = ({ fromChannel }: { fromChannel: boolean }) => {
+const UnavailableInviteKeyPopup = () => {
   const dispatch = useDispatch()
   const {
     [THEME_COLORS.BACKGROUND]: background,
@@ -19,12 +19,7 @@ const ActionRestrictedPopup = ({ fromChannel }: { fromChannel: boolean }) => {
   } = useColor()
 
   const handleClose = () => {
-    dispatch(setActionIsRestrictedAC(false, false, null))
-  }
-
-  const handleInvite = () => {
-    dispatch(setOpenInviteModalAC(true))
-    handleClose()
+    dispatch(setChannelInviteKeyAvailableAC(true))
   }
 
   return (
@@ -33,28 +28,21 @@ const ActionRestrictedPopup = ({ fromChannel }: { fromChannel: boolean }) => {
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon color={iconPrimary} onClick={handleClose} />
           <PopupName color={textPrimary} marginBottom='20px'>
-            {fromChannel ? 'Privacy note' : "Can't create group"}
+            Failed to join
           </PopupName>
           <PopupDescription color={textPrimary} highlightColor={linkColor}>
-            {fromChannel
-              ? 'Couldn’t add the user. Please invite them directly instead.'
-              : 'Not everyone can be added to this group.'}
+            You can't join the group or community as the invite link was reset.
           </PopupDescription>
         </PopupBody>
         <PopupFooter backgroundColor={surface1}>
-          {fromChannel && (
-            <Button type='button' color={textPrimary} backgroundColor='transparent' onClick={handleClose}>
-              Cancel
-            </Button>
-          )}
           <Button
             type='button'
             backgroundColor={accentColor}
             color={textOnPrimary}
             borderRadius='8px'
-            onClick={fromChannel ? handleInvite : handleClose}
+            onClick={handleClose}
           >
-            {fromChannel ? 'Invite' : 'Cancel'}
+            Close
           </Button>
         </PopupFooter>
       </Popup>
@@ -62,4 +50,4 @@ const ActionRestrictedPopup = ({ fromChannel }: { fromChannel: boolean }) => {
   )
 }
 
-export default ActionRestrictedPopup
+export default UnavailableInviteKeyPopup

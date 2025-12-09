@@ -11,6 +11,7 @@ export interface IMembersStore {
   restricted: {
     isRestricted: boolean
     fromChannel: boolean
+    members: IMember[] | null
   }
   openInviteModal: boolean
 }
@@ -24,7 +25,8 @@ const initialState: IMembersStore = {
   rolesMap: {},
   restricted: {
     isRestricted: false,
-    fromChannel: false
+    fromChannel: false,
+    members: []
   },
   openInviteModal: false
 }
@@ -115,10 +117,14 @@ const memberSlice = createSlice({
       state.membersHasNext = action.payload.hasNext
     },
 
-    setActionIsRestricted: (state, action: PayloadAction<{ isRestricted: boolean; fromChannel: boolean }>) => {
-      const { isRestricted, fromChannel } = action.payload
+    setActionIsRestricted: (
+      state,
+      action: PayloadAction<{ isRestricted: boolean; fromChannel: boolean; members: IMember[] | null }>
+    ) => {
+      const { isRestricted, fromChannel, members } = action.payload
       state.restricted.isRestricted = isRestricted
       state.restricted.fromChannel = fromChannel
+      state.restricted.members = members
     },
 
     setOpenInviteModal: (state, action: PayloadAction<{ open: boolean }>) => {

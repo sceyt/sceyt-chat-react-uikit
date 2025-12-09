@@ -90,7 +90,7 @@ export const getRolesFailAC = (timeout?: number, attempts?: number) => getRolesF
 
 export const setMembersHasNextAC = (hasNext: boolean) => setMembersHasNext({ hasNext })
 
-export const setActionIsRestrictedAC = (isRestricted: boolean, fromChannel: boolean) =>
-  setActionIsRestricted({ isRestricted, fromChannel })
+export const setActionIsRestrictedAC = (isRestricted: boolean, fromChannel: boolean, members: IMember[] | null) =>
+  setActionIsRestricted({ isRestricted, fromChannel, members: members || [] })
 
 export const setOpenInviteModalAC = (open: boolean) => setOpenInviteModal({ open })
