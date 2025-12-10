@@ -127,13 +127,12 @@ function useFormatMessage(
       }
     }
 
-    // If no matches, just add the entire text as a single node
+    // Insert all nodes at the selection, replacing any selected content
     if (matches.length === 0) {
-      nodes.push($createTextNode(pastedText))
-    }
-
-    // Insert all nodes at the selection
-    if (nodes.length > 0) {
+      // For plain text without mentions, use insertText which properly replaces selection
+      selection.insertText(pastedText)
+    } else if (nodes.length > 0) {
+      // For text with mentions, use insertNodes
       selection.insertNodes(nodes)
     }
   }
