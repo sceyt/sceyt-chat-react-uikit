@@ -195,7 +195,8 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   ogMetadataProps,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  collapsedCharacterLimit
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -831,6 +832,7 @@ const Message = ({
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
             ogMetadataProps={ogMetadataProps}
             unsupportedMessage={unsupportedMessage}
+            collapsedCharacterLimit={collapsedCharacterLimit}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (

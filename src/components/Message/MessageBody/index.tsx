@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC, useMemo } from 'react'
+import React, { FC, useMemo, useState, useEffect } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -168,6 +168,7 @@ interface IMessageBodyProps {
   ogMetadataProps?: OGMetadataProps
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
+  collapsedCharacterLimit?: number
 }
 
 const MessageBody = ({
@@ -300,7 +301,8 @@ const MessageBody = ({
   shouldOpenUserProfileForMention,
   ogMetadataProps,
   unsupportedMessage,
-  onInviteLinkClick
+  onInviteLinkClick,
+  collapsedCharacterLimit
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -319,6 +321,32 @@ const MessageBody = ({
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const messageUserID = message.user ? message.user.id : 'deleted'
+  const [isExpanded, setIsExpanded] = useState(false)
+
+  useEffect(() => {
+    setIsExpanded(false)
+  }, [message.id])
+
+  const characterLimit = useMemo(() => {
+    if (collapsedCharacterLimit !== undefined && collapsedCharacterLimit !== null) {
+      const limit =
+        typeof collapsedCharacterLimit === 'number' ? collapsedCharacterLimit : Number(collapsedCharacterLimit)
+      return limit > 0 && !isNaN(limit) ? limit : 700
+    }
+    return 700
+  }, [collapsedCharacterLimit])
+
+  const shouldTruncate = useMemo(() => {
+    if (!message.body || typeof message.body !== 'string') return false
+    return message.body.length > characterLimit
+  }, [message.body, characterLimit])
+
+  const displayText = useMemo(() => {
+    if (!message.body || typeof message.body !== 'string') return message.body
+    if (!shouldTruncate || isExpanded) return message.body
+    return message.body.substring(0, characterLimit) + '...'
+  }, [message.body, shouldTruncate, isExpanded, characterLimit])
+
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
     [prevMessage]
@@ -749,22 +777,29 @@ const MessageBody = ({
           />
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
-          <span ref={messageTextRef}>
-            {MessageTextFormat({
-              text: message.body,
-              message,
-              contactsMap,
-              getFromContacts,
-              accentColor,
-              textSecondary,
-              onMentionNameClick: handleOpenUserProfile,
-              shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-              unsupportedMessage,
-              target: ogMetadataProps?.target,
-              isInviteLink: ogMetadataProps?.isInviteLink || false,
-              onInviteLinkClick
-            })}
-          </span>
+          <React.Fragment>
+            <span ref={messageTextRef}>
+              {MessageTextFormat({
+                text: displayText,
+                message,
+                contactsMap,
+                getFromContacts,
+                accentColor,
+                textSecondary,
+                onMentionNameClick: handleOpenUserProfile,
+                shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+                unsupportedMessage,
+                target: ogMetadataProps?.target,
+                isInviteLink: ogMetadataProps?.isInviteLink || false,
+                onInviteLinkClick
+              })}
+            </span>
+            {shouldTruncate && !isExpanded && (
+              <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                Read more
+              </ReadMoreLink>
+            )}
+          </React.Fragment>
         )}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
@@ -1197,4 +1232,17 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   right: ${(props) => props.rtlDirection && '0'};
   top: -50px;
   z-index: 99;
+`
+
+const ReadMoreLink = styled.span<{ accentColor: string }>`
+  display: block;
+  color: ${(props) => props.accentColor};
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 8px;
+  font-style: Medium;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.4px;
+  user-select: none;
 `
