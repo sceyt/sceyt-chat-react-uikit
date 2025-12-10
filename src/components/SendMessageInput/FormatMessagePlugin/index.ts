@@ -15,10 +15,10 @@ import {
 } from 'lexical'
 
 import { useDidUpdate } from '../../../hooks'
-import { bodyAttributesMapByType } from '../../../helpers/message'
-import { IMessage } from '../../../types'
+import { bodyAttributesMapByType, makeUsername } from '../../../helpers/message'
+import { IMessage, IMember } from '../../../types'
 import { useCallback, useEffect } from 'react'
-import { $isMentionNode } from '../MentionNode'
+import { $createMentionNode, $isMentionNode } from '../MentionNode'
 import { getSelectedNode, mergeRegister } from '../FloatingTextFormatToolbarPlugin'
 
 function useFormatMessage(
@@ -28,30 +28,146 @@ function useFormatMessage(
   setMessageBodyAttributes: (data: any) => void,
   // eslint-disable-next-line no-unused-vars
   setMessageText: (newMessageText: string) => void,
-  messageToEdit?: IMessage
+  setMentionedMember: (mentionedMember: any) => void,
+  messageToEdit?: IMessage,
+  activeChannelMembers: IMember[] = [],
+  contactsMap: any = {},
+  getFromContacts: boolean = false
 ): void {
-  function $insertDataTransferForPlainText(dataTransfer: DataTransfer, selection: RangeSelection): void {
-    const text = dataTransfer.getData('text/plain') || dataTransfer.getData('text/uri-list')
+  function processMentionsInPastedText(
+    pastedText: string,
+    activeChannelMembers: IMember[],
+    contactsMap: any,
+    getFromContacts: boolean,
+    setMentionedMember: (mentionedMember: any) => void,
+    selection: RangeSelection
+  ): void {
+    if (!pastedText) return
 
-    if (text != null) {
-      selection.insertRawText(text)
+    // Build contacts list - include contactsMap values if getFromContacts is true
+    const contacts = getFromContacts ? [...Object.values(contactsMap), ...activeChannelMembers] : activeChannelMembers
+
+    const mentionPatterns: Array<{ pattern: string; contact: any }> = []
+    contacts.forEach((contactOrMember: any) => {
+      const contactFromMap = contactsMap[contactOrMember.id]
+
+      const contact = getFromContacts && contactFromMap ? contactFromMap : undefined
+      const member = contact ? undefined : contactOrMember
+
+      const fullDisplayName = makeUsername(contact, member, getFromContacts, false)
+
+      if (fullDisplayName && fullDisplayName !== 'Deleted user') {
+        mentionPatterns.push({
+          pattern: `@${fullDisplayName}`,
+          contact: contactOrMember
+        })
+      }
+    })
+
+    mentionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
+
+    // Find all mention matches in the pasted text
+    const matches: Array<{ start: number; end: number; contact: any; pattern: string }> = []
+    const usedRanges: Array<{ start: number; end: number }> = []
+
+    mentionPatterns.forEach(({ pattern, contact }) => {
+      let searchIndex = 0
+      while (true) {
+        const index = pastedText.indexOf(pattern, searchIndex)
+        if (index === -1) break
+
+        const isOverlapping = usedRanges.some((range) => index < range.end && index + pattern.length > range.start)
+
+        if (!isOverlapping) {
+          const charBefore = index > 0 ? pastedText[index - 1] : undefined
+          const isValidStart =
+            charBefore === undefined || charBefore === ' ' || charBefore === '\n' || charBefore === '\r'
+
+          const charAfter = pastedText[index + pattern.length]
+          const isValidEnd = charAfter === undefined || charAfter === ' ' || charAfter === '\n' || charAfter === '\r'
+
+          if (isValidStart && isValidEnd) {
+            matches.push({ start: index, end: index + pattern.length, contact, pattern })
+            usedRanges.push({ start: index, end: index + pattern.length })
+          }
+        }
+        searchIndex = index + 1
+      }
+    })
+
+    // Sort matches by start position (ascending for left-to-right processing)
+    matches.sort((a, b) => a.start - b.start)
+
+    // Build nodes from the pasted text with mentions converted
+    const nodes: any[] = []
+    let currentIndex = 0
+
+    matches.forEach(({ start, end, contact, pattern }) => {
+      // Add text before the mention
+      if (start > currentIndex) {
+        const textBefore = pastedText.substring(currentIndex, start)
+        if (textBefore) {
+          nodes.push($createTextNode(textBefore))
+        }
+      }
+
+      // Add mention node
+      setMentionedMember(contact)
+      const mentionNode = $createMentionNode({ ...contact, name: pattern })
+      nodes.push(mentionNode)
+
+      currentIndex = end
+    })
+
+    // Add remaining text after the last mention
+    if (currentIndex < pastedText.length) {
+      const remainingText = pastedText.substring(currentIndex)
+      if (remainingText) {
+        nodes.push($createTextNode(remainingText))
+      }
+    }
+
+    // If no matches, just add the entire text as a single node
+    if (matches.length === 0) {
+      nodes.push($createTextNode(pastedText))
+    }
+
+    // Insert all nodes at the selection
+    if (nodes.length > 0) {
+      selection.insertNodes(nodes)
     }
   }
+
   const handlePast = useCallback(
-    (e: any) => {
-      const pastedTex = e.clipboardData.getData('text/plain')
-      if (pastedTex) {
+    (e: ClipboardEvent | KeyboardEvent | InputEvent) => {
+      // Only process mentions on paste events (which have clipboardData)
+      if (!('clipboardData' in e) || !e.clipboardData) {
+        return false
+      }
+
+      const pastedText = e.clipboardData.getData('text/plain')
+      if (pastedText) {
+        // Process paste and mentions in a single update to create one undo step
         editor.update(() => {
           const selection = $getSelection()
-          const { clipboardData } = event as ClipboardEvent
-          if (clipboardData != null && $isRangeSelection(selection)) {
-            $insertDataTransferForPlainText(clipboardData, selection)
+          if ($isRangeSelection(selection)) {
+            // Process mentions only in the pasted text and insert the processed content
+            processMentionsInPastedText(
+              pastedText,
+              activeChannelMembers,
+              contactsMap,
+              getFromContacts,
+              setMentionedMember,
+              selection
+            )
           }
         })
       }
+      return true
     },
-    [editor]
+    [editor, contactsMap, setMentionedMember, getFromContacts, activeChannelMembers]
   )
+
   const onDelete = useCallback(
     (event: KeyboardEvent) => {
       event.preventDefault()
@@ -120,22 +236,6 @@ function useFormatMessage(
               (parsedEditorState.root.children[0].children[0].type === 'mention' ||
                 parsedEditorState.root.children[0].children[0].format > 0)))
         ) {
-          /* if (
-          parsedEditorState.root &&
-          parsedEditorState.root.children &&
-          parsedEditorState.root.children.length &&
-          (parsedEditorState.root.children[0].children.length > 1 ||
-            (parsedEditorState.root.children[0].children[0] &&
-              parsedEditorState.root.children[0].children[0].type === 'mention'))
-        ) { */
-          /*   if (
-            parsedEditorState.root.children[0].children.length === 1 &&
-            parsedEditorState.root.children[0].children[0].format > 0
-          ) {
-            return
-          } */
-          // log.info('parsedEditorState.root.children[0].children >>> ', parsedEditorState.root.children[0].children)
-          // log.info('offsetList >>> ', offsetList)
           let currentOffsetDiff = 0
           let newMessageText = messageText
           parsedEditorState.root.children[0].children.forEach((child: any, index: number) => {
@@ -224,9 +324,32 @@ export default function FormatMessagePlugin({
   editorState,
   setMessageBodyAttributes,
   setMessageText,
-  messageToEdit
-}: any): JSX.Element | null {
+  setMentionedMember,
+  messageToEdit,
+  activeChannelMembers,
+  contactsMap,
+  getFromContacts
+}: {
+  editorState: any
+  setMessageBodyAttributes: (data: any) => void
+  setMessageText: (newMessageText: string) => void
+  setMentionedMember: (mentionedMember: any) => void
+  messageToEdit?: IMessage
+  activeChannelMembers: IMember[]
+  contactsMap: any
+  getFromContacts: boolean
+}): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
-  useFormatMessage(editor, editorState, setMessageBodyAttributes, setMessageText, messageToEdit)
+  useFormatMessage(
+    editor,
+    editorState,
+    setMessageBodyAttributes,
+    setMessageText,
+    setMentionedMember,
+    messageToEdit,
+    activeChannelMembers,
+    contactsMap,
+    getFromContacts
+  )
   return null
 }

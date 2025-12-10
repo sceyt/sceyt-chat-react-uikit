@@ -1907,6 +1907,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             setMessageBodyAttributes={setMessageBodyAttributes}
                             setMessageText={messageToEdit ? setEditMessageText : setMessageText}
                             messageToEdit={messageToEdit}
+                            activeChannelMembers={activeChannelMembers}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
+                            setMentionedMember={handleSetMentionMember}
                           />
                           <React.Fragment>
                             {isEmojisOpened && (
