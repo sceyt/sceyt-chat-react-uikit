@@ -232,7 +232,6 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   max-height: 400px;
   overflow-y: auto;
   overflow-x: hidden;
-  padding-right: 8px;
 
   &::-webkit-scrollbar {
     width: 6px;
@@ -276,6 +275,8 @@ const ChannelTitle = styled.div<{ color: string }>`
   font-size: 15px;
   font-weight: 500;
   line-height: 20px;
+  font-family: Inter;
+  letter-spacing: -0.2px;
   color: ${(props) => props.color};
   margin-bottom: 4px;
   overflow: hidden;
@@ -284,8 +285,10 @@ const ChannelTitle = styled.div<{ color: string }>`
 `
 
 const ChannelMembers = styled.div<{ color: string }>`
-  font-size: 13px;
-  line-height: 16px;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
   color: ${(props) => props.color};
 `
 
