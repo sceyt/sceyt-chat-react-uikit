@@ -211,6 +211,7 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: OGMetadataProps
+  collapsedCharacterLimit?: number
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -362,7 +363,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
     order: { image: 1, title: 2, description: 3, link: 4 },
     infoPadding: '0 8px',
     isInviteLink: false
-  }
+  },
+  collapsedCharacterLimit
 }) => {
   return (
     <React.Fragment>
@@ -500,6 +502,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
         showInfoMessageProps={showInfoMessageProps}
         ogMetadataProps={ogMetadataProps}
+        collapsedCharacterLimit={collapsedCharacterLimit}
       />
     </React.Fragment>
   )

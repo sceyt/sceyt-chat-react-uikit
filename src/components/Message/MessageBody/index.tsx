@@ -335,7 +335,9 @@ const MessageBody = ({
       const limit =
         typeof collapsedCharacterLimit === 'number' ? collapsedCharacterLimit : Number(collapsedCharacterLimit)
 
-      return !isNaN(limit) ? limit : undefined
+      if (isNaN(limit) || limit <= 0) return undefined
+
+      return limit
     }
 
     return undefined
@@ -1109,7 +1111,8 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.ogMetadataProps?.ogShowTitle === nextProps.ogMetadataProps?.ogShowTitle &&
     prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
     prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
-    prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order
+    prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order &&
+    prevProps.collapsedCharacterLimit === nextProps.collapsedCharacterLimit
   )
 })
 
