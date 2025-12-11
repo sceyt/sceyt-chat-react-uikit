@@ -335,7 +335,7 @@ const MessageBody = ({
       const limit =
         typeof collapsedCharacterLimit === 'number' ? collapsedCharacterLimit : Number(collapsedCharacterLimit)
 
-      if (isNaN(limit) || limit <= 0) return undefined
+      if (isNaN(limit) || limit < 0) return undefined
 
       return limit
     }
