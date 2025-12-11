@@ -152,7 +152,12 @@ const Details = ({
   backgroundColor,
   bordersColor,
   showPhoneNumber,
-  QRCodeIcon
+  QRCodeIcon,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -483,6 +488,11 @@ const Details = ({
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
             actionItemsFontSize={actionItemsFontSize}
             borderColor={bordersColor}
+            commonGroupsOrder={commonGroupsOrder}
+            commonGroupsIcon={commonGroupsIcon}
+            commonGroupsIconColor={commonGroupsIconColor}
+            commonGroupsTextColor={commonGroupsTextColor}
+            showGroupsInCommon={showGroupsInCommon}
           />
         )}
         {/* <div ref={tabsRef}> */}

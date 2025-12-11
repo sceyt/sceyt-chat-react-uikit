@@ -1685,7 +1685,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             </ReplyIconWrapper>
                           )
                         ))}
-                      <ReplyMessageBody>
+                      <ReplyMessageBody linkColor={accentColor}>
                         <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
@@ -2128,13 +2128,16 @@ const UserName = styled.span<any>`
   margin-left: 4px;
 `
 
-const ReplyMessageBody = styled.div`
+const ReplyMessageBody = styled.div<{ linkColor: string }>`
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  a {
+    color: ${(props) => props.linkColor};
+  }
 `
 
 const EditReplyMessageHeader = styled.h4<{ color: string }>`

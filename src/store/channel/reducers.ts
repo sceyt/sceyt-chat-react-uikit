@@ -56,6 +56,9 @@ export interface IChannelState {
   }
   joinableChannel: IChannel | null
   channelInviteKeyAvailable: boolean
+  mutualChannels: IChannel[]
+  mutualChannelsHasNext: boolean
+  mutualChannelsLoadingState: number | null
 }
 
 const initialState: IChannelState = {
@@ -91,7 +94,10 @@ const initialState: IChannelState = {
   draftIsRemoved: '',
   channelInviteKeys: {},
   joinableChannel: null,
-  channelInviteKeyAvailable: true
+  channelInviteKeyAvailable: true,
+  mutualChannels: [],
+  mutualChannelsHasNext: false,
+  mutualChannelsLoadingState: null
 }
 
 const channelSlice = createSlice({
@@ -489,6 +495,24 @@ const channelSlice = createSlice({
 
     setChannelInviteKeyAvailable: (state, action: PayloadAction<{ available: boolean }>) => {
       state.channelInviteKeyAvailable = action.payload.available
+    },
+
+    setMutualChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      // If empty array is passed, replace the list (for clearing/resetting)
+      // Otherwise, append to existing list (for pagination)
+      if (action.payload.channels.length === 0 && state.mutualChannels.length > 0) {
+        state.mutualChannels = []
+      } else {
+        state.mutualChannels = [...state.mutualChannels, ...action.payload.channels]
+      }
+    },
+
+    setMutualChannelsHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
+      state.mutualChannelsHasNext = action.payload.hasNext
+    },
+
+    setMutualChannelsLoadingState: (state, action: PayloadAction<{ state: number }>) => {
+      state.mutualChannelsLoadingState = action.payload.state
     }
   },
   extraReducers: (builder) => {
@@ -535,7 +559,10 @@ export const {
   setDraftIsRemoved,
   setChannelInviteKeys,
   setJoinableChannel,
-  setChannelInviteKeyAvailable
+  setChannelInviteKeyAvailable,
+  setMutualChannels,
+  setMutualChannelsHasNext,
+  setMutualChannelsLoadingState
 } = channelSlice.actions
 
 // Export reducer

@@ -22,7 +22,10 @@ import {
   updateChannelDataAC,
   updateSearchedChannelDataAC,
   updateUserStatusOnChannelAC,
-  setJoinableChannelAC
+  setJoinableChannelAC,
+  setMutualChannelsHasNextAC,
+  setMutualChannelsAC,
+  setMutualChannelsLoadingStateAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -36,6 +39,7 @@ import {
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
   LOAD_MORE_CHANNELS_FOR_FORWARD,
+  LOAD_MORE_MUTUAL_CHANNELS,
   MARK_CHANNEL_AS_READ,
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
@@ -60,7 +64,8 @@ import {
   UPDATE_CHANNEL_INVITE_KEY,
   GET_CHANNEL_BY_INVITE_KEY,
   JOIN_TO_CHANNEL_WITH_INVITE_KEY,
-  SET_MESSAGE_RETENTION_PERIOD
+  SET_MESSAGE_RETENTION_PERIOD,
+  GET_CHANNELS_WITH_USER
 } from './constants'
 import {
   destroyChannelsMap,
@@ -1687,6 +1692,61 @@ function* setMessageRetentionPeriod(action: IAction): any {
   }
 }
 
+function* getChannelsWithUser(action: IAction): any {
+  yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADING))
+  // Clear existing mutual channels when fetching new user
+  yield put(setMutualChannelsAC([]))
+  try {
+    const { payload } = action
+    const { userId } = payload
+    const SceytChatClient = getClient()
+    const channelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+    channelsQueryBuilder.memberCount(0)
+    channelsQueryBuilder.setMutualWithUserId(userId)
+    channelsQueryBuilder.limit(15)
+    const channelsQuery = yield call(channelsQueryBuilder.build)
+    query.mutualChannelsQuery = channelsQuery
+    const channelsData = yield call(channelsQuery.loadNextPage)
+    const channels = channelsData.channels
+    if (channelsData.hasNext) {
+      yield put(setMutualChannelsHasNextAC(true))
+    } else {
+      yield put(setMutualChannelsHasNextAC(false))
+    }
+    yield put(setMutualChannelsAC(channels))
+  } catch (e) {
+    log.error('ERROR in get groups in common', e)
+  } finally {
+    yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADED))
+  }
+}
+
+function* loadMoreMutualChannels(action: IAction): any {
+  yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADING))
+  try {
+    const { payload } = action
+    const { limit } = payload
+    const { mutualChannelsQuery } = query
+    if (!mutualChannelsQuery) {
+      return
+    }
+    if (limit) {
+      mutualChannelsQuery.limit = limit
+    }
+    const channelsData = yield call(mutualChannelsQuery.loadNextPage)
+    if (channelsData.hasNext) {
+      yield put(setMutualChannelsHasNextAC(true))
+    } else {
+      yield put(setMutualChannelsHasNextAC(false))
+    }
+    yield put(setMutualChannelsAC(channelsData.channels))
+  } catch (e) {
+    log.error('ERROR in load more mutual channels', e)
+  } finally {
+    yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADED))
+  }
+}
+
 export default function* ChannelsSaga() {
   yield takeLatest(CREATE_CHANNEL, createChannel)
   yield takeLatest(GET_CHANNELS, getChannels)
@@ -1695,6 +1755,8 @@ export default function* ChannelsSaga() {
   yield takeLatest(SEARCH_CHANNELS_FOR_FORWARD, searchChannelsForForward)
   yield takeLatest(LOAD_MORE_CHANNEL, channelsLoadMore)
   yield takeLatest(LOAD_MORE_CHANNELS_FOR_FORWARD, channelsForForwardLoadMore)
+  yield takeLatest(GET_CHANNELS_WITH_USER, getChannelsWithUser)
+  yield takeLatest(LOAD_MORE_MUTUAL_CHANNELS, loadMoreMutualChannels)
   yield takeEvery(SWITCH_CHANNEL, switchChannel)
   yield takeLatest(LEAVE_CHANNEL, leaveChannel)
   yield takeLatest(DELETE_CHANNEL, deleteChannel)
