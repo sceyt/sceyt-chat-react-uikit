@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC, useMemo, useState, useEffect } from 'react'
+import React, { FC, useMemo, useState, useEffect, useRef } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -322,30 +322,50 @@ const MessageBody = ({
   const getFromContacts = getShowOnlyContactUsers()
   const messageUserID = message.user ? message.user.id : 'deleted'
   const [isExpanded, setIsExpanded] = useState(false)
+  const textContainerRef = useRef<HTMLDivElement>(null)
+  const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
 
   useEffect(() => {
     setIsExpanded(false)
+    setTextHeight('auto')
   }, [message.id])
 
   const characterLimit = useMemo(() => {
     if (collapsedCharacterLimit !== undefined && collapsedCharacterLimit !== null) {
       const limit =
         typeof collapsedCharacterLimit === 'number' ? collapsedCharacterLimit : Number(collapsedCharacterLimit)
-      return limit > 0 && !isNaN(limit) ? limit : 700
+
+      return !isNaN(limit) ? limit : undefined
     }
-    return 700
+
+    return undefined
   }, [collapsedCharacterLimit])
 
   const shouldTruncate = useMemo(() => {
     if (!message.body || typeof message.body !== 'string') return false
+    if (characterLimit === undefined) return false
     return message.body.length > characterLimit
   }, [message.body, characterLimit])
 
   const displayText = useMemo(() => {
     if (!message.body || typeof message.body !== 'string') return message.body
-    if (!shouldTruncate || isExpanded) return message.body
+    if (!shouldTruncate || isExpanded || characterLimit === undefined) return message.body
     return message.body.substring(0, characterLimit) + '...'
   }, [message.body, shouldTruncate, isExpanded, characterLimit])
+
+  useEffect(() => {
+    if (textContainerRef.current && shouldTruncate) {
+      // Use requestAnimationFrame to ensure DOM has updated after state change
+      requestAnimationFrame(() => {
+        if (textContainerRef.current) {
+          const height = textContainerRef.current.scrollHeight
+          setTextHeight(height)
+        }
+      })
+    } else if (!shouldTruncate) {
+      setTextHeight('auto')
+    }
+  }, [isExpanded, displayText, shouldTruncate])
 
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
@@ -778,27 +798,37 @@ const MessageBody = ({
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
           <React.Fragment>
-            <span ref={messageTextRef}>
-              {MessageTextFormat({
-                text: displayText,
-                message,
-                contactsMap,
-                getFromContacts,
-                accentColor,
-                textSecondary,
-                onMentionNameClick: handleOpenUserProfile,
-                shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-                unsupportedMessage,
-                target: ogMetadataProps?.target,
-                isInviteLink: ogMetadataProps?.isInviteLink || false,
-                onInviteLinkClick
-              })}
-            </span>
-            {shouldTruncate && !isExpanded && (
-              <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
-                Read more
-              </ReadMoreLink>
-            )}
+            <TextContentContainer ref={textContainerRef} textHeight={textHeight} shouldTruncate={shouldTruncate}>
+              <span
+                ref={messageTextRef}
+                onCopy={(e) => {
+                  if (shouldTruncate && !isExpanded && message.body) {
+                    e.preventDefault()
+                    e.clipboardData?.setData('text/plain', message.body)
+                  }
+                }}
+              >
+                {MessageTextFormat({
+                  text: displayText,
+                  message,
+                  contactsMap,
+                  getFromContacts,
+                  accentColor,
+                  textSecondary,
+                  onMentionNameClick: handleOpenUserProfile,
+                  shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+                  unsupportedMessage,
+                  target: ogMetadataProps?.target,
+                  isInviteLink: ogMetadataProps?.isInviteLink || false,
+                  onInviteLinkClick
+                })}
+              </span>
+              {shouldTruncate && !isExpanded && (
+                <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                  Read more
+                </ReadMoreLink>
+              )}
+            </TextContentContainer>
           </React.Fragment>
         )}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
@@ -1234,6 +1264,12 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   z-index: 99;
 `
 
+const TextContentContainer = styled.div<{ textHeight: number | 'auto'; shouldTruncate: boolean }>`
+  overflow: hidden;
+  height: ${(props) => (props.shouldTruncate && props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
+  transition: height 0.3s ease-out;
+`
+
 const ReadMoreLink = styled.span<{ accentColor: string }>`
   display: block;
   color: ${(props) => props.accentColor};
@@ -1245,4 +1281,5 @@ const ReadMoreLink = styled.span<{ accentColor: string }>`
   line-height: 20px;
   letter-spacing: -0.4px;
   user-select: none;
+  transition: opacity 0.2s ease;
 `

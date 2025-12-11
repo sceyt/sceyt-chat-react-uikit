@@ -356,7 +356,14 @@ const Message = ({
     setMessageActionsShow(false)
   }
   const handleCopyMessage = () => {
-    navigator.clipboard.writeText(messageTextRef.current.innerText)
+    const characterLimit = collapsedCharacterLimit
+    const isTruncated =
+      characterLimit !== undefined &&
+      message.body &&
+      typeof message.body === 'string' &&
+      message.body.length > characterLimit
+    const textToCopy = isTruncated && message.body ? message.body : messageTextRef.current.innerText
+    navigator.clipboard.writeText(textToCopy)
     setMessageActionsShow(false)
   }
 

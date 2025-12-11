@@ -481,7 +481,7 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps,
-  collapsedCharacterLimit = 700
+  collapsedCharacterLimit
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
