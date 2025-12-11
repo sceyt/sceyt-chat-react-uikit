@@ -58,8 +58,10 @@ import MessageStatusAndTime from './MessageStatusAndTime'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
-import { isMessageUnsupported } from 'helpers/message'
+import { extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
 import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
+import { MessageTextFormat } from 'messageUtils'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
 
 const Message = ({
   message,
@@ -355,8 +357,18 @@ const Message = ({
 
     setMessageActionsShow(false)
   }
+
   const handleCopyMessage = () => {
-    const textToCopy = message.body && typeof message.body === 'string' ? message.body : ''
+    const getFromContacts = getShowOnlyContactUsers()
+    const textToCopyHTML = MessageTextFormat({
+      text: message.body,
+      message,
+      contactsMap,
+      getFromContacts,
+      accentColor: '',
+      textSecondary: ''
+    })
+    const textToCopy = typeof textToCopyHTML === 'string' ? textToCopyHTML : extractTextFromReactElement(textToCopyHTML)
     navigator.clipboard.writeText(textToCopy)
     setMessageActionsShow(false)
   }

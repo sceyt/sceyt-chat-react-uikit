@@ -369,3 +369,27 @@ export const handleVoteDetails = (
     voteDetails: newVoteDetails
   }
 }
+
+export const extractTextFromReactElement = (element: any): string => {
+  if (typeof element === 'string') {
+    return element
+  }
+  if (element === null || element === undefined) {
+    return ''
+  }
+  if (Array.isArray(element)) {
+    return element.map(extractTextFromReactElement).join('')
+  }
+  if (typeof element === 'object' && element.props) {
+    if (typeof element.props.children === 'string') {
+      return element.props.children
+    }
+    if (Array.isArray(element.props.children)) {
+      return element.props.children.map(extractTextFromReactElement).join('')
+    }
+    if (element.props.children) {
+      return extractTextFromReactElement(element.props.children)
+    }
+  }
+  return ''
+}
