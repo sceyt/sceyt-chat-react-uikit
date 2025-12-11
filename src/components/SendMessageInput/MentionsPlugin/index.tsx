@@ -237,7 +237,11 @@ function MentionsContainer({
   setMentionsIsOpen
 }: any) {
   const theme = useSelector(themeSelector)
-  const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
+  const {
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.SURFACE_1]: scrollbarThumbColor
+  } = useColor()
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -285,7 +289,12 @@ function MentionsContainer({
   }, [])
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList borderColor={borderColor} backgroundColor={background} theme={theme}>
+      <MentionsList
+        borderColor={borderColor}
+        backgroundColor={background}
+        scrollbarThumbColor={scrollbarThumbColor}
+        theme={theme}
+      >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -422,6 +431,7 @@ const MentionsList = styled.ul<{
   backgroundColor: string
   withBorder?: boolean
   borderColor: string
+  scrollbarThumbColor: string
   theme: string
 }>`
   position: absolute;
@@ -452,12 +462,12 @@ const MentionsList = styled.ul<{
   }
 
   &::-webkit-scrollbar-thumb {
-    background: #37393c;
+    background: ${(props) => props.scrollbarThumbColor};
     border-radius: 6px;
   }
 
   &::-webkit-scrollbar-thumb:hover {
-    background: #37393c;
+    background: ${(props) => props.scrollbarThumbColor};
   }
 `
 
@@ -478,7 +488,7 @@ const Handle = styled.div<{
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
-  width: 340px;
+  max-width: 340px;
   height: 52px;
   font-size: 15px;
   padding: 0 16px;
