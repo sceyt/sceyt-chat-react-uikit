@@ -355,7 +355,6 @@ const MessageBody = ({
 
   useEffect(() => {
     if (textContainerRef.current && shouldTruncate) {
-      // Use requestAnimationFrame to ensure DOM has updated after state change
       requestAnimationFrame(() => {
         if (textContainerRef.current) {
           const height = textContainerRef.current.scrollHeight
