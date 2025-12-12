@@ -325,11 +325,6 @@ const MessageBody = ({
   const textContainerRef = useRef<HTMLDivElement>(null)
   const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
 
-  useEffect(() => {
-    setIsExpanded(false)
-    setTextHeight('auto')
-  }, [message.id])
-
   const characterLimit = useMemo(() => {
     if (collapsedCharacterLimit !== undefined && collapsedCharacterLimit !== null) {
       const limit =
