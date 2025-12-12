@@ -23,7 +23,7 @@ import MessageHeader from '../MessageHeader'
 import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
-import { MessageTextFormat } from 'messageUtils'
+import { MessageTextFormat, trimReactMessage } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import PollMessage from '../PollMessage'
@@ -325,53 +325,62 @@ const MessageBody = ({
   const textContainerRef = useRef<HTMLDivElement>(null)
   const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
 
-  const characterLimit = useMemo(() => {
-    if (collapsedCharacterLimit !== undefined && collapsedCharacterLimit !== null) {
-      const limit =
-        typeof collapsedCharacterLimit === 'number' ? collapsedCharacterLimit : Number(collapsedCharacterLimit)
-
-      if (isNaN(limit) || limit < 0) return undefined
-
-      return limit
-    }
-
-    return undefined
-  }, [collapsedCharacterLimit])
-
-  const shouldTruncate = useMemo(() => {
-    if (!message.body) return false
-    if (characterLimit === undefined) return false
-    return message.body.length > characterLimit
-  }, [message.body, characterLimit])
-
-  const displayText = useMemo(() => {
-    if (!message.body) return message.body
-    if (!shouldTruncate || isExpanded || characterLimit === undefined) return message.body
-    return message.body.substring(0, characterLimit) + '...'
-  }, [message.body, shouldTruncate, isExpanded, characterLimit])
-
-  const displayMessage = useMemo(() => {
-    if (!shouldTruncate || isExpanded || characterLimit === undefined) return message
-
-    const filteredBodyAttributes = message.bodyAttributes?.filter((attribute: any) => {
-      return attribute.offset < characterLimit
+  const messageText = useMemo(() => {
+    return MessageTextFormat({
+      text: message.body,
+      message,
+      contactsMap,
+      getFromContacts,
+      accentColor,
+      textSecondary,
+      onMentionNameClick: handleOpenUserProfile,
+      shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+      unsupportedMessage,
+      target: ogMetadataProps?.target,
+      isInviteLink: ogMetadataProps?.isInviteLink || false,
+      onInviteLinkClick
     })
+  }, [
+    message,
+    contactsMap,
+    getFromContacts,
+    accentColor,
+    textSecondary,
+    shouldOpenUserProfileForMention,
+    unsupportedMessage,
+    ogMetadataProps?.target,
+    ogMetadataProps?.isInviteLink,
+    onInviteLinkClick
+  ])
 
-    return { ...message, bodyAttributes: filteredBodyAttributes || [] }
-  }, [message, shouldTruncate, isExpanded, characterLimit])
+  const messageTextTrimmed = useMemo(() => {
+    if (!message.body) return { result: messageText, truncated: false }
+    if (isExpanded) return { result: messageText, truncated: false }
+    return trimReactMessage(messageText, collapsedCharacterLimit)
+  }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
 
   useEffect(() => {
-    if (textContainerRef.current && shouldTruncate) {
-      requestAnimationFrame(() => {
-        if (textContainerRef.current) {
-          const height = textContainerRef.current.scrollHeight
-          setTextHeight(height)
-        }
-      })
-    } else if (!shouldTruncate && textHeight !== 'auto') {
-      setTextHeight('auto')
+    if (textContainerRef.current) {
+      if (messageTextTrimmed.truncated && !isExpanded) {
+        requestAnimationFrame(() => {
+          if (textContainerRef.current) {
+            const height = textContainerRef.current.scrollHeight
+            setTextHeight(height)
+          }
+        })
+      } else if (isExpanded) {
+        requestAnimationFrame(() => {
+          if (textContainerRef.current) {
+            const fullHeight = textContainerRef.current.scrollHeight
+            setTextHeight(fullHeight)
+          }
+        })
+      } else if (!messageTextTrimmed.truncated && textHeight !== 'auto') {
+        // Reset to auto when not truncated and not expanded
+        setTextHeight('auto')
+      }
     }
-  }, [isExpanded, displayText, shouldTruncate])
+  }, [isExpanded, messageTextTrimmed.truncated, textHeight])
 
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
@@ -803,24 +812,12 @@ const MessageBody = ({
           />
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
-          <TextContentContainer ref={textContainerRef} textHeight={textHeight} shouldTruncate={shouldTruncate}>
+          <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
             <span ref={messageTextRef}>
-              {MessageTextFormat({
-                text: displayText,
-                message: displayMessage,
-                contactsMap,
-                getFromContacts,
-                accentColor,
-                textSecondary,
-                onMentionNameClick: handleOpenUserProfile,
-                shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-                unsupportedMessage,
-                target: ogMetadataProps?.target,
-                isInviteLink: ogMetadataProps?.isInviteLink || false,
-                onInviteLinkClick
-              })}
+              {messageTextTrimmed?.result}
+              {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
             </span>
-            {shouldTruncate && !isExpanded && (
+            {messageTextTrimmed.truncated && !isExpanded && (
               <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
                 Read more
               </ReadMoreLink>
@@ -1261,9 +1258,9 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   z-index: 99;
 `
 
-const TextContentContainer = styled.div<{ textHeight: number | 'auto'; shouldTruncate: boolean }>`
+const TextContentContainer = styled.div<{ textHeight: number | 'auto' }>`
   overflow: hidden;
-  height: ${(props) => (props.shouldTruncate && props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
+  height: ${(props) => (props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
   transition: height 0.3s ease-out;
 `
 
