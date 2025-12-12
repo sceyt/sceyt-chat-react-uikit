@@ -810,15 +810,7 @@ const MessageBody = ({
         {message.type !== MESSAGE_TYPE.POLL && (
           <React.Fragment>
             <TextContentContainer ref={textContainerRef} textHeight={textHeight} shouldTruncate={shouldTruncate}>
-              <span
-                ref={messageTextRef}
-                onCopy={(e) => {
-                  if (shouldTruncate && !isExpanded && message.body) {
-                    e.preventDefault()
-                    e.clipboardData?.setData('text/plain', message.body)
-                  }
-                }}
-              >
+              <span ref={messageTextRef}>
                 {MessageTextFormat({
                   text: displayText,
                   message: displayMessage,
