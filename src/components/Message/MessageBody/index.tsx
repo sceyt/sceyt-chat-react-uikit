@@ -360,7 +360,7 @@ const MessageBody = ({
   }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
 
   useEffect(() => {
-    if (textContainerRef.current) {
+    if (textContainerRef.current && typeof collapsedCharacterLimit === 'number' && collapsedCharacterLimit >= 0) {
       if (messageTextTrimmed.truncated && !isExpanded) {
         requestAnimationFrame(() => {
           if (textContainerRef.current) {
@@ -376,11 +376,10 @@ const MessageBody = ({
           }
         })
       } else if (!messageTextTrimmed.truncated && textHeight !== 'auto') {
-        // Reset to auto when not truncated and not expanded
         setTextHeight('auto')
       }
     }
-  }, [isExpanded, messageTextTrimmed.truncated, textHeight])
+  }, [isExpanded, messageTextTrimmed.truncated, textHeight, collapsedCharacterLimit])
 
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
