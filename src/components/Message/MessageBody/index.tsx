@@ -354,7 +354,7 @@ const MessageBody = ({
     if (!shouldTruncate || isExpanded || characterLimit === undefined) return message
 
     const filteredBodyAttributes = message.bodyAttributes?.filter((attribute: any) => {
-      return attribute.offset + attribute.length <= characterLimit
+      return attribute.offset < characterLimit
     })
 
     return { ...message, bodyAttributes: filteredBodyAttributes || [] }
