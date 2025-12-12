@@ -3,7 +3,7 @@ import { IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../type
 import { DESTROY_SESSION } from '../channel/constants'
 import {
   MESSAGE_LOAD_DIRECTION,
-  MESSAGES_MAX_LENGTH,
+  MESSAGES_MAX_PAGE_COUNT,
   setHasNextCached,
   setHasPrevCached,
   PendingPollAction,
@@ -188,31 +188,28 @@ const messageSlice = createSlice({
       )
 
       if (direction === MESSAGE_LOAD_DIRECTION.PREV && newMessagesLength > 0) {
-        if (currentMessagesLength + newMessagesLength >= MESSAGES_MAX_LENGTH) {
+        if (currentMessagesLength + newMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
           setHasNextCached(true)
           if (newMessagesLength > 0) {
-            if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+            if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
               state.activeChannelMessages.splice(-newMessagesLength)
             } else {
-              state.activeChannelMessages.splice(-(newMessagesLength - (MESSAGES_MAX_LENGTH - currentMessagesLength)))
+              state.activeChannelMessages.splice(
+                -(currentMessagesLength - currentMessagesLength + newMessagesLength - MESSAGES_MAX_PAGE_COUNT)
+              )
             }
           }
-          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
-          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
-          setHasNextCached(true)
-          state.activeChannelMessages.splice(-sliceElementCount)
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         } else {
           state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
         }
-      } else if (direction === 'next' && newMessagesLength > 0) {
-        if (currentMessagesLength >= MESSAGES_MAX_LENGTH) {
+      } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && newMessagesLength > 0) {
+        if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, messagesIsNotIncludeInActiveChannelMessages.length)
           state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_LENGTH) {
-          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_LENGTH
+        } else if (newMessagesLength + currentMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
+          const sliceElementCount = newMessagesLength + currentMessagesLength - MESSAGES_MAX_PAGE_COUNT
           setHasPrevCached(true)
           state.activeChannelMessages.splice(0, sliceElementCount)
           state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
@@ -241,6 +238,7 @@ const messageSlice = createSlice({
           state.activeChannelMessages[index] = { ...message, markerTotals, deliveryStatus }
         }
       }
+      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
     },
 
     updateMessage: (
@@ -300,6 +298,7 @@ const messageSlice = createSlice({
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }
+      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
     },
 
     updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
@@ -726,6 +725,15 @@ const messageSlice = createSlice({
       }
       state.pendingPollActions[messageId] = [...state.pendingPollActions[messageId], event]
     },
+    updatePendingPollAction: (state, action: PayloadAction<{ messageId: string; message: IMessage }>) => {
+      const { messageId, message } = action.payload
+      if (!state.pendingPollActions[messageId]) {
+        return
+      }
+      state.pendingPollActions[messageId] = state.pendingPollActions[messageId].map((action) => {
+        return action.message?.id === messageId || action.message?.tid === messageId ? { ...action, message } : action
+      })
+    },
     setPendingMessage: (state, action: PayloadAction<{ channelId: string; message: IMessage }>) => {
       const { channelId, message } = action.payload
       if (!state.pendingMessagesMap[channelId]) {
@@ -831,7 +839,8 @@ export const {
   setPendingMessage,
   removePendingMessage,
   updatePendingMessage,
-  clearPendingMessagesMap
+  clearPendingMessagesMap,
+  updatePendingPollAction
 } = messageSlice.actions
 
 // Export reducer

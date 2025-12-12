@@ -348,13 +348,13 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
   } else {
     const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
     if (updateChannel) {
-      const updateMessage = message
+      let updateMessage = message
       if (
         updateChannel.lastMessage &&
         updateChannel.lastMessage.id === message.id &&
         updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
       ) {
-        updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+        updateMessage = { ...message, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
       }
       updateChannel = { ...updateChannel, lastMessage: updateMessage }
       // update channel on channel map
@@ -369,12 +369,12 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
     if (channel.id === channelId) {
       channel = { ...channel, ...config }
       if (messageUpdateData && channel.lastMessage && messageUpdateData.id === channel.lastMessage.id) {
-        const updateMessage = messageUpdateData
+        let updateMessage = messageUpdateData
         if (
           channel.lastMessage.id === messageUpdateData.id &&
           channel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
         ) {
-          updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+          updateMessage = { ...messageUpdateData, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
         }
         channel.lastMessage = { ...channel.lastMessage, ...updateMessage }
       }

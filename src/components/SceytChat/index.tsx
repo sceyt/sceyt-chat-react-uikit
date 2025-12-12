@@ -12,10 +12,15 @@ import {
   setTabIsActiveAC,
   watchForEventsAC
 } from '../../store/channel/actions'
-import { channelListWidthSelector, isDraggingSelector, joinableChannelSelector } from '../../store/channel/selector'
+import {
+  channelInviteKeyAvailableSelector,
+  channelListWidthSelector,
+  isDraggingSelector,
+  joinableChannelSelector
+} from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
-import { getRolesFailSelector } from '../../store/member/selector'
+import { restrictedSelector, getRolesFailSelector } from '../../store/member/selector'
 // Hooks
 import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
@@ -55,6 +60,8 @@ import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
 import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 import { CONNECTION_STATUS } from 'store/user/constants'
+import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
+import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
 
 const SceytChat = ({
   client,
@@ -91,6 +98,8 @@ const SceytChat = ({
   const joinableChannel = useSelector(joinableChannelSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+  const restricted = useSelector(restrictedSelector, shallowEqual)
+  const channelInviteKeyAvailable = useSelector(channelInviteKeyAvailableSelector, shallowEqual)
   const [tabIsActive, setTabIsActive] = useState(true)
   let hidden: any = null
   let visibilityChange: any = null
@@ -365,6 +374,8 @@ const SceytChat = ({
         >
           {children}
           {embeddedJoinGroupPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
+          {restricted?.isRestricted && <ActionRestrictedPopup fromChannel={restricted?.fromChannel} />}
+          {!channelInviteKeyAvailable && <UnavailableInviteKeyPopup />}
         </ChatContainer>
       ) : (
         ''

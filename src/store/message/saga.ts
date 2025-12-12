@@ -81,11 +81,9 @@ import {
   retractPollVoteAC,
   deletePollVotesFromListAC,
   removePendingPollActionAC,
+  resendPendingPollActionsAC,
   removePendingMessageAC,
-  sendMessageAC,
-  sendTextMessageAC,
-  forwardMessageAC,
-  resendPendingPollActionsAC
+  updatePendingPollActionAC
 } from './actions'
 import {
   attachmentTypes,
@@ -119,7 +117,6 @@ import {
   MESSAGE_LOAD_DIRECTION,
   getHasNextCached,
   addAllMessages,
-  addMessageToMap,
   updateMessageOnAllMessages,
   deletePendingAttachment,
   setPendingAttachment,
@@ -132,7 +129,9 @@ import {
   setPendingPollAction,
   checkPendingPollActionConflict,
   getPendingMessagesMap,
-  getPendingMessages
+  getPendingMessages,
+  addMessageToMap,
+  MESSAGES_MAX_PAGE_COUNT
 } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
@@ -151,6 +150,7 @@ import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
+import { isResendableError } from 'helpers/error'
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -222,33 +222,51 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
   )
 }
 
-const addPendingMessage = async (message: any, messageCopy: IMessage, channel: IChannel) => {
+const addPendingMessage = async (message: any, messageCopy: IMessage, channelId: string) => {
   const messageToAdd = {
     ...messageCopy,
     createdAt: new Date(Date.now()),
     mentionedUsers: message.mentionedUsers,
     parentMessage: message.parentMessage
   }
-  setPendingMessage(channel.id, messageToAdd)
+  setPendingMessage(channelId, messageToAdd)
 }
 
 const updateMessage = function* (
   actionType: string,
   pending: IMessage,
-  channel: IChannel,
-  scrollToNewMessage: boolean = true
-) {
+  channelId: string,
+  scrollToNewMessage: boolean = true,
+  message: IMessage
+): any {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
-    addMessageToMap(channel.id, pending)
-    if (activeChannelId === channel.id) {
+    if (activeChannelId === channelId) {
       addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
     }
-    if (activeChannelId === channel.id) {
+    if (activeChannelId === channelId) {
       yield put(addMessageAC(pending))
     }
+    yield call(addPendingMessage, message, pending, channelId)
     if (scrollToNewMessage) {
-      yield put(scrollToNewMessageAC(true, true))
+      const channel = yield call(getChannelFromAllChannels, channelId)
+      const messages = store.getState().MessageReducer.activeChannelMessages
+      if (messages.findIndex((msg: IMessage) => msg.id === channel?.lastMessage?.id) >= 10) {
+        yield put(scrollToNewMessageAC(true, false, false))
+        yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+        const repliedMessage = document.getElementById(channel?.lastMessage?.id)
+        if (repliedMessage) {
+          const scrollRef = document.getElementById('scrollableDiv')
+          if (scrollRef) {
+            scrollRef.scrollTo({
+              top: 1000,
+              behavior: 'smooth'
+            })
+          }
+        }
+      } else if (channel?.id) {
+        yield put(getMessagesAC(channel, false, channel?.lastMessage?.id, undefined, false, 'smooth', true))
+      }
     }
   }
 }
@@ -256,7 +274,7 @@ const updateMessage = function* (
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
   const { payload } = action
-  const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage, isAddToPendingMessagesMap } = payload
+  const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
   const pendingMessages: IMessage[] = []
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
@@ -389,7 +407,9 @@ function* sendMessage(action: IAction): any {
             messagesToSend.push(messageForSend)
             const pending = { ...messageForSend, attachments: [attachment], createdAt: new Date(Date.now()) }
             pendingMessages.push(pending)
-            yield call(updateMessage, action.type, pending, channel)
+            if (action.type !== RESEND_MESSAGE) {
+              yield call(updateMessage, action.type, pending, channel.id, true, message)
+            }
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -421,7 +441,9 @@ function* sendMessage(action: IAction): any {
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
           const pending = { ...messageToSend, attachments: message.attachments, createdAt: new Date(Date.now()) }
           pendingMessages.push(pending)
-          yield call(updateMessage, action.type, pending, channel)
+          if (action.type !== RESEND_MESSAGE) {
+            yield call(updateMessage, action.type, pending, channel.id, true, message)
+          }
 
           messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
@@ -480,9 +502,6 @@ function* sendMessage(action: IAction): any {
                 deletePendingAttachment(messageAttachment[k].tid!)
               }
             }
-            if (action.type === RESEND_MESSAGE) {
-              messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
-            }
             let attachmentsToUpdate = []
             if (messageResponse.attachments && messageResponse.attachments.length > 0) {
               const currentAttachmentsMap: { [key: string]: IAttachment } = {}
@@ -513,16 +532,17 @@ function* sendMessage(action: IAction): any {
               createdAt: messageResponse.createdAt,
               channelId: channel.id
             }
-            yield put(updateMessageAC(messageToSend.tid as string, JSON.parse(JSON.stringify(messageUpdateData))))
-            updateMessageOnMap(channel.id, {
-              messageId: messageToSend.tid as string,
-              params: messageUpdateData
-            })
+            const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
+            const activeChannelId = getActiveChannelId()
+            if (activeChannelId === channel.id) {
+              yield put(updateMessageAC(messageToSend.tid as string, stringifiedMessageUpdateData, true))
+            }
+            yield put(removePendingMessageAC(channel.id, messageToSend.tid as string))
+            addMessageToMap(channel.id, stringifiedMessageUpdateData)
             updateMessageOnAllMessages(messageToSend.tid as string, messageUpdateData)
-            const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-            updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
+            updateChannelLastMessageOnAllChannels(channel.id, stringifiedMessageUpdateData)
             const channelUpdateParam = {
-              lastMessage: messageToUpdate,
+              lastMessage: stringifiedMessageUpdateData,
               lastReactedMessage: null
             }
             if (channel.unread) {
@@ -534,27 +554,22 @@ function* sendMessage(action: IAction): any {
             throw new Error('Connection required to send message')
           }
         } catch (e) {
-          const pendingMessage = pendingMessages?.find((pendingMessage) => pendingMessage.tid === messageToSend.tid)
-          if (channel && pendingMessage && action.type !== RESEND_MESSAGE) {
-            const connectionIsDisconnected =
-              store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
-            if (isAddToPendingMessagesMap && connectionIsDisconnected) {
-              yield call(addPendingMessage, message, pendingMessage, channel)
-            } else {
-              yield put(removePendingMessageAC(channel.id, pendingMessage.tid!))
+          const isErrorResendable = isResendableError(e?.type)
+          if (!isErrorResendable) {
+            yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
+          } else {
+            log.error('Error on uploading attachment', messageToSend.tid, e)
+            if (messageToSend.attachments && messageToSend.attachments.length) {
+              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
             }
-          }
-          log.error('Error on uploading attachment', messageToSend.tid, e)
-          if (messageToSend.attachments && messageToSend.attachments.length) {
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
-          }
 
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid!,
-            params: { state: MESSAGE_STATUS.FAILED }
-          })
-          updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
-          yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid!,
+              params: { state: MESSAGE_STATUS.FAILED }
+            })
+            updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
+            yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+          }
         }
       }
     }
@@ -570,7 +585,7 @@ function* sendMessage(action: IAction): any {
 function* sendTextMessage(action: IAction): any {
   // let messageForCatch = {}
   const { payload } = action
-  const { message, connectionState, channelId, isAddToPendingMessagesMap } = payload
+  const { message, connectionState, channelId } = payload
   yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
   let channel: IChannel = yield call(getChannelFromMap, channelId)
   if (!channel) {
@@ -580,9 +595,8 @@ function* sendTextMessage(action: IAction): any {
     }
   }
 
-  let sendMessageTid
+  let sendMessageTid: string | null = null
   let pendingMessage: IMessage | null = null
-  const activeChannelId = getActiveChannelId()
 
   try {
     if (channel.isMockChannel) {
@@ -641,7 +655,9 @@ function* sendTextMessage(action: IAction): any {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
     if (pendingMessage) {
-      yield call(updateMessage, action.type, pendingMessage, channel)
+      if (action.type !== RESEND_MESSAGE) {
+        yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+      }
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
@@ -667,15 +683,16 @@ function* sendTextMessage(action: IAction): any {
         pollDetails: messageResponse?.pollDetails,
         channelId: channel.id
       }
+      const activeChannelId = getActiveChannelId()
       if (activeChannelId === channel.id) {
-        yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
+        yield put(updateMessageAC(messageToSend.tid, messageUpdateData, true))
       }
-      updateMessageOnMap(channel.id, {
-        messageId: !isAddToPendingMessagesMap ? message.tid : messageToSend.tid,
-        params: messageUpdateData
-      })
+      const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
+      yield put(updatePendingPollActionAC(messageToSend.tid as string, stringifiedMessageUpdateData))
+      yield put(removePendingMessageAC(channel.id, messageToSend.tid))
+      addMessageToMap(channel.id, stringifiedMessageUpdateData)
       if (activeChannelId === channel.id) {
-        updateMessageOnAllMessages(!isAddToPendingMessagesMap ? message.tid : messageToSend.tid, messageUpdateData)
+        updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
       }
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
       updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
@@ -690,9 +707,6 @@ function* sendTextMessage(action: IAction): any {
         yield put(markChannelAsReadAC(channel.id))
       }
       channel.lastMessage = messageToUpdate
-      if (action.type === RESEND_MESSAGE) {
-        messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
-      }
     } else {
       // eslint-disable-next-line
       throw new Error('Connection required to send message')
@@ -700,22 +714,20 @@ function* sendTextMessage(action: IAction): any {
 
     // messageForCatch = messageToSend
   } catch (e) {
-    if (activeChannelId === channel.id && pendingMessage && action.type !== RESEND_MESSAGE) {
-      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
-      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
-        yield call(addPendingMessage, message, pendingMessage, channel)
-      } else {
-        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
+    log.error('error on send text message ... ', e?.type)
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable && channel.id && sendMessageTid) {
+      yield put(removePendingMessageAC(channel.id, sendMessageTid!))
+    } else if (channel.id && sendMessageTid) {
+      updateMessageOnMap(channel.id, {
+        messageId: sendMessageTid,
+        params: { state: MESSAGE_STATUS.FAILED }
+      })
+      const activeChannelId = getActiveChannelId()
+      if (activeChannelId === channel.id) {
+        updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
+        yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
       }
-    }
-    log.error('error on send text message ... ', e)
-    updateMessageOnMap(channel.id, {
-      messageId: sendMessageTid,
-      params: { state: MESSAGE_STATUS.FAILED }
-    })
-    if (activeChannelId === channel.id) {
-      updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
-      yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
     }
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   } finally {
@@ -725,7 +737,7 @@ function* sendTextMessage(action: IAction): any {
 
 function* forwardMessage(action: IAction): any {
   const { payload } = action
-  const { message, channelId, connectionState, isForward, isAddToPendingMessagesMap } = payload
+  const { message, channelId, connectionState, isForward } = payload
   let pendingMessage: IMessage | null = null
   let channel: IChannel | null = null
   const activeChannelId = getActiveChannelId()
@@ -793,7 +805,7 @@ function* forwardMessage(action: IAction): any {
         )
         .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
         .setPollDetails(pollDetails)
-      const messageToSend = messageBuilder.create()
+      const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
       messageToSend.tid = action.type === RESEND_MESSAGE ? action.payload.message.tid : messageToSend.tid
       messageTid = messageToSend.tid
       pendingMessage = {
@@ -820,7 +832,9 @@ function* forwardMessage(action: IAction): any {
         }
       }
       if (pendingMessage) {
-        yield call(updateMessage, action.type, pendingMessage, channel, false)
+        if (action.type !== RESEND_MESSAGE) {
+          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message)
+        }
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
         const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -839,17 +853,12 @@ function* forwardMessage(action: IAction): any {
           channelId: channel.id
         }
         if (channelId === activeChannelId) {
-          yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData))))
+          yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
           updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
         }
-        if (action.type === RESEND_MESSAGE) {
-          messageToSend.tid && store.dispatch(removePendingMessageAC(channel.id, messageToSend.tid))
-        }
+        if (messageToSend.tid) yield put(removePendingMessageAC(channel.id, messageToSend.tid))
 
-        updateMessageOnMap(channel.id, {
-          messageId: !isAddToPendingMessagesMap ? message.tid : messageToSend.tid,
-          params: messageUpdateData
-        })
+        addMessageToMap(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
         const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
         updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
         const channelUpdateParam = {
@@ -866,22 +875,20 @@ function* forwardMessage(action: IAction): any {
       }
     }
   } catch (e) {
-    if (pendingMessage && channel && action.type !== RESEND_MESSAGE) {
-      const connectionIsDisconnected = store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED
-      if (isAddToPendingMessagesMap && connectionIsDisconnected) {
-        yield call(addPendingMessage, message, pendingMessage, channel)
-      } else {
-        yield put(removePendingMessageAC(channel.id, pendingMessage!.tid!))
-      }
-    }
-    if (channel && messageTid) {
-      updateMessageOnMap(channel.id, {
-        messageId: messageTid!,
-        params: { state: MESSAGE_STATUS.FAILED }
-      })
-      if (activeChannelId === channel.id) {
-        updateMessageOnAllMessages(messageTid!, { state: MESSAGE_STATUS.FAILED })
-        yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable) {
+      yield put(removePendingMessageAC(channel!.id, messageTid!))
+    } else {
+      if (channel && messageTid) {
+        updateMessageOnMap(channel.id, {
+          messageId: messageTid!,
+          params: { state: MESSAGE_STATUS.FAILED }
+        })
+        const activeChannelId = getActiveChannelId()
+        if (activeChannelId === channel.id) {
+          updateMessageOnAllMessages(messageTid!, { state: MESSAGE_STATUS.FAILED })
+          yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
+        }
       }
     }
     log.error('error on forward message ... ', e)
@@ -893,23 +900,30 @@ function* forwardMessage(action: IAction): any {
 function* resendMessage(action: IAction): any {
   const { payload } = action
   const { message, connectionState, channelId } = payload
+  const attachments = message?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
+
   if (message.forwardingDetails) {
-    store.dispatch(forwardMessageAC(message, channelId, connectionState, false, false))
-  } else if (message.attachments && message.attachments.length) {
+    yield call(forwardMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId, isForward: false }
+    })
+  } else if (attachments && attachments.length) {
     const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
     const isVoiceMessage = message.attachments[0].type === attachmentTypes.voice
-    store.dispatch(
-      sendMessageAC(
+    yield call(sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
         message,
-        channelId,
         connectionState,
-        isVoiceMessage ? false : sendAttachmentsAsSeparateMessage,
-        false,
-        false
-      )
-    )
+        channelId,
+        sendAttachmentsAsSeparateMessage: isVoiceMessage ? false : sendAttachmentsAsSeparateMessage
+      }
+    })
   } else {
-    store.dispatch(sendTextMessageAC(message, channelId, connectionState, false))
+    yield call(sendTextMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId }
+    })
   }
 }
 
@@ -1006,7 +1020,7 @@ const sendPendingMessages = function* (connectionState: string) {
         if (msg?.forwardingDetails) {
           yield call(forwardMessage, {
             type: RESEND_MESSAGE,
-            payload: { message: msg, connectionState, channelId, isForward: true, isAddToPendingMessagesMap: false }
+            payload: { message: msg, connectionState, channelId, isForward: true }
           })
         } else if (attachments && attachments.length > 0) {
           yield call(sendMessage, {
@@ -1015,15 +1029,13 @@ const sendPendingMessages = function* (connectionState: string) {
               message: msg,
               connectionState,
               channelId,
-              sendAttachmentsAsSeparateMessage: false,
-              isResend: true,
-              isAddToPendingMessagesMap: false
+              sendAttachmentsAsSeparateMessage: false
             }
           })
         } else {
           yield call(sendTextMessage, {
             type: RESEND_MESSAGE,
-            payload: { message: msg, connectionState, channelId, isAddToPendingMessagesMap: false }
+            payload: { message: msg, connectionState, channelId }
           })
         }
       } catch (error) {
@@ -1039,40 +1051,39 @@ const sendPendingMessages = function* (connectionState: string) {
   }
 }
 
-const updateMessages = function* (channel: IChannel, updatedMessages: IMessage[]) {
-  const previousAllMessages = getAllMessages()
-  let messages = [...updatedMessages]
-  const lastMessageId = messages[messages.length - 1]?.id
-  const setMappedAllMessages: { [key: string]: IMessage } = {}
-  previousAllMessages.forEach((msg: IMessage) => {
-    if (msg.channelId === channel.id) {
-      setMappedAllMessages[msg.id || msg.tid || ''] = msg
-    }
-  })
-  const allMessagesAfterLastMessage = lastMessageId
-    ? Object.values(setMappedAllMessages || {})?.filter((msg: IMessage) => msg.id > lastMessageId || !msg.id)
-    : Object.values(setMappedAllMessages || {})
-  messages = [...messages, ...(allMessagesAfterLastMessage || [])]
-  setMessagesToMap(channel.id, messages)
+const updateMessages = function* (
+  channel: IChannel,
+  updatedMessages: IMessage[],
+  firstMessageId?: string,
+  lastMessageId?: string
+) {
+  const messages = [...updatedMessages]
+  setMessagesToMap(channel.id, messages, firstMessageId, lastMessageId)
   setAllMessages(messages)
   yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+}
+
+const getFilteredPendingMessages = (messages: IMessage[]) => {
+  let filteredPendingMessages: IMessage[] = []
+  const activeChannelId = getActiveChannelId()
+  const pendingMessages = JSON.parse(JSON.stringify(getPendingMessages(activeChannelId) || []))
+  if (pendingMessages && pendingMessages.length) {
+    const messagesMap: { [key: string]: IMessage } = {}
+    messages.forEach((msg) => {
+      messagesMap[msg.tid || ''] = msg
+    })
+    filteredPendingMessages = pendingMessages.filter((msg: IMessage) => !messagesMap[msg.tid || ''])
+  }
+  return filteredPendingMessages
 }
 
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    const {
-      channel,
-      loadWithLastMessage,
-      messageId,
-      limit,
-      withDeliveredMessages,
-      highlight,
-      behavior,
-      scrollToMessage
-    } = action.payload
+    const { channel, loadWithLastMessage, messageId, limit, highlight, behavior, scrollToMessage, networkChanged } =
+      action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
-    if (channel.id && !channel.isMockChannel) {
+    if (channel?.id && !channel?.isMockChannel) {
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(limit || MESSAGES_MAX_LENGTH)
@@ -1085,46 +1096,28 @@ function* getMessagesQuery(action: IAction): any {
       )
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
       if (loadWithLastMessage) {
-        const allMessages = getAllMessages()
-        const havLastMessage =
-          allMessages &&
-          allMessages.length &&
-          channel.lastMessage &&
-          allMessages[allMessages.length - 1] &&
-          allMessages[allMessages.length - 1].id === channel.lastMessage.id
-        if ((channel.newMessageCount && channel.newMessageCount > 0) || !havLastMessage) {
-          // if (channel.newMessageCount && channel.newMessageCount > 0) {
+        if (channel.newMessageCount && channel.newMessageCount > 0) {
           setHasPrevCached(false)
-          setMessagesToMap(channel.id, [])
           setAllMessages([])
-          // }
-          result =
-            connectionState === CONNECTION_STATUS.CONNECTED
-              ? yield call(messageQuery.loadPreviousMessageId, '0')
-              : { messages: [], hasNext: false }
-
-          if (result.messages.length === 50) {
-            messageQuery.limit = 30
-            const secondResult =
+          messageQuery.limit = MESSAGES_MAX_LENGTH
+          if (Number(channel.lastDisplayedMessageId)) {
+            result =
               connectionState === CONNECTION_STATUS.CONNECTED
-                ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
+                ? yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
                 : { messages: [], hasNext: false }
-            result.messages = [...secondResult.messages, ...result.messages]
-            result.hasNext = secondResult.hasNext
+          } else {
+            result =
+              connectionState === CONNECTION_STATUS.CONNECTED
+                ? yield call(messageQuery.loadPrevious)
+                : { messages: [], hasNext: false }
           }
-          let sentMessages: IMessage[] = []
-          if (withDeliveredMessages) {
-            sentMessages = getFromAllMessagesByMessageId('', '', true)
-          }
-          const messagesMap: { [key: string]: IMessage } = {}
-          result.messages.forEach((msg) => {
-            messagesMap[msg.tid || ''] = msg
-          })
-          const filteredSentMessages = sentMessages.filter((msg) => !messagesMap[msg.tid || ''])
-
-          result.messages = [...result.messages, ...filteredSentMessages].slice(filteredSentMessages.length)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          setMessagesToMap(channel.id, result.messages)
+          setMessagesToMap(
+            channel.id,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
           setAllMessages(result.messages)
           yield put(setMessagesHasPrevAC(true))
         } else {
@@ -1135,11 +1128,18 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setMessagesHasNextAC(false))
         setHasNextCached(false)
         if (messageId && scrollToMessage) {
-          yield put(setScrollToMessagesAC(messageId, highlight, behavior))
+          if (channel.newMessageCount && channel.newMessageCount > 0) {
+            yield put(setScrollToMessagesAC(channel.lastDisplayedMessageId, highlight, behavior))
+          } else {
+            yield put(scrollToNewMessageAC(true))
+          }
         }
       } else if (messageId) {
+        const messages = store.getState().MessageReducer.activeChannelMessages
+        const centerMessageId = messages[Math.floor(messages.length / 2)]?.id
+        const loadWithMessageId = networkChanged && messages?.length > 0 ? centerMessageId : messageId
         const allMessages = getAllMessages()
-        const messageIndex = allMessages.findIndex((msg) => msg.id === messageId)
+        const messageIndex = allMessages.findIndex((msg) => msg.id === loadWithMessageId)
         const maxLengthPart = MESSAGES_MAX_LENGTH / 2
         if (messageIndex >= maxLengthPart) {
           result.messages = allMessages.slice(messageIndex - maxLengthPart, messageIndex + maxLengthPart)
@@ -1149,40 +1149,63 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesHasPrevAC(true))
         } else {
           messageQuery.limit = MESSAGES_MAX_LENGTH
-          log.info('load by message id from server ...............', messageId)
+          log.info('load by message id from server ...............', loadWithMessageId)
           result =
             connectionState === CONNECTION_STATUS.CONNECTED
-              ? yield call(messageQuery.loadNearMessageId, messageId)
+              ? yield call(messageQuery.loadNearMessageId, loadWithMessageId)
               : { messages: [], hasNext: false }
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           if (result.messages.length === 50) {
-            messageQuery.limit = MESSAGES_MAX_LENGTH - 50
+            messageQuery.limit = (MESSAGES_MAX_PAGE_COUNT - 50) / 2
             const secondResult =
               connectionState === CONNECTION_STATUS.CONNECTED
                 ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
                 : { messages: [], hasNext: false }
+            result.messages = [...secondResult.messages, ...result.messages]
+            yield put(addMessagesAC(JSON.parse(JSON.stringify(secondResult.messages)), MESSAGE_LOAD_DIRECTION.PREV))
+            messageQuery.limit = MESSAGES_MAX_PAGE_COUNT - 50 - secondResult.messages.length
             messageQuery.reverse = false
             const thirdResult =
               connectionState === CONNECTION_STATUS.CONNECTED
                 ? yield call(messageQuery.loadNextMessageId, result.messages[result.messages.length - 1].id)
                 : { messages: [], hasNext: false }
-            result.messages = [...secondResult.messages, ...result.messages, ...thirdResult.messages]
-            result.hasNext = secondResult.hasNext
+            result.messages = [...result.messages, ...thirdResult.messages]
+            yield put(addMessagesAC(JSON.parse(JSON.stringify(thirdResult.messages)), MESSAGE_LOAD_DIRECTION.NEXT))
+            if (secondResult.hasNext && !thirdResult.hasNext) {
+              messageQuery.limit = MESSAGES_MAX_PAGE_COUNT - 50 - secondResult.messages.length - result.messages.length
+              const fourthResult =
+                connectionState === CONNECTION_STATUS.CONNECTED
+                  ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
+                  : { messages: [], hasNext: false }
+              result.messages = [...fourthResult.messages, ...result.messages]
+              yield put(addMessagesAC(JSON.parse(JSON.stringify(fourthResult.messages)), MESSAGE_LOAD_DIRECTION.PREV))
+            } else if (!secondResult.hasNext && thirdResult.hasNext) {
+              messageQuery.limit = MESSAGES_MAX_PAGE_COUNT - 50 - secondResult.messages.length - result.messages.length
+              const fourthResult =
+                connectionState === CONNECTION_STATUS.CONNECTED
+                  ? yield call(messageQuery.loadNextMessageId, result.messages[result.messages.length - 1].id)
+                  : { messages: [], hasNext: false }
+              result.messages = [...result.messages, ...fourthResult.messages]
+              yield put(addMessagesAC(JSON.parse(JSON.stringify(fourthResult.messages)), MESSAGE_LOAD_DIRECTION.NEXT))
+            }
             messageQuery.reverse = true
-            yield put(setMessagesHasPrevAC(secondResult.hasNext))
           }
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          setMessagesToMap(channel.id, result.messages)
+          setMessagesToMap(
+            channel.id,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
           setAllMessages([...result.messages])
           setHasPrevCached(false)
           setHasNextCached(false)
         }
         yield put(setMessagesHasNextAC(true))
         if (scrollToMessage) {
-          yield put(setScrollToMessagesAC(messageId, true, behavior))
+          yield put(setScrollToMessagesAC(loadWithMessageId, highlight, behavior))
         }
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-        setMessagesToMap(channel.id, [])
         setAllMessages([])
         messageQuery.limit = MESSAGES_MAX_LENGTH
         if (Number(channel.lastDisplayedMessageId)) {
@@ -1190,39 +1213,11 @@ function* getMessagesQuery(action: IAction): any {
             connectionState === CONNECTION_STATUS.CONNECTED
               ? yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
               : { messages: [], hasNext: false }
-          if (result.messages.length === 50) {
-            messageQuery.limit =
-              channel.newMessageCount > 25 ? (MESSAGES_MAX_LENGTH - 50) / 2 : MESSAGES_MAX_LENGTH - 50
-            const secondResult =
-              connectionState === CONNECTION_STATUS.CONNECTED
-                ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-                : { messages: [], hasNext: false }
-            if (channel.newMessageCount > 25) {
-              messageQuery.reverse = false
-              const thirdResult =
-                connectionState === CONNECTION_STATUS.CONNECTED
-                  ? yield call(messageQuery.loadNextMessageId, result.messages[result.messages.length - 1].id)
-                  : { messages: [], hasNext: false }
-              result.messages = [...secondResult.messages, ...result.messages, ...thirdResult.messages]
-              messageQuery.reverse = true
-            } else {
-              result.messages = [...secondResult.messages, ...result.messages]
-            }
-          }
         } else {
           result =
             connectionState === CONNECTION_STATUS.CONNECTED
               ? yield call(messageQuery.loadPrevious)
               : { messages: [], hasNext: false }
-          if (result.messages.length === 50) {
-            messageQuery.limit = MESSAGES_MAX_LENGTH - 50
-            const secondResult =
-              connectionState === CONNECTION_STATUS.CONNECTED
-                ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-                : { messages: [], hasNext: false }
-            result.messages = [...secondResult.messages, ...result.messages]
-            result.hasNext = secondResult.hasNext
-          }
         }
         yield put(setMessagesHasPrevAC(true))
         yield put(
@@ -1232,42 +1227,40 @@ function* getMessagesQuery(action: IAction): any {
               channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
-        setMessagesToMap(channel.id, result.messages)
+        setMessagesToMap(
+          channel.id,
+          result.messages,
+          result.messages[0]?.id,
+          result.messages[result.messages.length - 1]?.id
+        )
         setAllMessages([...result.messages])
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-        /*
-        if (channel.lastDisplayedMessageId) {
-          yield put(setMessagesNextCompleteAC(true))
-          yield put(setMessagesPrevCompleteAC(true))
-          messageQuery.limit = 30
-          // result = yield call(messageQuery.loadPreviousMessageId, '0')
-          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
-        } else {
-          messageQuery.limit = 20
-          result = yield call(messageQuery.loadNext)
-        }
-        yield put(setMessagesNextCompleteAC(true)) */
       } else {
-        setMessagesToMap(channel.id, [])
-        setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
-          setMessagesToMap(channel.id, [])
-          setAllMessages([...cachedMessages])
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
+          const parsedMessages = getFromAllMessagesByMessageId('', '', true)
+          setMessagesToMap(
+            channel.id,
+            parsedMessages,
+            parsedMessages[0]?.id,
+            parsedMessages[parsedMessages.length - 1]?.id
+          )
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(parsedMessages))))
+          const filteredPendingMessages = getFilteredPendingMessages(parsedMessages)
+          yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         }
         log.info('load message from server')
-        result =
-          connectionState === CONNECTION_STATUS.CONNECTED
-            ? yield call(messageQuery.loadPrevious)
-            : { messages: [], hasNext: false }
-        if (result.messages.length === 50) {
-          messageQuery.limit = MESSAGES_MAX_LENGTH - 50
-          const secondResult =
+
+        result = { messages: [], hasNext: false }
+        if (channel?.lastDisplayedMessageId > channel?.lastMessage?.id) {
+          result =
             connectionState === CONNECTION_STATUS.CONNECTED
-              ? yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
+              ? yield call(messageQuery.loadPreviousMessageId, channel?.lastDisplayedMessageId)
               : { messages: [], hasNext: false }
-          result.messages = [...secondResult.messages, ...result.messages]
-          result.hasNext = secondResult.hasNext
+        } else {
+          result =
+            connectionState === CONNECTION_STATUS.CONNECTED
+              ? yield call(messageQuery.loadPrevious)
+              : { messages: [], hasNext: false }
         }
         const updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
@@ -1275,28 +1268,29 @@ function* getMessagesQuery(action: IAction): any {
           updateMessageOnAllMessages(msg.id, updatedMessage || msg)
           updatedMessages.push(updatedMessage || msg)
         })
-        yield call(updateMessages, channel, updatedMessages)
+
+        const messageIdForLoad =
+          channel?.lastDisplayedMessageId > channel?.lastMessage?.id
+            ? channel?.lastDisplayedMessageId || '0'
+            : channel?.lastMessage?.id || '0'
+        yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
       }
-
-      const pendingMessages = getPendingMessages(channel.id)
-      if (pendingMessages && pendingMessages.length) {
-        const messagesMap: { [key: string]: IMessage } = {}
-        result.messages.forEach((msg) => {
-          messagesMap[msg.tid || ''] = msg
-        })
-        const filteredPendingMessages = pendingMessages.filter((msg: IMessage) => !messagesMap[msg.tid || ''])
-        yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-      }
+      const filteredPendingMessages = getFilteredPendingMessages(result.messages)
+      yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
 
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
         yield put(setWaitToSendPendingMessagesAC(false))
         yield spawn(sendPendingMessages, connectionState)
       }
-      // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));
-    } else if (channel.isMockChannel) {
+      const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
+      if (updatedChannel) {
+        yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
+        updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
+      }
+    } else if (channel?.isMockChannel) {
       yield put(setMessagesAC([]))
     }
   } catch (e) {
@@ -1358,7 +1352,12 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.PREV)
-          setMessagesToMap(channelId, result.messages)
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
@@ -1371,7 +1370,12 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadNextMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.NEXT)
-          setMessagesToMap(channelId, result.messages)
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
         }
         yield put(setMessagesHasNextAC(result.hasNext))
       }
@@ -1642,13 +1646,7 @@ function* getMessageMarkers(action: IAction): any {
   }
 }
 
-function* executeAddPollVote(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-  isResend?: boolean
-): any {
+function* executeAddPollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!message.pollDetails) return
   const user = getClient().user
@@ -1688,14 +1686,7 @@ function* executeAddPollVote(
     incrementVotesPerOptionCount: 1
   })
 
-  if (!isResend) {
-    for (const obj of objs) {
-      updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
-      updateMessageOnAllMessages(message.id, {}, obj)
-      yield put(updateMessageAC(message.id, {}, undefined, obj))
-    }
-  }
-  if (channel) {
+  if (channel && message.id) {
     yield call(channel.addVote, message.id, pollId, [optionId])
     yield put(removePendingPollActionAC(message.id, 'ADD_POLL_VOTE', optionId))
   }
@@ -1722,7 +1713,6 @@ function* addPollVote(action: IAction): any {
     const { channelId, pollId, optionId, message, isResend } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
-      const connectionState = sceytChatClient.connectionState
       const user = sceytChatClient.user
       const vote: IPollVote = {
         optionId,
@@ -1745,93 +1735,73 @@ function* addPollVote(action: IAction): any {
           createdAt: new Date().getTime()
         }
       }
-      if (connectionState !== CONNECTION_STATUS.CONNECTED) {
-        // Check for conflicts before doing optimistic update
-        const pendingAction = {
-          type: 'ADD_POLL_VOTE' as const,
-          channelId,
-          pollId,
-          optionId,
-          message
-        }
-        const conflictCheck = checkPendingPollActionConflict(pendingAction)
+      const pendingAction = {
+        type: 'ADD_POLL_VOTE' as const,
+        channelId,
+        pollId,
+        optionId,
+        message
+      }
+      const conflictCheck = checkPendingPollActionConflict(pendingAction)
 
-        // If there's a conflicting pending delete, we need to revert its optimistic update
-        if (conflictCheck.hasConflict && !conflictCheck.shouldSkip) {
-          // Remove the conflicting pending delete action (which had an optimistic update)
-          // The optimistic update for delete needs to be reverted, then we apply the add
-          // Since delete was already applied optimistically, we need to revert it by applying add
-          const channel = yield call(getChannelFromMap, channelId)
-          if (channel) {
-            // Get the current message state (which has the delete applied)
-            const currentMessage =
-              Object.values(getMessagesFromMap(channelId) || {})?.find(
-                (msg: IMessage) => msg.id === message.id || msg.tid === message.id
-              ) || message
-            // Apply add on top (which effectively reverts the delete)
+      // If there's a conflicting pending delete, we need to revert its optimistic update
+      if (conflictCheck.hasConflict && !conflictCheck.shouldSkip) {
+        // Remove the conflicting pending delete action (which had an optimistic update)
+        // The optimistic update for delete needs to be reverted, then we apply the add
+        // Since delete was already applied optimistically, we need to revert it by applying add
+        const channel = yield call(getChannelFromMap, channelId)
+        if (channel) {
+          // Get the current message state (which has the delete applied)
+          const currentMessage =
+            Object.values(getMessagesFromMap(channelId) || {})?.find(
+              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+            ) || message
+          // Apply add on top (which effectively reverts the delete)
 
-            const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
-            yield put(
-              addPollVotesToListAC(
-                pollId,
-                optionId,
-                [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
-                hasNext,
-                message.id
-              )
+          const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
+          yield put(
+            addPollVotesToListAC(
+              pollId,
+              optionId,
+              [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
+              hasNext,
+              message.id
             )
-            const obj: { type: 'addOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
-              type: 'addOwn' as const,
-              vote,
-              incrementVotesPerOptionCount: 1
-            }
-            updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
-            updateMessageOnAllMessages(message.id, {}, obj)
-            yield put(updateMessageAC(message.id, {}, undefined, obj))
+          )
+          const obj: { type: 'addOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
+            type: 'addOwn' as const,
+            vote,
+            incrementVotesPerOptionCount: 1
           }
-        } else if (!conflictCheck.shouldSkip) {
-          // No conflict, update message optimistically so user sees their vote immediately
-          yield* updateMessageOptimisticallyForAddPollVote(channelId, message, vote)
+          updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+          updateMessageOnAllMessages(message.id, {}, obj)
+          yield put(updateMessageAC(message.id, {}, undefined, obj))
         }
+      } else if (!conflictCheck.shouldSkip) {
+        // No conflict, update message optimistically so user sees their vote immediately
+        yield* updateMessageOptimisticallyForAddPollVote(channelId, message, vote)
+      }
 
-        // Store as pending action to send when connected (if not skipped)
-        if (!conflictCheck.shouldSkip) {
-          setPendingPollAction(pendingAction)
-        }
-        return
+      // Store as pending action to send when connected (if not skipped)
+      if (!conflictCheck.shouldSkip && !isResend) {
+        setPendingPollAction(pendingAction)
       }
 
       // Execute immediately if connected
-      yield* executeAddPollVote(channelId, pollId, optionId, message, isResend)
+      yield* executeAddPollVote(channelId, pollId, optionId, message)
     }
   } catch (e) {
     log.error('error in add poll vote', e)
   }
 }
 
-function* executeDeletePollVote(
-  channelId: string,
-  pollId: string,
-  optionId: string,
-  message: IMessage,
-  isResend?: boolean
-): any {
+function* executeDeletePollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!message.pollDetails) return
   const vote = message.pollDetails?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId)
   if (!vote) return
-  const obj: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
-    type: 'deleteOwn' as const,
-    vote,
-    incrementVotesPerOptionCount: -1
-  }
 
-  if (!isResend) {
-    updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
-    updateMessageOnAllMessages(message.id, {}, obj)
-    yield put(updateMessageAC(message.id, {}, undefined, obj))
-  }
-  if (channel) {
+  if (channel && message.id) {
     yield call(channel.deleteVote, message.id, pollId, [optionId])
     yield put(removePendingPollActionAC(message.id, 'DELETE_POLL_VOTE', optionId))
   }
@@ -1857,63 +1827,58 @@ function* deletePollVote(action: IAction): any {
     const { channelId, pollId, optionId, message, isResend } = payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
-      const connectionState = sceytChatClient.connectionState
       const vote = message.pollDetails?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId)
       if (!vote) return
-      if (connectionState !== CONNECTION_STATUS.CONNECTED) {
-        // Check for conflicts before doing optimistic update
-        const pendingAction = {
-          type: 'DELETE_POLL_VOTE' as const,
-          channelId,
-          pollId,
-          optionId,
-          message
-        }
-        const conflictCheck = checkPendingPollActionConflict(pendingAction)
+      const pendingAction = {
+        type: 'DELETE_POLL_VOTE' as const,
+        channelId,
+        pollId,
+        optionId,
+        message
+      }
+      const conflictCheck = checkPendingPollActionConflict(pendingAction)
 
-        // If there's a conflicting pending add and we should skip both, revert the add's optimistic update
-        if (conflictCheck.hasConflict && conflictCheck.shouldSkip) {
-          // Revert the optimistic update from the pending addPollVote
-          const channel = yield call(getChannelFromMap, channelId)
-          if (channel) {
-            // Get the current message state (which has the add applied optimistically)
-            const currentMessage =
-              Object.values(getMessagesFromMap(channelId) || {})?.find(
-                (msg: IMessage) => msg.id === message.id || msg.tid === message.id
-              ) || message
-            // Revert by applying delete (which removes the vote that was added optimistically)
+      // If there's a conflicting pending add and we should skip both, revert the add's optimistic update
+      if (conflictCheck.hasConflict && conflictCheck.shouldSkip) {
+        // Revert the optimistic update from the pending addPollVote
+        const channel = yield call(getChannelFromMap, channelId)
+        if (channel) {
+          // Get the current message state (which has the add applied optimistically)
+          const currentMessage =
+            Object.values(getMessagesFromMap(channelId) || {})?.find(
+              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+            ) || message
+          // Revert by applying delete (which removes the vote that was added optimistically)
 
-            yield put(
-              deletePollVotesFromListAC(
-                pollId,
-                optionId,
-                [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
-                message.id
-              )
+          yield put(
+            deletePollVotesFromListAC(
+              pollId,
+              optionId,
+              [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
+              message.id
             )
-            const obj: { type: 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
-              type: 'deleteOwn' as const,
-              vote,
-              incrementVotesPerOptionCount: -1
-            }
-            updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
-            updateMessageOnAllMessages(message.id, {}, obj)
-            yield put(updateMessageAC(message.id, {}, undefined, obj))
+          )
+          const obj: { type: 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
+            type: 'deleteOwn' as const,
+            vote,
+            incrementVotesPerOptionCount: -1
           }
-        } else if (!conflictCheck.shouldSkip) {
-          // No conflict or conflict that doesn't skip, update message optimistically so user sees vote removed immediately
-          yield* updateMessageOptimisticallyForDeletePollVote(channelId, message, vote)
+          updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+          updateMessageOnAllMessages(message.id, {}, obj)
+          yield put(updateMessageAC(message.id, {}, undefined, obj))
         }
+      } else if (!conflictCheck.shouldSkip) {
+        // No conflict or conflict that doesn't skip, update message optimistically so user sees vote removed immediately
+        yield* updateMessageOptimisticallyForDeletePollVote(channelId, message, vote)
+      }
 
-        // Store as pending action (conflict resolution is handled in setPendingPollAction)
-        if (!conflictCheck.shouldSkip) {
-          setPendingPollAction(pendingAction)
-        }
-        return
+      // Store as pending action (conflict resolution is handled in setPendingPollAction)
+      if (!conflictCheck.shouldSkip && !isResend) {
+        setPendingPollAction(pendingAction)
       }
 
       // Execute immediately if connected
-      yield* executeDeletePollVote(channelId, pollId, optionId, message, isResend)
+      yield* executeDeletePollVote(channelId, pollId, optionId, message)
     }
   } catch (e) {
     log.error('error in delete poll vote', e)
@@ -1930,7 +1895,7 @@ function* executeClosePoll(channelId: string, pollId: string, message: IMessage)
   updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
   updateMessageOnAllMessages(message.id, {}, obj)
   yield put(updateMessageAC(message.id, {}, undefined, obj))
-  if (channel) {
+  if (channel && message.id) {
     yield call(channel.closePoll, message.id, pollId)
     yield put(removePendingPollActionAC(message.id, 'CLOSE_POLL'))
   }
@@ -2005,7 +1970,7 @@ function* executeRetractPollVote(
       yield put(updateMessageAC(message.id, {}, undefined, obj))
     }
   }
-  if (channel) {
+  if (channel && message.id) {
     yield call(channel.retractVote, message.id, pollId)
     yield put(removePendingPollActionAC(message.id || '', 'RETRACT_POLL_VOTE'))
   }
@@ -2079,7 +2044,6 @@ function* resendPendingPollActions(action: IAction): any {
     const pendingPollActionsMapCopy = JSON.parse(JSON.stringify(pendingPollActionsMap))
 
     // Use a small delay similar to the message resend pattern
-    yield call(() => new Promise((resolve) => setTimeout(resolve, 1000)))
 
     Object.keys(pendingPollActionsMapCopy).forEach((messageId: string) => {
       pendingPollActionsMapCopy[messageId].forEach((pendingAction: any) => {

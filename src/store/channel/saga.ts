@@ -18,10 +18,14 @@ import {
   setSearchedChannelsAC,
   setSearchedChannelsForForwardAC,
   switchChannelActionAC,
+  setChannelInviteKeyAvailableAC,
   updateChannelDataAC,
   updateSearchedChannelDataAC,
   updateUserStatusOnChannelAC,
-  setJoinableChannelAC
+  setJoinableChannelAC,
+  setMutualChannelsHasNextAC,
+  setMutualChannelsAC,
+  setMutualChannelsLoadingStateAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -35,6 +39,7 @@ import {
   LEAVE_CHANNEL,
   LOAD_MORE_CHANNEL,
   LOAD_MORE_CHANNELS_FOR_FORWARD,
+  LOAD_MORE_MUTUAL_CHANNELS,
   MARK_CHANNEL_AS_READ,
   MARK_CHANNEL_AS_UNREAD,
   MARK_MESSAGES_AS_DELIVERED,
@@ -59,7 +64,8 @@ import {
   UPDATE_CHANNEL_INVITE_KEY,
   GET_CHANNEL_BY_INVITE_KEY,
   JOIN_TO_CHANNEL_WITH_INVITE_KEY,
-  SET_MESSAGE_RETENTION_PERIOD
+  SET_MESSAGE_RETENTION_PERIOD,
+  GET_CHANNELS_WITH_USER
 } from './constants'
 import {
   destroyChannelsMap,
@@ -102,7 +108,7 @@ import {
   updateMessageOnAllMessages,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
-import { updateMembersPresenceAC } from '../member/actions'
+import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
@@ -241,6 +247,9 @@ function* createChannel(action: IAction): any {
       yield call(setActiveChannelId, createdChannel.id)
     }
   } catch (e) {
+    if (e.code === 1041) {
+      yield put(setActionIsRestrictedAC(true, false, null))
+    }
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
   }
@@ -324,7 +333,7 @@ function* getChannels(action: IAction): any {
               channel
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
-                  channelMessageMap[channel.id] = messages[0]
+                  channelMessageMap[channel?.id] = messages[0]
                   log.info('[getChannels] successfully fetched reaction message for channel:', channel?.id)
                   resolve(true)
                 })
@@ -341,8 +350,8 @@ function* getChannels(action: IAction): any {
         channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
       )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
-        if (channelMessageMap[channel.id]) {
-          channel.lastReactedMessage = channelMessageMap[channel.id]
+        if (channelMessageMap[channel?.id]) {
+          channel.lastReactedMessage = channelMessageMap[channel?.id]
         }
         return channel
       })
@@ -1545,7 +1554,7 @@ function* getChannelInviteKeys(action: IAction): any {
 function* regenerateChannelInviteKey(action: IAction): any {
   try {
     const { payload } = action
-    const { channelId, key } = payload
+    const { channelId, key, deletePermanently } = payload
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
@@ -1553,7 +1562,8 @@ function* regenerateChannelInviteKey(action: IAction): any {
     if (channel) {
       const inviteKey = yield call(channel.regenerateInviteKey, {
         key,
-        channelId
+        channelId,
+        deletePermanently
       })
       yield put(setChannelInviteKeysAC(channelId, [inviteKey]))
     }
@@ -1615,6 +1625,9 @@ function* getChannelByInviteKey(action: IAction): any {
       window.history.pushState({}, '', window.location.pathname)
     }
   } catch (e) {
+    if (e.code === 1109) {
+      yield put(setChannelInviteKeyAvailableAC(false))
+    }
     log.error('ERROR in get channel by invite key', e)
   }
 }
@@ -1679,6 +1692,61 @@ function* setMessageRetentionPeriod(action: IAction): any {
   }
 }
 
+function* getChannelsWithUser(action: IAction): any {
+  yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADING))
+  // Clear existing mutual channels when fetching new user
+  yield put(setMutualChannelsAC([]))
+  try {
+    const { payload } = action
+    const { userId } = payload
+    const SceytChatClient = getClient()
+    const channelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
+    channelsQueryBuilder.memberCount(0)
+    channelsQueryBuilder.setMutualWithUserId(userId)
+    channelsQueryBuilder.limit(15)
+    const channelsQuery = yield call(channelsQueryBuilder.build)
+    query.mutualChannelsQuery = channelsQuery
+    const channelsData = yield call(channelsQuery.loadNextPage)
+    const channels = channelsData.channels
+    if (channelsData.hasNext) {
+      yield put(setMutualChannelsHasNextAC(true))
+    } else {
+      yield put(setMutualChannelsHasNextAC(false))
+    }
+    yield put(setMutualChannelsAC(channels))
+  } catch (e) {
+    log.error('ERROR in get groups in common', e)
+  } finally {
+    yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADED))
+  }
+}
+
+function* loadMoreMutualChannels(action: IAction): any {
+  yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADING))
+  try {
+    const { payload } = action
+    const { limit } = payload
+    const { mutualChannelsQuery } = query
+    if (!mutualChannelsQuery) {
+      return
+    }
+    if (limit) {
+      mutualChannelsQuery.limit = limit
+    }
+    const channelsData = yield call(mutualChannelsQuery.loadNextPage)
+    if (channelsData.hasNext) {
+      yield put(setMutualChannelsHasNextAC(true))
+    } else {
+      yield put(setMutualChannelsHasNextAC(false))
+    }
+    yield put(setMutualChannelsAC(channelsData.channels))
+  } catch (e) {
+    log.error('ERROR in load more mutual channels', e)
+  } finally {
+    yield put(setMutualChannelsLoadingStateAC(LOADING_STATE.LOADED))
+  }
+}
+
 export default function* ChannelsSaga() {
   yield takeLatest(CREATE_CHANNEL, createChannel)
   yield takeLatest(GET_CHANNELS, getChannels)
@@ -1687,6 +1755,8 @@ export default function* ChannelsSaga() {
   yield takeLatest(SEARCH_CHANNELS_FOR_FORWARD, searchChannelsForForward)
   yield takeLatest(LOAD_MORE_CHANNEL, channelsLoadMore)
   yield takeLatest(LOAD_MORE_CHANNELS_FOR_FORWARD, channelsForForwardLoadMore)
+  yield takeLatest(GET_CHANNELS_WITH_USER, getChannelsWithUser)
+  yield takeLatest(LOAD_MORE_MUTUAL_CHANNELS, loadMoreMutualChannels)
   yield takeEvery(SWITCH_CHANNEL, switchChannel)
   yield takeLatest(LEAVE_CHANNEL, leaveChannel)
   yield takeLatest(DELETE_CHANNEL, deleteChannel)

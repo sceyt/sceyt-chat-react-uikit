@@ -12,7 +12,8 @@ import {
   updatePendingMessageAC,
   clearPendingMessagesMapAC
 } from 'store/message/actions'
-export const MESSAGES_MAX_LENGTH = 80
+export const MESSAGES_MAX_PAGE_COUNT = 80
+export const MESSAGES_MAX_LENGTH = 50
 export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
@@ -136,12 +137,12 @@ export const setAllMessages = (messages: IMessage[]) => {
 export const addAllMessages = (messages: IMessage[], direction: string) => {
   if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
     activeChannelAllMessages = [...messages, ...activeChannelAllMessages]
-    if (activeChannelAllMessages.length > MESSAGES_MAX_LENGTH) {
+    if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
       setHasNextCached(true)
     }
   } else {
     activeChannelAllMessages = [...activeChannelAllMessages, ...messages]
-    if (activeChannelAllMessages.length > MESSAGES_MAX_LENGTH) {
+    if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
       setHasPrevCached(true)
     }
   }
@@ -224,8 +225,8 @@ export const getHasNextCached = () => nextCached
 export const getFromAllMessagesByMessageId = (messageId: string, direction: string, getWithLastMessage?: boolean) => {
   let messagesForAdd: IMessage[] = []
   if (getWithLastMessage) {
-    messagesForAdd = [...activeChannelAllMessages.slice(-MESSAGES_MAX_LENGTH)]
-    setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_LENGTH)
+    messagesForAdd = [...activeChannelAllMessages.slice(-MESSAGES_MAX_PAGE_COUNT)]
+    setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT)
     setHasNextCached(false)
   } else {
     const fromMessageIndex = activeChannelAllMessages.findIndex((mes) => mes.id === messageId)
@@ -254,14 +255,24 @@ export const getFromAllMessagesByMessageId = (messageId: string, direction: stri
   return messagesForAdd
 }
 
-export function setMessagesToMap(channelId: string, messages: IMessage[]) {
+export function setMessagesToMap(
+  channelId: string,
+  messages: IMessage[],
+  firstMessageId: string = '0',
+  lastMessageId: string = '0'
+) {
   if (!messagesMap[channelId]) {
     messagesMap[channelId] = {}
   }
-  messages.forEach((msg: IMessage) => {
-    if (msg.tid && messagesMap[channelId][msg.tid]) {
-      delete messagesMap[channelId][msg.tid]
+  for (const key in messagesMap[channelId]) {
+    if (Object.prototype.hasOwnProperty.call(messagesMap[channelId], key)) {
+      const element = messagesMap[channelId][key]
+      if (element.id >= firstMessageId && element.id <= lastMessageId) {
+        delete messagesMap[channelId][key]
+      }
     }
+  }
+  messages.forEach((msg: IMessage) => {
     messagesMap[channelId][msg.id || msg.tid!] = msg
   })
 }
@@ -305,8 +316,6 @@ export function updateMessageOnMap(
       updatedPendingMessages.forEach((msg: IMessage) => {
         store.dispatch(updatePendingMessageAC(channelId, msg.tid || msg.id, msg))
       })
-    } else {
-      store.dispatch(removePendingMessageAC(channelId, updatedMessage.messageId))
     }
   }
   let updatedMessageData = null

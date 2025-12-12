@@ -28,3 +28,7 @@ export const tabIsActiveSelector = (store: any) => store.ChannelReducer.tabIsAct
 export const channelMessageDraftIsRemovedSelector = (store: any) => store.ChannelReducer.draftIsRemoved
 export const channelInviteKeysSelector = (store: any) => store.ChannelReducer.channelInviteKeys
 export const joinableChannelSelector = (store: any) => store.ChannelReducer.joinableChannel
+export const channelInviteKeyAvailableSelector = (store: any) => store.ChannelReducer.channelInviteKeyAvailable
+export const mutualChannelsSelector = (store: any) => store.ChannelReducer.mutualChannels
+export const mutualChannelsHasNextSelector = (store: any) => store.ChannelReducer.mutualChannelsHasNext
+export const mutualChannelsLoadingStateSelector = (store: any) => store.ChannelReducer.mutualChannelsLoadingState

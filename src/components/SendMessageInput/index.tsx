@@ -61,6 +61,7 @@ import { themeSelector } from '../../store/theme/selector'
 
 // Helpers
 import {
+  checkIsTypeKeyPressed,
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
@@ -447,7 +448,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     onError
   }
 
-  const handleSendTypingState = (typingState: boolean) => {
+  const handleSendTypingState = (typingState: boolean, code?: string) => {
+    if (code) {
+      const isTypeKeyPressed = checkIsTypeKeyPressed(code)
+      if (!isTypeKeyPressed) {
+        return
+      }
+    }
     if (typingState) {
       setInTypingStateTimout(
         setTimeout(() => {
@@ -613,11 +620,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } else {
       if (typingTimout) {
         if (!inTypingStateTimout) {
-          handleSendTypingState(true)
+          handleSendTypingState(true, code)
         }
         clearTimeout(typingTimout)
       } else {
-        handleSendTypingState(true)
+        handleSendTypingState(true, code)
       }
 
       setTypingTimout(
@@ -1325,7 +1332,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
+  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes, messageToEdit])
 
   useDidUpdate(() => {
     if (mentionedUsers && mentionedUsers.length) {
@@ -1678,7 +1685,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             </ReplyIconWrapper>
                           )
                         ))}
-                      <ReplyMessageBody>
+                      <ReplyMessageBody linkColor={accentColor}>
                         <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
@@ -1769,7 +1776,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                  {showRecording || getAudioRecordingFromMap(activeChannel.id) ? (
+                  {(showRecording || getAudioRecordingFromMap(activeChannel.id)) && !messageToEdit ? (
                     <AudioCont />
                   ) : (
                     <MessageInputWrapper
@@ -1900,6 +1907,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             setMessageBodyAttributes={setMessageBodyAttributes}
                             setMessageText={messageToEdit ? setEditMessageText : setMessageText}
                             messageToEdit={messageToEdit}
+                            activeChannelMembers={activeChannelMembers}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
+                            setMentionedMember={handleSetMentionMember}
                           />
                           <React.Fragment>
                             {isEmojisOpened && (
@@ -1955,7 +1966,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </MessageInputWrapper>
                   )}
 
-                  {sendMessageIsActive || !voiceMessage || messageToEdit ? (
+                  {sendMessageIsActive ||
+                  (!voiceMessage && !getAudioRecordingFromMap(activeChannel?.id)?.file) ||
+                  messageToEdit ? (
                     <SendMessageButton
                       isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
@@ -2115,13 +2128,16 @@ const UserName = styled.span<any>`
   margin-left: 4px;
 `
 
-const ReplyMessageBody = styled.div`
+const ReplyMessageBody = styled.div<{ linkColor: string }>`
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  a {
+    color: ${(props) => props.linkColor};
+  }
 `
 
 const EditReplyMessageHeader = styled.h4<{ color: string }>`

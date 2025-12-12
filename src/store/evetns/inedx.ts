@@ -1095,6 +1095,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_ADDED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_ADDED ... ')
           const { channel, pollDetails, messageId } = args
           const pollDetailsData = pollDetails as IPollDetails
           const activeChannelId = yield call(getActiveChannelId)
@@ -1150,6 +1151,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_DELETED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_DELETED ... ')
           const { channel, pollDetails, messageId } = args
           const pollDetailsData = pollDetails as IPollDetails
           const activeChannelId = yield call(getActiveChannelId)
@@ -1186,6 +1188,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_RETRACTED ... ')
           const { channel, pollDetails, messageId } = args
           const activeChannelId = yield call(getActiveChannelId)
           const pollDetailsData = pollDetails as IPollDetails
@@ -1221,6 +1224,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_CLOSED ... ')
           const { channel, messageId } = args
           const activeChannelId = yield call(getActiveChannelId)
           const obj = { type: 'close' as const, incrementVotesPerOptionCount: 0 }

@@ -33,7 +33,11 @@ import {
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,
-  setJoinableChannel
+  setJoinableChannel,
+  setChannelInviteKeyAvailable,
+  setMutualChannels,
+  setMutualChannelsHasNext,
+  setMutualChannelsLoadingState
 } from './reducers'
 
 // Import saga action constants
@@ -74,7 +78,9 @@ import {
   UPDATE_CHANNEL_INVITE_KEY,
   GET_CHANNEL_BY_INVITE_KEY,
   JOIN_TO_CHANNEL_WITH_INVITE_KEY,
-  SET_MESSAGE_RETENTION_PERIOD
+  SET_MESSAGE_RETENTION_PERIOD,
+  GET_CHANNELS_WITH_USER,
+  LOAD_MORE_MUTUAL_CHANNELS
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -186,6 +192,8 @@ export const switchChannelActionAC = (channel: IChannel | null, updateActiveChan
   type: SWITCH_CHANNEL,
   payload: { channel, updateActiveChannel }
 })
+
+export const setChannelInviteKeyAvailableAC = (available: boolean) => setChannelInviteKeyAvailable({ available })
 
 export const updateChannelAC = (channelId: string, config: any) => ({
   type: UPDATE_CHANNEL,
@@ -345,9 +353,9 @@ export const getChannelInviteKeysAC = (channelId: string) => ({
   payload: { channelId }
 })
 
-export const regenerateChannelInviteKeyAC = (channelId: string, key: string) => ({
+export const regenerateChannelInviteKeyAC = (channelId: string, key: string, deletePermanently: boolean) => ({
   type: REGENERATE_CHANNEL_INVITE_KEY,
-  payload: { channelId, key }
+  payload: { channelId, key, deletePermanently }
 })
 
 export const updateChannelInviteKeyAC = (
@@ -369,4 +377,20 @@ export const joinChannelWithInviteKeyAC = (key: string) => ({
 export const setMessageRetentionPeriodAC = (channelId: string, periodInMilliseconds: number | null) => ({
   type: SET_MESSAGE_RETENTION_PERIOD,
   payload: { channelId, periodInMilliseconds }
+})
+
+export const getChannelsWithUserAC = (userId: string) => ({
+  type: GET_CHANNELS_WITH_USER,
+  payload: { userId }
+})
+
+export const setMutualChannelsAC = (channels: IChannel[]) => setMutualChannels({ channels })
+
+export const setMutualChannelsHasNextAC = (hasNext: boolean) => setMutualChannelsHasNext({ hasNext })
+
+export const setMutualChannelsLoadingStateAC = (state: number) => setMutualChannelsLoadingState({ state })
+
+export const loadMoreMutualChannelsAC = (limit?: number) => ({
+  type: LOAD_MORE_MUTUAL_CHANNELS,
+  payload: { limit }
 })
