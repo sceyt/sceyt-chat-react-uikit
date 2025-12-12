@@ -339,6 +339,7 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: OGMetadataProps
+  collapsedCharacterLimit?: number
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -479,7 +480,8 @@ const MessageList: React.FC<MessagesProps> = ({
   hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
-  ogMetadataProps
+  ogMetadataProps,
+  collapsedCharacterLimit
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1453,6 +1455,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                           showInfoMessageProps={showInfoMessageProps}
                           ogMetadataProps={ogMetadataProps}
+                          collapsedCharacterLimit={collapsedCharacterLimit}
                         />
                       </MessageWrapper>
                     )}
