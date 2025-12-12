@@ -803,31 +803,29 @@ const MessageBody = ({
           />
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
-          <React.Fragment>
-            <TextContentContainer ref={textContainerRef} textHeight={textHeight} shouldTruncate={shouldTruncate}>
-              <span ref={messageTextRef}>
-                {MessageTextFormat({
-                  text: displayText,
-                  message: displayMessage,
-                  contactsMap,
-                  getFromContacts,
-                  accentColor,
-                  textSecondary,
-                  onMentionNameClick: handleOpenUserProfile,
-                  shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
-                  unsupportedMessage,
-                  target: ogMetadataProps?.target,
-                  isInviteLink: ogMetadataProps?.isInviteLink || false,
-                  onInviteLinkClick
-                })}
-              </span>
-              {shouldTruncate && !isExpanded && (
-                <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
-                  Read more
-                </ReadMoreLink>
-              )}
-            </TextContentContainer>
-          </React.Fragment>
+          <TextContentContainer ref={textContainerRef} textHeight={textHeight} shouldTruncate={shouldTruncate}>
+            <span ref={messageTextRef}>
+              {MessageTextFormat({
+                text: displayText,
+                message: displayMessage,
+                contactsMap,
+                getFromContacts,
+                accentColor,
+                textSecondary,
+                onMentionNameClick: handleOpenUserProfile,
+                shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+                unsupportedMessage,
+                target: ogMetadataProps?.target,
+                isInviteLink: ogMetadataProps?.isInviteLink || false,
+                onInviteLinkClick
+              })}
+            </span>
+            {shouldTruncate && !isExpanded && (
+              <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                Read more
+              </ReadMoreLink>
+            )}
+          </TextContentContainer>
         )}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
