@@ -339,13 +339,13 @@ const MessageBody = ({
   }, [collapsedCharacterLimit])
 
   const shouldTruncate = useMemo(() => {
-    if (!message.body || typeof message.body !== 'string') return false
+    if (!message.body) return false
     if (characterLimit === undefined) return false
     return message.body.length > characterLimit
   }, [message.body, characterLimit])
 
   const displayText = useMemo(() => {
-    if (!message.body || typeof message.body !== 'string') return message.body
+    if (!message.body) return message.body
     if (!shouldTruncate || isExpanded || characterLimit === undefined) return message.body
     return message.body.substring(0, characterLimit) + '...'
   }, [message.body, shouldTruncate, isExpanded, characterLimit])
