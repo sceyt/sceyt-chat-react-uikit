@@ -368,7 +368,7 @@ const MessageBody = ({
           setTextHeight(height)
         }
       })
-    } else if (!shouldTruncate) {
+    } else if (!shouldTruncate && textHeight !== 'auto') {
       setTextHeight('auto')
     }
   }, [isExpanded, displayText, shouldTruncate])
