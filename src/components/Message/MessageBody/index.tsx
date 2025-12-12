@@ -355,6 +355,16 @@ const MessageBody = ({
     return message.body.substring(0, characterLimit) + '...'
   }, [message.body, shouldTruncate, isExpanded, characterLimit])
 
+  const displayMessage = useMemo(() => {
+    if (!shouldTruncate || isExpanded || characterLimit === undefined) return message
+
+    const filteredBodyAttributes = message.bodyAttributes?.filter((attribute: any) => {
+      return attribute.offset + attribute.length <= characterLimit
+    })
+
+    return { ...message, bodyAttributes: filteredBodyAttributes || [] }
+  }, [message, shouldTruncate, isExpanded, characterLimit])
+
   useEffect(() => {
     if (textContainerRef.current && shouldTruncate) {
       requestAnimationFrame(() => {
@@ -811,7 +821,7 @@ const MessageBody = ({
               >
                 {MessageTextFormat({
                   text: displayText,
-                  message,
+                  message: displayMessage,
                   contactsMap,
                   getFromContacts,
                   accentColor,
