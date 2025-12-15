@@ -333,20 +333,6 @@ const MessageTextFormat = ({
   }
 }
 
-const isMentionNode = (node: any): boolean => {
-  if (!node || typeof node !== 'object') return false
-  if (node.props && node.props.className) {
-    const className = node.props.className
-    if (typeof className === 'string' && className.includes('mention')) {
-      return true
-    }
-    if (Array.isArray(className) && className.some((cls: any) => typeof cls === 'string' && cls.includes('mention'))) {
-      return true
-    }
-  }
-  return false
-}
-
 const getNodeTextLength = (node: any): number => {
   if (!node) return 0
   if (typeof node === 'string') return node.length
@@ -438,33 +424,22 @@ const trimReactMessage = (parts: any[] | string, limit: number | undefined) => {
         remaining -= part.length
       }
     } else if (part && typeof part === 'object') {
-      if (isMentionNode(part)) {
-        const nodeTextLength = getNodeTextLength(part)
-        if (nodeTextLength <= remaining) {
-          result.push(part)
-          remaining -= nodeTextLength
-        } else {
-          truncated = true
-          break
-        }
+      if (remaining <= 0) {
+        truncated = true
+        break
+      }
+
+      const nodeTextLength = getNodeTextLength(part)
+
+      if (nodeTextLength > remaining) {
+        const { node: truncatedNode } = truncateNodeText(part, remaining)
+        result.push(truncatedNode)
+        remaining = 0
+        truncated = true
+        break
       } else {
-        if (remaining <= 0) {
-          truncated = true
-          break
-        }
-
-        const nodeTextLength = getNodeTextLength(part)
-
-        if (nodeTextLength > remaining) {
-          const { node: truncatedNode } = truncateNodeText(part, remaining)
-          result.push(truncatedNode)
-          remaining = 0
-          truncated = true
-          break
-        } else {
-          result.push(part)
-          remaining -= nodeTextLength
-        }
+        result.push(part)
+        remaining -= nodeTextLength
       }
     }
   }

@@ -34,108 +34,110 @@ function useFormatMessage(
   contactsMap: any = {},
   getFromContacts: boolean = false
 ): void {
-  function processMentionsInPastedText(
-    pastedText: string,
-    activeChannelMembers: IMember[],
-    contactsMap: any,
-    getFromContacts: boolean,
-    setMentionedMember: (mentionedMember: any) => void,
-    selection: RangeSelection
-  ): void {
-    if (!pastedText) return
+  const processMentionsInPastedText = useCallback(
+    (
+      pastedText: string,
+      activeChannelMembers: IMember[],
+      contactsMap: any,
+      getFromContacts: boolean,
+      setMentionedMember: (mentionedMember: any) => void,
+      selection: RangeSelection
+    ): void => {
+      if (!pastedText) return
 
-    // Build contacts list - include contactsMap values if getFromContacts is true
-    const contacts = getFromContacts ? [...Object.values(contactsMap), ...activeChannelMembers] : activeChannelMembers
+      // Build contacts list - include contactsMap values if getFromContacts is true
+      const contacts = [...activeChannelMembers]
+      const mentionPatterns: Array<{ pattern: string; contact: any }> = []
+      contacts.forEach((contactOrMember: any) => {
+        const contactFromMap = contactsMap[contactOrMember.id]
 
-    const mentionPatterns: Array<{ pattern: string; contact: any }> = []
-    contacts.forEach((contactOrMember: any) => {
-      const contactFromMap = contactsMap[contactOrMember.id]
+        const contact = getFromContacts && contactFromMap ? contactFromMap : undefined
+        const member = contact ? undefined : contactOrMember
 
-      const contact = getFromContacts && contactFromMap ? contactFromMap : undefined
-      const member = contact ? undefined : contactOrMember
+        const fullDisplayName = makeUsername(contact, member, getFromContacts, false)
 
-      const fullDisplayName = makeUsername(contact, member, getFromContacts, false)
+        if (fullDisplayName && fullDisplayName !== 'Deleted user') {
+          mentionPatterns.push({
+            pattern: `@${fullDisplayName}`,
+            contact: contactOrMember
+          })
+        }
+      })
 
-      if (fullDisplayName && fullDisplayName !== 'Deleted user') {
-        mentionPatterns.push({
-          pattern: `@${fullDisplayName}`,
-          contact: contactOrMember
-        })
-      }
-    })
+      mentionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
 
-    mentionPatterns.sort((a, b) => b.pattern.length - a.pattern.length)
+      // Find all mention matches in the pasted text
+      const matches: Array<{ start: number; end: number; contact: any; pattern: string }> = []
+      const usedRanges: Array<{ start: number; end: number }> = []
 
-    // Find all mention matches in the pasted text
-    const matches: Array<{ start: number; end: number; contact: any; pattern: string }> = []
-    const usedRanges: Array<{ start: number; end: number }> = []
+      mentionPatterns.forEach(({ pattern, contact }) => {
+        let searchIndex = 0
+        while (true) {
+          const index = pastedText.indexOf(pattern, searchIndex)
+          if (index === -1) break
 
-    mentionPatterns.forEach(({ pattern, contact }) => {
-      let searchIndex = 0
-      while (true) {
-        const index = pastedText.indexOf(pattern, searchIndex)
-        if (index === -1) break
+          const isOverlapping = usedRanges.some((range) => index < range.end && index + pattern.length > range.start)
 
-        const isOverlapping = usedRanges.some((range) => index < range.end && index + pattern.length > range.start)
+          if (!isOverlapping) {
+            const charBefore = index > 0 ? pastedText[index - 1] : undefined
+            const isValidStart =
+              charBefore === undefined || charBefore === ' ' || charBefore === '\n' || charBefore === '\r'
 
-        if (!isOverlapping) {
-          const charBefore = index > 0 ? pastedText[index - 1] : undefined
-          const isValidStart =
-            charBefore === undefined || charBefore === ' ' || charBefore === '\n' || charBefore === '\r'
+            const charAfter = pastedText[index + pattern.length]
+            const isValidEnd = charAfter === undefined || charAfter === ' ' || charAfter === '\n' || charAfter === '\r'
 
-          const charAfter = pastedText[index + pattern.length]
-          const isValidEnd = charAfter === undefined || charAfter === ' ' || charAfter === '\n' || charAfter === '\r'
+            if (isValidStart && isValidEnd) {
+              matches.push({ start: index, end: index + pattern.length, contact, pattern })
+              usedRanges.push({ start: index, end: index + pattern.length })
+            }
+          }
+          searchIndex = index + 1
+        }
+      })
 
-          if (isValidStart && isValidEnd) {
-            matches.push({ start: index, end: index + pattern.length, contact, pattern })
-            usedRanges.push({ start: index, end: index + pattern.length })
+      // Sort matches by start position (ascending for left-to-right processing)
+      matches.sort((a, b) => a.start - b.start)
+
+      // Build nodes from the pasted text with mentions converted
+      const nodes: any[] = []
+      let currentIndex = 0
+
+      matches.forEach(({ start, end, contact, pattern }) => {
+        // Add text before the mention
+        if (start > currentIndex) {
+          const textBefore = pastedText.substring(currentIndex, start)
+          if (textBefore) {
+            nodes.push($createTextNode(textBefore))
           }
         }
-        searchIndex = index + 1
-      }
-    })
 
-    // Sort matches by start position (ascending for left-to-right processing)
-    matches.sort((a, b) => a.start - b.start)
+        // Add mention node
+        setMentionedMember(contact)
+        const mentionNode = $createMentionNode({ ...contact, name: pattern })
+        nodes.push(mentionNode)
 
-    // Build nodes from the pasted text with mentions converted
-    const nodes: any[] = []
-    let currentIndex = 0
+        currentIndex = end
+      })
 
-    matches.forEach(({ start, end, contact, pattern }) => {
-      // Add text before the mention
-      if (start > currentIndex) {
-        const textBefore = pastedText.substring(currentIndex, start)
-        if (textBefore) {
-          nodes.push($createTextNode(textBefore))
+      // Add remaining text after the last mention
+      if (currentIndex < pastedText.length) {
+        const remainingText = pastedText.substring(currentIndex)
+        if (remainingText) {
+          nodes.push($createTextNode(remainingText))
         }
       }
 
-      // Add mention node
-      setMentionedMember(contact)
-      const mentionNode = $createMentionNode({ ...contact, name: pattern })
-      nodes.push(mentionNode)
-
-      currentIndex = end
-    })
-
-    // Add remaining text after the last mention
-    if (currentIndex < pastedText.length) {
-      const remainingText = pastedText.substring(currentIndex)
-      if (remainingText) {
-        nodes.push($createTextNode(remainingText))
+      // Insert all nodes at the selection, replacing any selected content
+      if (matches.length === 0) {
+        // For plain text without mentions, use insertText which properly replaces selection
+        selection.insertText(pastedText)
+      } else if (nodes.length > 0) {
+        // For text with mentions, use insertNodes
+        selection.insertNodes(nodes)
       }
-    }
-
-    // Insert all nodes at the selection, replacing any selected content
-    if (matches.length === 0) {
-      // For plain text without mentions, use insertText which properly replaces selection
-      selection.insertText(pastedText)
-    } else if (nodes.length > 0) {
-      // For text with mentions, use insertNodes
-      selection.insertNodes(nodes)
-    }
-  }
+    },
+    [activeChannelMembers, contactsMap, getFromContacts, setMentionedMember]
+  )
 
   const handlePast = useCallback(
     (e: ClipboardEvent | KeyboardEvent | InputEvent) => {
@@ -143,7 +145,6 @@ function useFormatMessage(
       if (!('clipboardData' in e) || !e.clipboardData) {
         return false
       }
-
       const pastedText = e.clipboardData.getData('text/plain')
       if (pastedText) {
         // Process paste and mentions in a single update to create one undo step
@@ -164,7 +165,7 @@ function useFormatMessage(
       }
       return true
     },
-    [editor, contactsMap, setMentionedMember, getFromContacts, activeChannelMembers]
+    [editor, contactsMap, setMentionedMember, getFromContacts, activeChannelMembers, processMentionsInPastedText]
   )
 
   const onDelete = useCallback(
@@ -203,20 +204,7 @@ function useFormatMessage(
       editor.registerCommand(KEY_DELETE_COMMAND, onDelete, COMMAND_PRIORITY_LOW),
       editor.registerCommand(KEY_BACKSPACE_COMMAND, onDelete, COMMAND_PRIORITY_LOW)
     )
-    // log.info('selectedIndex. .> > >> > . . ', selectedIndex)
-    /* editor.registerCommand(
-      KEY_ENTER_COMMAND,
-      (event: KeyboardEvent | null) => {
-        if (event !== null) {
-          log.info('...>>>> preventDefault ...>>>>>')
-          event.preventDefault()
-          event.stopImmediatePropagation()
-        }
-        return true
-      },
-      COMMAND_PRIORITY_NORMAL
-    ) */
-  }, [])
+  }, [editor, handlePast, onDelete])
   useDidUpdate(() => {
     if (editorState) {
       editorState.read(() => {
