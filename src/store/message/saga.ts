@@ -532,17 +532,18 @@ function* sendMessage(action: IAction): any {
               createdAt: messageResponse.createdAt,
               channelId: channel.id
             }
-            const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
+            const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageResponse))
             const activeChannelId = getActiveChannelId()
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, stringifiedMessageUpdateData, true))
             }
             yield put(removePendingMessageAC(channel.id, messageToSend.tid as string))
-            addMessageToMap(channel.id, stringifiedMessageUpdateData)
             updateMessageOnAllMessages(messageToSend.tid as string, messageUpdateData)
-            updateChannelLastMessageOnAllChannels(channel.id, stringifiedMessageUpdateData)
+            const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+            addMessageToMap(channel.id, messageToUpdate)
+            updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
             const channelUpdateParam = {
-              lastMessage: stringifiedMessageUpdateData,
+              lastMessage: messageToUpdate,
               lastReactedMessage: null
             }
             if (channel.unread) {
