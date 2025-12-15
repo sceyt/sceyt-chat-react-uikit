@@ -158,7 +158,6 @@ const GroupsInCommonPopup = ({ theme, togglePopup, user }: IProps) => {
   )
 
   useEffect(() => {
-    console.log('connectionStatus', connectionStatus, 'mutualChannels', !mutualChannels?.length, 'user', user?.id)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED && !mutualChannels?.length) {
       if (user?.id) {
         dispatch(getChannelsWithUserAC(user.id))
