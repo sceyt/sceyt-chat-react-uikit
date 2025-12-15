@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useSelector, useDispatch } from 'store/hooks'
 
@@ -25,7 +25,8 @@ import {
   contactListSelector,
   contactsMapSelector,
   usersListSelector,
-  usersLoadingStateSelector
+  usersLoadingStateSelector,
+  usersMapSelector
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
@@ -64,6 +65,28 @@ interface IProps {
   popupWidth?: string
   popupHeight?: string
   handleOpenInviteModal?: () => void
+}
+
+const UserItem = ({ user, memberDisplayName }: { user: IUser; memberDisplayName: string }) => {
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const usersMap = useSelector(usersMapSelector)
+
+  const userUpdated = useMemo(() => {
+    return usersMap[user?.id] || user
+  }, [user, usersMap])
+
+  return (
+    <UserNamePresence>
+      <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
+      <SubTitle color={textSecondary}>
+        {userUpdated.presence && userUpdated.presence.state === USER_PRESENCE_STATUS.ONLINE
+          ? 'Online'
+          : userUpdated.presence &&
+            userUpdated.presence.lastActiveAt &&
+            userLastActiveDateFormat(userUpdated.presence.lastActiveAt)}
+      </SubTitle>
+    </UserNamePresence>
+  )
 }
 
 const UsersPopup = ({
@@ -399,17 +422,7 @@ const UsersPopup = ({
                     textSize={16}
                     setDefaultAvatar
                   />
-
-                  <UserNamePresence>
-                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
-                    <SubTitle color={textSecondary}>
-                      {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
-                        ? 'Online'
-                        : user.presence &&
-                          user.presence.lastActiveAt &&
-                          userLastActiveDateFormat(user.presence.lastActiveAt)}
-                    </SubTitle>
-                  </UserNamePresence>
+                  <UserItem user={user} memberDisplayName={memberDisplayName} />
                   {/* {isAdd && isSelected && (
                     <DropDown
                       withIcon
