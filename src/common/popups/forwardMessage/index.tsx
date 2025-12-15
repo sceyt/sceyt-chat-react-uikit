@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import styled from 'styled-components'
@@ -21,7 +21,7 @@ import { Avatar } from '../../../components'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
-import { contactsMapSelector } from '../../../store/user/selector'
+import { contactsMapSelector, usersMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import CustomCheckbox from '../../customCheckbox'
 
@@ -42,6 +42,51 @@ interface IProps {
   // eslint-disable-next-line no-unused-vars
   handleForward: (channelIds: string[]) => void
   loading?: boolean
+}
+
+const ChannelMembersItem = ({
+  channel,
+  directChannelUser,
+  isDirectChannel
+}: {
+  channel: IChannel
+  directChannelUser: IMember
+  isDirectChannel: boolean
+}) => {
+  const { [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const usersMap = useSelector(usersMapSelector)
+  const directChannelUserUpdated = useMemo(() => {
+    if (isDirectChannel) {
+      return usersMap[directChannelUser?.id] || directChannelUser
+    }
+    return directChannelUser
+  }, [isDirectChannel, directChannelUser, usersMap])
+
+  return (
+    <ChannelMembers color={textSecondary}>
+      {isDirectChannel && directChannelUserUpdated
+        ? (
+            hideUserPresence && hideUserPresence(directChannelUserUpdated)
+              ? ''
+              : directChannelUserUpdated.presence &&
+                directChannelUserUpdated.presence.state === USER_PRESENCE_STATUS.ONLINE
+          )
+          ? 'Online'
+          : directChannelUserUpdated &&
+            directChannelUserUpdated.presence &&
+            directChannelUserUpdated.presence.lastActiveAt &&
+            userLastActiveDateFormat(directChannelUserUpdated.presence.lastActiveAt)
+        : `${channel?.memberCount} ${
+            channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
+              ? channel?.memberCount > 1
+                ? 'subscribers'
+                : 'subscriber'
+              : channel?.memberCount > 1
+                ? 'members'
+                : 'member'
+          } `}
+    </ChannelMembers>
+  )
 }
 
 function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
@@ -260,30 +305,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                                     : 'Deleted User'
                                 : channel.subject}
                             </ChannelTitle>
-                            <ChannelMembers color={textSecondary}>
-                              {isDirectChannel && directChannelUser
-                                ? (
-                                    hideUserPresence && hideUserPresence(directChannelUser)
-                                      ? ''
-                                      : directChannelUser.presence &&
-                                        directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                                  )
-                                  ? 'Online'
-                                  : directChannelUser &&
-                                    directChannelUser.presence &&
-                                    directChannelUser.presence.lastActiveAt &&
-                                    userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
-                                : `${channel?.memberCount} ${
-                                    channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
-                                    channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
-                                      ? channel?.memberCount > 1
-                                        ? 'subscribers'
-                                        : 'subscriber'
-                                      : directChannelUser?.memberCount > 1
-                                        ? 'members'
-                                        : 'member'
-                                  } `}
-                            </ChannelMembers>
+                            <ChannelMembersItem
+                              channel={channel}
+                              directChannelUser={directChannelUser}
+                              isDirectChannel={isDirectChannel}
+                            />
                           </ChannelInfo>
                           <CustomCheckbox
                             borderColor={iconInactive}
@@ -307,6 +333,16 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     <ChannelsGroupTitle color={textSecondary}>Channels</ChannelsGroupTitle>
                     {searchedChannels.channels.map((channel: IChannel) => {
                       const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
+                      const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+                      const isSelfChannel =
+                        isDirectChannel &&
+                        channel.memberCount === 1 &&
+                        channel.members.length > 0 &&
+                        channel.members[0].id === user.id
+                      const directChannelUser =
+                        isDirectChannel && isSelfChannel
+                          ? user
+                          : channel.members.find((member: IMember) => member.id !== user.id)
                       return (
                         <ChannelItem
                           key={channel.id}
@@ -323,18 +359,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           />
                           <ChannelInfo>
                             <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
-                            <ChannelMembers color={textSecondary}>
-                              {`${channel.memberCount} ${
-                                channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
-                                channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
-                                  ? channel.memberCount > 1
-                                    ? 'subscribers'
-                                    : 'subscriber'
-                                  : channel.memberCount > 1
-                                    ? 'members'
-                                    : 'member'
-                              } `}
-                            </ChannelMembers>
+                            <ChannelMembersItem
+                              channel={channel}
+                              directChannelUser={directChannelUser}
+                              isDirectChannel={isDirectChannel}
+                            />
                           </ChannelInfo>
                           <CustomCheckbox
                             borderColor={iconInactive}
@@ -400,30 +429,11 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                               ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                               : '')}
                       </ChannelTitle>
-                      <ChannelMembers color={textSecondary}>
-                        {isDirectChannel && directChannelUser
-                          ? (
-                              hideUserPresence && hideUserPresence(directChannelUser)
-                                ? ''
-                                : directChannelUser.presence &&
-                                  directChannelUser.presence.state === USER_PRESENCE_STATUS.ONLINE
-                            )
-                            ? 'Online'
-                            : directChannelUser &&
-                              directChannelUser.presence &&
-                              directChannelUser.presence.lastActiveAt &&
-                              userLastActiveDateFormat(directChannelUser.presence.lastActiveAt)
-                          : `${channel.memberCount} ${
-                              channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST ||
-                              channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
-                                ? channel.memberCount > 1
-                                  ? 'subscribers'
-                                  : 'subscriber'
-                                : channel.memberCount > 1
-                                  ? 'members'
-                                  : 'member'
-                            } `}
-                      </ChannelMembers>
+                      <ChannelMembersItem
+                        channel={channel}
+                        directChannelUser={directChannelUser}
+                        isDirectChannel={isDirectChannel}
+                      />
                     </ChannelInfo>
                     <CustomCheckbox
                       borderColor={iconInactive}
