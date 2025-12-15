@@ -1264,7 +1264,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   useEffect(() => {
     if (
       messageText.trim() ||
-      (editMessageText.trim() && editMessageText && editMessageText.trim() !== messageToEdit.body) ||
+      (editMessageText?.trim() && editMessageText && editMessageText?.trim() !== messageToEdit?.body) ||
       attachments.length
     ) {
       if (attachments.length) {
