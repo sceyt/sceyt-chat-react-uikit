@@ -1932,6 +1932,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 getFromContacts={getFromContacts}
                                 members={activeChannelMembers}
                                 setMentionsIsOpen={setMentionsIsOpen}
+                                channelId={activeChannel?.id}
                               />
                             )}
                             <HistoryPlugin />
