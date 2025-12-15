@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import styled from 'styled-components'
@@ -21,7 +21,7 @@ import { Avatar } from '../../../components'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
-import { contactsMapSelector, usersMapSelector } from '../../../store/user/selector'
+import { contactsMapSelector } from '../../../store/user/selector'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import CustomCheckbox from '../../customCheckbox'
 
@@ -29,7 +29,7 @@ import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getClient } from '../../client'
 import PopupContainer from '../popupContainer'
-import { useColor } from '../../../hooks'
+import { useColor, useUpdatedUser } from '../../../hooks'
 interface ISelectedChannelsData {
   id: string
   displayName: string
@@ -54,13 +54,9 @@ const ChannelMembersItem = ({
   isDirectChannel: boolean
 }) => {
   const { [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
-  const usersMap = useSelector(usersMapSelector)
-  const directChannelUserUpdated = useMemo(() => {
-    if (isDirectChannel) {
-      return usersMap[directChannelUser?.id] || directChannelUser
-    }
-    return directChannelUser
-  }, [isDirectChannel, directChannelUser, usersMap])
+  // Always call the hook, but only use the updated value for direct channels
+  const updatedUser = useUpdatedUser(directChannelUser)
+  const directChannelUserUpdated = isDirectChannel ? updatedUser : directChannelUser
 
   return (
     <ChannelMembers color={textSecondary}>

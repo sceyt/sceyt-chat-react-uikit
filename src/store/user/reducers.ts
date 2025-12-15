@@ -54,7 +54,8 @@ const userSlice = createSlice({
     },
 
     updateUserMap: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
-      state.updatedUserMap = action.payload.usersMap
+      // Merge updates instead of replacing the entire map
+      state.updatedUserMap = { ...state.updatedUserMap, ...action.payload.usersMap }
     },
 
     setContacts: (state, action: PayloadAction<{ contacts: IContact[] }>) => {

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
 import { useSelector, useDispatch } from 'store/hooks'
 
@@ -25,15 +25,14 @@ import {
   contactListSelector,
   contactsMapSelector,
   usersListSelector,
-  usersLoadingStateSelector,
-  usersMapSelector
+  usersLoadingStateSelector
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate, useColor } from '../../../hooks'
+import { useDidUpdate, useColor, useUpdatedUser } from '../../../hooks'
 import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap,
@@ -69,11 +68,7 @@ interface IProps {
 
 const UserItem = ({ user, memberDisplayName }: { user: IUser; memberDisplayName: string }) => {
   const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
-  const usersMap = useSelector(usersMapSelector)
-
-  const userUpdated = useMemo(() => {
-    return usersMap[user?.id] || user
-  }, [user, usersMap])
+  const userUpdated = useUpdatedUser(user)
 
   return (
     <UserNamePresence>
