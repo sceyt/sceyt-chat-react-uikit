@@ -55,6 +55,14 @@ const MessageStatusIcon = ({
   accentColor?: string
 }) => {
   switch (messageStatus) {
+    case MESSAGE_DELIVERY_STATUS.PLAYED:
+      return messageStatusDisplayingType === 'ticks' ? (
+        <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor} />
+      ) : (
+        <StatusText fontSize={size} color={color}>
+          • Seen
+        </StatusText>
+      )
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
         <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor} />
