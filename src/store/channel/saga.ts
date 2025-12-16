@@ -181,6 +181,12 @@ function* createChannel(action: IAction): any {
     } else {
       createdChannel = yield call(SceytChatClient.Channel.create, createChannelData)
     }
+    const whoDoesNotAdded = channelData.members.filter(
+      (mem: IMember) => !createdChannel.members.some((addedMem: IMember) => addedMem.id === mem.id)
+    )
+    if (whoDoesNotAdded.length) {
+      yield put(setActionIsRestrictedAC(true, false, whoDoesNotAdded))
+    }
     let checkChannelExist = false
     if (createdChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
       checkChannelExist = yield call(checkChannelExists, createdChannel.id)
@@ -247,9 +253,6 @@ function* createChannel(action: IAction): any {
       yield call(setActiveChannelId, createdChannel.id)
     }
   } catch (e) {
-    if (e.code === 1041) {
-      yield put(setActionIsRestrictedAC(true, false, null))
-    }
     log.error(e, 'Error on create channel')
     // yield put(setErrorNotification(e.message))
   }

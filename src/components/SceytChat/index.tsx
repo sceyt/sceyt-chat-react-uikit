@@ -374,7 +374,13 @@ const SceytChat = ({
         >
           {children}
           {embeddedJoinGroupPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
-          {restricted?.isRestricted && <ActionRestrictedPopup fromChannel={restricted?.fromChannel} />}
+          {restricted?.isRestricted && (
+            <ActionRestrictedPopup
+              fromChannel={restricted?.fromChannel}
+              members={restricted?.members}
+              contactsMap={contactsMap}
+            />
+          )}
           {!channelInviteKeyAvailable && <UnavailableInviteKeyPopup />}
         </ChatContainer>
       ) : (

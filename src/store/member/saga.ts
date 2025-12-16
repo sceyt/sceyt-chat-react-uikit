@@ -108,19 +108,27 @@ function* addMembers(action: IAction): any {
       })
 
       const addedMembers = yield call(channel.addMembers, membersToAdd)
+      const whoDoesNotAdded = members.filter(
+        (mem: IMember) => !addedMembers.some((addedMem: IMember) => addedMem.id === mem.id)
+      )
+      if (whoDoesNotAdded.length) {
+        yield put(setActionIsRestrictedAC(true, true, whoDoesNotAdded))
+      }
       if (channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE) {
         const membersIds: string[] = []
         addedMembers.forEach((mem: IMember) => {
           membersIds.push(mem.id)
         })
-        const messageToSend: any = {
-          metadata: { m: membersIds },
-          body: 'AM',
-          mentionedUsers: getDisableFrowardMentionsCount() ? [] : addedMembers,
-          attachments: [],
-          type: 'system'
+        if (membersIds.length) {
+          const messageToSend: any = {
+            metadata: { m: membersIds },
+            body: 'AM',
+            mentionedUsers: getDisableFrowardMentionsCount() ? [] : addedMembers,
+            attachments: [],
+            type: 'system'
+          }
+          yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
         }
-        yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
       }
       yield put(addMembersToListAC(addedMembers))
       updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount + addedMembers.length })
@@ -134,9 +142,6 @@ function* addMembers(action: IAction): any {
       )
     }
   } catch (e) {
-    if (e.code === 1041) {
-      yield put(setActionIsRestrictedAC(true, true, action?.payload?.members || []))
-    }
     log.error('error on add members... ', e)
     // yield put(setErrorNotification(e.message))
   }
