@@ -122,7 +122,8 @@ const GroupsInCommonPopup = ({ theme, togglePopup, user }: IProps) => {
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered
+    [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const contactsMap: { [key: string]: IContact } = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -192,7 +193,7 @@ const GroupsInCommonPopup = ({ theme, togglePopup, user }: IProps) => {
             className={isScrolling ? 'show-scrollbar' : ''}
             onMouseEnter={() => setIsScrolling(true)}
             onMouseLeave={() => setIsScrolling(false)}
-            thumbColor={background}
+            thumbColor={surface2}
           >
             {isLoadingInitial ? (
               <LoadingText color={textSecondary}>Loading...</LoadingText>
@@ -233,21 +234,19 @@ const ChannelsList = styled.div<{ thumbColor: string }>`
   overflow-x: hidden;
 
   &::-webkit-scrollbar {
-    width: 6px;
+    width: 8px;
+    background: transparent;
   }
-
-  &::-webkit-scrollbar-track {
+  &::-webkit-scrollbar-thumb {
     background: transparent;
   }
 
-  &::-webkit-scrollbar-thumb {
-    background: ${(props) => props.thumbColor};
-    border-radius: 3px;
-    opacity: 0.3;
-  }
-
   &.show-scrollbar::-webkit-scrollbar-thumb {
-    opacity: 0.6;
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
   }
 `
 
