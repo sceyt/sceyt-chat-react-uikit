@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -20,7 +20,7 @@ import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
 import { copyToClipboard } from '../../helpers/clipboard'
-import { makeUsername } from '../../helpers/message'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
@@ -289,6 +289,13 @@ const Details = ({
     }
   }
 
+  const channelMetadata = useMemo(() => {
+    if (isJSON(activeChannel?.metadata)) {
+      return JSON.parse(activeChannel?.metadata)
+    }
+    return activeChannel?.metadata
+  }, [activeChannel])
+
   return (
     <Container
       backgroundColor={backgroundColor}
@@ -414,12 +421,10 @@ const Details = ({
             </ChannelInfo>
           </ChannelAvatarAndName>
 
-          {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
+          {showAboutChannel && activeChannel && channelMetadata && channelMetadata?.d && (
             <AboutChannel>
               {showAboutChannelTitle && <AboutChannelTitle color={textFootnote}>About</AboutChannelTitle>}
-              <AboutChannelText color={textPrimary}>
-                {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
-              </AboutChannelText>
+              <AboutChannelText color={textPrimary}>{channelMetadata?.d ? channelMetadata?.d : ''}</AboutChannelText>
             </AboutChannel>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}

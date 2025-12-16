@@ -1047,12 +1047,6 @@ function* switchChannel(action: IAction): any {
       }
       yield put(setActiveChannelAC({ ...channelToSwitch }))
     }
-    // yield put(switchTypingIndicatorAC(false))
-    // yield put(setMessageForThreadReply(undefined));
-    // yield put(deleteThreadReplyMessagesAC());
-    if (channel) {
-      // yield put(getMessagesAC(channel))
-    }
   } catch (e) {
     log.error('error in switch channel', e)
     // yield put(setErrorNotification(e.message));
