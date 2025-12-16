@@ -1,4 +1,4 @@
-import { put, call, spawn, takeLatest, takeEvery } from 'redux-saga/effects'
+import { put, call, spawn, takeLatest, takeEvery, delay } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
@@ -1238,15 +1238,9 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
       } else {
         if (cachedMessages && cachedMessages.length) {
-          const parsedMessages = getFromAllMessagesByMessageId('', '', true)
-          setMessagesToMap(
-            channel.id,
-            parsedMessages,
-            parsedMessages[0]?.id,
-            parsedMessages[parsedMessages.length - 1]?.id
-          )
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(parsedMessages))))
-          const filteredPendingMessages = getFilteredPendingMessages(parsedMessages)
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
+          yield delay(0)
+          const filteredPendingMessages = getFilteredPendingMessages(cachedMessages)
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         }
         log.info('load message from server')
@@ -1274,9 +1268,11 @@ function* getMessagesQuery(action: IAction): any {
           channel?.lastDisplayedMessageId > channel?.lastMessage?.id
             ? channel?.lastDisplayedMessageId || '0'
             : channel?.lastMessage?.id || '0'
-        yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
-        yield put(setMessagesHasPrevAC(true))
-        yield put(setMessagesHasNextAC(false))
+        if (updatedMessages.length) {
+          yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
+          yield put(setMessagesHasPrevAC(true))
+          yield put(setMessagesHasNextAC(false))
+        }
       }
       const filteredPendingMessages = getFilteredPendingMessages(result.messages)
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))

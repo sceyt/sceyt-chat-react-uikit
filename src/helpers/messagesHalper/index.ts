@@ -273,6 +273,9 @@ export function setMessagesToMap(
     }
   }
   messages.forEach((msg: IMessage) => {
+    if (msg.tid && messagesMap[channelId][msg.tid]) {
+      delete messagesMap[channelId][msg.tid]
+    }
     messagesMap[channelId][msg.id || msg.tid!] = msg
   })
 }
