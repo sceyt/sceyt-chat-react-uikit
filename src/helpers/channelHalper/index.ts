@@ -19,6 +19,8 @@ let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
 const allChannelsMap: channelMap = {}
+const pendingDeleteChannelMap: { [key: string]: IChannel } = {}
+
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
@@ -214,8 +216,16 @@ export function getChannelFromMap(channelId: string) {
   return channelsMap[channelId]
 }
 
-export function getLastChannelFromMap() {
-  return Object.values(channelsMap)[0]
+export function getLastChannelFromMap(deletePending: boolean = false) {
+  const channels = Object.values(channelsMap)
+  if (deletePending) {
+    for (const channel of channels) {
+      if (!getPendingDeleteChannel(channel.id)) {
+        return channel
+      }
+    }
+  }
+  return channels[0]
 }
 
 export function removeChannelFromMap(channelId: string) {
@@ -450,4 +460,20 @@ export const sortChannelByLastMessage = (channels: IChannel[]) => {
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     }
   })
+}
+
+export const setPendingDeleteChannel = (channel: IChannel) => {
+  pendingDeleteChannelMap[channel?.id] = channel
+}
+
+export const getPendingDeleteChannel = (channelId: string) => {
+  return pendingDeleteChannelMap[channelId]
+}
+
+export const getPendingDeleteChannels = () => {
+  return Object.values(pendingDeleteChannelMap)
+}
+
+export const removePendingDeleteChannel = (channelId: string) => {
+  delete pendingDeleteChannelMap[channelId]
 }

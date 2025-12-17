@@ -1282,6 +1282,8 @@ function* getMessagesQuery(action: IAction): any {
           yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
           yield put(setMessagesHasPrevAC(true))
           yield put(setMessagesHasNextAC(false))
+        } else if (!cachedMessages?.length && !result.messages?.length) {
+          yield put(setMessagesAC([]))
         }
       }
       const filteredPendingMessages = getFilteredPendingMessages(result.messages)

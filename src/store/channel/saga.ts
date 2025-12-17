@@ -87,7 +87,10 @@ import {
   getAutoSelectFitsChannel,
   getChannelTypesFilter,
   addChannelToAllChannels,
-  getOnUpdateChannel
+  getOnUpdateChannel,
+  setPendingDeleteChannel,
+  getPendingDeleteChannels,
+  removePendingDeleteChannel
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -116,6 +119,7 @@ import { updateUserOnMap, usersMap } from '../../helpers/userHelper'
 import log from 'loglevel'
 import { queryDirection } from 'store/message/constants'
 import store from 'store'
+import { isResendableError } from 'helpers/error'
 
 function* createChannel(action: IAction): any {
   try {
@@ -263,6 +267,7 @@ function* getChannels(action: IAction): any {
   try {
     const { payload } = action
     const { params } = payload
+    yield call(deletePendingDeleteChannels)
     log.info(`${new Date().toISOString()} [getChannels] input params: ${JSON.stringify(params)}`)
     const SceytChatClient = getClient()
     const connectionStatus = store.getState().UserReducer.connectionStatus
@@ -1256,6 +1261,26 @@ function* leaveChannel(action: IAction): any {
   }
 }
 
+function* deletePendingDeleteChannels() {
+  const pendingDeleteChannels = getPendingDeleteChannels()
+  for (const channel of pendingDeleteChannels) {
+    try {
+      yield call(channel.delete)
+      yield put(setChannelToRemoveAC(channel))
+
+      yield put(removeChannelAC(channel.id))
+
+      yield put(removeChannelCachesAC(channel.id))
+      removePendingDeleteChannel(channel.id)
+    } catch (error) {
+      const resendableError = isResendableError(error?.type)
+      if (!resendableError) {
+        removePendingDeleteChannel(channel.id)
+      }
+    }
+  }
+}
+
 function* deleteChannel(action: IAction): any {
   try {
     const { payload } = action
@@ -1264,6 +1289,15 @@ function* deleteChannel(action: IAction): any {
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
       channel = getChannelFromAllChannels(channelId)
+    }
+    if (store.getState().UserReducer.connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+      setPendingDeleteChannel(channel)
+      const activeChannelId = yield call(getActiveChannelId)
+      if (activeChannelId === channelId) {
+        const lastChannel = yield call(getLastChannelFromMap, true)
+        yield put(switchChannelActionAC(lastChannel || null))
+      }
+      return
     }
     if (channel) {
       yield call(channel.delete)
