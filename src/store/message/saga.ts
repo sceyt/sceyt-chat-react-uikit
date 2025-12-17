@@ -268,7 +268,7 @@ const updateMessage = function* (
           }
         }
       } else if (channel?.id) {
-        yield put(getMessagesAC(channel, false, channel?.lastMessage?.id, undefined, false, 'smooth', true))
+        yield put(getMessagesAC(channel, true, channel?.lastMessage?.id, undefined, false, 'smooth', true))
       }
     }
   }
@@ -1216,9 +1216,10 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setUnreadScrollToAC(true))
       } else {
         if (cachedMessages && cachedMessages.length) {
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
+          const messages = getFromAllMessagesByMessageId('', '', true)
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
           yield delay(0)
-          const filteredPendingMessages = getFilteredPendingMessages(cachedMessages)
+          const filteredPendingMessages = getFilteredPendingMessages(messages)
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         }
         log.info('load message from server')
