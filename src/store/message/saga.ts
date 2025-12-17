@@ -35,6 +35,7 @@ import {
   addChannelToAllChannels,
   getActiveChannelId,
   getChannelFromAllChannels,
+  getChannelFromAllChannelsMap,
   getChannelFromMap,
   getDisableFrowardMentionsCount,
   query,
@@ -283,6 +284,9 @@ function* sendMessage(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)!
       if (channel) {
         setChannelInMap(channel)
+      }
+      if (!channel) {
+        channel = getChannelFromAllChannelsMap(channelId)!
       }
     }
     if (channel.isMockChannel) {
@@ -556,9 +560,9 @@ function* sendMessage(action: IAction): any {
           }
         } catch (e) {
           const isErrorResendable = isResendableError(e?.type)
-          if (!isErrorResendable) {
+          if (!isErrorResendable && channel?.id && messageToSend?.tid) {
             yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
-          } else {
+          } else if (channel?.id) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
             if (messageToSend.attachments && messageToSend.attachments.length) {
               yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
@@ -593,6 +597,9 @@ function* sendTextMessage(action: IAction): any {
     channel = getChannelFromAllChannels(channelId)!
     if (channel) {
       setChannelInMap(channel)
+    }
+    if (!channel) {
+      channel = getChannelFromAllChannelsMap(channelId)!
     }
   }
 
@@ -717,9 +724,9 @@ function* sendTextMessage(action: IAction): any {
   } catch (e) {
     log.error('error on send text message ... ', e?.type)
     const isErrorResendable = isResendableError(e?.type)
-    if (!isErrorResendable && channel.id && sendMessageTid) {
+    if (!isErrorResendable && channel?.id && sendMessageTid) {
       yield put(removePendingMessageAC(channel.id, sendMessageTid!))
-    } else if (channel.id && sendMessageTid) {
+    } else if (channel?.id && sendMessageTid) {
       updateMessageOnMap(channel.id, {
         messageId: sendMessageTid,
         params: { state: MESSAGE_STATUS.FAILED }
@@ -754,6 +761,9 @@ function* forwardMessage(action: IAction): any {
       }
       if (channel) {
         setChannelInMap(channel)
+      }
+      if (!channel) {
+        channel = getChannelFromAllChannelsMap(channelId)!
       }
     }
     if (!channel) {
@@ -877,10 +887,10 @@ function* forwardMessage(action: IAction): any {
     }
   } catch (e) {
     const isErrorResendable = isResendableError(e?.type)
-    if (!isErrorResendable) {
+    if (!isErrorResendable && channel?.id && messageTid) {
       yield put(removePendingMessageAC(channel!.id, messageTid!))
     } else {
-      if (channel && messageTid) {
+      if (channel?.id && messageTid) {
         updateMessageOnMap(channel.id, {
           messageId: messageTid!,
           params: { state: MESSAGE_STATUS.FAILED }
@@ -1283,7 +1293,7 @@ function* getMessagesQuery(action: IAction): any {
         yield spawn(sendPendingMessages, connectionState)
       }
       const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
-      if (updatedChannel) {
+      if (updatedChannel && updatedChannel?.lastMessage) {
         yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
         updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
       }

@@ -18,6 +18,7 @@ type defaultRolesByChannelTypesMap = {
 let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
+const allChannelsMap: channelMap = {}
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
@@ -175,6 +176,7 @@ export function getInviteLinkOptions(): InviteLinkOptions | null {
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
+  allChannelsMap[channel.id] = { ...channel }
 }
 
 export function setActiveChannelId(id: string) {
@@ -202,7 +204,7 @@ export function setChannelsInMap(channels: IChannel[]) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
     channelsMap[channel.id] = { ...channel }
-
+    allChannelsMap[channel.id] = { ...channel }
     return channel
   })
   return { channels: JSON.parse(JSON.stringify(formattedChannel)), channelsForUpdateLastReactionMessage }
@@ -218,6 +220,7 @@ export function getLastChannelFromMap() {
 
 export function removeChannelFromMap(channelId: string) {
   delete channelsMap[channelId]
+  delete allChannelsMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
@@ -327,6 +330,10 @@ export function getChannelFromAllChannels(channelId: string) {
   return allChannels.find((channel) => channel.id === channelId)
 }
 
+export function getChannelFromAllChannelsMap(channelId: string) {
+  return allChannelsMap[channelId]
+}
+
 export function deleteChannelFromAllChannels(channelId: string) {
   allChannels = allChannels.filter((channel) => channel.id !== channelId)
 }
@@ -339,6 +346,7 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
         if (chan.id === channelId) {
           // update channel on channel map
           channelsMap[channelId] = { ...chan, lastMessage: message }
+          allChannelsMap[channelId] = { ...chan, lastMessage: message }
           // update channel on all channels
           return { ...chan, lastMessage: message }
         }
@@ -359,6 +367,7 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
       updateChannel = { ...updateChannel, lastMessage: updateMessage }
       // update channel on channel map
       channelsMap[channelId] = updateChannel
+      allChannelsMap[channelId] = updateChannel
       // update channel on all channels
       allChannels = [updateChannel, ...updatedChannels]
     }
@@ -383,6 +392,7 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
   })
   if (channelsMap[channelId]) {
     channelsMap[channelId] = { ...channelsMap[channelId], ...config }
+    allChannelsMap[channelId] = { ...channelsMap[channelId], ...config }
   }
 }
 

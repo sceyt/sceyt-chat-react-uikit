@@ -259,22 +259,22 @@ function* createChannel(action: IAction): any {
 }
 
 function* getChannels(action: IAction): any {
-  log.info('[getChannels] start get channels')
+  log.info(`${new Date().toISOString()} [getChannels] start get channels`)
   try {
     const { payload } = action
     const { params } = payload
-    log.info('[getChannels] input params:', JSON.stringify(params))
+    log.info(`${new Date().toISOString()} [getChannels] input params: ${JSON.stringify(params)}`)
     const SceytChatClient = getClient()
     const connectionStatus = store.getState().UserReducer.connectionStatus
-    log.info('[getChannels] connection status:', connectionStatus)
+    log.info(`${new Date().toISOString()} [getChannels] connection status: ${connectionStatus}`)
     if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
-      log.warn('[getChannels] connection not ready, aborting. Status:', connectionStatus)
+      log.warn(`${new Date().toISOString()} [getChannels] connection not ready, aborting. Status: ${connectionStatus}`)
       return
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
     const channelQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     const channelTypesFilter = getChannelTypesFilter()
-    log.info('[getChannels] channelTypesFilter:', JSON.stringify(channelTypesFilter))
+    log.info(`${new Date().toISOString()} [getChannels] channelTypesFilter: ${JSON.stringify(channelTypesFilter)}`)
     let types: string[] = []
     if (channelTypesFilter?.length) {
       types = channelTypesFilter
@@ -282,50 +282,52 @@ function* getChannels(action: IAction): any {
     if (params?.filter?.channelType) {
       types.push(params.filter.channelType)
     }
-    log.info('[getChannels] final types array:', JSON.stringify(types))
+    log.info(`${new Date().toISOString()} [getChannels] final types array: ${JSON.stringify(types)}`)
     if (types?.length) {
       channelQueryBuilder.types(types)
     }
     if (params.memberCount) {
-      log.info('[getChannels] setting memberCount filter:', params?.memberCount)
+      log.info(`${new Date().toISOString()} [getChannels] setting memberCount filter: ${params?.memberCount}`)
       channelQueryBuilder.memberCount(params.memberCount)
     }
     channelQueryBuilder.order('lastMessage')
     const limit = params.limit || 50
-    log.info('[getChannels] query limit:', limit)
+    log.info(`${new Date().toISOString()} [getChannels] query limit: ${limit}`)
     channelQueryBuilder.limit(limit)
     const channelQuery = yield call(channelQueryBuilder.build)
-    log.info('[getChannels] query built successfully')
+    log.info(`${new Date().toISOString()} [getChannels] query built successfully`)
     const channelsData = yield call(channelQuery.loadNextPage)
     const channelList = channelsData.channels
     log.info(
-      '[getChannels] channelsData received:',
-      JSON.stringify({
+      `${new Date().toISOString()} [getChannels] channelsData received: ${JSON.stringify({
         channelsCount: channelList?.length || 0,
         hasNext: channelsData.hasNext
-      })
+      })}`
     )
     yield put(channelHasNextAC(channelsData.hasNext))
     const channelId = yield call(getActiveChannelId)
-    log.info('[getChannels] active channelId:', channelId)
+    log.info(`${new Date().toISOString()} [getChannels] active channelId: ${channelId}`)
     let activeChannel = channelId ? yield call(getChannelFromMap, channelId) : null
-    log.info('[getChannels] activeChannel from map:', activeChannel ? activeChannel?.id : 'null')
+    log.info(
+      `${new Date().toISOString()} [getChannels] activeChannel from map: ${activeChannel ? activeChannel?.id : 'null'}`
+    )
     yield call(destroyChannelsMap)
-    log.info('[getChannels] channels map destroyed')
+    log.info(`${new Date().toISOString()} [getChannels] channels map destroyed`)
 
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
     log.info(
-      '[getChannels] setChannelsInMap result:',
-      JSON.stringify({
+      `${new Date().toISOString()} [getChannels] setChannelsInMap result: ${JSON.stringify({
         mappedChannelsCount: mappedChannels?.length || 0,
         channelsForUpdateLastReactionMessageCount: channelsForUpdateLastReactionMessage?.length || 0
-      })
+      })}`
     )
-    log.info('channelsForUpdateLastReactionMessage', channelsForUpdateLastReactionMessage?.length)
+    log.info(
+      `${new Date().toISOString()} channelsForUpdateLastReactionMessage: ${channelsForUpdateLastReactionMessage?.length}`
+    )
     if (channelsForUpdateLastReactionMessage?.length) {
       log.info(
-        '[getChannels] processing channels for reaction message update:',
-        channelsForUpdateLastReactionMessage?.length
+        `${new Date().toISOString()} [getChannels] processing channels for
+        reaction message update: ${channelsForUpdateLastReactionMessage?.length}`
       )
       const channelMessageMap: { [key: string]: IMessage } = {}
       yield call(async () => {
@@ -337,11 +339,13 @@ function* getChannels(action: IAction): any {
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
                   channelMessageMap[channel?.id] = messages[0]
-                  log.info('[getChannels] successfully fetched reaction message for channel:', channel?.id)
+                  log.info(
+                    `${new Date().toISOString()} [getChannels] successfully fetched reaction message for channel: ${channel?.id}`
+                  )
                   resolve(true)
                 })
                 .catch((e) => {
-                  log.error(e, 'Error on getMessagesById for channel:', channel?.id)
+                  log.error(e, `Error on getMessagesById for channel: ${channel?.id}`)
                   resolve(true)
                 })
             })
@@ -349,7 +353,9 @@ function* getChannels(action: IAction): any {
         )
       })
       log.info(
-        '[getChannels] reaction messages fetched:',
+        `${new Date().toISOString()} [getChannels] reaction messages fetched: ${
+          channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
+        }`,
         channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
       )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
@@ -358,37 +364,47 @@ function* getChannels(action: IAction): any {
         }
         return channel
       })
-      log.info('[getChannels] mappedChannels updated with reaction messages, final count:', mappedChannels?.length || 0)
+      log.info(
+        `${new Date().toISOString()} [getChannels] mappedChannels updated with reaction messages, final count: ${
+          mappedChannels?.length || 0
+        }`
+      )
     }
-    log.info('[getChannels] setting channels in state, count:', mappedChannels?.length || 0)
+    log.info(
+      `${new Date().toISOString()} [getChannels] setting channels in state, count: ${mappedChannels?.length || 0}`
+    )
     yield put(setChannelsAC(mappedChannels))
     if (!channelId) {
       ;[activeChannel] = channelList
-      log.info('[getChannels] no active channelId, setting first channel as active:', activeChannel?.id)
+      log.info(
+        `${new Date().toISOString()} [getChannels] no active channelId, setting first channel as active: ${activeChannel?.id}`
+      )
     }
     query.channelQuery = channelQuery
     if (activeChannel && getAutoSelectFitsChannel()) {
-      log.info('[getChannels] auto-selecting channel:', activeChannel?.id)
+      log.info(`${new Date().toISOString()} [getChannels] auto-selecting channel: ${activeChannel?.id}`)
       yield put(switchChannelActionAC(JSON.parse(JSON.stringify(activeChannel))))
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
     const hiddenList = store.getState().ChannelReducer.hideChannelList
-    log.info('[getChannels] hiddenList state:', hiddenList)
+    log.info(`${new Date().toISOString()} [getChannels] hiddenList state: ${hiddenList}`)
     if (!hiddenList) {
-      log.info('[getChannels] starting all channels query (hiddenList is false)')
+      log.info(`${new Date().toISOString()} [getChannels] starting all channels query (hiddenList is false)`)
       const allChannelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
       allChannelsQueryBuilder.order('lastMessage')
       if (channelTypesFilter?.length) {
         allChannelsQueryBuilder.types(channelTypesFilter)
-        log.info('[getChannels] allChannelsQuery types:', JSON.stringify(channelTypesFilter))
+        log.info(
+          `${new Date().toISOString()} [getChannels] allChannelsQuery types: ${JSON.stringify(channelTypesFilter)}`
+        )
       }
       if (params?.memberCount) {
         allChannelsQueryBuilder.memberCount(params.memberCount)
-        log.info('[getChannels] allChannelsQuery memberCount:', params?.memberCount)
+        log.info(`${new Date().toISOString()} [getChannels] allChannelsQuery memberCount: ${params?.memberCount}`)
       }
       allChannelsQueryBuilder.limit(50)
       const allChannelsQuery = yield call(allChannelsQueryBuilder.build)
-      log.info('[getChannels] allChannelsQuery built')
+      log.info(`${new Date().toISOString()} [getChannels] allChannelsQuery built`)
       let hasNext = true
       let totalAllChannelsAdded = 0
       for (let i = 0; i <= 4; i++) {
@@ -396,15 +412,17 @@ function* getChannels(action: IAction): any {
           try {
             const connectionStatus = store.getState().UserReducer.connectionStatus
             if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
-              log.warn('[getChannels] connection not ready, aborting. Status:', connectionStatus)
+              log.warn(
+                `${new Date().toISOString()} [getChannels] connection not ready, aborting. Status: ${connectionStatus}`
+              )
               break
             }
-            log.info('[getChannels] loading all channels page:', i + 1)
+            log.info(`${new Date().toISOString()} [getChannels] loading all channels page: ${i + 1}`)
             const allChannelsData = yield call(allChannelsQuery.loadNextPage)
             hasNext = allChannelsData.hasNext
             const allChannelList = allChannelsData.channels
             log.info(
-              '[getChannels] all channels page',
+              `${new Date().toISOString()} [getChannels] all channels page: ${i + 1}`,
               i + 1,
               'loaded:',
               JSON.stringify({
@@ -414,27 +432,37 @@ function* getChannels(action: IAction): any {
             )
             addChannelsToAllChannels(allChannelList)
             totalAllChannelsAdded += allChannelList?.length || 0
-            log.info('[getChannels] total all channels added so far:', totalAllChannelsAdded)
+            log.info(
+              `${new Date().toISOString()} [getChannels] total all channels added so far: ${totalAllChannelsAdded}`
+            )
           } catch (e) {
-            log.error(e, 'Error on get all channels page:', i + 1)
+            log.error(e, `Error on get all channels page: ${i + 1}`)
             break
           }
         } else {
-          log.info('[getChannels] no more pages available, stopping at iteration:', i)
+          log.info(`${new Date().toISOString()} [getChannels] no more pages available, stopping at iteration: ${i}`)
         }
       }
-      log.info('[getChannels] all channels query completed, total channels added:', totalAllChannelsAdded)
+      log.info(
+        `${new Date().toISOString()} [getChannels] all channels query completed, total channels added: ${totalAllChannelsAdded}`
+      )
     } else {
-      log.info('[getChannels] skipping all channels query (hiddenList is true)')
+      log.info(`${new Date().toISOString()} [getChannels] skipping all channels query (hiddenList is true)`)
     }
-    log.info('[getChannels] completed successfully. Final mapped channels count:', mappedChannels?.length || 0)
+    log.info(
+      `${new Date().toISOString()} [getChannels] completed successfully. Final mapped channels count: ${
+        mappedChannels?.length || 0
+      }`
+    )
   } catch (e) {
-    log.error('[getChannels] error occurred:', JSON.stringify(e), 'Error on get channels')
-    log.error('[getChannels] error details:', {
-      message: e.message,
-      code: e.code,
-      stack: e.stack
-    })
+    log.error(`${new Date().toISOString()} [getChannels] error occurred: ${JSON.stringify(e)}`, 'Error on get channels')
+    log.error(
+      `${new Date().toISOString()} [getChannels] error details: ${JSON.stringify({
+        message: e.message,
+        code: e.code,
+        stack: e.stack
+      })}`
+    )
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message));
     }
@@ -770,42 +798,42 @@ function* searchChannelsForForward(action: IAction): any {
 }
 
 function* channelsLoadMore(action: IAction): any {
-  log.info('[channelsLoadMore] start load more channels')
+  log.info(`${new Date().toISOString()} [channelsLoadMore] start load more channels`)
   try {
     const { payload } = action
     const { limit } = payload
-    log.info('[channelsLoadMore] input payload:', JSON.stringify({ limit }))
+    log.info(`${new Date().toISOString()} [channelsLoadMore] input payload:`, JSON.stringify({ limit }))
     const { channelQuery } = query
-    log.info('[channelsLoadMore] channelQuery exists:', !!channelQuery)
+    log.info(`${new Date().toISOString()} [channelsLoadMore] channelQuery exists:`, !!channelQuery)
     if (!channelQuery) {
-      log.error('[channelsLoadMore] channelQuery is null or undefined, cannot load more')
+      log.error(`${new Date().toISOString()} [channelsLoadMore] channelQuery is null or undefined, cannot load more`)
       return
     }
     if (limit) {
-      log.info('[channelsLoadMore] setting query limit to:', limit)
+      log.info(`${new Date().toISOString()} [channelsLoadMore] setting query limit to:`, limit)
       channelQuery.limit = limit
     } else {
-      log.info('[channelsLoadMore] no limit provided, using existing query limit')
+      log.info(`${new Date().toISOString()} [channelsLoadMore] no limit provided, using existing query limit`)
     }
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADING))
-    log.info('[channelsLoadMore] loading next page...')
+    log.info(`${new Date().toISOString()} [channelsLoadMore] loading next page...`)
     const channelsData = yield call(channelQuery.loadNextPage)
     const channelList = channelsData.channels
     log.info(
-      '[channelsLoadMore] channelsData received:',
+      `${new Date().toISOString()} [channelsLoadMore] channelsData received:`,
       JSON.stringify({
         channelsCount: channelList?.length || 0,
         hasNext: channelsData.hasNext
       })
     )
     yield put(channelHasNextAC(channelsData.hasNext))
-    log.info('[channelsLoadMore] hasNext set to:', channelsData.hasNext)
+    log.info(`${new Date().toISOString()} [channelsLoadMore] hasNext set to:`, channelsData.hasNext)
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(
       setChannelsInMap,
       channelsData.channels
     )
     log.info(
-      '[channelsLoadMore] setChannelsInMap result:',
+      `${new Date().toISOString()} [channelsLoadMore] setChannelsInMap result:`,
       JSON.stringify({
         mappedChannelsCount: mappedChannels?.length || 0,
         channelsForUpdateLastReactionMessageCount: channelsForUpdateLastReactionMessage?.length || 0
@@ -814,7 +842,7 @@ function* channelsLoadMore(action: IAction): any {
 
     if (channelsForUpdateLastReactionMessage?.length) {
       log.info(
-        '[channelsLoadMore] processing channels for reaction message update:',
+        `${new Date().toISOString()} [channelsLoadMore] processing channels for reaction message update:`,
         channelsForUpdateLastReactionMessage?.length
       )
       const channelMessageMap: { [key: string]: IMessage } = {}
@@ -827,7 +855,10 @@ function* channelsLoadMore(action: IAction): any {
                 .getMessagesById([channel.newReactions![0].messageId])
                 .then((messages) => {
                   channelMessageMap[channel.id] = messages[0]
-                  log.info('[channelsLoadMore] successfully fetched reaction message for channel:', channel?.id)
+                  log.info(
+                    `${new Date().toISOString()} [channelsLoadMore] successfully fetched reaction message for channel:`,
+                    channel?.id
+                  )
                   resolve(true)
                 })
                 .catch((e) => {
@@ -839,7 +870,7 @@ function* channelsLoadMore(action: IAction): any {
         )
       })
       log.info(
-        '[channelsLoadMore] reaction messages fetched:',
+        `${new Date().toISOString()} [channelsLoadMore] reaction messages fetched:`,
         channelMessageMap ? Object.keys(channelMessageMap)?.length : 0
       )
       mappedChannels = mappedChannels.map((channel: IChannel) => {
@@ -849,20 +880,26 @@ function* channelsLoadMore(action: IAction): any {
         return channel
       })
       log.info(
-        '[channelsLoadMore] mappedChannels updated with reaction messages, final count:',
+        `${new Date().toISOString()} [channelsLoadMore] mappedChannels updated with reaction messages, final count:`,
         mappedChannels?.length || 0
       )
     } else {
-      log.info('[channelsLoadMore] no channels need reaction message update')
+      log.info(`${new Date().toISOString()} [channelsLoadMore] no channels need reaction message update`)
     }
-    log.info('[channelsLoadMore] adding channels to state, count:', mappedChannels?.length || 0)
+    log.info(
+      `${new Date().toISOString()} [channelsLoadMore] adding channels to state, count:`,
+      mappedChannels?.length || 0
+    )
     yield put(addChannelsAC(mappedChannels))
     yield put(setChannelsLoadingStateAC(LOADING_STATE.LOADED))
-    log.info('[channelsLoadMore] completed successfully. Total channels added:', mappedChannels?.length || 0)
+    log.info(
+      `${new Date().toISOString()} [channelsLoadMore] completed successfully. Total channels added:`,
+      mappedChannels?.length || 0
+    )
   } catch (error) {
-    log.error('[channelsLoadMore] error occurred:', error)
+    log.error(`${new Date().toISOString()} [channelsLoadMore] error occurred:`, error)
     log.error(
-      '[channelsLoadMore] error details:',
+      `${new Date().toISOString()} [channelsLoadMore] error details:`,
       JSON.stringify({
         message: error?.message,
         code: error?.code,
