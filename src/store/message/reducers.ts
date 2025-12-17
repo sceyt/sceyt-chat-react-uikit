@@ -67,6 +67,7 @@ export interface IMessageStore {
   pendingPollActions: { [key: string]: PendingPollAction[] }
   pendingMessagesMap: { [key: string]: IMessage[] }
   unreadScrollTo: boolean
+  unreadMessageId: string
 }
 
 const initialState: IMessageStore = {
@@ -114,7 +115,8 @@ const initialState: IMessageStore = {
   pollVotesInitialCount: null,
   pendingPollActions: {},
   pendingMessagesMap: {},
-  unreadScrollTo: true
+  unreadScrollTo: true,
+  unreadMessageId: ''
 }
 
 const messageSlice = createSlice({
@@ -771,6 +773,9 @@ const messageSlice = createSlice({
     },
     clearPendingMessagesMap: (state) => {
       state.pendingMessagesMap = {}
+    },
+    setUnreadMessageId: (state, action: PayloadAction<{ messageId: string }>) => {
+      state.unreadMessageId = action.payload.messageId
     }
   },
   extraReducers: (builder) => {
@@ -840,7 +845,8 @@ export const {
   removePendingMessage,
   updatePendingMessage,
   clearPendingMessagesMap,
-  updatePendingPollAction
+  updatePendingPollAction,
+  setUnreadMessageId
 } = messageSlice.actions
 
 // Export reducer

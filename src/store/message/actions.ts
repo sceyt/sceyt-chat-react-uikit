@@ -85,7 +85,8 @@ import {
   removePendingMessage,
   updatePendingMessage,
   clearPendingMessagesMap,
-  updatePendingPollAction
+  updatePendingPollAction,
+  setUnreadMessageId
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 
@@ -603,4 +604,8 @@ export function updatePendingMessageAC(channelId: string, messageId: string, upd
 
 export function clearPendingMessagesMapAC() {
   return clearPendingMessagesMap()
+}
+
+export function setUnreadMessageIdAC(messageId: string) {
+  return setUnreadMessageId({ messageId })
 }

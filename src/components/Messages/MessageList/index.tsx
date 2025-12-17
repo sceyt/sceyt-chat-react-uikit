@@ -11,7 +11,8 @@ import {
   scrollToNewMessageAC,
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC,
-  setUnreadScrollToAC
+  setUnreadScrollToAC,
+  setUnreadMessageIdAC
 } from '../../../store/message/actions'
 import {
   activeChannelMessagesSelector,
@@ -26,7 +27,8 @@ import {
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
-  unreadScrollToSelector
+  unreadScrollToSelector,
+  unreadMessageIdSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { themeSelector } from '../../../store/theme/selector'
@@ -523,7 +525,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
-  const [unreadMessageId, setUnreadMessageId] = useState('')
+  const unreadMessageId = useSelector(unreadMessageIdSelector, shallowEqual)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const [isDragging, setIsDragging] = useState<any>(null)
   const [showTopDate, setShowTopDate] = useState<any>(null)
@@ -928,7 +930,7 @@ const MessageList: React.FC<MessagesProps> = ({
       const visibleMessagesIds = Object.keys(visibleMessages)
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
       dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, 'instant'))
-      setUnreadMessageId(messageId)
+      dispatch(setUnreadMessageIdAC(messageId))
     } else {
       if (!channel.isLinkedChannel) {
         clearVisibleMessagesMap()
@@ -938,9 +940,9 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
-          setUnreadMessageId(channel.lastDisplayedMessageId)
+          dispatch(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
         } else {
-          setUnreadMessageId('')
+          dispatch(setUnreadMessageIdAC(''))
         }
       }
     }
@@ -966,7 +968,7 @@ const MessageList: React.FC<MessagesProps> = ({
     if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage)) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage.user.id === user.id) {
-        setUnreadMessageId('')
+        dispatch(setUnreadMessageIdAC(''))
       }
     }
   }, [messages, hiddenMessagesProperties, user?.id])
@@ -1107,7 +1109,9 @@ const MessageList: React.FC<MessagesProps> = ({
       nextDisableRef.current = false
       clearMessagesMap()
       removeAllMessages()
-      dispatch(getMessagesAC(channel, false, lastVisibleMessageId, 0, false, 'instant', false, true))
+      const isWithLastVisibleMessageId =
+        lastVisibleMessageId !== channel.lastMessage?.id && lastVisibleMessageId ? lastVisibleMessageId : ''
+      dispatch(getMessagesAC(channel, false, isWithLastVisibleMessageId, 0, false, 'instant', false, true))
     }
   }, [connectionStatus])
 

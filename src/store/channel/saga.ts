@@ -1023,7 +1023,23 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
     }
 
     if (channel) {
-      yield call(channel.markVoiceMessagesAsPlayed, messageIds)
+      const messageListMarker = yield call(channel.markVoiceMessagesAsPlayed, messageIds)
+      for (const messageId of messageListMarker.messageIds) {
+        const updateParams = {
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.PLAYED,
+          userMarkers: [
+            {
+              user: messageListMarker.user,
+              createdAt: messageListMarker.createdAt,
+              messageId,
+              name: MESSAGE_DELIVERY_STATUS.READ
+            }
+          ]
+        }
+        yield put(updateMessageAC(messageId, updateParams))
+        updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        updateMessageOnAllMessages(messageId, updateParams)
+      }
     }
   } catch (e) {
     log.error(e, 'Error on mark voice messages read')
@@ -1044,7 +1060,23 @@ function* markMessagesDelivered(action: IAction): any {
 
     if (channel) {
       log.info('send delivered marker ', messageIds)
-      yield call(channel.markMessagesAsReceived, messageIds)
+      const messageListMarker = yield call(channel.markMessagesAsReceived, messageIds)
+      for (const messageId of messageListMarker.messageIds) {
+        const updateParams = {
+          deliveryStatus: MESSAGE_DELIVERY_STATUS.DELIVERED,
+          userMarkers: [
+            {
+              user: messageListMarker.user,
+              createdAt: messageListMarker.createdAt,
+              messageId,
+              name: MESSAGE_DELIVERY_STATUS.DELIVERED
+            }
+          ]
+        }
+        yield put(updateMessageAC(messageId, updateParams))
+        updateMessageOnMap(channel.id, { messageId, params: updateParams })
+        updateMessageOnAllMessages(messageId, updateParams)
+      }
     }
   } catch (e) {
     log.error(e, 'Error on mark messages delivered')

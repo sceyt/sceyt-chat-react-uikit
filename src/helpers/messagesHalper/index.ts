@@ -700,3 +700,36 @@ export const setPendingPollAction = (action: PendingPollAction) => {
 
   store.dispatch(setPendingPollActionsMapAC(messageId, action))
 }
+
+export const getCenterTwoMessages = (
+  messages: IMessage[]
+): {
+  mid1: { messageId: string; index: number }
+  mid2: { messageId: string; index: number }
+} => {
+  const mid = Math.floor(messages.length / 2)
+
+  if (messages.length % 2 === 0) {
+    return {
+      mid1: {
+        messageId: messages[mid - 1].id,
+        index: mid - 1
+      },
+      mid2: {
+        messageId: messages[mid].id,
+        index: mid
+      }
+    }
+  }
+
+  return {
+    mid1: {
+      messageId: messages[mid - 1].id,
+      index: mid - 1
+    },
+    mid2: {
+      messageId: messages[mid + 1].id,
+      index: mid + 1
+    }
+  }
+}
