@@ -114,7 +114,7 @@ const channelSlice = createSlice({
     },
 
     setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
-      state.channels = [...action.payload.channels]
+      state.channels = sortChannelByLastMessage([...action.payload.channels])
     },
 
     setSearchedChannels: (
@@ -333,7 +333,7 @@ const channelSlice = createSlice({
           })
         }
       }
-      state.channels = [...updatedChannels]
+      state.channels = sortChannelByLastMessage([...updatedChannels])
     },
 
     updateChannelLastMessage: (state, action: PayloadAction<{ message: IMessage | {}; channel: IChannel }>) => {
@@ -351,6 +351,7 @@ const channelSlice = createSlice({
             }
             return chan
           })
+          state.channels = sortChannelByLastMessage(state.channels)
         }
       } else {
         const updatedChannels = state.channels.filter((chan) => chan.id !== channel.id)
@@ -377,6 +378,7 @@ const channelSlice = createSlice({
         }
         return chan
       })
+      state.channels = sortChannelByLastMessage(state.channels)
     },
 
     setChannelInfoOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
