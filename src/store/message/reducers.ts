@@ -252,7 +252,6 @@ const messageSlice = createSlice({
         voteDetails?: {
           type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
           vote?: IPollVote
-          incrementVotesPerOptionCount: number
         }
       }>
     ) => {

@@ -1627,43 +1627,6 @@ function* getMessageMarkers(action: IAction): any {
 function* executeAddPollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!message.pollDetails) return
-  const user = getClient().user
-  const vote: IPollVote = {
-    optionId,
-    createdAt: new Date().getTime(),
-    user: {
-      id: user.id,
-      presence: {
-        status: user.presence?.status || 'online'
-      },
-      profile: {
-        avatar: user.avatarUrl || '',
-        firstName: user.firstName,
-        lastName: user.lastName,
-        metadata: user.metadata || '',
-        metadataMap: user.metadataMap || {},
-        updatedAt: new Date().getTime(),
-        username: user.username || '',
-        createdAt: new Date().getTime()
-      },
-      createdAt: new Date().getTime()
-    }
-  }
-  const objs = []
-  if (!message.pollDetails?.allowMultipleVotes && message.pollDetails?.voteDetails?.ownVotes?.length > 0) {
-    objs.push({
-      type: 'deleteOwn' as const,
-      vote: message.pollDetails?.voteDetails?.ownVotes?.[0],
-      incrementVotesPerOptionCount: -1
-    })
-  }
-
-  objs.push({
-    type: 'addOwn' as const,
-    vote,
-    incrementVotesPerOptionCount: 1
-  })
-
   if (channel && message.id) {
     yield call(channel.addVote, message.id, pollId, [optionId])
     yield put(removePendingPollActionAC(message.id, 'ADD_POLL_VOTE', optionId))
@@ -1674,15 +1637,23 @@ function* updateMessageOptimisticallyForAddPollVote(channelId: string, message: 
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
   if (!message.pollDetails) return
-  const obj: { type: 'addOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
-    type: 'addOwn' as const,
-    vote,
-    incrementVotesPerOptionCount: 1
+  const objs = []
+  if (!message.pollDetails?.allowMultipleVotes && message.pollDetails?.voteDetails?.ownVotes?.length > 0) {
+    objs.push({
+      type: 'deleteOwn' as const,
+      vote: message.pollDetails?.voteDetails?.ownVotes?.[0]
+    })
   }
+  objs.push({
+    type: 'addOwn' as const,
+    vote
+  })
 
-  updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
-  updateMessageOnAllMessages(message.id, {}, obj)
-  yield put(updateMessageAC(message.id, {}, undefined, obj))
+  for (const obj of objs) {
+    updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+    updateMessageOnAllMessages(message.id, {}, obj)
+    yield put(updateMessageAC(message.id, {}, undefined, obj))
+  }
 }
 
 function* addPollVote(action: IAction): any {
@@ -1746,10 +1717,9 @@ function* addPollVote(action: IAction): any {
               message.id
             )
           )
-          const obj: { type: 'addOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
+          const obj: { type: 'addOwn'; vote: IPollVote } = {
             type: 'addOwn' as const,
-            vote,
-            incrementVotesPerOptionCount: 1
+            vote
           }
           updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
           updateMessageOnAllMessages(message.id, {}, obj)
@@ -1757,7 +1727,7 @@ function* addPollVote(action: IAction): any {
         }
       } else if (!conflictCheck.shouldSkip) {
         // No conflict, update message optimistically so user sees their vote immediately
-        yield* updateMessageOptimisticallyForAddPollVote(channelId, message, vote)
+        yield call(updateMessageOptimisticallyForAddPollVote, channelId, message, vote)
       }
 
       // Store as pending action to send when connected (if not skipped)
@@ -1766,7 +1736,7 @@ function* addPollVote(action: IAction): any {
       }
 
       // Execute immediately if connected
-      yield* executeAddPollVote(channelId, pollId, optionId, message)
+      yield call(executeAddPollVote, channelId, pollId, optionId, message)
     }
   } catch (e) {
     log.error('error in add poll vote', e)
@@ -1789,10 +1759,9 @@ function* updateMessageOptimisticallyForDeletePollVote(channelId: string, messag
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
   if (!message.pollDetails) return
-  const obj: { type: 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
+  const obj: { type: 'deleteOwn'; vote: IPollVote } = {
     type: 'deleteOwn' as const,
-    vote,
-    incrementVotesPerOptionCount: -1
+    vote
   }
   updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
   updateMessageOnAllMessages(message.id, {}, obj)
@@ -1836,10 +1805,9 @@ function* deletePollVote(action: IAction): any {
               message.id
             )
           )
-          const obj: { type: 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number } = {
+          const obj: { type: 'deleteOwn'; vote: IPollVote } = {
             type: 'deleteOwn' as const,
-            vote,
-            incrementVotesPerOptionCount: -1
+            vote
           }
           updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
           updateMessageOnAllMessages(message.id, {}, obj)
@@ -1847,7 +1815,7 @@ function* deletePollVote(action: IAction): any {
         }
       } else if (!conflictCheck.shouldSkip) {
         // No conflict or conflict that doesn't skip, update message optimistically so user sees vote removed immediately
-        yield* updateMessageOptimisticallyForDeletePollVote(channelId, message, vote)
+        yield call(updateMessageOptimisticallyForDeletePollVote, channelId, message, vote)
       }
 
       // Store as pending action (conflict resolution is handled in setPendingPollAction)
@@ -1856,7 +1824,7 @@ function* deletePollVote(action: IAction): any {
       }
 
       // Execute immediately if connected
-      yield* executeDeletePollVote(channelId, pollId, optionId, message)
+      yield call(executeDeletePollVote, channelId, pollId, optionId, message)
     }
   } catch (e) {
     log.error('error in delete poll vote', e)
@@ -1866,9 +1834,8 @@ function* deletePollVote(action: IAction): any {
 function* executeClosePoll(channelId: string, pollId: string, message: IMessage): any {
   const channel = yield call(getChannelFromMap, channelId)
   // should update the poll details on the message
-  const obj: { type: 'close'; incrementVotesPerOptionCount: number } = {
-    type: 'close' as const,
-    incrementVotesPerOptionCount: 0
+  const obj: { type: 'close' } = {
+    type: 'close' as const
   }
   updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
   updateMessageOnAllMessages(message.id, {}, obj)
@@ -1905,7 +1872,7 @@ function* closePoll(action: IAction): any {
 
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Update message optimistically so user sees poll closed immediately
-        yield* updateMessageOptimisticallyForClosePoll(channelId, message)
+        yield call(updateMessageOptimisticallyForClosePoll, channelId, message)
 
         // Store as pending action
         setPendingPollAction({
@@ -1918,7 +1885,7 @@ function* closePoll(action: IAction): any {
       }
 
       // Execute immediately if connected
-      yield* executeClosePoll(channelId, pollId, message)
+      yield call(executeClosePoll, channelId, pollId, message)
     }
   } catch (e) {
     log.error('error in close poll', e)
@@ -1929,7 +1896,7 @@ function* executeRetractPollVote(
   channelId: string,
   pollId: string,
   message: IMessage,
-  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number }[],
+  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[],
   isResend?: boolean
 ): any {
   const channel = yield call(getChannelFromMap, channelId)
@@ -1957,7 +1924,7 @@ function* executeRetractPollVote(
 function* updateMessageOptimisticallyForRetractPollVote(
   channelId: string,
   message: IMessage,
-  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number }[]
+  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[]
 ): any {
   const channel = yield call(getChannelFromMap, channelId)
   if (!channel) return
@@ -1978,17 +1945,16 @@ function* retractPollVote(action: IAction): any {
     const sceytChatClient = getClient()
     if (sceytChatClient) {
       const connectionState = sceytChatClient.connectionState
-      const objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote; incrementVotesPerOptionCount: number }[] = []
+      const objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[] = []
       for (const vote of message.pollDetails?.voteDetails?.ownVotes || []) {
         objs.push({
           type: 'deleteOwn' as const,
-          vote,
-          incrementVotesPerOptionCount: -1
+          vote
         })
       }
       if (connectionState !== CONNECTION_STATUS.CONNECTED) {
         // Update message optimistically so user sees votes retracted immediately
-        yield* updateMessageOptimisticallyForRetractPollVote(channelId, message, objs)
+        yield call(updateMessageOptimisticallyForRetractPollVote, channelId, message, objs)
 
         // Store as pending action
         setPendingPollAction({
@@ -2001,7 +1967,7 @@ function* retractPollVote(action: IAction): any {
       }
 
       // Execute immediately if connected
-      yield* executeRetractPollVote(channelId, pollId, message, objs, isResend)
+      yield call(executeRetractPollVote, channelId, pollId, message, objs, isResend)
     }
   } catch (e) {
     log.error('error in retract poll vote', e)

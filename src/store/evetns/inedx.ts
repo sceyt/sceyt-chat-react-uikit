@@ -1106,15 +1106,13 @@ export default function* watchForEvents(): any {
           for (const vote of deletedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const vote of addedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('addOwn' as const) : ('add' as const),
-              vote,
-              incrementVotesPerOptionCount: 1
+              vote
             })
           }
 
@@ -1139,8 +1137,7 @@ export default function* watchForEvents(): any {
               },
               {
                 type: obj.type,
-                vote: obj.vote,
-                incrementVotesPerOptionCount: obj.incrementVotesPerOptionCount
+                vote: obj.vote
               }
             )
             if (channel.id === activeChannelId) {
@@ -1161,8 +1158,7 @@ export default function* watchForEvents(): any {
           for (const vote of deletedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const obj of objs) {
@@ -1197,8 +1193,7 @@ export default function* watchForEvents(): any {
           for (const vote of retractedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const obj of objs) {
@@ -1227,7 +1222,7 @@ export default function* watchForEvents(): any {
           log.info('CHANNEL_EVENT_TYPES.POLL_CLOSED ... ')
           const { channel, messageId } = args
           const activeChannelId = yield call(getActiveChannelId)
-          const obj = { type: 'close' as const, incrementVotesPerOptionCount: 0 }
+          const obj = { type: 'close' as const }
           updateMessageOnMap(
             channel.id,
             {

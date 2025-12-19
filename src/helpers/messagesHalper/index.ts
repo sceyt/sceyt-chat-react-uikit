@@ -154,7 +154,6 @@ export const updateMessageOnAllMessages = (
   voteDetails?: {
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
     vote?: IPollVote
-    incrementVotesPerOptionCount: number
   }
 ) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
@@ -296,7 +295,6 @@ export function updateMessageOnMap(
   voteDetails?: {
     vote?: IPollVote
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
-    incrementVotesPerOptionCount: number
   }
 ) {
   const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap

@@ -310,7 +310,6 @@ export const handleVoteDetails = (
   voteDetails?: {
     vote?: IPollVote
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
-    incrementVotesPerOptionCount: number
   },
   message?: IMessage
 ): IPollDetails | undefined => {
@@ -319,11 +318,15 @@ export const handleVoteDetails = (
   }
 
   const existingPollDetails = message.pollDetails
-  const existingVoteDetails = existingPollDetails.voteDetails || {
-    votesPerOption: {},
-    votes: [],
-    ownVotes: []
-  }
+  const existingVoteDetails = JSON.parse(
+    JSON.stringify(
+      existingPollDetails.voteDetails || {
+        votesPerOption: {},
+        votes: [],
+        ownVotes: []
+      }
+    )
+  )
 
   if (voteDetails.type === 'close') {
     return {
@@ -339,23 +342,37 @@ export const handleVoteDetails = (
   const vote = voteDetails.vote
   const optionId = vote.optionId
   const currentVotesPerOption = existingVoteDetails.votesPerOption || {}
-  const optionVotesCount = (currentVotesPerOption[optionId] || 0) + voteDetails.incrementVotesPerOptionCount
-  const newVotesPerOption = {
-    ...currentVotesPerOption,
-    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
-  }
+  let optionVotesCount = currentVotesPerOption[optionId] || 0
 
   let newVotes: IPollVote[] = existingVoteDetails.votes || []
   let newOwnVotes: IPollVote[] = existingVoteDetails.ownVotes || []
 
   if (voteDetails.type === 'add') {
     newVotes = [...newVotes, vote]
+    optionVotesCount++
   } else if (voteDetails.type === 'delete') {
     newVotes = deleteVoteFromPollDetails(newVotes, vote)
+    optionVotesCount--
   } else if (voteDetails.type === 'addOwn') {
-    newOwnVotes = [...newOwnVotes, vote]
+    const existingOwnVote = existingVoteDetails.ownVotes.find(
+      (v: IPollVote) => v.optionId === vote.optionId && v.user.id === vote.user.id
+    )
+    if (!existingOwnVote) {
+      optionVotesCount++
+      if (existingPollDetails.allowMultipleVotes) {
+        newOwnVotes = [...newOwnVotes, vote]
+      } else {
+        newOwnVotes = [vote]
+      }
+    }
   } else if (voteDetails.type === 'deleteOwn') {
     newOwnVotes = deleteVoteFromPollDetails(newOwnVotes, vote)
+    optionVotesCount--
+  }
+
+  const newVotesPerOption = {
+    ...currentVotesPerOption,
+    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
   }
 
   const newVoteDetails: IVoteDetails = {

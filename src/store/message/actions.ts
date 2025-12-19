@@ -362,7 +362,6 @@ export function updateMessageAC(
   voteDetails?: {
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
     vote?: IPollVote
-    incrementVotesPerOptionCount: number
   }
 ) {
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
