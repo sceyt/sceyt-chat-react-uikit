@@ -34,6 +34,8 @@ interface EditMessageContainerProps {
 
 export default function MessageActions({
   isPollMessage = false,
+  allowVoteRetract = false,
+  pollClosed = false,
   editModeToggle,
   channel,
   handleResendMessage,
@@ -152,7 +154,6 @@ export default function MessageActions({
     <MessageActionsWrapper isThreadMessage={isThreadMessage} rtlDirection={rtlDirection}>
       <EditMessageContainer backgroundColor={backgroundSections} className='message_actions_cont '>
         {showMessageReaction &&
-          !isPollMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           checkActionPermission('addMessageReaction') && (
             <Action
@@ -258,7 +259,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {isPollMessage && (
+        {isPollMessage && allowVoteRetract && !pollClosed && (
           <Action
             onClick={handleRetractVote}
             iconColor={messageActionIconsColor || iconInactive}
@@ -273,7 +274,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {!isPollMessage && (
+        {isPollMessage && !isIncoming && !pollClosed && (
           <Action
             onClick={handleEndVote}
             iconColor={messageActionIconsColor || iconInactive}
@@ -288,21 +289,24 @@ export default function MessageActions({
           </Action>
         )}
 
-        {showForwardMessage && forwardMessagePermitted && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
-          <Action
-            order={forwardIconOrder || 5}
-            iconColor={messageActionIconsColor || iconInactive}
-            hoverBackgroundColor={backgroundHovered}
-            hoverIconColor={accentColor}
-            onClick={() => handleOpenForwardMessage()}
-          >
-            <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
-              {forwardIconTooltipText || 'Forward Message'}
-              <ArrowDownIcon />
-            </ItemNote>
-            {forwardIcon || <ForwardIcon />}
-          </Action>
-        )}
+        {showForwardMessage &&
+          forwardMessagePermitted &&
+          messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
+          !isPollMessage && (
+            <Action
+              order={forwardIconOrder || 5}
+              iconColor={messageActionIconsColor || iconInactive}
+              hoverBackgroundColor={backgroundHovered}
+              hoverIconColor={accentColor}
+              onClick={() => handleOpenForwardMessage()}
+            >
+              <ItemNote disabledColor={textSecondary} bgColor={tooltipBackground} direction='top'>
+                {forwardIconTooltipText || 'Forward Message'}
+                <ArrowDownIcon />
+              </ItemNote>
+              {forwardIcon || <ForwardIcon />}
+            </Action>
+          )}
         {showSelectMessage && (
           <Action
             order={selectIconOrder || 6}

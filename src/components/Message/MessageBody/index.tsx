@@ -640,6 +640,8 @@ const MessageBody = ({
         ) : (
           <MessageActions
             isPollMessage={message?.type === MESSAGE_TYPE.POLL}
+            allowVoteRetract={message?.pollDetails?.allowVoteRetract}
+            pollClosed={message?.pollDetails?.closed}
             messageFrom={message.user}
             channel={channel}
             editModeToggle={toggleEditMode}
