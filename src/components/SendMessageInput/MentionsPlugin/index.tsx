@@ -12,15 +12,18 @@ import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
-import { THEME, USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME, USER_PRESENCE_STATUS, LOADING_STATE } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
-import { useSelector } from 'store/hooks'
+import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
+import { loadMoreMembersAC } from '../../../store/member/actions'
+import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
+import { shallowEqual } from 'react-redux'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -62,9 +65,6 @@ const AtSignMentionsRegexAliasRegex = new RegExp(
   '(^|\\s|\\()(' + '[' + TRIGGERS + ']' + '((?:' + VALID_CHARS + '){0,' + ALIAS_LENGTH_LIMIT + '})' + ')$'
 )
 
-// At most, 5 suggestions are shown in the popup.
-const SUGGESTION_LIST_LENGTH_LIMIT = 50
-
 const mentionsCache = new Map()
 
 let membersMap: { [key: string]: IMember } = {}
@@ -76,7 +76,6 @@ function useMentionLookupService(
   members: IMember[],
   getFromContacts?: boolean
 ) {
-  // const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const [results, setResults] = useState<Array<{ name: string; avatar?: string; id: string; presence: any }>>([])
   membersMap = useMemo(() => {
     mentionsCache.clear()
@@ -234,7 +233,8 @@ function MentionsContainer({
   selectedIndex,
   selectOptionAndCleanUp,
   setHighlightedIndex,
-  setMentionsIsOpen
+  setMentionsIsOpen,
+  channelId
 }: any) {
   const theme = useSelector(themeSelector)
   const {
@@ -242,6 +242,16 @@ function MentionsContainer({
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: scrollbarThumbColor
   } = useColor()
+
+  const dispatch = useDispatch()
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoadingState = useMemo(
+    () => channelsMembersLoadingState?.[channelId],
+    [channelsMembersLoadingState?.[channelId]]
+  )
+  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
+  const mentionsListRef = useRef<HTMLUListElement>(null)
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -287,13 +297,34 @@ function MentionsContainer({
       setMentionsIsOpen(false)
     }
   }, [])
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLUListElement>) => {
+      const target = e.currentTarget
+      const isScrolledToBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10 // 10px threshold
+
+      if (isScrolledToBottom && membersHasNext && membersLoadingState !== LOADING_STATE.LOADING && channelId) {
+        dispatch(loadMoreMembersAC(15, channelId))
+      }
+    },
+    [membersHasNext, membersLoadingState, channelId, dispatch]
+  )
+
+  useEffect(() => {
+    if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
+      dispatch(loadMoreMembersAC(15, channelId))
+    }
+  }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
+
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
       <MentionsList
-        borderColor={borderColor}
         backgroundColor={background}
         scrollbarThumbColor={scrollbarThumbColor}
         theme={theme}
+        ref={mentionsListRef}
+        borderColor={borderColor}
+        onScroll={handleScroll}
       >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
@@ -322,7 +353,8 @@ export default function MentionsPlugin({
   getFromContacts,
   setMentionMember,
   setMentionsIsOpen,
-  members
+  members,
+  channelId
 }: {
   contactsMap: IContactsMap
   userId: string
@@ -332,6 +364,7 @@ export default function MentionsPlugin({
   // eslint-disable-next-line no-unused-vars
   setMentionsIsOpen: (state: boolean) => void
   members: IMember[]
+  channelId?: string
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
   const [queryString, setQueryString] = useState<string | null>(null)
@@ -341,11 +374,8 @@ export default function MentionsPlugin({
   })
 
   const options = useMemo(
-    () =>
-      results
-        .map((result) => new MentionTypeaheadOption(result.name, result.id, result.presence, result.avatar))
-        .slice(0, SUGGESTION_LIST_LENGTH_LIMIT),
-    [results]
+    () => results.map((result) => new MentionTypeaheadOption(result.name, result.id, result.presence, result.avatar)),
+    [results?.length]
   )
 
   const handleOnOpen = () => {
@@ -394,7 +424,7 @@ export default function MentionsPlugin({
       options={options}
       onOpen={handleOnOpen}
       menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) =>
-        anchorElementRef.current && results.length
+        anchorElementRef.current
           ? ReactDOM.createPortal(
               <MentionsContainer
                 queryString={queryString}
@@ -403,6 +433,7 @@ export default function MentionsPlugin({
                 selectOptionAndCleanUp={selectOptionAndCleanUp}
                 selectedIndex={selectedIndex}
                 setHighlightedIndex={setHighlightedIndex}
+                channelId={channelId}
               />,
               anchorElementRef.current
             )

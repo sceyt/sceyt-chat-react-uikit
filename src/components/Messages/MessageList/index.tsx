@@ -11,7 +11,8 @@ import {
   scrollToNewMessageAC,
   setScrollToMessagesAC,
   showScrollToNewMessageButtonAC,
-  setUnreadScrollToAC
+  setUnreadScrollToAC,
+  setUnreadMessageIdAC
 } from '../../../store/message/actions'
 import {
   activeChannelMessagesSelector,
@@ -26,7 +27,8 @@ import {
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
-  unreadScrollToSelector
+  unreadScrollToSelector,
+  unreadMessageIdSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { themeSelector } from '../../../store/theme/selector'
@@ -339,6 +341,7 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: OGMetadataProps
+  collapsedCharacterLimit?: number
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -479,7 +482,8 @@ const MessageList: React.FC<MessagesProps> = ({
   hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
-  ogMetadataProps
+  ogMetadataProps,
+  collapsedCharacterLimit
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -521,7 +525,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
-  const [unreadMessageId, setUnreadMessageId] = useState('')
+  const unreadMessageId = useSelector(unreadMessageIdSelector, shallowEqual)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const [isDragging, setIsDragging] = useState<any>(null)
   const [showTopDate, setShowTopDate] = useState<any>(null)
@@ -576,7 +580,8 @@ const MessageList: React.FC<MessagesProps> = ({
   // @ts-ignore
   const handleMessagesListScroll = useCallback(async () => {
     const target = scrollRef.current
-    if (!target) return
+    const messageBox = document.getElementById('messageBox')
+    if (!target || !messageBox) return
     if (scrollToMentionedMessage) {
       if (target.scrollTop <= -50 || channel.lastMessage.id !== messages[messages.length - 1].id) {
         dispatch(showScrollToNewMessageButtonAC(true))
@@ -592,14 +597,18 @@ const MessageList: React.FC<MessagesProps> = ({
     // }, 1000)
     renderTopDate()
     let forceLoadPrevMessages = false
-    if (-target.scrollTop + target.offsetHeight + 30 > target.scrollHeight) {
+    if (-target.scrollTop + target.offsetHeight + 100 > messageBox.scrollHeight) {
       forceLoadPrevMessages = true
+    }
+    if (unreadScrollTo) {
+      return
     }
     if (
       target.scrollTop === 0 &&
       scrollToNewMessage.scrollToBottom &&
       scrollToNewMessage.updateMessageList &&
-      messagesLoading !== LOADING_STATE.LOADING
+      messagesLoading !== LOADING_STATE.LOADING &&
+      channel?.id
     ) {
       dispatch(getMessagesAC(channel, true))
     }
@@ -614,7 +623,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
     const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
     const hasIndex = typeof currentIndex === 'number'
-    if ((hasIndex && currentIndex < 15) || forceLoadPrevMessages) {
+    if ((hasIndex && currentIndex < 10) || forceLoadPrevMessages) {
       if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
         if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || prevDisableRef.current) {
           shouldLoadMessagesRef.current = 'prev'
@@ -631,7 +640,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
       }
     }
-    if ((hasIndex && currentIndex >= messages.length - 15) || target.scrollTop === 0) {
+    if ((hasIndex && currentIndex >= messages.length - 10) || target.scrollTop > -100) {
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !scrollToNewMessage.scrollToBottom &&
@@ -708,13 +717,13 @@ const MessageList: React.FC<MessagesProps> = ({
           1000 + positiveValue * 0.1
         )
       }
-    } else {
-      dispatch(getMessagesAC(channel, undefined, messageId))
+    } else if (channel?.id) {
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, true, 'smooth', true))
     }
   }
 
   const handleLoadMoreMessages = (direction: string, limit: number) => {
-    if (scrollToMentionedMessage) {
+    if (scrollToMentionedMessage || scrollToNewMessage.scrollToBottom) {
       return
     }
     const lastMessageId = messages.length && messages[messages.length - 1].id
@@ -881,9 +890,6 @@ const MessageList: React.FC<MessagesProps> = ({
             behavior: 'smooth'
           })
         }
-        setTimeout(() => {
-          dispatch(scrollToNewMessageAC(false, false, false))
-        }, 800)
       } else {
         nextDisableRef.current = true
         prevDisableRef.current = true
@@ -892,10 +898,6 @@ const MessageList: React.FC<MessagesProps> = ({
           behavior: 'smooth'
         })
         dispatch(showScrollToNewMessageButtonAC(false))
-        setTimeout(() => {
-          prevDisableRef.current = false
-          dispatch(scrollToNewMessageAC(false, false, false))
-        }, 800)
       }
     }
   }, [scrollToNewMessage])
@@ -923,24 +925,24 @@ const MessageList: React.FC<MessagesProps> = ({
     prevDisableRef.current = false
     shouldLoadMessagesRef.current = ''
     loadingRef.current = false
-    if (channel.backToLinkedChannel) {
+    if (channel.backToLinkedChannel && channel?.id) {
       const visibleMessages = getVisibleMessagesMap()
       const visibleMessagesIds = Object.keys(visibleMessages)
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, undefined, 'instant'))
-      setUnreadMessageId(messageId)
+      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, 'instant'))
+      dispatch(setUnreadMessageIdAC(messageId))
     } else {
       if (!channel.isLinkedChannel) {
         clearVisibleMessagesMap()
       }
-      if (channel) {
+      if (channel && channel?.id) {
         dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
-          setUnreadMessageId(channel.lastDisplayedMessageId)
+          dispatch(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
         } else {
-          setUnreadMessageId('')
+          dispatch(setUnreadMessageIdAC(''))
         }
       }
     }
@@ -966,7 +968,7 @@ const MessageList: React.FC<MessagesProps> = ({
     if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage)) {
       const lastMessage = messages[messages.length - 1]
       if (lastMessage.user.id === user.id) {
-        setUnreadMessageId('')
+        dispatch(setUnreadMessageIdAC(''))
       }
     }
   }, [messages, hiddenMessagesProperties, user?.id])
@@ -1101,13 +1103,15 @@ const MessageList: React.FC<MessagesProps> = ({
 
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && channel?.id) {
       loadingRef.current = false
       prevDisableRef.current = false
       nextDisableRef.current = false
       clearMessagesMap()
       removeAllMessages()
-      dispatch(getMessagesAC(channel, false, lastVisibleMessageId, 0, false, false, 'instant', false))
+      const isWithLastVisibleMessageId =
+        lastVisibleMessageId !== channel.lastMessage?.id && lastVisibleMessageId ? lastVisibleMessageId : ''
+      dispatch(getMessagesAC(channel, false, isWithLastVisibleMessageId, 0, false, 'instant', false, true))
     }
   }, [connectionStatus])
 
@@ -1118,7 +1122,29 @@ const MessageList: React.FC<MessagesProps> = ({
         scrollElement.style.scrollBehavior = 'inherit'
       }
       setScrollIntoView(true)
-      const lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId)
+      let lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId) || null
+      let newLastDisplayedMessageId = channel.lastDisplayedMessageId
+      if (!lastReadMessageNode && channel.lastDisplayedMessageId && channel.lastDisplayedMessageId !== '0') {
+        for (let index = 0; index < messages.length; index++) {
+          const message = messages[index]
+          if (
+            channel.lastDisplayedMessageId >= message.id &&
+            (messages.length < index + 2 || channel.lastDisplayedMessageId <= messages[index + 1].id)
+          ) {
+            newLastDisplayedMessageId = message.id
+            lastReadMessageNode = document.getElementById(newLastDisplayedMessageId)
+            break
+          }
+        }
+      } else if (
+        !lastReadMessageNode &&
+        (!channel.lastDisplayedMessageId || channel.lastDisplayedMessageId === '0') &&
+        messages?.length
+      ) {
+        newLastDisplayedMessageId = messages[0].id
+        lastReadMessageNode = document.getElementById(newLastDisplayedMessageId)
+      }
+
       if (lastReadMessageNode && scrollElement) {
         dispatch(scrollToNewMessageAC(false))
         scrollElement.scrollTo({
@@ -1238,6 +1264,7 @@ const MessageList: React.FC<MessagesProps> = ({
               replyMessage={messageForReply && messageForReply.id}
               attachmentsSelected={attachmentsSelected}
               className='messageBox'
+              id='messageBox'
             >
               {messages.map((message: any, index: number) => {
                 const prevMessage = messages[index - 1]
@@ -1432,6 +1459,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
                           showInfoMessageProps={showInfoMessageProps}
                           ogMetadataProps={ogMetadataProps}
+                          collapsedCharacterLimit={collapsedCharacterLimit}
                         />
                       </MessageWrapper>
                     )}

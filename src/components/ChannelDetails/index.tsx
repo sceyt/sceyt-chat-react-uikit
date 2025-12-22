@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -7,7 +7,7 @@ import { activeChannelSelector, channelEditModeSelector } from '../../store/chan
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
 import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
 import { loadMoreMembersAC } from '../../store/member/actions'
-import { membersHasNextSelector, membersLoadingStateSelector } from '../../store/member/selector'
+import { channelsMembersHasNextMapSelector, channelsMembersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
@@ -20,7 +20,7 @@ import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
 import { copyToClipboard } from '../../helpers/clipboard'
-import { makeUsername } from '../../helpers/message'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
@@ -152,7 +152,12 @@ const Details = ({
   backgroundColor,
   bordersColor,
   showPhoneNumber,
-  QRCodeIcon
+  QRCodeIcon,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -179,8 +184,16 @@ const Details = ({
   const editMode = useSelector(channelEditModeSelector)
   const activeChannel = useSelector(activeChannelSelector, shallowEqual)
   const [checkActionPermission] = usePermissions(activeChannel ? activeChannel.userRole : '')
-  const membersLoading = useSelector(membersLoadingStateSelector)
-  const membersHasNext = useSelector(membersHasNextSelector)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoading = useMemo(
+    () => channelsMembersLoadingState?.[activeChannel?.id],
+    [channelsMembersLoadingState?.[activeChannel?.id]]
+  )
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(
+    () => channelsMembersHasNext?.[activeChannel?.id],
+    [channelsMembersHasNext?.[activeChannel?.id]]
+  )
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
@@ -283,6 +296,13 @@ const Details = ({
       copiedPhoneTimerRef.current = setTimeout(() => setCopiedPhone(false), 1200)
     }
   }
+
+  const channelMetadata = useMemo(() => {
+    if (isJSON(activeChannel?.metadata)) {
+      return JSON.parse(activeChannel?.metadata)
+    }
+    return activeChannel?.metadata
+  }, [activeChannel])
 
   return (
     <Container
@@ -409,12 +429,10 @@ const Details = ({
             </ChannelInfo>
           </ChannelAvatarAndName>
 
-          {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
+          {showAboutChannel && activeChannel && channelMetadata && channelMetadata?.d && (
             <AboutChannel>
               {showAboutChannelTitle && <AboutChannelTitle color={textFootnote}>About</AboutChannelTitle>}
-              <AboutChannelText color={textPrimary}>
-                {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
-              </AboutChannelText>
+              <AboutChannelText color={textPrimary}>{channelMetadata?.d ? channelMetadata?.d : ''}</AboutChannelText>
             </AboutChannel>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
@@ -483,6 +501,11 @@ const Details = ({
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
             actionItemsFontSize={actionItemsFontSize}
             borderColor={bordersColor}
+            commonGroupsOrder={commonGroupsOrder}
+            commonGroupsIcon={commonGroupsIcon}
+            commonGroupsIconColor={commonGroupsIconColor}
+            commonGroupsTextColor={commonGroupsTextColor}
+            showGroupsInCommon={showGroupsInCommon}
           />
         )}
         {/* <div ref={tabsRef}> */}

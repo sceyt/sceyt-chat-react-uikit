@@ -118,7 +118,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
                       <Avatar
                         key={vote?.user?.id}
                         image={vote?.user?.profile?.avatar}
-                        name={vote?.user?.profile?.firstName}
+                        name={vote?.user?.profile?.firstName || vote?.user?.id}
                         size={18}
                         textSize={12}
                         setDefaultAvatar

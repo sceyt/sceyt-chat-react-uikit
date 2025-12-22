@@ -1,4 +1,4 @@
-import { IChannel, IMessage } from '../../types'
+import { IChannel, IMember, IMessage } from '../../types'
 import type { ReactNode } from 'react'
 import { isJSON } from '../message'
 import { CHANNEL_GROUP_TYPES, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../constants'
@@ -18,6 +18,9 @@ type defaultRolesByChannelTypesMap = {
 let autoSelectFitsChannel = false
 let allChannels: IChannel[] = []
 let channelsMap: channelMap = {}
+const allChannelsMap: channelMap = {}
+const pendingDeleteChannelMap: { [key: string]: IChannel } = {}
+
 let channelTypesMemberDisplayTextMap: channelTypesMemberDisplayTextMap
 let defaultRolesByChannelTypesMap: defaultRolesByChannelTypesMap
 let activeChannelId = ''
@@ -29,6 +32,13 @@ let disableFrowardMentionsCount: boolean = false
 let onUpdateChannel: (channel: IChannel, updatedFields: string[]) => void = () => {}
 let useInviteLink: boolean = false
 let disappearingSettings: { show?: boolean; customOptions?: { label: string; seconds: number }[] } | null
+export let customLoadMembersFunctions: {
+  loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+  getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+  addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+  joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+  updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+} | null
 
 export type InviteLinkListItemRenderParams = {
   onClick?: () => void
@@ -175,6 +185,7 @@ export function getInviteLinkOptions(): InviteLinkOptions | null {
 
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
+  allChannelsMap[channel.id] = { ...channel }
 }
 
 export function setActiveChannelId(id: string) {
@@ -202,7 +213,7 @@ export function setChannelsInMap(channels: IChannel[]) {
       channelsForUpdateLastReactionMessage.push(channel)
     }
     channelsMap[channel.id] = { ...channel }
-
+    allChannelsMap[channel.id] = { ...channel }
     return channel
   })
   return { channels: JSON.parse(JSON.stringify(formattedChannel)), channelsForUpdateLastReactionMessage }
@@ -212,12 +223,21 @@ export function getChannelFromMap(channelId: string) {
   return channelsMap[channelId]
 }
 
-export function getLastChannelFromMap() {
-  return Object.values(channelsMap)[0]
+export function getLastChannelFromMap(deletePending: boolean = false) {
+  const channels = Object.values(channelsMap)
+  if (deletePending) {
+    for (const channel of channels) {
+      if (!getPendingDeleteChannel(channel.id)) {
+        return channel
+      }
+    }
+  }
+  return channels[0]
 }
 
 export function removeChannelFromMap(channelId: string) {
   delete channelsMap[channelId]
+  delete allChannelsMap[channelId]
 }
 
 export function checkChannelExists(channelId: string) {
@@ -235,6 +255,7 @@ export function destroyChannelsMap() {
 export const query: any = {
   channelQuery: null,
   channelQueryForward: null,
+  channelMembersQuery: null,
   blockedQuery: null,
   current: null,
   membersQuery: null,
@@ -296,6 +317,10 @@ export function getDisableFrowardMentionsCount() {
   return disableFrowardMentionsCount
 }
 
+export function getCustomLoadMembersFunctions() {
+  return customLoadMembersFunctions
+}
+
 export function setOnUpdateChannel(callback: (channel: IChannel, updatedFields: string[]) => void) {
   onUpdateChannel = callback
 }
@@ -327,6 +352,10 @@ export function getChannelFromAllChannels(channelId: string) {
   return allChannels.find((channel) => channel.id === channelId)
 }
 
+export function getChannelFromAllChannelsMap(channelId: string) {
+  return allChannelsMap[channelId]
+}
+
 export function deleteChannelFromAllChannels(channelId: string) {
   allChannels = allChannels.filter((channel) => channel.id !== channelId)
 }
@@ -339,6 +368,7 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
         if (chan.id === channelId) {
           // update channel on channel map
           channelsMap[channelId] = { ...chan, lastMessage: message }
+          allChannelsMap[channelId] = { ...chan, lastMessage: message }
           // update channel on all channels
           return { ...chan, lastMessage: message }
         }
@@ -348,17 +378,18 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
   } else {
     const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
     if (updateChannel) {
-      const updateMessage = message
+      let updateMessage = message
       if (
         updateChannel.lastMessage &&
         updateChannel.lastMessage.id === message.id &&
         updateChannel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
       ) {
-        updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+        updateMessage = { ...message, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
       }
       updateChannel = { ...updateChannel, lastMessage: updateMessage }
       // update channel on channel map
       channelsMap[channelId] = updateChannel
+      allChannelsMap[channelId] = updateChannel
       // update channel on all channels
       allChannels = [updateChannel, ...updatedChannels]
     }
@@ -369,12 +400,12 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
     if (channel.id === channelId) {
       channel = { ...channel, ...config }
       if (messageUpdateData && channel.lastMessage && messageUpdateData.id === channel.lastMessage.id) {
-        const updateMessage = messageUpdateData
+        let updateMessage = messageUpdateData
         if (
           channel.lastMessage.id === messageUpdateData.id &&
           channel.lastMessage.deliveryStatus === MESSAGE_DELIVERY_STATUS.READ
         ) {
-          updateMessage.deliveryStatus = MESSAGE_DELIVERY_STATUS.READ
+          updateMessage = { ...messageUpdateData, deliveryStatus: MESSAGE_DELIVERY_STATUS.READ }
         }
         channel.lastMessage = { ...channel.lastMessage, ...updateMessage }
       }
@@ -383,6 +414,7 @@ export function updateChannelOnAllChannels(channelId: string, config: any, messa
   })
   if (channelsMap[channelId]) {
     channelsMap[channelId] = { ...channelsMap[channelId], ...config }
+    allChannelsMap[channelId] = { ...channelsMap[channelId], ...config }
   }
 }
 
@@ -421,6 +453,16 @@ export const setDisappearingSettings = (
   disappearingSettings = settings
 }
 
+export const setCustomLoadMembersFunctions = (functions: {
+  loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+  getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+  addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+  joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+  updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+}) => {
+  customLoadMembersFunctions = functions
+}
+
 export const getDisappearingSettings = () => disappearingSettings
 
 export const sortChannelByLastMessage = (channels: IChannel[]) => {
@@ -440,4 +482,20 @@ export const sortChannelByLastMessage = (channels: IChannel[]) => {
       return new Date(bDate).getTime() - new Date(aDate).getTime()
     }
   })
+}
+
+export const setPendingDeleteChannel = (channel: IChannel) => {
+  pendingDeleteChannelMap[channel?.id] = channel
+}
+
+export const getPendingDeleteChannel = (channelId: string) => {
+  return pendingDeleteChannelMap[channelId]
+}
+
+export const getPendingDeleteChannels = () => {
+  return Object.values(pendingDeleteChannelMap)
+}
+
+export const removePendingDeleteChannel = (channelId: string) => {
+  delete pendingDeleteChannelMap[channelId]
 }

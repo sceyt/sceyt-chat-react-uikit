@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 // Hooks
 import { useColor } from '../../hooks'
@@ -18,6 +18,14 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
+
+const fieldsObject = {
+  channelId: '',
+  currentRecordedFile: null,
+  recording: null,
+  recorder: null,
+  wavesurferContainer: null
+}
 
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
@@ -362,7 +370,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       shouldDraw = false
       const id = cId || channelId
       recorder
-        .stop()
+        ?.stop()
         .getMp3()
         .then(([buffer, blob]: any) => {
           const file = new File(buffer, 'record.mp3', {
@@ -505,6 +513,41 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     }
   }, [recording, maxRecordingDuration])
 
+  // Keep refs updated with latest values
+  useEffect(() => {
+    fieldsObject.channelId = channelId
+  }, [channelId])
+
+  useEffect(() => {
+    fieldsObject.recorder = recorder
+  }, [recorder])
+
+  useEffect(() => {
+    fieldsObject.currentRecordedFile = currentRecordedFile
+  }, [currentRecordedFile])
+
+  useEffect(() => {
+    fieldsObject.recording = recording
+  }, [recording])
+
+  useEffect(() => {
+    fieldsObject.wavesurferContainer = wavesurferContainer.current
+  }, [wavesurferContainer.current])
+
+  useEffect(() => {
+    return () => {
+      if (
+        fieldsObject.channelId &&
+        (!fieldsObject.currentRecordedFile || !(fieldsObject.currentRecordedFile as any)?.file) &&
+        fieldsObject.recorder &&
+        fieldsObject.recording
+      ) {
+        stopRecording(false, fieldsObject.channelId, true, fieldsObject.recorder, fieldsObject.wavesurferContainer)
+        handleStopRecording()
+      }
+    }
+  }, [])
+
   useEffect(() => {
     if (currentRecordedFile) {
       initWaveSurfer()
@@ -626,7 +669,13 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   )
 }
 
-export default AudioRecord
+export default memo(AudioRecord, (prevProps, nextProps) => {
+  return (
+    prevProps.channelId === nextProps.channelId &&
+    prevProps.showRecording === nextProps.showRecording &&
+    prevProps.maxRecordingDuration === nextProps.maxRecordingDuration
+  )
+})
 
 const Container = styled.div<{ recording?: boolean }>`
   width: 32px;
