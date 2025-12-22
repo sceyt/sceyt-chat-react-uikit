@@ -1115,6 +1115,7 @@ function* switchChannel(action: IAction): any {
     if (updateActiveChannel) {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
       yield put(setUnreadScrollToAC(true))
+      removeAllMessages()
       yield call(setActiveChannelId, channel && channel.id)
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
