@@ -230,4 +230,5 @@ export interface IMessageProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  collapsedCharacterLimit?: number
 }

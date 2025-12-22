@@ -84,7 +84,9 @@ import {
   setPendingMessage,
   removePendingMessage,
   updatePendingMessage,
-  clearPendingMessagesMap
+  clearPendingMessagesMap,
+  updatePendingPollAction,
+  setUnreadMessageId
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 
@@ -93,8 +95,7 @@ export function sendMessageAC(
   channelId: string,
   connectionState: string,
   sendAttachmentsAsSeparateMessage?: boolean,
-  isResend?: boolean,
-  isAddToPendingMessagesMap: boolean = true
+  isResend?: boolean
 ) {
   return {
     type: SEND_MESSAGE,
@@ -103,21 +104,15 @@ export function sendMessageAC(
       channelId,
       connectionState,
       sendAttachmentsAsSeparateMessage,
-      isResend,
-      isAddToPendingMessagesMap
+      isResend
     }
   }
 }
 
-export function sendTextMessageAC(
-  message: any,
-  channelId: string,
-  connectionState: string,
-  isAddToPendingMessagesMap: boolean = true
-) {
+export function sendTextMessageAC(message: any, channelId: string, connectionState: string) {
   return {
     type: SEND_TEXT_MESSAGE,
-    payload: { message, channelId, connectionState, isAddToPendingMessagesMap }
+    payload: { message, channelId, connectionState }
   }
 }
 
@@ -128,16 +123,10 @@ export function resendMessageAC(message: any, channelId: string, connectionState
   }
 }
 
-export function forwardMessageAC(
-  message: any,
-  channelId: string,
-  connectionState: string,
-  isForward: boolean = true,
-  isAddToPendingMessagesMap: boolean = true
-) {
+export function forwardMessageAC(message: any, channelId: string, connectionState: string, isForward: boolean = true) {
   return {
     type: FORWARD_MESSAGE,
-    payload: { message, channelId, connectionState, isForward, isAddToPendingMessagesMap }
+    payload: { message, channelId, connectionState, isForward }
   }
 }
 
@@ -168,10 +157,10 @@ export function getMessagesAC(
   loadWithLastMessage?: boolean,
   messageId?: string,
   limit?: number,
-  withDeliveredMessages?: boolean,
   highlight = true,
   behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage: boolean = true
+  scrollToMessage: boolean = true,
+  networkChanged: boolean = false
 ) {
   return {
     type: GET_MESSAGES,
@@ -180,10 +169,10 @@ export function getMessagesAC(
       loadWithLastMessage,
       messageId,
       limit,
-      withDeliveredMessages,
       highlight,
       behavior,
-      scrollToMessage
+      scrollToMessage,
+      networkChanged
     }
   }
 }
@@ -373,7 +362,6 @@ export function updateMessageAC(
   voteDetails?: {
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
     vote?: IPollVote
-    incrementVotesPerOptionCount: number
   }
 ) {
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
@@ -597,6 +585,10 @@ export function setPendingPollActionsMapAC(messageId: string, event: PendingPoll
   return setPendingPollActionsMap({ messageId, event })
 }
 
+export function updatePendingPollActionAC(messageId: string, message: IMessage) {
+  return updatePendingPollAction({ messageId, message })
+}
+
 export function setPendingMessageAC(channelId: string, message: IMessage) {
   return setPendingMessage({ channelId, message })
 }
@@ -611,4 +603,8 @@ export function updatePendingMessageAC(channelId: string, messageId: string, upd
 
 export function clearPendingMessagesMapAC() {
   return clearPendingMessagesMap()
+}
+
+export function setUnreadMessageIdAC(messageId: string) {
+  return setUnreadMessageId({ messageId })
 }

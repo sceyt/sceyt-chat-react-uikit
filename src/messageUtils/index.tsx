@@ -55,6 +55,14 @@ const MessageStatusIcon = ({
   accentColor?: string
 }) => {
   switch (messageStatus) {
+    case MESSAGE_DELIVERY_STATUS.PLAYED:
+      return messageStatusDisplayingType === 'ticks' ? (
+        <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor} />
+      ) : (
+        <StatusText fontSize={size} color={color}>
+          • Seen
+        </StatusText>
+      )
     case MESSAGE_DELIVERY_STATUS.READ:
       return messageStatusDisplayingType === 'ticks' ? (
         <ReadIconWrapper width={size} height={size} color={readIconColor || accentColor} />
@@ -318,22 +326,6 @@ const MessageTextFormat = ({
         messageText = linkifyTextPart(text, match, target, isInviteLink, onInviteLinkClick)
       }
     }
-
-    /* messageText.forEach((textPart, index) => {
-      // if (urlRegex.test(textPart)) {
-       messageText.forEach((textPart, index) => {
-      if (urlRegex.test(textPart)) {
-        const textArray = textPart.split(urlRegex)
-        const urlArray = textArray.map((part) => {
-          if (urlRegex.test(part)) {
-            return <a key={part} href={part} target='_blank' rel='noreferrer'>{`${part} `}</a>
-          }
-          return `${part} `
-        }) *!/
-        // @ts-ignore
-        messageText.splice(index, 1, ...urlArray)
-      }
-    }) */
     return messageText.length > 1 ? (asSampleText ? messageText.join('') : messageText) : text
   } catch (e) {
     log.error(' failed to format message .>>> ', e)
@@ -341,4 +333,118 @@ const MessageTextFormat = ({
   }
 }
 
-export { MessageStatusIcon, MessageTextFormat }
+const getNodeTextLength = (node: any): number => {
+  if (!node) return 0
+  if (typeof node === 'string') return node.length
+  if (typeof node === 'number') return String(node).length
+  if (Array.isArray(node)) {
+    return node.reduce((sum, child) => sum + getNodeTextLength(child), 0)
+  }
+  if (node.props && node.props.children) {
+    return getNodeTextLength(node.props.children)
+  }
+  return 0
+}
+
+const truncateNodeText = (node: any, maxLength: number): { node: any; usedLength: number } => {
+  if (!node) return { node, usedLength: 0 }
+
+  if (typeof node === 'string') {
+    if (node.length > maxLength) {
+      return { node: node.slice(0, maxLength), usedLength: maxLength }
+    }
+    return { node, usedLength: node.length }
+  }
+
+  if (typeof node === 'number') {
+    const str = String(node)
+    if (str.length > maxLength) {
+      return { node: str.slice(0, maxLength), usedLength: maxLength }
+    }
+    return { node, usedLength: str.length }
+  }
+
+  if (Array.isArray(node)) {
+    const result: any[] = []
+    let remaining = maxLength
+    for (const child of node) {
+      if (remaining <= 0) break
+      const { node: truncatedChild, usedLength } = truncateNodeText(child, remaining)
+      result.push(truncatedChild)
+      remaining -= usedLength
+    }
+    return { node: result, usedLength: maxLength - remaining }
+  }
+
+  if (node.props && node.props.children !== undefined) {
+    const { node: truncatedChildren, usedLength } = truncateNodeText(node.props.children, maxLength)
+    return {
+      node: {
+        ...node,
+        props: {
+          ...node.props,
+          children: truncatedChildren
+        }
+      },
+      usedLength
+    }
+  }
+
+  return { node, usedLength: 0 }
+}
+
+const trimReactMessage = (parts: any[] | string, limit: number | undefined) => {
+  if (typeof limit !== 'number' || limit < 0) {
+    return { result: parts, truncated: false }
+  }
+  if (typeof parts === 'string') {
+    if (parts.length > limit) {
+      return { result: parts.slice(0, limit) + '...', truncated: true }
+    }
+    return { result: parts, truncated: false }
+  }
+  let remaining = limit
+  let truncated = false
+  const result = []
+
+  for (const part of parts) {
+    if (typeof part === 'string') {
+      if (remaining <= 0) {
+        truncated = true
+        break
+      }
+
+      if (part.length > remaining) {
+        result.push(part.slice(0, remaining))
+        remaining = 0
+        truncated = true
+        break
+      } else {
+        result.push(part)
+        remaining -= part.length
+      }
+    } else if (part && typeof part === 'object') {
+      if (remaining <= 0) {
+        truncated = true
+        break
+      }
+
+      const nodeTextLength = getNodeTextLength(part)
+
+      if (nodeTextLength > remaining) {
+        const { node: truncatedNode } = truncateNodeText(part, remaining)
+        result.push(truncatedNode)
+        remaining = 0
+        truncated = true
+        break
+      } else {
+        result.push(part)
+        remaining -= nodeTextLength
+      }
+    }
+  }
+
+  return { result, truncated }
+}
+
+export { MessageStatusIcon, MessageTextFormat, trimReactMessage }

@@ -290,7 +290,8 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
 
   const handleConfirmReset = () => {
     setShowResetConfirm(false)
-    dispatch(regenerateChannelInviteKeyAC(channelId, channelInviteKeys?.[0]?.key || ''))
+    // delete permanently is hardcoded to true for now
+    dispatch(regenerateChannelInviteKeyAC(channelId, channelInviteKeys?.[0]?.key || '', true))
   }
 
   useEffect(() => {

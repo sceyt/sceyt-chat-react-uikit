@@ -12,6 +12,7 @@ import {
   getChannelFromMap,
   getChannelGroupName,
   getChannelTypesFilter,
+  getCustomLoadMembersFunctions,
   getLastChannelFromMap,
   getOnUpdateChannel,
   handleNewMessages,
@@ -77,7 +78,13 @@ import {
   updatePendingMessageOnMap
 } from '../../helpers/messagesHalper'
 import { getShowNotifications, setNotification } from '../../helpers/notifications'
-import { addMembersToListAC, getRolesAC, removeMemberFromListAC, updateMembersAC } from '../member/actions'
+import {
+  addMembersToListAC,
+  getRolesAC,
+  removeMemberFromListAC,
+  setMembersToListAC,
+  updateMembersAC
+} from '../member/actions'
 import { browserTabIsActiveSelector, contactsMapSelector } from '../user/selector'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { attachmentTypes } from '../../helpers/constants'
@@ -532,23 +539,42 @@ export default function* watchForEvents(): any {
         }
         case CHANNEL_EVENT_TYPES.JOIN: {
           // const { channel, joinedMember } = args
-          const { channel } = args
+          const { channel, joinedMember } = args
           log.info('channel JOIN ... . ', channel)
-          const activeChannelId = yield call(getActiveChannelId)
-          if (activeChannelId === channel.id) {
-            // yield put(addMembersToListAC([joinedMember]));
-          }
-          const chan = getChannelFromAllChannels(channel.id)
+          let chan = getChannelFromAllChannels(channel.id)
           if (!chan) {
             addChannelToAllChannels(channel)
+            chan = getChannelFromAllChannels(channel.id)
           }
-          // TODO notification
-          /* const not = {
-          id: createId(),
-          title: 'Member Joined',
-          message: `${joinedMember.firstName || joinedMember.id} joined to ${channel.subject}`,
-        };
-        yield put(setNotification(not)); */
+          if (chan) {
+            const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+            const joinMembersEvent = customLoadMembersFunctions?.joinMembersEvent
+            let membersList = []
+            if (joinMembersEvent) {
+              membersList = yield call(
+                joinMembersEvent,
+                chan.id,
+                [joinedMember],
+                store.getState().MembersReducer.channelsMembersMap[chan.id] || []
+              )
+              yield put(setMembersToListAC(membersList, chan.id))
+            } else {
+              yield put(addMembersToListAC([joinedMember], chan.id))
+            }
+            updateChannelOnAllChannels(chan.id, { memberCount: chan.memberCount + 1 })
+            const updateChannelData = joinMembersEvent
+              ? { members: membersList }
+              : yield call(updateActiveChannelMembersAdd, [joinedMember]) || {}
+            yield put(
+              updateChannelDataAC(chan.id, {
+                memberCount: chan.memberCount + 1,
+                ...updateChannelData
+              })
+            )
+            yield put(
+              updateSearchedChannelDataAC(chan.id, { memberCount: chan.memberCount + 1 }, getChannelGroupName(chan))
+            )
+          }
           break
         }
         case CHANNEL_EVENT_TYPES.LEAVE: {
@@ -571,7 +597,7 @@ export default function* watchForEvents(): any {
             if (channelExists) {
               let updateChannelData = {}
               if (activeChannelId === channel.id) {
-                yield put(removeMemberFromListAC([member]))
+                yield put(removeMemberFromListAC([member], channel.id))
                 updateChannelData = yield call(updateActiveChannelMembersRemove, [member]) || {}
               }
 
@@ -636,7 +662,7 @@ export default function* watchForEvents(): any {
             } else {
               let updateChannelData = {}
               if (activeChannelId === channel.id) {
-                yield put(removeMemberFromListAC(removedMembers))
+                yield put(removeMemberFromListAC(removedMembers, channel.id))
                 updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
               }
 
@@ -675,8 +701,23 @@ export default function* watchForEvents(): any {
           if (channelExists) {
             let updateChannelData = {}
             if (activeChannelId === channel.id) {
-              yield put(addMembersToListAC(addedMembers))
-              updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
+              const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+              const addMembersEvent = customLoadMembersFunctions?.addMembersEvent
+              let membersList = []
+              if (addMembersEvent) {
+                membersList = yield call(
+                  addMembersEvent,
+                  channel.id,
+                  addedMembers,
+                  store.getState().MembersReducer.channelsMembersMap[channel.id] || []
+                )
+                yield put(setMembersToListAC(membersList, channel.id))
+              } else {
+                yield put(addMembersToListAC(addedMembers, channel.id))
+              }
+              updateChannelData = addMembersEvent
+                ? { members: membersList }
+                : yield call(updateActiveChannelMembersAdd, addedMembers) || {}
             }
             yield put(
               updateChannelDataAC(channel.id, {
@@ -1095,6 +1136,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_ADDED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_ADDED ... ')
           const { channel, pollDetails, messageId } = args
           const pollDetailsData = pollDetails as IPollDetails
           const activeChannelId = yield call(getActiveChannelId)
@@ -1105,15 +1147,13 @@ export default function* watchForEvents(): any {
           for (const vote of deletedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const vote of addedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('addOwn' as const) : ('add' as const),
-              vote,
-              incrementVotesPerOptionCount: 1
+              vote
             })
           }
 
@@ -1138,8 +1178,7 @@ export default function* watchForEvents(): any {
               },
               {
                 type: obj.type,
-                vote: obj.vote,
-                incrementVotesPerOptionCount: obj.incrementVotesPerOptionCount
+                vote: obj.vote
               }
             )
             if (channel.id === activeChannelId) {
@@ -1150,6 +1189,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_DELETED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_DELETED ... ')
           const { channel, pollDetails, messageId } = args
           const pollDetailsData = pollDetails as IPollDetails
           const activeChannelId = yield call(getActiveChannelId)
@@ -1159,8 +1199,7 @@ export default function* watchForEvents(): any {
           for (const vote of deletedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const obj of objs) {
@@ -1186,6 +1225,7 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_RETRACTED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_RETRACTED ... ')
           const { channel, pollDetails, messageId } = args
           const activeChannelId = yield call(getActiveChannelId)
           const pollDetailsData = pollDetails as IPollDetails
@@ -1194,8 +1234,7 @@ export default function* watchForEvents(): any {
           for (const vote of retractedVotes) {
             objs.push({
               type: vote.user.id === SceytChatClient.user.id ? ('deleteOwn' as const) : ('delete' as const),
-              vote,
-              incrementVotesPerOptionCount: -1
+              vote
             })
           }
           for (const obj of objs) {
@@ -1221,9 +1260,10 @@ export default function* watchForEvents(): any {
           break
         }
         case CHANNEL_EVENT_TYPES.POLL_CLOSED: {
+          log.info('CHANNEL_EVENT_TYPES.POLL_CLOSED ... ')
           const { channel, messageId } = args
           const activeChannelId = yield call(getActiveChannelId)
-          const obj = { type: 'close' as const, incrementVotesPerOptionCount: 0 }
+          const obj = { type: 'close' as const }
           updateMessageOnMap(
             channel.id,
             {
@@ -1470,7 +1510,19 @@ export default function* watchForEvents(): any {
           log.info('channel CHANGE_ROLE  member ... ', members)
           const activeChannelId = yield call(getActiveChannelId)
           if (channel.id === activeChannelId) {
-            yield put(updateMembersAC(members))
+            const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+            const updateMembersEvent = customLoadMembersFunctions?.updateMembersEvent
+            if (updateMembersEvent) {
+              const membersList = yield call(
+                updateMembersEvent,
+                channel.id,
+                members,
+                store.getState().MembersReducer.channelsMembersMap[channel.id] || []
+              )
+              yield put(setMembersToListAC(membersList, channel.id))
+            } else {
+              yield put(updateMembersAC(members, channel.id))
+            }
           }
           for (let i = 0; i < members.length; i++) {
             if (members[i].id === SceytChatClient.user.id) {

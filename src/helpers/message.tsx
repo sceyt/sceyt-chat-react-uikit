@@ -310,7 +310,6 @@ export const handleVoteDetails = (
   voteDetails?: {
     vote?: IPollVote
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
-    incrementVotesPerOptionCount: number
   },
   message?: IMessage
 ): IPollDetails | undefined => {
@@ -319,11 +318,15 @@ export const handleVoteDetails = (
   }
 
   const existingPollDetails = message.pollDetails
-  const existingVoteDetails = existingPollDetails.voteDetails || {
-    votesPerOption: {},
-    votes: [],
-    ownVotes: []
-  }
+  const existingVoteDetails = JSON.parse(
+    JSON.stringify(
+      existingPollDetails.voteDetails || {
+        votesPerOption: {},
+        votes: [],
+        ownVotes: []
+      }
+    )
+  )
 
   if (voteDetails.type === 'close') {
     return {
@@ -339,23 +342,37 @@ export const handleVoteDetails = (
   const vote = voteDetails.vote
   const optionId = vote.optionId
   const currentVotesPerOption = existingVoteDetails.votesPerOption || {}
-  const optionVotesCount = (currentVotesPerOption[optionId] || 0) + voteDetails.incrementVotesPerOptionCount
-  const newVotesPerOption = {
-    ...currentVotesPerOption,
-    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
-  }
+  let optionVotesCount = currentVotesPerOption[optionId] || 0
 
   let newVotes: IPollVote[] = existingVoteDetails.votes || []
   let newOwnVotes: IPollVote[] = existingVoteDetails.ownVotes || []
 
   if (voteDetails.type === 'add') {
     newVotes = [...newVotes, vote]
+    optionVotesCount++
   } else if (voteDetails.type === 'delete') {
     newVotes = deleteVoteFromPollDetails(newVotes, vote)
+    optionVotesCount--
   } else if (voteDetails.type === 'addOwn') {
-    newOwnVotes = [...newOwnVotes, vote]
+    const existingOwnVote = existingVoteDetails.ownVotes.find(
+      (v: IPollVote) => v.optionId === vote.optionId && v.user.id === vote.user.id
+    )
+    if (!existingOwnVote) {
+      optionVotesCount++
+      if (existingPollDetails.allowMultipleVotes) {
+        newOwnVotes = [...newOwnVotes, vote]
+      } else {
+        newOwnVotes = [vote]
+      }
+    }
   } else if (voteDetails.type === 'deleteOwn') {
     newOwnVotes = deleteVoteFromPollDetails(newOwnVotes, vote)
+    optionVotesCount--
+  }
+
+  const newVotesPerOption = {
+    ...currentVotesPerOption,
+    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
   }
 
   const newVoteDetails: IVoteDetails = {
@@ -368,4 +385,101 @@ export const handleVoteDetails = (
     ...existingPollDetails,
     voteDetails: newVoteDetails
   }
+}
+
+export const extractTextFromReactElement = (element: any): string => {
+  if (typeof element === 'string') {
+    return element
+  }
+  if (element === null || element === undefined) {
+    return ''
+  }
+  if (Array.isArray(element)) {
+    return element.map(extractTextFromReactElement).join('')
+  }
+  if (typeof element === 'object' && element.props) {
+    if (typeof element.props.children === 'string') {
+      return element.props.children
+    }
+    if (Array.isArray(element.props.children)) {
+      return element.props.children.map(extractTextFromReactElement).join('')
+    }
+    if (element.props.children) {
+      return extractTextFromReactElement(element.props.children)
+    }
+  }
+  return ''
+}
+
+export const checkIsTypeKeyPressed = (code?: string) => {
+  return !(
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'CapsLock' ||
+    code === 'Shift' ||
+    code === 'ShiftLeft' ||
+    code === 'ShiftRight' ||
+    code === 'Control' ||
+    code === 'ControlLeft' ||
+    code === 'ControlRight' ||
+    code === 'Alt' ||
+    code === 'AltLeft' ||
+    code === 'AltRight' ||
+    code === 'MetaLeft' ||
+    code === 'MetaRight' ||
+    code === 'Space' ||
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'Shift'
+  )
 }

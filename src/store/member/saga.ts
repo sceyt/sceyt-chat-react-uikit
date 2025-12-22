@@ -1,18 +1,22 @@
 import { put, call, takeLatest, takeEvery } from 'redux-saga/effects'
 import {
   setMembersLoadingStateAC,
+  setActionIsRestrictedAC,
   removeMemberFromListAC,
   updateMembersAC,
   addMembersToListAC,
   setMembersToListAC,
   getRolesFailAC,
-  getRolesSuccessAC
+  getRolesSuccessAC,
+  setMembersHasNextAC
 } from './actions'
 import {
   getChannelFromMap,
   getDisableFrowardMentionsCount,
+  getCustomLoadMembersFunctions,
   query,
-  updateChannelOnAllChannels
+  updateChannelOnAllChannels,
+  getChannelFromAllChannels
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE } from '../../helpers/constants'
 
@@ -27,7 +31,7 @@ import {
   GET_ROLES
 } from './constants'
 import { updateChannelDataAC } from '../channel/actions'
-import { IAction, IMember } from '../../types'
+import { IAction, IChannel, IMember } from '../../types'
 import { getClient } from '../../common/client'
 import { sendTextMessageAC } from '../message/actions'
 import { CONNECTION_STATUS } from '../user/constants'
@@ -36,54 +40,85 @@ import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from 
 import store from 'store'
 
 function* getMembers(action: IAction): any {
+  const { payload } = action
+  const { channelId } = payload
   try {
-    const { payload } = action
-    const { channelId } = payload
-    if (!channelId) {
+    yield put(setMembersHasNextAC(true, channelId))
+    if (!channelId || store.getState().MembersReducer.channelsMembersHasNextMap[channelId] === false) {
       return
     }
+
     const SceytChatClient = getClient()
     const membersQueryBuilder = new (SceytChatClient.MemberListQueryBuilder as any)(channelId)
     membersQueryBuilder.all().byAffiliationOrder().orderKeyByUsername().limit(50)
 
     const membersQuery = yield call(membersQueryBuilder.build)
 
-    query.membersQuery = membersQuery
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
-    const { members } = yield call(membersQuery.loadNextPage)
-    yield put(setMembersToListAC(members))
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
+    if (!query.channelMembersQuery) {
+      query.channelMembersQuery = { [channelId]: membersQuery }
+    } else {
+      query.channelMembersQuery[channelId] = membersQuery
+    }
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
+    const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+    const getMembers = customLoadMembersFunctions?.getMembers
+    let channel: IChannel = getChannelFromMap(channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId) as IChannel
+      if (channel) {
+        channel = yield call(SceytChatClient.getChannel, channelId)
+      }
+    }
+    const { members, hasNext } = getMembers ? yield call(getMembers, channel) : yield call(membersQuery.loadNextPage)
+    yield put(setMembersToListAC(members, channelId))
+    yield put(setMembersHasNextAC(hasNext, channelId))
+    const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
+    yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     log.error('ERROR in get members - ', e.message)
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED, channelId))
   }
 }
 
 function* loadMoreMembers(action: IAction): any {
+  const { payload } = action
+  const { limit, channelId } = payload
   try {
-    const { payload } = action
-    const { limit } = payload
-    const { channelId } = payload
-    const { membersQuery } = query
+    const { channelMembersQuery } = query
+    const membersQuery = channelMembersQuery?.[channelId]
 
     if (limit && membersQuery) {
       membersQuery.limit = limit
     }
 
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING))
-    const { members } = yield call((membersQuery as any).loadNextPage)
-
-    yield put(addMembersToListAC(members))
-    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED))
-
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADING, channelId))
+    const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+    const loadMoreMembers = customLoadMembersFunctions?.loadMoreMembers
+    let channel: IChannel = getChannelFromMap(channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId) as IChannel
+      if (channel) {
+        const SceytChatClient = getClient()
+        channel = yield call(SceytChatClient.getChannel, channelId)
+      }
+    }
+    const { members, hasNext } = loadMoreMembers
+      ? yield call(loadMoreMembers, channel, limit)
+      : yield call(membersQuery.loadNextPage)
+    yield put(addMembersToListAC(members, channelId))
+    yield put(setMembersHasNextAC(hasNext, channelId))
     const updateChannelData = yield call(updateActiveChannelMembersAdd, members) || {}
-    yield put(updateChannelDataAC(channelId, { ...updateChannelData }))
+    yield put(updateChannelDataAC(channelId, updateChannelData))
   } catch (e) {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setMembersLoadingStateAC(LOADING_STATE.LOADED, channelId))
   }
 }
 
@@ -101,24 +136,47 @@ function* addMembers(action: IAction): any {
       })
 
       const addedMembers = yield call(channel.addMembers, membersToAdd)
+      const whoDoesNotAdded = members.filter(
+        (mem: IMember) => !addedMembers.some((addedMem: IMember) => addedMem.id === mem.id)
+      )
+      if (whoDoesNotAdded.length) {
+        yield put(setActionIsRestrictedAC(true, true, whoDoesNotAdded))
+      }
       if (channel.type === DEFAULT_CHANNEL_TYPE.GROUP || channel.type === DEFAULT_CHANNEL_TYPE.PRIVATE) {
         const membersIds: string[] = []
         addedMembers.forEach((mem: IMember) => {
           membersIds.push(mem.id)
         })
-        const messageToSend: any = {
-          metadata: { m: membersIds },
-          body: 'AM',
-          mentionedUsers: getDisableFrowardMentionsCount() ? [] : addedMembers,
-          attachments: [],
-          type: 'system'
+        if (membersIds.length) {
+          const messageToSend: any = {
+            metadata: { m: membersIds },
+            body: 'AM',
+            mentionedUsers: getDisableFrowardMentionsCount() ? [] : addedMembers,
+            attachments: [],
+            type: 'system'
+          }
+          yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
         }
-        yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
       }
-      yield put(addMembersToListAC(addedMembers))
+      const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+      const addMembersEvent = customLoadMembersFunctions?.addMembersEvent
+      let membersList = []
+      if (addMembersEvent) {
+        membersList = yield call(
+          addMembersEvent,
+          channelId,
+          addedMembers,
+          store.getState().MembersReducer.channelsMembersMap[channelId] || []
+        )
+        yield put(setMembersToListAC(membersList, channelId))
+      } else {
+        yield put(addMembersToListAC(addedMembers, channelId))
+      }
       updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount + addedMembers.length })
 
-      const updateChannelData = yield call(updateActiveChannelMembersAdd, addedMembers) || {}
+      const updateChannelData = addMembersEvent
+        ? { members: membersList }
+        : yield call(updateActiveChannelMembersAdd, addedMembers) || {}
       yield put(
         updateChannelDataAC(channel.id, {
           memberCount: channel.memberCount + addedMembers.length,
@@ -154,7 +212,7 @@ function* kickMemberFromChannel(action: IAction): any {
       }
       yield put(sendTextMessageAC(messageToSend, channelId, CONNECTION_STATUS.CONNECTED))
     }
-    yield put(removeMemberFromListAC(removedMembers))
+    yield put(removeMemberFromListAC(removedMembers, channelId))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
 
     const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
@@ -176,7 +234,7 @@ function* blockMember(action: IAction): any {
 
     const channel = yield call(getChannelFromMap, channelId)
     const removedMembers = yield call(channel.blockMembers, [memberId])
-    yield put(removeMemberFromListAC(removedMembers))
+    yield put(removeMemberFromListAC(removedMembers, channelId))
     updateChannelOnAllChannels(channel.id, { memberCount: channel.memberCount - removedMembers.length })
 
     const updateChannelData = yield call(updateActiveChannelMembersRemove, removedMembers) || {}
@@ -198,7 +256,19 @@ function* changeMemberRole(action: IAction): any {
 
     const channel = yield call(getChannelFromMap, channelId)
     const updatedMembers = yield call(channel.changeMembersRole, members)
-    yield put(updateMembersAC(updatedMembers))
+    const customLoadMembersFunctions = getCustomLoadMembersFunctions()
+    const updateMembersEvent = customLoadMembersFunctions?.updateMembersEvent
+    if (updateMembersEvent) {
+      const membersList = yield call(
+        updateMembersEvent,
+        channelId,
+        updatedMembers,
+        store.getState().MembersReducer.channelsMembersMap[channelId] || []
+      )
+      yield put(setMembersToListAC(membersList, channelId))
+    } else {
+      yield put(updateMembersAC(updatedMembers, channelId))
+    }
   } catch (e) {
     log.error('error in change member role', e)
     // yield put(setErrorNotification(e.message))
@@ -244,7 +314,7 @@ function* getRoles(action: IAction): any {
 }
 
 export default function* MembersSaga() {
-  yield takeLatest(GET_MEMBERS, getMembers)
+  yield takeEvery(GET_MEMBERS, getMembers)
   yield takeEvery(LOAD_MORE_MEMBERS, loadMoreMembers)
   yield takeEvery(ADD_MEMBERS, addMembers)
   yield takeEvery(KICK_MEMBER, kickMemberFromChannel)

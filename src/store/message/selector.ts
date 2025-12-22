@@ -44,3 +44,4 @@ export const pollVotesLoadingStateSelector = (store: any) => store.MessageReduce
 export const pendingPollActionsSelector = (store: any) => store.MessageReducer.pendingPollActions
 export const pendingMessagesMapSelector = (store: any) => store.MessageReducer.pendingMessagesMap
 export const unreadScrollToSelector = (store: any) => store.MessageReducer.unreadScrollTo
+export const unreadMessageIdSelector = (store: any) => store.MessageReducer.unreadMessageId

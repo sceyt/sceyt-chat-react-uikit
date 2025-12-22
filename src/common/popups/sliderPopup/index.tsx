@@ -708,11 +708,11 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
 
   img,
   video {
-    //max-width: calc(100vw - 300px);
     min-width: 280px;
     max-width: 100%;
     max-height: calc(100vh - 200px);
     height: 100%;
+    width: 100%;
     @media (max-width: 480px) {
       min-width: inherit;
     }

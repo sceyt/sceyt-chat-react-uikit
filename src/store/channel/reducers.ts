@@ -55,6 +55,10 @@ export interface IChannelState {
     }[]
   }
   joinableChannel: IChannel | null
+  channelInviteKeyAvailable: boolean
+  mutualChannels: IChannel[]
+  mutualChannelsHasNext: boolean
+  mutualChannelsLoadingState: number | null
 }
 
 const initialState: IChannelState = {
@@ -89,7 +93,11 @@ const initialState: IChannelState = {
   draggedAttachments: [],
   draftIsRemoved: '',
   channelInviteKeys: {},
-  joinableChannel: null
+  joinableChannel: null,
+  channelInviteKeyAvailable: true,
+  mutualChannels: [],
+  mutualChannelsHasNext: false,
+  mutualChannelsLoadingState: null
 }
 
 const channelSlice = createSlice({
@@ -106,7 +114,7 @@ const channelSlice = createSlice({
     },
 
     setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
-      state.channels = [...action.payload.channels]
+      state.channels = sortChannelByLastMessage([...action.payload.channels])
     },
 
     setSearchedChannels: (
@@ -325,7 +333,7 @@ const channelSlice = createSlice({
           })
         }
       }
-      state.channels = [...updatedChannels]
+      state.channels = sortChannelByLastMessage([...updatedChannels])
     },
 
     updateChannelLastMessage: (state, action: PayloadAction<{ message: IMessage | {}; channel: IChannel }>) => {
@@ -343,6 +351,7 @@ const channelSlice = createSlice({
             }
             return chan
           })
+          state.channels = sortChannelByLastMessage(state.channels)
         }
       } else {
         const updatedChannels = state.channels.filter((chan) => chan.id !== channel.id)
@@ -369,6 +378,7 @@ const channelSlice = createSlice({
         }
         return chan
       })
+      state.channels = sortChannelByLastMessage(state.channels)
     },
 
     setChannelInfoOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
@@ -483,6 +493,28 @@ const channelSlice = createSlice({
 
     setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
       state.joinableChannel = action.payload.channel
+    },
+
+    setChannelInviteKeyAvailable: (state, action: PayloadAction<{ available: boolean }>) => {
+      state.channelInviteKeyAvailable = action.payload.available
+    },
+
+    setMutualChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      // If empty array is passed, replace the list (for clearing/resetting)
+      // Otherwise, append to existing list (for pagination)
+      if (action.payload.channels.length === 0 && state.mutualChannels.length > 0) {
+        state.mutualChannels = []
+      } else {
+        state.mutualChannels = [...state.mutualChannels, ...action.payload.channels]
+      }
+    },
+
+    setMutualChannelsHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
+      state.mutualChannelsHasNext = action.payload.hasNext
+    },
+
+    setMutualChannelsLoadingState: (state, action: PayloadAction<{ state: number }>) => {
+      state.mutualChannelsLoadingState = action.payload.state
     }
   },
   extraReducers: (builder) => {
@@ -528,7 +560,11 @@ export const {
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,
-  setJoinableChannel
+  setJoinableChannel,
+  setChannelInviteKeyAvailable,
+  setMutualChannels,
+  setMutualChannelsHasNext,
+  setMutualChannelsLoadingState
 } = channelSlice.actions
 
 // Export reducer

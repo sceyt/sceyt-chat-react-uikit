@@ -32,7 +32,7 @@ import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate, useColor } from '../../../hooks'
+import { useDidUpdate, useColor, useUpdatedUser } from '../../../hooks'
 import {
   getChannelTypesMemberDisplayTextMap,
   getDefaultRolesByChannelTypesMap,
@@ -64,6 +64,24 @@ interface IProps {
   popupWidth?: string
   popupHeight?: string
   handleOpenInviteModal?: () => void
+}
+
+const UserItem = ({ user, memberDisplayName }: { user: IUser; memberDisplayName: string }) => {
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const userUpdated = useUpdatedUser(user)
+
+  return (
+    <UserNamePresence>
+      <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
+      <SubTitle color={textSecondary}>
+        {userUpdated.presence && userUpdated.presence.state === USER_PRESENCE_STATUS.ONLINE
+          ? 'Online'
+          : userUpdated.presence &&
+            userUpdated.presence.lastActiveAt &&
+            userLastActiveDateFormat(userUpdated.presence.lastActiveAt)}
+      </SubTitle>
+    </UserNamePresence>
+  )
 }
 
 const UsersPopup = ({
@@ -399,17 +417,7 @@ const UsersPopup = ({
                     textSize={16}
                     setDefaultAvatar
                   />
-
-                  <UserNamePresence>
-                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
-                    <SubTitle color={textSecondary}>
-                      {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
-                        ? 'Online'
-                        : user.presence &&
-                          user.presence.lastActiveAt &&
-                          userLastActiveDateFormat(user.presence.lastActiveAt)}
-                    </SubTitle>
-                  </UserNamePresence>
+                  <UserItem user={user} memberDisplayName={memberDisplayName} />
                   {/* {isAdd && isSelected && (
                     <DropDown
                       withIcon

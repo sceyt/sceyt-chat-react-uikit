@@ -5,8 +5,10 @@ import { IMember } from '../../types'
 export function* updateActiveChannelMembersAdd(addedMembers: IMember[]): any {
   const state = yield select()
   const activeChannel = state.ChannelReducer.activeChannel
+  const members = activeChannel?.members || []
+  const shouldUpdateMembers = addedMembers.filter((member) => !members.some((m: IMember) => m.id === member.id))
   if (activeChannel && activeChannel.id) {
-    let updatedMembers = [...(activeChannel.members || []), ...addedMembers]
+    let updatedMembers = [...(activeChannel.members || []), ...shouldUpdateMembers]
     // remove duplicates
     updatedMembers = Array.from(new Set(updatedMembers))
     return { members: updatedMembers }

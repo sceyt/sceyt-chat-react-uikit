@@ -36,9 +36,11 @@ import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
 import { ReactComponent as UnpinIcon } from '../../../assets/svg/unpin.svg'
 import { ReactComponent as WatchIcon } from '../../../assets/svg/watch.svg'
 import { ReactComponent as ChevronRightIcon } from '../../../assets/svg/chevronBottom.svg'
+import { ReactComponent as UsersIcon } from '../../../assets/svg/users.svg'
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
 import { getDisappearingSettings } from '../../../helpers/channelHalper'
+import { formatDisappearingMessageTime } from '../../../helpers'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
@@ -52,6 +54,7 @@ import DisappearingMessagesPopup from '../../../common/popups/disappearingMessag
 import DropDown from '../../../common/dropdown'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
+import GroupsInCommonPopup from 'common/popups/groupsInCommonPopup/indext'
 
 interface IProps {
   setActionsHeight?: (height: number) => void
@@ -129,6 +132,12 @@ interface IProps {
   actionItemsFontSize?: string
 
   borderColor?: string
+
+  commonGroupsOrder?: number
+  commonGroupsIcon?: JSX.Element
+  commonGroupsIconColor?: string
+  commonGroupsTextColor?: string
+  showGroupsInCommon?: boolean
 }
 
 const Actions = ({
@@ -195,7 +204,12 @@ const Actions = ({
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
   actionItemsFontSize,
-  borderColor
+  borderColor,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -217,6 +231,7 @@ const Actions = ({
   const [unblockUserPopupOpen, setUnblockUserPopupOpen] = useState(false)
   const [reportUserPopupOpen, setReportUserPopupOpen] = useState(false)
   const [disappearingMessagesPopupOpen, setDisappearingMessagesPopupOpen] = useState(false)
+  const [groupsInCommonPopupOpen, setGroupsInCommonPopupOpen] = useState(false)
   const [checkActionPermission] = usePermissions(channel.userRole)
   // const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [popupButtonText, setPopupButtonText] = useState('')
@@ -358,6 +373,10 @@ const Actions = ({
     } else {
       dispatch(pinChannelAC(channel.id))
     }
+  }
+
+  const handleToggleGroupsInCommonPopup = () => {
+    setGroupsInCommonPopupOpen(!groupsInCommonPopupOpen)
   }
 
   const handleToggleDisappearingMessagesPopup = () => {
@@ -515,13 +534,14 @@ const Actions = ({
               color={textPrimary}
               hoverColor={textPrimary}
               fontSize={actionItemsFontSize}
+              flexWrap='wrap'
             >
               <React.Fragment>
                 <DefaultWatchIcon $isLightMode={backgroundColor === '#FFFFFF'} />
                 Disappearing messages
                 <DisappearingMessagesStatusWrapper>
                   <DisappearingMessagesStatus color={textSecondary}>
-                    {channel.messageRetentionPeriod ? 'On' : 'Off'}
+                    {formatDisappearingMessageTime(channel.messageRetentionPeriod)}
                   </DisappearingMessagesStatus>
                   <ChevronRightIconWrapper>
                     <ChevronRightIcon color={iconPrimary} />
@@ -577,6 +597,28 @@ const Actions = ({
               <React.Fragment>{markAsUnreadIcon || <DefaultMarkAsUnRead />} Mark as unread</React.Fragment>
             </ActionItem>
           ))}
+
+        {!isSelfChannel && isDirectChannel && !channel.isMockChannel && showGroupsInCommon && (
+          <ActionItem
+            key={4}
+            order={commonGroupsOrder}
+            iconColor={commonGroupsTextColor || iconPrimary}
+            color={commonGroupsIconColor || textPrimary}
+            hoverColor={commonGroupsTextColor || textPrimary}
+            fontSize={actionItemsFontSize}
+            onClick={handleToggleGroupsInCommonPopup}
+          >
+            <React.Fragment>
+              {commonGroupsIcon || <UsersIcon />}
+              Groups in common
+              <DisappearingMessagesStatusWrapper>
+                <ChevronRightIconWrapper>
+                  <ChevronRightIcon color={iconPrimary} />
+                </ChevronRightIconWrapper>
+              </DisappearingMessagesStatusWrapper>
+            </React.Fragment>
+          </ActionItem>
+        )}
 
         {!isDirectChannel && showLeaveChannel && (
           <ActionItem
@@ -909,6 +951,14 @@ const Actions = ({
         />
       )}
 
+      {groupsInCommonPopupOpen && (
+        <GroupsInCommonPopup
+          theme={theme}
+          togglePopup={handleToggleGroupsInCommonPopup}
+          user={channel.members.find((member: IMember) => member.id !== user.id)}
+        />
+      )}
+
       {/*  {blockUserPopupOpen && (
         <DeletePopup
           deleteFunction={handleBlockUser}
@@ -1006,6 +1056,7 @@ const ActionItem = styled.li<{
   iconColor: string
   hoverColor: string
   order?: number
+  flexWrap?: string
 }>`
   position: relative;
   display: flex;
@@ -1016,7 +1067,7 @@ const ActionItem = styled.li<{
   cursor: pointer;
   order: ${(props) => props.order};
   pointer-events: ${(props) => props.disableEvent && 'none'};
-
+  ${(props) => props.flexWrap && `flex-wrap: ${props.flexWrap};`}
   & > div {
     margin-left: auto;
   }
@@ -1046,7 +1097,11 @@ const DisappearingMessagesStatusWrapper = styled.div`
 
 const DisappearingMessagesStatus = styled.span<{ color: string }>`
   color: ${(props) => props.color};
-  font-size: 14px;
+  font-weight: 400;
+  font-style: normal;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
 `
 
 const ChevronRightIconWrapper = styled.span`

@@ -3,7 +3,7 @@ import { Provider } from 'react-redux'
 import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
+import { IAttachment, IChannel, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
 
 import {
@@ -11,7 +11,8 @@ import {
   setBaseUrlForInviteMembers,
   setInviteLinkOptions,
   setUseInviteLink,
-  setDisappearingSettings
+  setDisappearingSettings,
+  setCustomLoadMembersFunctions
 } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
@@ -131,6 +132,13 @@ export interface IChatClientProps {
       seconds: number
     }[]
   } | null
+  customLoadMembersFunctions?: {
+    loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+    getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+    addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+    joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+    updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+  } | null
 }
 
 const SceytChatContainer = ({
@@ -165,7 +173,8 @@ const SceytChatContainer = ({
   },
   embeddedJoinGroupPopup = false,
   onUpdateChannel,
-  disappearingSettings = null
+  disappearingSettings = null,
+  customLoadMembersFunctions = null
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -194,6 +203,12 @@ const SceytChatContainer = ({
       setDisappearingSettings(disappearingSettings)
     }
   }, [disappearingSettings])
+
+  useEffect(() => {
+    if (customLoadMembersFunctions) {
+      setCustomLoadMembersFunctions(customLoadMembersFunctions)
+    }
+  }, [customLoadMembersFunctions])
 
   return (
     <Provider store={store} context={SceytReduxContext}>

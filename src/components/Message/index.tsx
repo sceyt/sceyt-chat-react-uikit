@@ -39,14 +39,13 @@ import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.
 // Helpers
 import {
   deletePendingMessage,
-  getPendingAttachment,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IAttachment, IReaction } from 'types'
+import { IReaction } from 'types'
 // Components
 import Avatar from '../Avatar'
 import ConfirmPopup from 'common/popups/delete'
@@ -58,8 +57,10 @@ import MessageStatusAndTime from './MessageStatusAndTime'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
-import { isMessageUnsupported } from 'helpers/message'
+import { extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
 import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
+import { MessageTextFormat } from 'messageUtils'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
 
 const Message = ({
   message,
@@ -195,7 +196,8 @@ const Message = ({
   messageTimeColorOnAttachment,
   shouldOpenUserProfileForMention,
   ogMetadataProps,
-  showInfoMessageProps = {}
+  showInfoMessageProps = {},
+  collapsedCharacterLimit
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -342,20 +344,23 @@ const Message = ({
   }
 
   const handleResendMessage = () => {
-    const messageToResend = { ...message }
-    if (message.attachments && message.attachments.length) {
-      messageToResend.attachments = (message.attachments as IAttachment[]).map((att) => {
-        const pendingAttachment = getPendingAttachment(att.tid!)
-        return { ...att, data: new File([pendingAttachment.file], att.data.name) }
-      })
-    }
-
-    dispatch(resendMessageAC(messageToResend, channel.id, connectionStatus))
+    dispatch(resendMessageAC(message, channel.id, connectionStatus))
 
     setMessageActionsShow(false)
   }
+
   const handleCopyMessage = () => {
-    navigator.clipboard.writeText(messageTextRef.current.innerText)
+    const getFromContacts = getShowOnlyContactUsers()
+    const textToCopyHTML = MessageTextFormat({
+      text: message.body,
+      message,
+      contactsMap,
+      getFromContacts,
+      accentColor: '',
+      textSecondary: ''
+    })
+    const textToCopy = typeof textToCopyHTML === 'string' ? textToCopyHTML : extractTextFromReactElement(textToCopyHTML)
+    navigator.clipboard.writeText(textToCopy)
     setMessageActionsShow(false)
   }
 
@@ -422,12 +427,11 @@ const Message = ({
   }
 
   const handleSendReadMarker = () => {
-    if (!message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
+    if (message.incoming && !message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
       if (
         message.userMarkers &&
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
-        message.incoming &&
         !unreadScrollTo
       ) {
         dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
@@ -653,7 +657,7 @@ const Message = ({
         className='messageContent'
       >
         {message.state === MESSAGE_STATUS.FAILED && (
-          <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming}>
+          <FailedMessageIcon rtl={ownMessageOnRightSide && !message.incoming} onClick={handleResendMessage}>
             <ErrorIconWrapper />
           </FailedMessageIcon>
         )}
@@ -831,6 +835,7 @@ const Message = ({
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
             ogMetadataProps={ogMetadataProps}
             unsupportedMessage={unsupportedMessage}
+            collapsedCharacterLimit={collapsedCharacterLimit}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
@@ -1090,6 +1095,7 @@ const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   right: ${(props) => props.rtl && '-24px'};
   width: 20px;
   height: 20px;
+  cursor: pointer;
 `
 const ErrorIconWrapper = styled(ErrorIcon)`
   width: 20px;

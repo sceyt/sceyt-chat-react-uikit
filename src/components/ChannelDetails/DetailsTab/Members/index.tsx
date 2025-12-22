@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import {
@@ -7,9 +7,13 @@ import {
   changeMemberRoleAC,
   getMembersAC,
   kickMemberAC,
-  loadMoreMembersAC
+  setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
+import {
+  channelsMembersHasNextMapSelector,
+  channelsMembersLoadingStateSelector,
+  openInviteModalSelector
+} from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -39,9 +43,11 @@ import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
 import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
+import { shallowEqual } from 'react-redux'
 
 interface IProps {
   channel: IChannel
+  members: IMember[]
   theme: string
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
@@ -60,6 +66,7 @@ interface IProps {
 
 const Members = ({
   channel,
+  members,
   theme,
   checkActionPermission,
   showChangeMemberRole = true,
@@ -94,11 +101,16 @@ const Members = ({
   const [makeAdminPopup, setMakeAdminPopup] = useState(false)
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
-  const [openInviteModal, setOpenInviteModal] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
-  const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
-  const membersLoading = useSelector(membersLoadingStateSelector) || {}
+  const openInviteModal = useSelector(openInviteModalSelector)
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channel.id], [channelsMembersHasNext?.[channel.id]])
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoading = useMemo(
+    () => channelsMembersLoadingState?.[channel.id],
+    [channelsMembersLoadingState?.[channel.id]]
+  )
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -112,15 +124,6 @@ const Members = ({
     !checkActionPermission('changeMemberRole') &&
     !checkActionPermission('kickAndBlockMember') &&
     !checkActionPermission('kickMember')
-
-  const handleMembersListScroll = (event: any) => {
-    // setCloseMenu(true)
-    if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
-      if (membersLoading === LOADING_STATE.LOADED) {
-        dispatch(loadMoreMembersAC(15, channel.id))
-      }
-    }
-  }
 
   const watchDropdownState = (state: boolean, memberId: string) => {
     if (state) {
@@ -239,7 +242,7 @@ const Members = ({
   }
 
   const handleOpenInviteModal = () => {
-    setOpenInviteModal(true)
+    dispatch(setOpenInviteModalAC(true))
     setAddMemberPopupOpen(false)
   }
 
@@ -247,15 +250,17 @@ const Members = ({
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
-    dispatch(getMembersAC(channel.id))
-  }, [channel])
+    if (channel?.id && membersHasNext === undefined && membersLoading !== LOADING_STATE.LOADING) {
+      dispatch(getMembersAC(channel.id))
+    }
+  }, [channel?.id])
 
   const currentUserRole = members.find((member) => member.id === user.id)?.role
 
   return (
     <Container theme={theme}>
       <ActionsMenu>
-        <MembersList onScroll={handleMembersListScroll}>
+        <MembersList>
           {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
             <MemberItem
               key={1}
@@ -496,7 +501,7 @@ const Members = ({
       )}
       {openInviteModal && (
         <InviteLinkModal
-          onClose={() => setOpenInviteModal(false)}
+          onClose={() => dispatch(setOpenInviteModalAC(false))}
           SVGOrPNGLogoIcon={QRCodeIcon}
           channelId={channel.id}
         />
