@@ -755,7 +755,7 @@ function* forwardMessage(action: IAction): any {
         !(channel.userRole === 'admin' || channel.userRole === 'owner')
       )
     ) {
-      if (message.attachments && message.attachments.length) {
+      if (message.attachments && message.attachments.length && action.type !== RESEND_MESSAGE) {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
@@ -782,20 +782,24 @@ function* forwardMessage(action: IAction): any {
           allowVoteRetract: message.pollDetails.allowVoteRetract
         }
       }
-      messageBuilder
-        .setBody(message.body)
-        .setBodyAttributes(message.bodyAttributes)
-        .setAttachments(attachments)
-        .setMentionUserIds(mentionedUserIds)
-        .setType(message.type)
-        .setDisableMentionsCount(getDisableFrowardMentionsCount())
-        .setMetadata(
-          message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
-        )
-        .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
-        .setPollDetails(pollDetails)
-      const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-      messageToSend.tid = action.type === RESEND_MESSAGE ? action.payload.message.tid : messageToSend.tid
+      if (action.type !== RESEND_MESSAGE) {
+        messageBuilder
+          .setBody(message.body)
+          .setBodyAttributes(message.bodyAttributes)
+          .setAttachments(attachments)
+          .setMentionUserIds(mentionedUserIds)
+          .setType(message.type)
+          .setDisableMentionsCount(getDisableFrowardMentionsCount())
+          .setMetadata(
+            message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
+          )
+          .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
+          .setPollDetails(pollDetails)
+      }
+      const messageToSend =
+        action.type === RESEND_MESSAGE
+          ? { ...action.payload.message, attachments: message.attachments }
+          : messageBuilder.create()
       messageTid = messageToSend.tid
       pendingMessage = {
         ...messageToSend,
