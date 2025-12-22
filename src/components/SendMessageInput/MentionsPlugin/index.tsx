@@ -252,6 +252,7 @@ function MentionsContainer({
   )
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
   const mentionsListRef = useRef<HTMLUListElement>(null)
+  const [alignRight, setAlignRight] = useState(false)
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -316,6 +317,34 @@ function MentionsContainer({
     }
   }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
 
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (mentionsListRef.current && contRef.current) {
+        const containerElement = contRef.current
+        const containerRect = containerElement.getBoundingClientRect()
+        const listWidth = 340 // fixed width from styled component
+        const leftOffset = -60 // current left offset
+        const rightEdge = containerRect.left + leftOffset + listWidth
+
+        // Check if list would overflow the right edge of the window
+        if (rightEdge > window.innerWidth) {
+          setAlignRight(true)
+        } else {
+          setAlignRight(false)
+        }
+      }
+    }
+
+    // Check on mount and when options change
+    const timeoutId = setTimeout(checkOverflow, 0)
+    window.addEventListener('resize', checkOverflow)
+
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [options?.length])
+
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
       <MentionsList
@@ -325,6 +354,7 @@ function MentionsContainer({
         ref={mentionsListRef}
         borderColor={borderColor}
         onScroll={handleScroll}
+        alignRight={alignRight}
       >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
@@ -464,6 +494,7 @@ const MentionsList = styled.ul<{
   borderColor: string
   scrollbarThumbColor: string
   theme: string
+  alignRight?: boolean
 }>`
   position: absolute;
   bottom: 47px;
@@ -472,7 +503,8 @@ const MentionsList = styled.ul<{
   transition: all 0.2s;
   overflow-x: hidden;
   overflow-y: auto;
-  left: -60px;
+  left: ${(props) => (props.alignRight ? 'auto' : '-60px')};
+  right: ${(props) => (props.alignRight ? '-60px' : 'auto')};
   z-index: 200;
   padding: 0;
   margin: 0;
