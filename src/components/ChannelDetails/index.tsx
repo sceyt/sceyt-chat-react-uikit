@@ -7,7 +7,7 @@ import { activeChannelSelector, channelEditModeSelector } from '../../store/chan
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
 import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
 import { loadMoreMembersAC } from '../../store/member/actions'
-import { membersHasNextSelector, membersLoadingStateSelector } from '../../store/member/selector'
+import { channelsMembersHasNextMapSelector, channelsMembersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
@@ -184,8 +184,16 @@ const Details = ({
   const editMode = useSelector(channelEditModeSelector)
   const activeChannel = useSelector(activeChannelSelector, shallowEqual)
   const [checkActionPermission] = usePermissions(activeChannel ? activeChannel.userRole : '')
-  const membersLoading = useSelector(membersLoadingStateSelector)
-  const membersHasNext = useSelector(membersHasNextSelector)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoading = useMemo(
+    () => channelsMembersLoadingState?.[activeChannel?.id],
+    [channelsMembersLoadingState?.[activeChannel?.id]]
+  )
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(
+    () => channelsMembersHasNext?.[activeChannel?.id],
+    [channelsMembersHasNext?.[activeChannel?.id]]
+  )
   const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)

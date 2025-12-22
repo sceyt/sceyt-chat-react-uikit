@@ -22,7 +22,8 @@ import { useColor } from '../../../hooks'
 import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
 import { loadMoreMembersAC } from '../../../store/member/actions'
-import { membersHasNextSelector, membersLoadingStateSelector } from '../../../store/member/selector'
+import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
+import { shallowEqual } from 'react-redux'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -75,7 +76,6 @@ function useMentionLookupService(
   members: IMember[],
   getFromContacts?: boolean
 ) {
-  // const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const [results, setResults] = useState<Array<{ name: string; avatar?: string; id: string; presence: any }>>([])
   membersMap = useMemo(() => {
     mentionsCache.clear()
@@ -239,8 +239,13 @@ function MentionsContainer({
   const theme = useSelector(themeSelector)
   const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
   const dispatch = useDispatch()
-  const membersHasNext = useSelector(membersHasNextSelector)
-  const membersLoadingState = useSelector(membersLoadingStateSelector)
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoadingState = useMemo(
+    () => channelsMembersLoadingState?.[channelId],
+    [channelsMembersLoadingState?.[channelId]]
+  )
+  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
   const mentionsListRef = useRef<HTMLUListElement>(null)
 
   const contRef: any = useRef()
@@ -299,6 +304,12 @@ function MentionsContainer({
     },
     [membersHasNext, membersLoadingState, channelId, dispatch]
   )
+
+  useEffect(() => {
+    if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
+      dispatch(loadMoreMembersAC(15, channelId))
+    }
+  }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
 
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
@@ -406,7 +417,7 @@ export default function MentionsPlugin({
       options={options}
       onOpen={handleOnOpen}
       menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) =>
-        anchorElementRef.current && options.length
+        anchorElementRef.current
           ? ReactDOM.createPortal(
               <MentionsContainer
                 queryString={queryString}

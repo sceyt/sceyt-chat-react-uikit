@@ -70,25 +70,27 @@ export const changeMemberRoleAC = (channelId: string, members: IMember[]) => ({
 })
 
 // Action creators that now use Redux Toolkit actions
-export const setMembersToListAC = (members: IMember[]) => setMembersToList({ members })
+export const setMembersToListAC = (members: IMember[], channelId: string) => setMembersToList({ members, channelId })
 
-export const addMembersToListAC = (members: IMember[]) => addMembersToList({ members })
+export const addMembersToListAC = (members: IMember[], channelId: string) => addMembersToList({ members, channelId })
 
-export const updateMembersAC = (members: IMember[]) => updateMembers({ members })
+export const updateMembersAC = (members: IMember[], channelId: string) => updateMembers({ members, channelId })
 
 export const updateMembersPresenceAC = (usersMap: { [key: string]: IUser }) => updateMembersPresence({ usersMap })
 
-export const setMembersLoadingStateAC = (state: number) => setMembersLoadingState({ state })
+export const setMembersLoadingStateAC = (loadingState: number, channelId: string) =>
+  setMembersLoadingState({ loadingState, channelId })
 
-export const clearMembersAC = () => clearMembers()
+export const clearMembersAC = (channelId: string) => clearMembers({ channelId })
 
-export const removeMemberFromListAC = (members: IMember[]) => removeMemberFromList({ members })
+export const removeMemberFromListAC = (members: IMember[], channelId: string) =>
+  removeMemberFromList({ members, channelId })
 
 export const getRolesSuccessAC = (roles: IRole[]) => getRolesSuccess({ roles })
 
 export const getRolesFailAC = (timeout?: number, attempts?: number) => getRolesFail({ timeout, attempts })
 
-export const setMembersHasNextAC = (hasNext: boolean) => setMembersHasNext({ hasNext })
+export const setMembersHasNextAC = (hasNext: boolean, channelId: string) => setMembersHasNext({ hasNext, channelId })
 
 export const setActionIsRestrictedAC = (isRestricted: boolean, fromChannel: boolean, members: IMember[] | null) =>
   setActionIsRestricted({ isRestricted, fromChannel, members: members || [] })

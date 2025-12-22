@@ -1,6 +1,6 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import styled from 'styled-components'
-import { useDispatch } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import { emptyChannelAttachmentsAC } from '../../../store/message/actions'
 // Helpers
@@ -9,12 +9,15 @@ import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs } from '../../../helpers/const
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IChannel } from '../../../types'
 // Components
-import Members from './Members'
 import Media from './Media'
 import Files from './Files'
 import Links from './Links'
 import Voices from './Voices'
 import { useColor } from '../../../hooks'
+import Members from './Members'
+import { activeChannelMembersMapSelector } from 'store/member/selector'
+import { IMember } from 'types'
+import { shallowEqual } from 'react-redux'
 
 interface IProps {
   channel: IChannel
@@ -117,6 +120,11 @@ const DetailsTab = ({
   } = useColor()
 
   const dispatch = useDispatch()
+  const activeChannelMembersMap = useSelector(activeChannelMembersMapSelector, shallowEqual)
+  const members: IMember[] = useMemo(
+    () => activeChannelMembersMap?.[channel.id] || [],
+    [activeChannelMembersMap?.[channel.id]]
+  )
   const isDirectChannel = channel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const showMembers = !isDirectChannel && checkActionPermission('getMembers')
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
@@ -189,6 +197,7 @@ const DetailsTab = ({
       {showMembers && activeTab === channelDetailsTabs.member && (
         <Members
           theme={theme}
+          members={members}
           channel={channel}
           checkActionPermission={checkActionPermission}
           showChangeMemberRole={showChangeMemberRole}

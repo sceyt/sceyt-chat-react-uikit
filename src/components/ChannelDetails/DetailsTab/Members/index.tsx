@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import {
@@ -9,7 +9,11 @@ import {
   kickMemberAC,
   setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import { activeChannelMembersSelector, openInviteModalSelector } from '../../../../store/member/selector'
+import {
+  channelsMembersHasNextMapSelector,
+  channelsMembersLoadingStateSelector,
+  openInviteModalSelector
+} from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
@@ -24,7 +28,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -39,9 +43,11 @@ import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
 import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
+import { shallowEqual } from 'react-redux'
 
 interface IProps {
   channel: IChannel
+  members: IMember[]
   theme: string
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
@@ -60,6 +66,7 @@ interface IProps {
 
 const Members = ({
   channel,
+  members,
   theme,
   checkActionPermission,
   showChangeMemberRole = true,
@@ -95,9 +102,15 @@ const Members = ({
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
-  const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const openInviteModal = useSelector(openInviteModalSelector)
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channel.id], [channelsMembersHasNext?.[channel.id]])
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoading = useMemo(
+    () => channelsMembersLoadingState?.[channel.id],
+    [channelsMembersLoadingState?.[channel.id]]
+  )
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -237,7 +250,7 @@ const Members = ({
     if (getFromContacts) {
       dispatch(getContactsAC())
     }
-    if (channel?.id) {
+    if (channel?.id && membersHasNext === undefined && membersLoading !== LOADING_STATE.LOADING) {
       dispatch(getMembersAC(channel.id))
     }
   }, [channel?.id])

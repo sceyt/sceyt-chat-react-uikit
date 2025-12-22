@@ -41,7 +41,6 @@ import {
   setCloseSearchChannelsAC,
   setDraggedAttachmentsAC
 } from '../../store/channel/actions'
-import { getMembersAC } from '../../store/member/actions'
 
 // Selectors
 import {
@@ -56,7 +55,7 @@ import {
   typingOrRecordingIndicatorArraySelector
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
-import { activeChannelMembersSelector } from '../../store/member/selector'
+import { activeChannelMembersMapSelector, channelsMembersHasNextMapSelector } from '../../store/member/selector'
 import { themeSelector } from '../../store/theme/selector'
 
 // Helpers
@@ -131,6 +130,7 @@ import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
+import { getMembersAC } from 'store/member/actions'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -365,7 +365,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const messageToEdit = useSelector(messageToEditSelector)
-  const activeChannelMembers = useSelector(activeChannelMembersSelector, shallowEqual)
+  const activeChannelMembersMap = useSelector(activeChannelMembersMapSelector, shallowEqual)
+  const activeChannelMembers = useMemo(
+    () => activeChannelMembersMap?.[activeChannel?.id] || [],
+    [activeChannelMembersMap?.[activeChannel?.id]]
+  )
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(
+    () => channelsMembersHasNext?.[activeChannel?.id],
+    [channelsMembersHasNext?.[activeChannel?.id]]
+  )
+
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
@@ -1255,7 +1265,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       prevActiveChannelId = activeChannel.id
     }
 
-    if (activeChannel.id) {
+    if (activeChannel.id && membersHasNext === undefined) {
       dispatch(getMembersAC(activeChannel.id))
     }
     setMentionedUsers([])

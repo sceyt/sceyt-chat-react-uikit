@@ -1,4 +1,4 @@
-import { IChannel, IMessage } from '../../types'
+import { IChannel, IMember, IMessage } from '../../types'
 import type { ReactNode } from 'react'
 import { isJSON } from '../message'
 import { CHANNEL_GROUP_TYPES, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../constants'
@@ -32,6 +32,13 @@ let disableFrowardMentionsCount: boolean = false
 let onUpdateChannel: (channel: IChannel, updatedFields: string[]) => void = () => {}
 let useInviteLink: boolean = false
 let disappearingSettings: { show?: boolean; customOptions?: { label: string; seconds: number }[] } | null
+export let customLoadMembersFunctions: {
+  loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+  getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+  addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+  joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+  updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+} | null
 
 export type InviteLinkListItemRenderParams = {
   onClick?: () => void
@@ -248,6 +255,7 @@ export function destroyChannelsMap() {
 export const query: any = {
   channelQuery: null,
   channelQueryForward: null,
+  channelMembersQuery: null,
   blockedQuery: null,
   current: null,
   membersQuery: null,
@@ -307,6 +315,10 @@ export function setDisableFrowardMentionsCount(disable: boolean) {
 
 export function getDisableFrowardMentionsCount() {
   return disableFrowardMentionsCount
+}
+
+export function getCustomLoadMembersFunctions() {
+  return customLoadMembersFunctions
 }
 
 export function setOnUpdateChannel(callback: (channel: IChannel, updatedFields: string[]) => void) {
@@ -439,6 +451,16 @@ export const setDisappearingSettings = (
   settings: { show?: boolean; customOptions?: { label: string; seconds: number }[] } | null
 ) => {
   disappearingSettings = settings
+}
+
+export const setCustomLoadMembersFunctions = (functions: {
+  loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+  getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+  addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+  joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+  updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+}) => {
+  customLoadMembersFunctions = functions
 }
 
 export const getDisappearingSettings = () => disappearingSettings
