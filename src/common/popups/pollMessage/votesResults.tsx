@@ -29,12 +29,13 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BORDER]: border,
     [THEME_COLORS.ACCENT]: accent
   } = useColor()
-
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const optionIdToVotes = useMemo(() => {
     const votes: Record<string, IPollVote[]> = {}
     poll.options.forEach((opt) => {
@@ -81,7 +82,12 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
               <TitleWrapper background={surface1}>
                 <Question color={textPrimary}>{poll.name}</Question>
               </TitleWrapper>
-              <OptionsList>
+              <OptionsList
+                thumbColor={surface2}
+                className={isScrolling ? 'show-scrollbar' : ''}
+                onMouseEnter={() => setIsScrolling(true)}
+                onMouseLeave={() => setIsScrolling(false)}
+              >
                 {poll.options.map((opt) => {
                   const allVotes = optionIdToVotes[opt.id] || []
                   const totalVotes = poll.voteDetails?.votesPerOption?.[opt.id] || 0
@@ -166,13 +172,33 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
 
 export default VotesResultsPopup
 
-const OptionsList = styled.div`
+const OptionsList = styled.div<{ thumbColor: string }>`
   display: flex;
   flex-direction: column;
   gap: 16px;
-  overflow-y: auto;
   max-height: 504px;
   border-radius: 10px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  width: calc(100% + 20px);
+  padding-right: 14px;
+  box-sizing: border-box;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const OptionBlock = styled.div<{ background: string; border: string }>`

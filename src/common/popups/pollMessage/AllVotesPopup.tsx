@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback, useMemo } from 'react'
+import React, { useEffect, useCallback, useMemo, useState } from 'react'
 import styled from 'styled-components'
 import PopupContainer from '../popupContainer'
 import { Popup, PopupBody, PopupName, CloseIcon } from 'UIHelper'
@@ -32,7 +32,8 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
   const contactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
@@ -49,6 +50,7 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
   const isLoading = pollVotesLoadingState[key] === LOADING_STATE.LOADING
   const totalVotes = poll.voteDetails?.votesPerOption?.[optionId] || 0
   const isLoadingInitial = allVotes.length === 0 && (isLoading || totalVotes > 0)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   useEffect(() => {
     if (allVotes.length === 0 && totalVotes > 0 && !isLoading) {
@@ -107,7 +109,13 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
                 <Loader color={textSecondary} />
               </LoaderContainer>
             ) : (
-              <VotesList onScroll={handleScroll}>
+              <VotesList
+                thumbColor={surface2}
+                onScroll={handleScroll}
+                className={isScrolling ? 'show-scrollbar' : ''}
+                onMouseEnter={() => setIsScrolling(true)}
+                onMouseLeave={() => setIsScrolling(false)}
+              >
                 {[...(ownVote ? [ownVote] : []), ...allVotes].map((vote: IPollVote) => {
                   const contact = contactsMap[vote.user.id]
                   return (
@@ -158,12 +166,30 @@ const AllVotesPopup = ({ onClose, poll, messageId, optionId, optionName }: AllVo
 
 export default AllVotesPopup
 
-const VotesList = styled.div`
+const VotesList = styled.div<{ thumbColor: string }>`
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
   max-height: 500px;
   padding: 8px 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding-right: 14px;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const VoterRow = styled.div`
@@ -235,7 +261,7 @@ const BackButton = styled.button<{ color: string }>`
 `
 
 const VotesContainer = styled.div<{ backgroundColor: string }>`
-  padding: 0 16px 8px 16px;
+  padding: 0 2px 8px 16px;
   border-radius: 10px;
   background-color: ${(p) => p.backgroundColor};
   margin-top: 16px;
