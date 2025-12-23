@@ -811,7 +811,8 @@ function* forwardMessage(action: IAction): any {
       messageTid = messageToSend.tid
       pendingMessage = {
         ...messageToSend,
-        createdAt: new Date(Date.now())
+        createdAt: new Date(Date.now()),
+        user: message.user
       }
       if (isForward && pendingMessage && action.type !== RESEND_MESSAGE) {
         if (message.forwardingDetails) {
