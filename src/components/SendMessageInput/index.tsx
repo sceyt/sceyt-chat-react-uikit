@@ -2266,7 +2266,6 @@ const LexicalWrapper = styled.div<{
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
     overflow-y: auto;
     overflow-x: hidden;
-    padding-right: 16px;
 
     &::-webkit-scrollbar {
       width: 8px;
