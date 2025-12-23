@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
 import {
@@ -9,14 +9,9 @@ import {
   kickMemberAC,
   setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import {
-  channelsMembersHasNextMapSelector,
-  channelsMembersLoadingStateSelector,
-  openInviteModalSelector,
-  rolesMapSelector
-} from '../../../../store/member/selector'
+import { openInviteModalSelector, rolesMapSelector } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
-import { contactsMapSelector } from '../../../../store/user/selector'
+import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
 // Assets
 import { ReactComponent as AddMemberIcon } from '../../../../assets/svg/addMember.svg'
@@ -29,7 +24,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -45,6 +40,7 @@ import UsersPopup from '../../../../common/popups/users'
 import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
 import { shallowEqual } from 'react-redux'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 interface IProps {
   channel: IChannel
@@ -106,13 +102,8 @@ const Members = ({
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const openInviteModal = useSelector(openInviteModalSelector)
   const rolesMap = useSelector(rolesMapSelector, shallowEqual)
-  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
-  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channel.id], [channelsMembersHasNext?.[channel.id]])
-  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
-  const membersLoading = useMemo(
-    () => channelsMembersLoadingState?.[channel.id],
-    [channelsMembersLoadingState?.[channel.id]]
-  )
+  const connectionStatus = useSelector(connectionStatusSelector)
+
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -249,13 +240,15 @@ const Members = ({
   }
 
   useEffect(() => {
-    if (getFromContacts) {
-      dispatch(getContactsAC())
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (getFromContacts) {
+        dispatch(getContactsAC())
+      }
+      if (channel?.id) {
+        dispatch(getMembersAC(channel.id))
+      }
     }
-    if (channel?.id && membersHasNext === undefined && membersLoading !== LOADING_STATE.LOADING) {
-      dispatch(getMembersAC(channel.id))
-    }
-  }, [channel?.id])
+  }, [channel?.id, connectionStatus])
 
   const currentUserRole = members.find((member) => member.id === user.id)?.role
 
