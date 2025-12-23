@@ -32,6 +32,7 @@ let disableFrowardMentionsCount: boolean = false
 let onUpdateChannel: (channel: IChannel, updatedFields: string[]) => void = () => {}
 let useInviteLink: boolean = false
 let disappearingSettings: { show?: boolean; customOptions?: { label: string; seconds: number }[] } | null
+let showOwnMessageForward: boolean = true
 export let customLoadMembersFunctions: {
   loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
   getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
@@ -461,6 +462,14 @@ export const setCustomLoadMembersFunctions = (functions: {
   updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
 }) => {
   customLoadMembersFunctions = functions
+}
+
+export const setShowOwnMessageForward = (show: boolean) => {
+  showOwnMessageForward = show
+}
+
+export const getShowOwnMessageForward = () => {
+  return showOwnMessageForward
 }
 
 export const getDisappearingSettings = () => disappearingSettings

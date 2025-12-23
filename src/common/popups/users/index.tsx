@@ -133,6 +133,7 @@ const UsersPopup = ({
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -354,7 +355,13 @@ const UsersPopup = ({
             {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
           {actionType !== 'createChat' && selectedMembers.length !== 0 && (
-            <SelectedMembersContainer ref={selectedMembersCont}>
+            <SelectedMembersContainer
+              ref={selectedMembersCont}
+              thumbColor={surface2}
+              className={isSelectedMembersScrolling ? 'show-scrollbar' : ''}
+              onMouseEnter={() => setIsSelectedMembersScrolling(true)}
+              onMouseLeave={() => setIsSelectedMembersScrolling(false)}
+            >
               {selectedMembers.map((member) => {
                 return (
                   <SelectedMemberBubble backgroundColor={surface1} key={`selected-${member.id}`}>
@@ -526,12 +533,9 @@ const MembersContainer = styled(List)<{
 }>`
   display: flex;
   flex-direction: column;
-  //margin-top: 24px;
   position: relative;
   max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
-
-  //width: calc(100% + 16px);
   padding-right: 16px;
 
   &::-webkit-scrollbar {
@@ -632,7 +636,7 @@ const MemberName = styled.h4<{ color?: string }>`
   overflow: hidden;
 `
 
-const SelectedMembersContainer = styled.div`
+const SelectedMembersContainer = styled.div<{ thumbColor: string }>`
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -641,7 +645,23 @@ const SelectedMembersContainer = styled.div`
   overflow-x: hidden;
   padding: 2px 12px 0;
   box-sizing: border-box;
-  //flex: 0 0 auto;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const SelectedMemberBubble = styled.div<{ backgroundColor: string }>`

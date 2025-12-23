@@ -38,6 +38,7 @@ import {
   getChannelFromAllChannelsMap,
   getChannelFromMap,
   getDisableFrowardMentionsCount,
+  getShowOwnMessageForward,
   query,
   removeChannelFromMap,
   setChannelInMap,
@@ -240,15 +241,19 @@ const updateMessage = function* (
   pending: IMessage,
   channelId: string,
   scrollToNewMessage: boolean = true,
-  message: IMessage
+  message: IMessage,
+  isNotShowOwnMessageForward: boolean = false
 ): any {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
     if (activeChannelId === channelId) {
-      addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
+      addAllMessages(
+        [{ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }],
+        MESSAGE_LOAD_DIRECTION.NEXT
+      )
     }
     if (activeChannelId === channelId) {
-      yield put(addMessageAC(pending))
+      yield put(addMessageAC({ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }))
     }
     yield call(addPendingMessage, message, pending, channelId)
     if (scrollToNewMessage) {
@@ -724,6 +729,9 @@ function* sendTextMessage(action: IAction): any {
 function* forwardMessage(action: IAction): any {
   const { payload } = action
   const { message, channelId, connectionState, isForward } = payload
+  const showOwnMessageForward = getShowOwnMessageForward()
+  const SceytChatClient = getClient()
+  const isNotShowOwnMessageForward = message.user.id === SceytChatClient.user.id && !showOwnMessageForward
   let pendingMessage: IMessage | null = null
   let channel: IChannel | null = null
   const activeChannelId = getActiveChannelId()
@@ -755,7 +763,7 @@ function* forwardMessage(action: IAction): any {
         !(channel.userRole === 'admin' || channel.userRole === 'owner')
       )
     ) {
-      if (message.attachments && message.attachments.length) {
+      if (message.attachments && message.attachments.length && action.type !== RESEND_MESSAGE) {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
@@ -782,24 +790,29 @@ function* forwardMessage(action: IAction): any {
           allowVoteRetract: message.pollDetails.allowVoteRetract
         }
       }
-      messageBuilder
-        .setBody(message.body)
-        .setBodyAttributes(message.bodyAttributes)
-        .setAttachments(attachments)
-        .setMentionUserIds(mentionedUserIds)
-        .setType(message.type)
-        .setDisableMentionsCount(getDisableFrowardMentionsCount())
-        .setMetadata(
-          message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
-        )
-        .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
-        .setPollDetails(pollDetails)
-      const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-      messageToSend.tid = action.type === RESEND_MESSAGE ? action.payload.message.tid : messageToSend.tid
+      if (action.type !== RESEND_MESSAGE) {
+        messageBuilder
+          .setBody(message.body)
+          .setBodyAttributes(message.bodyAttributes)
+          .setAttachments(attachments)
+          .setMentionUserIds(mentionedUserIds)
+          .setType(message.type)
+          .setDisableMentionsCount(getDisableFrowardMentionsCount())
+          .setMetadata(
+            message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
+          )
+          .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
+          .setPollDetails(pollDetails)
+      }
+      const messageToSend =
+        action.type === RESEND_MESSAGE
+          ? { ...action.payload.message, attachments: message.attachments }
+          : messageBuilder.create()
       messageTid = messageToSend.tid
       pendingMessage = {
         ...messageToSend,
-        createdAt: new Date(Date.now())
+        createdAt: new Date(Date.now()),
+        user: message.user
       }
       if (isForward && pendingMessage && action.type !== RESEND_MESSAGE) {
         if (message.forwardingDetails) {
@@ -822,11 +835,14 @@ function* forwardMessage(action: IAction): any {
       }
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
-          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message)
+          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
         }
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
-        const messageResponse = yield call(channel.sendMessage, messageToSend)
+        const messageResponse = yield call(channel.sendMessage, {
+          ...messageToSend,
+          ...(isNotShowOwnMessageForward ? { forwardingDetails: null } : {})
+        })
         const messageUpdateData = {
           ...messageResponse,
           channelId: channel.id

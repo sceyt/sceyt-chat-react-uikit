@@ -1115,6 +1115,7 @@ function* switchChannel(action: IAction): any {
     if (updateActiveChannel) {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
       yield put(setUnreadScrollToAC(true))
+      removeAllMessages()
       yield call(setActiveChannelId, channel && channel.id)
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel
@@ -1803,7 +1804,7 @@ function* getChannelsWithUser(action: IAction): any {
     const channelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     channelsQueryBuilder.memberCount(0)
     channelsQueryBuilder.setMutualWithUserId(userId)
-    channelsQueryBuilder.withExcludeTypes([DEFAULT_CHANNEL_TYPE.DIRECT])
+    channelsQueryBuilder.types([DEFAULT_CHANNEL_TYPE.PRIVATE])
     channelsQueryBuilder.limit(15)
     const channelsQuery = yield call(channelsQueryBuilder.build)
     query.mutualChannelsQuery = channelsQuery

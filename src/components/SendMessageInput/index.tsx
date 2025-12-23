@@ -346,6 +346,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
@@ -438,6 +439,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
 
@@ -1897,6 +1899,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         highlightedBackground={textSelectionBackgroundColor || highlightedBackground}
                         borderRadius={inputBorderRadius}
                         color={textPrimary}
+                        thumbColor={surface2}
                       >
                         <LexicalComposer initialConfig={initialConfig}>
                           <AutoFocusPlugin messageForReply={messageForReply} />
@@ -1951,7 +1954,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 <div
                                   onKeyDown={handleSendEditMessage}
                                   onDoubleClick={handleDoubleClick}
-                                  className='rich_text_editor'
+                                  className={`rich_text_editor ${isScrolling ? 'show-scrollbar' : ''}`}
+                                  onMouseEnter={() => setIsScrolling(true)}
+                                  onMouseLeave={() => setIsScrolling(false)}
                                   ref={onRef}
                                 >
                                   <ContentEditable className='content_editable_input' />
@@ -2241,6 +2246,7 @@ const LexicalWrapper = styled.div<{
   mentionColor: string
   isChrome?: boolean
   highlightedBackground?: string
+  thumbColor?: string
 }>`
   position: relative;
   width: 100%;
@@ -2253,12 +2259,29 @@ const LexicalWrapper = styled.div<{
     border: none;
     box-sizing: border-box;
     outline: none !important;
-    overflow: auto;
     border-radius: ${(props) => props.borderRadius};
     background-color: ${(props) => props.backgroundColor};
     padding: ${(props) => props.paddings || '8px 6px'};
     color: ${(props) => props.color};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: transparent;
+    }
+
+    &.show-scrollbar::-webkit-scrollbar-thumb {
+      background: ${(props) => props.thumbColor};
+      border-radius: 4px;
+    }
+    &.show-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
     & p {
       font-size: 15px;

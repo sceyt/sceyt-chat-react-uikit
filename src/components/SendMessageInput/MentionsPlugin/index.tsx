@@ -237,7 +237,12 @@ function MentionsContainer({
   channelId
 }: any) {
   const theme = useSelector(themeSelector)
-  const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
+  const {
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.SURFACE_1]: scrollbarThumbColor
+  } = useColor()
+
   const dispatch = useDispatch()
   const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
   const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
@@ -247,6 +252,7 @@ function MentionsContainer({
   )
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
   const mentionsListRef = useRef<HTMLUListElement>(null)
+  const [alignRight, setAlignRight] = useState(false)
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -311,14 +317,44 @@ function MentionsContainer({
     }
   }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
 
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (mentionsListRef.current && contRef.current) {
+        const containerElement = contRef.current
+        const containerRect = containerElement.getBoundingClientRect()
+        const listWidth = 340 // fixed width from styled component
+        const leftOffset = -60 // current left offset
+        const rightEdge = containerRect.left + leftOffset + listWidth
+
+        // Check if list would overflow the right edge of the window
+        if (rightEdge > window.innerWidth) {
+          setAlignRight(true)
+        } else {
+          setAlignRight(false)
+        }
+      }
+    }
+
+    // Check on mount and when options change
+    const timeoutId = setTimeout(checkOverflow, 0)
+    window.addEventListener('resize', checkOverflow)
+
+    return () => {
+      clearTimeout(timeoutId)
+      window.removeEventListener('resize', checkOverflow)
+    }
+  }, [options?.length])
+
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
       <MentionsList
+        backgroundColor={background}
+        scrollbarThumbColor={scrollbarThumbColor}
+        theme={theme}
         ref={mentionsListRef}
         borderColor={borderColor}
-        backgroundColor={background}
-        theme={theme}
         onScroll={handleScroll}
+        alignRight={alignRight}
       >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
@@ -336,6 +372,7 @@ function MentionsContainer({
           />
         ))}
       </MentionsList>
+      <Handle backgroundColor={background} />
     </MentionsContainerWrapper>
   )
 }
@@ -455,16 +492,22 @@ const MentionsList = styled.ul<{
   backgroundColor: string
   withBorder?: boolean
   borderColor: string
+  scrollbarThumbColor: string
   theme: string
+  alignRight?: boolean
 }>`
   position: absolute;
-  bottom: 5px;
-  width: 300px;
+  bottom: 47px;
+  width: 340px;
+  max-height: 268px;
   transition: all 0.2s;
-  overflow: auto;
-  max-height: 240px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  left: ${(props) => (props.alignRight ? 'auto' : '-60px')};
+  right: ${(props) => (props.alignRight ? '-60px' : 'auto')};
   z-index: 200;
-  padding: 2px 0 0;
+  padding: 0;
+  margin: 0;
   background: ${(props) => props.backgroundColor};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
@@ -472,13 +515,47 @@ const MentionsList = styled.ul<{
     props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.scrollbarThumbColor};
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${(props) => props.scrollbarThumbColor};
+  }
+`
+
+const Handle = styled.div<{
+  backgroundColor: string
+}>`
+  position: absolute;
+  bottom: 39px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 20px;
+  height: 8px;
+  background: ${(props) => props.backgroundColor};
+  z-index: 201;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
 `
 
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
+  max-width: 340px;
+  height: 52px;
   font-size: 15px;
-  padding: 6px 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
   transition: all 0.2s;
   cursor: pointer;
   background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
