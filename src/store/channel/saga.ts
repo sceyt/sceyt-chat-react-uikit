@@ -1804,7 +1804,7 @@ function* getChannelsWithUser(action: IAction): any {
     const channelsQueryBuilder = new (SceytChatClient.ChannelListQueryBuilder as any)()
     channelsQueryBuilder.memberCount(0)
     channelsQueryBuilder.setMutualWithUserId(userId)
-    channelsQueryBuilder.withExcludeTypes([DEFAULT_CHANNEL_TYPE.DIRECT])
+    channelsQueryBuilder.types([DEFAULT_CHANNEL_TYPE.PRIVATE])
     channelsQueryBuilder.limit(15)
     const channelsQuery = yield call(channelsQueryBuilder.build)
     query.mutualChannelsQuery = channelsQuery
