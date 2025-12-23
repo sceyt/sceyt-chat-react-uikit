@@ -12,7 +12,8 @@ import {
 import {
   channelsMembersHasNextMapSelector,
   channelsMembersLoadingStateSelector,
-  openInviteModalSelector
+  openInviteModalSelector,
+  rolesMapSelector
 } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
 import { contactsMapSelector } from '../../../../store/user/selector'
@@ -104,6 +105,7 @@ const Members = ({
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
   const openInviteModal = useSelector(openInviteModalSelector)
+  const rolesMap = useSelector(rolesMapSelector, shallowEqual)
   const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channel.id], [channelsMembersHasNext?.[channel.id]])
   const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
@@ -325,78 +327,86 @@ const Members = ({
                         userLastActiveDateFormat(member.presence.lastActiveAt)}
                   </SubTitle>
                 </MemberNamePresence>
-                {!noMemberEditPermissions && member.role !== 'owner' && member.id !== user.id && (
-                  <DropDown
-                    theme={theme}
-                    isSelect
-                    forceClose={!!(closeMenu && closeMenu !== member.id)}
-                    watchToggleState={(state) => watchDropdownState(state, member.id)}
-                    trigger={
-                      <EditMemberIcon color={iconInactive}>
-                        <MoreIcon color={iconInactive} />
-                      </EditMemberIcon>
-                    }
-                  >
-                    <DropdownOptionsUl>
-                      {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
-                        <DropdownOptionLi
-                          textColor={textPrimary}
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleChangeRolePopup(e)
-                            setCloseMenu('1')
-                          }}
-                          key={1}
-                          hoverBackground={backgroundHovered}
-                        >
-                          Change role
-                        </DropdownOptionLi>
-                      )}
-                      {showMakeMemberAdmin && checkActionPermission('changeMemberRole') && member.role !== 'owner' && (
-                        <DropdownOptionLi
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleMakeAdminPopup(e, member.role === 'admin')
-                            setCloseMenu('1')
-                          }}
-                          textColor={member.role === 'admin' ? errorColor : ''}
-                          key={2}
-                          hoverBackground={backgroundHovered}
-                        >
-                          {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
-                        </DropdownOptionLi>
-                      )}
-                      {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
-                        <DropdownOptionLi
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleKickMemberPopup(e)
-                            setCloseMenu('1')
-                          }}
-                          textColor={errorColor}
-                          key={3}
-                          hoverBackground={backgroundHovered}
-                        >
-                          Remove
-                        </DropdownOptionLi>
-                      )}
-                      {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
-                        <DropdownOptionLi
-                          textColor={errorColor}
-                          key={4}
-                          hoverBackground={backgroundHovered}
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleBlockMemberPopup(e)
-                            setCloseMenu('1')
-                          }}
-                        >
-                          Remove and Block member
-                        </DropdownOptionLi>
-                      )}
-                    </DropdownOptionsUl>
-                  </DropDown>
-                )}
+                {!noMemberEditPermissions &&
+                  member.role !== 'owner' &&
+                  currentUserRole &&
+                  rolesMap?.[member.role]?.priority &&
+                  rolesMap?.[currentUserRole]?.priority &&
+                  rolesMap?.[member.role]?.priority < rolesMap?.[currentUserRole]?.priority &&
+                  member.id !== user.id && (
+                    <DropDown
+                      theme={theme}
+                      isSelect
+                      forceClose={!!(closeMenu && closeMenu !== member.id)}
+                      watchToggleState={(state) => watchDropdownState(state, member.id)}
+                      trigger={
+                        <EditMemberIcon color={iconInactive}>
+                          <MoreIcon color={iconInactive} />
+                        </EditMemberIcon>
+                      }
+                    >
+                      <DropdownOptionsUl>
+                        {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
+                          <DropdownOptionLi
+                            textColor={textPrimary}
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleChangeRolePopup(e)
+                              setCloseMenu('1')
+                            }}
+                            key={1}
+                            hoverBackground={backgroundHovered}
+                          >
+                            Change role
+                          </DropdownOptionLi>
+                        )}
+                        {showMakeMemberAdmin &&
+                          checkActionPermission('changeMemberRole') &&
+                          member.role !== 'owner' && (
+                            <DropdownOptionLi
+                              onClick={(e: any) => {
+                                setSelectedMember(member)
+                                toggleMakeAdminPopup(e, member.role === 'admin')
+                                setCloseMenu('1')
+                              }}
+                              textColor={member.role === 'admin' ? errorColor : ''}
+                              key={2}
+                              hoverBackground={backgroundHovered}
+                            >
+                              {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                            </DropdownOptionLi>
+                          )}
+                        {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
+                          <DropdownOptionLi
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleKickMemberPopup(e)
+                              setCloseMenu('1')
+                            }}
+                            textColor={errorColor}
+                            key={3}
+                            hoverBackground={backgroundHovered}
+                          >
+                            Remove
+                          </DropdownOptionLi>
+                        )}
+                        {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
+                          <DropdownOptionLi
+                            textColor={errorColor}
+                            key={4}
+                            hoverBackground={backgroundHovered}
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleBlockMemberPopup(e)
+                              setCloseMenu('1')
+                            }}
+                          >
+                            Remove and Block member
+                          </DropdownOptionLi>
+                        )}
+                      </DropdownOptionsUl>
+                    </DropDown>
+                  )}
               </MemberItem>
             ))}
         </MembersList>
