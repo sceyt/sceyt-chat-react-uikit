@@ -958,8 +958,13 @@ const AttachmentImgCont = styled.div<{
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
   max-width: 100%;
-  height: ${(props) =>
-    props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+
+  ${(props) =>
+    !props.fitTheContainer && !props.isRepliedMessage && props.height && props.width
+      ? `aspect-ratio: ${props.width} / ${props.height};`
+      : `
+     height: ${props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+    `}
   max-height: 400px;
   min-height: ${(props) => props.height && '165px'};
   cursor: pointer;
