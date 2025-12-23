@@ -221,25 +221,31 @@ export const getHasPrevCached = () => prevCached
 export const setHasNextCached = (state: boolean) => (nextCached = state)
 export const getHasNextCached = () => nextCached
 
-export const getFromAllMessagesByMessageId = (messageId: string, direction: string, getWithLastMessage?: boolean) => {
+export const getFromAllMessagesByMessageId = (
+  messageId: string,
+  direction: string,
+  getWithLastMessage?: boolean,
+  messagesArray?: IMessage[]
+) => {
+  const messages = activeChannelAllMessages?.length ? activeChannelAllMessages : messagesArray || []
   let messagesForAdd: IMessage[] = []
   if (getWithLastMessage) {
-    messagesForAdd = [...activeChannelAllMessages.slice(-MESSAGES_MAX_PAGE_COUNT)]
-    setHasPrevCached(activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT)
+    messagesForAdd = [...messages.slice(-MESSAGES_MAX_PAGE_COUNT)]
+    setHasPrevCached(messages.length > MESSAGES_MAX_PAGE_COUNT)
     setHasNextCached(false)
   } else {
-    const fromMessageIndex = activeChannelAllMessages.findIndex((mes) => mes.id === messageId)
+    const fromMessageIndex = messages.findIndex((mes) => mes.id === messageId)
     if (fromMessageIndex !== 0) {
       if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
         const sliceFromIndex =
           fromMessageIndex <= LOAD_MAX_MESSAGE_COUNT ? 0 : fromMessageIndex - (LOAD_MAX_MESSAGE_COUNT + 1)
-        messagesForAdd = activeChannelAllMessages.slice(sliceFromIndex, fromMessageIndex)
+        messagesForAdd = messages.slice(sliceFromIndex, fromMessageIndex)
         setHasPrevCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT || sliceFromIndex === 0))
         setHasNextCached(true)
       } else {
         const toMessage = fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-        messagesForAdd = activeChannelAllMessages.slice(fromMessageIndex + 1, toMessage)
-        if (toMessage > activeChannelAllMessages.length - 1) {
+        messagesForAdd = messages.slice(fromMessageIndex + 1, toMessage)
+        if (toMessage > messages.length - 1) {
           setHasNextCached(false)
         } else {
           setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))

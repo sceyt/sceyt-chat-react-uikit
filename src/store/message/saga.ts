@@ -1079,7 +1079,7 @@ function* getMessagesQuery(action: IAction): any {
       action.payload
     let channelNewMessageCount = channel?.newMessageCount || 0
     const connectionState = store.getState().UserReducer.connectionStatus
-
+    const messages = store.getState().MessageReducer.activeChannelMessages
     if (channel?.id && !channel?.isMockChannel) {
       const SceytChatClient = getClient()
       if (networkChanged) {
@@ -1149,8 +1149,7 @@ function* getMessagesQuery(action: IAction): any {
             yield put(scrollToNewMessageAC(true))
           }
         }
-      } else if (messageId) {
-        const messages = store.getState().MessageReducer.activeChannelMessages
+      } else if (messageId && messages?.length) {
         let loadNextMessageId = ''
         let loadPreviousMessageId = ''
         let nextLoadLimit = MESSAGES_MAX_PAGE_COUNT / 2
@@ -1232,7 +1231,12 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setUnreadScrollToAC(true))
       } else {
         if (cachedMessages && cachedMessages.length) {
-          const messages = getFromAllMessagesByMessageId('', '', true)
+          const messages = getFromAllMessagesByMessageId(
+            '',
+            '',
+            true,
+            cachedMessages?.length ? cachedMessages : undefined
+          )
           yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
           yield delay(0)
           const filteredPendingMessages = getFilteredPendingMessages(messages)
