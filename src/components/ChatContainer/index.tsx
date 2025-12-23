@@ -12,7 +12,8 @@ import {
   setInviteLinkOptions,
   setUseInviteLink,
   setDisappearingSettings,
-  setCustomLoadMembersFunctions
+  setCustomLoadMembersFunctions,
+  setShowOwnMessageForward
 } from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
@@ -139,6 +140,7 @@ export interface IChatClientProps {
     joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
     updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
   } | null
+  showOwnMessageForward?: boolean
 }
 
 const SceytChatContainer = ({
@@ -174,7 +176,8 @@ const SceytChatContainer = ({
   embeddedJoinGroupPopup = false,
   onUpdateChannel,
   disappearingSettings = null,
-  customLoadMembersFunctions = null
+  customLoadMembersFunctions = null,
+  showOwnMessageForward = true
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
@@ -209,6 +212,10 @@ const SceytChatContainer = ({
       setCustomLoadMembersFunctions(customLoadMembersFunctions)
     }
   }, [customLoadMembersFunctions])
+
+  useEffect(() => {
+    setShowOwnMessageForward(showOwnMessageForward)
+  }, [showOwnMessageForward])
 
   return (
     <Provider store={store} context={SceytReduxContext}>

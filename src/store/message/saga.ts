@@ -38,6 +38,7 @@ import {
   getChannelFromAllChannelsMap,
   getChannelFromMap,
   getDisableFrowardMentionsCount,
+  getShowOwnMessageForward,
   query,
   removeChannelFromMap,
   setChannelInMap,
@@ -240,15 +241,19 @@ const updateMessage = function* (
   pending: IMessage,
   channelId: string,
   scrollToNewMessage: boolean = true,
-  message: IMessage
+  message: IMessage,
+  isNotShowOwnMessageForward: boolean = false
 ): any {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
     if (activeChannelId === channelId) {
-      addAllMessages([pending], MESSAGE_LOAD_DIRECTION.NEXT)
+      addAllMessages(
+        [{ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }],
+        MESSAGE_LOAD_DIRECTION.NEXT
+      )
     }
     if (activeChannelId === channelId) {
-      yield put(addMessageAC(pending))
+      yield put(addMessageAC({ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }))
     }
     yield call(addPendingMessage, message, pending, channelId)
     if (scrollToNewMessage) {
@@ -724,6 +729,9 @@ function* sendTextMessage(action: IAction): any {
 function* forwardMessage(action: IAction): any {
   const { payload } = action
   const { message, channelId, connectionState, isForward } = payload
+  const showOwnMessageForward = getShowOwnMessageForward()
+  const SceytChatClient = getClient()
+  const isNotShowOwnMessageForward = message.user.id === SceytChatClient.user.id && !showOwnMessageForward
   let pendingMessage: IMessage | null = null
   let channel: IChannel | null = null
   const activeChannelId = getActiveChannelId()
@@ -826,11 +834,14 @@ function* forwardMessage(action: IAction): any {
       }
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
-          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message)
+          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
         }
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
-        const messageResponse = yield call(channel.sendMessage, messageToSend)
+        const messageResponse = yield call(channel.sendMessage, {
+          ...messageToSend,
+          ...(isNotShowOwnMessageForward ? { forwardingDetails: null } : {})
+        })
         const messageUpdateData = {
           ...messageResponse,
           channelId: channel.id
