@@ -93,6 +93,7 @@ import { isJSON } from '../../helpers/message'
 import log from 'loglevel'
 import store from 'store'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
+import { MESSAGE_TYPE } from '../../types/enum'
 
 export default function* watchForEvents(): any {
   const SceytChatClient = getClient()
@@ -904,7 +905,7 @@ export default function* watchForEvents(): any {
                     textSecondary
                   })
                   setNotification(
-                    messageBody,
+                    message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
                     message.user,
                     channel,
                     undefined,
@@ -1100,7 +1101,7 @@ export default function* watchForEvents(): any {
                   textSecondary
                 })
                 setNotification(
-                  messageBody,
+                  message?.type === MESSAGE_TYPE.VIEW_ONCE ? `Self-destructing` : messageBody,
                   reaction.user,
                   channel,
                   reaction.key,
