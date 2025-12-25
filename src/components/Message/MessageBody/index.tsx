@@ -674,6 +674,7 @@ const MessageBody = ({
           <MessageActions
             isPollMessage={message?.type === MESSAGE_TYPE.POLL}
             allowVoteRetract={message?.pollDetails?.allowVoteRetract}
+            isViewOnceMessage={message?.type === MESSAGE_TYPE.VIEW_ONCE && message?.viewOnce}
             pollClosed={message?.pollDetails?.closed}
             messageFrom={message.user}
             channel={channel}
