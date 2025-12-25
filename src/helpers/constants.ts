@@ -10,7 +10,8 @@ export const MESSAGE_DELIVERY_STATUS = {
   SENT: 'sent',
   DELIVERED: 'received',
   READ: 'displayed',
-  PLAYED: 'played'
+  PLAYED: 'played',
+  OPENED: 'opened'
 }
 
 export const MESSAGE_STATUS = {

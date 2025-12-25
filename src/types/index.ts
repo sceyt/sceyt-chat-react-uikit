@@ -87,6 +87,7 @@ export interface IBodyAttribute {
 }
 
 export interface IMarker {
+  count: number
   name: string
   messageId: string
   createdAt: Date
@@ -189,6 +190,7 @@ export interface IMessage {
     user: IUser
   }
   pollDetails?: IPollDetails
+  viewOnce?: boolean
 }
 
 export interface IMember extends IUser {

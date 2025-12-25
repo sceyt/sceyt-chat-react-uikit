@@ -104,13 +104,15 @@ import { useDidUpdate, useColor } from '../../hooks'
 // Icons
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
+import { ReactComponent as ViewOnceNotSelectedIcon } from '../../assets/svg/view_once_not_selected.svg'
+import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_once_selected.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ChooseFileIcon } from '../../assets/svg/choseFile.svg'
 import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
-import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
+import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle_white.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
@@ -224,8 +226,11 @@ interface SendMessageProps {
   fileAttachmentSizeLimit?: number
   AddAttachmentsIcon?: JSX.Element
   attachmentIcoOrder?: number
+  viewOnceIconOrder?: number
   sendIconOrder?: number
   inputOrder?: number
+  ViewOnceSelectedSVGIcon?: JSX.Element
+  ViewOnceNotSelectedSVGIcon?: JSX.Element
   CustomTypingIndicator?: FC<{
     from: {
       id: string
@@ -291,7 +296,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   inputOrder = 1,
   showAddEmojis = true,
   AddEmojisIcon,
-  emojiIcoOrder = 2,
+  emojiIcoOrder = 3,
   showAddAttachments = true,
   showChooseFileAttachment = true,
   showChooseMediaAttachment = true,
@@ -303,6 +308,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   allowedMediaExtensionsErrorMessage,
   AddAttachmentsIcon,
   attachmentIcoOrder = 0,
+  viewOnceIconOrder = 2,
+  ViewOnceSelectedSVGIcon,
+  ViewOnceNotSelectedSVGIcon,
   CustomTypingIndicator,
   margin,
   padding,
@@ -355,7 +363,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -424,6 +433,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [isIncomingMessage, setIsIncomingMessage] = useState(false)
   const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
+  const [viewOnce, setViewOnce] = useState(false)
 
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -598,9 +608,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               size: attachment.size
             }
           })
+          // Add viewOnce flag if enabled and valid
+          if (viewOnce && canShowViewOnceToggle) {
+            messageToSend.viewOnce = true
+          }
           // if (!sendAsSeparateMessage) {
           const attachmentsToSent = [...messageToSend.attachments]
-          if (linkAttachment) {
+          if (linkAttachment && !messageToSend.viewOnce) {
             attachmentsToSent.push(linkAttachment)
           }
           dispatch(
@@ -624,6 +638,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       setAttachments([])
       attachmentsUpdate = []
+      setViewOnce(false)
       handleCloseReply()
       setShouldClearEditor({ clear: true })
       setMentionedUsers([])
@@ -709,6 +724,38 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setAttachments([])
       attachmentsUpdate = []
     }
+    // Reset viewOnce when all attachments are removed
+    if (attachmentsUpdate.length === 0) {
+      setViewOnce(false)
+    }
+  }
+
+  // Check if view-once toggle should be shown (exactly 1 image/video attachment)
+  const canShowViewOnceToggle = useMemo(() => {
+    if (attachments.length !== 1) return false
+    const attachment = attachments[0]
+    return attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
+  }, [attachments])
+
+  // Handle adding attachment - show warning if view-once is enabled and adding second attachment
+  const handleAddAttachmentWithViewOnceCheck = async (file: File, isMediaAttachment: boolean) => {
+    // Check if adding second attachment when view-once is enabled
+    if (viewOnce && attachments.length >= 1) {
+      const newAttachmentType = file.type.split('/')[0]
+      const isNewAttachmentImageOrVideo = newAttachmentType === 'image' || newAttachmentType === 'video'
+
+      if (isNewAttachmentImageOrVideo) {
+        // Show warning and disable view-once
+        setUploadErrorMessage('You can only send one message when "View Once" is enabled')
+        setViewOnce(false)
+        setTimeout(() => {
+          setUploadErrorMessage('')
+        }, 5000)
+      }
+    }
+
+    // Proceed with adding attachment
+    await handleAddAttachment(file, isMediaAttachment)
   }
 
   const showFileUploadError = (message: string) => {
@@ -744,7 +791,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       }
       if (allowUpload) {
-        handleAddAttachment(file, isMediaAttachment)
+        handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
       } else {
         showFileUploadError(errorMessage)
       }
@@ -794,7 +841,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
           if (allowUpload) {
-            handleAddAttachment(file, true)
+            handleAddAttachmentWithViewOnceCheck(file, true)
           } else {
             showFileUploadError(errorMessage)
           }
@@ -1172,7 +1219,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         if (allowUpload) {
-          handleAddAttachment(file, isMediaAttachment)
+          handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
         } else {
           showFileUploadError(errorMessage)
         }
@@ -1369,7 +1416,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
     attachmentsUpdate = attachments
-  }, [attachments])
+
+    // Auto-disable view-once if attachment count changes from 1 to more than 1
+    if (viewOnce && attachments.length !== 1) {
+      setViewOnce(false)
+    }
+    // Auto-disable view-once if the single attachment is not image/video
+    if (viewOnce && attachments.length === 1) {
+      const attachment = attachments[0]
+      if (attachment.type !== attachmentTypes.image && attachment.type !== attachmentTypes.video) {
+        setViewOnce(false)
+      }
+    }
+  }, [attachments, viewOnce])
 
   useEffect(() => {
     if (emojiBtnRef.current && messageInputRef.current) {
@@ -1514,7 +1573,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
         selectionBackgroundColor={textSelectionBackgroundColor || background}
       >
-        {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
             <MessageCountWrapper color={textPrimary}>
@@ -1787,6 +1845,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </ChosenAttachments>
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
+                  {uploadErrorMessage && (
+                    <ViewOnceWarningTooltip backgroundColor={tooltipBackground}>
+                      <WarningIconWrapper>
+                        <BlockInfoIcon />
+                      </WarningIconWrapper>
+                      <WarningText color={textOnPrimary}>{uploadErrorMessage}</WarningText>
+                    </ViewOnceWarningTooltip>
+                  )}
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
                   {(showRecording || getAudioRecordingFromMap(activeChannel.id)) && !messageToEdit ? (
                     <AudioCont />
@@ -1817,7 +1883,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           {AddEmojisIcon || <EmojiSmileIcon />}
                         </EmojiButton>
                       )}
-                      {showAddAttachments && addAttachmentByMenu ? (
+                      {canShowViewOnceToggle && (
+                        <ViewOnceToggleCont
+                          key='view-once'
+                          order={viewOnceIconOrder}
+                          onClick={() => setViewOnce(!viewOnce)}
+                          color={viewOnce ? accentColor : iconInactive}
+                          textColor={viewOnce ? textOnPrimary : iconInactive}
+                        >
+                          {viewOnce
+                            ? ViewOnceSelectedSVGIcon || <ViewOnceSelectedIcon />
+                            : ViewOnceNotSelectedSVGIcon || <ViewOnceNotSelectedIcon />}
+                        </ViewOnceToggleCont>
+                      )}
+                      {showAddAttachments && addAttachmentByMenu && !messageToEdit ? (
                         <DropDown
                           theme={theme}
                           forceClose={showChooseAttachmentType}
@@ -1878,7 +1957,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           </DropdownOptionsUl>
                         </DropDown>
                       ) : (
-                        (showChooseMediaAttachment || showChooseFileAttachment) && (
+                        (showChooseMediaAttachment || showChooseFileAttachment) &&
+                        !messageToEdit && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
                             color={iconInactive}
@@ -2117,11 +2197,40 @@ const EditMessageText = styled.p<any>`
   text-overflow: ellipsis;
   word-break: break-word;
 `
-const UploadErrorMessage = styled.p<{ color: string }>`
-  margin: 0;
+const ViewOnceWarningTooltip = styled.div<{ backgroundColor: string }>`
   position: absolute;
-  top: -30px;
+  top: -70px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background-color: ${(props) => props.backgroundColor};
+  border-radius: 16px;
+  z-index: 1000;
+  max-width: 300px;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.15);
+`
+
+const WarningIconWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+
+  & > svg {
+    width: 24px;
+    height: 24px;
+  }
+`
+
+const WarningText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 18px;
 `
 
 const CloseEditMode = styled.span<{ color: string }>`
@@ -2642,6 +2751,24 @@ const CloseIconWrapper = styled.span<{ color: string }>`
   margin-left: auto;
   padding: 10px;
   color: ${(props) => props.color};
+`
+
+const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string }>`
+  position: relative;
+  cursor: pointer;
+  margin: auto;
+  display: flex;
+  height: max-content;
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
+
+  svg {
+    circle {
+      fill: ${(props) => props.color};
+    }
+    path {
+      fill: ${(props) => props.textColor};
+    }
+  }
 `
 
 export default SendMessageInput

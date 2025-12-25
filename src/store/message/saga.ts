@@ -148,7 +148,7 @@ import {
 import { createImageThumbnail, getImageSize } from '../../helpers/resizeImage'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
-import { isJSON } from '../../helpers/message'
+import { canBeViewOnce, isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
 import { getFrame } from 'helpers/getVideoFrame'
@@ -403,6 +403,10 @@ function* sendMessage(action: IAction): any {
             if (message.repliedInThread) {
               messageBuilder.setReplyInThread()
             }
+            // Set view-once only for first message with exactly 1 image/video attachment
+            if (i === 0 && canBeViewOnce(message)) {
+              messageBuilder.setViewOnce(true)
+            }
             const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
             setPendingAttachment(messageAttachment.tid as string, {
               ...messageAttachment.data,
@@ -447,6 +451,11 @@ function* sendMessage(action: IAction): any {
 
           if (message.repliedInThread) {
             messageBuilder.setReplyInThread()
+          }
+
+          // Set view-once if message has viewOnce flag and exactly 1 image/video attachment
+          if (canBeViewOnce(message)) {
+            messageBuilder.setViewOnce(true)
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()

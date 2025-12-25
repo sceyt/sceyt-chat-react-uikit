@@ -483,3 +483,10 @@ export const checkIsTypeKeyPressed = (code?: string) => {
     code === 'Shift'
   )
 }
+
+export const canBeViewOnce = (message: IMessage): boolean => {
+  if (!message.viewOnce) return false
+  if (!message.attachments || message.attachments.length !== 1) return false
+  const attachment = message.attachments[0]
+  return attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
+}

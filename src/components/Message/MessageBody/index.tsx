@@ -6,6 +6,8 @@ import { useColor } from 'hooks'
 import { useSelector } from '../../../store/hooks'
 // Assets
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
+import { ReactComponent as ViewOnceIcon } from '../../../assets/svg/view-once.svg'
+import { ReactComponent as ViewOnceIconOpen } from '../../../assets/svg/view-once-open.svg'
 // Helpers
 import { calculateRenderedImageWidth } from 'helpers'
 import { isJSON } from 'helpers/message'
@@ -15,7 +17,7 @@ import { getSendAttachmentsAsSeparateMessages } from 'helpers/customUploader'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IAttachment, IChannel, IMessage, IUser, OGMetadataProps } from 'types'
+import { IAttachment, IChannel, IMarker, IMessage, IUser, OGMetadataProps } from 'types'
 // Components
 import MessageActions from '../MessageActions'
 import RepliedMessage from '../RepliedMessage'
@@ -311,7 +313,9 @@ const MessageBody = ({
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.LINK_COLOR]: linkColor
+    [THEME_COLORS.LINK_COLOR]: linkColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive
   } = useColor()
 
   const bubbleOutgoing = outgoingMessageBackground
@@ -352,6 +356,30 @@ const MessageBody = ({
     ogMetadataProps?.isInviteLink,
     onInviteLinkClick
   ])
+
+  const viewOnce = useMemo(() => message.viewOnce, [message?.viewOnce])
+
+  const hasOpened = useMemo(() => {
+    if (!viewOnce) return false
+    if (message?.incoming) {
+      return message?.userMarkers?.some((marker: IMarker) => marker.name === MESSAGE_DELIVERY_STATUS.OPENED)
+    } else {
+      return message?.markerTotals?.some(
+        (marker: { name: string; count: number }) => marker.name === MESSAGE_DELIVERY_STATUS.OPENED && marker.count > 0
+      )
+    }
+  }, [viewOnce, message?.incoming, message?.userMarkers, message?.markerTotals])
+
+  // Get informational message text for view-once media on web
+  const getViewOnceMessage = () => {
+    if (hasOpened) {
+      return 'Message self-destructed'
+    } else if (!message?.incoming) {
+      return 'You sent a one-time view message. For privacy reasons, it can only be viewed on mobile.'
+    } else {
+      return 'You received a one-time view message. For privacy reasons, it can only be viewed on mobile.'
+    }
+  }
 
   const messageTextTrimmed = useMemo(() => {
     if (!message.body) return { result: messageText, truncated: false }
@@ -415,37 +443,42 @@ const MessageBody = ({
       (showMessageStatusForEachMessage || !nextMessage),
     [message.incoming, showMessageStatus, message.state, showMessageStatusForEachMessage, nextMessage]
   )
-  const withAttachments = useMemo(() => message.attachments && message.attachments.length > 0, [message.attachments])
-  const notLinkAttachment = useMemo(
-    () => withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link),
-    [withAttachments, message.attachments]
+  const withAttachments = useMemo(
+    () => message.attachments && message.attachments.length > 0 && !viewOnce,
+    [message.attachments, viewOnce]
   )
 
-  const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
+  const notLinkAttachment = useMemo(
+    () => withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link && !viewOnce),
+    [withAttachments, message.attachments, viewOnce]
+  )
+
+  const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link && !viewOnce)
   const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
   const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment = useMemo(
     () =>
       withAttachments &&
+      !viewOnce &&
       message.attachments.find(
         (attachment: IAttachment) =>
           attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image,
-        [withAttachments, message.attachments]
+        [withAttachments, message.attachments, viewOnce]
       ),
-    [withAttachments, message.attachments]
+    [withAttachments, message.attachments, viewOnce]
   )
-  const withMediaAttachment = useMemo(() => !!mediaAttachment, [mediaAttachment])
+  const withMediaAttachment = useMemo(() => !!mediaAttachment && !viewOnce, [mediaAttachment, viewOnce])
   const attachmentMetas = useMemo(
     () =>
       mediaAttachment &&
       (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata),
-    [mediaAttachment]
+    [mediaAttachment, viewOnce]
   )
 
   const fileAttachment = useMemo(() => {
-    return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file)
-  }, [message.attachments])
+    return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file && !viewOnce)
+  }, [message.attachments, viewOnce])
 
   const borderRadius = useMemo(
     () =>
@@ -496,9 +529,9 @@ const MessageBody = ({
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
 
   const hasLongLinkAttachmentUrl = useMemo(() => {
-    if (!linkAttachment || !linkAttachment.url) return false
+    if (!linkAttachment || !linkAttachment.url || viewOnce) return false
     return linkAttachment.url.length > 100
-  }, [linkAttachment])
+  }, [linkAttachment, viewOnce])
 
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
   const linkMetadata = useMemo(() => {
@@ -814,14 +847,29 @@ const MessageBody = ({
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
           <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
-            <span ref={messageTextRef}>
-              {messageTextTrimmed?.result}
-              {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
-            </span>
-            {messageTextTrimmed.truncated && !isExpanded && (
-              <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
-                Read more
-              </ReadMoreLink>
+            {viewOnce ? (
+              <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
+                {hasOpened ? (
+                  <ViewOnceIconOpen style={{ marginRight: '8px' }} />
+                ) : (
+                  <ViewOnceIconWrapper backgroundColor={background}>
+                    <ViewOnceIcon />
+                  </ViewOnceIconWrapper>
+                )}
+                <ViewOnceInfoText color={textSecondary}>{getViewOnceMessage()}</ViewOnceInfoText>
+              </ViewOnceMessageWrapper>
+            ) : (
+              <React.Fragment>
+                <span ref={messageTextRef}>
+                  {messageTextTrimmed?.result}
+                  {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
+                </span>
+                {messageTextTrimmed.truncated && !isExpanded && (
+                  <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                    Read more
+                  </ReadMoreLink>
+                )}
+              </React.Fragment>
             )}
           </TextContentContainer>
         )}
@@ -1155,6 +1203,37 @@ const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; wit
   font-style: italic;
 `
 
+const ViewOnceInfoText = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
+  font-size: 14px;
+  line-height: 1.4;
+  display: block;
+`
+
+const ViewOnceMessageWrapper = styled.div<{ color: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    path {
+      fill: ${(props) => props.color};
+    }
+  }
+}
+`
+
+const ViewOnceIconWrapper = styled.div<{ backgroundColor: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  background-color: ${(props) => props.backgroundColor};
+  border-radius: 50%;
+  margin-right: 8px;
+`
 const MessageBodyContainer = styled.div<{
   isSelfMessage?: boolean
   outgoingMessageStyles?: {
