@@ -99,6 +99,7 @@ import {
   clearMessagesAC,
   clearSelectedMessagesAC,
   sendTextMessageAC,
+  setMessagesHasPrevAC,
   setUnreadScrollToAC,
   // clearMessagesAC,
   updateMessageAC
@@ -1116,6 +1117,7 @@ function* switchChannel(action: IAction): any {
       const currentActiveChannel = getChannelFromMap(getActiveChannelId())
       yield put(setUnreadScrollToAC(true))
       removeAllMessages()
+      yield put(setMessagesHasPrevAC(true))
       yield call(setActiveChannelId, channel && channel.id)
       if (channel.isLinkedChannel) {
         channelToSwitch.linkedFrom = currentActiveChannel

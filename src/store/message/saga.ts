@@ -1399,8 +1399,6 @@ function* loadMoreMessages(action: IAction): any {
       yield put(addMessagesAC([], direction))
       if (direction === MESSAGE_LOAD_DIRECTION.NEXT) {
         yield put(setMessagesHasNextAC(false))
-      } else {
-        yield put(setMessagesHasPrevAC(false))
       }
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
