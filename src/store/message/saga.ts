@@ -406,6 +406,7 @@ function* sendMessage(action: IAction): any {
             // Set view-once only for first message with exactly 1 image/video attachment
             if (i === 0 && canBeViewOnce(message)) {
               messageBuilder.setViewOnce(true)
+              messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
             }
             const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
             setPendingAttachment(messageAttachment.tid as string, {
@@ -456,6 +457,7 @@ function* sendMessage(action: IAction): any {
           // Set view-once if message has viewOnce flag and exactly 1 image/video attachment
           if (canBeViewOnce(message)) {
             messageBuilder.setViewOnce(true)
+            messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()

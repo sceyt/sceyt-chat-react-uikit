@@ -10,5 +10,6 @@ export enum MESSAGE_TYPE {
   LINK = 'link',
   FILE = 'file',
   POLL = 'poll',
-  DELETED = ''
+  DELETED = '',
+  VIEW_ONCE = 'view_once'
 }

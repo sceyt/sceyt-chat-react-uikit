@@ -21,6 +21,7 @@ import { ReactComponent as NotificationOffIcon } from '../../assets/svg/unmuteNo
 import { ReactComponent as PinedIcon } from '../../assets/svg/pin.svg'
 import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
 import { ReactComponent as BadgeIcon } from '../../assets/svg/badge.svg'
+import { ReactComponent as ViewOnceIconOpen } from '../../assets/svg/view_once_last_message.svg'
 // Components
 import Avatar from '../Avatar'
 // Helpers
@@ -86,6 +87,7 @@ interface IChannelProps {
 }
 
 const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
+  const isViewOnce = lastMessage?.type === MESSAGE_TYPE.VIEW_ONCE && lastMessage?.viewOnce
   return (
     !!(
       (lastMessage.attachments && lastMessage.attachments.length) ||
@@ -98,12 +100,12 @@ const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.image ? (
       <React.Fragment>
-        <ImageIcon />
+        {isViewOnce ? <ViewOnceIconOpen /> : <ImageIcon />}
         {lastMessage.body ? '' : 'Photo'}
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
       <React.Fragment>
-        <CameraIcon />
+        {isViewOnce ? <ViewOnceIconOpen /> : <CameraIcon />}
         {lastMessage.body ? '' : 'Video'}
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
@@ -1053,8 +1055,8 @@ export const LastMessageDescription = styled.div<{ poll?: boolean }>`
   white-space: nowrap;
   max-width: 100%;
   & > svg {
-    width: 18px;
-    height: 18px;
+    width: 16px;
+    height: 16px;
     margin: ${(props) => (props.poll ? '0 0 -3px 0' : '3px 0 -3px 0')};
     margin-right: 4px;
   }
