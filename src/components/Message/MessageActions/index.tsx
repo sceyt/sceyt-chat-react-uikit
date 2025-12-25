@@ -35,6 +35,7 @@ interface EditMessageContainerProps {
 export default function MessageActions({
   isPollMessage = false,
   allowVoteRetract = false,
+  isViewOnceMessage = false,
   pollClosed = false,
   editModeToggle,
   channel,
@@ -172,6 +173,7 @@ export default function MessageActions({
           )}
         {showEditMessage &&
           !isPollMessage &&
+          !isViewOnceMessage &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
           (isIncoming ? allowEditDeleteIncomingMessage : true) &&
           editMessagePermitted &&
@@ -243,7 +245,7 @@ export default function MessageActions({
             )}
           </React.Fragment>
         )}
-        {showCopyMessage && !isPollMessage && (
+        {showCopyMessage && !isPollMessage && !isViewOnceMessage && (
           <Action
             order={copyIconOrder || 4}
             iconColor={messageActionIconsColor || iconInactive}
@@ -259,7 +261,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {isPollMessage && allowVoteRetract && !pollClosed && (
+        {isPollMessage && allowVoteRetract && !pollClosed && !isViewOnceMessage && (
           <Action
             onClick={handleRetractVote}
             iconColor={messageActionIconsColor || iconInactive}
@@ -274,7 +276,7 @@ export default function MessageActions({
           </Action>
         )}
 
-        {isPollMessage && !isIncoming && !pollClosed && (
+        {isPollMessage && !isIncoming && !pollClosed && !isViewOnceMessage && (
           <Action
             onClick={handleEndVote}
             iconColor={messageActionIconsColor || iconInactive}
@@ -292,7 +294,8 @@ export default function MessageActions({
         {showForwardMessage &&
           forwardMessagePermitted &&
           messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING &&
-          !isPollMessage && (
+          !isPollMessage &&
+          !isViewOnceMessage && (
             <Action
               order={forwardIconOrder || 5}
               iconColor={messageActionIconsColor || iconInactive}
@@ -357,7 +360,7 @@ export default function MessageActions({
               {deleteIcon || <DeleteIcon />}
             </Action>
           )}
-        {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && (
+        {showReportMessage && messageStatus !== MESSAGE_DELIVERY_STATUS.PENDING && !isViewOnceMessage && (
           <Action
             order={reportIconOrder || 9}
             iconColor={messageActionIconsColor || iconInactive}
