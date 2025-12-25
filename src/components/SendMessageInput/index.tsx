@@ -227,6 +227,7 @@ interface SendMessageProps {
   AddAttachmentsIcon?: JSX.Element
   attachmentIcoOrder?: number
   viewOnceIconOrder?: number
+  showViewOnceToggle?: boolean
   sendIconOrder?: number
   inputOrder?: number
   ViewOnceSelectedSVGIcon?: JSX.Element
@@ -311,6 +312,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   viewOnceIconOrder = 2,
   ViewOnceSelectedSVGIcon,
   ViewOnceNotSelectedSVGIcon,
+  showViewOnceToggle = false,
   CustomTypingIndicator,
   margin,
   padding,
@@ -1883,7 +1885,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           {AddEmojisIcon || <EmojiSmileIcon />}
                         </EmojiButton>
                       )}
-                      {canShowViewOnceToggle && (
+                      {showViewOnceToggle && canShowViewOnceToggle && (
                         <ViewOnceToggleCont
                           key='view-once'
                           order={viewOnceIconOrder}
