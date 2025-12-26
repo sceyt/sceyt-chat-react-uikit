@@ -285,7 +285,11 @@ export const EditorTheme: EditorThemeClasses = {
 }
 
 export const isMessageUnsupported = (message: IMessage) => {
-  if (message?.type !== MESSAGE_TYPE.VIEW_ONCE && message?.viewOnce) {
+  if (
+    message?.type !== MESSAGE_TYPE.VIEW_ONCE &&
+    message?.viewOnce &&
+    !(message?.type === MESSAGE_TYPE.DELETED && message.state === MESSAGE_STATUS.DELETE)
+  ) {
     return true
   }
   return (
@@ -492,5 +496,9 @@ export const canBeViewOnce = (message: IMessage): boolean => {
   if (!message.viewOnce) return false
   if (!message.attachments || message.attachments.length !== 1) return false
   const attachment = message.attachments[0]
-  return attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
+  return (
+    attachment.type === attachmentTypes.image ||
+    attachment.type === attachmentTypes.video ||
+    attachment.type === attachmentTypes.voice
+  )
 }

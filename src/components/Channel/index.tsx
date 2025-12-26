@@ -115,8 +115,8 @@ const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.voice ? (
       <React.Fragment>
-        <VoiceIcon />
-        {lastMessage.body ? '' : 'Voice'}
+        {isViewOnce ? <ViewOnceIconOpen /> : <VoiceIcon />}
+        {lastMessage.body && !isViewOnce ? '' : 'Voice'}
       </React.Fragment>
     ) : null)
   )

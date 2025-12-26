@@ -1063,3 +1063,21 @@ export const CopiedTooltip = styled.span<{ background: string; color: string }>`
     }
   }
 `
+
+export const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string }>`
+  position: relative;
+  cursor: pointer;
+  margin: auto;
+  display: flex;
+  height: max-content;
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
+
+  svg {
+    circle {
+      fill: ${(props) => props.color};
+    }
+    path {
+      fill: ${(props) => props.textColor};
+    }
+  }
+`

@@ -358,6 +358,10 @@ const MessageBody = ({
   ])
 
   const viewOnce = useMemo(() => message.viewOnce, [message?.viewOnce])
+  const isViewOnceAndVoiceMessage = useMemo(
+    () => viewOnce && message?.attachments?.[0]?.type === attachmentTypes.voice,
+    [viewOnce, message?.attachments?.[0]?.type]
+  )
 
   const hasOpened = useMemo(() => {
     if (!viewOnce) return false
@@ -444,41 +448,52 @@ const MessageBody = ({
     [message.incoming, showMessageStatus, message.state, showMessageStatusForEachMessage, nextMessage]
   )
   const withAttachments = useMemo(
-    () => message.attachments && message.attachments.length > 0 && !viewOnce,
-    [message.attachments, viewOnce]
+    () => message.attachments && message.attachments.length > 0 && (!viewOnce || isViewOnceAndVoiceMessage),
+    [message.attachments, viewOnce, isViewOnceAndVoiceMessage]
   )
 
   const notLinkAttachment = useMemo(
-    () => withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link && !viewOnce),
+    () =>
+      withAttachments &&
+      message.attachments.some(
+        (a: IAttachment) => a.type !== attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
+      ),
     [withAttachments, message.attachments, viewOnce]
   )
 
-  const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link && !viewOnce)
+  const linkAttachment = message.attachments.find(
+    (a: IAttachment) => a.type === attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
+  )
   const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
   const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment = useMemo(
     () =>
       withAttachments &&
-      !viewOnce &&
+      (!viewOnce || isViewOnceAndVoiceMessage) &&
       message.attachments.find(
         (attachment: IAttachment) =>
           attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image,
-        [withAttachments, message.attachments, viewOnce]
+        [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
       ),
-    [withAttachments, message.attachments, viewOnce]
+    [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
   )
-  const withMediaAttachment = useMemo(() => !!mediaAttachment && !viewOnce, [mediaAttachment, viewOnce])
+  const withMediaAttachment = useMemo(
+    () => !!mediaAttachment && (!viewOnce || isViewOnceAndVoiceMessage),
+    [mediaAttachment, viewOnce, isViewOnceAndVoiceMessage]
+  )
   const attachmentMetas = useMemo(
     () =>
       mediaAttachment &&
       (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata),
-    [mediaAttachment, viewOnce]
+    [mediaAttachment]
   )
 
   const fileAttachment = useMemo(() => {
-    return message.attachments.find((attachment: IAttachment) => attachment.type === attachmentTypes.file && !viewOnce)
-  }, [message.attachments, viewOnce])
+    return message.attachments.find(
+      (attachment: IAttachment) => attachment.type === attachmentTypes.file && (!viewOnce || isViewOnceAndVoiceMessage)
+    )
+  }, [message.attachments, viewOnce, isViewOnceAndVoiceMessage])
 
   const borderRadius = useMemo(
     () =>
@@ -968,6 +983,7 @@ const MessageBody = ({
         withAttachments &&
           (message.attachments as any[]).map((attachment: any) => (
             <Attachment
+              viewOnce={viewOnce}
               key={attachment.tid || attachment.url}
               handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
               attachment={{

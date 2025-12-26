@@ -25,7 +25,8 @@ import {
   setJoinableChannelAC,
   setMutualChannelsHasNextAC,
   setMutualChannelsAC,
-  setMutualChannelsLoadingStateAC
+  setMutualChannelsLoadingStateAC,
+  updateMessageAsOpenedAC
 } from './actions'
 import {
   BLOCK_CHANNEL,
@@ -65,7 +66,9 @@ import {
   GET_CHANNEL_BY_INVITE_KEY,
   JOIN_TO_CHANNEL_WITH_INVITE_KEY,
   SET_MESSAGE_RETENTION_PERIOD,
-  GET_CHANNELS_WITH_USER
+  GET_CHANNELS_WITH_USER,
+  MARK_MESSAGE_AS_OPENED,
+  UPDATE_MESSAGE_AS_OPENED
 } from './constants'
 import {
   destroyChannelsMap,
@@ -1033,7 +1036,7 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
               user: messageListMarker.user,
               createdAt: messageListMarker.createdAt,
               messageId,
-              name: MESSAGE_DELIVERY_STATUS.READ
+              name: MESSAGE_DELIVERY_STATUS.PLAYED
             }
           ]
         }
@@ -1044,6 +1047,59 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
     }
   } catch (e) {
     log.error(e, 'Error on mark voice messages read')
+  }
+}
+
+function* updateMessageAsOpened(action: IAction): any {
+  const { payload } = action
+  const { channelId, messageListMarker } = payload
+  let channel = yield call(getChannelFromMap, channelId)
+  if (!channel) {
+    channel = getChannelFromAllChannels(channelId)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+  if (channel) {
+    for (const messageId of messageListMarker.messageIds) {
+      const updateParams = {
+        deliveryStatus: MESSAGE_DELIVERY_STATUS.OPENED,
+        userMarkers: [
+          {
+            user: messageListMarker.user,
+            createdAt: messageListMarker.createdAt,
+            messageId,
+            name: MESSAGE_DELIVERY_STATUS.OPENED
+          }
+        ]
+      }
+      yield put(updateMessageAC(messageId, updateParams))
+      updateMessageOnMap(channel.id, { messageId, params: updateParams })
+      updateMessageOnAllMessages(messageId, updateParams)
+    }
+  }
+}
+
+function* markMessageAsOpened(action: IAction): any {
+  const { payload } = action
+  const { channelId, messageIds, shouldUpdateMessage } = payload
+  try {
+    let channel = yield call(getChannelFromMap, channelId)
+    if (!channel) {
+      channel = getChannelFromAllChannels(channelId)
+      if (channel) {
+        setChannelInMap(channel)
+      }
+    }
+
+    if (channel) {
+      const messageListMarker = yield call(channel.markMessagesAsOpened, messageIds)
+      if (shouldUpdateMessage) {
+        yield put(updateMessageAsOpenedAC(channelId, messageListMarker))
+      }
+    }
+  } catch (e) {
+    log.error(e, 'Error on mark message as opened')
   }
 }
 
@@ -1869,6 +1925,8 @@ export default function* ChannelsSaga() {
   yield takeEvery(MARK_MESSAGES_AS_READ, markMessagesRead)
   yield takeLatest(MARK_MESSAGES_AS_DELIVERED, markMessagesDelivered)
   yield takeLatest(MARK_VOICE_MESSAGE_AS_PLAYED, markVoiceMessageAsPlayed)
+  yield takeLatest(MARK_MESSAGE_AS_OPENED, markMessageAsOpened)
+  yield takeLatest(UPDATE_MESSAGE_AS_OPENED, updateMessageAsOpened)
   yield takeLatest(WATCH_FOR_EVENTS, watchForChannelEvents)
   yield takeLatest(TURN_OFF_NOTIFICATION, notificationsTurnOff)
   yield takeLatest(TURN_ON_NOTIFICATION, notificationsTurnOn)

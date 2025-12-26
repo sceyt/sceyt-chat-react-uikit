@@ -403,7 +403,7 @@ function* sendMessage(action: IAction): any {
             if (message.repliedInThread) {
               messageBuilder.setReplyInThread()
             }
-            // Set view-once only for first message with exactly 1 image/video attachment
+            // Set view-once only for first message with exactly 1 image/video/voice attachment
             if (i === 0 && canBeViewOnce(message)) {
               messageBuilder.setViewOnce(true)
               messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
@@ -454,7 +454,7 @@ function* sendMessage(action: IAction): any {
             messageBuilder.setReplyInThread()
           }
 
-          // Set view-once if message has viewOnce flag and exactly 1 image/video attachment
+          // Set view-once if message has viewOnce flag and exactly 1 image/video/voice attachment
           if (canBeViewOnce(message)) {
             messageBuilder.setViewOnce(true)
             messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
@@ -955,8 +955,8 @@ function* deleteMessage(action: IAction): any {
     updateMessageOnAllMessages(messageId, deletedMessage)
 
     const messageToUpdate = JSON.parse(JSON.stringify(deletedMessage))
-    updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
     if (channel.lastMessage.id === messageId) {
+      updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {

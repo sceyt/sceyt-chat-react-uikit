@@ -80,7 +80,9 @@ import {
   JOIN_TO_CHANNEL_WITH_INVITE_KEY,
   SET_MESSAGE_RETENTION_PERIOD,
   GET_CHANNELS_WITH_USER,
-  LOAD_MORE_MUTUAL_CHANNELS
+  LOAD_MORE_MUTUAL_CHANNELS,
+  MARK_MESSAGE_AS_OPENED,
+  UPDATE_MESSAGE_AS_OPENED
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -225,6 +227,28 @@ export const markMessagesAsDeliveredAC = (channelId: string, messageIds: string[
 export const markVoiceMessageAsPlayedAC = (channelId: string, messageIds: string[]) => ({
   type: MARK_VOICE_MESSAGE_AS_PLAYED,
   payload: { channelId, messageIds }
+})
+
+export const markMessageAsOpenedAC = (
+  channelId: string,
+  messageIds: string[],
+  shouldUpdateMessage: boolean = true
+) => ({
+  type: MARK_MESSAGE_AS_OPENED,
+  payload: { channelId, messageIds, shouldUpdateMessage }
+})
+
+export const updateMessageAsOpenedAC = (
+  channelId: string,
+  messageListMarker: {
+    messageIds: string[]
+    user: IUser | null
+    createdAt: Date
+    name: string
+  }
+) => ({
+  type: UPDATE_MESSAGE_AS_OPENED,
+  payload: { channelId, messageListMarker }
 })
 
 export const sendTypingAC = (state: boolean) => ({

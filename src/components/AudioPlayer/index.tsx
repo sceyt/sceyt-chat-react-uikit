@@ -9,6 +9,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 // Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
+import { ReactComponent as BadgeIcon } from '../../assets/svg/badge.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
@@ -33,9 +34,25 @@ interface AudioPlayerProps {
   messagePlayed: boolean | undefined
   channelId?: string
   incoming?: boolean
+  viewOnce?: boolean
+  setViewOnceVoiceModalOpen?: (open: boolean) => void
+  bgColor?: string
+  borderRadius?: string
+  onClose?: () => void
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, channelId, incoming }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  url,
+  file,
+  messagePlayed,
+  channelId,
+  incoming,
+  viewOnce,
+  setViewOnceVoiceModalOpen,
+  bgColor,
+  borderRadius,
+  onClose
+}) => {
   const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -47,7 +64,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground
   } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
@@ -80,8 +99,11 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
       }
     }
   }
-
   const handlePlayPause = () => {
+    if (setViewOnceVoiceModalOpen) {
+      setViewOnceVoiceModalOpen(true)
+      return
+    }
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
@@ -214,6 +236,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
               dispatch(setPlayingAudioIdAC(null))
             }
             clearInterval(intervalRef.current)
+            if (onClose) {
+              onClose()
+            }
           })
 
           wavesurfer.current.on('pause', () => {
@@ -252,9 +277,15 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   }, [playingAudioId])
 
   return (
-    <Container>
+    <Container backgroundColor={bgColor} borderRadius={borderRadius}>
       <PlayPause onClick={handlePlayPause} iconColor={accentColor}>
         {playAudio ? <PauseIcon /> : <PlayIcon />}
+        {viewOnce && (
+          <DisappearingMessagesBadge
+            color={incoming ? incomingMessageBackground : outgoingMessageBackground}
+            iconColor={accentColor}
+          />
+        )}
       </PlayPause>
       <WaveContainer>
         <VisualizationWrapper>
@@ -288,17 +319,19 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
 
 export default AudioPlayer
 
-const Container = styled.div`
+const Container = styled.div<{ backgroundColor?: string; borderRadius?: string }>`
   position: relative;
   display: flex;
   align-items: flex-start;
   width: 230px;
   padding: 8px 12px;
+  ${(props) => props.backgroundColor && `background-color: ${props.backgroundColor};`}
+  ${(props) => props.borderRadius && `border-radius: ${props.borderRadius};`}
 `
 
 const PlayPause = styled.div<{ iconColor: string }>`
   cursor: pointer;
-
+  position: relative;
   & > svg {
     color: ${(props) => props.iconColor};
     display: flex;
@@ -359,4 +392,26 @@ const Timer = styled.div<{ color: string }>`
   font-size: 11px;
   line-height: 12px;
   color: ${(props) => props.color};
+`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; iconColor: string }>`
+  position: absolute;
+  bottom: -3px;
+  right: -8px;
+  width: 24px !important;
+  height: 24px !important;
+  transform: scale(0.875);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  color: ${(props) => props.color};
+  & > path:nth-child(1) {
+    stroke: ${(props) => props.color};
+    fill: ${(props) => props.iconColor};
+  }
+  g {
+    path {
+      stroke: ${(props) => props.color};
+    }
+  }
 `

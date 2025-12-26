@@ -34,7 +34,7 @@ import {
   formatLargeText,
   setDownloadFilePromise
 } from '../../helpers'
-import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
@@ -43,11 +43,13 @@ import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
+import ViewOnceVoiceModal from '../../common/popups/viewOnceMedia/ViewOnceVoiceModal'
 // Components
 import VideoPreview from '../VideoPreview'
 import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
 import { isJSON } from 'helpers/message'
+import { updateMessageAsOpenedAC } from 'store/channel/actions'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -78,6 +80,7 @@ interface AttachmentPops {
   messagePlayed?: boolean | undefined
   channelId?: string
   incoming?: boolean
+  viewOnce?: boolean
 }
 
 const Attachment = ({
@@ -104,7 +107,8 @@ const Attachment = ({
   messageType,
   messagePlayed,
   channelId,
-  incoming
+  incoming,
+  viewOnce
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -131,6 +135,7 @@ const Attachment = ({
     () => attachmentUpdatedMap[attachment.url],
     [attachmentUpdatedMap, attachment.url]
   )
+  const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [imageLoading, setImageLoading] = useState(!attachmentUrlFromMap)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
@@ -490,6 +495,29 @@ const Attachment = ({
 
   return (
     <React.Fragment>
+      {viewOnce && attachment.type === attachmentTypes.voice && (
+        <ViewOnceVoiceModal
+          url={attachment.attachmentUrl || attachmentUrl}
+          file={attachment}
+          messagePlayed={messagePlayed || false}
+          channelId={channelId || ''}
+          incoming={incoming || false}
+          isOpen={viewOnceVoiceModalOpen}
+          onClose={() => {
+            setViewOnceVoiceModalOpen(false)
+            if (incoming) {
+              dispatch(
+                updateMessageAsOpenedAC(channelId || '', {
+                  messageIds: [attachment.messageId],
+                  user: attachment.user || null,
+                  createdAt: new Date(),
+                  name: MESSAGE_DELIVERY_STATUS.OPENED
+                })
+              )
+            }
+          }}
+        />
+      )}
       {attachment.type === attachmentTypes.image ? (
         <AttachmentImgCont
           draggable={false}
@@ -759,6 +787,8 @@ const Attachment = ({
           messagePlayed={messagePlayed}
           channelId={channelId}
           incoming={incoming}
+          viewOnce={viewOnce}
+          setViewOnceVoiceModalOpen={setViewOnceVoiceModalOpen}
         />
       ) : attachment.type === attachmentTypes.link ? null : (
         /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>

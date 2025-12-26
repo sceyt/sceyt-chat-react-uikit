@@ -66,7 +66,7 @@ import {
   getAllowEditDeleteIncomingMessage,
   makeUsername
 } from '../../helpers/message'
-import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
+import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
@@ -117,6 +117,7 @@ import { ReactComponent as ChooseMediaIcon } from '../../assets/svg/choseMedia.s
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+import { ReactComponent as ViewOnceIconOpen } from '../../assets/svg/view_once_last_message.svg'
 
 // Components
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
@@ -1265,9 +1266,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               type: attachmentTypes.voice
             }
           ],
-          type: 'text'
+          type: 'text',
+          viewOnce: viewOnce || false
         }
         dispatch(sendMessageAC(messageToSend, id, connectionStatus))
+        // Reset viewOnce after sending
+        setViewOnce(false)
       }
 
       reader.onerror = (e: any) => {
@@ -1419,18 +1423,26 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
     attachmentsUpdate = attachments
 
+    // Check if there's an active audio recording
+    const hasAudioRecording = showRecording || getAudioRecordingFromMap(activeChannel?.id)?.file
+
     // Auto-disable view-once if attachment count changes from 1 to more than 1
-    if (viewOnce && attachments.length !== 1) {
+    // But allow viewOnce for audio recordings even when attachments array is empty
+    if (viewOnce && attachments.length !== 1 && !hasAudioRecording) {
       setViewOnce(false)
     }
-    // Auto-disable view-once if the single attachment is not image/video
+    // Auto-disable view-once if the single attachment is not image/video/voice
     if (viewOnce && attachments.length === 1) {
       const attachment = attachments[0]
-      if (attachment.type !== attachmentTypes.image && attachment.type !== attachmentTypes.video) {
+      if (
+        attachment.type !== attachmentTypes.image &&
+        attachment.type !== attachmentTypes.video &&
+        attachment.type !== attachmentTypes.voice
+      ) {
         setViewOnce(false)
       }
     }
-  }, [attachments, viewOnce])
+  }, [attachments, viewOnce, showRecording, activeChannel?.id])
 
   useEffect(() => {
     if (emojiBtnRef.current && messageInputRef.current) {
@@ -1743,6 +1755,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </CloseEditMode>
                     <ReplyMessageCont>
                       {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                        !messageForReply.viewOnce &&
                         (messageForReply.attachments[0].type === attachmentTypes.image ||
                         messageForReply.attachments[0].type === attachmentTypes.video ? (
                           <Attachment
@@ -1774,8 +1787,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         </EditReplyMessageHeader>
                         {messageForReply.attachments && messageForReply.attachments.length ? (
                           messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                            'Voice'
-                          ) : messageForReply.body &&
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
+                            </TextInOneLine>
+                          ) : !messageForReply.viewOnce &&
+                            messageForReply.body &&
                             messageForReply.bodyAttributes &&
                             messageForReply.bodyAttributes.length > 0 ? (
                             MessageTextFormat({
@@ -1804,11 +1821,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                               textSecondary
                             })
                           ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                            <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
+                            </TextInOneLine>
                           ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                            <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
+                            </TextInOneLine>
                           ) : (
-                            <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
+                            </TextInOneLine>
                           )
                         ) : (
                           MessageTextFormat({
@@ -2094,6 +2119,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         showRecording={showRecording}
                         channelId={activeChannel.id}
                         maxRecordingDuration={audioRecordingMaxDuration}
+                        showViewOnceToggle={showViewOnceToggle}
+                        viewOnce={viewOnce}
+                        setViewOnce={setViewOnce}
+                        ViewOnceSelectedSVGIcon={ViewOnceSelectedSVGIcon}
+                        ViewOnceNotSelectedSVGIcon={ViewOnceNotSelectedSVGIcon}
                       />
                     </SendMessageButton>
                   )}
@@ -2753,24 +2783,6 @@ const CloseIconWrapper = styled.span<{ color: string }>`
   margin-left: auto;
   padding: 10px;
   color: ${(props) => props.color};
-`
-
-const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string }>`
-  position: relative;
-  cursor: pointer;
-  margin: auto;
-  display: flex;
-  height: max-content;
-  order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
-
-  svg {
-    circle {
-      fill: ${(props) => props.color};
-    }
-    path {
-      fill: ${(props) => props.textColor};
-    }
-  }
 `
 
 export default SendMessageInput

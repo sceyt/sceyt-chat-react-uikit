@@ -33,7 +33,8 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
     (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.SENT ||
       currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
       currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
-      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED)
   ) {
     return true
   }
@@ -41,17 +42,27 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
     markerName === MESSAGE_DELIVERY_STATUS.DELIVERED &&
     (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.DELIVERED ||
       currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
-      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED)
   ) {
     return true
   }
   if (
     markerName === MESSAGE_DELIVERY_STATUS.READ &&
-    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ || currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED)
+    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.READ ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED)
   ) {
     return true
   }
-  if (markerName === MESSAGE_DELIVERY_STATUS.PLAYED && currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED) {
+  if (
+    markerName === MESSAGE_DELIVERY_STATUS.PLAYED &&
+    (currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.PLAYED ||
+      currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED)
+  ) {
+    return true
+  }
+  if (markerName === MESSAGE_DELIVERY_STATUS.OPENED && currentDeliveryStatus === MESSAGE_DELIVERY_STATUS.OPENED) {
     return true
   }
   return false

@@ -3,7 +3,7 @@ import React, { useEffect } from 'react'
 import styled from 'styled-components'
 import { THEME_COLORS } from 'UIHelper/constants'
 
-const PopupContainer = ({ children }: any) => {
+const PopupContainer = ({ children, bgColor }: { children: React.ReactNode; bgColor?: string }) => {
   const { [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } = useColor()
   useEffect(() => {
     const body = document.querySelector('body')
@@ -17,7 +17,7 @@ const PopupContainer = ({ children }: any) => {
       }
     }
   }, [])
-  return <Container background={overlayBackground}>{children}</Container>
+  return <Container background={bgColor || overlayBackground}>{children}</Container>
 }
 
 export default PopupContainer

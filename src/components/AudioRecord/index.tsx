@@ -9,6 +9,8 @@ import { ReactComponent as CancelRecordIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
+import { ReactComponent as ViewOnceNotSelectedIcon } from '../../assets/svg/view_once_not_selected.svg'
+import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_once_selected.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
@@ -18,6 +20,7 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
+import { ViewOnceToggleCont } from 'UIHelper'
 
 const fieldsObject = {
   channelId: '',
@@ -35,6 +38,11 @@ interface AudioPlayerProps {
   showRecording: boolean
   channelId: string
   maxRecordingDuration?: number
+  showViewOnceToggle: boolean
+  viewOnce: boolean
+  setViewOnce: (viewOnce: boolean) => void
+  ViewOnceSelectedSVGIcon: React.ReactNode
+  ViewOnceNotSelectedSVGIcon: React.ReactNode
 }
 let shouldDraw = false
 const DEFAULT_MAX_RECORDING_DURATION = 600
@@ -45,14 +53,21 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   setShowRecording,
   showRecording,
   channelId,
-  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION
+  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION,
+  showViewOnceToggle,
+  viewOnce,
+  setViewOnce,
+  ViewOnceSelectedSVGIcon,
+  ViewOnceNotSelectedSVGIcon
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.WARNING]: warningColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const [recording, setStartRecording] = useState<any>(null)
@@ -637,8 +652,20 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   return (
     <Container recording={showRecording || currentRecordedFile}>
       {(showRecording || currentRecordedFile) && (
-        <PlayPause iconColor={iconPrimary} onClick={() => cancelRecording()}>
-          <CancelRecordIcon />
+        <PlayPause iconColor={iconPrimary}>
+          {(showRecording || currentRecordedFile) && showViewOnceToggle && (
+            <ViewOnceToggleCont
+              key='view-once'
+              onClick={() => setViewOnce(!viewOnce)}
+              color={viewOnce ? accentColor : iconInactive}
+              textColor={viewOnce ? textOnPrimary : iconInactive}
+            >
+              {viewOnce
+                ? ViewOnceSelectedSVGIcon || <ViewOnceSelectedIcon />
+                : ViewOnceNotSelectedSVGIcon || <ViewOnceNotSelectedIcon />}
+            </ViewOnceToggleCont>
+          )}
+          <CancelRecordIcon onClick={() => cancelRecording()} style={{ padding: '4px' }} />
         </PlayPause>
       )}
 
@@ -673,7 +700,11 @@ export default memo(AudioRecord, (prevProps, nextProps) => {
   return (
     prevProps.channelId === nextProps.channelId &&
     prevProps.showRecording === nextProps.showRecording &&
-    prevProps.maxRecordingDuration === nextProps.maxRecordingDuration
+    prevProps.maxRecordingDuration === nextProps.maxRecordingDuration &&
+    prevProps.showViewOnceToggle === nextProps.showViewOnceToggle &&
+    prevProps.viewOnce === nextProps.viewOnce &&
+    prevProps.ViewOnceSelectedSVGIcon === nextProps.ViewOnceSelectedSVGIcon &&
+    prevProps.ViewOnceNotSelectedSVGIcon === nextProps.ViewOnceNotSelectedSVGIcon
   )
 })
 
@@ -720,9 +751,13 @@ const AudioVisualization = styled.div<{ show?: boolean }>`
 `
 
 const PlayPause = styled.div<{ iconColor?: string }>`
-  cursor: pointer;
-  padding: 10px;
+  padding: 10px 0 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   > svg {
+    cursor: pointer;
     color: ${(props) => props.iconColor};
   }
 `
