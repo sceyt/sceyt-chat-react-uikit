@@ -101,12 +101,12 @@ const LastMessageAttachments = ({ lastMessage }: { lastMessage: IMessage }) => {
     ) : lastMessage.attachments[0].type === attachmentTypes.image ? (
       <React.Fragment>
         {isViewOnce ? <ViewOnceIconOpen /> : <ImageIcon />}
-        {lastMessage.body ? '' : 'Photo'}
+        {lastMessage.body && !isViewOnce ? '' : 'Photo'}
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.video ? (
       <React.Fragment>
         {isViewOnce ? <ViewOnceIconOpen /> : <CameraIcon />}
-        {lastMessage.body ? '' : 'Video'}
+        {lastMessage.body && !isViewOnce ? '' : 'Video'}
       </React.Fragment>
     ) : lastMessage.attachments[0].type === attachmentTypes.file ? (
       <React.Fragment>
@@ -153,6 +153,7 @@ const ChannelMessageText = ({
   isDirectChannel: boolean
   unsupportedMessage?: boolean
 }) => {
+  const isViewOnce = lastMessage?.type === MESSAGE_TYPE.VIEW_ONCE && lastMessage?.viewOnce
   const audioRecording = useMemo(() => {
     return getAudioRecordingFromMap(channel.id)
   }, [channel.id, draftMessageText])
@@ -265,6 +266,7 @@ const ChannelMessageText = ({
               )}
               {LastMessageAttachments({ lastMessage })}
               {!!(lastMessage && lastMessage.id) &&
+                !isViewOnce &&
                 MessageTextFormat({
                   text: lastMessage.body,
                   message: lastMessage,
