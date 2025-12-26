@@ -321,7 +321,7 @@ const UsersPopup = ({
   }, [])
 
   return (
-    <PopupContainer theme={theme}>
+    <PopupContainer>
       <Popup
         // isLoading={usersLoadingState}
         maxHeight={popupHeight || '721px'}

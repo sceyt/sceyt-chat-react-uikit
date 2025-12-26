@@ -353,7 +353,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
   }
 
   return (
-    <PopupContainer theme={theme}>
+    <PopupContainer>
       <Popup maxWidth='522px' minWidth='522px' height='auto' padding='0' backgroundColor={background}>
         <PopupBody paddingH='24px' paddingV='24px' withFooter>
           <CloseIcon onClick={onClose} color={iconPrimary} />
