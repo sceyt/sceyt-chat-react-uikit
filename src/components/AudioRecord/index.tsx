@@ -36,6 +36,7 @@ interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   setShowRecording: (start: boolean) => void
   showRecording: boolean
+  isSelfChannel: boolean
   channelId: string
   maxRecordingDuration?: number
   showViewOnceToggle: boolean
@@ -52,6 +53,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   sendRecordedFile,
   setShowRecording,
   showRecording,
+  isSelfChannel,
   channelId,
   maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION,
   showViewOnceToggle,
@@ -653,7 +655,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     <Container recording={showRecording || currentRecordedFile}>
       {(showRecording || currentRecordedFile) && (
         <PlayPause iconColor={iconPrimary}>
-          {(showRecording || currentRecordedFile) && showViewOnceToggle && (
+          {(showRecording || currentRecordedFile) && showViewOnceToggle && !isSelfChannel && (
             <ViewOnceToggleCont
               key='view-once'
               onClick={() => setViewOnce(!viewOnce)}

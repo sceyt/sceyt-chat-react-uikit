@@ -393,6 +393,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
@@ -2120,6 +2125,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         channelId={activeChannel.id}
                         maxRecordingDuration={audioRecordingMaxDuration}
                         showViewOnceToggle={showViewOnceToggle}
+                        isSelfChannel={isSelfChannel}
                         viewOnce={viewOnce}
                         setViewOnce={setViewOnce}
                         ViewOnceSelectedSVGIcon={ViewOnceSelectedSVGIcon}

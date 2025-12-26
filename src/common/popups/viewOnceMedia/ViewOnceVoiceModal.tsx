@@ -1,13 +1,18 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import styled from 'styled-components'
-import { useDispatch } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 import { useColor } from '../../../hooks'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IAttachment } from '../../../types'
+import { IAttachment, IContactsMap, IMember } from '../../../types'
 import AudioPlayer from '../../../components/AudioPlayer'
 import PopupContainer from '../popupContainer'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
 import { markMessageAsOpenedAC } from '../../../store/channel/actions'
+import { activeChannelSelector } from 'store/channel/selector'
+import { DEFAULT_CHANNEL_TYPE } from 'helpers/constants'
+import { contactsMapSelector, userSelector } from 'store/user/selector'
+import { makeUsername } from 'helpers/message'
+import { getShowOnlyContactUsers } from 'helpers/contacts'
 
 interface ViewOnceVoiceModalProps {
   url: string
@@ -44,6 +49,16 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
     }
   }, [isOpen, incoming, dispatch])
 
+  const user = useSelector(userSelector)
+  const activeChannel = useSelector(activeChannelSelector)
+  const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+
+  const member = useMemo(() => {
+    return isDirectChannel ? activeChannel?.members.find((member: IMember) => member.id !== user.id) : null
+  }, [isDirectChannel, activeChannel?.members])
+  const contactsMap: IContactsMap = useSelector(contactsMapSelector)
+  const getFromContacts = getShowOnlyContactUsers()
+
   if (!isOpen) return null
 
   return (
@@ -54,7 +69,13 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
           <HeaderDescription color={textSecondary}>
             {incoming
               ? 'This message will be destructed after you play it once'
-              : 'This message will be destructed after play by someone else'}
+              : isDirectChannel
+                ? `This message will be destructed after ${makeUsername(
+                    contactsMap[member?.id],
+                    member,
+                    getFromContacts
+                  )} plays it`
+                : 'This message will be destructed after play by someone else'}
           </HeaderDescription>
           <CloseButton onClick={onClose} iconColor={iconPrimary}>
             <CloseIcon />
