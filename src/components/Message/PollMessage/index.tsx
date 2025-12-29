@@ -14,9 +14,11 @@ import { ReactComponent as FilledCheckboxIcon } from '../../../assets/svg/filled
 
 interface PollMessageProps {
   message: IMessage
+  minWidth?: string
+  maxWidth?: string
 }
 
-const PollMessage = ({ message }: PollMessageProps) => {
+const PollMessage = ({ message, minWidth, maxWidth }: PollMessageProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -72,7 +74,7 @@ const PollMessage = ({ message }: PollMessageProps) => {
   }
 
   return (
-    <Container>
+    <Container style={{ minWidth, maxWidth }}>
       <Question color={textPrimary}>{poll.name}</Question>
       <SubTitle color={textSecondary}>
         {poll.anonymous ? 'Anonymous poll · ' : ''}
@@ -162,10 +164,11 @@ const PollMessage = ({ message }: PollMessageProps) => {
 
 export default PollMessage
 
-const Container = styled.div`
+const Container = styled.div<{ minWidth?: string; maxWidth?: string }>`
   display: flex;
   flex-direction: column;
-  min-width: 250px;
+  min-width: ${(p) => p.minWidth || '250px'};
+  max-width: ${(p) => p.maxWidth || '100%'};
   width: 100%;
 `
 
