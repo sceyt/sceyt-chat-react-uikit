@@ -70,7 +70,6 @@ export type InviteLinkModalRenderParams = {
   onReset: () => void
   inviteUrl: string
   channelId: string
-  theme: string
   colors: {
     accentColor: string
     textPrimary: string

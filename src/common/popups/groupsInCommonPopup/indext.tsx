@@ -29,7 +29,6 @@ import { clearMessagesAC } from 'store/message/actions'
 import { CONNECTION_STATUS } from 'store/user/constants'
 
 interface IProps {
-  theme?: string
   togglePopup: () => void
   user: IMember | null | undefined
 }
@@ -114,7 +113,7 @@ const MutualChannelItem = ({
   )
 }
 
-const GroupsInCommonPopup = ({ theme, togglePopup, user }: IProps) => {
+const GroupsInCommonPopup = ({ togglePopup, user }: IProps) => {
   const ChatClient = getClient()
   const { user: currentUser } = ChatClient
   const {
@@ -174,14 +173,7 @@ const GroupsInCommonPopup = ({ theme, togglePopup, user }: IProps) => {
 
   return (
     <PopupContainer>
-      <Popup
-        theme={theme}
-        backgroundColor={background}
-        maxWidth='520px'
-        minWidth='520px'
-        isLoading={isLoadingInitial}
-        padding='0'
-      >
+      <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' isLoading={isLoadingInitial} padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon color={iconPrimary} onClick={togglePopup} />
           <PopupName color={textPrimary} marginBottom='20px'>

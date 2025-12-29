@@ -59,7 +59,6 @@ import GroupsInCommonPopup from 'common/popups/groupsInCommonPopup/indext'
 interface IProps {
   setActionsHeight?: (height: number) => void
   channel: IChannel
-  theme?: string
   actionMenuOpen?: () => void
   menuIsOpen?: boolean
   toggleable: boolean
@@ -144,7 +143,6 @@ const Actions = ({
   setActionsHeight,
   channel,
   actionMenuOpen,
-  theme,
   menuIsOpen,
   toggleable,
   showMuteUnmuteNotifications = true,
@@ -408,7 +406,7 @@ const Actions = ({
   ])
 
   return (
-    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || surface1} ref={containerRef}>
+    <Container isDirect={isDirectChannel} borderColor={borderColor || surface1} ref={containerRef}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
@@ -437,7 +435,6 @@ const Actions = ({
           ) : (
             <DropDown
               isSelect
-              theme={theme}
               height='auto'
               position='left'
               order={muteUnmuteNotificationsOrder}
@@ -944,7 +941,6 @@ const Actions = ({
       )}
       {disappearingMessagesPopupOpen && (
         <DisappearingMessagesPopup
-          theme={theme}
           togglePopup={handleToggleDisappearingMessagesPopup}
           handleSetTimer={handleSetDisappearingMessagesTimer}
           currentTimer={channel.messageRetentionPeriod}
@@ -953,7 +949,6 @@ const Actions = ({
 
       {groupsInCommonPopupOpen && (
         <GroupsInCommonPopup
-          theme={theme}
           togglePopup={handleToggleGroupsInCommonPopup}
           user={channel.members.find((member: IMember) => member.id !== user.id)}
         />
@@ -997,7 +992,7 @@ const Actions = ({
 
 export default Actions
 
-const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor: string }>`
+const Container = styled.div<{ isDirect: boolean; borderColor: string }>`
   padding: 10px 16px;
   border-bottom: 6px solid ${(props) => props.borderColor};
 ]`

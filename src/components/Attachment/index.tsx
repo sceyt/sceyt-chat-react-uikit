@@ -726,7 +726,6 @@ const Attachment = ({
                 </UploadProgress>
               ) : null}
               <VideoPreview
-                theme={theme}
                 width={
                   isRepliedMessage
                     ? '40px'
@@ -788,7 +787,7 @@ const Attachment = ({
           channelId={channelId}
           incoming={incoming}
           viewOnce={viewOnce}
-          setViewOnceVoiceModalOpen={setViewOnceVoiceModalOpen}
+          setViewOnceVoiceModalOpen={viewOnce ? setViewOnceVoiceModalOpen : undefined}
         />
       ) : attachment.type === attachmentTypes.link ? null : (
         /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>

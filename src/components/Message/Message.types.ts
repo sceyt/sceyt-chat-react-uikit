@@ -210,7 +210,6 @@ export interface IMessageProps {
   openedMessageMenuId?: string
   tabIsActive?: boolean
   connectionStatus: string
-  theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string

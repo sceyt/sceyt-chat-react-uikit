@@ -37,7 +37,6 @@ import {
   switchChannelActionAC,
   switchChannelInfoAC
 } from '../../store/channel/actions'
-import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
@@ -241,7 +240,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
-  const theme = useSelector(themeSelector)
   const channelListRef = useRef<HTMLInputElement | null>(null)
   const channelsScrollRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
@@ -486,7 +484,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
         {showCreateChannelIcon &&
           (CreateChannel || (
             <CreateChannelButton
-              theme={theme}
               newChannelIcon={newChannelIcon}
               newGroupIcon={newGroupIcon}
               newChatIcon={newChatIcon}
@@ -500,7 +497,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
       {showSearch && searchChannelsPosition === 'bottom' && (
         <ChannelSearch
           searchValue={searchValue}
-          theme={theme}
           width={channelSearchWidth}
           borderRadius={searchInputBorderRadius}
           handleSearchValueChange={handleSearchValueChange}
@@ -528,7 +524,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                     <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                   ) : (
                     <Channel
-                      theme={theme}
                       selectedChannelLeftBorder={selectedChannelLeftBorder}
                       selectedChannelBackground={selectedChannelBackground}
                       selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -576,7 +571,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -624,7 +618,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           />
                         ) : (
                           <ContactItem
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -660,7 +653,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -722,7 +714,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                 ) : (
                   <Channel
-                    theme={theme}
                     selectedChannelLeftBorder={selectedChannelLeftBorder}
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -775,7 +766,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -818,7 +808,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}

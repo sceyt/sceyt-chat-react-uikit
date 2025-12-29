@@ -22,7 +22,6 @@ import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channelId: string
-  theme?: string
   filePreviewIcon?: JSX.Element
   filePreviewHoverIcon?: JSX.Element
   filePreviewTitleColor?: string

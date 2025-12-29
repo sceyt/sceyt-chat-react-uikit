@@ -7,7 +7,6 @@ import {
   channelInfoIsOpenSelector,
   channelListHiddenSelector
 } from '../../store/channel/selector'
-import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -91,7 +90,6 @@ export default function ChatHeader({
   const getFromContacts = getShowOnlyContactUsers()
   // const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
-  const theme = useSelector(themeSelector)
   const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -198,7 +196,6 @@ export default function ChatHeader({
         <ChannelName>
           <SectionHeader
             color={titleColor || textPrimary}
-            theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
             lineHeight={titleLineHeight}

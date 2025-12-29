@@ -190,7 +190,6 @@ const Message = ({
   openedMessageMenuId,
   tabIsActive,
   connectionStatus,
-  theme,
   messageTextFontSize,
   messageTextLineHeight,
   messageTimeColorOnAttachment,
@@ -804,7 +803,6 @@ const Message = ({
             contactsMap={contactsMap}
             openedMessageMenuId={openedMessageMenuId}
             connectionStatus={connectionStatus}
-            theme={theme}
             messageTextFontSize={messageTextFontSize}
             messageTextLineHeight={messageTextLineHeight}
             messageActionsShow={messageActionsShow}
@@ -1005,8 +1003,7 @@ export default React.memo(Message, (prevProps, nextProps) => {
     prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&
     prevProps.contactsMap === nextProps.contactsMap &&
     prevProps.connectionStatus === nextProps.connectionStatus &&
-    prevProps.openedMessageMenuId === nextProps.openedMessageMenuId &&
-    prevProps.theme === nextProps.theme
+    prevProps.openedMessageMenuId === nextProps.openedMessageMenuId
   )
 })
 

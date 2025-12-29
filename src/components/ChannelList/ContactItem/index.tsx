@@ -13,7 +13,6 @@ interface IChannelProps {
   contact: IContact
   showAvatar?: boolean
   avatarBorderRadius?: string
-  theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
   selectedChannelLeftBorder?: string
@@ -36,7 +35,6 @@ interface IChannelProps {
 const ContactItem: React.FC<IChannelProps> = ({
   contact,
   createChatWithContact,
-  theme,
   showAvatar = true,
   avatarBorderRadius,
   channelsPaddings,
@@ -61,7 +59,6 @@ const ContactItem: React.FC<IChannelProps> = ({
   return (
     <Container
       // ref={channelItemRef}
-      theme={theme}
       channelsPaddings={channelsPaddings}
       channelsMargin={channelsMargin}
       onClick={() => createChatWithContact(contact)}
@@ -87,7 +84,6 @@ const ContactItem: React.FC<IChannelProps> = ({
         </AvatarWrapper>
       )}
       <ChannelInfo
-        theme={theme}
         avatar={showAvatar}
         subjectFontSize={channelSubjectFontSize}
         subjectLineHeight={channelSubjectLineHeight}
@@ -105,7 +101,6 @@ export default ContactItem
 export const ChannelInfo = styled.div<{
   textColor: string
   avatar?: boolean
-  theme?: string
   subjectFontSize?: string
   subjectLineHeight?: string
   subjectColor?: string
@@ -153,7 +148,6 @@ const Container = styled.div<{
   channelsPaddings?: string
   selectedChannelPaddings?: string
   channelsMargin?: string
-  theme?: string
   hoverBackground?: string
 }>`
   position: relative;

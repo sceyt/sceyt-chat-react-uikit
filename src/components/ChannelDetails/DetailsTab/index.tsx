@@ -22,7 +22,6 @@ import { shallowEqual } from 'react-redux'
 interface IProps {
   channel: IChannel
   activeTab: string
-  theme: string
   // eslint-disable-next-line no-unused-vars
   setActiveTab: (activeTab: string) => void
   // eslint-disable-next-line no-unused-vars
@@ -69,7 +68,6 @@ interface IProps {
 
 const DetailsTab = ({
   channel,
-  theme,
   activeTab,
   checkActionPermission,
   setActiveTab,
@@ -150,7 +148,7 @@ const DetailsTab = ({
   }, [showMembers])
 
   return (
-    <Container theme={theme}>
+    <Container>
       <DetailsTabHeader
         color={textSecondary}
         activeTabColor={accentColor}
@@ -196,7 +194,6 @@ const DetailsTab = ({
       </DetailsTabHeader>
       {showMembers && activeTab === channelDetailsTabs.member && (
         <Members
-          theme={theme}
           members={members}
           channel={channel}
           checkActionPermission={checkActionPermission}
@@ -217,7 +214,6 @@ const DetailsTab = ({
       {activeTab === channelDetailsTabs.file && (
         <Files
           channelId={channel.id}
-          theme={theme}
           filePreviewIcon={filePreviewIcon}
           filePreviewHoverIcon={filePreviewHoverIcon}
           filePreviewTitleColor={filePreviewTitleColor}
@@ -258,7 +254,7 @@ const DetailsTab = ({
 
 export default DetailsTab
 
-const Container = styled.div<{ theme?: string }>`
+const Container = styled.div`
   min-height: calc(100vh - 64px);
 `
 

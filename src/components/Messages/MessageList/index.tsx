@@ -31,7 +31,6 @@ import {
   unreadMessageIdSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
-import { themeSelector } from '../../../store/theme/selector'
 import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
@@ -93,7 +92,6 @@ const CreateMessageDateDivider = ({
   dateDividerBackgroundColor,
   dateDividerBorderRadius,
   noMargin,
-  theme,
   marginBottom,
   marginTop,
   chatBackgroundColor
@@ -108,7 +106,6 @@ const CreateMessageDateDivider = ({
   dateDividerBackgroundColor?: string
   dateDividerBorderRadius?: string
   noMargin?: boolean
-  theme?: any
   marginBottom?: string
   marginTop?: string
   chatBackgroundColor?: string
@@ -126,7 +123,6 @@ const CreateMessageDateDivider = ({
   }
   return !differentDays ? null : (
     <MessageDivider
-      theme={theme}
       dividerText={dividerText}
       visibility={messagesHasNext && lastIndex}
       dateDividerFontSize={dateDividerFontSize}
@@ -504,7 +500,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const { user } = ChatClient
 
   const dispatch = useDispatch()
-  const theme = useSelector(themeSelector)
   const channel: IChannel = useSelector(activeChannelSelector)
   const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
@@ -1282,7 +1277,6 @@ const MessageList: React.FC<MessagesProps> = ({
                         prevMessage.type === MESSAGE_TYPE.SYSTEM &&
                         message.type !== MESSAGE_TYPE.SYSTEM
                       }
-                      theme={theme}
                       lastIndex={false}
                       currentMessageDate={message.createdAt}
                       nextMessageDate={prevMessage && prevMessage.createdAt}
@@ -1328,7 +1322,6 @@ const MessageList: React.FC<MessagesProps> = ({
                       >
                         <Message
                           message={message}
-                          theme={theme}
                           channel={channel}
                           stopScrolling={setStopScrolling}
                           handleMediaItemClick={(attachment) => setMediaFile(attachment)}
@@ -1465,7 +1458,6 @@ const MessageList: React.FC<MessagesProps> = ({
                     )}
                     {isUnreadMessage ? (
                       <MessageDivider
-                        theme={theme}
                         newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
                         newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
                         newMessagesSeparatorWidth={newMessagesSeparatorWidth}

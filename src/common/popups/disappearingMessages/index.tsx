@@ -27,7 +27,6 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import NetworkErrorPopup from '../networkError'
 
 interface IProps {
-  theme?: string
   togglePopup: () => void
   handleSetTimer: (timerInSeconds: number | null) => void
   currentTimer?: number | null
@@ -45,7 +44,7 @@ const TIMER_OPTIONS: TimerOptionItem[] = [
   { key: '1month', label: '1 month' }
 ]
 
-function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, currentTimer }: IProps) {
+function DisappearingMessagesPopup({ togglePopup, handleSetTimer, currentTimer }: IProps) {
   const colors = useColor()
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -151,11 +150,11 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
     return CUSTOM_OPTIONS.find((o) => o.label === customValue)?.label || '2 days'
   }, [customValue, CUSTOM_OPTIONS])
 
-  if (showNetworkError) return <NetworkErrorPopup theme={theme} togglePopup={handleCloseNetworkError} />
+  if (showNetworkError) return <NetworkErrorPopup togglePopup={handleCloseNetworkError} />
 
   return (
     <PopupContainer>
-      <Popup theme={theme} backgroundColor={background} maxWidth='522px' minWidth='522px' width='100%' padding='0'>
+      <Popup backgroundColor={background} maxWidth='522px' minWidth='522px' width='100%' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px' marginBottom='0'>
           <CloseIcon color={iconPrimary} onClick={togglePopup} />
 
@@ -223,7 +222,6 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                   >
                     <DropDown
                       withIcon
-                      theme={theme}
                       isSelect
                       position='top'
                       trigger={
@@ -231,7 +229,7 @@ function DisappearingMessagesPopup({ theme, togglePopup, handleSetTimer, current
                       }
                       watchToggleState={setDropdownOpen}
                     >
-                      <CustomDropdownOptionsUl theme={theme} accentColor={accentColor}>
+                      <CustomDropdownOptionsUl accentColor={accentColor}>
                         {CUSTOM_OPTIONS.map((o) => (
                           <CustomDropdownOptionLi
                             hoverBackground={backgroundHovered}

@@ -10,7 +10,6 @@ import { loadMoreMembersAC } from '../../store/member/actions'
 import { channelsMembersHasNextMapSelector, channelsMembersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
-import { themeSelector } from '../../store/theme/selector'
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
 // Assets
@@ -173,7 +172,6 @@ const Details = ({
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
-  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
@@ -309,7 +307,6 @@ const Details = ({
       backgroundColor={backgroundColor}
       mounted={mounted}
       size={size}
-      theme={theme}
       borderColor={bordersColor || borderThemeColor}
     >
       <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
@@ -332,7 +329,6 @@ const Details = ({
 
       {editMode && (
         <EditChannel
-          theme={theme}
           channel={activeChannel}
           handleToggleEditMode={setEditMode}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
@@ -440,7 +436,6 @@ const Details = ({
         {activeChannel && activeChannel.userRole && (
           <Actions
             setActionsHeight={setActionsHeight}
-            theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}
             unmuteNotificationIcon={unmuteNotificationIcon}
@@ -511,7 +506,6 @@ const Details = ({
         {/* <div ref={tabsRef}> */}
         {!(activeChannel && activeChannel.isMockChannel) && (
           <DetailsTab
-            theme={theme}
             channel={activeChannel}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -566,7 +560,6 @@ export default Details
 
 const Container = styled.div<{
   mounted: boolean
-  theme?: string
   borderColor?: string
   size?: 'small' | 'medium' | 'large'
   backgroundColor?: string

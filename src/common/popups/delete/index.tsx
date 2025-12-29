@@ -11,7 +11,6 @@ interface IProps {
   title: string
   description: string | JSX.Element
   buttonText: string
-  theme?: string
   buttonTextColor?: string
   buttonBackground?: string
   togglePopup: () => void
@@ -27,7 +26,6 @@ interface IProps {
 function ConfirmPopup({
   title,
   description,
-  theme,
   buttonText,
   buttonTextColor,
   buttonBackground,
@@ -75,14 +73,7 @@ function ConfirmPopup({
 
   return (
     <PopupContainer>
-      <Popup
-        theme={theme}
-        backgroundColor={background}
-        maxWidth='520px'
-        minWidth='520px'
-        isLoading={loading}
-        padding='0'
-      >
+      <Popup backgroundColor={background} maxWidth='520px' minWidth='520px' isLoading={loading} padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon color={iconPrimary} onClick={() => togglePopup()} />
           <PopupName color={textPrimary} isDelete marginBottom='20px'>

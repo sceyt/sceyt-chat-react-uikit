@@ -378,7 +378,6 @@ const QuestionInputWrapper = styled.div<{}>`
 
 const CustomTextArea = styled.textarea<{
   error?: boolean
-  theme?: string
   color: string
   placeholderColor: string
   backgroundColor: string

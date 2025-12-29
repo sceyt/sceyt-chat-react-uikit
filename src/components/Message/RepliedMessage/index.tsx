@@ -17,7 +17,6 @@ import { MessageTextFormat } from '../../../messageUtils'
 import Attachment from '../../Attachment'
 
 interface IRepliedMessageProps {
-  theme: string
   message: IMessage
   isPendingMessage?: boolean
   handleScrollToRepliedMessage: (msgId: string) => void
@@ -201,7 +200,6 @@ const RepliedMessage = ({
 export default React.memo(RepliedMessage, (prevProps, nextProps) => {
   // Custom comparison function to check if only 'messages' prop has changed
   return (
-    prevProps.theme === nextProps.theme &&
     prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
     prevProps.message.state === nextProps.message.state &&
     prevProps.message.userReactions === nextProps.message.userReactions &&

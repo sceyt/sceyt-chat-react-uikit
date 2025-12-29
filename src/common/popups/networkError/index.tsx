@@ -6,11 +6,10 @@ import { useColor } from '../../../hooks'
 import PopupContainer from '../popupContainer'
 
 interface IProps {
-  theme?: string
   togglePopup: () => void
 }
 
-function NetworkErrorPopup({ theme, togglePopup }: IProps) {
+function NetworkErrorPopup({ togglePopup }: IProps) {
   const colors = useColor()
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -23,15 +22,7 @@ function NetworkErrorPopup({ theme, togglePopup }: IProps) {
 
   return (
     <PopupContainer>
-      <Popup
-        theme={theme}
-        backgroundColor={background}
-        maxWidth='522px'
-        minWidth='522px'
-        width='522px'
-        height='220px'
-        padding='0'
-      >
+      <Popup backgroundColor={background} maxWidth='522px' minWidth='522px' width='522px' height='220px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px' marginBottom='0'>
           <CloseIcon color={iconPrimary} onClick={togglePopup} />
 

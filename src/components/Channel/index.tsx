@@ -43,7 +43,6 @@ interface IChannelProps {
   channel: IChannel
   showAvatar?: boolean
   avatarBorderRadius?: string
-  theme?: string
   notificationsIsMutedIcon?: JSX.Element
   notificationsIsMutedIconColor?: string
   selectedChannelLeftBorder?: string
@@ -287,7 +286,6 @@ const ChannelMessageText = ({
 
 const Channel: React.FC<IChannelProps> = ({
   channel,
-  theme,
   showAvatar = true,
   avatarBorderRadius,
   notificationsIsMutedIcon,
@@ -555,8 +553,6 @@ const Channel: React.FC<IChannelProps> = ({
 
   return (
     <Container
-      // ref={channelItemRef}
-      theme={theme}
       backgroundColor={background}
       selectedChannel={channel.id === activeChannel.id}
       selectedChannelLeftBorder={selectedChannelLeftBorder}
@@ -597,7 +593,6 @@ const Channel: React.FC<IChannelProps> = ({
         </AvatarWrapper>
       )}
       <ChannelInfo
-        theme={theme}
         avatar={showAvatar}
         isMuted={channel.muted}
         isPinned={!!channel.pinnedAt}
@@ -810,7 +805,6 @@ export const ChannelInfo = styled.div<{
   statusWidth: number
   avatar?: boolean
   isMuted?: boolean
-  theme?: string
   uppercase?: boolean
   subjectFontSize?: string
   subjectLineHeight?: string
@@ -908,7 +902,6 @@ const Container = styled.div<{
   selectedChannelPaddings?: string
   channelsMargin?: string
   selectedChannelBorderRadius?: string
-  theme?: string
   hoverBackground?: string
   backgroundColor?: string
 }>`

@@ -56,7 +56,6 @@ import {
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { activeChannelMembersMapSelector, channelsMembersHasNextMapSelector } from '../../store/member/selector'
-import { themeSelector } from '../../store/theme/selector'
 
 // Helpers
 import {
@@ -374,7 +373,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const messageToEdit = useSelector(messageToEditSelector)
@@ -1930,7 +1928,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                       )}
                       {showAddAttachments && addAttachmentByMenu && !messageToEdit ? (
                         <DropDown
-                          theme={theme}
                           forceClose={showChooseAttachmentType}
                           position={addAttachmentsInRightSide ? 'top' : 'topRight'}
                           margin='auto 0 0'

@@ -12,9 +12,8 @@ interface IProps {
   image: any
   onAccept: (file: File) => void
   handleClosePopup: (cropped?: boolean) => void
-  theme?: string
 }
-const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
+const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -57,7 +56,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   }, [area])
   return (
     <PopupContainer>
-      <Popup theme={theme} backgroundColor={background} minWidth='500px' maxWidth='600px' padding='0'>
+      <Popup backgroundColor={background} minWidth='500px' maxWidth='600px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} color={iconPrimary} />
           <Row align='center'>

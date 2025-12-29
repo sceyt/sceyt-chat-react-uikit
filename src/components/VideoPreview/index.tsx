@@ -16,7 +16,6 @@ import { THEME_COLORS } from 'UIHelper/constants'
 interface IVideoPreviewProps {
   width?: string
   height?: string
-  theme?: string
   file: IAttachment
   borderRadius?: string
   isPreview?: boolean

@@ -45,7 +45,6 @@ import { CONNECTION_STATUS } from 'store/user/constants'
 interface IProps {
   channel: IChannel
   members: IMember[]
-  theme: string
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
   showChangeMemberRole?: boolean
@@ -64,7 +63,6 @@ interface IProps {
 const Members = ({
   channel,
   members,
-  theme,
   checkActionPermission,
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
@@ -253,7 +251,7 @@ const Members = ({
   const currentUserRole = members.find((member) => member.id === user.id)?.role
 
   return (
-    <Container theme={theme}>
+    <Container>
       <ActionsMenu>
         <MembersList>
           {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
@@ -328,7 +326,6 @@ const Members = ({
                   rolesMap?.[member.role]?.priority < rolesMap?.[currentUserRole]?.priority &&
                   member.id !== user.id && (
                     <DropDown
-                      theme={theme}
                       isSelect
                       forceClose={!!(closeMenu && closeMenu !== member.id)}
                       watchToggleState={(state) => watchDropdownState(state, member.id)}
@@ -407,7 +404,6 @@ const Members = ({
 
       {kickMemberPopupOpen && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleKickMember}
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
@@ -433,7 +429,6 @@ const Members = ({
       )}
       {blockMemberPopupOpen && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleBlockMember}
           togglePopup={toggleBlockMemberPopup}
           buttonText='Block'
@@ -445,7 +440,6 @@ const Members = ({
       )}
       {makeAdminPopup && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
@@ -468,7 +462,6 @@ const Members = ({
           togglePopup={() => toggleMakeAdminPopup(undefined, true)}
           buttonText='Revoke'
           title='Revoke admin'
-          theme={theme}
           description={
             <span>
               Are you sure you want to revoke
@@ -483,12 +476,7 @@ const Members = ({
         />
       )}
       {changeMemberRolePopup && (
-        <ChangeMemberRole
-          theme={theme}
-          channelId={channel.id}
-          member={selectedMember!}
-          handleClosePopup={toggleChangeRolePopup}
-        />
+        <ChangeMemberRole channelId={channel.id} member={selectedMember!} handleClosePopup={toggleChangeRolePopup} />
       )}
       {addMemberPopupOpen && (
         <UsersPopup
@@ -515,7 +503,7 @@ const Members = ({
 
 export default Members
 
-const Container = styled.div<{ theme?: string }>``
+const Container = styled.div``
 
 const ActionsMenu = styled.div`
   position: relative;

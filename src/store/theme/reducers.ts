@@ -18,11 +18,13 @@ export default (state = initialState, { type, payload }: IAction) => {
 
   switch (type) {
     case SET_THEME: {
+      console.log('SET_THEME', payload)
       const { theme } = payload
       newState.theme = theme
       return newState
     }
     case SET_THEME_NEW: {
+      console.log('SET_THEME_NEW', payload)
       const { theme } = payload
       newState.newTheme = theme
       return newState

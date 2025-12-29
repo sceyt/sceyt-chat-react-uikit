@@ -83,7 +83,6 @@ export const Container = styled.div<{
 
 interface IProps {
   dividerText: string
-  theme?: string
   visibility?: boolean
   unread?: boolean
   dateDividerFontSize?: string
@@ -124,7 +123,6 @@ export default function MessageDivider({
   newMessagesSeparatorSpaceColor,
   noMargin,
   marginTop,
-  theme,
   marginBottom,
   chatBackgroundColor
 }: IProps) {
@@ -145,7 +143,6 @@ export default function MessageDivider({
   return (
     <Container
       className={unread ? 'unread' : 'divider'}
-      theme={theme}
       marginTop={marginTop}
       dividerVisibility={!visibility || unread}
       dateDividerFontSize={dateDividerFontSize || newMessagesSeparatorFontSize}

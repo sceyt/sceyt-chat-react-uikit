@@ -137,7 +137,6 @@ interface IMessageBodyProps {
   contactsMap: { [key: string]: any }
   openedMessageMenuId?: string
   connectionStatus: string
-  theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageActionsShow?: boolean
@@ -272,7 +271,6 @@ const MessageBody = ({
   fixEmojiCategoriesTitleOnTop,
   selectedMessagesMap,
   contactsMap,
-  theme,
   messageTextFontSize,
   messageTextLineHeight,
   handleToggleForwardMessagePopup,
@@ -773,7 +771,6 @@ const MessageBody = ({
       {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
         <RepliedMessage
           message={message}
-          theme={theme}
           isPendingMessage={isPendingMessage}
           handleScrollToRepliedMessage={handleScrollToRepliedMessage}
           ownMessageOnRightSide={ownMessageOnRightSide}
@@ -819,7 +816,6 @@ const MessageBody = ({
           </ForwardedTitle>
         )}
       <MessageText
-        theme={theme}
         draggable={false}
         color={textPrimary}
         fontSize={messageTextFontSize}
@@ -1156,7 +1152,6 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.imageAttachmentMaxHeight === nextProps.imageAttachmentMaxHeight &&
     prevProps.videoAttachmentMaxWidth === nextProps.videoAttachmentMaxWidth &&
     prevProps.videoAttachmentMaxHeight === nextProps.videoAttachmentMaxHeight &&
-    prevProps.theme === nextProps.theme &&
     prevProps.messageTextFontSize === nextProps.messageTextFontSize &&
     prevProps.messageTextLineHeight === nextProps.messageTextLineHeight &&
     prevProps.messageActionsShow === nextProps.messageActionsShow &&

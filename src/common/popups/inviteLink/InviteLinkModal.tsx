@@ -4,7 +4,6 @@ import { Popup, PopupName, CloseIcon, PopupBody, Button, PopupFooter, CopiedTool
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 import { ReactComponent as CopySvg } from '../../../assets/svg/copyIcon.svg'
-import { themeSelector } from 'store/theme/selector'
 import PopupContainer from '../popupContainer'
 // import { createChannelInviteKeyAC } from 'store/channel/actions'
 import { useDispatch, useSelector } from 'store/hooks'
@@ -45,7 +44,6 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
     [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
-  const theme = useSelector(themeSelector) || 'light'
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const channelsInviteKeys: {
     [key: string]: InviteKey[]
@@ -327,7 +325,6 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
       onReset: () => handleReset(),
       inviteUrl,
       channelId,
-      theme,
       colors: {
         accentColor,
         textPrimary,

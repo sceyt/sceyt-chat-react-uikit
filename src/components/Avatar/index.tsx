@@ -39,7 +39,7 @@ const Avatar: React.FC<IProps> = ({
   handleAvatarClick
   // customAvatarColors
 }) => {
-  const theme = useSelector(themeSelector) as 'light' | 'dark'
+  const theme = useSelector(themeSelector)
   const { [THEME_COLORS.ICON_INACTIVE]: iconInactive } = useColor()
   const [resolvedImageSrc, setResolvedImageSrc] = useState<string | null>(image || null)
   const isDeletedUserAvatar = !image && !name
