@@ -787,7 +787,15 @@ const Attachment = ({
           channelId={channelId}
           incoming={incoming}
           viewOnce={viewOnce}
-          setViewOnceVoiceModalOpen={viewOnce ? setViewOnceVoiceModalOpen : undefined}
+          setViewOnceVoiceModalOpen={
+            viewOnce
+              ? () => {
+                  if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+                    setViewOnceVoiceModalOpen(true)
+                  }
+                }
+              : undefined
+          }
         />
       ) : attachment.type === attachmentTypes.link ? null : (
         /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>
