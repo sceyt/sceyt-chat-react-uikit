@@ -18,6 +18,7 @@ import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
 import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
 import AudioVisualization from './AudioVisualization'
+import { convertAudioForSafari, isSafari } from '../../helpers/audioConversion'
 
 interface Recording {
   recordingSeconds: number
@@ -82,6 +83,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const wavesurfer = useRef<any>(null)
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
+  const convertedUrlRef = useRef<string | null>(null)
 
   const handleSetAudioRate = () => {
     if (wavesurfer.current) {
@@ -175,11 +177,70 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
   useEffect(() => {
     if (url) {
+      // Clean up previous converted URL if it exists
+      if (convertedUrlRef.current) {
+        URL.revokeObjectURL(convertedUrlRef.current)
+        convertedUrlRef.current = null
+      }
+
       if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
         wavesurfer.current.destroy()
       }
       const initWaveSurfer = async () => {
         try {
+          // Check if we need to convert for Safari
+          let audioUrl = url
+          const needsConversion =
+            isSafari() &&
+            url &&
+            url !== '_' &&
+            (url.endsWith('.mp3') || file.name?.endsWith('.mp3') || file.type === 'audio/mpeg')
+
+          if (needsConversion) {
+            try {
+              // Clean up any previous converted URL before creating a new one
+              if (convertedUrlRef.current) {
+                URL.revokeObjectURL(convertedUrlRef.current)
+                convertedUrlRef.current = null
+              }
+
+              // Use a unique cache key based on file ID or URL to prevent reuse
+              const cacheKey = file.id || url
+
+              // Fetch the audio file with cache control to ensure fresh data
+              const response = await fetch(url, {
+                cache: 'no-store' // Prevent browser caching
+              })
+
+              if (!response.ok) {
+                throw new Error(`Failed to fetch audio: ${response.statusText}`)
+              }
+
+              const blob = await response.blob()
+
+              // Create a unique file name using file ID to prevent conflicts
+              const uniqueFileName = `${file.id || Date.now()}_${file.name || 'audio.mp3'}`
+              const audioFile = new File([blob], uniqueFileName, {
+                type: blob.type || 'audio/mpeg',
+                lastModified: Date.now()
+              })
+
+              // Convert to Safari-compatible format
+              const convertedFile = await convertAudioForSafari(audioFile, file?.messageId)
+
+              // Create blob URL from converted file
+              const convertedBlobUrl = URL.createObjectURL(convertedFile)
+              audioUrl = convertedBlobUrl
+              convertedUrlRef.current = convertedBlobUrl
+
+              log.info(`Converted audio for Safari: ${cacheKey} -> ${convertedBlobUrl}`)
+            } catch (conversionError) {
+              log.warn('Failed to convert audio for Safari, using original:', conversionError)
+              // Fallback to original URL if conversion fails
+              audioUrl = url
+            }
+          }
+
           wavesurfer.current = WaveSurfer.create({
             container: wavesurferContainer.current,
             waveColor: 'transparent',
@@ -211,12 +272,12 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             }
           }
 
-          wavesurfer.current.load(url, peaks)
+          wavesurfer.current.load(audioUrl, peaks)
 
           wavesurfer.current.on('ready', () => {
             const audioDuration = wavesurfer.current.getDuration()
-            setDuration(audioDuration)
-            setCurrentTime(formatAudioVideoTime(audioDuration))
+            setDuration(file?.metadata?.dur || audioDuration)
+            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
 
             wavesurfer.current.drawBuffer = (d: any) => {
               log.info('filters --- ', d)
@@ -229,8 +290,8 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             setPlayAudio(false)
             wavesurfer.current.seekTo(0)
             const audioDuration = wavesurfer.current.getDuration()
-            setDuration(audioDuration)
-            setCurrentTime(formatAudioVideoTime(audioDuration))
+            setDuration(file?.metadata?.dur || audioDuration)
+            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
             setCurrentTimeSeconds(0)
             if (playingAudioId === file.id) {
               dispatch(setPlayingAudioIdAC(null))
@@ -266,8 +327,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
     }
     return () => {
       clearInterval(intervalRef.current)
+      // Clean up converted blob URL if it exists
+      if (convertedUrlRef.current) {
+        URL.revokeObjectURL(convertedUrlRef.current)
+        convertedUrlRef.current = null
+      }
+      // Destroy wavesurfer instance
+      if (wavesurfer.current) {
+        wavesurfer.current.destroy()
+        wavesurfer.current = null
+      }
     }
-  }, [url])
+  }, [url, file.id])
 
   useEffect(() => {
     if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
