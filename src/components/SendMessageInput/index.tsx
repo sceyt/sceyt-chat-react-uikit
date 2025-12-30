@@ -1323,7 +1323,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       prevActiveChannelId = activeChannel.id
     }
 
-    if (activeChannel.id && membersHasNext === undefined) {
+    if (
+      activeChannel.id &&
+      membersHasNext === undefined &&
+      !(activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT && activeChannel.memberCount === 2)
+    ) {
       dispatch(getMembersAC(activeChannel.id))
     }
     setMentionedUsers([])

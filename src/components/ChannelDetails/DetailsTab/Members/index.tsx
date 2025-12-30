@@ -242,7 +242,7 @@ const Members = ({
       if (getFromContacts) {
         dispatch(getContactsAC())
       }
-      if (channel?.id) {
+      if (channel?.id && !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && channel.memberCount === 2)) {
         dispatch(getMembersAC(channel.id))
       }
     }
