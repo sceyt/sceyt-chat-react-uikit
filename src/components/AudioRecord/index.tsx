@@ -716,8 +716,11 @@ const Container = styled.div<{ recording?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  ${(props) => props.recording && `width: 400px`};
-  transition: all 0.3s ease-in-out;
+  ${(props) =>
+    props.recording &&
+    `width: 400px;
+    transition: all 0.3s ease-in-out;
+    `}
 `
 const AudioWrapper = styled.div<{ backgroundColor: string; recording?: boolean }>`
   position: relative;

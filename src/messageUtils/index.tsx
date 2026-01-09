@@ -304,12 +304,17 @@ const MessageTextFormat = ({
             }
           } else {
             nextPartIndex = attributeOffset + attribute.length
-
+            const textPart = `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
+            const match = linkify.match(textPart)
+            let newTextPart = textPart
+            if (!isLastMessage && !asSampleText && match) {
+              newTextPart = linkifyTextPart(textPart, match, target, isInviteLink, onInviteLinkClick)
+            }
             messageText.push(
               firstPart,
               // @ts-ignore
               asSampleText ? (
-                `${text.slice(attributeOffset, attributeOffset + attribute.length)}`
+                newTextPart
               ) : (
                 <StyledText
                   isLastMessage={isLastMessage}
@@ -317,7 +322,7 @@ const MessageTextFormat = ({
                   key={`${attributeOffset}-${attribute.type}`}
                   color={isLastMessage ? textSecondary : accentColor}
                 >
-                  {`${text.slice(attributeOffset, attributeOffset + attribute.length)}`}
+                  {newTextPart}
                 </StyledText>
               ),
               index === combinedAttributesList.length - 1 ? secondPart : ''

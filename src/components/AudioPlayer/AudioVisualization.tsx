@@ -29,13 +29,12 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
 
     // Find the maximum value for normalization
     const maxVal = Math.max(...tmb)
-    if (maxVal === 0) return []
 
     // Normalize values to fit within the height (0 to height)
     return tmb.map((value) => {
       // Normalize to 0-1 range, then scale to height
       // Use a minimum height of 2px for visibility
-      const normalized = (value / maxVal) * height
+      const normalized = maxVal > 0 ? (value / maxVal) * height : 0
       return Math.max(2, normalized)
     })
   }, [tmb, height])
@@ -76,6 +75,8 @@ const Container = styled.div<{ height: number }>`
   height: ${(props) => props.height}px;
   width: 100%;
   gap: 2px;
+  justify-content: space-between;
+  margin-right: 4px;
 `
 
 const Bar = styled.div<{

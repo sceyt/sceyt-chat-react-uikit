@@ -3,7 +3,7 @@ import styled from 'styled-components'
 import { useDispatch, useSelector } from 'store/hooks'
 import { useColor } from '../../../hooks'
 import { THEME_COLORS } from '../../../UIHelper/constants'
-import { IAttachment, IContactsMap, IMember } from '../../../types'
+import { IAttachment, IContactsMap, IMember, IMessage } from '../../../types'
 import AudioPlayer from '../../../components/AudioPlayer'
 import PopupContainer from '../popupContainer'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
@@ -13,6 +13,9 @@ import { DEFAULT_CHANNEL_TYPE } from 'helpers/constants'
 import { contactsMapSelector, userSelector } from 'store/user/selector'
 import { makeUsername } from 'helpers/message'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
+import MessageStatusAndTime from 'components/Message/MessageStatusAndTime'
+import { activeChannelMessagesSelector } from 'store/message/selector'
+import { shallowEqual } from 'react-redux'
 
 interface ViewOnceVoiceModalProps {
   url: string
@@ -41,6 +44,7 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary
   } = useColor()
+  const messages = useSelector(activeChannelMessagesSelector, shallowEqual) || []
   const dispatch = useDispatch()
 
   useEffect(() => {
@@ -58,6 +62,10 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
   }, [isDirectChannel, activeChannel?.members])
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const getFromContacts = getShowOnlyContactUsers()
+
+  const message = useMemo(() => {
+    return messages.find((message: IMessage) => message.id === file.messageId)
+  }, [file])
 
   if (!isOpen) return null
 
@@ -93,6 +101,16 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
             borderRadius={'16px 16px 0 16px'}
             onClose={onClose}
           />
+          <MessageStatusAndTimeContainer>
+            <MessageStatusAndTime
+              message={message}
+              messageStatusDisplayingType={'ticks'}
+              messageStatusVisible={true}
+              leftMargin
+              messageTimeColorOnAttachment={textSecondary}
+              messageTimeVisible={true}
+            />
+          </MessageStatusAndTimeContainer>
         </AudioPlayerWrapper>
       </ModalContainer>
     </PopupContainer>
@@ -136,10 +154,17 @@ const CloseButton = styled.div<{ iconColor: string }>`
 `
 
 const AudioPlayerWrapper = styled.div`
-  width: 100%;
+  width: max-content;
+  position: relative;
   display: flex;
   justify-content: center;
   align-items: center;
+`
+
+const MessageStatusAndTimeContainer = styled.div`
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
 `
 
 const Header = styled.div<{ backgroundColor: string }>`
