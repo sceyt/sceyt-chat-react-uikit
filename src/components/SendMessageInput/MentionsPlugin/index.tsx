@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as ReactDOM from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
   LexicalTypeaheadMenuPlugin,
@@ -234,7 +233,9 @@ function MentionsContainer({
   selectOptionAndCleanUp,
   setHighlightedIndex,
   setMentionsIsOpen,
-  channelId
+  channelId,
+  alignLeft,
+  handleLeftOffset
 }: any) {
   const theme = useSelector(themeSelector)
   const {
@@ -252,7 +253,6 @@ function MentionsContainer({
   )
   const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
   const mentionsListRef = useRef<HTMLUListElement>(null)
-  const [alignRight, setAlignRight] = useState(false)
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -317,34 +317,6 @@ function MentionsContainer({
     }
   }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
 
-  useEffect(() => {
-    const checkOverflow = () => {
-      if (mentionsListRef.current && contRef.current) {
-        const containerElement = contRef.current
-        const containerRect = containerElement.getBoundingClientRect()
-        const listWidth = 340 // fixed width from styled component
-        const leftOffset = -60 // current left offset
-        const rightEdge = containerRect.left + leftOffset + listWidth
-
-        // Check if list would overflow the right edge of the window
-        if (rightEdge > window.innerWidth) {
-          setAlignRight(true)
-        } else {
-          setAlignRight(false)
-        }
-      }
-    }
-
-    // Check on mount and when options change
-    const timeoutId = setTimeout(checkOverflow, 0)
-    window.addEventListener('resize', checkOverflow)
-
-    return () => {
-      clearTimeout(timeoutId)
-      window.removeEventListener('resize', checkOverflow)
-    }
-  }, [options?.length])
-
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
       <MentionsList
@@ -354,7 +326,7 @@ function MentionsContainer({
         ref={mentionsListRef}
         borderColor={borderColor}
         onScroll={handleScroll}
-        alignRight={alignRight}
+        alignLeft={alignLeft}
       >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
@@ -372,7 +344,7 @@ function MentionsContainer({
           />
         ))}
       </MentionsList>
-      <Handle backgroundColor={background} />
+      <Handle backgroundColor={background} leftOffset={handleLeftOffset} />
     </MentionsContainerWrapper>
   )
 }
@@ -453,29 +425,40 @@ export default function MentionsPlugin({
       triggerFn={checkForMentionMatch}
       options={options}
       onOpen={handleOnOpen}
-      menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) =>
-        anchorElementRef.current
-          ? ReactDOM.createPortal(
-              <MentionsContainer
-                queryString={queryString}
-                options={options}
-                setMentionsIsOpen={setMentionsIsOpen}
-                selectOptionAndCleanUp={selectOptionAndCleanUp}
-                selectedIndex={selectedIndex}
-                setHighlightedIndex={setHighlightedIndex}
-                channelId={channelId}
-              />,
-              anchorElementRef.current
-            )
-          : null
-      }
+      menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) => {
+        const containerRect = anchorElementRef.current?.getBoundingClientRect()
+        const listWidth = 340 // fixed width from styled component
+        const leftOffset = 30 // current left offset
+        const channelDetailsWrapper = document.getElementById('channel_details_wrapper')
+        const channelDetailsWrapperRect = channelDetailsWrapper?.getBoundingClientRect()
+        const channelDetailsWrapperWidth = channelDetailsWrapperRect?.width
+        let alignLeft = 0
+        if (window.innerWidth - (channelDetailsWrapperWidth || 0) - (containerRect?.left || 0) - listWidth < 0) {
+          alignLeft = window.innerWidth - (channelDetailsWrapperWidth || 0) - 10 - listWidth
+        } else {
+          alignLeft = (containerRect?.left || 0) - leftOffset
+        }
+        return anchorElementRef.current ? (
+          <MentionsContainer
+            queryString={queryString}
+            options={options}
+            setMentionsIsOpen={setMentionsIsOpen}
+            selectOptionAndCleanUp={selectOptionAndCleanUp}
+            selectedIndex={selectedIndex}
+            setHighlightedIndex={setHighlightedIndex}
+            channelId={channelId}
+            alignLeft={alignLeft}
+            handleLeftOffset={(containerRect?.left || 0) + 7}
+          />
+        ) : null
+      }}
     />
   )
 }
 
 export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; ref?: any }>`
-  position: relative;
   animation: fadeIn 0.2s ease-in-out;
+  width: 0;
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -494,17 +477,16 @@ const MentionsList = styled.ul<{
   borderColor: string
   scrollbarThumbColor: string
   theme: string
-  alignRight?: boolean
+  alignLeft: number
 }>`
-  position: absolute;
+  position: fixed;
   bottom: 47px;
   width: 340px;
   max-height: 268px;
-  transition: all 0.2s;
+  transition: height 0.2s ease;
   overflow-x: hidden;
   overflow-y: auto;
-  left: ${(props) => (props.alignRight ? 'auto' : '-60px')};
-  right: ${(props) => (props.alignRight ? '-60px' : 'auto')};
+  left: ${(props) => `${props.alignLeft}px`};
   z-index: 200;
   padding: 0;
   margin: 0;
@@ -536,10 +518,11 @@ const MentionsList = styled.ul<{
 
 const Handle = styled.div<{
   backgroundColor: string
+  leftOffset: number
 }>`
-  position: absolute;
+  position: fixed;
   bottom: 39px;
-  left: 50%;
+  left: ${(props) => `${props.leftOffset}px`};
   transform: translateX(-50%);
   width: 20px;
   height: 8px;
