@@ -425,6 +425,7 @@ function* sendMessage(action: IAction): any {
               ...messageForSend,
               attachments: [attachment],
               createdAt: new Date(Date.now()),
+              mentionedUsers: message.mentionedUsers,
               parentMessage: message.parentMessage || null
             }
             pendingMessages.push(pending)
@@ -470,6 +471,7 @@ function* sendMessage(action: IAction): any {
             ...messageToSend,
             attachments: message.attachments,
             createdAt: new Date(Date.now()),
+            mentionedUsers: message.mentionedUsers,
             parentMessage: message.parentMessage || null
           }
           pendingMessages.push(pending)
