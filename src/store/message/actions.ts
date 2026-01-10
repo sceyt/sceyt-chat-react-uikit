@@ -367,8 +367,8 @@ export function updateMessageAC(
   return updateMessage({ messageId, params, addIfNotExists, voteDetails })
 }
 
-export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }) {
-  return updateMessagesStatus({ name, markersMap })
+export function updateMessagesStatusAC(name: string, markersMap: { [key: string]: IMarker }, isOwnMarker?: boolean) {
+  return updateMessagesStatus({ name, markersMap, isOwnMarker })
 }
 
 export function clearMessagesAC() {

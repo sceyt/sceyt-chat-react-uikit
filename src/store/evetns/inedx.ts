@@ -947,6 +947,7 @@ export default function* watchForEvents(): any {
           log.info('channel MESSAGE_MARKERS_RECEIVED ... channel: ', channel, 'markers list: ', markerList)
 
           if (channel) {
+            const isOwnMarker = markerList.user?.id === SceytChatClient.user.id
             const activeChannelId = yield call(getActiveChannelId)
             let updateLastMessage = false
             const markersMap: any = {}
@@ -957,7 +958,9 @@ export default function* watchForEvents(): any {
               } else {
                 const isPendingMessage = getMessageFromPendingMessagesMap(activeChannelId, messageId)
                 if (isPendingMessage) {
-                  updatePendingMessageOnMap(activeChannelId, messageId, { deliveryStatus: markerList.name })
+                  updatePendingMessageOnMap(activeChannelId, messageId, {
+                    deliveryStatus: markerList.name
+                  })
                 }
               }
               markersMap[messageId] = true
@@ -966,25 +969,34 @@ export default function* watchForEvents(): any {
                   updateLastMessage = true
                 }
               }
-              updateChannelOnAllChannels(channelId, {}, { id: messageId, deliveryStatus: markerList.name })
+              updateChannelOnAllChannels(
+                channelId,
+                {},
+                {
+                  id: messageId,
+                  deliveryStatus: markerList.name
+                }
+              )
             }
             if (updateLastMessage) {
               const lastMessage = {
                 ...channel.lastMessage,
-                ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerList.name)
+                ...updateMessageDeliveryStatusAndMarkers(channel.lastMessage, markerList.name, isOwnMarker)
               }
 
               updateChannelLastMessageOnAllChannels(channel.id, lastMessage)
               yield put(updateChannelLastMessageStatusAC(lastMessage, channel))
             }
             if (activeChannelId === channelId) {
-              yield put(updateMessagesStatusAC(markerList.name, markersMap))
-              updateMarkersOnAllMessages(markersMap, markerList.name)
+              yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker))
+              updateMarkersOnAllMessages(markersMap, markerList.name, isOwnMarker)
             }
 
             updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
-            updateMessageStatusOnAllMessages(markerList.name, markersMap)
-            yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
+            updateMessageStatusOnAllMessages(markerList.name, markersMap, isOwnMarker)
+            if (!isOwnMarker) {
+              yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
+            }
           }
 
           break

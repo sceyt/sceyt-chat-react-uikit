@@ -226,9 +226,10 @@ const messageSlice = createSlice({
       action: PayloadAction<{
         name: string
         markersMap: { [key: string]: IMarker }
+        isOwnMarker?: boolean
       }>
     ) => {
-      const { name, markersMap } = action.payload
+      const { name, markersMap, isOwnMarker } = action.payload
       const markerName = name
       for (let index = 0; index < state.activeChannelMessages.length; index++) {
         if (!markersMap[state.activeChannelMessages[index].id]) {
@@ -236,7 +237,7 @@ const messageSlice = createSlice({
         }
         if (state.activeChannelMessages[index].state !== 'Deleted') {
           const message = state.activeChannelMessages[index]
-          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, markerName)
+          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, markerName, isOwnMarker)
           state.activeChannelMessages[index] = {
             ...message,
             ...statusUpdatedMessage

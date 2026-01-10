@@ -12,7 +12,6 @@ import {
   updatePendingMessageAC,
   clearPendingMessagesMapAC
 } from 'store/message/actions'
-import { getClient } from 'common/client'
 export const MESSAGES_MAX_PAGE_COUNT = 80
 export const MESSAGES_MAX_LENGTH = 50
 export const LOAD_MAX_MESSAGE_COUNT = 30
@@ -79,13 +78,13 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
  */
 export const updateMessageDeliveryStatusAndMarkers = (
   message: IMessage,
-  markerName: string
+  markerName: string,
+  isOwnMarker?: boolean
 ): {
   userMarkers?: IMarker[]
   markerTotals?: IMarker[]
   deliveryStatus: string
 } => {
-  const isOwnMarker = message.user.id !== getClient().user.id
   if (shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) {
     return {
       markerTotals: message.markerTotals,
@@ -195,10 +194,10 @@ export const updateMessageOnAllMessages = (
   })
 }
 
-export const updateMessageStatusOnAllMessages = (name: string, markersMap: any) => {
+export const updateMessageStatusOnAllMessages = (name: string, markersMap: any, isOwnMarker?: boolean) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (markersMap[message.id]) {
-      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name)
+      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name, isOwnMarker)
       return { ...message, ...statusUpdatedMessage }
     }
     return message
@@ -211,12 +210,12 @@ export const removeMessageFromAllMessages = (messageId: string) => {
   )
 }
 
-export const updateMarkersOnAllMessages = (markersMap: any, name: string) => {
+export const updateMarkersOnAllMessages = (markersMap: any, name: string, isOwnMarker?: boolean) => {
   activeChannelAllMessages = activeChannelAllMessages.map((message) => {
     if (!markersMap[message.id]) {
       return message
     }
-    const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name)
+    const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name, isOwnMarker)
     return { ...message, ...statusUpdatedMessage }
   })
 }
@@ -509,7 +508,11 @@ export function removeMessageFromMap(channelId: string, messageId: string) {
   store.dispatch(removePendingMessageAC(channelId, messageId))
 }
 
-export function updatePendingMessageOnMap(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
+export function updatePendingMessageOnMap(
+  channelId: string,
+  messageId: string,
+  updatedMessage: Partial<IMessage & { isOwnMarker?: boolean }>
+) {
   store.dispatch(updatePendingMessageAC(channelId, messageId, updatedMessage))
 }
 
