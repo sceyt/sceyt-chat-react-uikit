@@ -543,9 +543,11 @@ function* sendMessage(action: IAction): any {
                 currentAttachmentsMap[attachment.tid!] = attachment
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
-                if (currentAttachmentsMap[attachment.tid!]) {
+                if (currentAttachmentsMap[attachment.tid!] && attachment.type !== attachmentTypes.voice) {
                   log.info('set at')
                   return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+                } else if (attachment.type === attachmentTypes.voice) {
+                  return { ...attachment, attachmentUrl: null }
                 }
                 return attachment
               })
@@ -555,10 +557,9 @@ function* sendMessage(action: IAction): any {
               attachments: attachmentsToUpdate,
               channelId: channel.id
             }
-            const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageResponse))
             const activeChannelId = getActiveChannelId()
             if (activeChannelId === channel.id) {
-              yield put(updateMessageAC(messageToSend.tid as string, stringifiedMessageUpdateData, true))
+              yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
             }
             yield put(removePendingMessageAC(channel.id, messageToSend.tid as string))
             updateMessageOnAllMessages(messageToSend.tid as string, messageUpdateData)

@@ -1265,7 +1265,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           viewOnce: viewOnce || false,
           parentMessage: messageForReply || null
         }
-        dispatch(sendMessageAC(messageToSend, id, connectionStatus))
+        const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
         // Reset viewOnce after sending
         setViewOnce(false)
         setAttachments([])
