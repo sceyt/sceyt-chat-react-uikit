@@ -1,4 +1,4 @@
-import { IAttachment, IMessage, IPollVote, IReaction } from '../../types'
+import { IAttachment, IMarker, IMessage, IPollVote, IReaction } from '../../types'
 import { checkArraysEqual } from '../index'
 import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
@@ -12,6 +12,7 @@ import {
   updatePendingMessageAC,
   clearPendingMessagesMapAC
 } from 'store/message/actions'
+import { getClient } from 'common/client'
 export const MESSAGES_MAX_PAGE_COUNT = 80
 export const MESSAGES_MAX_LENGTH = 50
 export const LOAD_MAX_MESSAGE_COUNT = 30
@@ -79,20 +80,24 @@ export const shouldSkipDeliveryStatusUpdate = (markerName: string, currentDelive
 export const updateMessageDeliveryStatusAndMarkers = (
   message: IMessage,
   markerName: string
-): { markerTotals: { name: string; count: number }[]; deliveryStatus: string } => {
+): {
+  userMarkers?: IMarker[]
+  markerTotals?: IMarker[]
+  deliveryStatus: string
+} => {
+  const isOwnMarker = message.user.id !== getClient().user.id
   if (shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) {
     return {
       markerTotals: message.markerTotals,
       deliveryStatus: message.deliveryStatus
     }
   }
-  const markerInMarkersTotal = message?.markerTotals?.find(
-    (marker: { name: string; count: number }) => marker.name === markerName
-  )
+  const markersTotal = isOwnMarker ? message.userMarkers : message.markerTotals
+  const markerInMarkersTotal = markersTotal?.find((marker: IMarker) => marker.name === markerName)
   if (!markerInMarkersTotal) {
     return {
-      markerTotals: [
-        ...(message.markerTotals || []),
+      [isOwnMarker ? 'userMarkers' : 'markerTotals']: [
+        ...(markersTotal || []),
         {
           name: markerName,
           count: 1
@@ -102,7 +107,7 @@ export const updateMessageDeliveryStatusAndMarkers = (
     }
   } else {
     return {
-      markerTotals: message.markerTotals.map((marker: { name: string; count: number }) =>
+      [isOwnMarker ? 'userMarkers' : 'markerTotals']: markersTotal.map((marker: { name: string; count: number }) =>
         marker.name === markerName ? { ...marker, count: marker.count + 1 } : marker
       ),
       deliveryStatus: markerName

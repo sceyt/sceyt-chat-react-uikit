@@ -159,10 +159,7 @@ export interface IMessage {
   updatedAt?: Date
   type: string
   deliveryStatus: string
-  markerTotals: {
-    name: string
-    count: number
-  }[]
+  markerTotals: IMarker[]
   userMarkers: IMarker[]
   incoming: boolean
   metadata: any

@@ -236,8 +236,11 @@ const messageSlice = createSlice({
         }
         if (state.activeChannelMessages[index].state !== 'Deleted') {
           const message = state.activeChannelMessages[index]
-          const { markerTotals, deliveryStatus } = updateMessageDeliveryStatusAndMarkers(message, markerName)
-          state.activeChannelMessages[index] = { ...message, markerTotals, deliveryStatus }
+          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, markerName)
+          state.activeChannelMessages[index] = {
+            ...message,
+            ...statusUpdatedMessage
+          }
         }
       }
       state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))

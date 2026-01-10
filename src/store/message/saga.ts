@@ -728,7 +728,7 @@ function* sendTextMessage(action: IAction): any {
 
     // messageForCatch = messageToSend
   } catch (e) {
-    log.error('error on send text message ... ', e?.type)
+    log.error('error on send text message ... ', e?.type, e)
     const isErrorResendable = isResendableError(e?.type)
     if (!isErrorResendable && channel?.id && sendMessageTid) {
       yield put(removePendingMessageAC(channel.id, sendMessageTid!))
@@ -1586,6 +1586,9 @@ function* loadMoreMessageAttachments(action: any) {
       AttachmentQuery = query.AttachmentByTypeQueryForPopup
     } else {
       AttachmentQuery = query.AttachmentByTypeQuery
+    }
+    if (!AttachmentQuery) {
+      return
     }
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     AttachmentQuery.limit = limit
