@@ -421,7 +421,12 @@ function* sendMessage(action: IAction): any {
             }
 
             messagesToSend.push(messageForSend)
-            const pending = { ...messageForSend, attachments: [attachment], createdAt: new Date(Date.now()) }
+            const pending = {
+              ...messageForSend,
+              attachments: [attachment],
+              createdAt: new Date(Date.now()),
+              parentMessage: message.parentMessage || null
+            }
             pendingMessages.push(pending)
             if (action.type !== RESEND_MESSAGE) {
               yield call(updateMessage, action.type, pending, channel.id, true, message)
@@ -461,7 +466,12 @@ function* sendMessage(action: IAction): any {
           }
 
           let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
-          const pending = { ...messageToSend, attachments: message.attachments, createdAt: new Date(Date.now()) }
+          const pending = {
+            ...messageToSend,
+            attachments: message.attachments,
+            createdAt: new Date(Date.now()),
+            parentMessage: message.parentMessage || null
+          }
           pendingMessages.push(pending)
           if (action.type !== RESEND_MESSAGE) {
             yield call(updateMessage, action.type, pending, channel.id, true, message)

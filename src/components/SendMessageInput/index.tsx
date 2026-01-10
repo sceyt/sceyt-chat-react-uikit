@@ -559,13 +559,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              // let mentionsToFind = [...mentionedUsers]
-              // const draftMessage = getDraftMessageFromMap(activeChannel.id)
-              // if (draftMessage) {
-              //   mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
-              // }
-              // const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
-              // mentionUsersToSend.push(mentionToAdd)
               mentionUsersToSend.push({ id: att.metadata })
             }
           })
@@ -579,7 +572,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageTexToSend) {
           const linkify = new LinkifyIt()
           const match = linkify.match(messageTexToSend)
-          // const messageTextArr = [messageTexToSend]
           if (match) {
             linkAttachment = {
               type: attachmentTypes.link,
@@ -1270,11 +1262,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           ],
           type: 'text',
-          viewOnce: viewOnce || false
+          viewOnce: viewOnce || false,
+          parentMessage: messageForReply || null
         }
         dispatch(sendMessageAC(messageToSend, id, connectionStatus))
         // Reset viewOnce after sending
         setViewOnce(false)
+        setAttachments([])
+        handleCloseReply()
       }
 
       reader.onerror = (e: any) => {
