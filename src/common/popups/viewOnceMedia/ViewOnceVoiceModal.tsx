@@ -105,7 +105,7 @@ const ViewOnceVoiceModal: React.FC<ViewOnceVoiceModalProps> = ({
             <MessageStatusAndTime
               message={message}
               messageStatusDisplayingType={'ticks'}
-              messageStatusVisible={true}
+              messageStatusVisible={!incoming}
               leftMargin
               messageTimeColorOnAttachment={textSecondary}
               messageTimeVisible={true}

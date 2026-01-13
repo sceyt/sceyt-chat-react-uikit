@@ -367,7 +367,7 @@ const DownloadFile = styled.a<any>`
 export const AttachmentFile = styled.div<{
   isPrevious?: boolean
   borderRadius?: string
-  background?: string
+  backgroundColor?: string
   border?: string
   borderColor: string
 }>`
@@ -377,7 +377,7 @@ export const AttachmentFile = styled.div<{
   padding: 6px 12px;
   width: 350px;
   height: 70px;
-  background: ${(props) => props.background || '#ffffff'};
+  background: ${(props) => props.backgroundColor || '#ffffff'};
   border: ${(props) => props.border || `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   margin-right: ${(props) => props.isPrevious && '16px'};

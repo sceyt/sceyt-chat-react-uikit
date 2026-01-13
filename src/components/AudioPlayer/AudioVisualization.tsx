@@ -44,7 +44,7 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
   const fractionalPart = exactIndex - floorIndex
 
   return (
-    <Container height={height}>
+    <Container style={{ height: `${height}px`, gap: `${barGap}px` }}>
       {normalizedBars.map((barHeight, index) => {
         const progressRatio = index < floorIndex ? 1 : index === floorIndex ? fractionalPart : 0
         const barOpacity = progressRatio > 0 ? 0.8 + progressRatio * 0.2 : 0.8
@@ -52,14 +52,20 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
         return (
           <Bar
             key={index}
-            height={barHeight}
-            width={barWidth}
-            gap={barGap}
-            radius={barRadius}
-            waveColor={waveColor}
-            progressColor={progressColor}
-            progressRatio={progressRatio}
-            barOpacity={barOpacity}
+            style={
+              {
+                width: `${barWidth}px`,
+                height: `${barHeight}px`,
+                borderRadius: `${barRadius}px`,
+                backgroundColor: waveColor,
+                opacity: barOpacity,
+                '--progress-width': `${progressRatio * 100}%`,
+                '--progress-color': progressColor
+              } as React.CSSProperties & {
+                '--progress-width': string
+                '--progress-color': string
+              }
+            }
           />
         )
       })}
@@ -69,43 +75,27 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
 
 export default AudioVisualization
 
-const Container = styled.div<{ height: number }>`
+const Container = styled.div`
   display: flex;
   align-items: center;
-  height: ${(props) => props.height}px;
   width: 100%;
-  gap: 2px;
   justify-content: space-between;
   margin-right: 4px;
 `
 
-const Bar = styled.div<{
-  height: number
-  width: number
-  gap: number
-  radius: number
-  waveColor: string
-  progressColor: string
-  progressRatio: number
-  barOpacity: number
-}>`
+const Bar = styled.div`
   position: relative;
-  width: ${(props) => props.width}px;
-  height: ${(props) => props.height}px;
-  border-radius: ${(props) => props.radius}px;
   min-height: 2px;
   overflow: hidden;
-  background-color: ${(props) => props.waveColor};
-  opacity: ${(props) => props.barOpacity};
 
   &::before {
     content: '';
     position: absolute;
     top: 0;
     left: 0;
-    width: ${(props) => props.progressRatio * 100}%;
+    width: var(--progress-width);
     height: 100%;
-    background-color: ${(props) => props.progressColor};
+    background-color: var(--progress-color);
     border-radius: inherit;
     will-change: width;
     transform: translateZ(0);

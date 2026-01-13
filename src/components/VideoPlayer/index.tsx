@@ -261,6 +261,8 @@ export default VideoPlayer
 const Component = styled.div<{ fullScreen?: boolean; loaded?: boolean; ref?: any }>`
   position: relative;
   display: inline-flex;
+  width: 100%;
+  height: 100%;
   & > video {
     ${(props) =>
       props.fullScreen &&
@@ -279,7 +281,7 @@ const Component = styled.div<{ fullScreen?: boolean; loaded?: boolean; ref?: any
     bottom: 0;
     height: 70px;
     width: 100%;
-    background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0) 100%);
+    background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0.8) 100%);
   }
 `
 

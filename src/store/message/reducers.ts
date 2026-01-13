@@ -27,7 +27,10 @@ export interface IMessageStore {
   activeTabAttachments: any[]
   attachmentsForPopup: any[]
   attachmentHasNext: boolean
+  attachmentForPopupHasPrev: boolean
   attachmentForPopupHasNext: boolean
+  attachmentLoadingState: number | null
+  attachmentForPopupLoadingState: number | null
   messageToEdit: IMessage | null
   messageForReply?: IMessage | null
   activeChannelMessageUpdated: { messageId: string; params: IMessage } | null
@@ -81,6 +84,9 @@ const initialState: IMessageStore = {
   activeTabAttachments: [],
   attachmentHasNext: true,
   attachmentForPopupHasNext: true,
+  attachmentForPopupHasPrev: true,
+  attachmentLoadingState: null,
+  attachmentForPopupLoadingState: null,
   messageToEdit: null,
   activeChannelNewMessage: null,
   pendingMessages: {},
@@ -408,9 +414,9 @@ const messageSlice = createSlice({
     ) => {
       const { attachments, direction } = action.payload
       if (direction === 'prev') {
-        state.attachmentsForPopup.push(...attachments)
-      } else {
         state.attachmentsForPopup.unshift(...attachments)
+      } else {
+        state.attachmentsForPopup.push(...attachments)
       }
     },
 
@@ -418,8 +424,13 @@ const messageSlice = createSlice({
       state.attachmentHasNext = action.payload.hasPrev
     },
 
-    setAttachmentsCompleteForPopup: (state, action: PayloadAction<{ hasPrev: boolean }>) => {
-      state.attachmentForPopupHasNext = action.payload.hasPrev
+    setAttachmentsCompleteForPopup: (state, action: PayloadAction<{ hasPrev?: boolean; hasNext?: boolean }>) => {
+      if (action.payload.hasPrev !== undefined) {
+        state.attachmentForPopupHasPrev = action.payload.hasPrev
+      }
+      if (action.payload.hasNext !== undefined) {
+        state.attachmentForPopupHasNext = action.payload.hasNext
+      }
     },
 
     updateUploadProgress: (
@@ -449,6 +460,14 @@ const messageSlice = createSlice({
 
     setMessagesLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
       state.messagesLoadingState = action.payload.state
+    },
+
+    setAttachmentsLoadingState: (state, action: PayloadAction<{ state: number | null; forPopup?: boolean }>) => {
+      if (action.payload.forPopup) {
+        state.attachmentForPopupLoadingState = action.payload.state
+      } else {
+        state.attachmentLoadingState = action.payload.state
+      }
     },
 
     setSendMessageInputHeight: (state, action: PayloadAction<{ height: number }>) => {
@@ -819,6 +838,7 @@ export const {
   removeUploadProgress,
   setMessageToEdit,
   setMessagesLoadingState,
+  setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
   uploadAttachmentCompilation,

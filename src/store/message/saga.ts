@@ -87,7 +87,8 @@ import {
   removePendingMessageAC,
   updatePendingPollActionAC,
   setUnreadScrollToAC,
-  setUnreadMessageIdAC
+  setUnreadMessageIdAC,
+  setAttachmentsLoadingStateAC
 } from './actions'
 import {
   attachmentTypes,
@@ -1529,8 +1530,9 @@ function* loadMoreReactions(action: IAction): any {
 }
 
 function* getMessageAttachments(action: IAction): any {
+  const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
   try {
-    const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     const SceytChatClient = getClient()
     let typeList = [
       attachmentTypes.video,
@@ -1566,7 +1568,20 @@ function* getMessageAttachments(action: IAction): any {
     if (forPopup) {
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
       yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(result.attachments))))
-      yield put(setAttachmentsCompleteForPopupAC(result.hasNext))
+      const attachmentIndex = result.attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
+      let hasPrev = false
+      if (attachmentIndex >= limit / 2 && result.hasNext && limit === result.attachments.length) {
+        hasPrev = true
+      } else {
+        hasPrev = false
+      }
+      let hasNext = false
+      if (attachmentIndex <= limit / 2 - 1 && result.hasNext && limit === result.attachments.length) {
+        hasNext = true
+      } else {
+        hasNext = false
+      }
+      yield put(setAttachmentsCompleteForPopupAC(hasPrev, hasNext))
     } else {
       query.AttachmentByTypeQuery = AttachmentByTypeQuery
       yield put(setAttachmentsCompleteAC(result.hasNext))
@@ -1576,12 +1591,14 @@ function* getMessageAttachments(action: IAction): any {
   } catch (e) {
     log.error('error in message attachment query', e)
     // yield put(setErrorNotification(e.message))
+  } finally {
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
   }
 }
 
 function* loadMoreMessageAttachments(action: any) {
+  const { limit, direction, forPopup, attachmentId } = action.payload
   try {
-    const { limit, direction, forPopup } = action.payload
     let AttachmentQuery
     if (forPopup) {
       AttachmentQuery = query.AttachmentByTypeQueryForPopup
@@ -1591,14 +1608,33 @@ function* loadMoreMessageAttachments(action: any) {
     if (!AttachmentQuery) {
       return
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     AttachmentQuery.limit = limit
-    const { attachments, hasNext } = yield call(AttachmentQuery.loadPrevious)
+    let result = { attachments: [], hasNext: false }
+    if (attachmentId) {
+      if (direction === queryDirection.NEXT) {
+        result = yield call(AttachmentQuery.loadNextAttachmentId, attachmentId)
+      } else {
+        result = yield call(AttachmentQuery.loadPreviousAttachmentId, attachmentId)
+      }
+    } else {
+      if (direction === queryDirection.NEXT) {
+        result = yield call(AttachmentQuery.loadNext)
+      } else {
+        result = yield call(AttachmentQuery.loadPrevious)
+      }
+    }
+    const { attachments, hasNext } = result
     if (forPopup) {
       yield put(addAttachmentsForPopupAC(attachments, direction))
+      if (attachmentId && direction === queryDirection.NEXT) {
+        yield put(setAttachmentsCompleteForPopupAC(undefined, result.hasNext))
+      } else if (attachmentId && direction === queryDirection.PREV) {
+        yield put(setAttachmentsCompleteForPopupAC(result.hasNext, undefined))
+      }
     } else {
       yield put(setAttachmentsCompleteAC(hasNext))
-      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
       yield put(addAttachmentsAC(attachments))
     }
   } catch (e) {
@@ -1606,6 +1642,8 @@ function* loadMoreMessageAttachments(action: any) {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
   }
 }
 

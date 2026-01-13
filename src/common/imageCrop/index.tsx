@@ -76,7 +76,7 @@ const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
                 showGrid={false}
               />
             </CropperWrapper>
-            <Controls className='controls' background={border} tickColor={accentColor}>
+            <Controls className='controls' backgroundColor={border} tickColor={accentColor}>
               <input
                 type='range'
                 value={state.zoom}
@@ -119,11 +119,11 @@ const CropperWrapper = styled.div`
   height: 300px;
   margin: 14px 0;
 `
-const Controls = styled.div<{ background: string; tickColor: string }>`
+const Controls = styled.div<{ backgroundColor: string; tickColor: string }>`
   & > input {
     width: 100%;
     -webkit-appearance: none;
-    background-color: ${({ background }) => background};
+    background-color: ${({ backgroundColor }) => backgroundColor};
     border-radius: 3px;
 
     &::-webkit-slider-runnable-track {

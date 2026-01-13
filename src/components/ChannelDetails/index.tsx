@@ -5,7 +5,7 @@ import styled from 'styled-components'
 // Store
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
-import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
+import { activeTabAttachmentsHasNextSelector, attachmentLoadingStateSelector } from '../../store/message/selector'
 import { loadMoreMembersAC } from '../../store/member/actions'
 import { channelsMembersHasNextMapSelector, channelsMembersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
@@ -192,8 +192,8 @@ const Details = ({
     () => channelsMembersHasNext?.[activeChannel?.id],
     [channelsMembersHasNext?.[activeChannel?.id]]
   )
-  const messagesLoading = useSelector(messagesLoadingState)
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
+  const attachmentLoadingState = useSelector(attachmentLoadingStateSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const detailsRef = useRef<any>(null)
@@ -240,7 +240,7 @@ const Details = ({
         if (membersLoading === LOADING_STATE.LOADED && membersHasNext) {
           dispatch(loadMoreMembersAC(15, activeChannel.id))
         }
-      } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {
+      } else if (attachmentLoadingState === LOADING_STATE.LOADED && attachmentsHasNex) {
         dispatch(loadMoreAttachmentsAC(20))
       }
     }
@@ -401,7 +401,7 @@ const Details = ({
                     <PhoneNumberContainer onClick={handleCopyPhoneNumber} role='button' aria-label='Copy phone number'>
                       {`+${directChannelUser.id}`}
                       {copiedPhone && (
-                        <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                        <CopiedTooltip backgroundColor={tooltipBackground} color={textOnPrimary}>
                           Copied
                         </CopiedTooltip>
                       )}

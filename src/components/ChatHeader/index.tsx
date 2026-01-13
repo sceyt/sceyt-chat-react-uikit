@@ -144,7 +144,7 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={border}>
+    <Container backgroundColor={backgroundColor} borderBottom={borderBottom} borderColor={border}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
@@ -246,7 +246,7 @@ export default function ChatHeader({
   )
 }
 
-const Container = styled.div<{ background?: string; borderColor: string; borderBottom?: string }>`
+const Container = styled.div<{ backgroundColor?: string; borderColor: string; borderBottom?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -254,7 +254,7 @@ const Container = styled.div<{ background?: string; borderColor: string; borderB
   height: 64px;
   box-sizing: border-box;
   border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor}`};
-  background-color: ${(props) => props.background};
+  background-color: ${(props) => props.backgroundColor};
 `
 
 const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any; order?: number }>`

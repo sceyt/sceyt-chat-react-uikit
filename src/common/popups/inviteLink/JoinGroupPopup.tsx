@@ -71,7 +71,7 @@ export default function JoinGroupPopup({ onClose, onJoin, channel }: IProps) {
       themeColors: {
         textPrimary,
         textSecondary,
-        background,
+        backgroundColor: background,
         iconPrimary,
         surface1
       },

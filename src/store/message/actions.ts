@@ -23,7 +23,8 @@ import {
   RETRACT_POLL_VOTE,
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
-  RESEND_PENDING_POLL_ACTIONS
+  RESEND_PENDING_POLL_ACTIONS,
+  queryDirection
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
@@ -55,6 +56,7 @@ import {
   removeUploadProgress,
   setMessageToEdit,
   setMessagesLoadingState,
+  setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
   uploadAttachmentCompilation,
@@ -199,7 +201,9 @@ export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolea
 export function setMessagesLoadingStateAC(state: number) {
   return setMessagesLoadingState({ state })
 }
-
+export function setAttachmentsLoadingStateAC(state: number, forPopup?: boolean) {
+  return setAttachmentsLoadingState({ state, forPopup: forPopup || false })
+}
 export function addMessagesAC(messages: any, direction: string) {
   return addMessages({ messages, direction })
 }
@@ -401,10 +405,15 @@ export function setAttachmentsForPopupAC(attachments: IAttachment[]) {
   return setAttachmentsForPopup({ attachments })
 }
 
-export function loadMoreAttachmentsAC(limit: number) {
+export function loadMoreAttachmentsAC(
+  limit: number,
+  direction: string = queryDirection.PREV,
+  attachmentId?: string,
+  forPopup?: boolean
+) {
   return {
     type: LOAD_MORE_MESSAGES_ATTACHMENTS,
-    payload: { limit }
+    payload: { limit, direction, attachmentId, forPopup: forPopup || false }
   }
 }
 
@@ -420,8 +429,8 @@ export function setAttachmentsCompleteAC(hasPrev: boolean) {
   return setAttachmentsComplete({ hasPrev })
 }
 
-export function setAttachmentsCompleteForPopupAC(hasPrev: boolean) {
-  return setAttachmentsCompleteForPopup({ hasPrev })
+export function setAttachmentsCompleteForPopupAC(hasPrev?: boolean, hasNext?: boolean) {
+  return setAttachmentsCompleteForPopup({ hasPrev, hasNext })
 }
 
 export function pauseAttachmentUploadingAC(attachmentId: string) {

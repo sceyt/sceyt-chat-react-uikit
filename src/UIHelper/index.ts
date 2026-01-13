@@ -1035,7 +1035,7 @@ export const AttachmentPreviewTitle = styled.span<{ color: string; fontSize?: st
   color: ${(props) => props.color};
 `
 
-export const CopiedTooltip = styled.span<{ background: string; color: string }>`
+export const CopiedTooltip = styled.span<{ backgroundColor: string; color: string }>`
   position: absolute;
   left: 50%;
   transform: translateX(-50%);
@@ -1048,7 +1048,7 @@ export const CopiedTooltip = styled.span<{ background: string; color: string }>`
   pointer-events: none;
   z-index: 10;
   animation: slideDownFadeIn 0.3s ease-out;
-  background-color: ${(p) => p.background};
+  background-color: ${(p) => p.backgroundColor};
   color: ${(p) => p.color};
   box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
 
@@ -1067,9 +1067,10 @@ export const CopiedTooltip = styled.span<{ background: string; color: string }>`
 export const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string }>`
   position: relative;
   cursor: pointer;
-  margin: auto;
+  margin: auto 0px 0px;
+  height: 32px;
+  align-items: center;
   display: flex;
-  height: max-content;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
 
   svg {

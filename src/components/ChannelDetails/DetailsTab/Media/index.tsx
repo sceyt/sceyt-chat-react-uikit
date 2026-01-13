@@ -74,14 +74,7 @@ const Media = ({ channel }: IProps) => {
           </React.Fragment>
         )
       })}
-      {mediaFile && (
-        <SliderPopup
-          channel={channel}
-          setIsSliderOpen={setMediaFile}
-          mediaFiles={attachments}
-          currentMediaFile={mediaFile}
-        />
-      )}
+      {mediaFile && <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />}
     </Container>
   )
 }

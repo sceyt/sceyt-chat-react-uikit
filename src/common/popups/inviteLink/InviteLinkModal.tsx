@@ -329,7 +329,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
         accentColor,
         textPrimary,
         textSecondary,
-        background,
+        backgroundColor: background,
         backgroundHovered,
         surface1,
         textOnPrimary,
@@ -401,7 +401,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
                     <CopySvg color={accentColor} />
                   </CopyButton>
                   {showCopiedToast && (
-                    <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                    <CopiedTooltip backgroundColor={tooltipBackground} color={textOnPrimary}>
                       Link copied
                     </CopiedTooltip>
                   )}

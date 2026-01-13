@@ -520,7 +520,7 @@ const MessageInfo = ({
                 onClick={() => setActiveTab(tab.key)}
                 textOnPrimary={textOnPrimary}
                 textSecondary={textSecondary}
-                background={activeTab === tab.key ? accentColor : 'transparent'}
+                backgroundColor={activeTab === tab.key ? accentColor : 'transparent'}
                 borderColor={border}
               >
                 {tab.label}
@@ -567,7 +567,7 @@ const Tab = styled.button<{
   inactiveColor: string
   textOnPrimary: string
   textSecondary: string
-  background: string
+  backgroundColor: string
   borderColor: string
 }>`
   border: none;
@@ -576,8 +576,8 @@ const Tab = styled.button<{
   padding: 6px 11px;
   border-radius: 16px;
   color: ${(p) => (p.active ? p.textOnPrimary : p.textSecondary)};
-  background: ${(p) => p.background};
-  border: 1px solid ${(p) => (p.active ? p.background : p.borderColor)};
+  background: ${(p) => p.backgroundColor};
+  border: 1px solid ${(p) => (p.active ? p.backgroundColor : p.borderColor)};
   &:hover {
     opacity: 0.9;
   }

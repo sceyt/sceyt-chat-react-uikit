@@ -97,7 +97,7 @@ const PollMessage = ({ message, minWidth, maxWidth }: PollMessageProps) => {
           return (
             <Option
               key={opt.id}
-              background={surface1}
+              backgroundColor={surface1}
               hover={backgroundHovered}
               color={textPrimary}
               onClick={() => {
@@ -197,7 +197,7 @@ const Options = styled.div`
   margin-top: 4px;
 `
 
-const Option = styled.div<{ background: string; hover: string; color: string; disabled?: boolean }>`
+const Option = styled.div<{ backgroundColor: string; hover: string; color: string; disabled?: boolean }>`
   padding: 10px 0;
   color: ${(p) => p.color};
   cursor: pointer;

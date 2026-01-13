@@ -78,6 +78,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   const [currentTime, setCurrentTime] = useState<any>('')
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0)
   const [duration, setDuration] = useState<number>(0)
+  const [realDuration, setRealDuration] = useState<number>(0)
   const [audioRate, setAudioRate] = useState<any>(1)
 
   const wavesurfer = useRef<any>(null)
@@ -110,7 +111,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
         dispatch(setPlayingAudioIdAC(`player_${file.id}`))
-        // const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
@@ -276,6 +276,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
 
           wavesurfer.current.on('ready', () => {
             const audioDuration = wavesurfer.current.getDuration()
+            setRealDuration(audioDuration)
             setDuration(file?.metadata?.dur || audioDuration)
             setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
 
@@ -290,6 +291,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
             setPlayAudio(false)
             wavesurfer.current.seekTo(0)
             const audioDuration = wavesurfer.current.getDuration()
+            setRealDuration(audioDuration)
             setDuration(file?.metadata?.dur || audioDuration)
             setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
             setCurrentTimeSeconds(0)
@@ -367,7 +369,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
           {file.metadata?.tmb && Array.isArray(file.metadata.tmb) && (
             <AudioVisualization
               tmb={file.metadata.tmb}
-              duration={duration || file.metadata.dur || 0}
+              duration={realDuration || duration || file.metadata.dur || 0}
               currentTime={currentTimeSeconds}
               waveColor={textSecondary}
               progressColor={accentColor}

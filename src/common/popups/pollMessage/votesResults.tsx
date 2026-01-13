@@ -79,7 +79,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                 Vote results
               </PopupName>
 
-              <TitleWrapper background={surface1}>
+              <TitleWrapper backgroundColor={surface1}>
                 <Question color={textPrimary}>{poll.name}</Question>
               </TitleWrapper>
               <OptionsList
@@ -93,7 +93,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                   const totalVotes = poll.voteDetails?.votesPerOption?.[opt.id] || 0
 
                   return (
-                    <OptionBlock key={opt.id} background={surface1} border={border}>
+                    <OptionBlock key={opt.id} backgroundColor={surface1} border={border}>
                       <OptionHeader>
                         <OptionTitle color={textPrimary}>{opt.name}</OptionTitle>
                         <OptionCount color={textPrimary}>
@@ -201,8 +201,8 @@ const OptionsList = styled.div<{ thumbColor: string }>`
   }
 `
 
-const OptionBlock = styled.div<{ background: string; border: string }>`
-  background: ${(p) => p.background};
+const OptionBlock = styled.div<{ backgroundColor: string; border: string }>`
+  background: ${(p) => p.backgroundColor};
   border-radius: 10px;
   border: 1px solid ${(p) => p.border}0F; /* subtle */
   padding: 14px 16px 0 16px;
@@ -273,11 +273,11 @@ const VotedAt = styled.div<{ color: string }>`
   letter-spacing: -0.2px;
 `
 
-const TitleWrapper = styled.div<{ background: string }>`
+const TitleWrapper = styled.div<{ backgroundColor: string }>`
   margin: 0 auto;
   border-radius: 10px;
   padding: 16px;
-  background: ${(p) => p.background};
+  background: ${(p) => p.backgroundColor};
   margin-bottom: 16px;
 `
 

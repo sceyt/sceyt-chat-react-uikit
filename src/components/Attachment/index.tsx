@@ -817,7 +817,7 @@ const Attachment = ({
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED
           }
           borderRadius={isRepliedMessage ? '50%' : borderRadius}
-          background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+          backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}
@@ -1089,7 +1089,7 @@ export const AttachmentFile = styled.div<{
   isRepliedMessage?: boolean
   isUploading?: boolean
   borderRadius?: string
-  background?: string
+  backgroundColor?: string
   border?: string
   width?: number
   borderColor: string
@@ -1102,7 +1102,7 @@ export const AttachmentFile = styled.div<{
   min-width: ${(props) => !props.isRepliedMessage && (props.width || (props.isUploading ? '260px' : '205px'))};
   transition: all 0.1s;
   //height: 70px;
-  background: ${(props) => props.background};
+  background: ${(props) => props.backgroundColor};
   border: ${(props) => props.border || `1px solid  ${props.borderColor}`};
   box-sizing: border-box;
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};

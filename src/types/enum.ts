@@ -1,6 +1,6 @@
 export enum HiddenMessageProperty {
   hideAfterChannelChange = 'hideAfterChannelChange',
-  hideAfterSendMessage = "hideAfterSendMessage",
+  hideAfterSendMessage = 'hideAfterSendMessage'
 }
 
 export enum MESSAGE_TYPE {

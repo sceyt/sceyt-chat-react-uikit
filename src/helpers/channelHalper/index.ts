@@ -74,7 +74,7 @@ export type InviteLinkModalRenderParams = {
     accentColor: string
     textPrimary: string
     textSecondary: string
-    background: string
+    backgroundColor: string
     backgroundHovered: string
     surface1: string
     textOnPrimary: string
@@ -116,7 +116,13 @@ export type JoinGroupPopupRenderParams = {
   onClose: () => void
   onJoin: () => void
   channel: IChannel & { membersTotalCount: number; avatar: string }
-  themeColors: { textPrimary: string; textSecondary: string; background: string; iconPrimary: string; surface1: string }
+  themeColors: {
+    textPrimary: string
+    textSecondary: string
+    backgroundColor: string
+    iconPrimary: string
+    surface1: string
+  }
   contactsMap: { [key: string]: unknown }
   members: MemberSummary[]
   firstMembers: MemberSummary[]

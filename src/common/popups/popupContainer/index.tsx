@@ -17,12 +17,12 @@ const PopupContainer = ({ children, bgColor }: { children: React.ReactNode; bgCo
       }
     }
   }, [])
-  return <Container background={bgColor || overlayBackground}>{children}</Container>
+  return <Container backgroundColor={bgColor || overlayBackground}>{children}</Container>
 }
 
 export default PopupContainer
 
-const Container = styled.div<{ width?: number; height?: number; left?: number; top?: number; background: string }>`
+const Container = styled.div<{ width?: number; height?: number; left?: number; top?: number; backgroundColor: string }>`
   direction: initial;
   position: fixed;
   top: 0;
@@ -38,5 +38,5 @@ const Container = styled.div<{ width?: number; height?: number; left?: number; t
   display: flex;
   justify-content: center;
   align-items: center;
-  background: ${(props) => `${props.background}66`};
+  background: ${(props) => `${props.backgroundColor}66`};
 `
