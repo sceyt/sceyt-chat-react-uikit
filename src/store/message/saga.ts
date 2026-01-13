@@ -1565,18 +1565,21 @@ function* getMessageAttachments(action: IAction): any {
     } else {
       result = yield call(AttachmentByTypeQuery.loadPrevious)
     }
+    const attachments = result.attachments.sort((a: IAttachment, b: IAttachment) =>
+      forPopup ? Number(a.id || 0) - Number(b.id || 0) : Number(b.id || 0) - Number(a.id || 0)
+    )
     if (forPopup) {
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
-      yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(result.attachments))))
-      const attachmentIndex = result.attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
+      yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(attachments))))
+      const attachmentIndex = attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
       let hasPrev = false
-      if (attachmentIndex >= limit / 2 && result.hasNext && limit === result.attachments.length) {
+      if (attachmentIndex >= limit / 2 && result.hasNext && limit === attachments.length) {
         hasPrev = true
       } else {
         hasPrev = false
       }
       let hasNext = false
-      if (attachmentIndex <= limit / 2 - 1 && result.hasNext && limit === result.attachments.length) {
+      if (attachmentIndex <= limit / 2 - 1 && result.hasNext && limit === attachments.length) {
         hasNext = true
       } else {
         hasNext = false
@@ -1586,8 +1589,9 @@ function* getMessageAttachments(action: IAction): any {
       query.AttachmentByTypeQuery = AttachmentByTypeQuery
       yield put(setAttachmentsCompleteAC(result.hasNext))
       // yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
-      yield put(setAttachmentsAC(JSON.parse(JSON.stringify(result.attachments))))
+      yield put(setAttachmentsAC(JSON.parse(JSON.stringify(attachments))))
     }
+    console.log('attachments', attachments)
   } catch (e) {
     log.error('error in message attachment query', e)
     // yield put(setErrorNotification(e.message))

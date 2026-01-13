@@ -34,6 +34,7 @@ import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
 import { useColor } from '../../hooks'
+import { queryDirection } from 'store/message/constants'
 
 const Details = ({
   detailsTitleText,
@@ -241,7 +242,7 @@ const Details = ({
           dispatch(loadMoreMembersAC(15, activeChannel.id))
         }
       } else if (attachmentLoadingState === LOADING_STATE.LOADED && attachmentsHasNex) {
-        dispatch(loadMoreAttachmentsAC(20))
+        dispatch(loadMoreAttachmentsAC(20, queryDirection.PREV))
       }
     }
   }
