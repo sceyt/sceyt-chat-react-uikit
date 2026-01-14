@@ -972,6 +972,7 @@ export const UploadProgress = styled.div<{
   imageMinWidth?: string
   zIndex?: number
   borderColor: string
+  isPreview?: boolean
 }>`
   position: ${(props) => !props.positionStatic && 'absolute'};
   top: ${(props) => (props.fileAttachment ? '8px' : '0')};
@@ -980,8 +981,10 @@ export const UploadProgress = styled.div<{
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
   height: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
-  min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '165px' : null)};
-  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && '165px'};
+  min-width: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isPreview ? props.imageMinWidth || '165px' : null};
+  min-height: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && !props.isPreview && '165px'};
   display: flex;
   //display: none;
   align-items: center;

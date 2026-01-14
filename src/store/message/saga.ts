@@ -1591,7 +1591,6 @@ function* getMessageAttachments(action: IAction): any {
       // yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       yield put(setAttachmentsAC(JSON.parse(JSON.stringify(attachments))))
     }
-    console.log('attachments', attachments)
   } catch (e) {
     log.error('error in message attachment query', e)
     // yield put(setErrorNotification(e.message))

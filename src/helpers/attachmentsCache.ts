@@ -16,24 +16,43 @@ if (isBrowser) {
 export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: Response) => {
   if (cacheAvailable) {
     caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
-      // Fetch the image or video
-      // Add the response to the cache
-      cache
-        .put(attachmentUrl, attachmentResponse)
-        .then(() => {
-          log.info('Cache success')
-        })
-        .catch((e) => {
-          log.info('Error on cache attachment ... ', e)
-          caches.delete(attachmentUrl)
-        })
+      try {
+        // Create a Request object with a valid URL scheme
+        // The Cache API requires http/https URLs, so we use a fake domain
+        const cacheKey =
+          attachmentUrl.startsWith('http://') || attachmentUrl.startsWith('https://')
+            ? attachmentUrl
+            : `https://cache.local/${encodeURIComponent(attachmentUrl)}`
+
+        const request = new Request(cacheKey)
+        await cache.put(request, attachmentResponse)
+        log.info('Cache success')
+      } catch (e) {
+        log.info('Error on cache attachment ... ', e)
+        // Try to delete using the same key format
+        const deleteCacheKey =
+          attachmentUrl.startsWith('http://') || attachmentUrl.startsWith('https://')
+            ? attachmentUrl
+            : `https://cache.local/${encodeURIComponent(attachmentUrl)}`
+        try {
+          const deleteRequest = new Request(deleteCacheKey)
+          await cache.delete(deleteRequest)
+        } catch (deleteError) {
+          // Ignore delete errors
+        }
+      }
     })
   }
   // downloadedAttachments[attachmentId] = attachmentUrl
 }
-export const removeAttachmentFromCache = (attachmentId: string) => {
+export const removeAttachmentFromCache = async (attachmentId: string) => {
   if (cacheAvailable) {
-    caches.delete(attachmentId)
+    const cacheKey =
+      attachmentId.startsWith('http://') || attachmentId.startsWith('https://')
+        ? attachmentId
+        : `https://cache.local/${encodeURIComponent(attachmentId)}`
+    const request = new Request(cacheKey)
+    await caches.open(ATTACHMENTS_CACHE).then((cache) => cache.delete(request))
   }
   // downloadedAttachments[attachmentId] = attachmentUrl
 }
@@ -44,13 +63,18 @@ export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<
     return Promise.reject(new Error('Cache not available'))
   }
 
-  const response = await caches.match(attachmentUrl)
+  // Create the same cache key format as in setAttachmentToCache
+  const cacheKey =
+    attachmentUrl.startsWith('http://') || attachmentUrl.startsWith('https://')
+      ? attachmentUrl
+      : `https://cache.local/${encodeURIComponent(attachmentUrl)}`
+
+  const request = new Request(cacheKey)
+  const response = await caches.match(request)
   if (response) {
     // Use the cached response
     return URL.createObjectURL(await response.blob())
   } else {
-    // The image or video is not cached
-    log.info('The image or video is not cached', attachmentUrl)
     return false
   }
 }

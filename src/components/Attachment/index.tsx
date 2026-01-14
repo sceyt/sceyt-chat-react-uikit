@@ -39,7 +39,7 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
-import { base64ToDataURL } from '../../helpers/resizeImage'
+import { base64ToDataURL, resizeImage } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
@@ -199,14 +199,69 @@ const Attachment = ({
   }
 
   const downloadImage = (url: string) => {
-    const image = new Image()
+    const image = new Image(renderWidth / 2, renderHeight / 2)
     image.src = url
+    image.width = renderWidth / 2
+    image.height = renderHeight / 2
     image.onload = () => {
       setAttachmentUrl(url)
       setDownloadingFile(false)
     }
     image.onerror = () => {
       log.error('Error on download image', url)
+    }
+  }
+
+  // Compress image before caching
+  const compressAndCacheImage = async (
+    url: string,
+    cacheKey: string,
+    maxWidth?: number,
+    maxHeight?: number
+  ): Promise<string> => {
+    try {
+      const response = await fetch(url)
+      const blob = await response.blob()
+      // Only compress if it's an image
+      if (blob.type.startsWith('image/')) {
+        // Convert blob to File for resizeImage function
+        const file = new File([blob], 'image.jpg', { type: blob.type })
+
+        // Compress the image
+        const { blob: compressedBlob } = await resizeImage(
+          file,
+          maxWidth || renderWidth || 1280,
+          maxHeight || renderHeight || 1080,
+          1
+        )
+        const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''
+
+        if (compressedBlob) {
+          // Create Response from compressed blob
+          const compressedResponse = new Response(compressedBlob, {
+            headers: {
+              'Content-Type': blob.type
+            }
+          })
+          setAttachmentToCache(cacheKey, compressedResponse)
+          return returningUrl
+        }
+      }
+
+      // If not an image or compression failed, cache original
+      setAttachmentToCache(cacheKey, response)
+      return ''
+    } catch (error) {
+      log.error('Error compressing and caching image:', error)
+      // Fallback to caching original
+      try {
+        const response = await fetch(url)
+        setAttachmentToCache(cacheKey, response)
+        return ''
+      } catch (fetchError) {
+        log.error('Error caching image:', fetchError)
+        return ''
+      }
     }
   }
   const handlePauseResumeDownload = (e: Event) => {
@@ -329,17 +384,34 @@ const Attachment = ({
       const result = await urlPromise
       const url = URL.createObjectURL(result.Body)
       setSizeProgress(undefined)
-      const response = await fetch(url)
-      setAttachmentToCache(attachment.url, response)
+      let downloadingUrl = url
+      if (attachment.type === attachmentTypes.image) {
+        const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+        if (compressedUrl) {
+          downloadingUrl = compressedUrl
+        }
+      } else {
+        const response = await fetch(url)
+        setAttachmentToCache(attachment.url, response)
+      }
       setIsCached(true)
       setDownloadingFile(false)
-      setAttachmentUrl(url)
+      setAttachmentUrl(downloadingUrl)
     } else {
-      setAttachmentUrl(attachment.url)
-      fetch(attachment.url).then(async (response) => {
-        setAttachmentToCache(attachment.url, response)
+      let downloadingUrl = attachment.url
+      if (attachment.type === attachmentTypes.image) {
+        const compressedUrl = await compressAndCacheImage(attachment.url, attachment.url, renderWidth, renderHeight)
+        if (compressedUrl) {
+          downloadingUrl = compressedUrl
+        }
         setIsCached(true)
-      })
+      } else {
+        fetch(attachment.url).then(async (response) => {
+          setAttachmentToCache(attachment.url, response)
+          setIsCached(true)
+        })
+      }
+      setAttachmentUrl(downloadingUrl)
     }
   }
 
@@ -396,18 +468,26 @@ const Attachment = ({
                   },
                   messageType
                 ).then(async (url) => {
-                  downloadImage(url)
-                  const response = await fetch(url)
-                  setAttachmentToCache(attachment.url, response)
+                  const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+                  if (compressedUrl) {
+                    setAttachmentUrl(compressedUrl)
+                  }
+                  downloadImage(compressedUrl || url)
                   setIsCached(true)
                   setDownloadingFile(false)
                 })
               } else {
-                downloadImage(attachment.url)
-                fetch(attachment.url).then(async (response) => {
-                  setAttachmentToCache(attachment.url, response)
-                  setIsCached(true)
-                })
+                const compressedUrl = await compressAndCacheImage(
+                  attachment.url,
+                  attachment.url,
+                  renderWidth,
+                  renderHeight
+                )
+                if (compressedUrl) {
+                  setAttachmentUrl(compressedUrl)
+                }
+                downloadImage(compressedUrl || attachment.url)
+                setIsCached(true)
               }
             }
           } else {
@@ -439,9 +519,17 @@ const Attachment = ({
               },
               messageType
             ).then(async (url) => {
-              const response = await fetch(url)
-              setAttachmentToCache(attachment.url, response)
-              setAttachmentUrl(url)
+              let downloadingUrl = url
+              if (attachment.type === attachmentTypes.image) {
+                const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+                if (compressedUrl) {
+                  downloadingUrl = compressedUrl
+                }
+              } else {
+                const response = await fetch(url)
+                setAttachmentToCache(attachment.url, response)
+              }
+              setAttachmentUrl(downloadingUrl)
               setDownloadingFile(false)
             })
           } else {
@@ -542,14 +630,20 @@ const Attachment = ({
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
-            fitTheContainer={isDetailsView}
+            fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
               // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
             }
+            isDetailsView={isDetailsView}
+            loading='eager'
+            fetchPriority='high'
+            decoding='async'
             onLoad={() => setImageLoading(false)}
+            width={renderWidth / 2}
+            height={renderHeight / 2}
           />
-          {!isPreview && (isInUploadingState || imageLoading) ? (
+          {!isPreview && !isRepliedMessage && (isInUploadingState || imageLoading) ? (
             <UploadProgress
               backgroundImage={attachmentThumb}
               isRepliedMessage={isRepliedMessage}
@@ -662,7 +756,7 @@ const Attachment = ({
               }
               isDetailsView={isDetailsView}
             >
-              {isInUploadingState || downloadingFile ? (
+              {(isInUploadingState || downloadingFile) && !isRepliedMessage && !isPreview ? (
                 <UploadProgress
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
@@ -741,7 +835,7 @@ const Attachment = ({
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
                 file={attachment}
-                src={attachmentUrl}
+                src={attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
                 uploading={
                   attachmentCompilationState[attachment.tid!] &&
@@ -836,12 +930,12 @@ const Attachment = ({
                   }
                   width='40px'
                   height='40px'
-                  src={attachment.attachmentUrl}
+                  src={attachment.attachmentUrl || attachmentUrl}
                   setVideoIsReadyToSend={setVideoIsReadyToSend}
                   isPreview
                 />
               ) : isPreview && attachment.attachmentUrl ? (
-                <FileThumbnail src={attachment.attachmentUrl} />
+                <FileThumbnail src={attachment.attachmentUrl || attachmentUrl} />
               ) : (
                 attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING &&
                 attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.PAUSED &&
@@ -998,7 +1092,9 @@ const AttachmentImgCont = styled.div<{
 
   ${(props) =>
     !props.fitTheContainer && !props.isRepliedMessage && props.height && props.width
-      ? `aspect-ratio: ${props.width} / ${props.height};`
+      ? `aspect-ratio: ${props.width < 165 ? 165 : props.width} / ${
+          props.width < 165 ? (props.height * 165) / props.width : props.height
+        };`
       : `
      height: ${props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
     `}
@@ -1143,7 +1239,7 @@ const RemoveChosenFile = styled(RemoveAttachment)<{ backgroundColor: string; col
   padding: 2px;
   cursor: pointer;
   color: ${(props) => props.color};
-  z-index: 4;
+  z-index: 5;
   circle {
     stroke: ${(props) => props.backgroundColor};
   }
@@ -1199,25 +1295,26 @@ export const AttachmentImg = styled.img<{
   fitTheContainer?: boolean
   imageMinWidth?: string
   imageMaxHeight?: string
+  isDetailsView?: boolean
 }>`
   position: ${(props) => props.absolute && 'absolute'};
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
   padding: ${(props) => (props.isRepliedMessage ? '0.5px' : props.withBorder && `2px`)};
   box-sizing: border-box;
   max-width: 100%;
-  max-height: ${(props) => props.imageMaxHeight || '400px'};
+  max-height: ${(props) => (props.imageMaxHeight && !props.isDetailsView ? '400px' : '100%')};
   width: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
       ? '165px'
       : props.isRepliedMessage
         ? '40px'
         : ''};
   min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
       ? props.imageMinWidth || '165px'
       : props.isRepliedMessage
         ? '40px'
