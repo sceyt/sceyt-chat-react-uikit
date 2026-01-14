@@ -637,7 +637,6 @@ const Attachment = ({
             }
             isDetailsView={isDetailsView}
             loading='eager'
-            fetchPriority='high'
             decoding='async'
             onLoad={() => setImageLoading(false)}
             width={renderWidth / 2}
