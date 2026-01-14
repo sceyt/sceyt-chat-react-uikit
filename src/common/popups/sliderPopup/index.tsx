@@ -361,7 +361,7 @@ const SliderPopup = ({
           log.error('Error getting initial attachment from cache:', error)
         })
     }
-    if (currentMediaFile) {
+    if (currentMediaFile && !attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)) {
       dispatch(
         getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true)
       )
