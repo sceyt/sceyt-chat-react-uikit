@@ -1064,11 +1064,11 @@ export const CopiedTooltip = styled.span<{ backgroundColor: string; color: strin
   }
 `
 
-export const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string }>`
+export const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string; height?: string }>`
   position: relative;
   cursor: pointer;
   margin: auto 0px 0px;
-  height: 32px;
+  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
   align-items: center;
   display: flex;
   order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};

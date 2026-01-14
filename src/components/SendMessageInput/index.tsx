@@ -1920,6 +1920,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           onClick={() => setViewOnce(!viewOnce)}
                           color={viewOnce ? accentColor : iconInactive}
                           textColor={viewOnce ? textOnPrimary : iconInactive}
+                          height={inputContainerHeight || minHeight}
                         >
                           {viewOnce
                             ? ViewOnceSelectedSVGIcon || <ViewOnceSelectedIcon />
