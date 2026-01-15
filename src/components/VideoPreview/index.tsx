@@ -135,7 +135,7 @@ const VideoPreview = memo(function VideoPreview({
   }, [])
 
   useEffect(() => {
-    const videoSource = file.attachmentUrl || src || file.url
+    const videoSource = file.url
     if (!videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
 
     // If we already have a cached frame from store, skip extraction

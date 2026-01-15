@@ -50,6 +50,7 @@ import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
 import { isJSON } from 'helpers/message'
 import { updateMessageAsOpenedAC } from 'store/channel/actions'
+import { getVideoFirstFrame } from 'helpers/getVideoFrame'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -391,9 +392,29 @@ const Attachment = ({
         if (compressedUrl) {
           downloadingUrl = compressedUrl
         }
+        setAttachmentToCache(
+          attachment.url + '_original_image_url',
+          new Response(result.Body, {
+            headers: { 'Content-Type': 'image/jpeg' }
+          })
+        )
+        dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
       } else {
+        if (attachment.type === attachmentTypes.video) {
+          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.9)
+          if (result) {
+            const { frameBlobUrl, blob } = result
+            const response = new Response(blob, {
+              headers: { 'Content-Type': 'image/jpeg' }
+            })
+            const key = attachment.url + '-first-frame'
+            await setAttachmentToCache(key, response)
+            dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
+          }
+        }
         const response = await fetch(url)
         setAttachmentToCache(attachment.url, response)
+        dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
       }
       setIsCached(true)
       setDownloadingFile(false)
