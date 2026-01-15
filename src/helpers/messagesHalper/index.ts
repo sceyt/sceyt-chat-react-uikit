@@ -503,7 +503,9 @@ export function removeMessagesFromMap(channelId: string) {
 }
 
 export function removeMessageFromMap(channelId: string, messageId: string) {
-  delete messagesMap[channelId][messageId]
+  if (messagesMap[channelId] && messagesMap[channelId][messageId]) {
+    delete messagesMap[channelId][messageId]
+  }
 
   store.dispatch(removePendingMessageAC(channelId, messageId))
 }

@@ -29,14 +29,14 @@ export const customUpload = (
   messageType: string | null | undefined,
   // eslint-disable-next-line no-unused-vars
   getUpdatedFilePath?: (newPath: String) => void
-): Promise<string> => {
+): Promise<{ uri: string; blob: Blob }> => {
   return new Promise((resolve, reject) => {
     if (CustomUploader) {
       const uploadTask: IUploadTask = {
         updateLocalFileLocation: getUpdatedFilePath,
         progress,
         failure: (e: Error) => reject(e),
-        success: (uri: string) => resolve(uri),
+        success: ({ uri, blob }: { uri: string; blob: Blob }) => resolve({ uri, blob }),
         cancel: () => {},
         stop: () => {},
         resume: () => {}

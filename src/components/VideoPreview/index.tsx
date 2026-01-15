@@ -144,7 +144,7 @@ const VideoPreview = memo(function VideoPreview({
     // If we already have a cached frame from store, skip extraction
     if (attachmentVideoFirstFrame && !isPreview) return
 
-    const frameCacheKey = `${videoSource}-first-frame`
+    const frameCacheKey = `${file.url}-first-frame`
     let isMounted = true
     let eventListenersAttached = false
 
@@ -165,6 +165,7 @@ const VideoPreview = memo(function VideoPreview({
         }
       } catch (error) {
         // Cache miss, continue to extraction
+        console.error('Error checking cache:', error)
       }
       return false
     }
@@ -269,7 +270,7 @@ const VideoPreview = memo(function VideoPreview({
     }
 
     const handleSeeked = () => {
-      if (!isMounted || isExtractingRef.current || hasExtractionFailedRef.current) return
+      if (!isMounted || isExtractingRef.current || hasExtractionFailedRef.current || attachmentVideoFirstFrame) return
       extractFirstFrame()
     }
 
@@ -353,13 +354,15 @@ const VideoPreview = memo(function VideoPreview({
         </SmoothImageContainer>
       )}
       {/* Hidden video element for extracting first frame */}
-      <HiddenVideo
-        ref={hiddenVideoRef}
-        src={file.attachmentUrl || src || file.url}
-        preload='metadata'
-        muted
-        crossOrigin='anonymous'
-      />
+      {!attachmentVideoFirstFrame && (
+        <HiddenVideo
+          ref={hiddenVideoRef}
+          src={file.attachmentUrl || src || file.url}
+          preload='metadata'
+          muted
+          crossOrigin='anonymous'
+        />
+      )}
       {!isRepliedMessage && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (

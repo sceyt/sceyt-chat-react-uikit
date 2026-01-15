@@ -37,7 +37,7 @@ import {
   LOADING_STATE
 } from '../../../helpers/constants'
 import { queryDirection } from '../../../store/message/constants'
-import { useColor, useDidUpdate } from '../../../hooks'
+import { useColor } from '../../../hooks'
 import { Avatar } from '../../../components'
 import { connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { UploadingIcon } from '../../../UIHelper'
@@ -82,11 +82,10 @@ const SliderPopup = ({
   const { user } = ChatClient
   const [currentFile, setCurrentFile] = useState<IMedia>({ ...currentMediaFile })
   const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
-  const [imageLoading, setImageLoading] = useState(true)
+  const [itemsLoadedMap, setItemsLoadedMap] = useState<{ [key: string]: boolean }>({})
   const [playedVideo, setPlayedVideo] = useState<string | undefined>()
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
-  const [visibleSlide, setVisibleSlide] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
   const attachmentLoadingStateForPopup = useSelector(attachmentForPopupLoadingStateSelector)
@@ -100,7 +99,6 @@ const SliderPopup = ({
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
   const attachmentsList = useSelector(attachmentsForPopupSelector, shallowEqual) || []
-  const visibilityTimeout = useRef<NodeJS.Timeout | null>(null)
   const previousListLengthRef = useRef<number>(attachmentsList.length)
   const currentFileIdRef = useRef<string | undefined>(currentFile?.id)
   const [skipTransition, setSkipTransition] = useState(false)
@@ -117,20 +115,8 @@ const SliderPopup = ({
   }
 
   const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
-    if (visibilityTimeout.current) {
-      clearTimeout(visibilityTimeout.current)
-    }
-    const image = new Image()
-    image.src = src
-    image.onload = () => {
-      if (setToDownloadedFiles && currentFile) {
-        dispatch(setUpdateMessageAttachmentAC(currentFile.url + (type === 'image' ? '_original_image_url' : ''), src))
-        visibilityTimeout.current = setTimeout(() => {
-          setVisibleSlide(true)
-        }, 100)
-      }
-      setImageLoading(false)
-      // setCurrentFileUrl(src)
+    if (setToDownloadedFiles && currentFile) {
+      dispatch(setUpdateMessageAttachmentAC(currentFile.url + (type === 'image' ? '_original_image_url' : ''), src))
     }
   }
 
@@ -237,80 +223,73 @@ const SliderPopup = ({
     setMessageToDelete(undefined)
     setIsSliderOpen(false)
   }
-  useDidUpdate(() => {
+  useEffect(() => {
     if (playedVideo) {
       const videoElem = document.getElementById(playedVideo) as HTMLVideoElement | null
       if (videoElem) {
         videoElem.pause()
       }
     }
-    if (currentFile) {
-      getAttachmentUrlFromCache(currentFile.url + prefixUrl)
-        .then((cachedUrl) => {
-          if (cachedUrl) {
-            if (!attachmentUpdatedMap[currentFile.url + prefixUrl]) {
-              setVisibleSlide(false)
+    if (currentFile && currentFile.id) {
+      const attachmentKey = currentFile.url + prefixUrl
+      const hasAttachment = !!attachmentUpdatedMap[attachmentKey]
+
+      // If attachment is already loaded, check if it's ready
+      if (!hasAttachment) {
+        getAttachmentUrlFromCache(attachmentKey)
+          .then((cachedUrl: string | false) => {
+            if (cachedUrl) {
               if (currentFile.type === 'image') {
                 downloadImage(cachedUrl as string, true, 'image')
               } else {
-                if (visibilityTimeout.current) {
-                  clearTimeout(visibilityTimeout.current)
-                }
-                dispatch(setUpdateMessageAttachmentAC(currentFile.url + prefixUrl, cachedUrl))
+                dispatch(setUpdateMessageAttachmentAC(attachmentKey, cachedUrl))
                 setPlayedVideo(currentFile.id)
-                visibilityTimeout.current = setTimeout(() => {
-                  setVisibleSlide(true)
-                }, 100)
               }
-            }
-          } else {
-            if (customDownloader) {
-              customDownloader(currentFile.url, false, () => {}, messageType)
-                .then(async (url) => {
-                  try {
-                    const response = await fetch(url)
-                    setAttachmentToCache(currentFile.url + prefixUrl, response)
-                    if (currentFile.type === 'image') {
-                      downloadImage(url, true, 'image')
-                    } else {
-                      if (visibilityTimeout.current) {
-                        clearTimeout(visibilityTimeout.current)
-                      }
-                      dispatch(setUpdateMessageAttachmentAC(currentFile.url + prefixUrl, url))
-                      setPlayedVideo(currentFile.id)
-                      visibilityTimeout.current = setTimeout(() => {
-                        setVisibleSlide(true)
-                      }, 100)
-                    }
-                  } catch (error) {
-                    log.error('Error fetching attachment:', error)
-                  }
-                })
-                .catch((e) => {
-                  log.error('Failed to download attachment:', e)
-                })
             } else {
-              if (!attachmentUpdatedMap[currentFile.url + prefixUrl]) {
-                setVisibleSlide(false)
+              if (customDownloader) {
+                customDownloader(currentFile.url, false, () => {}, messageType)
+                  .then(async (url) => {
+                    try {
+                      const response = await fetch(url)
+                      setAttachmentToCache(attachmentKey, response)
+                      if (currentFile.type === 'image') {
+                        downloadImage(url, true, 'image')
+                      } else {
+                        dispatch(setUpdateMessageAttachmentAC(attachmentKey, url))
+                        setPlayedVideo(currentFile.id)
+                      }
+                    } catch (error) {
+                      log.error('Error fetching attachment:', error)
+                    }
+                  })
+                  .catch((e) => {
+                    log.error('Failed to download attachment:', e)
+                  })
+              } else {
                 if (currentFile.type === 'image') {
                   downloadImage(currentFile.url as string, true, 'image')
                 } else {
-                  if (visibilityTimeout.current) {
-                    clearTimeout(visibilityTimeout.current)
-                  }
-                  dispatch(setUpdateMessageAttachmentAC(currentFile.url + prefixUrl, currentFile.url))
+                  dispatch(setUpdateMessageAttachmentAC(attachmentKey, currentFile.url))
                   setPlayedVideo(currentFile.id)
-                  visibilityTimeout.current = setTimeout(() => {
-                    setVisibleSlide(true)
-                  }, 100)
                 }
               }
             }
-          }
-        })
-        .catch((e) => log.error('Error getting attachment from cache:', e))
+          })
+          .catch((e) => {
+            log.error('Error getting attachment from cache:', e)
+          })
+      }
     }
-  }, [currentFile, playedVideo, attachmentUpdatedMap, customDownloader, messageType, downloadImage, dispatch])
+  }, [
+    currentFile,
+    playedVideo,
+    attachmentUpdatedMap,
+    customDownloader,
+    messageType,
+    downloadImage,
+    dispatch,
+    prefixUrl
+  ])
 
   useEffect(() => {
     if (currentFile && currentFile.id) {
@@ -324,11 +303,10 @@ const SliderPopup = ({
   }, [attachmentsList])
 
   useEffect(() => {
-    setImageLoading(true)
-    if (customDownloader && currentMediaFile) {
+    if (customDownloader && currentMediaFile && currentMediaFile.id) {
       const attachmentUrl = currentMediaFile.url + (currentMediaFile.type === 'image' ? '_original_image_url' : '')
       getAttachmentUrlFromCache(attachmentUrl)
-        .then((cachedUrl) => {
+        .then((cachedUrl: string | false) => {
           if (cachedUrl) {
             if (currentMediaFile.type === 'image') {
               downloadImage(cachedUrl as string, false, 'image')
@@ -357,7 +335,12 @@ const SliderPopup = ({
                   log.error('Error downloading initial attachment:', error)
                 })
             } else {
-              downloadImage(attachmentUrl, false, 'image')
+              if (currentMediaFile.type === 'image') {
+                downloadImage(attachmentUrl, false, 'image')
+              } else {
+                dispatch(setUpdateMessageAttachmentAC(attachmentUrl, currentMediaFile.url))
+                setPlayedVideo(currentMediaFile.id)
+              }
             }
           }
         })
@@ -369,12 +352,6 @@ const SliderPopup = ({
       dispatch(
         getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true)
       )
-    }
-
-    return () => {
-      if (visibilityTimeout.current) {
-        clearTimeout(visibilityTimeout.current)
-      }
     }
   }, [])
 
@@ -464,6 +441,25 @@ const SliderPopup = ({
     }
   }, [activeFileIndex, attachmentLoadingStateForPopup, attachmentsForPopupHasPrev, attachmentsList, dispatch])
 
+  // Check if carousel is loading (attachments list is being fetched)
+  const isCarouselLoading = useMemo(() => {
+    return (
+      attachmentLoadingStateForPopup !== LOADING_STATE.LOADED ||
+      activeFileIndex < 0 ||
+      !attachmentsList ||
+      !attachmentsList.length
+    )
+  }, [attachmentLoadingStateForPopup, activeFileIndex, attachmentsList])
+
+  // Helper function to check if a specific item is loading
+  const isItemLoading = useCallback(
+    (fileId: string | undefined) => {
+      if (!fileId) return false
+      return !itemsLoadedMap[fileId]
+    },
+    [itemsLoadedMap]
+  )
+
   return (
     <Container draggable={false}>
       <SliderHeader>
@@ -542,34 +538,24 @@ const SliderPopup = ({
           return true
         }}
       >
-        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
+        {/* Carousel-level loading - shows when carousel/attachments list is loading */}
+        {isCarouselLoading && (
+          <UploadCont className='upload_cont'>
+            <UploadingIcon color={textOnPrimary} />
+          </UploadCont>
+        )}
+        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length && (
           <Carousel
             pagination={false}
             className='custom_carousel'
             initialActiveIndex={activeFileIndex >= 0 ? activeFileIndex : 0}
             skipTransition={skipTransition}
             onNextStart={() => {
-              if (activeFileIndex + 1 < attachmentsList.length) {
-                const nextFile = attachmentsList[activeFileIndex + 1]
-                if (
-                  nextFile &&
-                  !attachmentUpdatedMap[nextFile.url + (nextFile.type === 'image' ? '_original_image_url' : '')]
-                ) {
-                  setImageLoading(true)
-                }
-              }
+              // Loading state will be set when currentFile changes in useDidUpdate
               loadNextMoreAttachments()
             }}
             onPrevStart={() => {
-              if (activeFileIndex - 1 >= 0) {
-                const prevFile = attachmentsList[activeFileIndex - 1]
-                if (
-                  prevFile &&
-                  !attachmentUpdatedMap[prevFile.url + (prevFile.type === 'image' ? '_original_image_url' : '')]
-                ) {
-                  setImageLoading(true)
-                }
-              }
+              // Loading state will be set when currentFile changes in useDidUpdate
               loadPrevMoreAttachments()
             }}
             onChange={(pageIndex: number) => {
@@ -610,28 +596,54 @@ const SliderPopup = ({
                 className='custom_carousel_item'
                 key={file.id}
                 draggable={false}
-                visibleSlide={
-                  visibleSlide || attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')]
-                }
                 onMouseDown={handleCarouselItemMouseDown}
                 onContextMenu={(e: React.MouseEvent) => {
                   e.stopPropagation()
                 }}
               >
+                {/* Per-item loading indicator - shows when this specific item is loading */}
+                {isItemLoading(file.id) && file.type === 'image' && (
+                  <ItemLoadingCont>
+                    <UploadingIcon color={textOnPrimary} />
+                  </ItemLoadingCont>
+                )}
                 {file.type === 'image' ? (
                   <React.Fragment>
-                    {attachmentLoadingStateForPopup !== LOADING_STATE.LOADED ||
-                    (!attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')] &&
-                      imageLoading) ? (
-                      <UploadCont>
-                        <UploadingIcon color={textOnPrimary} />
-                      </UploadCont>
-                    ) : (
-                      <img
-                        draggable={false}
-                        src={attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')]}
-                        alt={file.name || 'Attachment'}
-                        onMouseDown={(e) => {
+                    {attachmentLoadingStateForPopup === LOADING_STATE.LOADED &&
+                      attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')] && (
+                        <img
+                          draggable={false}
+                          src={attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')]}
+                          alt={file.name || 'Attachment'}
+                          onMouseDown={(e) => {
+                            if (e.button === 2) {
+                              e.stopPropagation()
+                            }
+                          }}
+                          style={{ position: 'relative', zIndex: 2, opacity: isItemLoading(file.id) ? 0 : 1 }}
+                          onLoad={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
+                            }
+                          }}
+                          onError={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
+                            }
+                          }}
+                        />
+                      )}
+                  </React.Fragment>
+                ) : (
+                  <React.Fragment>
+                    {attachmentUpdatedMap[file.url] && (
+                      <VideoPlayer
+                        activeFileId={currentFile?.id || ''}
+                        videoFileId={file.id || ''}
+                        src={attachmentUpdatedMap[file.url]}
+                        onMouseDown={(e: React.MouseEvent) => {
                           if (e.button === 2) {
                             e.stopPropagation()
                           }
@@ -639,23 +651,10 @@ const SliderPopup = ({
                       />
                     )}
                   </React.Fragment>
-                ) : (
-                  <VideoPlayer
-                    activeFileId={currentFile?.id || ''}
-                    videoFileId={file.id || ''}
-                    src={attachmentUpdatedMap[file.url]}
-                    onMouseDown={(e: React.MouseEvent) => {
-                      if (e.button === 2) {
-                        e.stopPropagation()
-                      }
-                    }}
-                  />
                 )}
               </CarouselItem>
             ))}
           </Carousel>
-        ) : (
-          <UploadingIcon color={textOnPrimary} />
         )}
       </SliderBody>
       {forwardPopupOpen && (
@@ -814,11 +813,11 @@ const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean; color
     }
   `}
 `
-const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
+const CarouselItem = styled.div`
   position: relative;
   display: flex;
-  opacity: ${(props) => (props.visibleSlide ? 1 : 0)};
   max-width: calc(100% - 200px);
+  z-index: 2;
 
   img,
   video {
@@ -840,15 +839,27 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   }
 `
 const UploadCont = styled.div`
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 100px;
-  min-width: 100px;
+  left: calc((100vw - 100%) / -2);
+  top: calc((100vh - 100%) / -2);
+  width: 100vw;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: absolute;
+  z-index: 1;
+`
+
+const ItemLoadingCont = styled.div`
+  position: absolute;
+  left: calc((100vw - 100%) / -2);
+  top: calc((100vh - 100% + 60px) / -2);
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 `
 
 const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; color: string }>`

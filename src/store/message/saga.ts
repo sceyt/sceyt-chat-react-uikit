@@ -88,7 +88,8 @@ import {
   updatePendingPollActionAC,
   setUnreadScrollToAC,
   setUnreadMessageIdAC,
-  setAttachmentsLoadingStateAC
+  setAttachmentsLoadingStateAC,
+  setUpdateMessageAttachmentAC
 } from './actions'
 import {
   attachmentTypes,
@@ -146,7 +147,8 @@ import {
   pauseUpload,
   resumeUpload
 } from '../../helpers/customUploader'
-import { createImageThumbnail, getImageSize } from '../../helpers/resizeImage'
+import { createImageThumbnail, resizeImageWithPica } from '../../helpers/resizeImage'
+import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
@@ -156,6 +158,7 @@ import { getFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { isResendableError } from 'helpers/error'
+import { calculateRenderedImageWidth } from 'helpers'
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -163,32 +166,66 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
         store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
       }
-      let fileSize = attachment.size
       const fileType = attachment.url.type.split('/')[0]
+      let fileSize = attachment.size
       let filePath: any
+      let uriLocal
       const handleUpdateLocalPath = (updatedLink: string) => {
-        if (fileType === 'image' || fileType === 'video') {
+        if (fileType === 'video') {
           filePath = updatedLink
           message.attachments[0] = { ...message.attachments[0], attachmentUrl: updatedLink }
         }
       }
-      let uri
+      let blobLocal: Blob | null = null
       if (attachment.cachedUrl) {
-        uri = attachment.cachedUrl
+        uriLocal = attachment.cachedUrl
         store.dispatch(updateAttachmentUploadingProgressAC(attachment.data.size, attachment.data.size, attachment.tid))
       } else {
-        uri = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
+        const { uri, blob } = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
+        uriLocal = uri
+        blobLocal = blob
+        fileSize = blobLocal.size
+        filePath = URL.createObjectURL(blobLocal)
       }
-      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
       let thumbnailMetas: any
       if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'image') {
-        fileSize = await getImageSize(filePath)
         thumbnailMetas = await createImageThumbnail(
           null,
           filePath,
           attachment.type === 'file' ? 50 : undefined,
           attachment.type === 'file' ? 50 : undefined
         )
+
+        // Resize and cache the image for display
+        try {
+          if (blobLocal && blobLocal.type.startsWith('image/')) {
+            // Convert blob to File for resizeImageWithPica
+            const file = new File([blobLocal], attachment.name || 'image', { type: blobLocal.type })
+
+            // Resize with Pica (high-quality resizing)
+            const [newWidth, newHeight] = calculateRenderedImageWidth(
+              thumbnailMetas.imageWidth || 1280,
+              thumbnailMetas.imageHeight || 1080
+            )
+            const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
+            if (resizedBlob) {
+              // Cache the resized image using the uploaded URI as the cache key
+              const resizedResponse = new Response(resizedBlob, {
+                headers: {
+                  'Content-Type': resizedBlob.type || blobLocal.type
+                }
+              })
+              setAttachmentToCache(uriLocal, resizedResponse)
+              filePath = URL.createObjectURL(resizedBlob)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
+              message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
+            }
+          }
+        } catch (error) {
+          log.error('Error resizing and caching image during upload:', error)
+          // Continue even if caching fails
+        }
+        store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
       } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
         const meta = await getFrame(filePath)
         thumbnailMetas = {
@@ -215,7 +252,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                 ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
               })
           })
-      const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
+      const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
         .setMetadata(attachmentMeta)

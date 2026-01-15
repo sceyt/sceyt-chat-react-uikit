@@ -80,7 +80,7 @@ const Avatar: React.FC<IProps> = ({
 
     // Try to read from Cache Storage first; fall back to network and write-through
     getAttachmentUrlFromCache(image)
-      .then(async (cachedUrl) => {
+      .then(async (cachedUrl: string | false) => {
         if (isCancelled) return
         if (cachedUrl) {
           setResolvedImageSrc(cachedUrl)

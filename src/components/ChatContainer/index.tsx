@@ -28,7 +28,7 @@ export interface IUploadTask {
   // eslint-disable-next-line no-unused-vars
   failure: (error: Error) => void
   // eslint-disable-next-line no-unused-vars
-  success: (uri: string) => void
+  success: ({ uri, blob }: { uri: string; blob: Blob }) => void
   cancel: () => void
   stop: () => void
   resume: () => void

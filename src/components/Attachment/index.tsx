@@ -39,7 +39,7 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
-import { base64ToDataURL, resizeImage } from '../../helpers/resizeImage'
+import { base64ToDataURL, resizeImageWithPica } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
@@ -120,7 +120,9 @@ const Attachment = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.BACKGROUND]: background
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -136,7 +138,6 @@ const Attachment = ({
     [attachmentUpdatedMap, attachment.url]
   )
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
-  const [imageLoading, setImageLoading] = useState(!attachmentUrlFromMap)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
   const [failTimeout, setFailTimeout]: any = useState()
@@ -212,7 +213,7 @@ const Attachment = ({
     }
   }
 
-  // Compress image before caching
+  // Compress image before caching using Pica for high-quality resizing
   const compressAndCacheImage = async (
     url: string,
     cacheKey: string,
@@ -224,11 +225,11 @@ const Attachment = ({
       const blob = await response.blob()
       // Only compress if it's an image
       if (blob.type.startsWith('image/')) {
-        // Convert blob to File for resizeImage function
-        const file = new File([blob], 'image.jpg', { type: blob.type })
+        // Convert blob to File for resizeImageWithPica function
+        const file = new File([blob], 'image.jpeg', { type: blob.type })
 
-        // Compress the image
-        const { blob: compressedBlob } = await resizeImage(
+        // Compress the image with Pica (high-quality resizing)
+        const { blob: compressedBlob } = await resizeImageWithPica(
           file,
           maxWidth || renderWidth || 1280,
           maxHeight || renderHeight || 1080,
@@ -240,7 +241,7 @@ const Attachment = ({
           // Create Response from compressed blob
           const compressedResponse = new Response(compressedBlob, {
             headers: {
-              'Content-Type': blob.type
+              'Content-Type': compressedBlob.type || blob.type
             }
           })
           setAttachmentToCache(cacheKey, compressedResponse)
@@ -442,10 +443,11 @@ const Attachment = ({
       !attachment.attachmentUrl &&
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       attachment.id &&
+      !attachmentUrlFromMap &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
       getAttachmentUrlFromCache(attachment.url)
-        .then(async (cachedUrl) => {
+        .then(async (cachedUrl: string | false) => {
           if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
               // @ts-ignore
@@ -473,6 +475,7 @@ const Attachment = ({
                     setAttachmentUrl(compressedUrl)
                   }
                   downloadImage(compressedUrl || url)
+                  dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || url))
                   setIsCached(true)
                   setDownloadingFile(false)
                 })
@@ -487,6 +490,7 @@ const Attachment = ({
                   setAttachmentUrl(compressedUrl)
                 }
                 downloadImage(compressedUrl || attachment.url)
+                dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || attachment.url))
                 setIsCached(true)
               }
             }
@@ -530,6 +534,7 @@ const Attachment = ({
                 setAttachmentToCache(attachment.url, response)
               }
               setAttachmentUrl(downloadingUrl)
+              dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.url))
               setDownloadingFile(false)
             })
           } else {
@@ -615,7 +620,6 @@ const Attachment = ({
           isPreview={isPreview}
           ref={imageContRef}
           borderRadius={borderRadius}
-          backgroundImage={attachmentThumb}
           withPrefix={withPrefix}
           isRepliedMessage={isRepliedMessage}
           fitTheContainer={isDetailsView}
@@ -624,7 +628,6 @@ const Attachment = ({
         >
           <AttachmentImg
             draggable={false}
-            src={attachment.attachmentUrl || attachmentUrl}
             borderRadius={borderRadius}
             imageMinWidth={imageMinWidth}
             isPreview={isPreview}
@@ -636,13 +639,14 @@ const Attachment = ({
               // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
             }
             isDetailsView={isDetailsView}
-            loading='eager'
-            decoding='async'
-            onLoad={() => setImageLoading(false)}
-            width={renderWidth / 2}
-            height={renderHeight / 2}
+            before={true}
+            backgroundImage={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
+            borderColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
           />
-          {!isPreview && !isRepliedMessage && (isInUploadingState || imageLoading) ? (
+          {!isPreview &&
+          !isRepliedMessage &&
+          (isInUploadingState ||
+            !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
               backgroundImage={attachmentThumb}
               isRepliedMessage={isRepliedMessage}
@@ -1068,7 +1072,6 @@ const DownloadImage = styled.div<any>`
 const AttachmentImgCont = styled.div<{
   isPreview: boolean
   backgroundColor?: string
-  backgroundImage?: string
   ref?: any
   borderRadius?: string
   imgIsLoaded?: boolean
@@ -1088,7 +1091,6 @@ const AttachmentImgCont = styled.div<{
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
   max-width: 100%;
-
   ${(props) =>
     !props.fitTheContainer && !props.isRepliedMessage && props.height && props.width
       ? `aspect-ratio: ${props.width < 165 ? 165 : props.width} / ${
@@ -1283,7 +1285,7 @@ const AttachmentFileInfo = styled.div<{ isPreview: boolean }>`
   `}
 `
 
-export const AttachmentImg = styled.img<{
+export const AttachmentImg = styled.div<{
   absolute?: boolean
   borderRadius?: string
   ref?: any
@@ -1295,6 +1297,9 @@ export const AttachmentImg = styled.img<{
   imageMinWidth?: string
   imageMaxHeight?: string
   isDetailsView?: boolean
+  before?: boolean
+  backgroundImage?: string
+  borderColor?: string
 }>`
   position: ${(props) => props.absolute && 'absolute'};
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
@@ -1321,6 +1326,31 @@ export const AttachmentImg = styled.img<{
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;
+  ${(props) =>
+    props.before &&
+    `
+    &::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: ${!props.isRepliedMessage && !props.isPreview && !props.isDetailsView ? 'calc(100% - 4px)' : '100%'};
+      height: ${!props.isRepliedMessage && !props.isPreview && !props.isDetailsView ? 'calc(100% - 4px)' : '100%'};
+      background-image: url(${props.backgroundImage});
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      z-index: 1;
+      border-radius: inherit;
+      ${
+        props.borderColor &&
+        !props.isRepliedMessage &&
+        !props.isPreview &&
+        !props.isDetailsView &&
+        `border: 2px solid ${props.borderColor};`
+      }
+    }
+  `}
 `
 
 const VideoCont = styled.div<{ isDetailsView?: boolean }>`
