@@ -6,11 +6,13 @@ import { IAttachment } from '../../types'
 import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
 import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
 import { base64ToDataURL } from '../../helpers/resizeImage'
+import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { useDispatch, useSelector } from 'store/hooks'
 import { attachmentUpdatedMapSelector } from 'store/message/selector'
+import { calculateRenderedImageWidth } from 'helpers'
 
 interface IVideoPreviewProps {
   width: string
@@ -51,7 +53,7 @@ const VideoPreview = memo(function VideoPreview({
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector)
 
   // Calculate initial duration from metadata
-  const initialDuration = useMemo(() => {
+  const videoCurrentTime = useMemo(() => {
     if (file.metadata?.dur) {
       const mins = Math.floor(file.metadata.dur / 60)
       const seconds = Math.floor(file.metadata.dur % 60)
@@ -59,8 +61,6 @@ const VideoPreview = memo(function VideoPreview({
     }
     return null
   }, [file.metadata?.dur])
-
-  const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(initialDuration)
 
   // Get cached frame from store
   const attachmentVideoFirstFrame = useMemo(
@@ -89,8 +89,6 @@ const VideoPreview = memo(function VideoPreview({
   const hasExtractionFailedRef = useRef(false)
   const extractedBlobUrlsRef = useRef<Set<string>>(new Set())
   const previousBackgroundImageRef = useRef<string | undefined>(undefined)
-
-  const hiddenVideoRef = useRef<HTMLVideoElement>(null)
 
   const thumbnailWithPrefix = useMemo(() => {
     return !(file.metadata?.tmb && file.metadata.tmb.length < 70)
@@ -137,16 +135,14 @@ const VideoPreview = memo(function VideoPreview({
   }, [])
 
   useEffect(() => {
-    const hiddenVideo = hiddenVideoRef.current
     const videoSource = file.attachmentUrl || src || file.url
-    if (!hiddenVideo || !videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
+    if (!videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
 
     // If we already have a cached frame from store, skip extraction
     if (attachmentVideoFirstFrame && !isPreview) return
 
     const frameCacheKey = `${file.url}-first-frame`
     let isMounted = true
-    let eventListenersAttached = false
 
     // Reset extraction failed flag when source changes
     hasExtractionFailedRef.current = false
@@ -171,162 +167,75 @@ const VideoPreview = memo(function VideoPreview({
     }
 
     const extractFirstFrame = async () => {
-      if (!hiddenVideo || isExtractingRef.current || !isMounted) return
+      if (isExtractingRef.current || !isMounted) return
 
       try {
-        // Ensure video has dimensions
-        if (hiddenVideo.videoWidth === 0 || hiddenVideo.videoHeight === 0) {
-          return
-        }
-
         isExtractingRef.current = true
+        const [newWidth, newHeight] = calculateRenderedImageWidth(
+          file.metadata?.szw || 1280,
+          file.metadata?.szh || 1080
+        )
+        // Use getVideoFirstFrame helper function - it handles everything internally
+        const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)
 
-        const canvas = document.createElement('canvas')
-        canvas.width = hiddenVideo.videoWidth / 2
-        canvas.height = hiddenVideo.videoHeight / 2
-        const ctx = canvas.getContext('2d')
-
-        if (!ctx) {
+        if (!result || !isMounted) {
           isExtractingRef.current = false
           return
         }
+        if (isPreview && setVideoIsReadyToSend) {
+          setVideoIsReadyToSend(file.tid!)
+        }
 
-        ctx.drawImage(hiddenVideo, 0, 0, canvas.width, canvas.height)
+        const { frameBlobUrl, blob } = result
 
         try {
-          canvas.toBlob(
-            async (blob) => {
-              if (!blob || !isMounted) {
-                isExtractingRef.current = false
-                return
-              }
-
-              try {
-                // Cache the frame
-                const response = new Response(blob, {
-                  headers: { 'Content-Type': 'image/jpeg' }
-                })
-                if (!isPreview) {
-                  setAttachmentToCache(frameCacheKey, response)
-                }
-
-                // Create blob URL for display
-                const blobUrl = URL.createObjectURL(blob)
-                extractedBlobUrlsRef.current.add(blobUrl)
-
-                if (isMounted) {
-                  setBackgroundImage(blobUrl)
-                  setBackgroundWithPrefix(false)
-                  if (!isPreview) {
-                    dispatch(setUpdateMessageAttachmentAC(`${file.url}-first-frame`, blobUrl))
-                  }
-
-                  // Update duration if available
-                  if (hiddenVideo.duration && !videoCurrentTime) {
-                    const minutes = Math.floor(hiddenVideo.duration / 60)
-                    const seconds = Math.floor(hiddenVideo.duration % 60)
-                    setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
-                  }
-                } else {
-                  // Component unmounted, cleanup blob URL
-                  URL.revokeObjectURL(blobUrl)
-                }
-              } catch (error) {
-                console.error('Error processing extracted frame:', error)
-              } finally {
-                isExtractingRef.current = false
-              }
-            },
-            'image/jpeg',
-            0.8
-          )
-        } catch (corsError) {
-          // CORS error - canvas is tainted, cannot export
-          console.warn('Cannot extract frame due to CORS restrictions:', corsError)
-          hasExtractionFailedRef.current = true
-          isExtractingRef.current = false
-
-          // Remove event listeners to prevent infinite retries
-          if (eventListenersAttached && hiddenVideo) {
-            hiddenVideo.removeEventListener('seeked', handleSeeked)
-            hiddenVideo.removeEventListener('loadedmetadata', handleLoadedMetadata)
-            hiddenVideo.removeEventListener('canplay', handleCanPlay)
-            eventListenersAttached = false
+          // Cache the frame
+          const response = new Response(blob, {
+            headers: { 'Content-Type': 'image/jpeg' }
+          })
+          if (!isPreview) {
+            setAttachmentToCache(frameCacheKey, response)
           }
+
+          // Track blob URL for cleanup
+          extractedBlobUrlsRef.current.add(frameBlobUrl)
+
+          if (isMounted) {
+            setBackgroundImage(frameBlobUrl)
+            setBackgroundWithPrefix(false)
+            if (!isPreview) {
+              dispatch(setUpdateMessageAttachmentAC(`${file.url}-first-frame`, frameBlobUrl))
+            }
+          } else {
+            // Component unmounted, cleanup blob URL
+            URL.revokeObjectURL(frameBlobUrl)
+          }
+        } catch (error) {
+          console.error('Error processing extracted frame:', error)
+          if (frameBlobUrl) {
+            URL.revokeObjectURL(frameBlobUrl)
+          }
+        } finally {
+          isExtractingRef.current = false
         }
       } catch (error) {
         console.error('Error extracting first frame:', error)
         hasExtractionFailedRef.current = true
         isExtractingRef.current = false
-
-        // Remove event listeners to prevent infinite retries
-        if (eventListenersAttached && hiddenVideo) {
-          hiddenVideo.removeEventListener('seeked', handleSeeked)
-          hiddenVideo.removeEventListener('loadedmetadata', handleLoadedMetadata)
-          hiddenVideo.removeEventListener('canplay', handleCanPlay)
-          eventListenersAttached = false
-        }
       }
     }
 
-    const handleSeeked = () => {
-      if (!isMounted || isExtractingRef.current || hasExtractionFailedRef.current || attachmentVideoFirstFrame) return
-      extractFirstFrame()
-    }
-
-    const handleLoadedMetadata = async () => {
-      if (!isMounted || isExtractingRef.current || hasExtractionFailedRef.current) return
-
-      const cached = await checkCache()
-      if (!cached && hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
-        if (setVideoIsReadyToSend && file.tid) {
-          setVideoIsReadyToSend(file.tid)
-        }
-        hiddenVideo.currentTime = 0.1
-      }
-    }
-
-    const handleCanPlay = async () => {
-      if (!isMounted || isExtractingRef.current || hasExtractionFailedRef.current) return
-
-      if (hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
-        const cached = await checkCache()
-        if (!cached) {
-          hiddenVideo.currentTime = 0.1
-        }
-      }
-    }
-
-    // Set video source if needed
-    if (hiddenVideo.src !== videoSource) {
-      hiddenVideo.src = videoSource
-    }
-
-    // Check cache first
+    // Check cache first, then extract if needed
     checkCache().then((cached) => {
-      if (!cached && isMounted && !eventListenersAttached) {
-        // Set up event listeners only if cache miss
-        hiddenVideo.addEventListener('seeked', handleSeeked)
-        hiddenVideo.addEventListener('loadedmetadata', handleLoadedMetadata)
-        hiddenVideo.addEventListener('canplay', handleCanPlay)
-        eventListenersAttached = true
-
-        // If video is already loaded, try to extract immediately
-        if (hiddenVideo.readyState >= 2 && hiddenVideo.videoWidth > 0) {
-          hiddenVideo.currentTime = 0.1
-        }
+      if (!cached && isMounted && !isExtractingRef.current) {
+        extractFirstFrame()
       }
     })
 
     return () => {
       isMounted = false
-      if (eventListenersAttached && hiddenVideo) {
-        hiddenVideo.removeEventListener('seeked', handleSeeked)
-        hiddenVideo.removeEventListener('loadedmetadata', handleLoadedMetadata)
-        hiddenVideo.removeEventListener('canplay', handleCanPlay)
-      }
     }
-  }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview])
+  }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview, setVideoIsReadyToSend])
 
   return (
     <Component
@@ -352,16 +261,6 @@ const VideoPreview = memo(function VideoPreview({
             borderColor={border}
           />
         </SmoothImageContainer>
-      )}
-      {/* Hidden video element for extracting first frame */}
-      {!attachmentVideoFirstFrame && (
-        <HiddenVideo
-          ref={hiddenVideoRef}
-          src={file.attachmentUrl || src || file.url}
-          preload='metadata'
-          muted
-          crossOrigin='anonymous'
-        />
       )}
       {!isRepliedMessage && (
         <VideoControls className='video-controls'>
@@ -550,14 +449,4 @@ const SmoothUploadProgress = styled(UploadProgress)<{ $shouldAnimate?: boolean }
       opacity: 1;
     }
   }
-`
-
-const HiddenVideo = styled.video`
-  position: absolute;
-  opacity: 0;
-  pointer-events: none;
-  width: 1px;
-  height: 1px;
-  z-index: -1;
-  object-fit: contain;
 `

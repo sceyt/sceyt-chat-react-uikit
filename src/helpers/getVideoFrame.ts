@@ -85,31 +85,7 @@ export async function getFrame2(videoSrc: any, time: number) {
         resolve({ thumb, width: video.videoWidth, height: video.videoHeight })
       }
     }, 500)
-    // } else {
-    //   reject(new Error('src not found'))
-    // }
   })
-  /* const canvas = document.createElement('canvas')
-  canvas.width = video.videoWidth
-  canvas.height = video.videoHeight
-  // @ts-ignore
-  const ctx = canvas.getContext('2d')
-  if (time) {
-    video.currentTime = time
-  }
-  // @ts-ignore
-  ctx.drawImage(video, 0, 0)
-  // @ts-ignore
-
-  log.info('canvas.toDataURL()  3 ... ', canvas.toDataURL())
-  const thumb = await createImageThumbnail(null, canvas.toDataURL())
-  log.info('thumb ---- ', thumb) */
-  /* const image = new Image()
-  image.onload = async function () {
-    const thumb = await createImageThumbnail(image)
-    log.info('thumb ---- ', thumb)
-  }
-  image.src = canvas.toDataURL() */
 }
 
 export async function getFrame3(video: any, time: number) {
@@ -132,4 +108,123 @@ export async function getFrame3(video: any, time: number) {
     log.info('thumb ---- ', thumb)
   }
   image.src = canvas.toDataURL() */
+}
+
+/**
+ * Extract the first frame from a video as a blob URL
+ * Uses metadata preload to minimize data download
+ *
+ * @param videoSrc - Video source (URL string or Blob)
+ * @param maxWidth - Maximum width for the extracted frame (default: original width / 2)
+ * @param maxHeight - Maximum height for the extracted frame (default: original height / 2)
+ * @param quality - JPEG quality 0-1 (default: 0.8)
+ * @returns Promise resolving to blob URL string, or null if extraction fails
+ */
+export async function getVideoFirstFrame(
+  videoSrc: string | Blob,
+  maxWidth?: number,
+  maxHeight?: number,
+  quality: number = 0.8
+): Promise<{ frameBlobUrl: string; blob: Blob } | null> {
+  return new Promise((resolve) => {
+    try {
+      const video = document.createElement('video')
+      video.preload = 'metadata'
+      video.muted = true
+      video.crossOrigin = 'anonymous'
+
+      // Set video source
+      if (videoSrc instanceof Blob) {
+        video.src = URL.createObjectURL(videoSrc)
+      } else {
+        video.src = videoSrc
+      }
+
+      let videoUrlCreated = false
+
+      const cleanup = () => {
+        if (videoUrlCreated && videoSrc instanceof Blob) {
+          URL.revokeObjectURL(video.src)
+        }
+      }
+
+      const extractFrame = () => {
+        try {
+          // Check if video has dimensions
+          if (video.videoWidth === 0 || video.videoHeight === 0) {
+            cleanup()
+            resolve(null)
+            return
+          }
+
+          // Calculate canvas dimensions
+          const canvasWidth = maxWidth || video.videoWidth / 2
+          const canvasHeight = maxHeight || video.videoHeight / 2
+
+          const canvas = document.createElement('canvas')
+          canvas.width = canvasWidth
+          canvas.height = canvasHeight
+          const ctx = canvas.getContext('2d')
+
+          if (!ctx) {
+            cleanup()
+            resolve(null)
+            return
+          }
+
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
+
+          // Convert canvas to blob
+          canvas.toBlob(
+            (blob) => {
+              if (!blob) {
+                cleanup()
+                resolve(null)
+                return
+              }
+
+              // Create blob URL for the frame
+              const frameBlobUrl = URL.createObjectURL(blob)
+              cleanup()
+              resolve({ frameBlobUrl, blob })
+            },
+            'image/jpeg',
+            quality
+          )
+        } catch (error) {
+          log.error('Error extracting video frame:', error)
+          cleanup()
+          resolve(null)
+        }
+      }
+
+      // Wait for metadata to load
+      video.onloadedmetadata = () => {
+        videoUrlCreated = true
+
+        // Seek to first frame (0.1 seconds to ensure we get a decodable frame)
+        video.currentTime = 0.1
+
+        // Wait for seek to complete
+        video.onseeked = () => {
+          extractFrame()
+        }
+
+        video.onerror = (error) => {
+          log.error('Error seeking video for frame extraction', error)
+          cleanup()
+          resolve(null)
+        }
+      }
+
+      video.onerror = () => {
+        log.error('Error loading video metadata for frame extraction')
+        cleanup()
+        resolve(null)
+      }
+    } catch (error) {
+      log.error('Error in getVideoFirstFrame:', error)
+      resolve(null)
+    }
+  })
 }

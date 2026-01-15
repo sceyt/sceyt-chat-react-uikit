@@ -13,9 +13,9 @@ if (isBrowser) {
   cacheAvailable = 'caches' in global
 }
 
-export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: Response) => {
+export const setAttachmentToCache = async (attachmentUrl: string, attachmentResponse: Response) => {
   if (cacheAvailable) {
-    caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
+    await caches.open(ATTACHMENTS_CACHE).then(async (cache) => {
       try {
         // Create a Request object with a valid URL scheme
         // The Cache API requires http/https URLs, so we use a fake domain
@@ -42,8 +42,9 @@ export const setAttachmentToCache = (attachmentUrl: string, attachmentResponse: 
         }
       }
     })
+  } else {
+    log.error('Cache is not available')
   }
-  // downloadedAttachments[attachmentId] = attachmentUrl
 }
 export const removeAttachmentFromCache = async (attachmentId: string) => {
   if (cacheAvailable) {

@@ -154,7 +154,7 @@ import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
-import { getFrame } from 'helpers/getVideoFrame'
+import { getFrame, getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { isResendableError } from 'helpers/error'
@@ -173,7 +173,6 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const handleUpdateLocalPath = (updatedLink: string) => {
         if (fileType === 'video') {
           filePath = updatedLink
-          message.attachments[0] = { ...message.attachments[0], attachmentUrl: updatedLink }
         }
       }
       let blobLocal: Blob | null = null
@@ -215,7 +214,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                   'Content-Type': resizedBlob.type || blobLocal.type
                 }
               })
-              setAttachmentToCache(uriLocal, resizedResponse)
+              await setAttachmentToCache(uriLocal, resizedResponse)
               filePath = URL.createObjectURL(resizedBlob)
               store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
               message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
@@ -225,7 +224,6 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           log.error('Error resizing and caching image during upload:', error)
           // Continue even if caching fails
         }
-        store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
       } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
         const meta = await getFrame(filePath)
         thumbnailMetas = {
@@ -234,7 +232,38 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           imageHeight: meta.height,
           duration: meta.duration
         }
+        if (blobLocal) {
+          const [newWidth, newHeight] = calculateRenderedImageWidth(
+            thumbnailMetas.imageWidth || 1280,
+            thumbnailMetas.imageHeight || 1080
+          )
+          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.9)
+          if (result) {
+            const { frameBlobUrl, blob } = result
+            if (frameBlobUrl && blob) {
+              const response = new Response(blob, {
+                headers: {
+                  'Content-Type': blob.type
+                }
+              })
+              if (blobLocal) {
+                await setAttachmentToCache(
+                  uriLocal,
+                  new Response(blobLocal, {
+                    headers: {
+                      'Content-Type': blobLocal.type
+                    }
+                  })
+                )
+              }
+              await setAttachmentToCache(`${uriLocal}-first-frame`, response)
+              store.dispatch(setUpdateMessageAttachmentAC(`${uriLocal}-first-frame`, frameBlobUrl))
+              message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
+            }
+          }
+        }
       }
+      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
 
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
