@@ -415,12 +415,6 @@ export const AttachmentFile = styled.div<{
   }
 `
 
-export const AttachmentImg = styled.img<{ borderRadius?: string }>`
-  width: 100%;
-  border-radius: ${(props) => props.borderRadius || '6px'};
-  object-fit: cover;
-`
-
 // Container for smooth image transitions
 const SmoothImageContainer = styled.div`
   position: absolute;

@@ -141,6 +141,9 @@ const Attachment = ({
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [shouldAnimateImage, setShouldAnimateImage] = useState(false)
+  const previousImageSrcRef = useRef<string | undefined>(undefined)
   const [failTimeout, setFailTimeout]: any = useState()
   const [progress, setProgress] = useState(3)
   const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>({
@@ -180,7 +183,7 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
-  let attachmentThumb
+  let attachmentThumb: string | undefined
   let withPrefix = true
   if (
     attachment.type !== attachmentTypes.voice &&
@@ -199,6 +202,24 @@ const Attachment = ({
       log.error('error on get attachmentThumb', e)
     }
   }
+
+  // Track image source changes to detect thumbnail -> full image transition
+  useEffect(() => {
+    const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+    const wasThumbnail = previousImageSrcRef.current === attachmentThumb
+    const isNowFullImage =
+      currentSrc &&
+      currentSrc !== attachmentThumb &&
+      (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+
+    if (wasThumbnail && isNowFullImage && currentSrc !== previousImageSrcRef.current) {
+      // Reset animation state when transitioning from thumbnail to full image
+      setImageLoaded(false)
+      setShouldAnimateImage(true)
+    }
+
+    previousImageSrcRef.current = currentSrc
+  }, [attachment.attachmentUrl, attachmentUrlFromMap, attachmentUrl, attachmentThumb])
 
   const downloadImage = (url: string) => {
     const image = new Image(renderWidth / 2, renderHeight / 2)
@@ -654,15 +675,33 @@ const Attachment = ({
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
+            src={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
             fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
               // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
             }
             isDetailsView={isDetailsView}
-            before={true}
-            backgroundImage={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
             borderColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
+            fetchpriority='high'
+            loading='lazy'
+            decoding='async'
+            $shouldAnimate={shouldAnimateImage}
+            $isLoaded={imageLoaded}
+            onLoad={() => {
+              const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+              const wasThumbnail = previousImageSrcRef.current === attachmentThumb
+              const isNowFullImage =
+                currentSrc &&
+                currentSrc !== attachmentThumb &&
+                (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+
+              if (wasThumbnail && isNowFullImage) {
+                setShouldAnimateImage(true)
+              }
+              setImageLoaded(true)
+              previousImageSrcRef.current = currentSrc
+            }}
           />
           {!isPreview &&
           !isRepliedMessage &&
@@ -1306,7 +1345,7 @@ const AttachmentFileInfo = styled.div<{ isPreview: boolean }>`
   `}
 `
 
-export const AttachmentImg = styled.div<{
+export const AttachmentImg = styled.img<{
   absolute?: boolean
   borderRadius?: string
   ref?: any
@@ -1321,6 +1360,9 @@ export const AttachmentImg = styled.div<{
   before?: boolean
   backgroundImage?: string
   borderColor?: string
+  fetchpriority?: string
+  $shouldAnimate?: boolean
+  $isLoaded?: boolean
 }>`
   position: ${(props) => props.absolute && 'absolute'};
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
@@ -1347,6 +1389,8 @@ export const AttachmentImg = styled.div<{
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;
+  opacity: ${(props) => (props.$shouldAnimate && !props.$isLoaded ? 0 : 1)};
+  transition: opacity 0.3s ease-in-out;
   ${(props) =>
     props.before &&
     `

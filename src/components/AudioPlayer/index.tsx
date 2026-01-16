@@ -356,7 +356,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         {viewOnce && (
           <DisappearingMessagesBadge
             color={incoming ? incomingMessageBackground : outgoingMessageBackground}
-            iconColor={accentColor}
+            $iconColor={accentColor}
           />
         )}
       </PlayPause>
@@ -466,7 +466,7 @@ const Timer = styled.div<{ color: string }>`
   line-height: 12px;
   color: ${(props) => props.color};
 `
-export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; iconColor: string }>`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; $iconColor: string }>`
   position: absolute;
   bottom: -3px;
   right: -8px;
@@ -480,7 +480,7 @@ export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; icon
   color: ${(props) => props.color};
   & > path:nth-child(1) {
     stroke: ${(props) => props.color};
-    fill: ${(props) => props.iconColor};
+    fill: ${(props) => props.$iconColor};
   }
   g {
     path {
