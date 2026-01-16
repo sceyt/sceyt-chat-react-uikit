@@ -971,6 +971,10 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
+  const connectionStatus = store.getState().UserReducer.connectionStatus
+  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
   let channel = yield call(getChannelFromMap, channelId)
   try {
     if (!channel) {
@@ -1017,6 +1021,10 @@ function* markMessagesRead(action: IAction): any {
 function* markVoiceMessageAsPlayed(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
+  const connectionStatus = store.getState().UserReducer.connectionStatus
+  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
   try {
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
@@ -1053,6 +1061,10 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
 function* updateMessageAsOpened(action: IAction): any {
   const { payload } = action
   const { channelId, messageListMarker } = payload
+  const connectionStatus = store.getState().UserReducer.connectionStatus
+  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
   let channel = yield call(getChannelFromMap, channelId)
   if (!channel) {
     channel = getChannelFromAllChannels(channelId)
@@ -1083,6 +1095,10 @@ function* updateMessageAsOpened(action: IAction): any {
 function* markMessageAsOpened(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds, shouldUpdateMessage } = payload
+  const connectionStatus = store.getState().UserReducer.connectionStatus
+  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
   try {
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
@@ -1106,6 +1122,10 @@ function* markMessageAsOpened(action: IAction): any {
 function* markMessagesDelivered(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
+  const connectionStatus = store.getState().UserReducer.connectionStatus
+  if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
+    return
+  }
   try {
     let channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
