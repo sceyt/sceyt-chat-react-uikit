@@ -91,6 +91,7 @@ import {
   setUnreadMessageId
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
+import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
 
 export function sendMessageAC(
   message: any,
@@ -356,7 +357,7 @@ export function updateOGMetadataAC(url: string, metadata: IOGMetadata | null) {
 }
 
 export function setUpdateMessageAttachmentAC(url: string, attachmentUrl: string) {
-  return updateMessageAttachment({ url, attachmentUrl })
+  return updateMessageAttachment({ url: url + ATTACHMENT_VERSION, attachmentUrl })
 }
 
 export function updateMessageAC(

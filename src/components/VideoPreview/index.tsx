@@ -4,7 +4,11 @@ import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../helpers/attachmentsCache'
 import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { useColor } from 'hooks'
@@ -26,7 +30,6 @@ interface IVideoPreviewProps {
   src: string
   uploading?: boolean
   isDetailsView?: boolean
-  // eslint-disable-next-line no-unused-vars
   setVideoIsReadyToSend?: (attachmentId: string) => void
 }
 
@@ -64,7 +67,7 @@ const VideoPreview = memo(function VideoPreview({
 
   // Get cached frame from store
   const attachmentVideoFirstFrame = useMemo(
-    () => attachmentUpdatedMap[`${file.url}-first-frame`],
+    () => attachmentUpdatedMap[getAttachmentURLWithVersion(file.url)],
     [attachmentUpdatedMap, file.url]
   )
 
@@ -135,13 +138,13 @@ const VideoPreview = memo(function VideoPreview({
   }, [])
 
   useEffect(() => {
-    const videoSource = file.url
+    const videoSource = src
     if (!videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
 
     // If we already have a cached frame from store, skip extraction
     if (attachmentVideoFirstFrame && !isPreview) return
 
-    const frameCacheKey = `${file.url}-first-frame`
+    const frameCacheKey = file.url
     let isMounted = true
 
     // Reset extraction failed flag when source changes
@@ -155,7 +158,7 @@ const VideoPreview = memo(function VideoPreview({
           setBackgroundImage(cachedUrl)
           setBackgroundWithPrefix(false)
           if (!isPreview) {
-            dispatch(setUpdateMessageAttachmentAC(`${file.url}-first-frame`, cachedUrl))
+            dispatch(setUpdateMessageAttachmentAC(file.url, cachedUrl))
           }
           return true
         }
@@ -204,7 +207,7 @@ const VideoPreview = memo(function VideoPreview({
             setBackgroundImage(frameBlobUrl)
             setBackgroundWithPrefix(false)
             if (!isPreview) {
-              dispatch(setUpdateMessageAttachmentAC(`${file.url}-first-frame`, frameBlobUrl))
+              dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
             }
           } else {
             // Component unmounted, cleanup blob URL

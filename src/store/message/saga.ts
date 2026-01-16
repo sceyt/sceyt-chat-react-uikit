@@ -218,6 +218,15 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
               filePath = URL.createObjectURL(resizedBlob)
               store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
               message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
+              setAttachmentToCache(
+                uriLocal + `_original_image_url`,
+                new Response(blobLocal, {
+                  headers: {
+                    'Content-Type': blobLocal.type
+                  }
+                })
+              )
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, filePath))
             }
           }
         } catch (error) {
@@ -248,7 +257,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
               })
               if (blobLocal) {
                 await setAttachmentToCache(
-                  uriLocal,
+                  uriLocal + `_original_video_url`,
                   new Response(blobLocal, {
                     headers: {
                       'Content-Type': blobLocal.type
@@ -256,8 +265,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                   })
                 )
               }
-              await setAttachmentToCache(`${uriLocal}-first-frame`, response)
-              store.dispatch(setUpdateMessageAttachmentAC(`${uriLocal}-first-frame`, frameBlobUrl))
+              await setAttachmentToCache(uriLocal, response)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
               message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
             }
           }

@@ -43,7 +43,11 @@ import { connectionStatusSelector, contactsMapSelector } from '../../../store/us
 import { UploadingIcon } from '../../../UIHelper'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../../helpers/attachmentsCache'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../../helpers/attachmentsCache'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
@@ -93,7 +97,11 @@ const SliderPopup = ({
   const attachmentsForPopupHasNext = useSelector(attachmentsForPopupHasNextSelector)
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
   const prefixUrl = useMemo(() => {
-    return currentFile?.type === 'image' ? '_original_image_url' : ''
+    return currentFile?.type === 'image'
+      ? '_original_image_url'
+      : currentFile?.type === 'video'
+        ? '_original_video_url'
+        : ''
   }, [currentFile?.type])
 
   const customDownloader = getCustomDownloader()
@@ -116,7 +124,8 @@ const SliderPopup = ({
 
   const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
     if (setToDownloadedFiles && currentFile) {
-      dispatch(setUpdateMessageAttachmentAC(currentFile.url + (type === 'image' ? '_original_image_url' : ''), src))
+      const url = currentFile.url + (type === 'image' ? '_original_image_url' : '_original_video_url')
+      dispatch(setUpdateMessageAttachmentAC(url, src))
     }
   }
 
@@ -223,6 +232,7 @@ const SliderPopup = ({
     setMessageToDelete(undefined)
     setIsSliderOpen(false)
   }
+
   useEffect(() => {
     if (playedVideo) {
       const videoElem = document.getElementById(playedVideo) as HTMLVideoElement | null
@@ -232,7 +242,8 @@ const SliderPopup = ({
     }
     if (currentFile && currentFile.id) {
       const attachmentKey = currentFile.url + prefixUrl
-      const hasAttachment = !!attachmentUpdatedMap[attachmentKey]
+      const attachmentKeyWithVersion = getAttachmentURLWithVersion(attachmentKey)
+      const hasAttachment = !!attachmentUpdatedMap[attachmentKeyWithVersion]
 
       // If attachment is already loaded, check if it's ready
       if (!hasAttachment) {
@@ -304,7 +315,7 @@ const SliderPopup = ({
 
   useEffect(() => {
     if (customDownloader && currentMediaFile && currentMediaFile.id) {
-      const attachmentUrl = currentMediaFile.url + (currentMediaFile.type === 'image' ? '_original_image_url' : '')
+      const attachmentUrl = currentMediaFile.url + prefixUrl
       getAttachmentUrlFromCache(attachmentUrl)
         .then((cachedUrl: string | false) => {
           if (cachedUrl) {
@@ -610,10 +621,11 @@ const SliderPopup = ({
                 {file.type === 'image' ? (
                   <React.Fragment>
                     {attachmentLoadingStateForPopup === LOADING_STATE.LOADED &&
-                      attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')] && (
+                      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
                         <img
+                          loading='lazy'
                           draggable={false}
-                          src={attachmentUpdatedMap[file.url + (file.type === 'image' ? '_original_image_url' : '')]}
+                          src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
                           alt={file.name || 'Attachment'}
                           onMouseDown={(e) => {
                             if (e.button === 2) {
@@ -638,11 +650,11 @@ const SliderPopup = ({
                   </React.Fragment>
                 ) : (
                   <React.Fragment>
-                    {attachmentUpdatedMap[file.url] && (
+                    {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')] && (
                       <VideoPlayer
                         activeFileId={currentFile?.id || ''}
                         videoFileId={file.id || ''}
-                        src={attachmentUpdatedMap[file.url]}
+                        src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')]}
                         onMouseDown={(e: React.MouseEvent) => {
                           if (e.button === 2) {
                             e.stopPropagation()

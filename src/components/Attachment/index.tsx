@@ -38,7 +38,11 @@ import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME, UPLOAD
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../helpers/attachmentsCache'
 import { base64ToDataURL, resizeImageWithPica } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
@@ -135,7 +139,7 @@ const Attachment = ({
   const imageContRef = useRef<HTMLDivElement>(null)
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
   const attachmentUrlFromMap = useMemo(
-    () => attachmentUpdatedMap[attachment.url],
+    () => attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
     [attachmentUpdatedMap, attachment.url]
   )
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
@@ -428,14 +432,20 @@ const Attachment = ({
             const response = new Response(blob, {
               headers: { 'Content-Type': 'image/jpeg' }
             })
-            const key = attachment.url + '-first-frame'
+            const key = attachment.url
             await setAttachmentToCache(key, response)
             dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
           }
         }
         const response = await fetch(url)
-        setAttachmentToCache(attachment.url, response)
-        dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
+        if (attachment.type === attachmentTypes.video) {
+          setAttachmentToCache(attachment.url + `_original_video_url`, response)
+          dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
+        } else {
+          const response = await fetch(url)
+          setAttachmentToCache(attachment.url, response)
+          dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
+        }
       }
       setIsCached(true)
       setDownloadingFile(false)
@@ -981,7 +991,10 @@ const Attachment = ({
           borderColor={borderColor}
         >
           {attachmentThumb ? (
-            <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
+            <FileThumbnail
+              src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb}
+              loading='lazy'
+            />
           ) : (
             // <FileThumbnail src={base64ToDataURL(attachmentMetadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
@@ -1423,45 +1436,3 @@ const VideoCont = styled.div<{ isDetailsView?: boolean }>`
   cursor: pointer;
   height: ${(props) => props.isDetailsView && '100%'};
 `
-
-/* const LinkAttachmentCont = styled.a<{ isDetailsView?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  height: 248px;
-  text-decoration: none;
-`
-
-const LinkTitle = styled.h4`
-  margin: 0 12px 4px;
-  color: ${colors.gray6};
-  font-weight: 500;
-  font-size: 15px;
-  line-height: 20px;
-  letter-spacing: -0.2px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-`
-
-const LinkDescription = styled.p`
-  margin: 0 12px 10px;
-  color: ${colors.gray6};
-  font-weight: 400;
-  font-size: 13px;
-  line-height: 16px;
-  letter-spacing: -0.078px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-`
-
-const LinkImage = styled.img<any>`
-  width: 320px;
-  height: 180px;
-  object-fit: cover;
-  border-radius: 4px 4px 14px 14px;
-` */

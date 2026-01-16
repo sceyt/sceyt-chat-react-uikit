@@ -54,8 +54,6 @@ const Media = ({ channel }: IProps) => {
                   isDetailsView
                 />
               ) : (
-                // <img src={file.url} alt='' />
-
                 <Attachment
                   attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
                   handleMediaItemClick={handleMediaItemClick}
@@ -63,12 +61,6 @@ const Media = ({ channel }: IProps) => {
                   borderRadius='8px'
                   isDetailsView
                 />
-                /* <video>
-                  <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
-                  <source src={file.url} type='video/ogg' />
-                  <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-                  Your browser does not support the video tag.
-                </video> */
               )}
             </MediaItem>
           </React.Fragment>

@@ -133,7 +133,7 @@ const Avatar: React.FC<IProps> = ({
           <span>{avatarText}</span>
         )
       ) : (
-        <AvatarImage draggable={false} showImage src={resolvedImageSrc || image} size={size} alt='' />
+        <AvatarImage draggable={false} showImage src={resolvedImageSrc || image} size={size} alt='' loading='lazy' />
       )}
     </Container>
   )

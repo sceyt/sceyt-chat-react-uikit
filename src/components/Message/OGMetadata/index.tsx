@@ -330,7 +330,7 @@ const OGMetadata = ({
         <OGRow>
           <OGTextWrapper>{textContent}</OGTextWrapper>
           <FaviconContainer aria-hidden='true'>
-            <FaviconImg src={faviconUrl} alt='' />
+            <FaviconImg src={faviconUrl} alt='' loading='lazy' />
           </FaviconContainer>
         </OGRow>
       ) : (

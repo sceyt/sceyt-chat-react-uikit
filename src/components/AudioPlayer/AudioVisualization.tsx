@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react'
+import React, { useMemo, memo } from 'react'
 import styled from 'styled-components'
 
 interface AudioVisualizationProps {
@@ -9,7 +9,6 @@ interface AudioVisualizationProps {
   progressColor: string
   height?: number
   barWidth?: number
-  barGap?: number
   barRadius?: number
 }
 
@@ -21,7 +20,6 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
   progressColor,
   height = 20,
   barWidth = 1,
-  barGap = 2,
   barRadius = 1.5
 }) => {
   const normalizedBars = useMemo(() => {
@@ -39,65 +37,94 @@ const AudioVisualization: React.FC<AudioVisualizationProps> = ({
     })
   }, [tmb, height])
 
+  const containerWidth = 148
+
+  // Calculate spacing for space-between distribution
+  // First bar at 0, last bar at (containerWidth - barWidth)
+  // Equal spacing between all bars
+  const calculatedGap = useMemo(() => {
+    if (normalizedBars.length <= 1) return 0
+    // Total space available for gaps
+    const totalBarWidth = normalizedBars.length * barWidth
+    const totalGapSpace = containerWidth - totalBarWidth
+    // Equal spacing between all bars (normalizedBars.length - 1 gaps)
+    return totalGapSpace / (normalizedBars.length - 1)
+  }, [normalizedBars.length, barWidth, containerWidth])
+
   const exactIndex = duration > 0 ? (currentTime / duration) * normalizedBars.length : 0
   const floorIndex = Math.floor(exactIndex)
   const fractionalPart = exactIndex - floorIndex
 
-  return (
-    <Container style={{ height: `${height}px`, gap: `${barGap}px` }}>
-      {normalizedBars.map((barHeight, index) => {
-        const progressRatio = index < floorIndex ? 1 : index === floorIndex ? fractionalPart : 0
-        const barOpacity = progressRatio > 0 ? 0.8 + progressRatio * 0.2 : 0.8
+  if (normalizedBars.length === 0) {
+    return <Container style={{ height: `${height}px`, width: `${containerWidth}px` }} />
+  }
 
-        return (
-          <Bar
-            key={index}
-            style={
-              {
-                width: `${barWidth}px`,
-                height: `${barHeight}px`,
-                borderRadius: `${barRadius}px`,
-                backgroundColor: waveColor,
-                opacity: barOpacity,
-                '--progress-width': `${progressRatio * 100}%`,
-                '--progress-color': progressColor
-              } as React.CSSProperties & {
-                '--progress-width': string
-                '--progress-color': string
-              }
-            }
-          />
-        )
-      })}
+  return (
+    <Container style={{ height: `${height}px`, width: `${containerWidth}px` }}>
+      <SVG width={containerWidth} height={height}>
+        {normalizedBars.map((barHeight, index) => {
+          // Calculate x position for space-between distribution
+          let x: number
+          if (normalizedBars.length === 1) {
+            x = 0
+          } else {
+            x = index * (barWidth + calculatedGap)
+          }
+
+          // Ensure last bar aligns with right edge
+          if (index === normalizedBars.length - 1) {
+            x = containerWidth - barWidth
+          }
+
+          const centerY = height / 2
+          const barTop = centerY - barHeight / 2
+          const progressRatio = index < floorIndex ? 1 : index === floorIndex ? fractionalPart : 0
+          const barOpacity = progressRatio > 0 ? 0.8 + progressRatio * 0.2 : 0.8
+
+          return (
+            <g key={index}>
+              {/* Background bar */}
+              <rect
+                x={x}
+                y={barTop}
+                width={barWidth}
+                height={barHeight}
+                rx={barRadius}
+                ry={barRadius}
+                fill={waveColor}
+                opacity={barOpacity}
+              />
+              {/* Progress overlay */}
+              {progressRatio > 0 && (
+                <rect
+                  x={x}
+                  y={barTop}
+                  width={barWidth * progressRatio}
+                  height={barHeight}
+                  rx={barRadius}
+                  ry={barRadius}
+                  fill={progressColor}
+                />
+              )}
+            </g>
+          )
+        })}
+      </SVG>
     </Container>
   )
 }
 
-export default AudioVisualization
+export default memo(AudioVisualization)
 
 const Container = styled.div`
   display: flex;
   align-items: center;
   width: 100%;
-  justify-content: space-between;
+  justify-content: flex-start;
   margin-right: 4px;
+  position: relative;
 `
 
-const Bar = styled.div`
-  position: relative;
-  min-height: 2px;
-  overflow: hidden;
-
-  &::before {
-    content: '';
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: var(--progress-width);
-    height: 100%;
-    background-color: var(--progress-color);
-    border-radius: inherit;
-    will-change: width;
-    transform: translateZ(0);
-  }
+const SVG = styled.svg`
+  display: block;
 `

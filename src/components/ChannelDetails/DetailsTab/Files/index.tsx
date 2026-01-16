@@ -114,6 +114,7 @@ const Files = ({
                 {metas && metas.tmb ? (
                   <FileThumb
                     draggable={false}
+                    loading='lazy'
                     src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`}
                   />
                 ) : (

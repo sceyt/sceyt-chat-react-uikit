@@ -438,6 +438,7 @@ export default function InviteLinkModal({ onClose, SVGOrPNGLogoIcon, channelId }
                   alt='Invite QR'
                   width={200}
                   height={200}
+                  loading='lazy'
                 />
                 <LogoIconCont ref={logoRef}>{SVGOrPNGLogoIcon}</LogoIconCont>
               </QRCodeBox>

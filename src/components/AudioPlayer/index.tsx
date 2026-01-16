@@ -375,7 +375,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
               progressColor={accentColor}
               height={20}
               barWidth={1}
-              barGap={2}
               barRadius={1.5}
             />
           )}
