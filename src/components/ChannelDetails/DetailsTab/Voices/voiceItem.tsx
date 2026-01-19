@@ -111,6 +111,7 @@ const VoiceItem = ({
       clearInterval(intervalRef.current)
     }
   }, [])
+
   return (
     <FileItem
       onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
@@ -149,7 +150,7 @@ const VoiceItem = ({
         </AudioSendTime>
       </AudioInfo>
 
-      <Audio controls ref={audioRef} src={fileUrl}>
+      <Audio controls ref={audioRef} src={fileUrl} preload='metadata'>
         <source src={fileUrl} type='audio/ogg' />
         <source src={fileUrl} type='audio/mpeg' />
       </Audio>

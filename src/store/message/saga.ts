@@ -89,7 +89,8 @@ import {
   setUnreadScrollToAC,
   setUnreadMessageIdAC,
   setAttachmentsLoadingStateAC,
-  setUpdateMessageAttachmentAC
+  setUpdateMessageAttachmentAC,
+  loadMoreMessagesAC
 } from './actions'
 import {
   attachmentTypes,
@@ -1373,6 +1374,17 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesHasNextAC(false))
         } else if (!cachedMessages?.length && !result.messages?.length) {
           yield put(setMessagesAC([]))
+        }
+        if (limit && result.hasNext && MESSAGES_MAX_LENGTH - limit > 0) {
+          store.dispatch(
+            loadMoreMessagesAC(
+              channel.id,
+              MESSAGES_MAX_LENGTH - limit,
+              MESSAGE_LOAD_DIRECTION.PREV,
+              result.messages[0].id,
+              true
+            )
+          )
         }
       }
       const filteredPendingMessages = getFilteredPendingMessages(result.messages)

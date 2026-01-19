@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import moment from 'moment'
@@ -35,7 +35,6 @@ import { CONNECTION_STATUS } from 'store/user/constants'
 import { useDidUpdate, useOnScreen, useColor } from 'hooks'
 // Assets
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
-import { ReactComponent as SelectionIcon } from '../../assets/svg/selectionIcon.svg'
 // Helpers
 import {
   deletePendingMessage,
@@ -45,22 +44,26 @@ import {
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IReaction } from 'types'
+import { IReaction, IUser } from 'types'
 // Components
 import Avatar from '../Avatar'
-import ConfirmPopup from 'common/popups/delete'
-import ForwardMessagePopup from 'common/popups/forwardMessage'
-import ReactionsPopup from 'common/popups/reactions'
 import { IMessageProps } from './Message.types'
 import MessageBody from './MessageBody'
 import MessageStatusAndTime from './MessageStatusAndTime'
+import MessageReactions from './MessageReactions'
+import MessagePopups from './MessagePopups'
+import MessageSelection from './MessageSelection'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
-import MessageInfo from 'common/popups/messageInfo'
 import { MESSAGE_TYPE } from 'types/enum'
 import { extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
-import ConfirmEndPollPopup from 'common/popups/pollMessage/ConfirmEndPollPopup'
 import { MessageTextFormat } from 'messageUtils'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
+import { useMessageState } from './hooks/useMessageState'
+
+// Constants
+const MESSAGE_ACTIONS_HOVER_DELAY = 450
+const MAX_SELECTED_MESSAGES = 30
+const EMOJI_POPUP_THRESHOLD = 300
 
 const Message = ({
   message,
@@ -212,27 +215,44 @@ const Message = ({
   const bubbleIncoming = incomingMessageBackground
 
   const dispatch = useDispatch()
-  const [deletePopupOpen, setDeletePopupOpen] = useState(false)
-  const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
-  const [reportPopupOpen, setReportPopupOpen] = useState(false)
-  const [infoPopupOpen, setInfoPopupOpen] = useState(false)
-  const [messageActionsShow, setMessageActionsShow] = useState(false)
-  const [showEndVoteConfirmPopup, setShowEndVoteConfirmPopup] = useState(false)
-  const [emojisPopupOpen, setEmojisPopupOpen] = useState(false)
-  const [frequentlyEmojisOpen, setFrequentlyEmojisOpen] = useState(false)
-  const [reactionsPopupOpen, setReactionsPopupOpen] = useState(false)
-  const [reactionsPopupPosition, setReactionsPopupPosition] = useState(0)
-  const [emojisPopupPosition, setEmojisPopupPosition] = useState('')
-  const [reactionsPopupHorizontalPosition, setReactionsPopupHorizontalPosition] = useState({ left: 0, right: 0 })
+  const { state: messageState, setters: stateSetters, messageActionsTimeout } = useMessageState()
+  const {
+    deletePopupOpen,
+    forwardPopupOpen,
+    infoPopupOpen,
+    messageActionsShow,
+    showEndVoteConfirmPopup,
+    emojisPopupOpen,
+    frequentlyEmojisOpen,
+    reactionsPopupOpen,
+    reactionsPopupPosition,
+    emojisPopupPosition,
+    reactionsPopupHorizontalPosition
+  } = messageState
+  const {
+    setDeletePopupOpen,
+    setForwardPopupOpen,
+    setInfoPopupOpen,
+    setMessageActionsShow,
+    setShowEndVoteConfirmPopup,
+    setEmojisPopupOpen,
+    setFrequentlyEmojisOpen,
+    setReactionsPopupOpen,
+    setReactionsPopupPosition,
+    setEmojisPopupPosition,
+    setReactionsPopupHorizontalPosition,
+    setReportPopupOpen
+  } = stateSetters
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
-  const messageItemRef = useRef<any>()
+  const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
-  const reactionsCount =
-    message.reactionTotals &&
-    message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
-  const messageTextRef = useRef<any>(null)
-  const messageActionsTimeout = useRef<any>(null)
+  const reactionsCount = useMemo(() => {
+    return message.reactionTotals
+      ? message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
+      : 0
+  }, [message.reactionTotals])
+  const messageTextRef = useRef<HTMLDivElement>(null)
   const messageUserID = message.user ? message.user.id : 'deleted'
   const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
   const current = moment(message.createdAt).startOf('day')
@@ -256,99 +276,109 @@ const Message = ({
   const selectionIsActive = selectedMessagesMap && selectedMessagesMap.size > 0
 
   const isSelectedMessage = selectedMessagesMap && selectedMessagesMap.get(message.id || message.tid!)
-  const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= 30
+  const tooManySelected = selectedMessagesMap && selectedMessagesMap.size >= MAX_SELECTED_MESSAGES
 
-  const toggleEditMode = () => {
+  const toggleEditMode = useCallback(() => {
     dispatch(setMessageToEditAC(message))
     setMessageActionsShow(false)
-  }
+  }, [dispatch, message])
 
-  const handleRetractVote = () => {
+  const handleRetractVote = useCallback(() => {
     if (message?.pollDetails?.id) {
       dispatch(retractPollVoteAC(channel.id, message?.pollDetails?.id, message))
       setMessageActionsShow(false)
     }
-  }
+  }, [dispatch, channel.id, message])
 
-  const handleEndVote = () => {
+  const handleEndVote = useCallback(() => {
     setShowEndVoteConfirmPopup(true)
     setMessageActionsShow(false)
-  }
+  }, [])
 
-  const endVote = () => {
+  const endVote = useCallback(() => {
     if (!message?.pollDetails?.id) return
     dispatch(closePollAC(channel.id, message?.pollDetails?.id, message))
     setShowEndVoteConfirmPopup(false)
-  }
+  }, [dispatch, channel.id, message])
 
-  const handleToggleDeleteMessagePopup = () => {
+  const handleDeletePendingMessage = useCallback(() => {
+    deletePendingMessage(channel.id, message)
+    dispatch(deleteMessageFromListAC(message.id || message.tid!))
+  }, [dispatch, channel.id, message])
+
+  const handleToggleDeleteMessagePopup = useCallback(() => {
     if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
       handleDeletePendingMessage()
     } else {
-      setDeletePopupOpen(!deletePopupOpen)
-    }
-
-    setMessageActionsShow(false)
-  }
-
-  const handleToggleForwardMessagePopup = () => {
-    setForwardPopupOpen(!forwardPopupOpen)
-
-    setMessageActionsShow(false)
-    stopScrolling(!forwardPopupOpen)
-  }
-
-  const handleToggleInfoMessagePopupOpen = () => {
-    setInfoPopupOpen(!infoPopupOpen)
-
-    setMessageActionsShow(false)
-  }
-
-  const handleReplyMessage = (threadReply?: boolean) => {
-    if (threadReply) {
-      // dispatch(setMessageForThreadReply(message));
-    } else {
-      dispatch(setMessageForReplyAC(message))
+      setDeletePopupOpen((prev) => !prev)
     }
     setMessageActionsShow(false)
-  }
+  }, [message.deliveryStatus, handleDeletePendingMessage])
 
-  const handleToggleReportPopupOpen = () => {
-    setReportPopupOpen(!reportPopupOpen)
-
+  const handleToggleForwardMessagePopup = useCallback(() => {
+    setForwardPopupOpen((prev) => {
+      stopScrolling(!prev)
+      return !prev
+    })
     setMessageActionsShow(false)
-  }
+  }, [stopScrolling])
 
-  const handleSelectMessage = (e?: any) => {
-    if (e) {
-      e.preventDefault()
-      e.stopPropagation()
-    }
-    if (isSelectedMessage) {
-      if (selectedMessagesMap && selectedMessagesMap.size === 1) {
-        dispatch(clearSelectedMessagesAC())
+  const handleToggleInfoMessagePopupOpen = useCallback(() => {
+    setInfoPopupOpen((prev) => !prev)
+    setMessageActionsShow(false)
+  }, [])
+
+  const handleReplyMessage = useCallback(
+    (threadReply?: boolean) => {
+      if (threadReply) {
+        // dispatch(setMessageForThreadReply(message));
       } else {
-        dispatch(removeSelectedMessageAC(message.id))
+        dispatch(setMessageForReplyAC(message))
       }
-    } else if (!tooManySelected) {
-      dispatch(addSelectedMessageAC(message))
       setMessageActionsShow(false)
-    }
-  }
+    },
+    [dispatch, message]
+  )
 
-  const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
-    dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
-
+  const handleToggleReportPopupOpen = useCallback(() => {
+    setReportPopupOpen((prev: boolean) => !prev)
     setMessageActionsShow(false)
-  }
+  }, [setReportPopupOpen])
 
-  const handleResendMessage = () => {
+  const handleSelectMessage = useCallback(
+    (e?: React.MouseEvent) => {
+      if (e) {
+        e.preventDefault()
+        e.stopPropagation()
+      }
+      if (isSelectedMessage) {
+        if (selectedMessagesMap && selectedMessagesMap.size === 1) {
+          dispatch(clearSelectedMessagesAC())
+        } else {
+          dispatch(removeSelectedMessageAC(message.id))
+        }
+      } else if (!tooManySelected) {
+        dispatch(addSelectedMessageAC(message))
+        setMessageActionsShow(false)
+      }
+    },
+    [dispatch, isSelectedMessage, selectedMessagesMap, message, tooManySelected]
+  )
+
+  const handleDeleteMessage = useCallback(
+    (deleteOption: 'forMe' | 'forEveryone') => {
+      dispatch(deleteMessageAC(channel.id, message.id, deleteOption))
+      setMessageActionsShow(false)
+    },
+    [dispatch, channel.id, message.id]
+  )
+
+  const handleResendMessage = useCallback(() => {
     dispatch(resendMessageAC(message, channel.id, connectionStatus))
-
     setMessageActionsShow(false)
-  }
+  }, [dispatch, message, channel.id, connectionStatus])
 
-  const handleCopyMessage = () => {
+  const handleCopyMessage = useCallback(() => {
     const getFromContacts = getShowOnlyContactUsers()
     const textToCopyHTML = MessageTextFormat({
       text: message.body,
@@ -361,71 +391,72 @@ const Message = ({
     const textToCopy = typeof textToCopyHTML === 'string' ? textToCopyHTML : extractTextFromReactElement(textToCopyHTML)
     navigator.clipboard.writeText(textToCopy)
     setMessageActionsShow(false)
-  }
+  }, [message, contactsMap])
 
-  const handleToggleReactionsPopup = () => {
+  const handleToggleReactionsPopup = useCallback(() => {
     const reactionsContainer = document.getElementById(`${message.id}_reactions_container`)
-    const reactionsContPos = reactionsContainer && reactionsContainer.getBoundingClientRect()
+    const reactionsContPos = reactionsContainer?.getBoundingClientRect()
     const bottomPos = messageItemRef.current?.getBoundingClientRect().bottom
-    const offsetBottom = window.innerHeight - bottomPos
+    const offsetBottom = bottomPos ? window.innerHeight - bottomPos : 0
     setReactionsPopupPosition(offsetBottom)
     setReactionsPopupHorizontalPosition({
       left: reactionsContainer ? reactionsContainer.getBoundingClientRect().left : 0,
       right: reactionsContPos ? window.innerWidth - reactionsContPos.left - reactionsContPos.width : 0
     })
     dispatch(setReactionsListAC([], false))
-    setReactionsPopupOpen(!reactionsPopupOpen)
-  }
+    setReactionsPopupOpen((prev) => !prev)
+  }, [dispatch, message.id])
 
-  const handleMouseEnter = () => {
+  const handleMouseEnter = useCallback(() => {
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive) {
       messageActionsTimeout.current = setTimeout(() => {
         setMessageActionsShow(true)
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
-      }, 450)
+      }, MESSAGE_ACTIONS_HOVER_DELAY)
     }
-  }
+  }, [dispatch, message.state, message.id, message.tid, selectionIsActive])
 
-  const closeMessageActions = (close?: boolean) => {
-    setMessageActionsShow(!close)
-    if (close && !messageActionsShow && messageActionsTimeout.current) {
+  const closeMessageActions = useCallback(
+    (close?: boolean) => {
+      setMessageActionsShow(!close)
+      if (close && !messageActionsShow && messageActionsTimeout.current) {
+        clearTimeout(messageActionsTimeout.current)
+      }
+    },
+    [messageActionsShow]
+  )
+
+  const handleMouseLeave = useCallback(() => {
+    if (messageActionsTimeout.current) {
       clearTimeout(messageActionsTimeout.current)
     }
-  }
-
-  const handleMouseLeave = () => {
-    clearTimeout(messageActionsTimeout.current)
     setMessageActionsShow(false)
-  }
+  }, [])
 
-  const handleDeletePendingMessage = () => {
-    deletePendingMessage(channel.id, message)
-    dispatch(deleteMessageFromListAC(message.id || message.tid!))
-  }
-
-  const handleReactionAddDelete = (selectedEmoji: any) => {
-    if (message.userReactions && message.userReactions.some((item: IReaction) => item.key === selectedEmoji)) {
-      dispatch(
-        deleteReactionAC(
-          channel.id,
-          message.id,
-          selectedEmoji,
-          channel.lastReactedMessage && channel.lastReactedMessage.id === message.id
+  const handleReactionAddDelete = useCallback(
+    (selectedEmoji: string) => {
+      if (message.userReactions && message.userReactions.some((item: IReaction) => item.key === selectedEmoji)) {
+        dispatch(
+          deleteReactionAC(
+            channel.id,
+            message.id,
+            selectedEmoji,
+            channel.lastReactedMessage && channel.lastReactedMessage.id === message.id
+          )
         )
-      )
-    } else {
-      const score = 1
-      const reason = 'mmm'
-      const enforceUnique = false
-      dispatch(addReactionAC(channel.id, message.id, selectedEmoji, score, reason, enforceUnique))
-    }
+      } else {
+        const score = 1
+        const reason = 'mmm'
+        const enforceUnique = false
+        dispatch(addReactionAC(channel.id, message.id, selectedEmoji, score, reason, enforceUnique))
+      }
+      setMessageActionsShow(false)
+      setFrequentlyEmojisOpen(false)
+    },
+    [dispatch, channel.id, channel.lastReactedMessage, message.id, message.userReactions]
+  )
 
-    setMessageActionsShow(false)
-    setFrequentlyEmojisOpen(false)
-    // setReactionIsOpen(false)
-  }
-
-  const handleSendReadMarker = () => {
+  const handleSendReadMarker = useCallback(() => {
     if (message.incoming && !message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.DELIVERED)) {
       if (
         message.userMarkers &&
@@ -452,54 +483,71 @@ const Message = ({
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
-  }
+  }, [
+    dispatch,
+    message.incoming,
+    message.userMarkers,
+    message.id,
+    isVisible,
+    channel.id,
+    channel.newMessageCount,
+    connectionStatus,
+    unreadScrollTo
+  ])
 
-  const handleForwardMessage = (channelIds: string[]) => {
-    if (channelIds && channelIds.length) {
-      channelIds.forEach((channelId) => {
-        dispatch(forwardMessageAC(message, channelId, connectionStatus))
-      })
-    }
-  }
+  const handleForwardMessage = useCallback(
+    (channelIds: string[]) => {
+      if (channelIds && channelIds.length) {
+        channelIds.forEach((channelId) => {
+          dispatch(forwardMessageAC(message, channelId, connectionStatus))
+        })
+      }
+    },
+    [dispatch, message, connectionStatus]
+  )
 
-  const handleClick = (e: any) => {
+  const handleClick = useCallback((e: MouseEvent) => {
+    const target = e.target as Node
     const emojisContainer = document.getElementById('emojisContainer')
     const frequentlyEmojisContainer = document.getElementById('frequently_emojis_container')
-    if (emojisContainer && !emojisContainer.contains(e.target)) {
+    if (emojisContainer && !emojisContainer.contains(target)) {
       setEmojisPopupOpen(false)
     }
-    if (frequentlyEmojisContainer && !frequentlyEmojisContainer.contains(e.target)) {
+    if (frequentlyEmojisContainer && !frequentlyEmojisContainer.contains(target)) {
       setFrequentlyEmojisOpen(false)
     }
-  }
+  }, [])
 
-  const handleOpenEmojis = () => {
+  const handleOpenEmojis = useCallback(() => {
     if (openFrequentlyUsedReactions) {
       setFrequentlyEmojisOpen(true)
     } else {
       setEmojisPopupOpen(true)
     }
-  }
+  }, [openFrequentlyUsedReactions])
 
-  const handleCreateChat = (user?: any) => {
-    if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
-      dispatch(
-        createChannelAC(
-          {
-            metadata: '',
-            type: DEFAULT_CHANNEL_TYPE.DIRECT,
-            members: [
-              {
-                ...user,
-                role: 'owner'
-              }
-            ]
-          },
-          true
+  const handleCreateChat = useCallback(
+    (user?: IUser) => {
+      if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
+        dispatch(
+          createChannelAC(
+            {
+              metadata: '',
+              type: DEFAULT_CHANNEL_TYPE.DIRECT,
+              members: [
+                {
+                  ...user,
+                  role: 'owner'
+                }
+              ]
+            },
+            true
+          )
         )
-      )
-    }
-  }
+      }
+    },
+    [dispatch, selectionIsActive]
+  )
 
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
@@ -520,7 +568,18 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible, unreadScrollTo])
+  }, [
+    isVisible,
+    unreadScrollTo,
+    setLastVisibleMessageId,
+    message.id,
+    handleSendReadMarker,
+    channel.isLinkedChannel,
+    channel.lastMessage?.id,
+    scrollToNewMessage.scrollToBottom,
+    dispatch,
+    message
+  ])
 
   useEffect(() => {
     if (!isVisible && infoPopupOpen) {
@@ -544,7 +603,7 @@ const Message = ({
     if (emojisPopupOpen) {
       const bottomPos = messageItemRef.current ? messageItemRef.current.getBoundingClientRect().bottom : 0
       const offsetBottom = window.innerHeight - bottomPos
-      setEmojisPopupPosition(offsetBottom < 300 ? 'top' : 'bottom')
+      setEmojisPopupPosition(offsetBottom < EMOJI_POPUP_THRESHOLD ? 'top' : 'bottom')
       setFrequentlyEmojisOpen(false)
     } else {
       setEmojisPopupPosition('')
@@ -562,40 +621,46 @@ const Message = ({
     return () => {
       document.removeEventListener('mousedown', handleClick)
     }
-  }, [])
+  }, [handleClick])
 
-  const handleOpenChannelDetails = () => {
+  const handleOpenChannelDetails = useCallback(() => {
     dispatch(switchChannelInfoAC(true))
-  }
+  }, [dispatch])
 
-  const handleOpenUserProfile = (user?: any) => {
-    if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
-      dispatch(
-        createChannelAC(
-          {
-            metadata: '',
-            type: DEFAULT_CHANNEL_TYPE.DIRECT,
-            members: [
-              {
-                ...user,
-                role: 'owner'
-              }
-            ]
-          },
-          true
+  const handleOpenUserProfile = useCallback(
+    (user?: IUser) => {
+      if (getOpenChatOnUserInteraction() && user && !selectionIsActive) {
+        dispatch(
+          createChannelAC(
+            {
+              metadata: '',
+              type: DEFAULT_CHANNEL_TYPE.DIRECT,
+              members: [
+                {
+                  ...user,
+                  role: 'owner'
+                }
+              ]
+            },
+            true
+          )
         )
-      )
-      handleOpenChannelDetails()
-    }
-  }
+        handleOpenChannelDetails()
+      }
+    },
+    [dispatch, selectionIsActive, handleOpenChannelDetails]
+  )
 
   const unsupportedMessage = useMemo(() => {
     return isMessageUnsupported(message)
   }, [message])
 
-  const onInviteLinkClick = (key: string) => {
-    dispatch(getChannelByInviteKeyAC(key))
-  }
+  const onInviteLinkClick = useCallback(
+    (key: string) => {
+      dispatch(getChannelByInviteKeyAC(key))
+    },
+    [dispatch]
+  )
 
   return (
     <MessageItem
@@ -625,15 +690,15 @@ const Message = ({
       onClick={(e: React.MouseEvent<HTMLDivElement>) => selectionIsActive && handleSelectMessage(e)}
       // id={message.id}
     >
-      {selectionIsActive && message.state !== MESSAGE_STATUS.DELETE && (
-        <SelectMessageWrapper
-          activeColor={accentColor}
-          disabled={tooManySelected && !isSelectedMessage}
-          onClick={handleSelectMessage}
-        >
-          {isSelectedMessage ? <SelectionIcon /> : <EmptySelection disabled={tooManySelected} borderColor={border} />}
-        </SelectMessageWrapper>
-      )}
+      <MessageSelection
+        isActive={!!selectionIsActive}
+        isSelected={!!isSelectedMessage}
+        tooManySelected={!!tooManySelected}
+        messageState={message.state}
+        accentColor={accentColor}
+        borderColor={border}
+        onSelect={handleSelectMessage}
+      />
       {renderAvatar && (
         <Avatar
           name={message.user && (message.user.firstName || messageUserID)}
@@ -862,206 +927,97 @@ const Message = ({
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
-        {reactionsPopupOpen && (
-          <ReactionsPopup
-            openUserProfile={handleOpenUserProfile}
-            bottomPosition={reactionsPopupPosition}
-            horizontalPositions={reactionsPopupHorizontalPosition}
-            reactionTotals={message.reactionTotals || []}
-            messageId={message.id}
-            handleReactionsPopupClose={handleToggleReactionsPopup}
-            rtlDirection={ownMessageOnRightSide && !message.incoming}
-            handleAddDeleteEmoji={handleReactionAddDelete}
-            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
-            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
-          />
-        )}
-        <ReactionsContainer
-          id={`${message.id}_reactions_container`}
-          border={reactionsContainerBorder}
-          boxShadow={reactionsContainerBoxShadow}
-          borderRadius={reactionsContainerBorderRadius}
-          topPosition={reactionsContainerTopPosition}
-          padding={reactionsContainerPadding}
-          backgroundColor={reactionsContainerBackground || backgroundSections}
-          rtlDirection={ownMessageOnRightSide && !message.incoming}
-          isReacted={message.reactionTotals && message.reactionTotals.length > 0}
-        >
-          {message.reactionTotals && message.reactionTotals.length && (
-            <MessageReactionsCont
-              rtlDirection={ownMessageOnRightSide && !message.incoming}
-              onClick={handleToggleReactionsPopup}
-            >
-              {message.reactionTotals.slice(0, reactionsDisplayCount || 5).map((summery) => (
-                <MessageReaction
-                  key={summery.key}
-                  color={textPrimary}
-                  // onClick={() => handleReactionAddDelete(key)}
-                  self={!!message.userReactions.find((userReaction: IReaction) => userReaction.key === summery.key)}
-                  border={reactionItemBorder}
-                  borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground || backgroundSections}
-                  padding={reactionItemPadding}
-                  margin={reactionItemMargin}
-                  isLastReaction={reactionsCount === 1}
-                  fontSize={reactionsFontSize}
-                >
-                  <MessageReactionKey>
-                    {summery.key}
-                    {showEachReactionCount && (
-                      <ReactionItemCount color={textPrimary}>{summery.count}</ReactionItemCount>
-                    )}
-                  </MessageReactionKey>
-                </MessageReaction>
-              ))}
-              {showTotalReactionCount && reactionsCount && reactionsCount > 1 && (
-                <MessageReaction
-                  border={reactionItemBorder}
-                  color={textPrimary}
-                  borderRadius={reactionItemBorderRadius}
-                  backgroundColor={reactionItemBackground}
-                  padding={reactionItemPadding}
-                  margin={'0'}
-                  fontSize={'12px'}
-                >
-                  {reactionsCount}
-                </MessageReaction>
-              )}
-            </MessageReactionsCont>
-          )}
-        </ReactionsContainer>
-      </MessageContent>
-      {deletePopupOpen && (
-        <ConfirmPopup
-          handleFunction={handleDeleteMessage}
-          togglePopup={handleToggleDeleteMessagePopup}
-          buttonText='Delete'
-          description='Who do you want to remove this message for?'
-          isDeleteMessage
-          isIncomingMessage={message.incoming}
-          myRole={channel.userRole}
-          allowDeleteIncoming={allowEditDeleteIncomingMessage}
-          isDirectChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
-          title='Delete message'
-        />
-      )}
-      {forwardPopupOpen && (
-        <ForwardMessagePopup
-          handleForward={handleForwardMessage}
-          togglePopup={handleToggleForwardMessagePopup}
-          buttonText='Forward'
-          title='Forward message'
-        />
-      )}
-
-      {/*  {reportPopupOpen && (
-        <ReportPopup
-          reportFunction={handleReportMessage}
-          togglePopup={handleToggleReportPopupOpen}
-          buttonText="Report"
-          description="Choose the right reason to help us better process the report."
-          title="Report Message"
-        />
-      )} */}
-
-      {infoPopupOpen && (
-        <MessageInfo
+        <MessageReactions
           message={message}
-          togglePopup={handleToggleInfoMessagePopupOpen}
-          {...showInfoMessageProps}
-          contacts={contactsMap}
-          handleOpenUserProfile={handleOpenUserProfile}
+          reactionsCount={reactionsCount}
+          reactionsPopupOpen={reactionsPopupOpen}
+          reactionsPopupPosition={reactionsPopupPosition}
+          reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
+          rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
+          backgroundSections={backgroundSections}
+          textPrimary={textPrimary}
+          reactionsDisplayCount={reactionsDisplayCount || 5}
+          showEachReactionCount={showEachReactionCount ?? true}
+          showTotalReactionCount={!!showTotalReactionCount}
+          reactionItemBorder={reactionItemBorder}
+          reactionItemBorderRadius={reactionItemBorderRadius}
+          reactionItemBackground={reactionItemBackground}
+          reactionItemPadding={reactionItemPadding}
+          reactionItemMargin={reactionItemMargin}
+          reactionsFontSize={reactionsFontSize}
+          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
+          reactionsContainerBorder={reactionsContainerBorder}
+          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
+          reactionsContainerBackground={reactionsContainerBackground}
+          reactionsContainerTopPosition={reactionsContainerTopPosition}
+          reactionsContainerPadding={reactionsContainerPadding}
+          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+          onToggleReactionsPopup={handleToggleReactionsPopup}
+          onReactionAddDelete={handleReactionAddDelete}
+          onOpenUserProfile={handleOpenUserProfile}
         />
-      )}
-      {showEndVoteConfirmPopup && (
-        <ConfirmEndPollPopup
-          handleFunction={endVote}
-          togglePopup={() => setShowEndVoteConfirmPopup(false)}
-          title='End Poll'
-          buttonText='End Poll'
-          description='Are you sure you want to end this poll? People will no longer be able to vote.'
-        />
-      )}
+      </MessageContent>
+      <MessagePopups
+        message={message}
+        channel={channel}
+        deletePopupOpen={deletePopupOpen}
+        forwardPopupOpen={forwardPopupOpen}
+        infoPopupOpen={infoPopupOpen}
+        showEndVoteConfirmPopup={showEndVoteConfirmPopup}
+        allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
+        showInfoMessageProps={showInfoMessageProps}
+        contactsMap={contactsMap}
+        onDeleteMessage={handleDeleteMessage}
+        onToggleDeletePopup={handleToggleDeleteMessagePopup}
+        onForwardMessage={handleForwardMessage}
+        onToggleForwardPopup={handleToggleForwardMessagePopup}
+        onToggleInfoPopup={handleToggleInfoMessagePopupOpen}
+        onEndVote={endVote}
+        onToggleEndVotePopup={() => setShowEndVoteConfirmPopup(false)}
+        onOpenUserProfile={handleOpenUserProfile}
+      />
     </MessageItem>
   )
 }
 
 export default React.memo(Message, (prevProps, nextProps) => {
-  // Custom comparison function to check if only 'messages' prop has changed
-  return (
-    prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
-    prevProps.message.state === nextProps.message.state &&
-    prevProps.message.userReactions === nextProps.message.userReactions &&
-    prevProps.message.body === nextProps.message.body &&
-    prevProps.message.reactionTotals === nextProps.message.reactionTotals &&
-    prevProps.message.attachments === nextProps.message.attachments &&
-    prevProps.message.metadata === nextProps.message.metadata &&
-    prevProps.message.userMarkers === nextProps.message.userMarkers &&
-    prevProps.message.pollDetails === nextProps.message.pollDetails &&
-    prevProps.prevMessage === nextProps.prevMessage &&
-    prevProps.nextMessage === nextProps.nextMessage &&
-    prevProps.selectedMessagesMap === nextProps.selectedMessagesMap &&
-    prevProps.contactsMap === nextProps.contactsMap &&
-    prevProps.connectionStatus === nextProps.connectionStatus &&
-    prevProps.openedMessageMenuId === nextProps.openedMessageMenuId
-  )
+  // Custom comparison function - using shallow comparison for arrays/objects
+  // For arrays/objects, we check reference equality which is acceptable
+  // since Redux should maintain referential stability for unchanged data
+
+  // Compare message properties
+  if (prevProps.message.id !== nextProps.message.id) return false
+  if (prevProps.message.deliveryStatus !== nextProps.message.deliveryStatus) return false
+  if (prevProps.message.state !== nextProps.message.state) return false
+  if (prevProps.message.body !== nextProps.message.body) return false
+  if (prevProps.message.incoming !== nextProps.message.incoming) return false
+
+  // Shallow comparison for arrays/objects (reference equality)
+  if (prevProps.message.userReactions !== nextProps.message.userReactions) return false
+  if (prevProps.message.reactionTotals !== nextProps.message.reactionTotals) return false
+  if (prevProps.message.attachments !== nextProps.message.attachments) return false
+  if (prevProps.message.metadata !== nextProps.message.metadata) return false
+  if (prevProps.message.userMarkers !== nextProps.message.userMarkers) return false
+  if (prevProps.message.pollDetails !== nextProps.message.pollDetails) return false
+  if (prevProps.message.replyCount !== nextProps.message.replyCount) return false
+
+  // Compare other props
+  if (prevProps.prevMessage?.id !== nextProps.prevMessage?.id) return false
+  if (prevProps.nextMessage?.id !== nextProps.nextMessage?.id) return false
+  if (prevProps.channel.id !== nextProps.channel.id) return false
+  if (prevProps.channel.lastMessage?.id !== nextProps.channel.lastMessage?.id) return false
+  if (prevProps.channel.newMessageCount !== nextProps.channel.newMessageCount) return false
+  if (prevProps.selectedMessagesMap !== nextProps.selectedMessagesMap) return false
+  if (prevProps.contactsMap !== nextProps.contactsMap) return false
+  if (prevProps.connectionStatus !== nextProps.connectionStatus) return false
+  if (prevProps.openedMessageMenuId !== nextProps.openedMessageMenuId) return false
+  if (prevProps.isUnreadMessage !== nextProps.isUnreadMessage) return false
+  if (prevProps.unreadMessageId !== nextProps.unreadMessageId) return false
+  if (prevProps.tabIsActive !== nextProps.tabIsActive) return false
+
+  return true
 })
-
-const MessageReactionKey = styled.span`
-  display: inline-flex;
-  align-items: center;
-  font-family:
-    apple color emoji,
-    segoe ui emoji,
-    noto color emoji,
-    android emoji,
-    emojisymbols,
-    emojione mozilla,
-    twemoji mozilla,
-    segoe ui symbol;
-`
-
-const ReactionItemCount = styled.span<{ color: string }>`
-  margin-left: 2px;
-  font-family: Inter, sans-serif;
-  font-weight: 400;
-  font-size: 14px;
-  line-height: 16px;
-  color: ${(props) => props.color};
-`
-
-const MessageReaction = styled.span<{
-  self?: boolean
-  isLastReaction?: boolean
-  border?: string
-  color?: string
-  borderRadius?: string
-  backgroundColor?: string
-  fontSize?: string
-  padding?: string
-  margin?: string
-}>`
-  display: inline-flex;
-  //min-width: 23px;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  margin: ${(props: any) => props.margin || '0 8px 0 0'};
-  margin-right: ${(props) => props.isLastReaction && '0'};
-  border: ${(props) => props.border};
-  color: ${(props) => props.color};
-  box-sizing: border-box;
-  border-radius: ${(props) => props.borderRadius || '16px'};
-  font-size: ${(props) => props.fontSize || '18px'};
-  line-height: ${(props) => props.fontSize || '18px'};
-  padding: ${(props) => props.padding || '0'};
-  background-color: ${(props) => props.backgroundColor};
-  white-space: nowrap;
-
-  &:last-child {
-    margin-right: 0;
-  }
-`
 
 const ThreadMessageCountContainer = styled.div<{ color: string }>`
   position: relative;
@@ -1097,70 +1053,6 @@ const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
 const ErrorIconWrapper = styled(ErrorIcon)`
   width: 20px;
   height: 20px;
-`
-const SelectMessageWrapper = styled.div<{ activeColor?: string; disabled?: any }>`
-  display: flex;
-  padding: 10px;
-  position: absolute;
-  left: 4%;
-  bottom: calc(50% - 22px);
-  cursor: ${(props: any) => !props.disabled && 'pointer'};
-  & > svg {
-    color: ${(props) => props.activeColor};
-    width: 24px;
-    height: 24px;
-  }
-`
-const EmptySelection = styled.span<{ disabled?: boolean; borderColor: string }>`
-  display: inline-block;
-  width: 24px;
-  height: 24px;
-  border: 1.5px solid ${(props) => props.borderColor};
-  box-sizing: border-box;
-  border-radius: 50%;
-  transform: scale(0.92);
-  opacity: ${(props) => props.disabled && '0.5'};
-`
-
-const ReactionsContainer = styled.div<{
-  border?: string
-  boxShadow?: string
-  borderRadius?: string
-  topPosition?: string
-  backgroundColor: string
-  padding?: string
-  rtlDirection?: boolean
-  isReacted?: boolean
-}>`
-  display: inline-flex;
-  margin-left: ${(props: any) => props.rtlDirection && 'auto'};
-  margin-right: ${(props) => !props.rtlDirection && 'auto'};
-
-  margin-top: 4px;
-  justify-content: flex-end;
-  border: ${(props) => props.border};
-  box-shadow: ${(props) => props.boxShadow || '0px 4px 12px -2px rgba(17, 21, 57, 0.08)'};
-  filter: drop-shadow(0px 0px 2px rgba(17, 21, 57, 0.08));
-  border-radius: ${(props) => props.borderRadius || '16px'};
-  background-color: ${(props) => props.backgroundColor};
-  padding: ${(props) => (!props.isReacted ? '0' : props.padding || '4px 8px')};
-  z-index: 9;
-  ${(props) =>
-    props.topPosition &&
-    `
-      position: relative;
-      top: ${props.topPosition};
-  `};
-  overflow: hidden;
-  height: ${(props) => (props.isReacted ? '16px' : '0')};
-  transition: all 0.3s;
-`
-const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`
-  position: relative;
-  display: inline-flex;
-  max-width: 300px;
-  direction: ${(props: any) => props.rtlDirection && 'ltr'};
-  cursor: pointer;
 `
 
 const MessageStatus = styled.span<{ height?: string }>`

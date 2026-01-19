@@ -33,7 +33,7 @@ const Links = ({
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link))
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
   }, [channelId])
   return (
     <Container>

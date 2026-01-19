@@ -23,7 +23,7 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
         // Create a Request object with a valid URL scheme
         // The Cache API requires http/https URLs, so we use a fake domain
         const cacheKey =
-          attachmentURLVersion.startsWith('http://') || attachmentURLVersion.startsWith('https://')
+          attachmentURLVersion?.startsWith('http://') || attachmentURLVersion?.startsWith('https://')
             ? attachmentURLVersion
             : `https://cache.local/${encodeURIComponent(attachmentURLVersion)}`
 
@@ -34,7 +34,7 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
         log.info('Error on cache attachment ... ', e)
         // Try to delete using the same key format
         const deleteCacheKey =
-          attachmentURLVersion.startsWith('http://') || attachmentURLVersion.startsWith('https://')
+          attachmentURLVersion?.startsWith('http://') || attachmentURLVersion?.startsWith('https://')
             ? attachmentURLVersion
             : `https://cache.local/${encodeURIComponent(attachmentURLVersion)}`
         try {
@@ -53,7 +53,7 @@ export const setAttachmentToCache = async (attachmentUrl: string, attachmentResp
 export const removeAttachmentFromCache = async (attachmentId: string) => {
   if (cacheAvailable) {
     const cacheKey =
-      attachmentId.startsWith('http://') || attachmentId.startsWith('https://')
+      attachmentId?.startsWith('http://') || attachmentId?.startsWith('https://')
         ? attachmentId
         : `https://cache.local/${encodeURIComponent(attachmentId)}`
     const request = new Request(cacheKey)
@@ -71,7 +71,7 @@ export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<
 
   // Create the same cache key format as in setAttachmentToCache
   const cacheKey =
-    attachmentURLVersion.startsWith('http://') || attachmentURLVersion.startsWith('https://')
+    attachmentURLVersion?.startsWith('http://') || attachmentURLVersion?.startsWith('https://')
       ? attachmentURLVersion
       : `https://cache.local/${encodeURIComponent(attachmentURLVersion)}`
 

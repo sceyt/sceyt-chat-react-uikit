@@ -30,7 +30,7 @@ const Media = ({ channel }: IProps) => {
   }
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
-    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media))
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
   }, [channel.id])
   return (
     <Container>

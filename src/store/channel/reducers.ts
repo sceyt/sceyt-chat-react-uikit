@@ -43,7 +43,6 @@ export interface IChannelState {
   channelListWidth: number
   isDragging: boolean
   draggedAttachments: { data: any; name: any; type: any; attachmentType: string }[]
-  tabIsActive: boolean
   hideChannelList: boolean
   draftIsRemoved: string
   channelInviteKeys: {
@@ -88,7 +87,6 @@ const initialState: IChannelState = {
   channelEditMode: false,
   channelListWidth: 0,
   isDragging: false,
-  tabIsActive: true,
   hideChannelList: false,
   draggedAttachments: [],
   draftIsRemoved: '',
@@ -461,10 +459,6 @@ const channelSlice = createSlice({
       state.channelListWidth = action.payload.width
     },
 
-    setTabIsActive: (state, action: PayloadAction<{ isActive: boolean }>) => {
-      state.tabIsActive = action.payload.isActive
-    },
-
     setHideChannelList: (state, action: PayloadAction<{ hide: boolean }>) => {
       state.hideChannelList = action.payload.hide
     },
@@ -556,7 +550,6 @@ export const {
   setIsDragging,
   setDraggedAttachments,
   setChannelListWidth,
-  setTabIsActive,
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,

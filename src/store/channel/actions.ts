@@ -29,7 +29,6 @@ import {
   setIsDragging,
   setDraggedAttachments,
   setChannelListWidth,
-  setTabIsActive,
   setHideChannelList,
   setDraftIsRemoved,
   setChannelInviteKeys,
@@ -331,8 +330,6 @@ export const setIsDraggingAC = (isDragging: boolean) => setIsDragging({ isDraggi
 
 export const setDraggedAttachmentsAC = (attachments: File[], type: string) =>
   setDraggedAttachments({ attachments, type })
-
-export const setTabIsActiveAC = (isActive: boolean) => setTabIsActive({ isActive })
 
 export const setHideChannelListAC = (hide: boolean) => setHideChannelList({ hide })
 

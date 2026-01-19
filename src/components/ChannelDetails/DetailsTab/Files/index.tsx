@@ -78,7 +78,7 @@ const Files = ({
   }
 
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file))
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file, 35))
   }, [channelId])
 
   return (
@@ -115,6 +115,7 @@ const Files = ({
                   <FileThumb
                     draggable={false}
                     loading='lazy'
+                    decoding='async'
                     src={`${withPrefix ? 'data:image/jpeg;base64,' : ''}${attachmentThumb}`}
                   />
                 ) : (

@@ -624,6 +624,7 @@ const SliderPopup = ({
                       attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
                         <img
                           loading='lazy'
+                          decoding='async'
                           draggable={false}
                           src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
                           alt={file.name || 'Attachment'}

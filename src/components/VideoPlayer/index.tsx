@@ -265,6 +265,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
         onEnded={handleVideoEnded}
         onError={handleVideoError}
         playsInline
+        preload='metadata'
       />
 
       {isLoaded && (

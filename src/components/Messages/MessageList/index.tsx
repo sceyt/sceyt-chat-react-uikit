@@ -31,7 +31,7 @@ import {
   unreadMessageIdSelector
 } from '../../../store/message/selector'
 import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
-import { activeChannelSelector, isDraggingSelector, tabIsActiveSelector } from '../../../store/channel/selector'
+import { activeChannelSelector, isDraggingSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
@@ -46,9 +46,11 @@ import {
   clearVisibleMessagesMap,
   getHasNextCached,
   getHasPrevCached,
+  getMessagesFromMap,
   getVisibleMessagesMap,
   LOAD_MAX_MESSAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
+  MESSAGES_MAX_LENGTH,
   removeAllMessages,
   setHasNextCached,
   setHasPrevCached
@@ -80,6 +82,10 @@ import { getClient } from 'common/client'
 import log from 'loglevel'
 
 // moved to component-scoped refs below
+
+const getMessagesLimit = () => {
+  return window.innerHeight / 56 < MESSAGES_MAX_LENGTH ? window.innerHeight / 56 : MESSAGES_MAX_LENGTH
+}
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -501,11 +507,11 @@ const MessageList: React.FC<MessagesProps> = ({
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
+  const [opacity, setOpacity] = useState(0)
   const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
-  const tabIsActive = useSelector(tabIsActiveSelector, shallowEqual)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToMentionedMessage = useSelector(scrollToMentionedMessageSelector, shallowEqual)
@@ -529,7 +535,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const hideTopDateTimeout = useRef<any>(null)
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
-  const [lastVisibleMessageId, setLastVisibleMessageId] = useState('')
+  const lastVisibleMessageIdRef = useRef<string>('')
   const [scrollToReply, setScrollToReply] = useState<any>(null)
   const [previousScrollTop, setPreviousScrollTop] = useState(0)
   const [shouldPreserveScroll, setShouldPreserveScroll] = useState(false)
@@ -566,7 +572,9 @@ const MessageList: React.FC<MessagesProps> = ({
       if (!text && container.scrollTop > labelTop - 28) {
         const span = dateLabel?.firstChild && ((dateLabel.firstChild as HTMLElement).firstChild as HTMLElement)
         text = span ? span.innerText || '' : ''
-        setTopDateLabel(text)
+        if (text !== topDateLabel) {
+          setTopDateLabel(text)
+        }
         break
       }
     }
@@ -585,14 +593,16 @@ const MessageList: React.FC<MessagesProps> = ({
       }
       return
     }
-    setShowTopDate(true)
+    if (!showTopDate) {
+      setShowTopDate(true)
+    }
     clearTimeout(hideTopDateTimeout.current)
     // hideTopDateTimeout.current = setTimeout(() => {
     //   setShowTopDate(false)
     // }, 1000)
     renderTopDate()
     let forceLoadPrevMessages = false
-    if (-target.scrollTop + target.offsetHeight + 100 > messageBox.scrollHeight) {
+    if (-target.scrollTop + target.offsetHeight + 300 > messageBox.scrollHeight) {
       forceLoadPrevMessages = true
     }
     if (unreadScrollTo) {
@@ -608,15 +618,19 @@ const MessageList: React.FC<MessagesProps> = ({
       dispatch(getMessagesAC(channel, true))
     }
     if (target.scrollTop <= -50) {
-      dispatch(showScrollToNewMessageButtonAC(true))
+      if (!showScrollToNewMessageButton) {
+        dispatch(showScrollToNewMessageButtonAC(true))
+      }
     } else {
-      dispatch(showScrollToNewMessageButtonAC(false))
+      if (showScrollToNewMessageButton) {
+        dispatch(showScrollToNewMessageButtonAC(false))
+      }
     }
     if (scrollToReply) {
       target.scrollTop = scrollToReply
       return
     }
-    const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+    const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
     const hasIndex = typeof currentIndex === 'number'
     if ((hasIndex && currentIndex < 10) || forceLoadPrevMessages) {
       if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
@@ -635,7 +649,7 @@ const MessageList: React.FC<MessagesProps> = ({
         }
       }
     }
-    if ((hasIndex && currentIndex >= messages.length - 10) || target.scrollTop > -100) {
+    if ((hasIndex && currentIndex >= messages.length - 10) || target.scrollTop > -300) {
       if (
         connectionStatus === CONNECTION_STATUS.CONNECTED &&
         !scrollToNewMessage.scrollToBottom &&
@@ -664,11 +678,13 @@ const MessageList: React.FC<MessagesProps> = ({
     messagesLoading,
     hasPrevMessages,
     hasNextMessages,
-    lastVisibleMessageId,
+    lastVisibleMessageIdRef,
     connectionStatus,
     getHasPrevCached,
     getHasNextCached,
-    scrollToReply
+    scrollToReply,
+    showScrollToNewMessageButton,
+    showTopDate
   ])
 
   const onScroll = useCallback(() => {
@@ -931,7 +947,8 @@ const MessageList: React.FC<MessagesProps> = ({
         clearVisibleMessagesMap()
       }
       if (channel && channel?.id) {
-        dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
+        const limit = getMessagesLimit()
+        dispatch(getMessagesAC(channel, undefined, undefined, limit, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {
@@ -979,7 +996,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
     if (loadingRef.current) {
       if (loadDirectionRef.current !== 'next') {
-        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageIdRef.current)
         if (lastVisibleMessage) {
           scrollRef.current.style.scrollBehavior = 'inherit'
           scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
@@ -990,7 +1007,7 @@ const MessageList: React.FC<MessagesProps> = ({
             loadingRef.current = false
             loadFromServerRef.current = false
             nextDisableRef.current = false
-            const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+            const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
             if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
               handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
             }
@@ -1018,7 +1035,7 @@ const MessageList: React.FC<MessagesProps> = ({
           }
         }
       } else {
-        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageId)
+        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageIdRef.current)
         if (lastVisibleMessage) {
           scrollRef.current.style.scrollBehavior = 'inherit'
           scrollRef.current.scrollTop =
@@ -1072,7 +1089,7 @@ const MessageList: React.FC<MessagesProps> = ({
         loadingRef.current = false
         loadFromServerRef.current = false
         nextDisableRef.current = false
-        const currentIndex = messagesIndexMapRef.current[lastVisibleMessageId]
+        const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
         if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
         }
@@ -1094,7 +1111,7 @@ const MessageList: React.FC<MessagesProps> = ({
         clearTimeout(loadingMessagesTimeoutRef.current)
       }
     }
-  }, [messagesLoading, messages, lastVisibleMessageId])
+  }, [messagesLoading, messages, lastVisibleMessageIdRef])
 
   useEffect(() => {
     log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
@@ -1105,7 +1122,9 @@ const MessageList: React.FC<MessagesProps> = ({
       clearMessagesMap()
       removeAllMessages()
       const isWithLastVisibleMessageId =
-        lastVisibleMessageId !== channel.lastMessage?.id && lastVisibleMessageId ? lastVisibleMessageId : ''
+        lastVisibleMessageIdRef.current !== channel.lastMessage?.id && lastVisibleMessageIdRef.current
+          ? lastVisibleMessageIdRef.current
+          : ''
       dispatch(getMessagesAC(channel, false, isWithLastVisibleMessageId, 0, false, 'instant', false, true))
     }
   }, [connectionStatus])
@@ -1173,6 +1192,25 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
   }, [])
+
+  useEffect(() => {
+    if (messages.length > 0 && messagesLoading === LOADING_STATE.LOADED) {
+      const messageCache = getMessagesFromMap(channel.id)
+      if (messageCache && Object.keys(messageCache).length > 0) {
+        setOpacity(1)
+      } else {
+        setTimeout(() => {
+          setOpacity(1)
+        }, 100)
+      }
+    }
+  }, [messages, messagesLoading])
+
+  useEffect(() => {
+    if (channel.id) {
+      setOpacity(0)
+    }
+  }, [channel?.id])
 
   return (
     <React.Fragment>
@@ -1252,6 +1290,7 @@ const MessageList: React.FC<MessagesProps> = ({
           onDragEnter={handleDragIn}
           backgroundColor={backgroundColor || themeBackgroundColor}
           thumbColor={surface2}
+          style={{ opacity }}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox
@@ -1309,7 +1348,7 @@ const MessageList: React.FC<MessagesProps> = ({
                         border={dateDividerBorder}
                         backgroundColor={dateDividerBackgroundColor}
                         borderRadius={dateDividerBorderRadius}
-                        setLastVisibleMessageId={setLastVisibleMessageId}
+                        setLastVisibleMessageId={(msgId) => (lastVisibleMessageIdRef.current = msgId)}
                       />
                     ) : (
                       <MessageWrapper
@@ -1330,7 +1369,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           nextMessage={nextMessage}
                           isUnreadMessage={isUnreadMessage}
                           unreadMessageId={unreadMessageId}
-                          setLastVisibleMessageId={(msgId) => setLastVisibleMessageId(msgId)}
+                          setLastVisibleMessageId={(msgId) => (lastVisibleMessageIdRef.current = msgId)}
                           isThreadMessage={false}
                           fontFamily={fontFamily}
                           ownMessageOnRightSide={ownMessageOnRightSide}
@@ -1438,7 +1477,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           contactsMap={contactsMap}
                           connectionStatus={connectionStatus}
                           openedMessageMenuId={openedMessageMenuId}
-                          tabIsActive={tabIsActive}
+                          tabIsActive={browserTabIsActive}
                           messageTextFontSize={messageTextFontSize}
                           messageTextLineHeight={messageTextLineHeight}
                           messageStatusSize={messageStatusSize}

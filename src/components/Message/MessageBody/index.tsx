@@ -859,7 +859,7 @@ const MessageBody = ({
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
           <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
-            {viewOnce ? (
+            {viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
               <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
                 {hasOpened ? (
                   <ViewOnceIconOpen style={{ marginRight: '8px' }} />

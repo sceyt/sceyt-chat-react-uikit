@@ -226,16 +226,8 @@ const Details = ({
   const directChannelUser =
     isDirectChannel &&
     (activeChannel.members.find((member: IMember) => member.id !== user.id) || activeChannel?.members?.[0])
-  // const myPermissions: any = []
+
   const handleMembersListScroll = (event: any) => {
-    // setCloseMenu(true)
-    /* if (tabsRef.current.getBoundingClientRect().top <= detailsRef.current.offsetTop) {
-      if (!tabFixed) {
-        setTabFixed(true)
-      }
-    } else if (tabFixed) {
-      setTabFixed(false)
-    } */
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (activeTab === channelDetailsTabs.member) {
         if (membersLoading === LOADING_STATE.LOADED && membersHasNext) {

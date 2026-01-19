@@ -530,6 +530,11 @@ const Attachment = ({
                   dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || url))
                   setIsCached(true)
                   setDownloadingFile(false)
+                  fetch(url).then(async (response) => {
+                    setAttachmentToCache(attachment.url + '_original_image_url', response)
+                    const blobUrl = URL.createObjectURL(await response.blob())
+                    dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', blobUrl))
+                  })
                 })
               } else {
                 const compressedUrl = await compressAndCacheImage(
@@ -807,7 +812,7 @@ const Attachment = ({
           ) : null}
           {isPreview && (
             <RemoveChosenFile
-              backgroundColor={background}
+              $backgroundColor={background}
               color={iconInactive}
               onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
@@ -1304,7 +1309,7 @@ export const AttachmentFile = styled.div<{
   }
 `
 
-const RemoveChosenFile = styled(RemoveAttachment)<{ backgroundColor: string; color: string }>`
+const RemoveChosenFile = styled(RemoveAttachment)<{ $backgroundColor: string; color: string }>`
   position: absolute;
   width: 20px;
   height: 20px !important;
@@ -1315,10 +1320,10 @@ const RemoveChosenFile = styled(RemoveAttachment)<{ backgroundColor: string; col
   color: ${(props) => props.color};
   z-index: 5;
   circle {
-    stroke: ${(props) => props.backgroundColor};
+    stroke: ${(props) => props.$backgroundColor};
   }
   path {
-    stroke: ${(props) => props.backgroundColor};
+    stroke: ${(props) => props.$backgroundColor};
   }
 `
 /*

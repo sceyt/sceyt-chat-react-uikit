@@ -35,7 +35,7 @@ const Voices = ({
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice))
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.voice, 35))
   }, [channelId])
 
   return (

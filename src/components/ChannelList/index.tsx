@@ -450,6 +450,18 @@ const ChannelList: React.FC<IChannelListProps> = ({
     }
   }
 
+  // useEffect(() => {
+  //   const closeActiveChannel = (e: any) => {
+  //     if (e.key === 'Escape') {
+  //       dispatch(switchChannelActionAC(null))
+  //     }
+  //   }
+  //   window.addEventListener('keydown', closeActiveChannel)
+  //   return () => {
+  //     window.removeEventListener('keydown', closeActiveChannel)
+  //   }
+  // }, [])
+
   return (
     <Container
       className={className}

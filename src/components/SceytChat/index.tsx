@@ -9,7 +9,6 @@ import {
   joinChannelWithInviteKeyAC,
   setIsDraggingAC,
   setJoinableChannelAC,
-  setTabIsActiveAC,
   watchForEventsAC
 } from '../../store/channel/actions'
 import {
@@ -18,7 +17,7 @@ import {
   isDraggingSelector,
   joinableChannelSelector
 } from '../../store/channel/selector'
-import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
+import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
 import { restrictedSelector, getRolesFailSelector } from '../../store/member/selector'
 // Hooks
@@ -100,7 +99,8 @@ const SceytChat = ({
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const restricted = useSelector(restrictedSelector, shallowEqual)
   const channelInviteKeyAvailable = useSelector(channelInviteKeyAvailableSelector, shallowEqual)
-  const [tabIsActive, setTabIsActive] = useState(true)
+  const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
+
   let hidden: any = null
   let visibilityChange: any = null
   if (typeof document.hidden !== 'undefined') {
@@ -132,19 +132,16 @@ const SceytChat = ({
 
   const handleVisibilityChange = () => {
     if (document[hidden as keyof Document]) {
-      setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     } else {
-      setTabIsActive(true)
       dispatch(browserTabIsActiveAC(true))
     }
   }
+
   const handleFocusChange = (focus: boolean) => {
     if (focus) {
-      setTabIsActive(true)
       dispatch(browserTabIsActiveAC(true))
     } else {
-      setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     }
   }
@@ -166,13 +163,6 @@ const SceytChat = ({
       setActiveChannelId('')
       destroyChannelsMap()
       dispatch(destroySession())
-    }
-
-    window.onblur = () => {
-      setTabIsActive(false)
-    }
-    window.onfocus = () => {
-      setTabIsActive(true)
     }
   }, [client])
 
@@ -264,13 +254,12 @@ const SceytChat = ({
     }
   }, [])
   useEffect(() => {
-    dispatch(setTabIsActiveAC(tabIsActive))
-    if (tabIsActive && showNotifications) {
+    if (browserTabIsActive && showNotifications) {
       if (window.sceytTabNotifications) {
         window.sceytTabNotifications.close()
       }
     }
-  }, [tabIsActive])
+  }, [browserTabIsActive])
 
   useEffect(() => {
     if (theme) {
