@@ -531,9 +531,16 @@ const Attachment = ({
                   setIsCached(true)
                   setDownloadingFile(false)
                   fetch(url).then(async (response) => {
-                    setAttachmentToCache(attachment.url + '_original_image_url', response)
-                    const blobUrl = URL.createObjectURL(await response.blob())
-                    dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', blobUrl))
+                    const blob = await response.blob()
+                    const originalImageUrl = attachment.url + '_original_image_url'
+                    setAttachmentToCache(
+                      originalImageUrl,
+                      new Response(blob, {
+                        headers: { 'Content-Type': 'image/jpeg' }
+                      })
+                    )
+                    const blobUrl = URL.createObjectURL(blob)
+                    dispatch(setUpdateMessageAttachmentAC(originalImageUrl, blobUrl))
                   })
                 })
               } else {
