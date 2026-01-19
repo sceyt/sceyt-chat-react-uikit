@@ -483,22 +483,6 @@ const Attachment = ({
   }, [attachmentUrl])
 
   useEffect(() => {
-    /* if (attachment.type === 'link' && !isPreview) {
-      getMetadataFromUrl(attachment.url).then((res) => {
-        if (res) {
-          if (res.title) {
-            setLinkTitle(res.title)
-          }
-          if (res.description) {
-            setLinkDescription(res.description)
-          }
-          if (res.image) {
-            setLinkImage(res.image)
-          }
-        }
-      })
-    } */
-    // setAttachmentUrl('')
     if (
       !attachment.attachmentUrl &&
       connectionStatus === CONNECTION_STATUS.CONNECTED &&

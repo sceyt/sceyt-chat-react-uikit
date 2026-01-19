@@ -579,19 +579,26 @@ const messageSlice = createSlice({
 
     setMessageMarkers: (
       state,
-      action: PayloadAction<{ channelId: string; messageId: string; messageMarkers: IMarker[]; deliveryStatus: string }>
+      action: PayloadAction<{
+        channelId: string
+        messageId: string
+        messageMarkers: { [key: string]: IMarker[] }
+        deliveryStatuses: string[]
+      }>
     ) => {
-      const { channelId, messageId, messageMarkers, deliveryStatus } = action.payload
+      const { channelId, messageId, messageMarkers, deliveryStatuses } = action.payload
       if (!state.messageMarkers[channelId]) {
         state.messageMarkers[channelId] = {}
       }
       if (!state.messageMarkers[channelId][messageId]) {
         state.messageMarkers[channelId][messageId] = {}
       }
-      if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
-        state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+      for (const deliveryStatus of deliveryStatuses) {
+        if (!state.messageMarkers[channelId][messageId][deliveryStatus]) {
+          state.messageMarkers[channelId][messageId][deliveryStatus] = [] as IMarker[]
+        }
+        state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers[deliveryStatus]]
       }
-      state.messageMarkers[channelId][messageId][deliveryStatus] = [...messageMarkers]
     },
 
     updateMessagesMarkers: (

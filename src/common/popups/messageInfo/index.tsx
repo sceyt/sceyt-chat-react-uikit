@@ -39,6 +39,7 @@ interface IProps {
   listItemStyles?: IListItemStyles
   handleOpenUserProfile?: (user: IUser) => void
   contacts: { [key: string]: IContact }
+  isP2PChannel?: boolean
 }
 
 const defaultFormatDate = (date: Date) => {
@@ -73,7 +74,8 @@ const MessageInfo = ({
   tabsStyles = {},
   listItemStyles = {},
   handleOpenUserProfile,
-  contacts
+  contacts,
+  isP2PChannel = false
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -115,6 +117,18 @@ const MessageInfo = ({
   // Calculate a row height and max list height for 5 rows (approx: item height + vertical gaps)
   const rowHeightPx = useMemo(() => (avatarSize || 32) + 24, [avatarSize])
   const listMaxHeightPx = useMemo(() => rowHeightPx * 5 - 16, [rowHeightPx])
+  // For P2P channels: get the first marker from each status type
+  const p2pStatuses = useMemo(() => {
+    if (!isP2PChannel || !markers) return null
+    const receivedMarkers = markers.received
+    const displayedMarkers = markers.displayed
+    const playedMarkers = markers.played
+    return {
+      received: receivedMarkers ? [...receivedMarkers].sort(sortByDateDesc)[0] : null,
+      displayed: displayedMarkers ? [...displayedMarkers].sort(sortByDateDesc)[0] : null,
+      played: playedMarkers ? [...playedMarkers].sort(sortByDateDesc)[0] : null
+    }
+  }, [markers, isP2PChannel])
 
   const tabItems: Array<{ key: MessageInfoTab; label: string; data: IMarker[] }> = tabsOrder.map((tab) => {
     switch (tab.key) {
@@ -159,17 +173,30 @@ const MessageInfo = ({
       const containerRect = container.getBoundingClientRect()
       const anchorRect = anchorEl.getBoundingClientRect()
       const contentEl = contentRef.current
-      const tabsEl = tabsRef.current
-      const listEl = listRef.current
       const cs = contentEl ? getComputedStyle(contentEl) : ({} as any)
       const padTop = parseFloat(cs?.paddingTop || '0') || 0
       const padBottom = parseFloat(cs?.paddingBottom || '0') || 0
       const contentPaddingY = padTop + padBottom
-      const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
-      const tabsMarginBottom = 8
-      const listMarginTop = 8
-      const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
-      const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+
+      let desiredHeight = 0
+      if (isP2PChannel) {
+        // For P2P: simple status rows (no tabs, no list)
+        const statusRowHeight = 52 // Approximate height per status row
+        const statusRowsCount = Object.keys(markers || {}).length
+        const statusRowsHeight = statusRowHeight * statusRowsCount
+        const statusRowsGap = 8 * (statusRowsCount - 1)
+        desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
+      } else {
+        // For group channels: tabs + list
+        const tabsEl = tabsRef.current
+        const listEl = listRef.current
+        const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
+        const tabsMarginBottom = 8
+        const listMarginTop = 8
+        const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
+        desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+      }
+
       const maxPx = parseInt(String(height || '300'), 10) || 300
       const measuredTarget = Math.min(desiredHeight || 0, maxPx)
       // For flip decision while loading, consider worst-case; but keep visual height to measured
@@ -213,7 +240,7 @@ const MessageInfo = ({
     setTimeout(() => {
       initializingRef.current = false
     }, 150)
-  }, [])
+  }, [isP2PChannel, message.attachments, height, messagesMarkersLoadingState])
 
   // Reset initialization flag when popup closes
   useEffect(() => {
@@ -382,17 +409,30 @@ const MessageInfo = ({
     const containerRect = container.getBoundingClientRect()
     const anchorRect = anchorEl.getBoundingClientRect()
     const contentEl = contentRef.current
-    const tabsEl = tabsRef.current
-    const listEl = listRef.current
     const cs = contentEl ? getComputedStyle(contentEl) : ({} as any)
     const padTop = parseFloat(cs?.paddingTop || '0') || 0
     const padBottom = parseFloat(cs?.paddingBottom || '0') || 0
     const contentPaddingY = padTop + padBottom
-    const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
-    const tabsMarginBottom = 8
-    const listMarginTop = 8
-    const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
-    const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+
+    let desiredHeight = 0
+    if (isP2PChannel) {
+      // For P2P: simple status rows (no tabs, no list)
+      const statusRowHeight = 52 // Approximate height per status row
+      const statusRowsCount = Object.keys(markers || {}).length
+      const statusRowsHeight = statusRowHeight * statusRowsCount
+      const statusRowsGap = 8 * (statusRowsCount - 1)
+      desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
+    } else {
+      // For group channels: tabs + list
+      const tabsEl = tabsRef.current
+      const listEl = listRef.current
+      const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
+      const tabsMarginBottom = 8
+      const listMarginTop = 8
+      const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
+      desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+    }
+
     const maxPx = parseInt(String(height || '300'), 10)
     const measuredTarget = Math.min(desiredHeight || 0, isNaN(maxPx) ? 300 : Math.min(maxPx, desiredHeight))
     const nextHeight = Math.max(panelHeightPx || 0, measuredTarget)
@@ -452,7 +492,17 @@ const MessageInfo = ({
       setIsTransitioning(true)
       setPanelHeightPx(nextHeight)
     }
-  }, [ready, panelHeightPx, activeMarkers.length, messagesMarkersLoadingState, height, flipAbove])
+  }, [
+    ready,
+    panelHeightPx,
+    activeMarkers.length,
+    messagesMarkersLoadingState,
+    height,
+    flipAbove,
+    isP2PChannel,
+    message.attachments,
+    markers
+  ])
 
   // Lock flip while loading; unlock after load completes (transition end handler will also unlock if needed)
   useEffect(() => {
@@ -481,10 +531,15 @@ const MessageInfo = ({
   }, [])
 
   useEffect(() => {
-    if (activeTab && message.id && message.channelId) {
-      dispatch(getMessageMarkersAC(message.id, message.channelId, activeTab))
+    if (message.id && message.channelId) {
+      // For P2P, fetch all marker types
+      let deliveryStatuses = 'received,displayed'
+      if (message.attachments && message.attachments.length > 0 && message.attachments[0].type === 'voice') {
+        deliveryStatuses += ',played'
+      }
+      dispatch(getMessageMarkersAC(message.id, message.channelId, deliveryStatuses))
     }
-  }, [activeTab, message.id, message.channelId])
+  }, [activeTab, message.id, message.channelId, isP2PChannel, message.attachments, dispatch])
 
   if ((messagesMarkersLoadingState === LOADING_STATE.LOADING || messagesMarkersLoadingState == null) && !markers) {
     return null
@@ -510,34 +565,68 @@ const MessageInfo = ({
         minWidth={minWidth}
       >
         <Content ref={contentRef}>
-          <Tabs ref={tabsRef}>
-            {tabItems.map((tab) => (
-              <Tab
-                key={tab.key}
-                active={activeTab === tab.key}
-                activeColor={tabsStyles.activeColor || textOnPrimary}
-                inactiveColor={tabsStyles.inactiveColor || textSecondary}
-                onClick={() => setActiveTab(tab.key)}
-                textOnPrimary={textOnPrimary}
-                textSecondary={textSecondary}
-                backgroundColor={activeTab === tab.key ? accentColor : 'transparent'}
-                borderColor={border}
-              >
-                {tab.label}
-                {showCounts ? ` (${tab.data.length})` : ''}
-              </Tab>
-            ))}
-          </Tabs>
-          <List ref={listRef} maxHeight={listMaxHeightPx}>
-            {activeMarkers.map((marker: IMarker) => (
-              <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
-                {renderRow(marker)}
-              </React.Fragment>
-            ))}
-            {!activeMarkers.length && messagesMarkersLoadingState !== LOADING_STATE.LOADING && (
-              <Empty color={textSecondary}>No results</Empty>
-            )}
-          </List>
+          {isP2PChannel ? (
+            <P2PStatusList>
+              {p2pStatuses?.received && (
+                <P2PStatusRow>
+                  <P2PStatusLabel color={textPrimary}>Delivered</P2PStatusLabel>
+                  <P2PStatusDate color={textSecondary}>
+                    {formatDate(new Date((p2pStatuses.received as any).createdAt))}
+                  </P2PStatusDate>
+                </P2PStatusRow>
+              )}
+              {p2pStatuses?.displayed && (
+                <P2PStatusRow>
+                  <P2PStatusLabel color={textPrimary}>Seen</P2PStatusLabel>
+                  <P2PStatusDate color={textSecondary}>
+                    {formatDate(new Date((p2pStatuses.displayed as any).createdAt))}
+                  </P2PStatusDate>
+                </P2PStatusRow>
+              )}
+              {message.attachments &&
+                message.attachments.length > 0 &&
+                message.attachments[0].type === 'voice' &&
+                p2pStatuses?.played && (
+                  <P2PStatusRow>
+                    <P2PStatusLabel color={textPrimary}>Played</P2PStatusLabel>
+                    <P2PStatusDate color={textSecondary}>
+                      {formatDate(new Date((p2pStatuses.played as any).createdAt))}
+                    </P2PStatusDate>
+                  </P2PStatusRow>
+                )}
+            </P2PStatusList>
+          ) : (
+            <React.Fragment>
+              <Tabs ref={tabsRef}>
+                {tabItems.map((tab) => (
+                  <Tab
+                    key={tab.key}
+                    active={activeTab === tab.key}
+                    activeColor={tabsStyles.activeColor || textOnPrimary}
+                    inactiveColor={tabsStyles.inactiveColor || textSecondary}
+                    onClick={() => setActiveTab(tab.key)}
+                    textOnPrimary={textOnPrimary}
+                    textSecondary={textSecondary}
+                    backgroundColor={activeTab === tab.key ? accentColor : 'transparent'}
+                    borderColor={border}
+                  >
+                    {tab.label}
+                    {showCounts ? ` (${tab.data.length})` : ''}
+                  </Tab>
+                ))}
+              </Tabs>
+              <List ref={listRef} maxHeight={listMaxHeightPx}>
+                {activeMarkers.map((marker: IMarker) => (
+                  <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
+                    {renderRow(marker)}
+                  </React.Fragment>
+                ))}
+                {!activeMarkers.length && messagesMarkersLoadingState !== LOADING_STATE.LOADING && (
+                  <Empty color={textSecondary}>No results</Empty>
+                )}
+              </List>
+            </React.Fragment>
+          )}
         </Content>
       </Panel>
     </DropdownRoot>
@@ -694,4 +783,37 @@ const Content = styled.div`
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+`
+
+const P2PStatusList = styled.div`
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+`
+
+const P2PStatusRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  height: 52px;
+`
+
+const P2PStatusLabel = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  font-family: Inter;
+  font-weight: 500;
+  font-size: 16px;
+  line-height: 22px;
+  letter-spacing: 0px;
+`
+
+const P2PStatusDate = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  min-width: max-content;
+  font-family: Inter;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0px;
 `

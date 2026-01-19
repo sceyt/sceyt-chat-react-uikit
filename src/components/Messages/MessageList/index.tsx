@@ -46,7 +46,6 @@ import {
   clearVisibleMessagesMap,
   getHasNextCached,
   getHasPrevCached,
-  getMessagesFromMap,
   getVisibleMessagesMap,
   LOAD_MAX_MESSAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
@@ -507,7 +506,6 @@ const MessageList: React.FC<MessagesProps> = ({
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
-  const [opacity, setOpacity] = useState(0)
   const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
@@ -1193,25 +1191,6 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }, [])
 
-  useEffect(() => {
-    if (messages.length > 0 && messagesLoading === LOADING_STATE.LOADED) {
-      const messageCache = getMessagesFromMap(channel.id)
-      if (messageCache && Object.keys(messageCache).length > 0) {
-        setOpacity(1)
-      } else {
-        setTimeout(() => {
-          setOpacity(1)
-        }, 100)
-      }
-    }
-  }, [messages, messagesLoading])
-
-  useEffect(() => {
-    if (channel.id) {
-      setOpacity(0)
-    }
-  }, [channel?.id])
-
   return (
     <React.Fragment>
       {isDragging && !(attachmentsPreview?.show && mediaFile) && (
@@ -1290,7 +1269,6 @@ const MessageList: React.FC<MessagesProps> = ({
           onDragEnter={handleDragIn}
           backgroundColor={backgroundColor || themeBackgroundColor}
           thumbColor={surface2}
-          style={{ opacity }}
         >
           {messages.length && messages.length > 0 ? (
             <MessagesBox

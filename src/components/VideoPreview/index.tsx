@@ -115,7 +115,7 @@ const VideoPreview = memo(function VideoPreview({
 
   // Track background image changes for smooth transitions
   useEffect(() => {
-    if (backgroundImage !== undefined) {
+    if (backgroundImage !== undefined && !attachmentVideoFirstFrame) {
       if (previousBackgroundImageRef.current === undefined) {
         // First image - no animation needed
         setShouldAnimate(false)
@@ -125,7 +125,7 @@ const VideoPreview = memo(function VideoPreview({
       }
       previousBackgroundImageRef.current = backgroundImage
     }
-  }, [backgroundImage])
+  }, [backgroundImage, attachmentVideoFirstFrame])
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -268,7 +268,6 @@ const VideoPreview = memo(function VideoPreview({
       {!isRepliedMessage && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
-            // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
             <VideoPlayButton>
               <PlayIcon />
             </VideoPlayButton>

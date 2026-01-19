@@ -476,20 +476,20 @@ export function clearSelectedMessagesAC() {
   return clearSelectedMessages()
 }
 
-export function getMessageMarkersAC(messageId: string, channelId: string, deliveryStatus: string) {
+export function getMessageMarkersAC(messageId: string, channelId: string, deliveryStatuses: string) {
   return {
     type: GET_MESSAGE_MARKERS,
-    payload: { messageId, channelId, deliveryStatus }
+    payload: { messageId, channelId, deliveryStatuses }
   }
 }
 
 export function setMessageMarkersAC(
   channelId: string,
   messageId: string,
-  messageMarkers: IMarker[],
-  deliveryStatus: string
+  messageMarkers: { [key: string]: IMarker[] },
+  deliveryStatuses: string[]
 ) {
-  return setMessageMarkers({ channelId, messageId, messageMarkers, deliveryStatus })
+  return setMessageMarkers({ channelId, messageId, messageMarkers, deliveryStatuses })
 }
 
 export function updateMessagesMarkersAC(channelId: string, deliveryStatus: string, marker: IMarker) {

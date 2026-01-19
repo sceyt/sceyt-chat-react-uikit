@@ -29,7 +29,7 @@ import {
   RESEND_PENDING_POLL_ACTIONS
 } from './constants'
 
-import { IAction, IAttachment, IChannel, IMessage, IPollOption, IPollVote } from '../../types'
+import { IAction, IAttachment, IChannel, IMarker, IMessage, IPollOption, IPollVote } from '../../types'
 import { getClient } from '../../common/client'
 import {
   addChannelToAllChannels,
@@ -1775,17 +1775,24 @@ function* resumeAttachmentUploading(action: any) {
 function* getMessageMarkers(action: IAction): any {
   try {
     yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADING))
-    const { messageId, channelId, deliveryStatus } = action.payload
+    const { messageId, channelId, deliveryStatuses } = action.payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
-      const messageMarkerListQueryBuilder = new sceytChatClient.MessageMarkerListQueryBuilder(
-        channelId,
-        String(messageId),
-        deliveryStatus
-      )
-      const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
-      const messageMarkers = yield call(messageMarkerListQuery.loadNext)
-      yield put(setMessageMarkersAC(channelId, messageId, messageMarkers.markers, deliveryStatus))
+      const deliveryStatusesArray = deliveryStatuses.split(',')
+      const messageMarkers: { [key: string]: IMarker[] } = {}
+      for (const deliveryStatus of deliveryStatusesArray) {
+        const messageMarkerListQueryBuilder = new sceytChatClient.MessageMarkerListQueryBuilder(
+          channelId,
+          String(messageId),
+          deliveryStatus
+        )
+        const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
+        const messageMarkersResult = yield call(messageMarkerListQuery.loadNext)
+        messageMarkers[deliveryStatus] = messageMarkersResult.markers
+      }
+      if (Object.keys(messageMarkers).length > 0) {
+        yield put(setMessageMarkersAC(channelId, messageId, messageMarkers, deliveryStatusesArray))
+      }
     }
   } catch (e) {
     log.error('error in get message markers', e)

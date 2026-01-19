@@ -76,6 +76,7 @@ const MessagePopups: React.FC<MessagePopupsProps> = ({
           {...showInfoMessageProps}
           contacts={contactsMap}
           handleOpenUserProfile={onOpenUserProfile}
+          isP2PChannel={channel.type === DEFAULT_CHANNEL_TYPE.DIRECT}
         />
       )}
       {showEndVoteConfirmPopup && (
