@@ -437,13 +437,21 @@ const Attachment = ({
             dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
           }
         }
-        const response = await fetch(url)
         if (attachment.type === attachmentTypes.video) {
-          setAttachmentToCache(attachment.url + `_original_video_url`, response)
+          setAttachmentToCache(
+            attachment.url + `_original_video_url`,
+            new Response(result.Body, {
+              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            })
+          )
           dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
         } else {
-          const response = await fetch(url)
-          setAttachmentToCache(attachment.url, response)
+          setAttachmentToCache(
+            attachment.url,
+            new Response(result.Body, {
+              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            })
+          )
           dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
         }
       }
@@ -951,7 +959,7 @@ const Attachment = ({
                 isPreview
               />
               <RemoveChosenFile
-                backgroundColor={background}
+                $backgroundColor={background}
                 color={iconPrimary}
                 onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
@@ -1114,7 +1122,7 @@ const Attachment = ({
           )}
           {isPreview && (
             <RemoveChosenFile
-              backgroundColor={background}
+              $backgroundColor={background}
               color={iconPrimary}
               onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
