@@ -657,7 +657,7 @@ const Actions = ({
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}
-                  color={unblockUserTextColor || warningColor}
+                  color={unblockUserTextColor || textPrimary}
                   hoverColor={unblockUserTextColor || textPrimary}
                   iconColor={warningColor}
                   fontSize={actionItemsFontSize}

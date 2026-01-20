@@ -620,7 +620,7 @@ const Channel: React.FC<IChannelProps> = ({
             {notificationsIsMutedIcon || <NotificationOffIcon />}
           </MutedIcon>
         )}
-        {getCustomLatestMessage
+        {getCustomLatestMessage && !typingOrRecording.items.length
           ? getCustomLatestMessageComponent({
               lastMessage,
               typingOrRecording,
