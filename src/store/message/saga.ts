@@ -457,7 +457,6 @@ function* sendMessage(action: IAction): any {
 
           // not for SDK, for displaying attachments and their progress
           messageAttachment.tid = attachment.tid
-          messageAttachment.attachmentUrl = attachment.attachmentUrl
 
           if (customUploader) {
             messageAttachment.url = attachment.data
@@ -592,8 +591,7 @@ function* sendMessage(action: IAction): any {
                 messageResponse.attachments[k] = {
                   ...messageResponse.attachments[k],
                   user: JSON.parse(JSON.stringify(messageResponse.user)),
-                  tid: messageAttachment[k].tid as string,
-                  attachmentUrl: messageAttachment[k].attachmentUrl
+                  tid: messageAttachment[k].tid as string
                 }
                 const pendingAttachment = getPendingAttachment(messageAttachment[k].tid as string)
                 if (!messageAttachment[k].cachedUrl) {
@@ -622,9 +620,9 @@ function* sendMessage(action: IAction): any {
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
                 if (currentAttachmentsMap[attachment.tid!] && attachment.type !== attachmentTypes.voice) {
                   log.info('set at')
-                  return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+                  return { ...attachment }
                 } else if (attachment.type === attachmentTypes.voice) {
-                  return { ...attachment, attachmentUrl: null }
+                  return { ...attachment }
                 }
                 return attachment
               })

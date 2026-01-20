@@ -600,7 +600,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               tid: attachment.tid,
               cachedUrl: attachment.cachedUrl,
               upload: attachment.upload,
-              attachmentUrl: attachment.attachmentUrl,
               metadata: attachment.metadata,
               type: attachment.type,
               size: attachment.size

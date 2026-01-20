@@ -76,56 +76,19 @@ const VideoPreview = memo(function VideoPreview({
   const attachmentThumb = useMemo(() => {
     if (file.metadata?.tmb) {
       if (file.metadata.tmb.length < 70) {
-        return base64ToDataURL(file.metadata.tmb)
+        return { thumbnail: base64ToDataURL(file.metadata.tmb), withPrefix: false }
       }
-      return file.metadata.tmb
+      return { thumbnail: file.metadata.tmb, withPrefix: true }
     }
-    return undefined
+    return { thumbnail: undefined, withPrefix: false }
   }, [file.metadata?.tmb])
 
   const [backgroundImage, setBackgroundImage] = useState<string | undefined>(
-    attachmentVideoFirstFrame || attachmentThumb || undefined
+    attachmentVideoFirstFrame || attachmentThumb?.thumbnail || undefined
   )
-  const [backgroundWithPrefix, setBackgroundWithPrefix] = useState(false)
-  const [shouldAnimate, setShouldAnimate] = useState(false)
   const isExtractingRef = useRef(false)
   const hasExtractionFailedRef = useRef(false)
   const extractedBlobUrlsRef = useRef<Set<string>>(new Set())
-  const previousBackgroundImageRef = useRef<string | undefined>(undefined)
-
-  const thumbnailWithPrefix = useMemo(() => {
-    return !(file.metadata?.tmb && file.metadata.tmb.length < 70)
-  }, [file.metadata?.tmb])
-
-  // Initialize background image from thumbnail or cached frame
-  useEffect(() => {
-    // Prefer cached frame from store
-    if (attachmentVideoFirstFrame && attachmentVideoFirstFrame !== backgroundImage) {
-      setBackgroundImage(attachmentVideoFirstFrame)
-      setBackgroundWithPrefix(false)
-      return
-    }
-
-    // Fall back to thumbnail if available and no background image set
-    if (attachmentThumb && !backgroundImage) {
-      setBackgroundImage(attachmentThumb)
-      setBackgroundWithPrefix(thumbnailWithPrefix)
-    }
-  }, [attachmentVideoFirstFrame, attachmentThumb, thumbnailWithPrefix, backgroundImage])
-
-  // Track background image changes for smooth transitions
-  useEffect(() => {
-    if (backgroundImage !== undefined && !attachmentVideoFirstFrame) {
-      if (previousBackgroundImageRef.current === undefined) {
-        // First image - no animation needed
-        setShouldAnimate(false)
-      } else if (previousBackgroundImageRef.current !== backgroundImage) {
-        // Image changed - enable animation
-        setShouldAnimate(true)
-      }
-      previousBackgroundImageRef.current = backgroundImage
-    }
-  }, [backgroundImage, attachmentVideoFirstFrame])
 
   // Cleanup blob URLs on unmount
   useEffect(() => {
@@ -156,7 +119,6 @@ const VideoPreview = memo(function VideoPreview({
         if (cachedUrl && isMounted) {
           extractedBlobUrlsRef.current.add(cachedUrl)
           setBackgroundImage(cachedUrl)
-          setBackgroundWithPrefix(false)
           if (!isPreview) {
             dispatch(setUpdateMessageAttachmentAC(file.url, cachedUrl))
           }
@@ -205,7 +167,6 @@ const VideoPreview = memo(function VideoPreview({
 
           if (isMounted) {
             setBackgroundImage(frameBlobUrl)
-            setBackgroundWithPrefix(false)
             if (!isPreview) {
               dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
             }
@@ -250,20 +211,17 @@ const VideoPreview = memo(function VideoPreview({
       backgroundColor={backgroundColor}
       isDetailsView={isDetailsView}
     >
-      {!uploading && (
-        <SmoothImageContainer>
-          <SmoothUploadProgress
-            $shouldAnimate={shouldAnimate}
-            isPreview={isPreview}
-            isDetailsView={isDetailsView}
-            // onClick={handlePauseResumeDownload}
-            isRepliedMessage={isRepliedMessage}
-            borderRadius={borderRadius}
-            backgroundImage={backgroundImage}
-            withPrefix={backgroundWithPrefix}
-            borderColor={border}
-          />
-        </SmoothImageContainer>
+      {!uploading && backgroundImage && (
+        <UploadProgress
+          backgroundImage={backgroundImage}
+          isRepliedMessage={isRepliedMessage}
+          width={parseInt(width)}
+          height={parseInt(height)}
+          withBorder={!isPreview && !isDetailsView}
+          backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+          isDetailsView={isDetailsView}
+          borderColor={border}
+        />
       )}
       {!isRepliedMessage && (
         <VideoControls className='video-controls'>
@@ -414,35 +372,5 @@ export const AttachmentFile = styled.div<{
   & > ${AttachmentIconCont} svg {
     width: 36px;
     height: 36px;
-  }
-`
-
-// Container for smooth image transitions
-const SmoothImageContainer = styled.div`
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 5;
-`
-
-// Extended UploadProgress with smooth background-image transition
-const SmoothUploadProgress = styled(UploadProgress)<{ $shouldAnimate?: boolean }>`
-  background-color: transparent !important;
-
-  ${(props) =>
-    props.$shouldAnimate &&
-    `
-    animation: fadeInImage 0.2s ease-in-out;
-  `}
-
-  @keyframes fadeInImage {
-    from {
-      opacity: 0.3;
-    }
-    to {
-      opacity: 1;
-    }
   }
 `
