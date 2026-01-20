@@ -247,7 +247,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
             thumbnailMetas.imageWidth || 1280,
             thumbnailMetas.imageHeight || 1080
           )
-          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.9)
+          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.8)
           if (result) {
             const { frameBlobUrl, blob } = result
             if (frameBlobUrl && blob) {
