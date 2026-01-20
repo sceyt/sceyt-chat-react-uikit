@@ -426,7 +426,7 @@ const Attachment = ({
         dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
       } else {
         if (attachment.type === attachmentTypes.video) {
-          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.9)
+          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.8)
           if (result) {
             const { frameBlobUrl, blob } = result
             const response = new Response(blob, {
