@@ -1,9 +1,9 @@
 import styled from 'styled-components'
-import React, { memo, useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useEffect, useMemo, useRef } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
-import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
+import { AttachmentIconCont } from '../../UIHelper'
 import {
   getAttachmentUrlFromCache,
   getAttachmentURLWithVersion,
@@ -83,22 +83,8 @@ const VideoPreview = memo(function VideoPreview({
     return { thumbnail: undefined, withPrefix: false }
   }, [file.metadata?.tmb])
 
-  const [backgroundImage, setBackgroundImage] = useState<string | undefined>(
-    attachmentVideoFirstFrame || attachmentThumb?.thumbnail || undefined
-  )
   const isExtractingRef = useRef(false)
   const hasExtractionFailedRef = useRef(false)
-  const extractedBlobUrlsRef = useRef<Set<string>>(new Set())
-
-  // Cleanup blob URLs on unmount
-  useEffect(() => {
-    return () => {
-      extractedBlobUrlsRef.current.forEach((url) => {
-        URL.revokeObjectURL(url)
-      })
-      extractedBlobUrlsRef.current.clear()
-    }
-  }, [])
 
   useEffect(() => {
     const videoSource = src
@@ -108,7 +94,6 @@ const VideoPreview = memo(function VideoPreview({
     if (attachmentVideoFirstFrame && !isPreview) return
 
     const frameCacheKey = file.url
-    let isMounted = true
 
     // Reset extraction failed flag when source changes
     hasExtractionFailedRef.current = false
@@ -116,9 +101,7 @@ const VideoPreview = memo(function VideoPreview({
     const checkCache = async (): Promise<boolean> => {
       try {
         const cachedUrl = await getAttachmentUrlFromCache(frameCacheKey)
-        if (cachedUrl && isMounted) {
-          extractedBlobUrlsRef.current.add(cachedUrl)
-          setBackgroundImage(cachedUrl)
+        if (cachedUrl) {
           if (!isPreview) {
             dispatch(setUpdateMessageAttachmentAC(file.url, cachedUrl))
           }
@@ -132,7 +115,7 @@ const VideoPreview = memo(function VideoPreview({
     }
 
     const extractFirstFrame = async () => {
-      if (isExtractingRef.current || !isMounted) return
+      if (isExtractingRef.current) return
 
       try {
         isExtractingRef.current = true
@@ -143,7 +126,7 @@ const VideoPreview = memo(function VideoPreview({
         // Use getVideoFirstFrame helper function - it handles everything internally
         const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)
 
-        if (!result || !isMounted) {
+        if (!result) {
           isExtractingRef.current = false
           return
         }
@@ -162,17 +145,8 @@ const VideoPreview = memo(function VideoPreview({
             setAttachmentToCache(frameCacheKey, response)
           }
 
-          // Track blob URL for cleanup
-          extractedBlobUrlsRef.current.add(frameBlobUrl)
-
-          if (isMounted) {
-            setBackgroundImage(frameBlobUrl)
-            if (!isPreview) {
-              dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
-            }
-          } else {
-            // Component unmounted, cleanup blob URL
-            URL.revokeObjectURL(frameBlobUrl)
+          if (!isPreview) {
+            dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
           }
         } catch (error) {
           console.error('Error processing extracted frame:', error)
@@ -191,16 +165,17 @@ const VideoPreview = memo(function VideoPreview({
 
     // Check cache first, then extract if needed
     checkCache().then((cached) => {
-      if (!cached && isMounted && !isExtractingRef.current) {
+      if (!cached && !isExtractingRef.current) {
         extractFirstFrame()
       }
     })
-
-    return () => {
-      isMounted = false
-    }
   }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview, setVideoIsReadyToSend])
 
+  console.log(
+    'attachmentVideoFirstFrame',
+    attachmentVideoFirstFrame ||
+      (attachmentThumb?.withPrefix ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}` : attachmentThumb?.thumbnail)
+  )
   return (
     <Component
       width={width}
@@ -211,16 +186,24 @@ const VideoPreview = memo(function VideoPreview({
       backgroundColor={backgroundColor}
       isDetailsView={isDetailsView}
     >
-      {!uploading && backgroundImage && (
-        <UploadProgress
-          backgroundImage={backgroundImage}
+      {!uploading && (
+        <UploadInProgress
           isRepliedMessage={isRepliedMessage}
+          src={
+            attachmentVideoFirstFrame ||
+            (attachmentThumb?.withPrefix
+              ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
+              : attachmentThumb?.thumbnail)
+          }
           width={parseInt(width)}
           height={parseInt(height)}
           withBorder={!isPreview && !isDetailsView}
           backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
           isDetailsView={isDetailsView}
           borderColor={border}
+          loading='lazy'
+          decoding='async'
+          fetchpriority='high'
         />
       )}
       {!isRepliedMessage && (
@@ -373,4 +356,49 @@ export const AttachmentFile = styled.div<{
     width: 36px;
     height: 36px;
   }
+`
+
+const UploadInProgress = styled.img<{
+  withPrefix?: boolean
+  width?: number
+  height?: number
+  borderRadius?: string
+  backgroundColor?: string
+  borderColor?: string
+  isRepliedMessage?: boolean
+  isPreview?: boolean
+  isDetailsView?: boolean
+  withBorder?: boolean
+  fileAttachment?: boolean
+  imageMinWidth?: string
+  fetchpriority?: string
+}>`
+  width: ${(props) =>
+    props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
+  height: ${(props) =>
+    props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
+  min-width: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isPreview ? props.imageMinWidth || '165px' : null};
+  min-height: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && !props.isPreview && '165px'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+  border-radius: ${(props) =>
+    props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
+  cursor: pointer;
+  border: ${(props) =>
+    props.isRepliedMessage
+      ? '0.5px solid rgba(0, 0, 0, 0.1)'
+      : props.withBorder && `2px solid ${props.backgroundColor}`};
+  box-sizing: border-box;
+  ${(props) =>
+    props.isDetailsView &&
+    `
+    width: 100%;
+    height: 100%;
+    min-width: inherit;
+  `}
 `

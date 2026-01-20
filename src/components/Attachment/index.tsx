@@ -998,6 +998,8 @@ const Attachment = ({
             <FileThumbnail
               src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb}
               loading='lazy'
+              decoding='async'
+              fetchpriority='high'
             />
           ) : (
             // <FileThumbnail src={base64ToDataURL(attachmentMetadata.tmb)} />

@@ -49,7 +49,6 @@ import {
   getVisibleMessagesMap,
   LOAD_MAX_MESSAGE_COUNT,
   MESSAGE_LOAD_DIRECTION,
-  MESSAGES_MAX_LENGTH,
   removeAllMessages,
   setHasNextCached,
   setHasPrevCached
@@ -79,12 +78,6 @@ import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.typ
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
 import log from 'loglevel'
-
-// moved to component-scoped refs below
-
-const getMessagesLimit = () => {
-  return window.innerHeight / 56 < MESSAGES_MAX_LENGTH ? window.innerHeight / 56 : MESSAGES_MAX_LENGTH
-}
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -945,8 +938,7 @@ const MessageList: React.FC<MessagesProps> = ({
         clearVisibleMessagesMap()
       }
       if (channel && channel?.id) {
-        const limit = getMessagesLimit()
-        dispatch(getMessagesAC(channel, undefined, undefined, limit, true))
+        dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
       }
       if (channel.id) {
         if (channel.newMessageCount && channel.newMessageCount > 0) {

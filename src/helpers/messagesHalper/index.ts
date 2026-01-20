@@ -13,7 +13,7 @@ import {
   clearPendingMessagesMapAC
 } from 'store/message/actions'
 export const MESSAGES_MAX_PAGE_COUNT = 80
-export const MESSAGES_MAX_LENGTH = 50
+export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 30
 export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
