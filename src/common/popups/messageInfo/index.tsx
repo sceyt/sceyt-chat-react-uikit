@@ -130,6 +130,19 @@ const MessageInfo = ({
     }
   }, [markers, isP2PChannel])
 
+  // Calculate visible row count for P2P channels
+  const p2pVisibleRowCount = useMemo(() => {
+    if (!isP2PChannel) return 0
+    const shouldShowAllStatuses = !p2pStatuses?.received && !p2pStatuses?.displayed && !p2pStatuses?.played
+    const hasVoiceAttachment =
+      message.attachments && message.attachments.length > 0 && message.attachments[0].type === 'voice'
+    let count = 0
+    if (shouldShowAllStatuses || p2pStatuses?.received) count++
+    if (shouldShowAllStatuses || p2pStatuses?.displayed) count++
+    if (hasVoiceAttachment && (shouldShowAllStatuses || p2pStatuses?.played)) count++
+    return count
+  }, [isP2PChannel, p2pStatuses, message.attachments])
+
   const tabItems: Array<{ key: MessageInfoTab; label: string; data: IMarker[] }> = tabsOrder.map((tab) => {
     switch (tab.key) {
       case 'played':
@@ -182,9 +195,8 @@ const MessageInfo = ({
       if (isP2PChannel) {
         // For P2P: simple status rows (no tabs, no list)
         const statusRowHeight = 52 // Approximate height per status row
-        const statusRowsCount = Object.keys(markers || {}).length
-        const statusRowsHeight = statusRowHeight * statusRowsCount
-        const statusRowsGap = 8 * (statusRowsCount - 1)
+        const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
+        const statusRowsGap = 8 * (p2pVisibleRowCount > 0 ? p2pVisibleRowCount - 1 : 0)
         desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
       } else {
         // For group channels: tabs + list
@@ -240,7 +252,7 @@ const MessageInfo = ({
     setTimeout(() => {
       initializingRef.current = false
     }, 150)
-  }, [isP2PChannel, message.attachments, height, messagesMarkersLoadingState])
+  }, [isP2PChannel, message.attachments, height, messagesMarkersLoadingState, p2pVisibleRowCount])
 
   // Reset initialization flag when popup closes
   useEffect(() => {
@@ -418,9 +430,8 @@ const MessageInfo = ({
     if (isP2PChannel) {
       // For P2P: simple status rows (no tabs, no list)
       const statusRowHeight = 52 // Approximate height per status row
-      const statusRowsCount = Object.keys(markers || {}).length
-      const statusRowsHeight = statusRowHeight * statusRowsCount
-      const statusRowsGap = 8 * (statusRowsCount - 1)
+      const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
+      const statusRowsGap = 8 * (p2pVisibleRowCount > 0 ? p2pVisibleRowCount - 1 : 0)
       desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
     } else {
       // For group channels: tabs + list
@@ -501,7 +512,8 @@ const MessageInfo = ({
     flipAbove,
     isP2PChannel,
     message.attachments,
-    markers
+    markers,
+    p2pVisibleRowCount
   ])
 
   // Lock flip while loading; unlock after load completes (transition end handler will also unlock if needed)
@@ -541,6 +553,11 @@ const MessageInfo = ({
     }
   }, [activeTab, message.id, message.channelId, isP2PChannel, message.attachments, dispatch])
 
+  const shouldShowAllStatuses = useMemo(() => {
+    if (!isP2PChannel) return false
+    return !p2pStatuses?.received && !p2pStatuses?.displayed && !p2pStatuses?.played
+  }, [isP2PChannel, p2pStatuses])
+
   if ((messagesMarkersLoadingState === LOADING_STATE.LOADING || messagesMarkersLoadingState == null) && !markers) {
     return null
   }
@@ -567,30 +584,30 @@ const MessageInfo = ({
         <Content ref={contentRef}>
           {isP2PChannel ? (
             <P2PStatusList>
-              {p2pStatuses?.received && (
+              {(shouldShowAllStatuses || p2pStatuses?.received) && (
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Delivered</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {formatDate(new Date((p2pStatuses.received as any).createdAt))}
+                    {p2pStatuses?.received ? formatDate(new Date((p2pStatuses.received as any).createdAt)) : '-'}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
-              {p2pStatuses?.displayed && (
+              {(shouldShowAllStatuses || p2pStatuses?.displayed) && (
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Seen</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {formatDate(new Date((p2pStatuses.displayed as any).createdAt))}
+                    {p2pStatuses?.displayed ? formatDate(new Date((p2pStatuses.displayed as any).createdAt)) : '-'}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
-              {message.attachments &&
+              {(shouldShowAllStatuses || p2pStatuses?.played) &&
+                message.attachments &&
                 message.attachments.length > 0 &&
-                message.attachments[0].type === 'voice' &&
-                p2pStatuses?.played && (
+                message.attachments[0].type === 'voice' && (
                   <P2PStatusRow>
                     <P2PStatusLabel color={textPrimary}>Played</P2PStatusLabel>
                     <P2PStatusDate color={textSecondary}>
-                      {formatDate(new Date((p2pStatuses.played as any).createdAt))}
+                      {p2pStatuses?.played ? formatDate(new Date((p2pStatuses.played as any).createdAt)) : '-'}
                     </P2PStatusDate>
                   </P2PStatusRow>
                 )}
