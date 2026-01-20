@@ -171,11 +171,6 @@ const VideoPreview = memo(function VideoPreview({
     })
   }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview, setVideoIsReadyToSend])
 
-  console.log(
-    'attachmentVideoFirstFrame',
-    attachmentVideoFirstFrame ||
-      (attachmentThumb?.withPrefix ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}` : attachmentThumb?.thumbnail)
-  )
   return (
     <Component
       width={width}
