@@ -1,6 +1,7 @@
 // import { calculateSize } from './resizeImage'
 
-import { binaryToBase64, calculateSize } from './resizeImage'
+import { setAttachmentToCache } from './attachmentsCache'
+import { binaryToBase64, calculateSize, resizeImageWithPica } from './resizeImage'
 import { rgbaToThumbHash } from './thumbhash'
 import log from 'loglevel'
 
@@ -171,4 +172,58 @@ export async function getVideoFirstFrame(
       resolve(null)
     }
   })
+}
+
+// Compress image before caching using Pica for high-quality resizing
+export const compressAndCacheImage = async (
+  url: string,
+  cacheKey: string,
+  maxWidth?: number,
+  maxHeight?: number,
+  quality?: number
+): Promise<string> => {
+  try {
+    const response = await fetch(url)
+    const blob = await response.blob()
+    // Only compress if it's an image
+    if (blob.type.startsWith('image/')) {
+      // Convert blob to File for resizeImageWithPica function
+      const file = new File([blob], 'image.jpeg', { type: blob.type })
+
+      // Compress the image with Pica (high-quality resizing)
+      const { blob: compressedBlob } = await resizeImageWithPica(
+        file,
+        maxWidth || 1280,
+        maxHeight || 1080,
+        quality || 1
+      )
+      const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''
+
+      if (compressedBlob) {
+        // Create Response from compressed blob
+        const compressedResponse = new Response(compressedBlob, {
+          headers: {
+            'Content-Type': compressedBlob.type || blob.type
+          }
+        })
+        setAttachmentToCache(cacheKey, compressedResponse)
+        return returningUrl
+      }
+    }
+
+    // If not an image or compression failed, cache original
+    setAttachmentToCache(cacheKey, response)
+    return ''
+  } catch (error) {
+    log.error('Error compressing and caching image:', error)
+    // Fallback to caching original
+    try {
+      const response = await fetch(url)
+      setAttachmentToCache(cacheKey, response)
+      return ''
+    } catch (fetchError) {
+      log.error('Error caching image:', fetchError)
+      return ''
+    }
+  }
 }

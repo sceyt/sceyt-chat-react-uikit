@@ -1530,7 +1530,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   flex-direction: column-reverse;
   flex-grow: 1;
   position: relative;
-  overflow: auto;
+  overflow: scroll;
   scroll-behavior: smooth;
   will-change: left, top;
   background-color: ${(props) => props.backgroundColor};

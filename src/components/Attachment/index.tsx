@@ -43,7 +43,7 @@ import {
   getAttachmentURLWithVersion,
   setAttachmentToCache
 } from '../../helpers/attachmentsCache'
-import { base64ToDataURL, resizeImageWithPica } from '../../helpers/resizeImage'
+import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
@@ -54,7 +54,7 @@ import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
 import { isJSON } from 'helpers/message'
 import { updateMessageAsOpenedAC } from 'store/channel/actions'
-import { getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -239,58 +239,6 @@ const Attachment = ({
     }
   }
 
-  // Compress image before caching using Pica for high-quality resizing
-  const compressAndCacheImage = async (
-    url: string,
-    cacheKey: string,
-    maxWidth?: number,
-    maxHeight?: number
-  ): Promise<string> => {
-    try {
-      const response = await fetch(url)
-      const blob = await response.blob()
-      // Only compress if it's an image
-      if (blob.type.startsWith('image/')) {
-        // Convert blob to File for resizeImageWithPica function
-        const file = new File([blob], 'image.jpeg', { type: blob.type })
-
-        // Compress the image with Pica (high-quality resizing)
-        const { blob: compressedBlob } = await resizeImageWithPica(
-          file,
-          maxWidth || renderWidth || 1280,
-          maxHeight || renderHeight || 1080,
-          1
-        )
-        const returningUrl = compressedBlob ? URL.createObjectURL(compressedBlob) : ''
-
-        if (compressedBlob) {
-          // Create Response from compressed blob
-          const compressedResponse = new Response(compressedBlob, {
-            headers: {
-              'Content-Type': compressedBlob.type || blob.type
-            }
-          })
-          setAttachmentToCache(cacheKey, compressedResponse)
-          return returningUrl
-        }
-      }
-
-      // If not an image or compression failed, cache original
-      setAttachmentToCache(cacheKey, response)
-      return ''
-    } catch (error) {
-      log.error('Error compressing and caching image:', error)
-      // Fallback to caching original
-      try {
-        const response = await fetch(url)
-        setAttachmentToCache(cacheKey, response)
-        return ''
-      } catch (fetchError) {
-        log.error('Error caching image:', fetchError)
-        return ''
-      }
-    }
-  }
   const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {

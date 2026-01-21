@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import styled from 'styled-components'
 // Assets
 import { ReactComponent as DeletedAvatarIcon } from '../../assets/svg/deletedUserAvatar.svg'
@@ -7,9 +7,12 @@ import { ReactComponent as DefaultAvatarIcon } from '../../assets/svg/avatar.svg
 import { generateAvatarColor } from '../../UIHelper'
 import { useColor } from '../../hooks'
 import { THEME_COLORS } from '../../UIHelper/constants'
-import { useSelector } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
+import { getAttachmentUrlFromCache, getAttachmentURLWithVersion } from '../../helpers/attachmentsCache'
+import { setUpdateMessageAttachmentAC } from 'store/message/actions'
+import { attachmentUpdatedMapSelector } from 'store/message/selector'
+import { compressAndCacheImage } from 'helpers/getVideoFrame'
 
 interface IProps {
   image?: string | null
@@ -37,12 +40,17 @@ const Avatar: React.FC<IProps> = ({
   border,
   borderRadius,
   handleAvatarClick
-  // customAvatarColors
 }) => {
   const theme = useSelector(themeSelector)
   const { [THEME_COLORS.ICON_INACTIVE]: iconInactive } = useColor()
-  const [resolvedImageSrc, setResolvedImageSrc] = useState<string | null>(image || null)
+  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
+  const attachmentUrlFromMap = useMemo(
+    () => image && attachmentUpdatedMap[getAttachmentURLWithVersion(image)],
+    [attachmentUpdatedMap, image]
+  )
+  const [resolvedImageSrc, setResolvedImageSrc] = useState<string | null>(attachmentUrlFromMap || image || null)
   const isDeletedUserAvatar = !image && !name
+  const dispatch = useDispatch()
   let avatarText = ''
   if (!image && name) {
     const trimedName = name.trim()
@@ -73,43 +81,48 @@ const Avatar: React.FC<IProps> = ({
 
     // Only attempt custom cache for network URLs
     const isHttpUrl = /^https?:\/\//i.test(image)
-    if (!isHttpUrl) {
+    const isBlobUrl = /^blob:https?:\/\//i.test(image)
+    if (!isHttpUrl && !isBlobUrl) {
       setResolvedImageSrc(image)
       return
     }
 
     // Try to read from Cache Storage first; fall back to network and write-through
+    if (attachmentUrlFromMap) {
+      return
+    }
     getAttachmentUrlFromCache(image)
       .then(async (cachedUrl: string | false) => {
         if (isCancelled) return
         if (cachedUrl) {
-          setResolvedImageSrc(cachedUrl)
+          dispatch(setUpdateMessageAttachmentAC(image, cachedUrl))
         } else {
           try {
-            const response = await fetch(image, { credentials: 'same-origin' })
-            // Write-through to cache; ignore failures
-            setAttachmentToCache(image, response.clone())
-            setResolvedImageSrc(image)
+            const compressedUrl = await compressAndCacheImage(image, image, 100, 100)
+            if (compressedUrl) {
+              dispatch(setUpdateMessageAttachmentAC(image, compressedUrl))
+            }
           } catch (_) {
-            setResolvedImageSrc(image)
+            dispatch(setUpdateMessageAttachmentAC(image, image))
           }
         }
       })
       .catch(async () => {
         if (isCancelled) return
         try {
-          const response = await fetch(image, { credentials: 'same-origin' })
-          setAttachmentToCache(image, response.clone())
-          setResolvedImageSrc(image)
+          const compressedUrl = await compressAndCacheImage(image, image, 100, 100)
+          if (compressedUrl) {
+            dispatch(setUpdateMessageAttachmentAC(image, compressedUrl))
+          }
         } catch (_) {
-          setResolvedImageSrc(image)
+          dispatch(setUpdateMessageAttachmentAC(image, image))
         }
       })
 
     return () => {
       isCancelled = true
     }
-  }, [image])
+  }, [image, attachmentUrlFromMap])
 
   return (
     <Container
@@ -136,7 +149,7 @@ const Avatar: React.FC<IProps> = ({
         <AvatarImage
           draggable={false}
           showImage
-          src={resolvedImageSrc || image}
+          src={attachmentUrlFromMap || resolvedImageSrc || image}
           size={size}
           alt=''
           loading='lazy'
