@@ -199,6 +199,7 @@ const VideoPreview = memo(function VideoPreview({
           loading='lazy'
           decoding='async'
           fetchpriority='high'
+          isPreview={isPreview}
         />
       )}
       {!isRepliedMessage && (

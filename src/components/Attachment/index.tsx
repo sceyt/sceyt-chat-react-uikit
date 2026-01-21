@@ -1275,16 +1275,6 @@ const RemoveChosenFile = styled(RemoveAttachment)<{ $backgroundColor: string; co
     stroke: ${(props) => props.$backgroundColor};
   }
 `
-/*
-const FailedFileIcon = styled(ErrorIcon)`
-  position: absolute;
-  top: -6px;
-  right: -24px;
-  width: 20px;
-  height: 20px;
-  padding: 2px;
-  cursor: pointer;
-` */
 
 const AttachmentName = styled.h3<{ color: string }>`
   font-size: 15px;
@@ -1324,8 +1314,6 @@ export const AttachmentImg = styled.img<{
   imageMinWidth?: string
   imageMaxHeight?: string
   isDetailsView?: boolean
-  before?: boolean
-  backgroundImage?: string
   borderColor?: string
   fetchpriority?: string
   $shouldAnimate?: boolean
@@ -1358,31 +1346,6 @@ export const AttachmentImg = styled.img<{
   z-index: 2;
   opacity: ${(props) => (props.$shouldAnimate && !props.$isLoaded ? 0 : 1)};
   transition: opacity 0.3s ease-in-out;
-  ${(props) =>
-    props.before &&
-    `
-    &::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: ${!props.isRepliedMessage && !props.isPreview && !props.isDetailsView ? 'calc(100% - 4px)' : '100%'};
-      height: ${!props.isRepliedMessage && !props.isPreview && !props.isDetailsView ? 'calc(100% - 4px)' : '100%'};
-      background-image: url(${props.backgroundImage});
-      background-size: cover;
-      background-position: center;
-      background-repeat: no-repeat;
-      z-index: 1;
-      border-radius: inherit;
-      ${
-        props.borderColor &&
-        !props.isRepliedMessage &&
-        !props.isPreview &&
-        !props.isDetailsView &&
-        `border: 2px solid ${props.borderColor};`
-      }
-    }
-  `}
 `
 
 const VideoCont = styled.div<{ isDetailsView?: boolean }>`
