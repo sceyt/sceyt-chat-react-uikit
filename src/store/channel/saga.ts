@@ -1136,7 +1136,6 @@ function* markMessagesDelivered(action: IAction): any {
     }
 
     if (channel) {
-      log.info('send delivered marker ', messageIds)
       const messageListMarker = yield call(channel.markMessagesAsReceived, messageIds)
       for (const messageId of messageListMarker.messageIds) {
         const updateParams = {
