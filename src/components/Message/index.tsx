@@ -682,7 +682,7 @@ const Message = ({
             ? '16px'
             : prevMessageUserID !== messageUserID || firstMessageInInterval
               ? differentUserMessageSpacing || '16px'
-              : sameUserMessageSpacing || '8px'
+              : sameUserMessageSpacing || '6px'
       }
       bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
       ref={messageItemRef}

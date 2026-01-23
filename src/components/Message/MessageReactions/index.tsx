@@ -200,7 +200,7 @@ const ReactionsContainer = styled.div<{
   display: inline-flex;
   margin-left: ${(props: any) => props.rtlDirection && 'auto'};
   margin-right: ${(props) => !props.rtlDirection && 'auto'};
-  margin-top: 4px;
+  margin-top: ${(props) => (props.isReacted ? '4px' : '0')};
   justify-content: flex-end;
   border: ${(props) => props.border};
   box-shadow: ${(props) => props.boxShadow || '0px 4px 12px -2px rgba(17, 21, 57, 0.08)'};
