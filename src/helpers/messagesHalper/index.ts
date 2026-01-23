@@ -180,6 +180,7 @@ export const updateMessageOnAllMessages = (
       let updatedMessage = {
         ...message,
         ...updatedParams,
+        userMarkers: [...message.userMarkers, ...updatedParams.userMarkers],
         ...statusUpdatedMessage
       }
       if (voteDetails) {
@@ -330,6 +331,7 @@ export function updateMessageOnMap(
           return {
             ...msg,
             ...updatedMessage.params,
+            userMarkers: [...msg.userMarkers, ...updatedMessage.params.userMarkers],
             ...statusUpdatedMessage
           }
         }
