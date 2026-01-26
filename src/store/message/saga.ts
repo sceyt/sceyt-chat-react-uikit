@@ -226,7 +226,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                   }
                 })
               )
-              store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, filePath))
+              const originalImageUrl = URL.createObjectURL(blobLocal)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, originalImageUrl))
             }
           }
         } catch (error) {
