@@ -88,11 +88,12 @@ export const updateMessageDeliveryStatusAndMarkers = (
   if (shouldSkipDeliveryStatusUpdate(markerName, message.deliveryStatus)) {
     return {
       markerTotals: message.markerTotals,
+      userMarkers: message.userMarkers,
       deliveryStatus: message.deliveryStatus
     }
   }
   const markersTotal = isOwnMarker ? message.userMarkers : message.markerTotals
-  const markerInMarkersTotal = markersTotal?.find((marker: IMarker) => marker.name === markerName)
+  const markerInMarkersTotal = (markersTotal || [])?.find((marker: IMarker) => marker.name === markerName)
   if (!markerInMarkersTotal) {
     return {
       [isOwnMarker ? 'userMarkers' : 'markerTotals']: [
@@ -180,7 +181,7 @@ export const updateMessageOnAllMessages = (
       let updatedMessage = {
         ...message,
         ...updatedParams,
-        userMarkers: [...message.userMarkers, ...updatedParams.userMarkers],
+        userMarkers: [...(message.userMarkers || []), ...(updatedParams.userMarkers || [])],
         ...statusUpdatedMessage
       }
       if (voteDetails) {
@@ -331,7 +332,7 @@ export function updateMessageOnMap(
           return {
             ...msg,
             ...updatedMessage.params,
-            userMarkers: [...msg.userMarkers, ...updatedMessage.params.userMarkers],
+            userMarkers: [...(msg.userMarkers || []), ...(updatedMessage.params.userMarkers || [])],
             ...statusUpdatedMessage
           }
         }

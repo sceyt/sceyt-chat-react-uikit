@@ -279,7 +279,8 @@ const messageSlice = createSlice({
             }
             const messageOldData: IMessage = {
               ...message,
-              userMarkers: [...message.userMarkers, ...params.userMarkers],
+              ...params,
+              userMarkers: [...(message.userMarkers || []), ...(params.userMarkers || [])],
               ...statusUpdatedMessage
             }
             let messageData = { ...messageOldData }
