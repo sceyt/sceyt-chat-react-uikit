@@ -148,7 +148,7 @@ export async function getVideoFirstFrame(
         videoUrlCreated = true
 
         // Seek to first frame (0.1 seconds to ensure we get a decodable frame)
-        video.currentTime = 0.1
+        video.currentTime = 0.01
 
         // Wait for seek to complete
         video.onseeked = () => {
