@@ -286,6 +286,7 @@ const Component = styled.div<{
   width: ${(props) => props.width};
   height: ${(props) => props.height};
   min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
 
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
