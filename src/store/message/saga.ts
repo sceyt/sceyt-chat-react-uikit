@@ -265,6 +265,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
                     }
                   })
                 )
+                const originalVideoUrl = URL.createObjectURL(blobLocal)
+                store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_video_url`, originalVideoUrl))
               }
               await setAttachmentToCache(uriLocal, response)
               store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
