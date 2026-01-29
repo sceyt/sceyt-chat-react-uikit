@@ -940,6 +940,8 @@ export const UploadPercent = styled.span<{
   justify-content: center;
   position: absolute;
   color: #fff;
+  left: ${(props) => (props.fileAttachment ? '0' : '')};
+  top: ${(props) => (props.fileAttachment ? '0' : '')};
   width: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   height: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   background-color: ${(props) => `${props.backgroundColor}66`};
@@ -980,10 +982,8 @@ export const UploadProgress = styled.div<{
   width: 100%;
   height: 100%;
   display: flex;
-  //display: none;
   align-items: center;
   justify-content: center;
-  //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
   background-image: url(${(props) =>
     props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
   background-size: cover;

@@ -2736,6 +2736,8 @@ const ReplyIconWrapper = styled.span<{ backgroundColor: string; iconColor: strin
   margin-right: 12px;
   width: 40px;
   height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
 
