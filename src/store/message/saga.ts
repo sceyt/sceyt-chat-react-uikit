@@ -832,7 +832,7 @@ function* forwardMessage(action: IAction): any {
   const { message, channelId, connectionState, isForward } = payload
   const showOwnMessageForward = getShowOwnMessageForward()
   const SceytChatClient = getClient()
-  const isNotShowOwnMessageForward = message.user.id === SceytChatClient.user.id && !showOwnMessageForward
+  const isNotShowOwnMessageForward = message?.user?.id === SceytChatClient.user.id && !showOwnMessageForward
   let pendingMessage: IMessage | null = null
   let channel: IChannel | null = null
   const activeChannelId = getActiveChannelId()
