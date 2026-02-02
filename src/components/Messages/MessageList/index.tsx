@@ -743,19 +743,27 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }
 
-  const handleDragIn = (e: any) => {
+  const handleDragIn = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
-    if (e.dataTransfer.items && e.dataTransfer.items.length > 0) {
-      let filesType = 'file'
+    if (isDragging) return
+    if (!e.dataTransfer.types.includes('Files')) return
+
+    let filesType: string
+
+    // Safari doesn't provide items during dragenter - show both options
+    if (!e.dataTransfer.items || e.dataTransfer.items.length === 0) {
+      filesType = 'media'
+    } else {
+      // Browser provides items (Chrome, Firefox) - detect type
       const fileList: DataTransferItem[] = Array.from(e.dataTransfer.items)
-      fileList.forEach((file) => {
-        const fileType = file.type.split('/')[0]
-        if (fileType === 'image' || fileType === 'video') {
-          filesType = 'media'
-        }
+      const hasMedia = fileList.some((item) => {
+        const fileType = item.type.split('/')[0]
+        return fileType === 'image' || fileType === 'video'
       })
-      setIsDragging(filesType)
+      filesType = hasMedia ? 'media' : 'file'
     }
+
+    setIsDragging(filesType)
   }
 
   const handleDragOver = (e: any) => {
@@ -763,6 +771,7 @@ const MessageList: React.FC<MessagesProps> = ({
     e.target && e.target.classList.add('dragover')
   }
   const handleDragOut = (e: any) => {
+    e.preventDefault()
     if (e.target.classList.contains('dragover')) {
       e.target.classList.remove('dragover')
     }
