@@ -1333,7 +1333,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           message={message}
                           channel={channel}
                           stopScrolling={setStopScrolling}
-                          handleMediaItemClick={(attachment) => setMediaFile(attachment)}
+                          handleMediaItemClick={(attachment) => attachment?.id && setMediaFile(attachment)}
                           handleScrollToRepliedMessage={handleScrollToRepliedMessage}
                           prevMessage={prevMessage}
                           nextMessage={nextMessage}

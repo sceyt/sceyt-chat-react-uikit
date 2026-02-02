@@ -20,6 +20,7 @@ import { messageMarkersSelector, messagesMarkersLoadingStateSelector } from 'sto
 import { LOADING_STATE } from 'helpers/constants'
 import { makeUsername } from 'helpers/message'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
+import {ReactComponent as CircleDashedIcon} from '../../../assets/svg/circle-dashed.svg'
 
 interface IProps {
   message: IMessage
@@ -50,7 +51,7 @@ const defaultFormatDate = (date: Date) => {
   if (m.isSame(moment().subtract(1, 'day'), 'day')) {
     return `Yesterday, ${m.format('HH:mm')}`
   }
-  return m.format('DD.MM.YYYY')
+  return m.format('DD.MM.YYYY, HH:mm')
 }
 
 const MessageInfo = ({
@@ -194,10 +195,9 @@ const MessageInfo = ({
       let desiredHeight = 0
       if (isP2PChannel) {
         // For P2P: simple status rows (no tabs, no list)
-        const statusRowHeight = 52 // Approximate height per status row
+        const statusRowHeight = 48 // Approximate height per status row
         const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
-        const statusRowsGap = 8 * (p2pVisibleRowCount > 0 ? p2pVisibleRowCount - 1 : 0)
-        desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
+        desiredHeight = contentPaddingY + statusRowsHeight
       } else {
         // For group channels: tabs + list
         const tabsEl = tabsRef.current
@@ -429,10 +429,9 @@ const MessageInfo = ({
     let desiredHeight = 0
     if (isP2PChannel) {
       // For P2P: simple status rows (no tabs, no list)
-      const statusRowHeight = 52 // Approximate height per status row
+      const statusRowHeight = 48 // Approximate height per status row
       const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
-      const statusRowsGap = 8 * (p2pVisibleRowCount > 0 ? p2pVisibleRowCount - 1 : 0)
-      desiredHeight = contentPaddingY + statusRowsHeight + statusRowsGap
+      desiredHeight = contentPaddingY + statusRowsHeight
     } else {
       // For group channels: tabs + list
       const tabsEl = tabsRef.current
@@ -581,14 +580,14 @@ const MessageInfo = ({
         maxWidth={maxWidth}
         minWidth={minWidth}
       >
-        <Content ref={contentRef}>
+        <Content ref={contentRef} padding={isP2PChannel ? "8px 16px" : "12px 16px"}>
           {isP2PChannel ? (
             <P2PStatusList>
               {(shouldShowAllStatuses || p2pStatuses?.received) && (
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Delivered</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {p2pStatuses?.received ? formatDate(new Date((p2pStatuses.received as any).createdAt)) : '-'}
+                    {p2pStatuses?.received ? formatDate(new Date((p2pStatuses.received as any).createdAt)) : <CircleDashedIcon />}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
@@ -596,7 +595,7 @@ const MessageInfo = ({
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Seen</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {p2pStatuses?.displayed ? formatDate(new Date((p2pStatuses.displayed as any).createdAt)) : '-'}
+                    {p2pStatuses?.displayed ? formatDate(new Date((p2pStatuses.displayed as any).createdAt)) : <CircleDashedIcon />}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
@@ -607,7 +606,7 @@ const MessageInfo = ({
                   <P2PStatusRow>
                     <P2PStatusLabel color={textPrimary}>Played</P2PStatusLabel>
                     <P2PStatusDate color={textSecondary}>
-                      {p2pStatuses?.played ? formatDate(new Date((p2pStatuses.played as any).createdAt)) : '-'}
+                      {p2pStatuses?.played ? formatDate(new Date((p2pStatuses.played as any).createdAt)) : <CircleDashedIcon />}
                     </P2PStatusDate>
                   </P2PStatusRow>
                 )}
@@ -794,8 +793,8 @@ const Panel = styled.div<{
   flex-direction: column;
 `
 
-const Content = styled.div`
-  padding: 16px 12px;
+const Content = styled.div<{ padding?: string }>`
+  padding: ${(p) => p.padding || '16px 12px'};
   height: 100%;
   box-sizing: border-box;
   display: flex;
@@ -805,7 +804,6 @@ const Content = styled.div`
 const P2PStatusList = styled.div`
   display: flex;
   flex-direction: column;
-  gap: 8px;
 `
 
 const P2PStatusRow = styled.div`
@@ -813,16 +811,16 @@ const P2PStatusRow = styled.div`
   align-items: center;
   justify-content: space-between;
   padding: 0 4px;
-  height: 52px;
+  height: 48px;
 `
 
 const P2PStatusLabel = styled.div<{ color: string }>`
   color: ${(p) => p.color};
   font-family: Inter;
   font-weight: 500;
-  font-size: 16px;
-  line-height: 22px;
-  letter-spacing: 0px;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
 `
 
 const P2PStatusDate = styled.div<{ color: string }>`

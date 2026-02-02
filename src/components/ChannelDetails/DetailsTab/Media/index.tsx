@@ -26,7 +26,9 @@ const Media = ({ channel }: IProps) => {
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
   const handleMediaItemClick = (file: IAttachment) => {
-    setMediaFile(file)
+    if (file?.id){
+      setMediaFile(file)
+    }
   }
   useEffect(() => {
     dispatch(setAttachmentsAC([]))

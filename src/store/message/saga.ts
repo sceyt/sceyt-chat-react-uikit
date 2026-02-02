@@ -280,19 +280,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...(attachment.metadata
-              ? typeof attachment.metadata === 'string'
-                ? JSON.parse(attachment.metadata)
-                : attachment.metadata
-              : {}),
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight,
-                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-              })
+          ...(attachment.metadata
+            ? typeof attachment.metadata === 'string'
+              ? JSON.parse(attachment.metadata)
+              : attachment.metadata
+            : {}),
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+            tmb: thumbnailMetas.thumbnail,
+            szw: thumbnailMetas.imageWidth,
+            szh: thumbnailMetas.imageHeight,
+            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
           })
+        })
       const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -1316,8 +1316,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-              result.messages.length > 0 &&
-              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+            result.messages.length > 0 &&
+            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
         setMessagesToMap(
@@ -1440,7 +1440,7 @@ function* loadMoreMessages(action: IAction): any {
     messageQueryBuilder.reverse(true)
     const messageQuery = yield call(messageQueryBuilder.build)
     messageQuery.limit = limit || 5
-
+    const now = Date.now()
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
 
@@ -1491,7 +1491,13 @@ function* loadMoreMessages(action: IAction): any {
         yield put(setMessagesHasNextAC(false))
       }
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    if (Date.now() - now < 10) {
+      setTimeout(() => {
+        store.dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      }, 10)
+    } else {
+      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    }
   } catch (e) {
     log.error('error in load more messages', e)
     /* if (e.code !== 10008) {
