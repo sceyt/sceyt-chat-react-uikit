@@ -727,6 +727,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
+  const MAX_ATTACHMENTS = 20
+
   // Check if view-once toggle should be shown (exactly 1 image/video attachment)
   const canShowViewOnceToggle = useMemo(() => {
     if (attachments.length !== 1) return false
@@ -736,6 +738,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   // Handle adding attachment - show warning if view-once is enabled and adding second attachment
   const handleAddAttachmentWithViewOnceCheck = async (file: File, isMediaAttachment: boolean) => {
+    // Check if maximum attachments limit is reached
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      setUploadErrorMessage(`You can upload a maximum of ${MAX_ATTACHMENTS} files`)
+      return
+    }
+
     // Check if adding second attachment when view-once is enabled
     if (viewOnce && attachments.length >= 1) {
       const newAttachmentType = file.type.split('/')[0]
@@ -765,8 +773,25 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleFileUpload = (e: any) => {
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length
 
-    fileList.forEach(async (file: any) => {
+    if (remainingSlots <= 0) {
+      showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+      fileUploader.current.value = ''
+      return
+    }
+
+    // Only process files that fit within remaining slots
+    const filesToProcess = fileList.slice(0, remainingSlots)
+    const skippedCount = fileList.length - filesToProcess.length
+
+    if (skippedCount > 0) {
+      showFileUploadError(
+        `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+      )
+    }
+
+    filesToProcess.forEach(async (file: any) => {
       let allowUpload = true
       let errorMessage = ''
       if (isMediaAttachment) {
@@ -788,7 +813,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       }
       if (allowUpload) {
-        handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
+        await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
       } else {
         showFileUploadError(errorMessage)
       }
@@ -818,7 +843,24 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       if (e.clipboardData.files && e.clipboardData.files.length > 0) {
         e.preventDefault()
         const fileList: File[] = Object.values(e.clipboardData.files)
-        fileList.forEach(async (file: any) => {
+        const remainingSlots = MAX_ATTACHMENTS - attachments.length
+
+        if (remainingSlots <= 0) {
+          showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+          return
+        }
+
+        // Only process files that fit within remaining slots
+        const filesToProcess = fileList.slice(0, remainingSlots)
+        const skippedCount = fileList.length - filesToProcess.length
+
+        if (skippedCount > 0) {
+          showFileUploadError(
+            `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+          )
+        }
+
+        filesToProcess.forEach(async (file: any) => {
           let allowUpload = true
           let errorMessage = ''
           if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
@@ -838,7 +880,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
           if (allowUpload) {
-            handleAddAttachmentWithViewOnceCheck(file, true)
+            await handleAddAttachmentWithViewOnceCheck(file, true)
           } else {
             showFileUploadError(errorMessage)
           }
@@ -1181,6 +1223,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (draggedAttachments.length > 0) {
+      const remainingSlots = MAX_ATTACHMENTS - attachments.length
+
+      if (remainingSlots <= 0) {
+        showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+        dispatch(setDraggedAttachmentsAC([], ''))
+        return
+      }
+
       const attachmentsFiles = draggedAttachments.map((draggedData: any) => {
         const arr = draggedData.data.split(',')
         const bstr = atob(arr[1])
@@ -1191,8 +1241,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         return new File([u8arr], draggedData.name, { type: draggedData.type })
       })
+
+      // Only process files that fit within remaining slots
+      const filesToProcess = attachmentsFiles.slice(0, remainingSlots)
+      const skippedCount = attachmentsFiles.length - filesToProcess.length
+
+      if (skippedCount > 0) {
+        showFileUploadError(
+          `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+        )
+      }
+
       const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
-      attachmentsFiles.forEach(async (file: any) => {
+      filesToProcess.forEach(async (file: any) => {
         let allowUpload = true
         let errorMessage = ''
 
@@ -1216,7 +1277,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         if (allowUpload) {
-          handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
+          await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
         } else {
           showFileUploadError(errorMessage)
         }
@@ -1339,9 +1400,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         attachments.forEach((att: any) => {
           if ((att.type === 'video' || att.data.type.split('/')[0] === 'video') && att.type !== 'file') {
             videoAttachment = true
-            if (!readyVideoAttachments[att.tid]) {
-              setSendMessageIsActive(false)
-            } else {
+            if (readyVideoAttachments[att.tid]) {
               setSendMessageIsActive(true)
             }
           }

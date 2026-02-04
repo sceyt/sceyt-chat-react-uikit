@@ -19,7 +19,7 @@ interface IVideoPlayerProps {
 }
 
 const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
   const progressRef = useRef<HTMLInputElement>(null)
@@ -298,7 +298,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
             </PlayPauseWrapper>
           )}
 
-          <ControlTime color={textPrimary}>
+          <ControlTime color={textOnPrimary}>
             {formatAudioVideoTime(currentTime)} / {formatAudioVideoTime(videoTime)}
           </ControlTime>
           <VolumeController>
