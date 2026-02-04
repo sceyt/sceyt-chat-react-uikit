@@ -1,4 +1,4 @@
-import React, { useMemo, useState, useCallback } from 'react'
+import React, { useMemo, useState, useCallback, useEffect } from 'react'
 import styled from 'styled-components'
 import PopupContainer from '../popupContainer'
 import { Popup, PopupBody, PopupName, CloseIcon, Row, Button } from 'UIHelper'
@@ -26,6 +26,14 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
   const getFromContacts = getShowOnlyContactUsers()
   const user = getClient().user
   const contactsMap = useSelector(contactsMapSelector)
+  const titleWrapperRef = React.useRef<HTMLDivElement>(null)
+const [titleHeight, setTitleHeight] = useState(0)
+
+useEffect(() => {
+  if (titleWrapperRef.current) {
+    setTitleHeight(titleWrapperRef.current.offsetHeight)
+  }
+}, [])
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -79,7 +87,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                 Vote results
               </PopupName>
 
-              <TitleWrapper backgroundColor={surface1}>
+              <TitleWrapper backgroundColor={surface1} ref={titleWrapperRef}>
                 <Question color={textPrimary}>{poll.name}</Question>
               </TitleWrapper>
               <OptionsList
@@ -87,6 +95,7 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
                 className={isScrolling ? 'show-scrollbar' : ''}
                 onMouseEnter={() => setIsScrolling(true)}
                 onMouseLeave={() => setIsScrolling(false)}
+                titleHeight={titleHeight}
               >
                 {poll.options.map((opt) => {
                   const allVotes = optionIdToVotes[opt.id] || []
@@ -172,11 +181,11 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
 
 export default VotesResultsPopup
 
-const OptionsList = styled.div<{ thumbColor: string }>`
+const OptionsList = styled.div<{ thumbColor: string, titleHeight: number }>`
   display: flex;
   flex-direction: column;
   gap: 16px;
-  max-height: 504px;
+  max-height: calc(554px - ${(props) => props.titleHeight}px);
   border-radius: 10px;
   overflow-y: auto;
   overflow-x: hidden;
@@ -287,4 +296,5 @@ const Question = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.4px;
+  overflow-wrap: anywhere;
 `
