@@ -17,7 +17,6 @@ import { useColor } from '../../../hooks'
 
 interface IChannelListProps {
   showSearch?: boolean
-  theme?: string
   uriPrefixOnCreateChannel?: string
   createChannelIcon?: JSX.Element
   newChannelIcon?: JSX.Element
@@ -28,7 +27,6 @@ interface IChannelListProps {
 
 const CreateChannelButton: React.FC<IChannelListProps> = ({
   showSearch,
-  theme,
   uriPrefixOnCreateChannel,
   createChannelIcon,
   newChannelIcon,
@@ -61,7 +59,6 @@ const CreateChannelButton: React.FC<IChannelListProps> = ({
       <DropDown
         forceClose={showAddMemberPopup || !!showCreateChannel}
         position='center'
-        theme={theme}
         zIndex='300'
         trigger={
           <CreateDropdownButton hoverBackground={backgroundHovered} leftAuto={!showSearch} iconColor={accentColor}>

@@ -8,7 +8,8 @@ import {
   updateUserMap,
   setContacts,
   updateUserProfile,
-  setBrowserTabIsActive
+  setBrowserTabIsActive,
+  setWaitToSendPendingMessages
 } from './reducers'
 
 // Import saga action constants
@@ -92,3 +93,5 @@ export const updateUserProfileAC = (profile: any) => updateUserProfile({ profile
 export const browserTabIsActiveAC = (state: boolean) => setBrowserTabIsActive({ state })
 
 export const updateUserStatusOnMapAC = (usersMap: { [key: string]: IUser }) => updateUserMap({ usersMap })
+
+export const setWaitToSendPendingMessagesAC = (state: boolean) => setWaitToSendPendingMessages({ state })

@@ -47,7 +47,6 @@ const SearchInput = styled.input<{
 
 interface IChannelSearchProps {
   searchValue: string
-  theme?: string
   // eslint-disable-next-line no-unused-vars
   handleSearchValueChange: (e: any) => void
   getMyChannels: () => void

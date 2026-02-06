@@ -29,9 +29,14 @@ import {
   setIsDragging,
   setDraggedAttachments,
   setChannelListWidth,
-  setTabIsActive,
   setHideChannelList,
-  setDraftIsRemoved
+  setDraftIsRemoved,
+  setChannelInviteKeys,
+  setJoinableChannel,
+  setChannelInviteKeyAvailable,
+  setMutualChannels,
+  setMutualChannelsHasNext,
+  setMutualChannelsLoadingState
 } from './reducers'
 
 // Import saga action constants
@@ -65,7 +70,18 @@ import {
   TURN_ON_NOTIFICATION,
   UPDATE_CHANNEL,
   WATCH_FOR_EVENTS,
-  GET_CHANNEL_MENTIONS
+  GET_CHANNEL_MENTIONS,
+  CREATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_INVITE_KEYS,
+  REGENERATE_CHANNEL_INVITE_KEY,
+  UPDATE_CHANNEL_INVITE_KEY,
+  GET_CHANNEL_BY_INVITE_KEY,
+  JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  SET_MESSAGE_RETENTION_PERIOD,
+  GET_CHANNELS_WITH_USER,
+  LOAD_MORE_MUTUAL_CHANNELS,
+  MARK_MESSAGE_AS_OPENED,
+  UPDATE_MESSAGE_AS_OPENED
 } from './constants'
 
 import { ChannelQueryParams, IChannel, IContact, IContactsMap, ICreateChannel, IMessage, IUser } from '../../types'
@@ -78,6 +94,11 @@ export const createChannelAC = (
 ) => ({
   type: CREATE_CHANNEL,
   payload: { channelData, dontCreateIfNotExists, callback }
+})
+
+export const getChannelByInviteKeyAC = (key: string) => ({
+  type: GET_CHANNEL_BY_INVITE_KEY,
+  payload: { key }
 })
 
 export const getChannelsAC = (params: ChannelQueryParams, isJoinChannel?: boolean) => ({
@@ -173,6 +194,8 @@ export const switchChannelActionAC = (channel: IChannel | null, updateActiveChan
   payload: { channel, updateActiveChannel }
 })
 
+export const setChannelInviteKeyAvailableAC = (available: boolean) => setChannelInviteKeyAvailable({ available })
+
 export const updateChannelAC = (channelId: string, config: any) => ({
   type: UPDATE_CHANNEL,
   payload: { channelId, config }
@@ -203,6 +226,28 @@ export const markMessagesAsDeliveredAC = (channelId: string, messageIds: string[
 export const markVoiceMessageAsPlayedAC = (channelId: string, messageIds: string[]) => ({
   type: MARK_VOICE_MESSAGE_AS_PLAYED,
   payload: { channelId, messageIds }
+})
+
+export const markMessageAsOpenedAC = (
+  channelId: string,
+  messageIds: string[],
+  shouldUpdateMessage: boolean = true
+) => ({
+  type: MARK_MESSAGE_AS_OPENED,
+  payload: { channelId, messageIds, shouldUpdateMessage }
+})
+
+export const updateMessageAsOpenedAC = (
+  channelId: string,
+  messageListMarker: {
+    messageIds: string[]
+    user: IUser | null
+    createdAt: Date
+    name: string
+  }
+) => ({
+  type: UPDATE_MESSAGE_AS_OPENED,
+  payload: { channelId, messageListMarker }
 })
 
 export const sendTypingAC = (state: boolean) => ({
@@ -264,6 +309,8 @@ export const updateUserStatusOnChannelAC = (usersMap: { [key: string]: IUser }) 
 
 export const setChannelListWithAC = (width: number) => setChannelListWidth({ width })
 
+export const setJoinableChannelAC = (channel: IChannel | null) => setJoinableChannel({ channel })
+
 export const clearHistoryAC = (channelId: string) => ({
   type: CLEAR_HISTORY,
   payload: { channelId }
@@ -284,8 +331,6 @@ export const setIsDraggingAC = (isDragging: boolean) => setIsDragging({ isDraggi
 export const setDraggedAttachmentsAC = (attachments: File[], type: string) =>
   setDraggedAttachments({ attachments, type })
 
-export const setTabIsActiveAC = (isActive: boolean) => setTabIsActive({ isActive })
-
 export const setHideChannelListAC = (hide: boolean) => setHideChannelList({ hide })
 
 export const setChannelDraftMessageIsRemovedAC = (channelId?: string) =>
@@ -302,4 +347,71 @@ export const destroySession = () => ({
 export const getChannelMentionsAC = (channelId: string) => ({
   type: GET_CHANNEL_MENTIONS,
   payload: { channelId }
+})
+
+export const createChannelInviteKeyAC = (
+  channelId: string,
+  accessPriorHistory: boolean = true,
+  expiresAt: number = 0,
+  maxUses: number = 0
+) => ({
+  type: CREATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, accessPriorHistory, expiresAt, maxUses }
+})
+
+export const setChannelInviteKeysAC = (
+  channelId: string,
+  inviteKeys: {
+    key: string
+    maxUses: number
+    expiresAt: number
+    accessPriorHistory: boolean
+  }[]
+) => setChannelInviteKeys({ channelId, inviteKeys })
+
+export const getChannelInviteKeysAC = (channelId: string) => ({
+  type: GET_CHANNEL_INVITE_KEYS,
+  payload: { channelId }
+})
+
+export const regenerateChannelInviteKeyAC = (channelId: string, key: string, deletePermanently: boolean) => ({
+  type: REGENERATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, key, deletePermanently }
+})
+
+export const updateChannelInviteKeyAC = (
+  channelId: string,
+  key: string,
+  accessPriorHistory: boolean,
+  expiresAt: number = 0,
+  maxUses: number = 0
+) => ({
+  type: UPDATE_CHANNEL_INVITE_KEY,
+  payload: { channelId, key, accessPriorHistory, expiresAt, maxUses }
+})
+
+export const joinChannelWithInviteKeyAC = (key: string) => ({
+  type: JOIN_TO_CHANNEL_WITH_INVITE_KEY,
+  payload: { key }
+})
+
+export const setMessageRetentionPeriodAC = (channelId: string, periodInMilliseconds: number | null) => ({
+  type: SET_MESSAGE_RETENTION_PERIOD,
+  payload: { channelId, periodInMilliseconds }
+})
+
+export const getChannelsWithUserAC = (userId: string) => ({
+  type: GET_CHANNELS_WITH_USER,
+  payload: { userId }
+})
+
+export const setMutualChannelsAC = (channels: IChannel[]) => setMutualChannels({ channels })
+
+export const setMutualChannelsHasNextAC = (hasNext: boolean) => setMutualChannelsHasNext({ hasNext })
+
+export const setMutualChannelsLoadingStateAC = (state: number) => setMutualChannelsLoadingState({ state })
+
+export const loadMoreMutualChannelsAC = (limit?: number) => ({
+  type: LOAD_MORE_MUTUAL_CHANNELS,
+  payload: { limit }
 })

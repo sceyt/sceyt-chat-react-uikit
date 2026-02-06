@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { useDispatch, useSelector } from 'store/hooks'
 import styled from 'styled-components'
-import moment from 'moment/moment'
 // Store
 import { contactsMapSelector, userSelector } from '../../../../store/user/selector'
 import { playingAudioIdSelector } from '../../../../store/message/selector'
@@ -13,7 +12,7 @@ import { ReactComponent as VoicePlayIcon } from '../../../../assets/svg/voicePre
 import { ReactComponent as VoicePauseIcon } from '../../../../assets/svg/voicePreviewPause.svg'
 // Helpers
 import { getCustomDownloader } from '../../../../helpers/customUploader'
-import { formatAudioVideoTime } from '../../../../helpers'
+import { formatAudioVideoTime, formatChannelDetailsDate } from '../../../../helpers'
 import { makeUsername } from '../../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../../helpers/contacts'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
@@ -112,6 +111,7 @@ const VoiceItem = ({
       clearInterval(intervalRef.current)
     }
   }, [])
+
   return (
     <FileItem
       onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
@@ -143,14 +143,14 @@ const VoiceItem = ({
             (file.user.id === user.id ? 'You' : makeUsername(contactsMap[file.user.id], file.user, getFromContacts))}
         </AudioTitle>
         <AudioDate color={voicePreviewDateAndTimeColor || textSecondary}>
-          {moment(file.createdAt).format('DD MMMM, YYYY')}
+          {formatChannelDetailsDate(file.createdAt)}
         </AudioDate>
         <AudioSendTime color={textSecondary}>
           {currentTime || (file.metadata.dur ? formatAudioVideoTime(file.metadata.dur) : '')}
         </AudioSendTime>
       </AudioInfo>
 
-      <Audio controls ref={audioRef} src={fileUrl}>
+      <Audio controls ref={audioRef} src={fileUrl} preload='metadata'>
         <source src={fileUrl} type='audio/ogg' />
         <source src={fileUrl} type='audio/mpeg' />
       </Audio>
@@ -231,7 +231,7 @@ const AudioDate = styled.span<{ color: string }>`
   max-width: calc(100% - 72px);
   font-style: normal;
   font-weight: normal;
-  font-size: 12px;
+  font-size: 13px;
   line-height: 16px;
   color: ${(props) => props.color};
 `

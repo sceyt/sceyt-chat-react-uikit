@@ -25,15 +25,17 @@ import { THEME_COLORS } from '../../../../../UIHelper/constants'
 import PopupContainer from '../../../../../common/popups/popupContainer'
 import DropDown from '../../../../../common/dropdown'
 import { useColor } from '../../../../../hooks'
+import { connectionStatusSelector } from 'store/user/selector'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 interface IProps {
-  theme: string
   channelId: string
   member: IMember
   handleClosePopup: () => void
 }
 
-const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps) => {
+const ChangeMemberRole = ({ channelId, member, handleClosePopup }: IProps) => {
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -54,8 +56,10 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
   const roles = useSelector(rolesSelector, shallowEqual) || []
 
   useEffect(() => {
-    dispatch(getRolesAC())
-  }, [])
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      dispatch(getRolesAC())
+    }
+  }, [connectionStatus])
 
   const handleSave = () => {
     if (isChanged && selectedRole) {
@@ -95,7 +99,6 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
             >
               <DropDown
                 withIcon
-                theme={theme}
                 isSelect
                 trigger={
                   <CustomSelectTrigger color={textPrimary}>
@@ -103,7 +106,7 @@ const ChangeMemberRole = ({ theme, channelId, member, handleClosePopup }: IProps
                   </CustomSelectTrigger>
                 }
               >
-                <DropdownOptionsUl theme={theme}>
+                <DropdownOptionsUl>
                   {!!roles.length &&
                     roles.map((role: IRole) => (
                       <DropdownOptionLi

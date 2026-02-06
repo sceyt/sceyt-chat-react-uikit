@@ -12,9 +12,8 @@ interface IProps {
   image: any
   onAccept: (file: File) => void
   handleClosePopup: (cropped?: boolean) => void
-  theme?: string
 }
-const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
+const ImageCrop = ({ image, onAccept, handleClosePopup }: IProps) => {
   const [area, setArea] = useState(null)
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -57,7 +56,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
   }, [area])
   return (
     <PopupContainer>
-      <Popup theme={theme} backgroundColor={background} minWidth='500px' maxWidth='600px' padding='0'>
+      <Popup backgroundColor={background} minWidth='500px' maxWidth='600px' padding='0'>
         <PopupBody paddingH='24px' paddingV='24px'>
           <CloseIcon onClick={handleClosePopup} color={iconPrimary} />
           <Row align='center'>
@@ -77,7 +76,7 @@ const ImageCrop = ({ theme, image, onAccept, handleClosePopup }: IProps) => {
                 showGrid={false}
               />
             </CropperWrapper>
-            <Controls className='controls' background={border} tickColor={accentColor}>
+            <Controls className='controls' backgroundColor={border} tickColor={accentColor}>
               <input
                 type='range'
                 value={state.zoom}
@@ -120,11 +119,11 @@ const CropperWrapper = styled.div`
   height: 300px;
   margin: 14px 0;
 `
-const Controls = styled.div<{ background: string; tickColor: string }>`
+const Controls = styled.div<{ backgroundColor: string; tickColor: string }>`
   & > input {
     width: 100%;
     -webkit-appearance: none;
-    background-color: ${({ background }) => background};
+    background-color: ${({ backgroundColor }) => backgroundColor};
     border-radius: 3px;
 
     &::-webkit-slider-runnable-track {

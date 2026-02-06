@@ -82,7 +82,6 @@ const EditChannelFooter = styled(ButtonBlock)`
 
 interface IProps {
   channel: IChannel
-  theme?: string
   // eslint-disable-next-line no-unused-vars
   handleToggleEditMode: (state: boolean) => void
   editChannelSaveButtonBackgroundColor?: string
@@ -93,7 +92,6 @@ interface IProps {
 
 const EditChannel = ({
   channel,
-  theme,
   handleToggleEditMode,
   editChannelSaveButtonBackgroundColor,
   editChannelSaveButtonTextColor,
@@ -247,12 +245,7 @@ const EditChannel = ({
         <AvatarCont>
           <DropDownWrapper>
             {!isDirectChannel && channel.userRole && (
-              <DropDown
-                theme={theme}
-                position='center'
-                iconColor={iconPrimary}
-                trigger={getUploadImageIcon() || <CameraIcon />}
-              >
+              <DropDown position='center' iconColor={iconPrimary} trigger={getUploadImageIcon() || <CameraIcon />}>
                 <DropdownOptionsUl>
                   <DropdownOptionLi
                     key={1}
@@ -292,7 +285,6 @@ const EditChannel = ({
         <Label color={textPrimary}> Name </Label>
         <CustomInput
           error={subjectIsWrong}
-          theme={theme}
           color={textPrimary}
           borderColor={borderColor}
           errorColor={warningColor}
@@ -312,7 +304,6 @@ const EditChannel = ({
         <Label color={textPrimary}> Description </Label>
         <CustomInput
           error={descriptionIsWrong}
-          theme={theme}
           color={textPrimary}
           errorColor={warningColor}
           borderColor={borderColor}
@@ -353,7 +344,6 @@ const EditChannel = ({
 
       {cropPopup && (
         <ImageCrop
-          theme={theme}
           image={{ name: newAvatar.name, url: selectedImageUrl }}
           onAccept={handleImageCrop}
           handleClosePopup={() => setCropPopup(false)}

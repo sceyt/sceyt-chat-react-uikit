@@ -16,7 +16,8 @@ import {
   pinChannelAC,
   turnOffNotificationsAC,
   turnOnNotificationsAC,
-  unpinChannelAC
+  unpinChannelAC,
+  setMessageRetentionPeriodAC
 } from '../../../store/channel/actions'
 import { blockUserAC, unblockUserAC } from '../../../store/user/actions'
 // Assets
@@ -33,8 +34,13 @@ import { ReactComponent as ReportIcon } from '../../../assets/svg/report.svg'
 import { ReactComponent as StarIcon } from '../../../assets/svg/star.svg'
 import { ReactComponent as PinIcon } from '../../../assets/svg/pin.svg'
 import { ReactComponent as UnpinIcon } from '../../../assets/svg/unpin.svg'
+import { ReactComponent as WatchIcon } from '../../../assets/svg/watch.svg'
+import { ReactComponent as ChevronRightIcon } from '../../../assets/svg/chevronBottom.svg'
+import { ReactComponent as UsersIcon } from '../../../assets/svg/users.svg'
 // Helpers
 import { hideUserPresence } from '../../../helpers/userHelper'
+import { getDisappearingSettings } from '../../../helpers/channelHalper'
+import { formatDisappearingMessageTime } from '../../../helpers'
 import { SectionHeader, DropdownOptionLi, DropdownOptionsUl } from '../../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, USER_STATE } from '../../../helpers/constants'
 // import DropDown from '../../../common/dropdown'
@@ -44,14 +50,15 @@ import { getClient } from '../../../common/client'
 // Components
 // import ReportPopup from '../../../../common/Popups/report';
 import ConfirmPopup from '../../../common/popups/delete'
+import DisappearingMessagesPopup from '../../../common/popups/disappearingMessages'
 import DropDown from '../../../common/dropdown'
 import { useColor } from '../../../hooks'
 import log from 'loglevel'
+import GroupsInCommonPopup from 'common/popups/groupsInCommonPopup/indext'
 
 interface IProps {
   setActionsHeight?: (height: number) => void
   channel: IChannel
-  theme?: string
   actionMenuOpen?: () => void
   menuIsOpen?: boolean
   toggleable: boolean
@@ -124,13 +131,18 @@ interface IProps {
   actionItemsFontSize?: string
 
   borderColor?: string
+
+  commonGroupsOrder?: number
+  commonGroupsIcon?: JSX.Element
+  commonGroupsIconColor?: string
+  commonGroupsTextColor?: string
+  showGroupsInCommon?: boolean
 }
 
 const Actions = ({
   setActionsHeight,
   channel,
   actionMenuOpen,
-  theme,
   menuIsOpen,
   toggleable,
   showMuteUnmuteNotifications = true,
@@ -190,13 +202,20 @@ const Actions = ({
   deleteAllMessagesIcon,
   deleteAllMessagesTextColor,
   actionItemsFontSize,
-  borderColor
+  borderColor,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IProps) => {
   const {
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
+    [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.SURFACE_1]: surface1,
-    [THEME_COLORS.WARNING]: warningColor
+    [THEME_COLORS.WARNING]: warningColor,
+    [THEME_COLORS.BACKGROUND]: backgroundColor
   } = useColor()
 
   const ChatClient = getClient()
@@ -209,6 +228,8 @@ const Actions = ({
   const [blockUserPopupOpen, setBlockUserPopupOpen] = useState(false)
   const [unblockUserPopupOpen, setUnblockUserPopupOpen] = useState(false)
   const [reportUserPopupOpen, setReportUserPopupOpen] = useState(false)
+  const [disappearingMessagesPopupOpen, setDisappearingMessagesPopupOpen] = useState(false)
+  const [groupsInCommonPopupOpen, setGroupsInCommonPopupOpen] = useState(false)
   const [checkActionPermission] = usePermissions(channel.userRole)
   // const [reportPopupOpen, setReportPopupOpen] = useState(false)
   const [popupButtonText, setPopupButtonText] = useState('')
@@ -226,6 +247,9 @@ const Actions = ({
   const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
   const disableAction = directChannelUser && !isSelfChannel && hideUserPresence && hideUserPresence(directChannelUser)
   const otherMembers = (isDirectChannel && channel.members.filter((member) => member.id && member.id !== user.id)) || []
+  const hasPermissiontoSetDM = channel.userRole === 'admin' || channel.userRole === 'owner'
+  const canToggleDisappearingMessages = isDirectChannel || hasPermissiontoSetDM
+
   const handleToggleClearHistoryPopup = () => {
     setClearHistoryPopupOpen(!clearHistoryPopupOpen)
   }
@@ -349,6 +373,19 @@ const Actions = ({
     }
   }
 
+  const handleToggleGroupsInCommonPopup = () => {
+    setGroupsInCommonPopupOpen(!groupsInCommonPopupOpen)
+  }
+
+  const handleToggleDisappearingMessagesPopup = () => {
+    setDisappearingMessagesPopupOpen(!disappearingMessagesPopupOpen)
+  }
+
+  const handleSetDisappearingMessagesTimer = (timerInSeconds: number | null) => {
+    const periodInMilliseconds = timerInSeconds ? timerInSeconds * 1000 : 0
+    dispatch(setMessageRetentionPeriodAC(channel.id, periodInMilliseconds))
+  }
+
   const containerRef = useRef<any>(null)
   useEffect(() => {
     if (containerRef.current) {
@@ -369,7 +406,7 @@ const Actions = ({
   ])
 
   return (
-    <Container isDirect={isDirectChannel} theme={theme} borderColor={borderColor || surface1} ref={containerRef}>
+    <Container isDirect={isDirectChannel} borderColor={borderColor || surface1} ref={containerRef}>
       {toggleable && (
         <ActionHeader onClick={handleActionsOpen}>
           <SectionHeader color={textPrimary}>ACTIONS</SectionHeader>
@@ -398,7 +435,6 @@ const Actions = ({
           ) : (
             <DropDown
               isSelect
-              theme={theme}
               height='auto'
               position='left'
               order={muteUnmuteNotificationsOrder}
@@ -484,6 +520,33 @@ const Actions = ({
             <React.Fragment>{staredMessagesIcon || <DefaultStarIcon />} Starred messages </React.Fragment>
           </ActionItem>
         )}
+        {getDisappearingSettings()?.show &&
+          !channel.isMockChannel &&
+          canToggleDisappearingMessages &&
+          (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
+            <ActionItem
+              key={1.5}
+              onClick={handleToggleDisappearingMessagesPopup}
+              iconColor={iconPrimary}
+              color={textPrimary}
+              hoverColor={textPrimary}
+              fontSize={actionItemsFontSize}
+              flexWrap='wrap'
+            >
+              <React.Fragment>
+                <DefaultWatchIcon $isLightMode={backgroundColor === '#FFFFFF'} />
+                Disappearing messages
+                <DisappearingMessagesStatusWrapper>
+                  <DisappearingMessagesStatus color={textSecondary}>
+                    {formatDisappearingMessageTime(channel.messageRetentionPeriod)}
+                  </DisappearingMessagesStatus>
+                  <ChevronRightIconWrapper>
+                    <ChevronRightIcon color={iconPrimary} />
+                  </ChevronRightIconWrapper>
+                </DisappearingMessagesStatusWrapper>
+              </React.Fragment>
+            </ActionItem>
+          )}
         {showPinChannel &&
           !channel.isMockChannel &&
           (isDirectChannel && directChannelUser ? directChannelUser.state !== USER_STATE.DELETED : true) && (
@@ -532,6 +595,28 @@ const Actions = ({
             </ActionItem>
           ))}
 
+        {!isSelfChannel && isDirectChannel && !channel.isMockChannel && showGroupsInCommon && (
+          <ActionItem
+            key={4}
+            order={commonGroupsOrder}
+            iconColor={commonGroupsTextColor || iconPrimary}
+            color={commonGroupsIconColor || textPrimary}
+            hoverColor={commonGroupsTextColor || textPrimary}
+            fontSize={actionItemsFontSize}
+            onClick={handleToggleGroupsInCommonPopup}
+          >
+            <React.Fragment>
+              {commonGroupsIcon || <UsersIcon />}
+              Groups in common
+              <DisappearingMessagesStatusWrapper>
+                <ChevronRightIconWrapper>
+                  <ChevronRightIcon color={iconPrimary} />
+                </ChevronRightIconWrapper>
+              </DisappearingMessagesStatusWrapper>
+            </React.Fragment>
+          </ActionItem>
+        )}
+
         {!isDirectChannel && showLeaveChannel && (
           <ActionItem
             key={4}
@@ -572,7 +657,7 @@ const Actions = ({
               (directChannelUser && directChannelUser.blocked ? (
                 <ActionItem
                   key={5}
-                  color={unblockUserTextColor || warningColor}
+                  color={unblockUserTextColor || textPrimary}
                   hoverColor={unblockUserTextColor || textPrimary}
                   iconColor={warningColor}
                   fontSize={actionItemsFontSize}
@@ -854,6 +939,20 @@ const Actions = ({
           title={popupTitle}
         />
       )}
+      {disappearingMessagesPopupOpen && (
+        <DisappearingMessagesPopup
+          togglePopup={handleToggleDisappearingMessagesPopup}
+          handleSetTimer={handleSetDisappearingMessagesTimer}
+          currentTimer={channel.messageRetentionPeriod}
+        />
+      )}
+
+      {groupsInCommonPopupOpen && (
+        <GroupsInCommonPopup
+          togglePopup={handleToggleGroupsInCommonPopup}
+          user={channel.members.find((member: IMember) => member.id !== user.id)}
+        />
+      )}
 
       {/*  {blockUserPopupOpen && (
         <DeletePopup
@@ -893,7 +992,7 @@ const Actions = ({
 
 export default Actions
 
-const Container = styled.div<{ isDirect: boolean; theme?: string; borderColor: string }>`
+const Container = styled.div<{ isDirect: boolean; borderColor: string }>`
   padding: 10px 16px;
   border-bottom: 6px solid ${(props) => props.borderColor};
 ]`
@@ -935,6 +1034,15 @@ const DefaultClearIcon = styled(ClearIcon)``
 const DefaultDeleteChannelIcon = styled(DeleteChannelIconD)``
 const DefaultBottomIcon = styled(BottomIcon)``
 const DefaultMarkAsReadIcon = styled(LeaveIcon)``
+const DefaultWatchIcon = styled(WatchIcon)<{ $isLightMode: boolean }>`
+  width: 24px;
+  height: 24px;
+
+  path.watch-ticks,
+  path:nth-child(2) {
+    fill: ${(props) => (props.$isLightMode ? '#FFFFFF' : '#000000')} !important;
+  }
+`
 
 const ActionItem = styled.li<{
   color: string
@@ -943,6 +1051,7 @@ const ActionItem = styled.li<{
   iconColor: string
   hoverColor: string
   order?: number
+  flexWrap?: string
 }>`
   position: relative;
   display: flex;
@@ -953,7 +1062,7 @@ const ActionItem = styled.li<{
   cursor: pointer;
   order: ${(props) => props.order};
   pointer-events: ${(props) => props.disableEvent && 'none'};
-
+  ${(props) => props.flexWrap && `flex-wrap: ${props.flexWrap};`}
   & > div {
     margin-left: auto;
   }
@@ -971,6 +1080,33 @@ const ActionItem = styled.li<{
 
   &:last-child {
     //margin-bottom: 0;
+  }
+`
+
+const DisappearingMessagesStatusWrapper = styled.div`
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`
+
+const DisappearingMessagesStatus = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
+  font-weight: 400;
+  font-style: normal;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+`
+
+const ChevronRightIconWrapper = styled.span`
+  display: flex;
+  align-items: center;
+
+  & > svg {
+    width: 16px;
+    height: 16px;
+    transform: rotate(-90deg);
   }
 `
 /*

@@ -143,6 +143,13 @@ export interface IDetailsProps {
   backgroundColor?: string
   bordersColor?: string
   showPhoneNumber?: boolean
+  QRCodeIcon?: JSX.Element
+
+  commonGroupsOrder?: number
+  commonGroupsIcon?: JSX.Element
+  commonGroupsIconColor?: string
+  commonGroupsTextColor?: string
+  showGroupsInCommon?: boolean
 }
 
 const ChannelDetailsContainer = ({
@@ -252,7 +259,13 @@ const ChannelDetailsContainer = ({
   tabItemsLineHeight,
   tabItemsMinWidth,
   bordersColor,
-  showPhoneNumber
+  showPhoneNumber,
+  QRCodeIcon,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
 
@@ -370,6 +383,12 @@ const ChannelDetailsContainer = ({
           tabItemsLineHeight={tabItemsLineHeight}
           tabItemsMinWidth={tabItemsMinWidth}
           showPhoneNumber={showPhoneNumber}
+          QRCodeIcon={QRCodeIcon}
+          commonGroupsOrder={commonGroupsOrder}
+          commonGroupsIcon={commonGroupsIcon}
+          commonGroupsIconColor={commonGroupsIconColor}
+          commonGroupsTextColor={commonGroupsTextColor}
+          showGroupsInCommon={showGroupsInCommon}
         />
       )}
     </DetailsWrapper>

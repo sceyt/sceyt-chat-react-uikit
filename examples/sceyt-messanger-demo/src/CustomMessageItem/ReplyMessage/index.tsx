@@ -83,7 +83,7 @@ function ReplyMessage(
         )
         // </MessageAttachments>
       }
-      <ReplyMessageBody rtlDirection={!message.incoming}>
+      <ReplyMessageBody rtlDirection={!message?.incoming}>
         <MessageOwner
           className="reply-message-owner"
           color={'#5159F6'}
@@ -116,7 +116,9 @@ function ReplyMessage(
               text: message.parentMessage?.body,
               message: message.parentMessage,
               getFromContacts: true,
-              asSampleText: true
+              asSampleText: true,
+              accentColor: '#5159F6',
+              textSecondary: '#17191C',
             })
           ) : (
             parentNotLinkAttachment &&
@@ -165,7 +167,7 @@ const ReplyMessageContainer = styled.div<{
     !props.withSenderName && props.withAttachments && '8px'};
   cursor: pointer;
 `
-const ReplyMessageBody = styled.div<{ rtlDirection?: boolean }>`
+const ReplyMessageBody = styled.div<{ rtlDirection?: boolean; children?: React.ReactNode }>`
   margin-top: auto;
   margin-bottom: auto;
   direction: ${(props: any) => (props.rtlDirection ? 'initial' : '')};

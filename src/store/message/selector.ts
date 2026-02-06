@@ -16,6 +16,7 @@ export const activeTabAttachmentsSelector = (store: any) => store.MessageReducer
 export const activeTabAttachmentsHasNextSelector = (store: any) => store.MessageReducer.attachmentHasNext
 export const attachmentsForPopupSelector = (store: any) => store.MessageReducer.attachmentsForPopup
 export const attachmentsForPopupHasNextSelector = (store: any) => store.MessageReducer.attachmentForPopupHasNext
+export const attachmentsForPopupHasPrevSelector = (store: any) => store.MessageReducer.attachmentForPopupHasPrev
 export const messageForReplySelector = (store: any) => store.MessageReducer.messageForReply
 export const messageForThreadReplySelector = (store: any) => store.MessageReducer.messageForThreadReply
 export const messageToEditSelector = (store: any) => store.MessageReducer.messageToEdit
@@ -36,5 +37,15 @@ export const openedMessageMenuSelector = (store: any) => store.MessageReducer.op
 export const playingAudioIdSelector = (store: any) => store.MessageReducer.playingAudioId
 export const selectedMessagesMapSelector = (store: any) => store.MessageReducer.selectedMessagesMap
 export const attachmentUpdatedMapSelector = (store: any) => store.MessageReducer.attachmentUpdatedMap
+export const attachmentLoadingStateSelector = (store: any) => store.MessageReducer.attachmentLoadingState
+export const attachmentForPopupLoadingStateSelector = (store: any) =>
+  store.MessageReducer.attachmentForPopupLoadingState
 export const messageMarkersSelector = (store: any) => store.MessageReducer.messageMarkers
 export const messagesMarkersLoadingStateSelector = (store: any) => store.MessageReducer.messagesMarkersLoadingState
+export const pollVotesListSelector = (store: any) => store.MessageReducer.pollVotesList
+export const pollVotesHasMoreSelector = (store: any) => store.MessageReducer.pollVotesHasMore
+export const pollVotesLoadingStateSelector = (store: any) => store.MessageReducer.pollVotesLoadingState
+export const pendingPollActionsSelector = (store: any) => store.MessageReducer.pendingPollActions
+export const pendingMessagesMapSelector = (store: any) => store.MessageReducer.pendingMessagesMap
+export const unreadScrollToSelector = (store: any) => store.MessageReducer.unreadScrollTo
+export const unreadMessageIdSelector = (store: any) => store.MessageReducer.unreadMessageId

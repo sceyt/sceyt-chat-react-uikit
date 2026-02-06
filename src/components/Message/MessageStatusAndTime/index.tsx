@@ -68,7 +68,7 @@ const MessageStatusAndTime = ({
       lineHeight={messageStatusAndTimeLineHeight}
       showOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
       leftMargin={leftMargin}
-      isSelfMessage={!message.incoming}
+      isSelfMessage={!message?.incoming}
       withAttachment={withAttachment}
       rtlDirection={ownMessageOnRightSide && !message.incoming}
       fileAttachment={fileAttachment}
@@ -78,7 +78,7 @@ const MessageStatusAndTime = ({
       messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
       messageTimeBackgroundColor={overlayBackground2}
     >
-      {message.state === MESSAGE_STATUS.EDIT ? (
+      {message?.state === MESSAGE_STATUS.EDIT ? (
         <MessageStatusUpdated color={messageStateColor || textSecondary} fontSize={messageStateFontSize}>
           edited
         </MessageStatusUpdated>
@@ -87,13 +87,13 @@ const MessageStatusAndTime = ({
       )}
       {messageTimeVisible && (
         <HiddenMessageTime color={messageTimeColor || textSecondary} fontSize={messageTimeFontSize}>{`${moment(
-          message.createdAt
+          message?.createdAt
         ).format('HH:mm')}`}</HiddenMessageTime>
       )}
       {messageStatusVisible && (
         <MessageStatus height={messageStatusAndTimeLineHeight}>
           {MessageStatusIcon({
-            messageStatus: message.deliveryStatus,
+            messageStatus: message?.deliveryStatus,
             messageStatusDisplayingType,
             size: messageStatusSize,
             color: messageStatusColor || iconPrimary,
@@ -109,9 +109,9 @@ const MessageStatusAndTime = ({
 export default React.memo(MessageStatusAndTime, (prevProps, nextProps) => {
   // Custom comparison function to check if only 'messages' prop has changed
   return (
-    prevProps.message.state === nextProps.message.state &&
-    prevProps.message.deliveryStatus === nextProps.message.deliveryStatus &&
-    prevProps.message.createdAt === nextProps.message.createdAt &&
+    prevProps.message?.state === nextProps.message?.state &&
+    prevProps.message?.deliveryStatus === nextProps.message?.deliveryStatus &&
+    prevProps.message?.createdAt === nextProps.message?.createdAt &&
     prevProps.showMessageTimeAndStatusOnlyOnHover === nextProps.showMessageTimeAndStatusOnlyOnHover &&
     prevProps.messageStatusSize === nextProps.messageStatusSize &&
     prevProps.messageStatusColor === nextProps.messageStatusColor &&

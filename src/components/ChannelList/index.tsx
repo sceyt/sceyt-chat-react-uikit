@@ -37,7 +37,6 @@ import {
   switchChannelActionAC,
   switchChannelInfoAC
 } from '../../store/channel/actions'
-import { themeSelector } from '../../store/theme/selector'
 import { getContactsAC } from '../../store/user/actions'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 // Hooks
@@ -46,6 +45,7 @@ import { useColor, useDidUpdate } from '../../hooks'
 import {
   getChannelMembersCount,
   getLastChannelFromMap,
+  getPendingDeleteChannel,
   removeChannelFromMap,
   setUploadImageIcon
 } from '../../helpers/channelHalper'
@@ -240,7 +240,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
   } = useColor()
   const dispatch = useDispatch()
   const getFromContacts = getShowOnlyContactUsers()
-  const theme = useSelector(themeSelector)
   const channelListRef = useRef<HTMLInputElement | null>(null)
   const channelsScrollRef = useRef<HTMLInputElement | null>(null)
   const [searchValue, setSearchValue] = useState('')
@@ -409,12 +408,12 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   useDidUpdate(() => {
     if (getSelectedChannel) {
-      if (!activeChannel?.mentionsIds) {
+      if (!activeChannel?.mentionsIds && activeChannel?.id && connectionStatus === CONNECTION_STATUS.CONNECTED) {
         dispatch(getChannelMentionsAC(activeChannel.id))
       }
       getSelectedChannel(activeChannel)
     }
-  }, [activeChannel, activeChannel?.members, activeChannel?.members?.length, activeChannel?.id])
+  }, [activeChannel, activeChannel?.members, activeChannel?.members?.length, activeChannel?.id, connectionStatus])
 
   useDidUpdate(() => {
     if (closeSearchChannels) {
@@ -441,14 +440,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     } else {
       setListWidthIsSet(false)
     }
-    // log.info('channels. ...........................', channels)
   }, [channels])
-
-  /* useEffect(() => {
-    if (contactsMap) {
-      log.info('contactsMap.>>>...', contactsMap)
-    }
-  }, [contactsMap]) */
 
   const setSelectedChannel = (channel: IChannel) => {
     if (activeChannel.id !== channel.id) {
@@ -457,6 +449,18 @@ const ChannelList: React.FC<IChannelListProps> = ({
       dispatch(switchChannelActionAC(channel))
     }
   }
+
+  // useEffect(() => {
+  //   const closeActiveChannel = (e: any) => {
+  //     if (e.key === 'Escape') {
+  //       dispatch(switchChannelActionAC(null))
+  //     }
+  //   }
+  //   window.addEventListener('keydown', closeActiveChannel)
+  //   return () => {
+  //     window.removeEventListener('keydown', closeActiveChannel)
+  //   }
+  // }, [])
 
   return (
     <Container
@@ -468,7 +472,7 @@ const ChannelList: React.FC<IChannelListProps> = ({
     >
       <ChannelListHeader
         withCustomList={!!List}
-        maxWidth={(channelListRef.current && channelListRef.current?.clientWidth) || 0}
+        maxWidth='100%'
         borderColor={borderColor}
         padding={searchChannelsPadding}
       >
@@ -492,7 +496,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
         {showCreateChannelIcon &&
           (CreateChannel || (
             <CreateChannelButton
-              theme={theme}
               newChannelIcon={newChannelIcon}
               newGroupIcon={newGroupIcon}
               newChatIcon={newChatIcon}
@@ -506,7 +509,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
       {showSearch && searchChannelsPosition === 'bottom' && (
         <ChannelSearch
           searchValue={searchValue}
-          theme={theme}
           width={channelSearchWidth}
           borderRadius={searchInputBorderRadius}
           handleSearchValueChange={handleSearchValueChange}
@@ -527,41 +529,42 @@ const ChannelList: React.FC<IChannelListProps> = ({
         >
           {!searchValue ? (
             <React.Fragment>
-              {channels.map((channel: IChannel) =>
-                ListItem ? (
-                  <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
-                ) : (
-                  <Channel
-                    theme={theme}
-                    selectedChannelLeftBorder={selectedChannelLeftBorder}
-                    selectedChannelBackground={selectedChannelBackground}
-                    selectedChannelBorderRadius={selectedChannelBorderRadius}
-                    selectedChannelPaddings={selectedChannelPaddings}
-                    channelHoverBackground={channelHoverBackground}
-                    channelSubjectFontSize={channelSubjectFontSize}
-                    channelSubjectLineHeight={channelSubjectLineHeight}
-                    channelSubjectColor={channelSubjectColor}
-                    channelLastMessageFontSize={channelLastMessageFontSize}
-                    channelLastMessageHeight={channelLastMessageHeight}
-                    channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
-                    channelAvatarSize={channelAvatarSize}
-                    channelAvatarTextSize={channelAvatarTextSize}
-                    channelsPaddings={channelsPaddings}
-                    channelsMargin={channelsMargin}
-                    notificationsIsMutedIcon={notificationsIsMutedIcon}
-                    notificationsIsMutedIconColor={notificationsIsMutedIconColor}
-                    pinedIcon={pinedIcon}
-                    showAvatar={showAvatar}
-                    avatarBorderRadius={avatarBorderRadius}
-                    channel={channel}
-                    key={channel.id}
-                    contactsMap={contactsMap}
-                    setSelectedChannel={setSelectedChannel}
-                    getCustomLatestMessage={getCustomLatestMessage as any}
-                    doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
-                    showPhoneNumber={showPhoneNumber}
-                  />
-                )
+              {channels.map(
+                (channel: IChannel) =>
+                  !getPendingDeleteChannel(channel.id) &&
+                  (ListItem ? (
+                    <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
+                  ) : (
+                    <Channel
+                      selectedChannelLeftBorder={selectedChannelLeftBorder}
+                      selectedChannelBackground={selectedChannelBackground}
+                      selectedChannelBorderRadius={selectedChannelBorderRadius}
+                      selectedChannelPaddings={selectedChannelPaddings}
+                      channelHoverBackground={channelHoverBackground}
+                      channelSubjectFontSize={channelSubjectFontSize}
+                      channelSubjectLineHeight={channelSubjectLineHeight}
+                      channelSubjectColor={channelSubjectColor}
+                      channelLastMessageFontSize={channelLastMessageFontSize}
+                      channelLastMessageHeight={channelLastMessageHeight}
+                      channelLastMessageTimeFontSize={channelLastMessageTimeFontSize}
+                      channelAvatarSize={channelAvatarSize}
+                      channelAvatarTextSize={channelAvatarTextSize}
+                      channelsPaddings={channelsPaddings}
+                      channelsMargin={channelsMargin}
+                      notificationsIsMutedIcon={notificationsIsMutedIcon}
+                      notificationsIsMutedIconColor={notificationsIsMutedIconColor}
+                      pinedIcon={pinedIcon}
+                      showAvatar={showAvatar}
+                      avatarBorderRadius={avatarBorderRadius}
+                      channel={channel}
+                      key={channel.id}
+                      contactsMap={contactsMap}
+                      setSelectedChannel={setSelectedChannel}
+                      getCustomLatestMessage={getCustomLatestMessage as any}
+                      doNotShowMessageDeliveryTypes={doNotShowMessageDeliveryTypes}
+                      showPhoneNumber={showPhoneNumber}
+                    />
+                  ))
               )}
             </React.Fragment>
           ) : channelsLoading === LOADING_STATE.LOADED && searchValue ? (
@@ -580,7 +583,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -628,7 +630,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           />
                         ) : (
                           <ContactItem
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -664,7 +665,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -726,7 +726,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                   <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                 ) : (
                   <Channel
-                    theme={theme}
                     selectedChannelLeftBorder={selectedChannelLeftBorder}
                     selectedChannelBackground={selectedChannelBackground}
                     selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -779,7 +778,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -822,7 +820,6 @@ const ChannelList: React.FC<IChannelListProps> = ({
                           <ListItem channel={channel} setSelectedChannel={setSelectedChannel} key={channel.id} />
                         ) : (
                           <Channel
-                            theme={theme}
                             selectedChannelLeftBorder={selectedChannelLeftBorder}
                             selectedChannelBackground={selectedChannelBackground}
                             selectedChannelBorderRadius={selectedChannelBorderRadius}
@@ -960,7 +957,7 @@ const LoadingWrapper = styled.div`
   top: calc(50% - 20px);
 `
 const ChannelListHeader = styled.div<{
-  maxWidth?: number
+  maxWidth?: string
   withoutProfile?: any
   withCustomList?: boolean
   borderColor?: string
@@ -971,12 +968,12 @@ const ChannelListHeader = styled.div<{
   flex-direction: row;
   justify-content: space-between;
   max-width: ${(props: {
-    maxWidth?: number
+    maxWidth?: string
     withoutProfile?: any
     withCustomList?: boolean
     borderColor?: string
     padding?: string
-  }) => (props.maxWidth ? `${props.maxWidth}px` : 'inherit')};
+  }) => (props.maxWidth ? `${props.maxWidth}` : 'inherit')};
   padding: ${(props) => props.padding || '12px'};
   box-sizing: border-box;
   padding-left: ${(props) => props.withoutProfile && '52px'};

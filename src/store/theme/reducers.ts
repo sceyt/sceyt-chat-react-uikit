@@ -4,7 +4,7 @@ import { SceytChatUIKitTheme } from '../../components'
 import { defaultTheme, defaultThemeMode } from '../../UIHelper/constants'
 
 export interface IThemeStore {
-  theme?: string,
+  theme?: string
   newTheme?: SceytChatUIKitTheme
 }
 
@@ -15,10 +15,10 @@ const initialState: IThemeStore = {
 
 export default (state = initialState, { type, payload }: IAction) => {
   const newState = { ...state }
-  
+
   switch (type) {
     case SET_THEME: {
-      const { theme } = payload 
+      const { theme } = payload
       newState.theme = theme
       return newState
     }

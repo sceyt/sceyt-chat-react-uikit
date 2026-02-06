@@ -28,7 +28,6 @@ import {
   deleteMessageFromListAC,
   editMessageAC,
   forwardMessageAC,
-  resendMessageAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessageForReplyAC,
@@ -42,7 +41,6 @@ import {
   setCloseSearchChannelsAC,
   setDraggedAttachmentsAC
 } from '../../store/channel/actions'
-import { getMembersAC } from '../../store/member/actions'
 
 // Selectors
 import {
@@ -57,17 +55,17 @@ import {
   typingOrRecordingIndicatorArraySelector
 } from '../../store/channel/selector'
 import { connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
-import { activeChannelMembersSelector } from '../../store/member/selector'
-import { themeSelector } from '../../store/theme/selector'
+import { activeChannelMembersMapSelector, channelsMembersHasNextMapSelector } from '../../store/member/selector'
 
 // Helpers
 import {
+  checkIsTypeKeyPressed,
   compareMessageBodyAttributes,
   EditorTheme,
   getAllowEditDeleteIncomingMessage,
   makeUsername
 } from '../../helpers/message'
-import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile } from '../../UIHelper'
+import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
 import { detectBrowser, detectOS, hashString } from '../../helpers'
@@ -80,7 +78,6 @@ import {
   draftMessagesMap,
   getAudioRecordingFromMap,
   getDraftMessageFromMap,
-  getPendingMessagesMap,
   removeDraftMessageFromMap,
   setDraftMessageToMap,
   setPendingAttachment,
@@ -98,7 +95,6 @@ import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame } from '../../helpers/getVideoFrame'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
-import { CONNECTION_STATUS } from '../../store/user/constants'
 
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
@@ -107,16 +103,20 @@ import { useDidUpdate, useColor } from '../../hooks'
 // Icons
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as EyeIcon } from '../../assets/svg/eye.svg'
+import { ReactComponent as ViewOnceNotSelectedIcon } from '../../assets/svg/view_once_not_selected.svg'
+import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_once_selected.svg'
 import { ReactComponent as EditIcon } from '../../assets/svg/editIcon.svg'
 import { ReactComponent as ReplyIcon } from '../../assets/svg/replyIcon.svg'
 import { ReactComponent as AttachmentIcon } from '../../assets/svg/addAttachment.svg'
 import { ReactComponent as EmojiSmileIcon } from '../../assets/svg/emojiSmileIcon.svg'
 import { ReactComponent as ChooseFileIcon } from '../../assets/svg/choseFile.svg'
-import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle.svg'
+import { ReactComponent as PollIcon } from '../../assets/svg/poll.svg'
+import { ReactComponent as BlockInfoIcon } from '../../assets/svg/error_circle_white.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../assets/svg/choseMedia.svg'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
+import { ReactComponent as ViewOnceIconOpen } from '../../assets/svg/view_once_last_message.svg'
 
 // Components
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
@@ -130,6 +130,9 @@ import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
+import CreatePollPopup from './Poll/CreatePollPopup'
+import { MESSAGE_TYPE } from 'types/enum'
+import { getMembersAC } from 'store/member/actions'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -223,8 +226,12 @@ interface SendMessageProps {
   fileAttachmentSizeLimit?: number
   AddAttachmentsIcon?: JSX.Element
   attachmentIcoOrder?: number
+  viewOnceIconOrder?: number
+  showViewOnceToggle?: boolean
   sendIconOrder?: number
   inputOrder?: number
+  ViewOnceSelectedSVGIcon?: JSX.Element
+  ViewOnceNotSelectedSVGIcon?: JSX.Element
   CustomTypingIndicator?: FC<{
     from: {
       id: string
@@ -268,6 +275,15 @@ interface SendMessageProps {
   placeholderText?: string
   placeholderTextColor?: string
   audioRecordingMaxDuration?: number
+  pollOptions?: {
+    showAddPoll?: boolean
+    choosePollText?: string
+    pollOptions?: {
+      id: string
+      text: string
+      votes: number
+    }[]
+  }
 }
 
 const SendMessageInput: React.FC<SendMessageProps> = ({
@@ -281,7 +297,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   inputOrder = 1,
   showAddEmojis = true,
   AddEmojisIcon,
-  emojiIcoOrder = 2,
+  emojiIcoOrder = 3,
   showAddAttachments = true,
   showChooseFileAttachment = true,
   showChooseMediaAttachment = true,
@@ -293,6 +309,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   allowedMediaExtensionsErrorMessage,
   AddAttachmentsIcon,
   attachmentIcoOrder = 0,
+  viewOnceIconOrder = 2,
+  ViewOnceSelectedSVGIcon,
+  ViewOnceNotSelectedSVGIcon,
+  showViewOnceToggle = false,
   CustomTypingIndicator,
   margin,
   padding,
@@ -329,12 +349,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   voiceMessage = true,
   placeholderText,
   placeholderTextColor,
-  audioRecordingMaxDuration
+  audioRecordingMaxDuration,
+  pollOptions
 }) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
     [THEME_COLORS.SURFACE_1]: surface1Background,
+    [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
@@ -343,22 +365,37 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
-  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const activeChannel = useSelector(activeChannelSelector)
   const messageToEdit = useSelector(messageToEditSelector)
-  const activeChannelMembers = useSelector(activeChannelMembersSelector, shallowEqual)
+  const activeChannelMembersMap = useSelector(activeChannelMembersMapSelector, shallowEqual)
+  const activeChannelMembers = useMemo(
+    () => activeChannelMembersMap?.[activeChannel?.id] || [],
+    [activeChannelMembersMap?.[activeChannel?.id]]
+  )
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(
+    () => channelsMembersHasNext?.[activeChannel?.id],
+    [channelsMembersHasNext?.[activeChannel?.id]]
+  )
+
   const messageForReply = useSelector(messageForReplySelector)
   const draggedAttachments = useSelector(draggedAttachmentsSelector)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const isDirectChannel = activeChannel && activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
+  const isSelfChannel =
+    isDirectChannel &&
+    activeChannel.memberCount === 1 &&
+    activeChannel.members.length > 0 &&
+    activeChannel.members[0].id === user.id
   const directChannelUser = isDirectChannel && activeChannel.members.find((member: IMember) => member.id !== user.id)
   const disableInput = disabled || (directChannelUser && hideUserPresence && hideUserPresence(directChannelUser))
   const isBlockedUserChat = directChannelUser && directChannelUser.blocked
@@ -380,7 +417,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [emojisPopupLeftPosition, setEmojisPopupLeftPosition] = useState(0)
   const [emojisPopupBottomPosition, setEmojisPopupBottomPosition] = useState(0)
   const [addAttachmentsInRightSide, setAddAttachmentsInRightSide] = useState(false)
-
+  const [showPoll, setShowPoll] = useState(false)
   const [shouldClearEditor, setShouldClearEditor] = useState<{ clear: boolean; draftMessage?: any }>({ clear: false })
   const [messageBodyAttributes, setMessageBodyAttributes] = useState<any>([])
   const [mentionedUsers, setMentionedUsers] = useState<any>([])
@@ -402,6 +439,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [isIncomingMessage, setIsIncomingMessage] = useState(false)
   const [mediaExtensions, setMediaExtensions] = useState('.jpg,.jpeg,.png,.gif,.mp4,.mov,.avi,.wmv,.flv,.webm,.jfif')
   const [uploadErrorMessage, setUploadErrorMessage] = useState('')
+  const [viewOnce, setViewOnce] = useState(false)
 
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(activeChannel.id))
   const contactsMap = useSelector(contactsMapSelector)
@@ -417,6 +455,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
 
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
 
@@ -437,7 +476,13 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     onError
   }
 
-  const handleSendTypingState = (typingState: boolean) => {
+  const handleSendTypingState = (typingState: boolean, code?: string) => {
+    if (code) {
+      const isTypeKeyPressed = checkIsTypeKeyPressed(code)
+      if (!isTypeKeyPressed) {
+        return
+      }
+    }
     if (typingState) {
       setInTypingStateTimout(
         setTimeout(() => {
@@ -469,14 +514,27 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
-  const handleSendEditMessage = (event?: any) => {
+  const handleSendEditMessage = (
+    event?: any,
+    pollDetails?: {
+      name: string
+      options: { id: string; name: string }[]
+      anonymous: boolean
+      allowMultipleVotes: boolean
+      allowVoteRetract: boolean
+      id: string
+    }
+  ) => {
     const { shiftKey, type, code } = event
     const isEnter: boolean = (code === 'Enter' || code === 'NumpadEnter') && shiftKey === false
+    const isPoll = pollDetails && pollDetails.options.length > 0 && pollDetails.name.trim()
+    const messageTextForSend = isPoll ? pollDetails?.name.trim() : messageText.trim()
     const shouldSend =
-      (isEnter || type === 'click') && (messageToEdit || messageText || (attachments.length && attachments.length > 0))
+      (isEnter || type === 'click') &&
+      (messageToEdit || messageTextForSend || (attachments.length && attachments.length > 0))
     if (isEnter) {
       event.preventDefault()
-      if (!messageText.trim() && !attachments.length && !messageToEdit) {
+      if (!messageTextForSend?.trim() && !attachments.length && !messageToEdit) {
         setShouldClearEditor({ clear: true })
       }
     }
@@ -486,8 +544,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       event.stopPropagation()
       if (messageToEdit) {
         handleEditMessage()
-      } else if (messageText.trim() || (attachments.length && attachments.length > 0)) {
-        const messageTexToSend = messageText.trim()
+      } else if (messageTextForSend?.trim() || (attachments.length && attachments.length > 0)) {
+        const messageTexToSend = messageTextForSend?.trim()
         const messageToSend: any = {
           // metadata: mentionedUsersPositions,
           body: messageTexToSend,
@@ -501,13 +559,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageBodyAttributes && messageBodyAttributes.length) {
           messageBodyAttributes.forEach((att: any) => {
             if (att.type === 'mention') {
-              // let mentionsToFind = [...mentionedUsers]
-              // const draftMessage = getDraftMessageFromMap(activeChannel.id)
-              // if (draftMessage) {
-              //   mentionsToFind = [...draftMessage.mentionedUsers, ...mentionedUsers]
-              // }
-              // const mentionToAdd = mentionsToFind.find((mention: any) => mention.id === att.metadata)
-              // mentionUsersToSend.push(mentionToAdd)
               mentionUsersToSend.push({ id: att.metadata })
             }
           })
@@ -521,7 +572,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (messageTexToSend) {
           const linkify = new LinkifyIt()
           const match = linkify.match(messageTexToSend)
-          // const messageTextArr = [messageTexToSend]
           if (match) {
             linkAttachment = {
               type: attachmentTypes.link,
@@ -530,9 +580,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
         }
-        if (messageTexToSend && !attachments.length) {
+        if (messageTexToSend?.trim() && !attachments.length) {
           if (linkAttachment) {
             messageToSend.attachments = [linkAttachment]
+          }
+          if (isPoll) {
+            messageToSend.pollDetails = pollDetails
+            messageToSend.type = 'poll'
+            messageToSend.body = messageTextForSend?.trim()
           }
           dispatch(sendTextMessageAC(messageToSend, activeChannel.id, connectionStatus))
         }
@@ -545,15 +600,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               tid: attachment.tid,
               cachedUrl: attachment.cachedUrl,
               upload: attachment.upload,
-              attachmentUrl: attachment.attachmentUrl,
               metadata: attachment.metadata,
               type: attachment.type,
               size: attachment.size
             }
           })
+          // Add viewOnce flag if enabled and valid
+          if (viewOnce && canShowViewOnceToggle) {
+            messageToSend.viewOnce = true
+          }
           // if (!sendAsSeparateMessage) {
           const attachmentsToSent = [...messageToSend.attachments]
-          if (linkAttachment) {
+          if (linkAttachment && !messageToSend.viewOnce) {
             attachmentsToSent.push(linkAttachment)
           }
           dispatch(
@@ -577,6 +635,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
       setAttachments([])
       attachmentsUpdate = []
+      setViewOnce(false)
       handleCloseReply()
       setShouldClearEditor({ clear: true })
       setMentionedUsers([])
@@ -585,11 +644,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     } else {
       if (typingTimout) {
         if (!inTypingStateTimout) {
-          handleSendTypingState(true)
+          handleSendTypingState(true, code)
         }
         clearTimeout(typingTimout)
       } else {
-        handleSendTypingState(true)
+        handleSendTypingState(true, code)
       }
 
       setTypingTimout(
@@ -662,6 +721,46 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setAttachments([])
       attachmentsUpdate = []
     }
+    // Reset viewOnce when all attachments are removed
+    if (attachmentsUpdate.length === 0) {
+      setViewOnce(false)
+    }
+  }
+
+  const MAX_ATTACHMENTS = 20
+
+  // Check if view-once toggle should be shown (exactly 1 image/video attachment)
+  const canShowViewOnceToggle = useMemo(() => {
+    if (attachments.length !== 1) return false
+    const attachment = attachments[0]
+    return attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video
+  }, [attachments])
+
+  // Handle adding attachment - show warning if view-once is enabled and adding second attachment
+  const handleAddAttachmentWithViewOnceCheck = async (file: File, isMediaAttachment: boolean) => {
+    // Check if maximum attachments limit is reached
+    if (attachments.length >= MAX_ATTACHMENTS) {
+      setUploadErrorMessage(`You can upload a maximum of ${MAX_ATTACHMENTS} files`)
+      return
+    }
+
+    // Check if adding second attachment when view-once is enabled
+    if (viewOnce && attachments.length >= 1) {
+      const newAttachmentType = file.type.split('/')[0]
+      const isNewAttachmentImageOrVideo = newAttachmentType === 'image' || newAttachmentType === 'video'
+
+      if (isNewAttachmentImageOrVideo) {
+        // Show warning and disable view-once
+        setUploadErrorMessage('You can only send one message when "View Once" is enabled')
+        setViewOnce(false)
+        setTimeout(() => {
+          setUploadErrorMessage('')
+        }, 5000)
+      }
+    }
+
+    // Proceed with adding attachment
+    await handleAddAttachment(file, isMediaAttachment)
   }
 
   const showFileUploadError = (message: string) => {
@@ -674,8 +773,25 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const handleFileUpload = (e: any) => {
     const isMediaAttachment = e.target.accept === mediaExtensions
     const fileList = Object.values(e.target.files)
+    const remainingSlots = MAX_ATTACHMENTS - attachments.length
 
-    fileList.forEach(async (file: any) => {
+    if (remainingSlots <= 0) {
+      showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+      fileUploader.current.value = ''
+      return
+    }
+
+    // Only process files that fit within remaining slots
+    const filesToProcess = fileList.slice(0, remainingSlots)
+    const skippedCount = fileList.length - filesToProcess.length
+
+    if (skippedCount > 0) {
+      showFileUploadError(
+        `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+      )
+    }
+
+    filesToProcess.forEach(async (file: any) => {
       let allowUpload = true
       let errorMessage = ''
       if (isMediaAttachment) {
@@ -697,7 +813,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
       }
       if (allowUpload) {
-        handleAddAttachment(file, isMediaAttachment)
+        await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
       } else {
         showFileUploadError(errorMessage)
       }
@@ -712,13 +828,39 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     fileUploader.current.click()
   }
 
+  const handleOpenPoll = () => {
+    setShowPoll(true)
+  }
+
   const handlePastAttachments = (e: any) => {
+    // Allow pasting into explicit allow-paste inputs (e.g., poll popup fields)
+    const target = e.target as HTMLElement
+    if (target && (target as any).dataset && (target as any).dataset.allowPaste === 'true') {
+      return
+    }
     const os = detectOS()
     if (!(os === 'Windows' && browser === 'Firefox')) {
       if (e.clipboardData.files && e.clipboardData.files.length > 0) {
         e.preventDefault()
         const fileList: File[] = Object.values(e.clipboardData.files)
-        fileList.forEach(async (file: any) => {
+        const remainingSlots = MAX_ATTACHMENTS - attachments.length
+
+        if (remainingSlots <= 0) {
+          showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+          return
+        }
+
+        // Only process files that fit within remaining slots
+        const filesToProcess = fileList.slice(0, remainingSlots)
+        const skippedCount = fileList.length - filesToProcess.length
+
+        if (skippedCount > 0) {
+          showFileUploadError(
+            `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+          )
+        }
+
+        filesToProcess.forEach(async (file: any) => {
           let allowUpload = true
           let errorMessage = ''
           if (mediaAttachmentSizeLimit && file.size / 1024 > mediaAttachmentSizeLimit) {
@@ -738,7 +880,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             }
           }
           if (allowUpload) {
-            handleAddAttachment(file, true)
+            await handleAddAttachmentWithViewOnceCheck(file, true)
           } else {
             showFileUploadError(errorMessage)
           }
@@ -1081,6 +1223,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
   useDidUpdate(() => {
     if (draggedAttachments.length > 0) {
+      const remainingSlots = MAX_ATTACHMENTS - attachments.length
+
+      if (remainingSlots <= 0) {
+        showFileUploadError(`You have reached the maximum limit of ${MAX_ATTACHMENTS} files`)
+        dispatch(setDraggedAttachmentsAC([], ''))
+        return
+      }
+
       const attachmentsFiles = draggedAttachments.map((draggedData: any) => {
         const arr = draggedData.data.split(',')
         const bstr = atob(arr[1])
@@ -1091,8 +1241,19 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
         return new File([u8arr], draggedData.name, { type: draggedData.type })
       })
+
+      // Only process files that fit within remaining slots
+      const filesToProcess = attachmentsFiles.slice(0, remainingSlots)
+      const skippedCount = attachmentsFiles.length - filesToProcess.length
+
+      if (skippedCount > 0) {
+        showFileUploadError(
+          `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+        )
+      }
+
       const isMediaAttachment = draggedAttachments[0].attachmentType === 'media'
-      attachmentsFiles.forEach(async (file: any) => {
+      filesToProcess.forEach(async (file: any) => {
         let allowUpload = true
         let errorMessage = ''
 
@@ -1116,7 +1277,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         }
 
         if (allowUpload) {
-          handleAddAttachment(file, isMediaAttachment)
+          await handleAddAttachmentWithViewOnceCheck(file, isMediaAttachment)
         } else {
           showFileUploadError(errorMessage)
         }
@@ -1160,9 +1321,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               type: attachmentTypes.voice
             }
           ],
-          type: 'text'
+          type: 'text',
+          viewOnce: viewOnce || false,
+          parentMessage: messageForReply || null
         }
-        dispatch(sendMessageAC(messageToSend, id, connectionStatus))
+        const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
+        dispatch(sendMessageAC(messageToSend, id, connectionStatus, connectionStatus, sendAttachmentsAsSeparateMessage))
+        // Reset viewOnce after sending
+        setViewOnce(false)
+        setAttachments([])
+        handleCloseReply()
       }
 
       reader.onerror = (e: any) => {
@@ -1211,14 +1379,20 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       prevActiveChannelId = activeChannel.id
     }
 
-    dispatch(getMembersAC(activeChannel.id))
+    if (
+      activeChannel.id &&
+      membersHasNext === undefined &&
+      !(activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT && activeChannel.memberCount === 2)
+    ) {
+      dispatch(getMembersAC(activeChannel.id))
+    }
     setMentionedUsers([])
   }, [activeChannel.id])
 
   useEffect(() => {
     if (
       messageText.trim() ||
-      (editMessageText.trim() && editMessageText && editMessageText.trim() !== messageToEdit.body) ||
+      (editMessageText?.trim() && editMessageText && editMessageText?.trim() !== messageToEdit?.body) ||
       attachments.length
     ) {
       if (attachments.length) {
@@ -1226,9 +1400,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         attachments.forEach((att: any) => {
           if ((att.type === 'video' || att.data.type.split('/')[0] === 'video') && att.type !== 'file') {
             videoAttachment = true
-            if (!readyVideoAttachments[att.tid]) {
-              setSendMessageIsActive(false)
-            } else {
+            if (readyVideoAttachments[att.tid]) {
               setSendMessageIsActive(true)
             }
           }
@@ -1286,7 +1458,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         document.body.removeAttribute('onbeforeunload')
       }
     }
-  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes])
+  }, [messageText, attachments, editMessageText, readyVideoAttachments, messageBodyAttributes, messageToEdit])
 
   useDidUpdate(() => {
     if (mentionedUsers && mentionedUsers.length) {
@@ -1298,20 +1470,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       })
     }
   }, [mentionedUsers])
-
-  useEffect(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      const pendingMessagesMap = getPendingMessagesMap()
-      const pendingMessagesMapCopy = JSON.parse(JSON.stringify(pendingMessagesMap))
-      setTimeout(() => {
-        Object.keys(pendingMessagesMapCopy).forEach((key: any) => {
-          pendingMessagesMapCopy[key].forEach((msg: IMessage) => {
-            dispatch(resendMessageAC(msg, key, connectionStatus))
-          })
-        })
-      }, 1000)
-    }
-  }, [connectionStatus])
 
   useDidUpdate(() => {
     if (handleAttachmentSelected) {
@@ -1325,7 +1483,27 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       }
     }
     attachmentsUpdate = attachments
-  }, [attachments])
+
+    // Check if there's an active audio recording
+    const hasAudioRecording = showRecording || getAudioRecordingFromMap(activeChannel?.id)?.file
+
+    // Auto-disable view-once if attachment count changes from 1 to more than 1
+    // But allow viewOnce for audio recordings even when attachments array is empty
+    if (viewOnce && attachments.length !== 1 && !hasAudioRecording) {
+      setViewOnce(false)
+    }
+    // Auto-disable view-once if the single attachment is not image/video/voice
+    if (viewOnce && attachments.length === 1) {
+      const attachment = attachments[0]
+      if (
+        attachment.type !== attachmentTypes.image &&
+        attachment.type !== attachmentTypes.video &&
+        attachment.type !== attachmentTypes.voice
+      ) {
+        setViewOnce(false)
+      }
+    }
+  }, [attachments, viewOnce, showRecording, activeChannel?.id])
 
   useEffect(() => {
     if (emojiBtnRef.current && messageInputRef.current) {
@@ -1454,6 +1632,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     }
   }
 
+  const isPollMessageSelected = useMemo(() => {
+    return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
+  }, [selectedMessagesMap])
+
   return (
     <SendMessageWrapper backgroundColor={backgroundColor || background}>
       <Container
@@ -1466,21 +1648,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         toolBarLeft={selectedText && selectedText.current ? selectedText.current.left : ''}
         selectionBackgroundColor={textSelectionBackgroundColor || background}
       >
-        {uploadErrorMessage && <UploadErrorMessage color={errorColor}>{uploadErrorMessage}</UploadErrorMessage>}
         {selectedMessagesMap && selectedMessagesMap.size > 0 ? (
           <SelectedMessagesWrapper>
             <MessageCountWrapper color={textPrimary}>
               {selectedMessagesMap.size} {selectedMessagesMap.size > 1 ? ' messages selected' : ' message selected'}
             </MessageCountWrapper>
-            <CustomButton
-              onClick={handleToggleForwardMessagePopup}
-              backgroundColor={backgroundHovered}
-              marginLeft='32px'
-              color={textPrimary}
-            >
-              <ForwardIcon />
-              Forward
-            </CustomButton>
+            {!isPollMessageSelected && (
+              <CustomButton
+                onClick={handleToggleForwardMessagePopup}
+                backgroundColor={backgroundHovered}
+                marginLeft='32px'
+                color={textPrimary}
+              >
+                <ForwardIcon />
+                Forward
+              </CustomButton>
+            )}
             <CustomButton
               onClick={handleToggleDeleteMessagePopup}
               color={errorColor}
@@ -1552,6 +1735,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               </ReadOnlyCont>
             ) : (
               <React.Fragment>
+                {showPoll && (
+                  <CreatePollPopup
+                    togglePopup={() => setShowPoll(false)}
+                    onCreate={(event, payload) => {
+                      handleSendEditMessage(event, payload)
+                    }}
+                  />
+                )}
                 <TypingIndicator>
                   {typingOrRecording?.items.length > 0 &&
                     (CustomTypingIndicator ? (
@@ -1625,6 +1816,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </CloseEditMode>
                     <ReplyMessageCont>
                       {!!(messageForReply.attachments && messageForReply.attachments.length) &&
+                        !messageForReply.viewOnce &&
                         (messageForReply.attachments[0].type === attachmentTypes.image ||
                         messageForReply.attachments[0].type === attachmentTypes.video ? (
                           <Attachment
@@ -1639,7 +1831,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             </ReplyIconWrapper>
                           )
                         ))}
-                      <ReplyMessageBody>
+                      <ReplyMessageBody linkColor={accentColor}>
                         <EditReplyMessageHeader color={accentColor}>
                           {replyMessageIcon || <ReplyIcon />} Reply to
                           <UserName>
@@ -1656,13 +1848,53 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         </EditReplyMessageHeader>
                         {messageForReply.attachments && messageForReply.attachments.length ? (
                           messageForReply.attachments[0].type === attachmentTypes.voice ? (
-                            'Voice'
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -3px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Voice'}
+                            </TextInOneLine>
+                          ) : !messageForReply.viewOnce &&
+                            messageForReply.body &&
+                            messageForReply.bodyAttributes &&
+                            messageForReply.bodyAttributes.length > 0 ? (
+                            MessageTextFormat({
+                              text: messageForReply.body,
+                              message: {
+                                ...messageForReply,
+                                mentionedUsers:
+                                  messageForReply.mentionedUsers && messageForReply.mentionedUsers.length > 0
+                                    ? messageForReply.mentionedUsers
+                                    : activeChannelMembers &&
+                                        messageForReply.bodyAttributes &&
+                                        messageForReply.bodyAttributes.length > 0
+                                      ? messageForReply.bodyAttributes
+                                          .filter((attr: any) => attr.type.includes('mention'))
+                                          .map((attr: any) => {
+                                            const member = activeChannelMembers.find((m: any) => m.id === attr.metadata)
+                                            return member || null
+                                          })
+                                          .filter((m: IMember | null): m is IMember => m !== null)
+                                      : messageForReply.mentionedUsers || [],
+                                channel: activeChannelMembers ? { members: activeChannelMembers } : undefined
+                              },
+                              contactsMap,
+                              getFromContacts,
+                              accentColor,
+                              textSecondary
+                            })
                           ) : messageForReply.attachments[0].type === attachmentTypes.image ? (
-                            <TextInOneLine>{messageForReply.body || 'Photo'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Photo'}
+                            </TextInOneLine>
                           ) : messageForReply.attachments[0].type === attachmentTypes.video ? (
-                            <TextInOneLine>{messageForReply.body || 'Video'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply?.viewOnce && <ViewOnceIconOpen style={{ margin: '0 4px -2px 0' }} />}
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'Video'}
+                            </TextInOneLine>
                           ) : (
-                            <TextInOneLine>{messageForReply.body || 'File'}</TextInOneLine>
+                            <TextInOneLine>
+                              {messageForReply.body && !messageForReply.viewOnce ? messageForReply.body : 'File'}
+                            </TextInOneLine>
                           )
                         ) : (
                           MessageTextFormat({
@@ -1701,8 +1933,16 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                   </ChosenAttachments>
                 )}
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
+                  {uploadErrorMessage && (
+                    <ViewOnceWarningTooltip backgroundColor={tooltipBackground}>
+                      <WarningIconWrapper>
+                        <BlockInfoIcon />
+                      </WarningIconWrapper>
+                      <WarningText color={textOnPrimary}>{uploadErrorMessage}</WarningText>
+                    </ViewOnceWarningTooltip>
+                  )}
                   <UploadFile ref={fileUploader} onChange={handleFileUpload} multiple type='file' />
-                  {showRecording || getAudioRecordingFromMap(activeChannel.id) ? (
+                  {(showRecording || getAudioRecordingFromMap(activeChannel.id)) && !messageToEdit ? (
                     <AudioCont />
                   ) : (
                     <MessageInputWrapper
@@ -1731,9 +1971,22 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                           {AddEmojisIcon || <EmojiSmileIcon />}
                         </EmojiButton>
                       )}
-                      {showAddAttachments && addAttachmentByMenu ? (
+                      {showViewOnceToggle && canShowViewOnceToggle && (
+                        <ViewOnceToggleCont
+                          key='view-once'
+                          order={viewOnceIconOrder}
+                          onClick={() => setViewOnce(!viewOnce)}
+                          color={viewOnce ? accentColor : iconInactive}
+                          textColor={viewOnce ? textOnPrimary : iconInactive}
+                          height={inputContainerHeight || minHeight}
+                        >
+                          {viewOnce
+                            ? ViewOnceSelectedSVGIcon || <ViewOnceSelectedIcon />
+                            : ViewOnceNotSelectedSVGIcon || <ViewOnceNotSelectedIcon />}
+                        </ViewOnceToggleCont>
+                      )}
+                      {showAddAttachments && addAttachmentByMenu && !messageToEdit ? (
                         <DropDown
-                          theme={theme}
                           forceClose={showChooseAttachmentType}
                           position={addAttachmentsInRightSide ? 'top' : 'topRight'}
                           margin='auto 0 0'
@@ -1776,10 +2029,24 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 {chooseFileAttachmentText ?? 'File'}
                               </DropdownOptionLi>
                             )}
+                            {pollOptions?.showAddPoll && (
+                              <DropdownOptionLi
+                                key={3}
+                                textColor={textPrimary}
+                                hoverBackground={backgroundHovered}
+                                onClick={handleOpenPoll}
+                                iconWidth='20px'
+                                iconColor={iconInactive}
+                              >
+                                <PollIcon />
+                                {pollOptions?.choosePollText ?? 'Poll'}
+                              </DropdownOptionLi>
+                            )}
                           </DropdownOptionsUl>
                         </DropDown>
                       ) : (
-                        (showChooseMediaAttachment || showChooseFileAttachment) && (
+                        (showChooseMediaAttachment || showChooseFileAttachment) &&
+                        !messageToEdit && (
                           <AddAttachmentIcon
                             ref={addAttachmentsBtnRef}
                             color={iconInactive}
@@ -1800,6 +2067,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         highlightedBackground={textSelectionBackgroundColor || highlightedBackground}
                         borderRadius={inputBorderRadius}
                         color={textPrimary}
+                        thumbColor={surface2}
                       >
                         <LexicalComposer initialConfig={initialConfig}>
                           <AutoFocusPlugin messageForReply={messageForReply} />
@@ -1820,6 +2088,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                             setMessageBodyAttributes={setMessageBodyAttributes}
                             setMessageText={messageToEdit ? setEditMessageText : setMessageText}
                             messageToEdit={messageToEdit}
+                            activeChannelMembers={activeChannelMembers}
+                            contactsMap={contactsMap}
+                            getFromContacts={getFromContacts}
+                            setMentionedMember={handleSetMentionMember}
                           />
                           <React.Fragment>
                             {isEmojisOpened && (
@@ -1841,6 +2113,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 getFromContacts={getFromContacts}
                                 members={activeChannelMembers}
                                 setMentionsIsOpen={setMentionsIsOpen}
+                                channelId={activeChannel?.id}
                               />
                             )}
                             <HistoryPlugin />
@@ -1849,7 +2122,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                                 <div
                                   onKeyDown={handleSendEditMessage}
                                   onDoubleClick={handleDoubleClick}
-                                  className='rich_text_editor'
+                                  className={`rich_text_editor ${isScrolling ? 'show-scrollbar' : ''}`}
+                                  onMouseEnter={() => setIsScrolling(true)}
+                                  onMouseLeave={() => setIsScrolling(false)}
                                   ref={onRef}
                                 >
                                   <ContentEditable className='content_editable_input' />
@@ -1875,7 +2150,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </MessageInputWrapper>
                   )}
 
-                  {sendMessageIsActive || !voiceMessage || messageToEdit ? (
+                  {sendMessageIsActive ||
+                  (!voiceMessage && !getAudioRecordingFromMap(activeChannel?.id)?.file) ||
+                  messageToEdit ? (
                     <SendMessageButton
                       isCustomButton={CustomSendMessageButton}
                       isActive={sendMessageIsActive}
@@ -1903,6 +2180,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                         showRecording={showRecording}
                         channelId={activeChannel.id}
                         maxRecordingDuration={audioRecordingMaxDuration}
+                        showViewOnceToggle={showViewOnceToggle}
+                        isSelfChannel={isSelfChannel}
+                        viewOnce={viewOnce}
+                        setViewOnce={setViewOnce}
+                        ViewOnceSelectedSVGIcon={ViewOnceSelectedSVGIcon}
+                        ViewOnceNotSelectedSVGIcon={ViewOnceNotSelectedSVGIcon}
                       />
                     </SendMessageButton>
                   )}
@@ -1919,7 +2202,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 const SendMessageWrapper = styled.div<{ backgroundColor: string }>`
   background-color: ${(props) => props.backgroundColor};
   position: relative;
-  z-index: 15;
+  z-index: 100;
 `
 const Container = styled.div<{
   margin?: string
@@ -1938,7 +2221,7 @@ const Container = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px'};
   position: relative;
   padding: ${(props) => props.padding || '0 calc(4% + 32px)'};
-  z-index: 15;
+  z-index: 100;
 
   & span.rdw-suggestion-dropdown {
     position: absolute;
@@ -2008,11 +2291,40 @@ const EditMessageText = styled.p<any>`
   text-overflow: ellipsis;
   word-break: break-word;
 `
-const UploadErrorMessage = styled.p<{ color: string }>`
-  margin: 0;
+const ViewOnceWarningTooltip = styled.div<{ backgroundColor: string }>`
   position: absolute;
-  top: -30px;
+  top: -70px;
+  right: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background-color: ${(props) => props.backgroundColor};
+  border-radius: 16px;
+  z-index: 1000;
+  max-width: 300px;
+  box-shadow: 0px 2px 8px rgba(0, 0, 0, 0.15);
+`
+
+const WarningIconWrapper = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+
+  & > svg {
+    width: 24px;
+    height: 24px;
+  }
+`
+
+const WarningText = styled.span<{ color: string }>`
   color: ${(props) => props.color};
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 18px;
 `
 
 const CloseEditMode = styled.span<{ color: string }>`
@@ -2035,13 +2347,16 @@ const UserName = styled.span<any>`
   margin-left: 4px;
 `
 
-const ReplyMessageBody = styled.div`
+const ReplyMessageBody = styled.div<{ linkColor: string }>`
   word-break: break-word;
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
   text-overflow: ellipsis;
+  a {
+    color: ${(props) => props.linkColor};
+  }
 `
 
 const EditReplyMessageHeader = styled.h4<{ color: string }>`
@@ -2134,6 +2449,7 @@ const LexicalWrapper = styled.div<{
   mentionColor: string
   isChrome?: boolean
   highlightedBackground?: string
+  thumbColor?: string
 }>`
   position: relative;
   width: 100%;
@@ -2146,12 +2462,29 @@ const LexicalWrapper = styled.div<{
     border: none;
     box-sizing: border-box;
     outline: none !important;
-    overflow: auto;
     border-radius: ${(props) => props.borderRadius};
     background-color: ${(props) => props.backgroundColor};
     padding: ${(props) => props.paddings || '8px 6px'};
     color: ${(props) => props.color};
     order: ${(props) => (props.order === 0 || props.order ? props.order : 1)};
+    overflow-y: auto;
+    overflow-x: hidden;
+
+    &::-webkit-scrollbar {
+      width: 8px;
+      background: transparent;
+    }
+    &::-webkit-scrollbar-thumb {
+      background: transparent;
+    }
+
+    &.show-scrollbar::-webkit-scrollbar-thumb {
+      background: ${(props) => props.thumbColor};
+      border-radius: 4px;
+    }
+    &.show-scrollbar::-webkit-scrollbar-track {
+      background: transparent;
+    }
 
     & p {
       font-size: 15px;
@@ -2462,6 +2795,8 @@ const ReplyIconWrapper = styled.span<{ backgroundColor: string; iconColor: strin
   margin-right: 12px;
   width: 40px;
   height: 40px;
+  min-width: 40px;
+  min-height: 40px;
   background-color: ${(props) => props.backgroundColor};
   border-radius: 50%;
 

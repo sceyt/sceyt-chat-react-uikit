@@ -34,20 +34,27 @@ import {
   formatLargeText,
   setDownloadFilePromise
 } from '../../helpers'
-import { attachmentTypes, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
+import { attachmentTypes, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS, THEME, UPLOAD_STATE } from '../../helpers/constants'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { getCustomDownloader, getCustomUploader } from '../../helpers/customUploader'
 import { AttachmentIconCont, UploadProgress, UploadPercent, CancelResumeWrapper } from '../../UIHelper'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../helpers/attachmentsCache'
-import { base64ToToDataURL } from '../../helpers/resizeImage'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../helpers/attachmentsCache'
+import { base64ToDataURL } from '../../helpers/resizeImage'
 import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
+import ViewOnceVoiceModal from '../../common/popups/viewOnceMedia/ViewOnceVoiceModal'
 // Components
 import VideoPreview from '../VideoPreview'
 import AudioPlayer from '../AudioPlayer'
 import log from 'loglevel'
 import { isJSON } from 'helpers/message'
+import { updateMessageAsOpenedAC } from 'store/channel/actions'
+import { compressAndCacheImage, getVideoFirstFrame } from 'helpers/getVideoFrame'
 
 interface AttachmentPops {
   attachment: IAttachment
@@ -78,6 +85,7 @@ interface AttachmentPops {
   messagePlayed?: boolean | undefined
   channelId?: string
   incoming?: boolean
+  viewOnce?: boolean
 }
 
 const Attachment = ({
@@ -104,7 +112,8 @@ const Attachment = ({
   messageType,
   messagePlayed,
   channelId,
-  incoming
+  incoming,
+  viewOnce
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -116,7 +125,9 @@ const Attachment = ({
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.BORDER]: borderColor,
-    [THEME_COLORS.BACKGROUND]: background
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground
   } = useColor()
 
   const dispatch = useDispatch()
@@ -128,12 +139,15 @@ const Attachment = ({
   const imageContRef = useRef<HTMLDivElement>(null)
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
   const attachmentUrlFromMap = useMemo(
-    () => attachmentUpdatedMap[attachment.url],
+    () => attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
     [attachmentUpdatedMap, attachment.url]
   )
-  const [imageLoading, setImageLoading] = useState(!attachmentUrlFromMap)
+  const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
+  const [imageLoaded, setImageLoaded] = useState(false)
+  const [shouldAnimateImage, setShouldAnimateImage] = useState(false)
+  const previousImageSrcRef = useRef<string | undefined>(undefined)
   const [failTimeout, setFailTimeout]: any = useState()
   const [progress, setProgress] = useState(3)
   const [sizeProgress, setSizeProgress] = useState<{ loaded: number; total: number } | undefined>({
@@ -173,7 +187,7 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
-  let attachmentThumb
+  let attachmentThumb: string | undefined
   let withPrefix = true
   if (
     attachment.type !== attachmentTypes.voice &&
@@ -183,7 +197,7 @@ const Attachment = ({
   ) {
     try {
       if (attachmentMetadata.tmb.length < 70) {
-        attachmentThumb = base64ToToDataURL(attachmentMetadata.tmb)
+        attachmentThumb = base64ToDataURL(attachmentMetadata.tmb)
         withPrefix = false
       } else {
         attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
@@ -193,9 +207,29 @@ const Attachment = ({
     }
   }
 
+  // Track image source changes to detect thumbnail -> full image transition
+  useEffect(() => {
+    const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+    const wasThumbnail = previousImageSrcRef.current === attachmentThumb
+    const isNowFullImage =
+      currentSrc &&
+      currentSrc !== attachmentThumb &&
+      (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+
+    if (wasThumbnail && isNowFullImage && currentSrc !== previousImageSrcRef.current) {
+      // Reset animation state when transitioning from thumbnail to full image
+      setImageLoaded(false)
+      setShouldAnimateImage(true)
+    }
+
+    previousImageSrcRef.current = currentSrc
+  }, [attachment.attachmentUrl, attachmentUrlFromMap, attachmentUrl, attachmentThumb])
+
   const downloadImage = (url: string) => {
-    const image = new Image()
+    const image = new Image(renderWidth / 2, renderHeight / 2)
     image.src = url
+    image.width = renderWidth / 2
+    image.height = renderHeight / 2
     image.onload = () => {
       setAttachmentUrl(url)
       setDownloadingFile(false)
@@ -204,6 +238,7 @@ const Attachment = ({
       log.error('Error on download image', url)
     }
   }
+
   const handlePauseResumeDownload = (e: Event) => {
     e.stopPropagation()
     if (downloadIsCancelled) {
@@ -324,17 +359,68 @@ const Attachment = ({
       const result = await urlPromise
       const url = URL.createObjectURL(result.Body)
       setSizeProgress(undefined)
-      const response = await fetch(url)
-      setAttachmentToCache(attachment.url, response)
+      let downloadingUrl = url
+      if (attachment.type === attachmentTypes.image) {
+        const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+        if (compressedUrl) {
+          downloadingUrl = compressedUrl
+        }
+        setAttachmentToCache(
+          attachment.url + '_original_image_url',
+          new Response(result.Body, {
+            headers: { 'Content-Type': 'image/jpeg' }
+          })
+        )
+        dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_image_url', url))
+      } else {
+        if (attachment.type === attachmentTypes.video) {
+          const result = await getVideoFirstFrame(url, renderWidth, renderHeight, 0.8)
+          if (result) {
+            const { frameBlobUrl, blob } = result
+            const response = new Response(blob, {
+              headers: { 'Content-Type': 'image/jpeg' }
+            })
+            const key = attachment.url
+            await setAttachmentToCache(key, response)
+            dispatch(setUpdateMessageAttachmentAC(key, frameBlobUrl))
+          }
+        }
+        if (attachment.type === attachmentTypes.video) {
+          setAttachmentToCache(
+            attachment.url + `_original_video_url`,
+            new Response(result.Body, {
+              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            })
+          )
+          dispatch(setUpdateMessageAttachmentAC(attachment.url + `_original_video_url`, url))
+        } else {
+          setAttachmentToCache(
+            attachment.url,
+            new Response(result.Body, {
+              headers: { 'Content-Type': attachment.type || 'application/octet-stream' }
+            })
+          )
+          dispatch(setUpdateMessageAttachmentAC(attachment.url, url))
+        }
+      }
       setIsCached(true)
       setDownloadingFile(false)
-      setAttachmentUrl(url)
+      setAttachmentUrl(downloadingUrl)
     } else {
-      setAttachmentUrl(attachment.url)
-      fetch(attachment.url).then(async (response) => {
-        setAttachmentToCache(attachment.url, response)
+      let downloadingUrl = attachment.url
+      if (attachment.type === attachmentTypes.image) {
+        const compressedUrl = await compressAndCacheImage(attachment.url, attachment.url, renderWidth, renderHeight)
+        if (compressedUrl) {
+          downloadingUrl = compressedUrl
+        }
         setIsCached(true)
-      })
+      } else {
+        fetch(attachment.url).then(async (response) => {
+          setAttachmentToCache(attachment.url, response)
+          setIsCached(true)
+        })
+      }
+      setAttachmentUrl(downloadingUrl)
     }
   }
 
@@ -345,30 +431,15 @@ const Attachment = ({
   }, [attachmentUrl])
 
   useEffect(() => {
-    /* if (attachment.type === 'link' && !isPreview) {
-      getMetadataFromUrl(attachment.url).then((res) => {
-        if (res) {
-          if (res.title) {
-            setLinkTitle(res.title)
-          }
-          if (res.description) {
-            setLinkDescription(res.description)
-          }
-          if (res.image) {
-            setLinkImage(res.image)
-          }
-        }
-      })
-    } */
-    // setAttachmentUrl('')
     if (
       !attachment.attachmentUrl &&
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       attachment.id &&
+      !attachmentUrlFromMap &&
       !(attachment.type === attachmentTypes.file || attachment.type === attachmentTypes.link)
     ) {
       getAttachmentUrlFromCache(attachment.url)
-        .then(async (cachedUrl) => {
+        .then(async (cachedUrl: string | false) => {
           if (attachment.type === attachmentTypes.image && !isPreview) {
             if (cachedUrl) {
               // @ts-ignore
@@ -391,18 +462,40 @@ const Attachment = ({
                   },
                   messageType
                 ).then(async (url) => {
-                  downloadImage(url)
-                  const response = await fetch(url)
-                  setAttachmentToCache(attachment.url, response)
+                  const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+                  if (compressedUrl) {
+                    setAttachmentUrl(compressedUrl)
+                  }
+                  downloadImage(compressedUrl || url)
+                  dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || url))
                   setIsCached(true)
                   setDownloadingFile(false)
+                  fetch(url).then(async (response) => {
+                    const blob = await response.blob()
+                    const originalImageUrl = attachment.url + '_original_image_url'
+                    setAttachmentToCache(
+                      originalImageUrl,
+                      new Response(blob, {
+                        headers: { 'Content-Type': 'image/jpeg' }
+                      })
+                    )
+                    const blobUrl = URL.createObjectURL(blob)
+                    dispatch(setUpdateMessageAttachmentAC(originalImageUrl, blobUrl))
+                  })
                 })
               } else {
-                downloadImage(attachment.url)
-                fetch(attachment.url).then(async (response) => {
-                  setAttachmentToCache(attachment.url, response)
-                  setIsCached(true)
-                })
+                const compressedUrl = await compressAndCacheImage(
+                  attachment.url,
+                  attachment.url,
+                  renderWidth,
+                  renderHeight
+                )
+                if (compressedUrl) {
+                  setAttachmentUrl(compressedUrl)
+                }
+                downloadImage(compressedUrl || attachment.url)
+                dispatch(setUpdateMessageAttachmentAC(attachment.url, compressedUrl || attachment.url))
+                setIsCached(true)
               }
             }
           } else {
@@ -434,9 +527,18 @@ const Attachment = ({
               },
               messageType
             ).then(async (url) => {
-              const response = await fetch(url)
-              setAttachmentToCache(attachment.url, response)
-              setAttachmentUrl(url)
+              let downloadingUrl = url
+              if (attachment.type === attachmentTypes.image) {
+                const compressedUrl = await compressAndCacheImage(url, attachment.url, renderWidth, renderHeight)
+                if (compressedUrl) {
+                  downloadingUrl = compressedUrl
+                }
+              } else {
+                const response = await fetch(url)
+                setAttachmentToCache(attachment.url, response)
+              }
+              setAttachmentUrl(downloadingUrl)
+              dispatch(setUpdateMessageAttachmentAC(attachment.url, attachment.url))
               setDownloadingFile(false)
             })
           } else {
@@ -490,6 +592,29 @@ const Attachment = ({
 
   return (
     <React.Fragment>
+      {viewOnce && attachment.type === attachmentTypes.voice && (
+        <ViewOnceVoiceModal
+          url={attachment.attachmentUrl || attachmentUrl}
+          file={attachment}
+          messagePlayed={messagePlayed || false}
+          channelId={channelId || ''}
+          incoming={incoming || false}
+          isOpen={viewOnceVoiceModalOpen}
+          onClose={() => {
+            setViewOnceVoiceModalOpen(false)
+            if (incoming) {
+              dispatch(
+                updateMessageAsOpenedAC(channelId || '', {
+                  messageIds: [attachment.messageId],
+                  user: attachment.user || null,
+                  createdAt: new Date(),
+                  name: MESSAGE_DELIVERY_STATUS.OPENED
+                })
+              )
+            }
+          }}
+        />
+      )}
       {attachment.type === attachmentTypes.image ? (
         <AttachmentImgCont
           draggable={false}
@@ -499,7 +624,6 @@ const Attachment = ({
           isPreview={isPreview}
           ref={imageContRef}
           borderRadius={borderRadius}
-          backgroundImage={attachmentThumb}
           withPrefix={withPrefix}
           isRepliedMessage={isRepliedMessage}
           fitTheContainer={isDetailsView}
@@ -508,20 +632,43 @@ const Attachment = ({
         >
           <AttachmentImg
             draggable={false}
-            src={attachment.attachmentUrl || attachmentUrl}
             borderRadius={borderRadius}
             imageMinWidth={imageMinWidth}
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
-            fitTheContainer={isDetailsView}
+            src={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
+            fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
               // attachmentMetadata && (attachmentMetadata.szh > 400 ? '400px' : `${attachmentMetadata.szh}px`)
             }
-            onLoad={() => setImageLoading(false)}
+            isDetailsView={isDetailsView}
+            borderColor={incoming ? incomingMessageBackground : outgoingMessageBackground}
+            fetchpriority='high'
+            loading='lazy'
+            decoding='async'
+            $shouldAnimate={shouldAnimateImage}
+            $isLoaded={imageLoaded}
+            onLoad={() => {
+              const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+              const wasThumbnail = previousImageSrcRef.current === attachmentThumb
+              const isNowFullImage =
+                currentSrc &&
+                currentSrc !== attachmentThumb &&
+                (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+
+              if (wasThumbnail && isNowFullImage) {
+                setShouldAnimateImage(true)
+              }
+              setImageLoaded(true)
+              previousImageSrcRef.current = currentSrc
+            }}
           />
-          {!isPreview && (isInUploadingState || imageLoading) ? (
+          {!isPreview &&
+          !isRepliedMessage &&
+          (isInUploadingState ||
+            !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
               backgroundImage={attachmentThumb}
               isRepliedMessage={isRepliedMessage}
@@ -612,7 +759,7 @@ const Attachment = ({
           ) : null}
           {isPreview && (
             <RemoveChosenFile
-              backgroundColor={background}
+              $backgroundColor={background}
               color={iconInactive}
               onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
@@ -634,7 +781,7 @@ const Attachment = ({
               }
               isDetailsView={isDetailsView}
             >
-              {isInUploadingState || downloadingFile ? (
+              {(isInUploadingState || downloadingFile) && !isRepliedMessage && !isPreview ? (
                 <UploadProgress
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
@@ -698,7 +845,6 @@ const Attachment = ({
                 </UploadProgress>
               ) : null}
               <VideoPreview
-                theme={theme}
                 width={
                   isRepliedMessage
                     ? '40px'
@@ -714,7 +860,7 @@ const Attachment = ({
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
                 file={attachment}
-                src={attachmentUrl}
+                src={attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
                 uploading={
                   attachmentCompilationState[attachment.tid!] &&
@@ -745,7 +891,7 @@ const Attachment = ({
                 isPreview
               />
               <RemoveChosenFile
-                backgroundColor={background}
+                $backgroundColor={background}
                 color={iconPrimary}
                 onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
               />
@@ -759,6 +905,16 @@ const Attachment = ({
           messagePlayed={messagePlayed}
           channelId={channelId}
           incoming={incoming}
+          viewOnce={viewOnce}
+          setViewOnceVoiceModalOpen={
+            viewOnce
+              ? () => {
+                  if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+                    setViewOnceVoiceModalOpen(true)
+                  }
+                }
+              : undefined
+          }
         />
       ) : attachment.type === attachmentTypes.link ? null : (
         /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>
@@ -780,16 +936,21 @@ const Attachment = ({
             attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED
           }
           borderRadius={isRepliedMessage ? '50%' : borderRadius}
-          background={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+          backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
           isRepliedMessage={isRepliedMessage}
           border={selectedFileAttachmentsBoxBorder || (theme === THEME.DARK ? 'none' : '')}
           width={fileAttachmentWidth}
           borderColor={borderColor}
         >
           {attachmentThumb ? (
-            <FileThumbnail src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb} />
+            <FileThumbnail
+              src={withPrefix ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb}
+              loading='lazy'
+              decoding='async'
+              fetchpriority='high'
+            />
           ) : (
-            // <FileThumbnail src={base64ToToDataURL(attachmentMetadata.tmb)} />
+            // <FileThumbnail src={base64ToDataURL(attachmentMetadata.tmb)} />
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
@@ -799,12 +960,12 @@ const Attachment = ({
                   }
                   width='40px'
                   height='40px'
-                  src={attachment.attachmentUrl}
+                  src={attachment.attachmentUrl || attachmentUrl}
                   setVideoIsReadyToSend={setVideoIsReadyToSend}
                   isPreview
                 />
               ) : isPreview && attachment.attachmentUrl ? (
-                <FileThumbnail src={attachment.attachmentUrl} />
+                <FileThumbnail src={attachment.attachmentUrl || attachmentUrl} />
               ) : (
                 attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.UPLOADING &&
                 attachmentCompilationState[attachment.tid!] !== UPLOAD_STATE.PAUSED &&
@@ -895,7 +1056,7 @@ const Attachment = ({
           )}
           {isPreview && (
             <RemoveChosenFile
-              backgroundColor={background}
+              $backgroundColor={background}
               color={iconPrimary}
               onClick={() => handleDeleteSelectedAttachment(attachment.tid!)}
             />
@@ -938,7 +1099,6 @@ const DownloadImage = styled.div<any>`
 const AttachmentImgCont = styled.div<{
   isPreview: boolean
   backgroundColor?: string
-  backgroundImage?: string
   ref?: any
   borderRadius?: string
   imgIsLoaded?: boolean
@@ -958,8 +1118,14 @@ const AttachmentImgCont = styled.div<{
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
   max-width: 100%;
-  height: ${(props) =>
-    props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+  ${(props) =>
+    !props.fitTheContainer && !props.isRepliedMessage && props.height && props.width
+      ? `aspect-ratio: ${props.width < 165 ? 165 : props.width} / ${
+          props.width < 165 ? (props.height * 165) / props.width : props.height
+        };`
+      : `
+     height: ${props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.height && `${props.height}px`};
+    `}
   max-height: 400px;
   min-height: ${(props) => props.height && '165px'};
   cursor: pointer;
@@ -1047,7 +1213,7 @@ export const AttachmentFile = styled.div<{
   isRepliedMessage?: boolean
   isUploading?: boolean
   borderRadius?: string
-  background?: string
+  backgroundColor?: string
   border?: string
   width?: number
   borderColor: string
@@ -1060,7 +1226,7 @@ export const AttachmentFile = styled.div<{
   min-width: ${(props) => !props.isRepliedMessage && (props.width || (props.isUploading ? '260px' : '205px'))};
   transition: all 0.1s;
   //height: 70px;
-  background: ${(props) => props.background};
+  background: ${(props) => props.backgroundColor};
   border: ${(props) => props.border || `1px solid  ${props.borderColor}`};
   box-sizing: border-box;
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
@@ -1092,7 +1258,7 @@ export const AttachmentFile = styled.div<{
   }
 `
 
-const RemoveChosenFile = styled(RemoveAttachment)<{ backgroundColor: string; color: string }>`
+const RemoveChosenFile = styled(RemoveAttachment)<{ $backgroundColor: string; color: string }>`
   position: absolute;
   width: 20px;
   height: 20px !important;
@@ -1101,24 +1267,14 @@ const RemoveChosenFile = styled(RemoveAttachment)<{ backgroundColor: string; col
   padding: 2px;
   cursor: pointer;
   color: ${(props) => props.color};
-  z-index: 4;
+  z-index: 5;
   circle {
-    stroke: ${(props) => props.backgroundColor};
+    stroke: ${(props) => props.$backgroundColor};
   }
   path {
-    stroke: ${(props) => props.backgroundColor};
+    stroke: ${(props) => props.$backgroundColor};
   }
 `
-/*
-const FailedFileIcon = styled(ErrorIcon)`
-  position: absolute;
-  top: -6px;
-  right: -24px;
-  width: 20px;
-  height: 20px;
-  padding: 2px;
-  cursor: pointer;
-` */
 
 const AttachmentName = styled.h3<{ color: string }>`
   font-size: 15px;
@@ -1157,25 +1313,30 @@ export const AttachmentImg = styled.img<{
   fitTheContainer?: boolean
   imageMinWidth?: string
   imageMaxHeight?: string
+  isDetailsView?: boolean
+  borderColor?: string
+  fetchpriority?: string
+  $shouldAnimate?: boolean
+  $isLoaded?: boolean
 }>`
   position: ${(props) => props.absolute && 'absolute'};
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
   padding: ${(props) => (props.isRepliedMessage ? '0.5px' : props.withBorder && `2px`)};
   box-sizing: border-box;
   max-width: 100%;
-  max-height: ${(props) => props.imageMaxHeight || '400px'};
+  max-height: ${(props) => (props.imageMaxHeight && !props.isDetailsView ? '400px' : '100%')};
   width: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
       ? '165px'
       : props.isRepliedMessage
         ? '40px'
         : ''};
   min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer
+    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
       ? props.imageMinWidth || '165px'
       : props.isRepliedMessage
         ? '40px'
@@ -1183,6 +1344,8 @@ export const AttachmentImg = styled.img<{
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;
+  opacity: ${(props) => (props.$shouldAnimate && !props.$isLoaded ? 0 : 1)};
+  transition: opacity 0.3s ease-in-out;
 `
 
 const VideoCont = styled.div<{ isDetailsView?: boolean }>`
@@ -1190,45 +1353,3 @@ const VideoCont = styled.div<{ isDetailsView?: boolean }>`
   cursor: pointer;
   height: ${(props) => props.isDetailsView && '100%'};
 `
-
-/* const LinkAttachmentCont = styled.a<{ isDetailsView?: boolean }>`
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  cursor: pointer;
-  height: 248px;
-  text-decoration: none;
-`
-
-const LinkTitle = styled.h4`
-  margin: 0 12px 4px;
-  color: ${colors.gray6};
-  font-weight: 500;
-  font-size: 15px;
-  line-height: 20px;
-  letter-spacing: -0.2px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 1;
-  -webkit-box-orient: vertical;
-`
-
-const LinkDescription = styled.p`
-  margin: 0 12px 10px;
-  color: ${colors.gray6};
-  font-weight: 400;
-  font-size: 13px;
-  line-height: 16px;
-  letter-spacing: -0.078px;
-  overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-`
-
-const LinkImage = styled.img<any>`
-  width: 320px;
-  height: 180px;
-  object-fit: cover;
-  border-radius: 4px 4px 14px 14px;
-` */

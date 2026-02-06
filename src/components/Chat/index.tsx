@@ -24,6 +24,8 @@ import { useDidUpdate, useColor } from '../../hooks'
 import { IChannel } from '../../types'
 import { getAutoSelectFitsChannel, getChannelMembersCount, setActiveChannelId } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
+import { connectionStatusSelector } from 'store/user/selector'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 interface IProps {
   hideChannelList?: boolean
@@ -61,9 +63,10 @@ export default function Chat({
   const activeChannel = useSelector(activeChannelSelector)
   const autoSelectChannel = getAutoSelectFitsChannel()
   const [channelDetailsWidth, setChannelDetailsWidth] = useState<number>(0)
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
 
   useEffect(() => {
-    if (hideChannelList && !channelListWidth) {
+    if (hideChannelList && !channelListWidth && connectionStatus === CONNECTION_STATUS.CONNECTED) {
       dispatch(setHideChannelListAC(true))
       dispatch(
         getChannelsAC(
@@ -72,7 +75,7 @@ export default function Chat({
         )
       )
     }
-  }, [channelListWidth])
+  }, [channelListWidth, connectionStatus])
 
   useEffect(() => {
     if (onSelectedChannelUpdated) {

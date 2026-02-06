@@ -43,9 +43,21 @@ export interface IChannelState {
   channelListWidth: number
   isDragging: boolean
   draggedAttachments: { data: any; name: any; type: any; attachmentType: string }[]
-  tabIsActive: boolean
   hideChannelList: boolean
   draftIsRemoved: string
+  channelInviteKeys: {
+    [key: string]: {
+      key: string
+      maxUses: number
+      expiresAt: number
+      accessPriorHistory: boolean
+    }[]
+  }
+  joinableChannel: IChannel | null
+  channelInviteKeyAvailable: boolean
+  mutualChannels: IChannel[]
+  mutualChannelsHasNext: boolean
+  mutualChannelsLoadingState: number | null
 }
 
 const initialState: IChannelState = {
@@ -75,10 +87,15 @@ const initialState: IChannelState = {
   channelEditMode: false,
   channelListWidth: 0,
   isDragging: false,
-  tabIsActive: true,
   hideChannelList: false,
   draggedAttachments: [],
-  draftIsRemoved: ''
+  draftIsRemoved: '',
+  channelInviteKeys: {},
+  joinableChannel: null,
+  channelInviteKeyAvailable: true,
+  mutualChannels: [],
+  mutualChannelsHasNext: false,
+  mutualChannelsLoadingState: null
 }
 
 const channelSlice = createSlice({
@@ -95,7 +112,7 @@ const channelSlice = createSlice({
     },
 
     setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
-      state.channels = [...action.payload.channels]
+      state.channels = sortChannelByLastMessage([...action.payload.channels])
     },
 
     setSearchedChannels: (
@@ -314,7 +331,7 @@ const channelSlice = createSlice({
           })
         }
       }
-      state.channels = [...updatedChannels]
+      state.channels = sortChannelByLastMessage([...updatedChannels])
     },
 
     updateChannelLastMessage: (state, action: PayloadAction<{ message: IMessage | {}; channel: IChannel }>) => {
@@ -332,6 +349,7 @@ const channelSlice = createSlice({
             }
             return chan
           })
+          state.channels = sortChannelByLastMessage(state.channels)
         }
       } else {
         const updatedChannels = state.channels.filter((chan) => chan.id !== channel.id)
@@ -358,6 +376,7 @@ const channelSlice = createSlice({
         }
         return chan
       })
+      state.channels = sortChannelByLastMessage(state.channels)
     },
 
     setChannelInfoOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
@@ -440,16 +459,56 @@ const channelSlice = createSlice({
       state.channelListWidth = action.payload.width
     },
 
-    setTabIsActive: (state, action: PayloadAction<{ isActive: boolean }>) => {
-      state.tabIsActive = action.payload.isActive
-    },
-
     setHideChannelList: (state, action: PayloadAction<{ hide: boolean }>) => {
       state.hideChannelList = action.payload.hide
     },
 
     setDraftIsRemoved: (state, action: PayloadAction<{ channelId: string }>) => {
       state.draftIsRemoved = action.payload.channelId
+    },
+
+    setChannelInviteKeys: (
+      state,
+      action: PayloadAction<{
+        channelId: string
+        inviteKeys: {
+          key: string
+          maxUses: number
+          expiresAt: number
+          accessPriorHistory: boolean
+        }[]
+      }>
+    ) => {
+      state.channelInviteKeys = {
+        ...state.channelInviteKeys,
+        [action.payload.channelId]: action.payload.inviteKeys
+      }
+    },
+
+    setJoinableChannel: (state, action: PayloadAction<{ channel: IChannel | null }>) => {
+      state.joinableChannel = action.payload.channel
+    },
+
+    setChannelInviteKeyAvailable: (state, action: PayloadAction<{ available: boolean }>) => {
+      state.channelInviteKeyAvailable = action.payload.available
+    },
+
+    setMutualChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
+      // If empty array is passed, replace the list (for clearing/resetting)
+      // Otherwise, append to existing list (for pagination)
+      if (action.payload.channels.length === 0 && state.mutualChannels.length > 0) {
+        state.mutualChannels = []
+      } else {
+        state.mutualChannels = [...state.mutualChannels, ...action.payload.channels]
+      }
+    },
+
+    setMutualChannelsHasNext: (state, action: PayloadAction<{ hasNext: boolean }>) => {
+      state.mutualChannelsHasNext = action.payload.hasNext
+    },
+
+    setMutualChannelsLoadingState: (state, action: PayloadAction<{ state: number }>) => {
+      state.mutualChannelsLoadingState = action.payload.state
     }
   },
   extraReducers: (builder) => {
@@ -491,9 +550,14 @@ export const {
   setIsDragging,
   setDraggedAttachments,
   setChannelListWidth,
-  setTabIsActive,
   setHideChannelList,
-  setDraftIsRemoved
+  setDraftIsRemoved,
+  setChannelInviteKeys,
+  setJoinableChannel,
+  setChannelInviteKeyAvailable,
+  setMutualChannels,
+  setMutualChannelsHasNext,
+  setMutualChannelsLoadingState
 } = channelSlice.actions
 
 // Export reducer

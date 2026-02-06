@@ -1,4 +1,15 @@
 export enum HiddenMessageProperty {
   hideAfterChannelChange = 'hideAfterChannelChange',
-  hideAfterSendMessage = "hideAfterSendMessage",
+  hideAfterSendMessage = 'hideAfterSendMessage'
+}
+
+export enum MESSAGE_TYPE {
+  TEXT = 'text',
+  MEDIA = 'media',
+  SYSTEM = 'system',
+  LINK = 'link',
+  FILE = 'file',
+  POLL = 'poll',
+  DELETED = '',
+  VIEW_ONCE = 'view_once'
 }

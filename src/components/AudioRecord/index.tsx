@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import styled from 'styled-components'
 // Hooks
 import { useColor } from '../../hooks'
@@ -9,6 +9,8 @@ import { ReactComponent as CancelRecordIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as SendIcon } from '../../assets/svg/send.svg'
 import { ReactComponent as StopIcon } from '../../assets/svg/stopRecord.svg'
 import { ReactComponent as RecordIcon } from '../../assets/svg/recordButton.svg'
+import { ReactComponent as ViewOnceNotSelectedIcon } from '../../assets/svg/view_once_not_selected.svg'
+import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_once_selected.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
@@ -18,6 +20,15 @@ import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
+import { ViewOnceToggleCont } from 'UIHelper'
+
+const fieldsObject = {
+  channelId: '',
+  currentRecordedFile: null,
+  recording: null,
+  recorder: null,
+  wavesurferContainer: null
+}
 
 interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
@@ -25,26 +36,40 @@ interface AudioPlayerProps {
   // eslint-disable-next-line no-unused-vars
   setShowRecording: (start: boolean) => void
   showRecording: boolean
+  isSelfChannel: boolean
   channelId: string
   maxRecordingDuration?: number
+  showViewOnceToggle: boolean
+  viewOnce: boolean
+  setViewOnce: (viewOnce: boolean) => void
+  ViewOnceSelectedSVGIcon: React.ReactNode
+  ViewOnceNotSelectedSVGIcon: React.ReactNode
 }
 let shouldDraw = false
 const DEFAULT_MAX_RECORDING_DURATION = 600
 
 // @ts-ignore
-const AudioRecord: React.FC<AudioPlayerProps> = ({ 
-  sendRecordedFile, 
-  setShowRecording, 
-  showRecording, 
-  channelId, 
-  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION
- }) => {
+const AudioRecord: React.FC<AudioPlayerProps> = ({
+  sendRecordedFile,
+  setShowRecording,
+  showRecording,
+  isSelfChannel,
+  channelId,
+  maxRecordingDuration = DEFAULT_MAX_RECORDING_DURATION,
+  showViewOnceToggle,
+  viewOnce,
+  setViewOnce,
+  ViewOnceSelectedSVGIcon,
+  ViewOnceNotSelectedSVGIcon
+}) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.WARNING]: warningColor,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
-    [THEME_COLORS.SURFACE_1]: surface1
+    [THEME_COLORS.SURFACE_1]: surface1,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
 
   const [recording, setStartRecording] = useState<any>(null)
@@ -362,7 +387,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       shouldDraw = false
       const id = cId || channelId
       recorder
-        .stop()
+        ?.stop()
         .getMp3()
         .then(([buffer, blob]: any) => {
           const file = new File(buffer, 'record.mp3', {
@@ -467,12 +492,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     let recordingInterval: any = null
     let backupTimeout: any = null
-  
+
     if (recording) {
-      backupTimeout = setTimeout(() => {
-        stopRecording(false, currentChannelId, false, recorder)
-      }, (maxRecordingDuration + 0.5) * 1000)
-  
+      backupTimeout = setTimeout(
+        () => {
+          stopRecording(false, currentChannelId, false, recorder)
+        },
+        (maxRecordingDuration + 0.5) * 1000
+      )
+
       recordingInterval = setInterval(() => {
         setCurrentTime((prevState: any) => {
           if (prevState >= maxRecordingDuration) {
@@ -488,7 +516,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       clearInterval(recordingInterval)
       clearTimeout(backupTimeout)
     }
-  
+
     return () => {
       if (sendingInterval) {
         clearInterval(sendingInterval)
@@ -501,7 +529,41 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       }
     }
   }, [recording, maxRecordingDuration])
-  
+
+  // Keep refs updated with latest values
+  useEffect(() => {
+    fieldsObject.channelId = channelId
+  }, [channelId])
+
+  useEffect(() => {
+    fieldsObject.recorder = recorder
+  }, [recorder])
+
+  useEffect(() => {
+    fieldsObject.currentRecordedFile = currentRecordedFile
+  }, [currentRecordedFile])
+
+  useEffect(() => {
+    fieldsObject.recording = recording
+  }, [recording])
+
+  useEffect(() => {
+    fieldsObject.wavesurferContainer = wavesurferContainer.current
+  }, [wavesurferContainer.current])
+
+  useEffect(() => {
+    return () => {
+      if (
+        fieldsObject.channelId &&
+        (!fieldsObject.currentRecordedFile || !(fieldsObject.currentRecordedFile as any)?.file) &&
+        fieldsObject.recorder &&
+        fieldsObject.recording
+      ) {
+        stopRecording(false, fieldsObject.channelId, true, fieldsObject.recorder, fieldsObject.wavesurferContainer)
+        handleStopRecording()
+      }
+    }
+  }, [])
 
   useEffect(() => {
     if (currentRecordedFile) {
@@ -592,8 +654,20 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   return (
     <Container recording={showRecording || currentRecordedFile}>
       {(showRecording || currentRecordedFile) && (
-        <PlayPause iconColor={iconPrimary} onClick={() => cancelRecording()}>
-          <CancelRecordIcon />
+        <PlayPause iconColor={iconPrimary}>
+          {(showRecording || currentRecordedFile) && showViewOnceToggle && !isSelfChannel && (
+            <ViewOnceToggleCont
+              key='view-once'
+              onClick={() => setViewOnce(!viewOnce)}
+              color={viewOnce ? accentColor : iconInactive}
+              textColor={viewOnce ? textOnPrimary : iconInactive}
+            >
+              {viewOnce
+                ? ViewOnceSelectedSVGIcon || <ViewOnceSelectedIcon />
+                : ViewOnceNotSelectedSVGIcon || <ViewOnceNotSelectedIcon />}
+            </ViewOnceToggleCont>
+          )}
+          <CancelRecordIcon onClick={() => cancelRecording()} style={{ padding: '4px' }} />
         </PlayPause>
       )}
 
@@ -624,7 +698,17 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   )
 }
 
-export default AudioRecord
+export default memo(AudioRecord, (prevProps, nextProps) => {
+  return (
+    prevProps.channelId === nextProps.channelId &&
+    prevProps.showRecording === nextProps.showRecording &&
+    prevProps.maxRecordingDuration === nextProps.maxRecordingDuration &&
+    prevProps.showViewOnceToggle === nextProps.showViewOnceToggle &&
+    prevProps.viewOnce === nextProps.viewOnce &&
+    prevProps.ViewOnceSelectedSVGIcon === nextProps.ViewOnceSelectedSVGIcon &&
+    prevProps.ViewOnceNotSelectedSVGIcon === nextProps.ViewOnceNotSelectedSVGIcon
+  )
+})
 
 const Container = styled.div<{ recording?: boolean }>`
   width: 32px;
@@ -632,8 +716,11 @@ const Container = styled.div<{ recording?: boolean }>`
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  ${(props) => props.recording && `width: 400px`};
-  transition: all 0.3s ease-in-out;
+  ${(props) =>
+    props.recording &&
+    `width: 400px;
+    transition: all 0.3s ease-in-out;
+    `}
 `
 const AudioWrapper = styled.div<{ backgroundColor: string; recording?: boolean }>`
   position: relative;
@@ -669,9 +756,13 @@ const AudioVisualization = styled.div<{ show?: boolean }>`
 `
 
 const PlayPause = styled.div<{ iconColor?: string }>`
-  cursor: pointer;
-  padding: 10px;
+  padding: 10px 0 10px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   > svg {
+    cursor: pointer;
     color: ${(props) => props.iconColor};
   }
 `

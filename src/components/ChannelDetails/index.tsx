@@ -1,16 +1,15 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
 import { activeChannelSelector, channelEditModeSelector } from '../../store/channel/selector'
 import { switchChannelInfoAC, toggleEditChannelAC } from '../../store/channel/actions'
-import { activeTabAttachmentsHasNextSelector, messagesLoadingState } from '../../store/message/selector'
+import { activeTabAttachmentsHasNextSelector, attachmentLoadingStateSelector } from '../../store/message/selector'
 import { loadMoreMembersAC } from '../../store/member/actions'
-import { membersLoadingStateSelector } from '../../store/member/selector'
+import { channelsMembersHasNextMapSelector, channelsMembersLoadingStateSelector } from '../../store/member/selector'
 import { loadMoreAttachmentsAC } from '../../store/message/actions'
 import { contactsMapSelector } from '../../store/user/selector'
-import { themeSelector } from '../../store/theme/selector'
 // Hooks
 import usePermissions from '../../hooks/usePermissions'
 // Assets
@@ -20,13 +19,13 @@ import { IDetailsProps } from '../ChannelDetailsContainer'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
 import { copyToClipboard } from '../../helpers/clipboard'
-import { makeUsername } from '../../helpers/message'
+import { isJSON, makeUsername } from '../../helpers/message'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getChannelTypesMemberDisplayTextMap } from '../../helpers/channelHalper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IContactsMap, IMember } from '../../types'
-import { CloseIcon, SectionHeader, SubTitle } from '../../UIHelper'
+import { CloseIcon, CopiedTooltip, SectionHeader, SubTitle } from '../../UIHelper'
 import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, LOADING_STATE, USER_PRESENCE_STATUS } from '../../helpers/constants'
 import { getClient } from '../../common/client'
 // Components
@@ -35,6 +34,7 @@ import DetailsTab from './DetailsTab'
 import Avatar from '../Avatar'
 import EditChannel from './EditChannel'
 import { useColor } from '../../hooks'
+import { queryDirection } from 'store/message/constants'
 
 const Details = ({
   detailsTitleText,
@@ -151,7 +151,13 @@ const Details = ({
   tabItemsMinWidth,
   backgroundColor,
   bordersColor,
-  showPhoneNumber
+  showPhoneNumber,
+  QRCodeIcon,
+  commonGroupsOrder,
+  commonGroupsIcon,
+  commonGroupsIconColor,
+  commonGroupsTextColor,
+  showGroupsInCommon
 }: IDetailsProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -167,7 +173,6 @@ const Details = ({
   const dispatch = useDispatch()
   const ChatClient = getClient()
   const { user } = ChatClient
-  const theme = useSelector(themeSelector)
   const getFromContacts = getShowOnlyContactUsers()
   const [mounted, setMounted] = useState(false)
   const [activeTab, setActiveTab] = useState('')
@@ -178,9 +183,18 @@ const Details = ({
   const editMode = useSelector(channelEditModeSelector)
   const activeChannel = useSelector(activeChannelSelector, shallowEqual)
   const [checkActionPermission] = usePermissions(activeChannel ? activeChannel.userRole : '')
-  const membersLoading = useSelector(membersLoadingStateSelector)
-  const messagesLoading = useSelector(messagesLoadingState)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoading = useMemo(
+    () => channelsMembersLoadingState?.[activeChannel?.id],
+    [channelsMembersLoadingState?.[activeChannel?.id]]
+  )
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const membersHasNext = useMemo(
+    () => channelsMembersHasNext?.[activeChannel?.id],
+    [channelsMembersHasNext?.[activeChannel?.id]]
+  )
   const attachmentsHasNex = useSelector(activeTabAttachmentsHasNextSelector)
+  const attachmentLoadingState = useSelector(attachmentLoadingStateSelector)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const detailsRef = useRef<any>(null)
@@ -212,23 +226,15 @@ const Details = ({
   const directChannelUser =
     isDirectChannel &&
     (activeChannel.members.find((member: IMember) => member.id !== user.id) || activeChannel?.members?.[0])
-  // const myPermissions: any = []
+
   const handleMembersListScroll = (event: any) => {
-    // setCloseMenu(true)
-    /* if (tabsRef.current.getBoundingClientRect().top <= detailsRef.current.offsetTop) {
-      if (!tabFixed) {
-        setTabFixed(true)
-      }
-    } else if (tabFixed) {
-      setTabFixed(false)
-    } */
     if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
       if (activeTab === channelDetailsTabs.member) {
-        if (membersLoading === LOADING_STATE.LOADED) {
+        if (membersLoading === LOADING_STATE.LOADED && membersHasNext) {
           dispatch(loadMoreMembersAC(15, activeChannel.id))
         }
-      } else if (messagesLoading === LOADING_STATE.LOADED && attachmentsHasNex) {
-        dispatch(loadMoreAttachmentsAC(20))
+      } else if (attachmentLoadingState === LOADING_STATE.LOADED && attachmentsHasNex) {
+        dispatch(loadMoreAttachmentsAC(20, queryDirection.PREV))
       }
     }
   }
@@ -282,12 +288,18 @@ const Details = ({
     }
   }
 
+  const channelMetadata = useMemo(() => {
+    if (isJSON(activeChannel?.metadata)) {
+      return JSON.parse(activeChannel?.metadata)
+    }
+    return activeChannel?.metadata
+  }, [activeChannel])
+
   return (
     <Container
       backgroundColor={backgroundColor}
       mounted={mounted}
       size={size}
-      theme={theme}
       borderColor={bordersColor || borderThemeColor}
     >
       <ChannelDetailsHeader borderColor={bordersColor || borderThemeColor}>
@@ -310,7 +322,6 @@ const Details = ({
 
       {editMode && (
         <EditChannel
-          theme={theme}
           channel={activeChannel}
           handleToggleEditMode={setEditMode}
           editChannelSaveButtonBackgroundColor={editChannelSaveButtonBackgroundColor}
@@ -342,7 +353,7 @@ const Details = ({
               name={
                 (activeChannel && activeChannel.subject) ||
                 (directChannelUser && (directChannelUser.firstName || directChannelUser.id)) ||
-                (isSelfChannel && 'Me')
+                (isSelfChannel && showPhoneNumber ? `+${user.id} (You)` : 'Me')
               }
               size={channelAvatarSize || 72}
               textSize={channelAvatarTextSize || 26}
@@ -361,7 +372,9 @@ const Details = ({
                     (isDirectChannel && directChannelUser
                       ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                       : isSelfChannel
-                        ? 'Me'
+                        ? showPhoneNumber
+                          ? `+${user.id} (You)`
+                          : 'Me'
                         : '')}
                 </ChannelName>
                 {!isDirectChannel && checkActionPermission('updateChannel') && (
@@ -381,7 +394,7 @@ const Details = ({
                     <PhoneNumberContainer onClick={handleCopyPhoneNumber} role='button' aria-label='Copy phone number'>
                       {`+${directChannelUser.id}`}
                       {copiedPhone && (
-                        <CopiedTooltip background={tooltipBackground} color={textOnPrimary}>
+                        <CopiedTooltip backgroundColor={tooltipBackground} color={textOnPrimary}>
                           Copied
                         </CopiedTooltip>
                       )}
@@ -405,12 +418,10 @@ const Details = ({
             </ChannelInfo>
           </ChannelAvatarAndName>
 
-          {showAboutChannel && activeChannel && activeChannel.metadata && activeChannel.metadata.d && (
+          {showAboutChannel && activeChannel && channelMetadata && channelMetadata?.d && (
             <AboutChannel>
               {showAboutChannelTitle && <AboutChannelTitle color={textFootnote}>About</AboutChannelTitle>}
-              <AboutChannelText color={textPrimary}>
-                {activeChannel && activeChannel.metadata && activeChannel.metadata.d ? activeChannel.metadata.d : ''}
-              </AboutChannelText>
+              <AboutChannelText color={textPrimary}>{channelMetadata?.d ? channelMetadata?.d : ''}</AboutChannelText>
             </AboutChannel>
           )}
           {/* <Info channel={channel} handleToggleEditMode={() => setEditMode(!editMode)} /> */}
@@ -418,7 +429,6 @@ const Details = ({
         {activeChannel && activeChannel.userRole && (
           <Actions
             setActionsHeight={setActionsHeight}
-            theme={theme}
             showMuteUnmuteNotifications={showMuteUnmuteNotifications}
             muteUnmuteNotificationsOrder={muteUnmuteNotificationsOrder}
             unmuteNotificationIcon={unmuteNotificationIcon}
@@ -479,12 +489,16 @@ const Details = ({
             timeOptionsToMuteNotifications={timeOptionsToMuteNotifications}
             actionItemsFontSize={actionItemsFontSize}
             borderColor={bordersColor}
+            commonGroupsOrder={commonGroupsOrder}
+            commonGroupsIcon={commonGroupsIcon}
+            commonGroupsIconColor={commonGroupsIconColor}
+            commonGroupsTextColor={commonGroupsTextColor}
+            showGroupsInCommon={showGroupsInCommon}
           />
         )}
         {/* <div ref={tabsRef}> */}
         {!(activeChannel && activeChannel.isMockChannel) && (
           <DetailsTab
-            theme={theme}
             channel={activeChannel}
             activeTab={activeTab}
             setActiveTab={setActiveTab}
@@ -526,6 +540,7 @@ const Details = ({
             tabItemsLineHeight={tabItemsLineHeight}
             tabItemsMinWidth={tabItemsMinWidth}
             onTabChange={handleTabChange}
+            QRCodeIcon={QRCodeIcon}
           />
         )}
         {/* </div> */}
@@ -538,7 +553,6 @@ export default Details
 
 const Container = styled.div<{
   mounted: boolean
-  theme?: string
   borderColor?: string
   size?: 'small' | 'medium' | 'large'
   backgroundColor?: string
@@ -661,20 +675,4 @@ const PhoneNumberContainer = styled.span`
   align-items: center;
   cursor: pointer;
   user-select: text;
-`
-
-const CopiedTooltip = styled.span<{ background: string; color: string }>`
-  position: absolute;
-  left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(100% + 6px);
-  padding: 4px 8px;
-  border-radius: 6px;
-  background: ${(props) => props.background};
-  color: ${(props) => props.color};
-  font-size: 12px;
-  line-height: 14px;
-  white-space: nowrap;
-  pointer-events: none;
-  z-index: 10;
 `

@@ -1,5 +1,6 @@
 import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { IContact, IUser } from '../../types'
+import { CONNECTION_STATUS } from './constants'
 
 export interface IUserStore {
   connectionStatus: string
@@ -10,6 +11,7 @@ export interface IUserStore {
   updatedUserMap: { [key: string]: IUser }
   user: IUser
   browserTabIsActive: boolean
+  waitToSendPendingMessages: boolean
 }
 
 const initialState: IUserStore = {
@@ -20,7 +22,8 @@ const initialState: IUserStore = {
   contactsMap: {},
   updatedUserMap: {},
   user: { id: '', firstName: '', lastName: '', state: '' },
-  browserTabIsActive: true
+  browserTabIsActive: true,
+  waitToSendPendingMessages: false
 }
 
 const userSlice = createSlice({
@@ -29,6 +32,9 @@ const userSlice = createSlice({
   reducers: {
     setConnectionStatus: (state, action: PayloadAction<{ status: string }>) => {
       state.connectionStatus = action.payload.status
+      if (action.payload.status === CONNECTION_STATUS.CONNECTED) {
+        state.waitToSendPendingMessages = true
+      }
     },
 
     setUser: (state, action: PayloadAction<{ user: IUser }>) => {
@@ -48,7 +54,8 @@ const userSlice = createSlice({
     },
 
     updateUserMap: (state, action: PayloadAction<{ usersMap: { [key: string]: IUser } }>) => {
-      state.updatedUserMap = action.payload.usersMap
+      // Merge updates instead of replacing the entire map
+      state.updatedUserMap = { ...state.updatedUserMap, ...action.payload.usersMap }
     },
 
     setContacts: (state, action: PayloadAction<{ contacts: IContact[] }>) => {
@@ -67,6 +74,10 @@ const userSlice = createSlice({
 
     setBrowserTabIsActive: (state, action: PayloadAction<{ state: boolean }>) => {
       state.browserTabIsActive = action.payload.state
+    },
+
+    setWaitToSendPendingMessages: (state, action: PayloadAction<{ state: boolean }>) => {
+      state.waitToSendPendingMessages = action.payload.state
     }
   },
   extraReducers: (builder) => {
@@ -86,7 +97,8 @@ export const {
   updateUserMap,
   setContacts,
   updateUserProfile,
-  setBrowserTabIsActive
+  setBrowserTabIsActive,
+  setWaitToSendPendingMessages
 } = userSlice.actions
 
 // Export reducer

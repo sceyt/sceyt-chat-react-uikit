@@ -292,7 +292,9 @@ function CustomMessageItem(
             MessageTextFormat({
               text: message.body,
               message,
-              getFromContacts: true
+              getFromContacts: true,
+              accentColor: '#5159F6',
+              textSecondary: '#17191C'
             })
           )}
         </span>
@@ -315,7 +317,8 @@ function CustomMessageItem(
               <MessageStatus>
                 {MessageStatusIcon({
                   messageStatus: message.deliveryStatus,
-                  messageStatusDisplayingType: 'ticks'
+                  messageStatusDisplayingType: 'ticks',
+                  color: notLinkAttachment ? '#fff' : ''
                 })}
               </MessageStatus>
             )}
@@ -353,7 +356,7 @@ function CustomMessageItem(
             MessageStatusIcon({
               messageStatus: message.deliveryStatus,
               messageStatusDisplayingType: 'ticks',
-              iconColor:
+              color:
                 message.attachments[0].type !== 'voice' &&
                 message.attachments[0].type !== 'file'
                   ? '#fff'

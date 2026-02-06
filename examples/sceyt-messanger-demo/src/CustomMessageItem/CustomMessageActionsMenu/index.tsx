@@ -39,7 +39,7 @@ function CustomMessageActionsMenu({
   handleSelectMessage?: () => void;
   handleOpenEmojis?: () => void;
   handleReplyMessage?: (threadReply?: boolean) => void;
-
+  
   isThreadMessage?: boolean;
   rtlDirection?: boolean;
   client: any;
@@ -109,10 +109,12 @@ function CustomMessageActionsMenu({
           <ItemNote direction='top'>Forward Message</ItemNote>
           <ForwardMessageIcon />
         </Action>
+        {!message.viewOnce && (
         <Action onClick={handleSelectMessage}>
-          <ItemNote direction='top'>Select</ItemNote>
-          <CheckIcon />
-        </Action>
+            <ItemNote direction='top'>Select</ItemNote>
+            <CheckIcon />
+          </Action>
+        )}
 
         <Action onClick={handleOpenDeleteMessage}>
           <ItemNote direction='top'>Delete Message</ItemNote>

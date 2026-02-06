@@ -1,10 +1,9 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 import moment from 'moment'
-// @ts-ignore
-import Carousel from 'react-elastic-carousel'
+import Carousel, { RenderArrowProps } from '../../Carousel'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { ReactComponent as DownloadIcon } from '../../../assets/svg/download.svg'
 import { ReactComponent as CloseIcon } from '../../../assets/svg/cancel.svg'
@@ -16,17 +15,39 @@ import { bytesToSize, downloadFile } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { IAttachment, IChannel, IMedia, IMessage } from '../../../types'
 import { getCustomDownloader } from '../../../helpers/customUploader'
-import { attachmentsForPopupSelector } from '../../../store/message/selector'
-import { deleteMessageAC, forwardMessageAC, getAttachmentsAC, removeAttachmentAC } from '../../../store/message/actions'
-import { DEFAULT_CHANNEL_TYPE, channelDetailsTabs, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import {
+  attachmentForPopupLoadingStateSelector,
+  attachmentsForPopupSelector,
+  attachmentUpdatedMapSelector,
+  attachmentsForPopupHasPrevSelector,
+  attachmentsForPopupHasNextSelector
+} from '../../../store/message/selector'
+import {
+  deleteMessageAC,
+  forwardMessageAC,
+  getAttachmentsAC,
+  loadMoreAttachmentsAC,
+  removeAttachmentAC,
+  setUpdateMessageAttachmentAC
+} from '../../../store/message/actions'
+import {
+  DEFAULT_CHANNEL_TYPE,
+  channelDetailsTabs,
+  MESSAGE_DELIVERY_STATUS,
+  LOADING_STATE
+} from '../../../helpers/constants'
 import { queryDirection } from '../../../store/message/constants'
-import { useColor, useDidUpdate } from '../../../hooks'
+import { useColor } from '../../../hooks'
 import { Avatar } from '../../../components'
 import { connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
 import { UploadingIcon } from '../../../UIHelper'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { getClient } from '../../client'
-import { getAttachmentUrlFromCache, setAttachmentToCache } from '../../../helpers/attachmentsCache'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../../helpers/attachmentsCache'
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
@@ -38,8 +59,7 @@ import log from 'loglevel'
 
 interface IProps {
   channel: IChannel
-  // eslint-disable-next-line no-unused-vars
-  setIsSliderOpen: (state: any) => void
+  setIsSliderOpen: (state: boolean) => void
   mediaFiles?: IMedia[]
   currentMediaFile: IMedia
   allowEditDeleteIncomingMessage?: boolean
@@ -50,7 +70,6 @@ interface IProps {
 const SliderPopup = ({
   channel,
   setIsSliderOpen,
-  mediaFiles,
   currentMediaFile,
   allowEditDeleteIncomingMessage,
   attachmentsPreview,
@@ -65,25 +84,32 @@ const SliderPopup = ({
   const connectionStatus = useSelector(connectionStatusSelector)
   const ChatClient = getClient()
   const { user } = ChatClient
-  const [currentFile, setCurrentFile] = useState<any>({ ...currentMediaFile })
+  const [currentFile, setCurrentFile] = useState<IMedia>({ ...currentMediaFile })
   const [downloadingFilesMap, setDownloadingFilesMap] = useState<{ [key: string]: { uploadPercent: number } }>({})
-  const [attachmentsList, setAttachmentsList] = useState<IMedia[]>([])
-  const [imageLoading, setImageLoading] = useState(true)
-  const [downloadedFiles, setDownloadedFiles] = useState<{ [key: string]: string }>({})
+  const [itemsLoadedMap, setItemsLoadedMap] = useState<{ [key: string]: boolean }>({})
   const [playedVideo, setPlayedVideo] = useState<string | undefined>()
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
-  const [visibleSlide, setVisibleSlide] = useState(false)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
   const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
+  const attachmentLoadingStateForPopup = useSelector(attachmentForPopupLoadingStateSelector)
+  const attachmentsForPopupHasPrev = useSelector(attachmentsForPopupHasPrevSelector)
+  const attachmentsForPopupHasNext = useSelector(attachmentsForPopupHasNextSelector)
+  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
+  const prefixUrl = useMemo(() => {
+    return currentFile?.type === 'image'
+      ? '_original_image_url'
+      : currentFile?.type === 'video'
+        ? '_original_video_url'
+        : ''
+  }, [currentFile?.type])
 
-  // const customUploader = getCustomUploader()
   const customDownloader = getCustomDownloader()
   const contactsMap = useSelector(contactsMapSelector)
-  const attachments = useSelector(attachmentsForPopupSelector, shallowEqual) || []
-  const visibilityTimeout = useRef<any>()
-  const carouselRef = useRef<any>(null)
-  // const attachmentsHasNext = useSelector(attachmentsForPopupHasNextSelector, shallowEqual) || []
+  const attachmentsList = useSelector(attachmentsForPopupSelector, shallowEqual) || []
+  const previousListLengthRef = useRef<number>(attachmentsList.length)
+  const currentFileIdRef = useRef<string | undefined>(currentFile?.id)
+  const [skipTransition, setSkipTransition] = useState(false)
   const attachmentUserName = currentFile
     ? currentFile.user &&
       makeUsername(
@@ -93,25 +119,16 @@ const SliderPopup = ({
       )
     : ''
   const handleClosePopup = () => {
-    setAttachmentsList([])
     setIsSliderOpen(false)
   }
 
-  const downloadImage = (src: string, setToDownloadedFiles?: boolean) => {
-    clearTimeout(visibilityTimeout.current)
-    const image = new Image()
-    image.src = src
-    image.onload = () => {
-      if (setToDownloadedFiles && currentFile) {
-        setDownloadedFiles({ ...downloadedFiles, [currentFile?.id]: src })
-        visibilityTimeout.current = setTimeout(() => {
-          setVisibleSlide(true)
-        }, 100)
-      }
-      setImageLoading(false)
-      // setCurrentFileUrl(src)
+  const downloadImage = (src: string, setToDownloadedFiles?: boolean, type?: string) => {
+    if (setToDownloadedFiles && currentFile) {
+      const url = currentFile.url + (type === 'image' ? '_original_image_url' : '_original_video_url')
+      dispatch(setUpdateMessageAttachmentAC(url, src))
     }
   }
+
   const handleCompleteDownload = (attachmentId: string, failed?: boolean) => {
     if (failed) {
       log.info('file download failed!')
@@ -137,217 +154,322 @@ const SliderPopup = ({
     )
   }
 
-  const handleClicks = (e: any) => {
-    if (!e.target.closest('.custom_carousel_item') && !e.target.closest('.custom_carousel_arrow')) {
+  const handleClicks = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement
+    if (!target.closest('.custom_carousel_item') && !target.closest('.custom_carousel_arrow')) {
       handleClosePopup()
     }
-  }
+  }, [])
 
-  const handleForwardMessage = async (channelIds: string[]) => {
-    let message = getAllMessages().find((message) => message.id === currentFile.messageId)
-    if (!message) {
-      let channelInstance = getChannelFromMap(channel.id)
-      if (!channelInstance) {
-        channelInstance = await ChatClient.getChannelById(channel.id)
+  const handleForwardMessage = useCallback(
+    async (channelIds: string[]) => {
+      try {
+        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        if (!message) {
+          let channelInstance = getChannelFromMap(channel.id)
+          if (!channelInstance) {
+            channelInstance = await ChatClient.getChannelById(channel.id)
+          }
+          const messages = await channelInstance.getMessagesById([currentFile.messageId])
+          if (!messages || messages.length === 0) {
+            log.error('Message not found for forwarding')
+            return
+          }
+          message = messages[0]
+        }
+        if (channelIds && channelIds.length && message) {
+          channelIds.forEach((channelId) => {
+            dispatch(forwardMessageAC(message, channelId, connectionStatus))
+          })
+        }
+        setIsSliderOpen(false)
+      } catch (error) {
+        log.error('Error forwarding message:', error)
       }
-      const messages = await channelInstance.getMessagesById([currentFile.messageId])
-      message = messages[0]
-    }
-    if (channelIds && channelIds.length) {
-      channelIds.forEach((channelId) => {
-        dispatch(forwardMessageAC(message, channelId, connectionStatus))
-      })
-    }
-    setIsSliderOpen(false)
-  }
+    },
+    [currentFile.messageId, channel.id, connectionStatus, dispatch]
+  )
 
   const handleToggleForwardMessagePopup = () => {
     setForwardPopupOpen(!forwardPopupOpen)
   }
 
-  const handleToggleDeleteMessagePopup = async () => {
+  const handleToggleDeleteMessagePopup = useCallback(async () => {
     if (!messageToDelete) {
-      let message = getAllMessages().find((message) => message.id === currentFile.messageId)
-      if (!message) {
-        let channelInstance = getChannelFromMap(channel.id)
-        if (!channelInstance) {
-          channelInstance = await ChatClient.getChannelById(channel.id)
+      try {
+        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        if (!message) {
+          let channelInstance = getChannelFromMap(channel.id)
+          if (!channelInstance) {
+            channelInstance = await ChatClient.getChannelById(channel.id)
+          }
+          const messages = await channelInstance.getMessagesById([currentFile.messageId])
+          if (!messages || messages.length === 0) {
+            log.error('Message not found for deletion')
+            return
+          }
+          message = messages[0]
         }
-        const messages = await channelInstance.getMessagesById([currentFile.messageId])
-        message = messages[0]
-      }
-      if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
-        deletePendingMessage(channel.id, message)
-      } else {
-        setMessageToDelete(message)
+        if (!message.deliveryStatus || message.deliveryStatus === MESSAGE_DELIVERY_STATUS.PENDING) {
+          deletePendingMessage(channel.id, message)
+        } else {
+          setMessageToDelete(message)
+        }
+      } catch (error) {
+        log.error('Error fetching message for deletion:', error)
       }
     } else {
       setMessageToDelete(undefined)
     }
-  }
+  }, [messageToDelete, currentFile.messageId, channel.id])
 
   const handleDeleteMessage = (deleteOption: 'forMe' | 'forEveryone') => {
     dispatch(deleteMessageAC(channel.id, currentFile.messageId, deleteOption))
-    dispatch(removeAttachmentAC(currentFile.id))
+    if (currentFile.id) {
+      dispatch(removeAttachmentAC(currentFile.id))
+    }
 
     setMessageToDelete(undefined)
     setIsSliderOpen(false)
   }
-  useDidUpdate(() => {
+
+  useEffect(() => {
     if (playedVideo) {
-      const videoElem: any = document.getElementById(playedVideo)
+      const videoElem = document.getElementById(playedVideo) as HTMLVideoElement | null
       if (videoElem) {
         videoElem.pause()
       }
     }
-    if (currentFile) {
-      getAttachmentUrlFromCache(currentFile.url)
-        .then((cachedUrl) => {
-          if (cachedUrl) {
-            if (!downloadedFiles[currentFile.id]) {
-              setVisibleSlide(false)
-              if (currentFile.type === 'image') {
-                downloadImage(cachedUrl as string, true)
-              } else {
-                clearTimeout(visibilityTimeout.current)
-                setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: cachedUrl })
-                setPlayedVideo(currentFile.id)
-                visibilityTimeout.current = setTimeout(() => {
-                  setVisibleSlide(true)
-                }, 100)
-              }
-            } else {
-              if (currentFile.type === 'image') {
-                downloadImage(cachedUrl as string)
-              } else {
-                setVisibleSlide(true)
-              }
-            }
-          } else {
-            if (customDownloader) {
-              customDownloader(currentFile.url, false, () => {}, messageType)
-                .then(async (url) => {
-                  const response = await fetch(url)
-                  setAttachmentToCache(currentFile.url, response)
-                  if (currentFile.type === 'image') {
-                    downloadImage(url, true)
-                  } else {
-                    clearTimeout(visibilityTimeout.current)
-                    setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: url })
-                    // setCurrentFileUrl(url)
-                    setPlayedVideo(currentFile.id)
-                    visibilityTimeout.current = setTimeout(() => {
-                      setVisibleSlide(true)
-                    }, 100)
-                  }
-                })
-                .catch((e) => {
-                  log.info('fail to download image...... ', e)
-                })
-            } else {
-              if (!downloadedFiles[currentFile.id]) {
-                setVisibleSlide(false)
-                if (currentFile.type === 'image') {
-                  downloadImage(currentFile.url as string, true)
-                } else {
-                  clearTimeout(visibilityTimeout.current)
-                  setDownloadedFiles({ ...downloadedFiles, [currentFile.id]: currentFile.url })
-                  setPlayedVideo(currentFile.id)
-                  visibilityTimeout.current = setTimeout(() => {
-                    setVisibleSlide(true)
-                  }, 100)
-                }
-              } else {
-                if (currentFile.type === 'image') {
-                  downloadImage(cachedUrl as string)
-                } else {
-                  setVisibleSlide(true)
-                }
-              }
-            }
-          }
-        })
-        .catch((e) => log.error(e))
-    }
-  }, [currentFile])
+    if (currentFile && currentFile.id) {
+      const attachmentKey = currentFile.url + prefixUrl
+      const attachmentKeyWithVersion = getAttachmentURLWithVersion(attachmentKey)
+      const hasAttachment = !!attachmentUpdatedMap[attachmentKeyWithVersion]
 
-  useDidUpdate(() => {
-    if (currentMediaFile) {
-      const currentMedia = attachmentsList.find((att: any) => att.id === currentMediaFile.id)
+      // If attachment is already loaded, check if it's ready
+      if (!hasAttachment) {
+        getAttachmentUrlFromCache(attachmentKey)
+          .then((cachedUrl: string | false) => {
+            if (cachedUrl) {
+              if (currentFile.type === 'image') {
+                downloadImage(cachedUrl as string, true, 'image')
+              } else {
+                dispatch(setUpdateMessageAttachmentAC(attachmentKey, cachedUrl))
+                setPlayedVideo(currentFile.id)
+              }
+            } else {
+              if (customDownloader) {
+                customDownloader(currentFile.url, false, () => {}, messageType)
+                  .then(async (url) => {
+                    try {
+                      const response = await fetch(url)
+                      setAttachmentToCache(attachmentKey, response)
+                      if (currentFile.type === 'image') {
+                        downloadImage(url, true, 'image')
+                      } else {
+                        dispatch(setUpdateMessageAttachmentAC(attachmentKey, url))
+                        setPlayedVideo(currentFile.id)
+                      }
+                    } catch (error) {
+                      log.error('Error fetching attachment:', error)
+                    }
+                  })
+                  .catch((e) => {
+                    log.error('Failed to download attachment:', e)
+                  })
+              } else {
+                if (currentFile.type === 'image') {
+                  downloadImage(currentFile.url as string, true, 'image')
+                } else {
+                  dispatch(setUpdateMessageAttachmentAC(attachmentKey, currentFile.url))
+                  setPlayedVideo(currentFile.id)
+                }
+              }
+            }
+          })
+          .catch((e) => {
+            log.error('Error getting attachment from cache:', e)
+          })
+      }
+    }
+  }, [
+    currentFile,
+    playedVideo,
+    attachmentUpdatedMap,
+    customDownloader,
+    messageType,
+    downloadImage,
+    dispatch,
+    prefixUrl
+  ])
+
+  useEffect(() => {
+    if (currentFile && currentFile.id) {
+      const currentMedia = attachmentsList.find((att: IMedia) => att.id === currentFile.id)
       if (currentMedia) {
-        setCurrentFile(currentMedia)
-        const indexOnList = attachmentsList.findIndex((item: any) => item.id === currentMedia?.id)
-        if (!attachmentsList[indexOnList + 1]) {
-          setNextButtonDisabled(true)
-        } else {
-          setNextButtonDisabled(false)
-        }
-        if (!attachmentsList[indexOnList - 1]) {
-          setPrevButtonDisabled(true)
-        } else {
-          setPrevButtonDisabled(false)
-        }
+        const indexOnList = attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
+        setNextButtonDisabled(!attachmentsList[indexOnList + 1])
+        setPrevButtonDisabled(!attachmentsList[indexOnList - 1])
       }
     }
   }, [attachmentsList])
 
-  useDidUpdate(() => {
-    setAttachmentsList(attachments || [])
-  }, [attachments])
-
   useEffect(() => {
-    setImageLoading(true)
-    if (customDownloader && currentMediaFile) {
-      getAttachmentUrlFromCache(currentMediaFile.url).then((cachedUrl) => {
-        if (cachedUrl) {
-          if (currentMediaFile.type === 'image') {
-            downloadImage(cachedUrl as string)
+    if (customDownloader && currentMediaFile && currentMediaFile.id) {
+      const attachmentUrl = currentMediaFile.url + prefixUrl
+      getAttachmentUrlFromCache(attachmentUrl)
+        .then((cachedUrl: string | false) => {
+          if (cachedUrl) {
+            if (currentMediaFile.type === 'image') {
+              downloadImage(cachedUrl as string, false, 'image')
+            } else {
+              dispatch(setUpdateMessageAttachmentAC(attachmentUrl, cachedUrl))
+              setPlayedVideo(currentMediaFile.id)
+            }
           } else {
-            setDownloadedFiles({ ...downloadedFiles, [currentMediaFile.id!]: cachedUrl })
-            setPlayedVideo(currentMediaFile.id)
-          }
-        } else {
-          if (customDownloader) {
-            customDownloader(currentMediaFile.url, false, () => {}, messageType).then(async (url) => {
-              const response = await fetch(url)
-              setAttachmentToCache(currentMediaFile.url, response)
+            if (customDownloader) {
+              customDownloader(currentMediaFile.url, false, () => {}, messageType)
+                .then(async (url) => {
+                  try {
+                    const response = await fetch(url)
+                    setAttachmentToCache(attachmentUrl, response)
+                    if (currentMediaFile.type === 'image') {
+                      downloadImage(url, false, 'image')
+                    } else {
+                      dispatch(setUpdateMessageAttachmentAC(attachmentUrl, url))
+                      setPlayedVideo(currentMediaFile.id)
+                    }
+                  } catch (error) {
+                    log.error('Error fetching initial attachment:', error)
+                  }
+                })
+                .catch((error) => {
+                  log.error('Error downloading initial attachment:', error)
+                })
+            } else {
               if (currentMediaFile.type === 'image') {
-                downloadImage(url)
+                downloadImage(attachmentUrl, false, 'image')
               } else {
-                setDownloadedFiles({ ...downloadedFiles, [currentMediaFile.id!]: url })
+                dispatch(setUpdateMessageAttachmentAC(attachmentUrl, currentMediaFile.url))
                 setPlayedVideo(currentMediaFile.id)
               }
-            })
-          } else {
-            downloadImage(currentMediaFile.url)
+            }
           }
-        }
-      })
+        })
+        .catch((error) => {
+          log.error('Error getting initial attachment from cache:', error)
+        })
     }
-    if (currentMediaFile) {
-      if (mediaFiles) {
-        setAttachmentsList(mediaFiles)
-      } else {
-        dispatch(
-          getAttachmentsAC(channel.id, channelDetailsTabs.media, 35, queryDirection.NEAR, currentMediaFile.id, true)
-        )
-      }
-    }
-
-    return () => {
-      setAttachmentsList([])
+    if (currentMediaFile && !attachmentsList.find((item: IMedia) => item.id === currentMediaFile.id)) {
+      dispatch(
+        getAttachmentsAC(channel.id, channelDetailsTabs.media, 34, queryDirection.NEAR, currentMediaFile.id, true)
+      )
     }
   }, [])
 
   const activeFileIndex = useMemo(() => {
-    return attachmentsList.findIndex((item) => item.id === currentFile.id)
+    if (!currentFile?.id) return -1
+    return attachmentsList.findIndex((item: IMedia) => item.id === currentFile.id)
   }, [attachmentsList, currentFile])
 
-  const handleCarouselItemMouseDown = (e: React.MouseEvent) => {
+  // Handle when attachmentsList increases - maintain current element position instantly
+  useEffect(() => {
+    const currentFileId = currentFile?.id
+    const previousLength = previousListLengthRef.current
+    const newLength = attachmentsList.length
+
+    let timeoutId: NodeJS.Timeout | null = null
+
+    // If list increased and we have a current file, update carousel to maintain position
+    if (newLength > previousLength && currentFileId) {
+      // Set skipTransition synchronously BEFORE any state updates to prevent blinking
+      // This must happen in the same render cycle to prevent visual glitches
+      setSkipTransition(true)
+
+      // Calculate the new index of the current file
+      const newIndex = attachmentsList.findIndex((item: IMedia) => item.id === currentFileId)
+
+      // If current file is found in the new list
+      if (newIndex >= 0) {
+        // If index changed (items prepended), update currentFile to trigger position update
+        // The activeFileIndex will recalculate, and Carousel will update via initialActiveIndex prop
+        if (newIndex !== activeFileIndex) {
+          const newFile = attachmentsList[newIndex]
+          if (newFile) {
+            // Batch the state update to happen after skipTransition is set
+            // React will batch these updates, but skipTransition will be set first
+            setCurrentFile(newFile)
+          }
+        }
+
+        // Reset skipTransition after position update completes
+        // Use multiple requestAnimationFrame calls to ensure all DOM updates are complete
+        timeoutId = setTimeout(() => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+              setSkipTransition(false)
+            })
+          })
+        }, 150)
+      } else {
+        // If current file not found, reset skipTransition after a delay
+        timeoutId = setTimeout(() => {
+          setSkipTransition(false)
+        }, 150)
+      }
+    }
+
+    // Update refs
+    previousListLengthRef.current = newLength
+    currentFileIdRef.current = currentFileId
+
+    // Return cleanup function that clears timeout if it was set
+    return () => {
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [attachmentsList.length, currentFile?.id, activeFileIndex, attachmentsList])
+
+  const handleCarouselItemMouseDown = useCallback((e: React.MouseEvent) => {
     if (e.button === 2) {
       e.stopPropagation()
     }
-  }
+  }, [])
+
+  const loadNextMoreAttachments = useCallback(() => {
+    if (
+      activeFileIndex > attachmentsList.length - 5 &&
+      attachmentLoadingStateForPopup === LOADING_STATE.LOADED &&
+      attachmentsForPopupHasNext
+    ) {
+      dispatch(loadMoreAttachmentsAC(34, queryDirection.NEXT, attachmentsList[attachmentsList.length - 1].id, true))
+    }
+  }, [activeFileIndex, attachmentLoadingStateForPopup, attachmentsForPopupHasNext, attachmentsList, dispatch])
+
+  const loadPrevMoreAttachments = useCallback(() => {
+    if (activeFileIndex < 5 && attachmentLoadingStateForPopup === LOADING_STATE.LOADED && attachmentsForPopupHasPrev) {
+      dispatch(loadMoreAttachmentsAC(34, queryDirection.PREV, attachmentsList[0].id, true))
+    }
+  }, [activeFileIndex, attachmentLoadingStateForPopup, attachmentsForPopupHasPrev, attachmentsList, dispatch])
+
+  // Check if carousel is loading (attachments list is being fetched)
+  const isCarouselLoading = useMemo(() => {
+    return (
+      attachmentLoadingStateForPopup !== LOADING_STATE.LOADED ||
+      activeFileIndex < 0 ||
+      !attachmentsList ||
+      !attachmentsList.length
+    )
+  }, [attachmentLoadingStateForPopup, activeFileIndex, attachmentsList])
+
+  // Helper function to check if a specific item is loading
+  const isItemLoading = useCallback(
+    (fileId: string | undefined) => {
+      if (!fileId) return false
+      return !itemsLoadedMap[fileId]
+    },
+    [itemsLoadedMap]
+  )
 
   return (
     <Container draggable={false}>
@@ -361,8 +483,6 @@ const SliderPopup = ({
           />
           <Info>
             <UserName color={textOnPrimary}>{attachmentUserName}</UserName>
-            {/* <FileName>{currentFile.name}</FileName> */}
-            {/* <FileSize></FileSize> */}
             <FileDateAndSize color={textOnPrimary}>
               {moment(currentFile && currentFile.createdAt).format('DD.MM.YYYY HH:mm')}{' '}
               <FileSize color={textOnPrimary}>
@@ -373,12 +493,12 @@ const SliderPopup = ({
         </FileInfo>
         <ActionsWrapper>
           <IconWrapper onClick={() => handleDownloadFile(currentFile, messageType)} color={textOnPrimary}>
-            {currentFile && downloadingFilesMap[currentFile.id] ? (
+            {currentFile && currentFile.id && downloadingFilesMap[currentFile.id] ? (
               <ProgressWrapper>
                 <CircularProgressbar
                   minValue={0}
                   maxValue={100}
-                  value={downloadingFilesMap[currentFile.id].uploadPercent || 0}
+                  value={downloadingFilesMap[currentFile.id!].uploadPercent || 0}
                   backgroundPadding={6}
                   background={true}
                   text=''
@@ -429,41 +549,50 @@ const SliderPopup = ({
           return true
         }}
       >
-        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length ? (
-          // @ts-ignore
+        {/* Carousel-level loading - shows when carousel/attachments list is loading */}
+        {isCarouselLoading && (
+          <UploadCont className='upload_cont'>
+            <UploadingIcon color={textOnPrimary} />
+          </UploadCont>
+        )}
+        {activeFileIndex >= 0 && attachmentsList && attachmentsList.length && (
           <Carousel
-            ref={carouselRef}
             pagination={false}
             className='custom_carousel'
-            initialActiveIndex={currentFile && activeFileIndex}
-            onChange={(_currentItem: any, pageIndex: any) => {
-              setImageLoading(true)
-              setCurrentFile(attachmentsList[pageIndex])
-              if (!attachmentsList[pageIndex + 1]) {
-                setNextButtonDisabled(true)
-              } else {
-                setNextButtonDisabled(false)
-              }
-              if (!attachmentsList[pageIndex - 1]) {
-                setPrevButtonDisabled(true)
-              } else {
-                setPrevButtonDisabled(false)
+            initialActiveIndex={activeFileIndex >= 0 ? activeFileIndex : 0}
+            skipTransition={skipTransition}
+            onNextStart={() => {
+              // Loading state will be set when currentFile changes in useDidUpdate
+              loadNextMoreAttachments()
+            }}
+            onPrevStart={() => {
+              // Loading state will be set when currentFile changes in useDidUpdate
+              loadPrevMoreAttachments()
+            }}
+            onChange={(pageIndex: number) => {
+              if (pageIndex >= 0 && pageIndex < attachmentsList.length) {
+                setCurrentFile(attachmentsList[pageIndex])
+                setNextButtonDisabled(!attachmentsList[pageIndex + 1])
+                setPrevButtonDisabled(!attachmentsList[pageIndex - 1])
               }
             }}
-            renderArrow={({ type, onClick, isEdge }: any) => {
+            renderArrow={({ type, onClick, isEdge }: RenderArrowProps) => {
               const pointer = type === 'PREV' ? <LeftArrow /> : <RightArrow />
-              const disabled = type === 'PREV' ? prevButtonDisabled : nextButtonDisabled
+              const disabled =
+                type === 'PREV'
+                  ? prevButtonDisabled && !attachmentsForPopupHasPrev
+                  : nextButtonDisabled && !attachmentsForPopupHasNext
+              const isEdgeButton = isEdge || (type === 'PREV' ? prevButtonDisabled : nextButtonDisabled)
               return (
                 <ArrowButton
                   className='custom_carousel_arrow'
                   leftButton={type === 'PREV'}
                   type='button'
                   onClick={(e: React.MouseEvent<HTMLButtonElement>) => {
-                    setImageLoading(true)
                     e.preventDefault()
                     onClick()
                   }}
-                  disabled={isEdge}
+                  disabled={isEdgeButton}
                   hide={disabled}
                   color={textOnPrimary}
                 >
@@ -473,67 +602,72 @@ const SliderPopup = ({
             }}
             isRTL={false}
           >
-            {attachmentsList.map((file) => (
+            {attachmentsList.map((file: IMedia) => (
               <CarouselItem
                 className='custom_carousel_item'
                 key={file.id}
                 draggable={false}
-                visibleSlide={visibleSlide}
                 onMouseDown={handleCarouselItemMouseDown}
                 onContextMenu={(e: React.MouseEvent) => {
                   e.stopPropagation()
                 }}
               >
-                {/* {downloadedFiles[file.id!] ? ( */}
-                <React.Fragment>
-                  {file.type === 'image' ? (
-                    <React.Fragment>
-                      {!downloadedFiles[file.id!] && imageLoading ? (
-                        <UploadCont>
-                          <UploadingIcon color={textOnPrimary} />
-                        </UploadCont>
-                      ) : (
+                {/* Per-item loading indicator - shows when this specific item is loading */}
+                {isItemLoading(file.id) && file.type === 'image' && (
+                  <ItemLoadingCont>
+                    <UploadingIcon color={textOnPrimary} />
+                  </ItemLoadingCont>
+                )}
+                {file.type === 'image' ? (
+                  <React.Fragment>
+                    {attachmentLoadingStateForPopup === LOADING_STATE.LOADED &&
+                      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')] && (
                         <img
+                          loading='lazy'
+                          decoding='async'
                           draggable={false}
-                          src={downloadedFiles[file.id!]}
-                          alt={file.name}
+                          src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_image_url')]}
+                          alt={file.name || 'Attachment'}
                           onMouseDown={(e) => {
                             if (e.button === 2) {
                               e.stopPropagation()
                             }
                           }}
+                          style={{ position: 'relative', zIndex: 2, opacity: isItemLoading(file.id) ? 0 : 1 }}
+                          onLoad={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: true }))
+                            }
+                          }}
+                          onError={() => {
+                            const fileId = file.id
+                            if (fileId) {
+                              setItemsLoadedMap((prev) => ({ ...prev, [fileId]: false }))
+                            }
+                          }}
                         />
                       )}
-                    </React.Fragment>
-                  ) : (
-                    <React.Fragment>
+                  </React.Fragment>
+                ) : (
+                  <React.Fragment>
+                    {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')] && (
                       <VideoPlayer
                         activeFileId={currentFile?.id || ''}
-                        videoFileId={file.id}
-                        src={downloadedFiles[file.id!]}
+                        videoFileId={file.id || ''}
+                        src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')]}
                         onMouseDown={(e: React.MouseEvent) => {
                           if (e.button === 2) {
                             e.stopPropagation()
                           }
                         }}
                       />
-                      {/* <video controls autoPlay id={file.url} src={downloadedFiles[file.url]}>
-                          <source src={downloadedFiles[file.url]} type={`video/${getFileExtension(file.name)}`} />
-                          <source src={downloadedFiles[file.url]} type='video/ogg' />
-                          <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-                          Your browser does not support the video tag.
-                        </video> */}
-                    </React.Fragment>
-                  )}
-                </React.Fragment>
-                {/* ) : ( */}
-                {/*  <UploadingIcon /> */}
-                {/* )} */}
+                    )}
+                  </React.Fragment>
+                )}
               </CarouselItem>
             ))}
           </Carousel>
-        ) : (
-          <UploadingIcon color={textOnPrimary} />
         )}
       </SliderBody>
       {forwardPopupOpen && (
@@ -637,15 +771,6 @@ const ClosePopupWrapper = styled.div<{ color: string }>`
   justify-content: flex-end;
   color: ${(props) => props.color};
 `
-/* const FileName = styled.span`
-  display: block;
-  font-style: normal;
-  font-weight: 500;
-  font-size: 15px;
-  line-height: 16px;
-  color: ${colors.white};
-  margin-bottom: 4px;
-` */
 
 const FileDateAndSize = styled.span<{ color: string }>`
   font-weight: 400;
@@ -701,21 +826,25 @@ const IconWrapper = styled.span<{ margin?: string; hideInMobile?: boolean; color
     }
   `}
 `
-const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
+const CarouselItem = styled.div`
   position: relative;
   display: flex;
-  opacity: ${(props) => (props.visibleSlide ? 1 : 0)};
+  max-width: calc(100% - 200px);
+  z-index: 2;
 
   img,
   video {
-    //max-width: calc(100vw - 300px);
     min-width: 280px;
     max-width: 100%;
+    margin: auto;
+    object-fit: contain;
     max-height: calc(100vh - 200px);
-    height: 100%;
     @media (max-width: 480px) {
       min-width: inherit;
     }
+  }
+  @media (max-width: 480px) {
+    max-width: calc(100% - 100px);
   }
 
   img {
@@ -723,16 +852,27 @@ const CarouselItem = styled.div<{ visibleSlide?: boolean }>`
   }
 `
 const UploadCont = styled.div`
-  //position: absolute;
-  left: 0;
-  top: 0;
-  width: 100%;
-  height: 100%;
-  min-height: 100px;
-  min-width: 100px;
+  left: calc((100vw - 100%) / -2);
+  top: calc((100vh - 100%) / -2);
+  width: 100vw;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: absolute;
+  z-index: 1;
+`
+
+const ItemLoadingCont = styled.div`
+  position: absolute;
+  left: calc((100vw - 100%) / -2);
+  top: calc((100vh - 100% + 60px) / -2);
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
 `
 
 const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; color: string }>`
@@ -751,6 +891,11 @@ const ArrowButton = styled.button<{ leftButton?: boolean; hide?: boolean; color:
   outline: none;
   cursor: pointer;
   visibility: ${(props) => props.hide && 'hidden'};
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  left: ${(props) => props.leftButton && '0'};
+  right: ${(props) => !props.leftButton && '0'};
   & > svg {
     width: 40px;
     height: 40px;

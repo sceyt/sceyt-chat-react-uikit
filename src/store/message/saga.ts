@@ -1,5 +1,5 @@
-import { put, call, takeLatest, takeEvery, select } from 'redux-saga/effects'
-
+import { put, call, spawn, takeLatest, takeEvery, delay } from 'redux-saga/effects'
+import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
   DELETE_MESSAGE,
@@ -19,17 +19,26 @@ import {
   RESUME_ATTACHMENT_UPLOADING,
   SEND_MESSAGE,
   SEND_TEXT_MESSAGE,
-  GET_MESSAGE_MARKERS
+  GET_MESSAGE_MARKERS,
+  ADD_POLL_VOTE,
+  DELETE_POLL_VOTE,
+  CLOSE_POLL,
+  RETRACT_POLL_VOTE,
+  GET_POLL_VOTES,
+  LOAD_MORE_POLL_VOTES,
+  RESEND_PENDING_POLL_ACTIONS
 } from './constants'
 
-import { IAction, IAttachment, IChannel, IMessage } from '../../types'
+import { IAction, IAttachment, IChannel, IMarker, IMessage, IPollOption, IPollVote } from '../../types'
 import { getClient } from '../../common/client'
 import {
   addChannelToAllChannels,
   getActiveChannelId,
   getChannelFromAllChannels,
+  getChannelFromAllChannelsMap,
   getChannelFromMap,
   getDisableFrowardMentionsCount,
+  getShowOwnMessageForward,
   query,
   removeChannelFromMap,
   setChannelInMap,
@@ -64,7 +73,23 @@ import {
   updateAttachmentUploadingProgressAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC,
-  setMessagesMarkersLoadingStateAC
+  setMessagesMarkersLoadingStateAC,
+  setPollVotesListAC,
+  addPollVotesToListAC,
+  setPollVotesLoadingStateAC,
+  addPollVoteAC,
+  deletePollVoteAC,
+  closePollAC,
+  retractPollVoteAC,
+  deletePollVotesFromListAC,
+  removePendingPollActionAC,
+  resendPendingPollActionsAC,
+  removePendingMessageAC,
+  updatePendingPollActionAC,
+  setUnreadScrollToAC,
+  setUnreadMessageIdAC,
+  setAttachmentsLoadingStateAC,
+  setUpdateMessageAttachmentAC
 } from './actions'
 import {
   attachmentTypes,
@@ -85,7 +110,6 @@ import {
 } from '../channel/actions'
 import {
   addReactionToMessageOnMap,
-  getAllMessages,
   getMessagesFromMap,
   setAllMessages,
   setHasNextCached,
@@ -98,66 +122,118 @@ import {
   MESSAGE_LOAD_DIRECTION,
   getHasNextCached,
   addAllMessages,
-  addMessageToMap,
   updateMessageOnAllMessages,
-  getVideoThumb,
-  IAttachmentMeta,
-  deleteVideoThumb,
   deletePendingAttachment,
-  checkChannelExistsOnMessagesMap,
-  getPendingMessages,
   setPendingAttachment,
   getPendingAttachment,
   removeReactionToMessageOnMap,
   addReactionOnAllMessages,
   removeReactionOnAllMessages,
   sendMessageHandler,
-  removePendingMessageFromMap,
-  setPendingMessage
+  setPendingMessage,
+  setPendingPollAction,
+  checkPendingPollActionConflict,
+  getPendingMessagesMap,
+  getPendingMessages,
+  addMessageToMap,
+  MESSAGES_MAX_PAGE_COUNT,
+  getCenterTwoMessages
 } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../user/constants'
-import { customUpload, getCustomUploader, pauseUpload, resumeUpload } from '../../helpers/customUploader'
-import { createImageThumbnail, getImageSize } from '../../helpers/resizeImage'
+import {
+  customUpload,
+  getCustomUploader,
+  getSendAttachmentsAsSeparateMessages,
+  pauseUpload,
+  resumeUpload
+} from '../../helpers/customUploader'
+import { createImageThumbnail, resizeImageWithPica } from '../../helpers/resizeImage'
+import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
-import { attachmentCompilationStateSelector } from './selector'
-import { isJSON } from '../../helpers/message'
+import { canBeViewOnce, isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
 import log from 'loglevel'
-import { getFrame } from 'helpers/getVideoFrame'
+import { getFrame, getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { MESSAGE_TYPE } from 'types/enum'
+import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
+import { isResendableError } from 'helpers/error'
+import { calculateRenderedImageWidth } from 'helpers'
 
-const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
+export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
     attachments.map(async (attachment) => {
       const handleUploadProgress = ({ loaded, total }: IProgress) => {
         store.dispatch(updateAttachmentUploadingProgressAC(loaded, total, attachment.tid))
       }
-      let fileSize = attachment.size
       const fileType = attachment.url.type.split('/')[0]
+      let fileSize = attachment.size
       let filePath: any
+      let uriLocal
       const handleUpdateLocalPath = (updatedLink: string) => {
-        if (fileType === 'image' || fileType === 'video') {
+        if (fileType === 'video') {
           filePath = updatedLink
-          message.attachments[0] = { ...message.attachments[0], attachmentUrl: updatedLink }
         }
       }
-      let uri
+      let blobLocal: Blob | null = null
       if (attachment.cachedUrl) {
-        uri = attachment.cachedUrl
+        uriLocal = attachment.cachedUrl
         store.dispatch(updateAttachmentUploadingProgressAC(attachment.data.size, attachment.data.size, attachment.tid))
       } else {
-        uri = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
+        const { uri, blob } = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
+        uriLocal = uri
+        blobLocal = blob
+        fileSize = blobLocal.size
+        filePath = URL.createObjectURL(blobLocal)
       }
-      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
       let thumbnailMetas: any
       if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'image') {
-        fileSize = await getImageSize(filePath)
         thumbnailMetas = await createImageThumbnail(
           null,
           filePath,
           attachment.type === 'file' ? 50 : undefined,
           attachment.type === 'file' ? 50 : undefined
         )
+
+        // Resize and cache the image for display
+        try {
+          if (blobLocal && blobLocal.type.startsWith('image/')) {
+            // Convert blob to File for resizeImageWithPica
+            const file = new File([blobLocal], attachment.name || 'image', { type: blobLocal.type })
+
+            // Resize with Pica (high-quality resizing)
+            const [newWidth, newHeight] = calculateRenderedImageWidth(
+              thumbnailMetas.imageWidth || 1280,
+              thumbnailMetas.imageHeight || 1080
+            )
+            const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
+            if (resizedBlob) {
+              // Cache the resized image using the uploaded URI as the cache key
+              const resizedResponse = new Response(resizedBlob, {
+                headers: {
+                  'Content-Type': resizedBlob.type || blobLocal.type
+                }
+              })
+              await setAttachmentToCache(uriLocal, resizedResponse)
+              filePath = URL.createObjectURL(resizedBlob)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, filePath))
+              message.attachments[0] = { ...message.attachments[0], attachmentUrl: filePath }
+              setAttachmentToCache(
+                uriLocal + `_original_image_url`,
+                new Response(blobLocal, {
+                  headers: {
+                    'Content-Type': blobLocal.type
+                  }
+                })
+              )
+              const originalImageUrl = URL.createObjectURL(blobLocal)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_image_url`, originalImageUrl))
+            }
+          }
+        } catch (error) {
+          log.error('Error resizing and caching image during upload:', error)
+          // Continue even if caching fails
+        }
       } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
         const meta = await getFrame(filePath)
         thumbnailMetas = {
@@ -166,25 +242,58 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
           imageHeight: meta.height,
           duration: meta.duration
         }
+        if (blobLocal) {
+          const [newWidth, newHeight] = calculateRenderedImageWidth(
+            thumbnailMetas.imageWidth || 1280,
+            thumbnailMetas.imageHeight || 1080
+          )
+          const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.8)
+          if (result) {
+            const { frameBlobUrl, blob } = result
+            if (frameBlobUrl && blob) {
+              const response = new Response(blob, {
+                headers: {
+                  'Content-Type': blob.type
+                }
+              })
+              if (blobLocal) {
+                await setAttachmentToCache(
+                  uriLocal + `_original_video_url`,
+                  new Response(blobLocal, {
+                    headers: {
+                      'Content-Type': blobLocal.type
+                    }
+                  })
+                )
+                const originalVideoUrl = URL.createObjectURL(blobLocal)
+                store.dispatch(setUpdateMessageAttachmentAC(uriLocal + `_original_video_url`, originalVideoUrl))
+              }
+              await setAttachmentToCache(uriLocal, response)
+              store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
+              message.attachments[0] = { ...message.attachments[0], attachmentUrl: frameBlobUrl }
+            }
+          }
+        }
       }
+      store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
 
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...(attachment.metadata
-              ? typeof attachment.metadata === 'string'
-                ? JSON.parse(attachment.metadata)
-                : attachment.metadata
-              : {}),
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight,
-                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-              })
+          ...(attachment.metadata
+            ? typeof attachment.metadata === 'string'
+              ? JSON.parse(attachment.metadata)
+              : attachment.metadata
+            : {}),
+          ...(thumbnailMetas &&
+            thumbnailMetas.thumbnail && {
+            tmb: thumbnailMetas.thumbnail,
+            szw: thumbnailMetas.imageWidth,
+            szh: thumbnailMetas.imageHeight,
+            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
           })
-      const attachmentBuilder = channel.createAttachmentBuilder(uri, attachment.type)
+        })
+      const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
         .setMetadata(attachmentMeta)
@@ -196,27 +305,64 @@ const handleUploadAttachments = async (attachments: IAttachment[], message: IMes
   )
 }
 
-const addPendingMessage = async (message: any, messageCopy: IMessage, channel: IChannel) => {
-  const messageToAdd = JSON.parse(
-    JSON.stringify({
-      ...messageCopy,
-      createdAt: new Date(Date.now()),
-      mentionedUsers: message.mentionedUsers,
-      parentMessage: message.parentMessage
-    })
-  )
-  addMessageToMap(channel.id, messageToAdd)
-  addAllMessages([messageToAdd], MESSAGE_LOAD_DIRECTION.NEXT)
-  setPendingMessage(channel.id, messageToAdd)
+const addPendingMessage = async (message: any, messageCopy: IMessage, channelId: string) => {
+  const messageToAdd = {
+    ...messageCopy,
+    createdAt: new Date(Date.now()),
+    mentionedUsers: message.mentionedUsers,
+    parentMessage: message.parentMessage
+  }
+  setPendingMessage(channelId, messageToAdd)
+}
 
-  store.dispatch(scrollToNewMessageAC(true))
-  store.dispatch(addMessageAC(messageToAdd))
+const updateMessage = function* (
+  actionType: string,
+  pending: IMessage,
+  channelId: string,
+  scrollToNewMessage: boolean = true,
+  message: IMessage,
+  isNotShowOwnMessageForward: boolean = false
+): any {
+  const activeChannelId = getActiveChannelId()
+  if (actionType !== RESEND_MESSAGE) {
+    if (activeChannelId === channelId) {
+      addAllMessages(
+        [{ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }],
+        MESSAGE_LOAD_DIRECTION.NEXT
+      )
+    }
+    if (activeChannelId === channelId) {
+      yield put(addMessageAC({ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }))
+    }
+    yield call(addPendingMessage, message, pending, channelId)
+    if (scrollToNewMessage) {
+      const channel = yield call(getChannelFromAllChannels, channelId)
+      const messages = store.getState().MessageReducer.activeChannelMessages
+      if (messages.findIndex((msg: IMessage) => msg.id === channel?.lastMessage?.id) >= 10) {
+        yield put(scrollToNewMessageAC(true, false, false))
+        yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+        const repliedMessage = document.getElementById(channel?.lastMessage?.id)
+        if (repliedMessage) {
+          const scrollRef = document.getElementById('scrollableDiv')
+          if (scrollRef) {
+            scrollRef.scrollTo({
+              top: 1000,
+              behavior: 'smooth'
+            })
+          }
+        }
+      } else if (channel?.id) {
+        yield put(getMessagesAC(channel, true, channel?.lastMessage?.id, undefined, false, 'smooth', true))
+      }
+    }
+  }
 }
 
 function* sendMessage(action: IAction): any {
   // let messageForCatch = {}
   const { payload } = action
   const { message, connectionState, channelId, sendAttachmentsAsSeparateMessage } = payload
+  const pendingMessages: IMessage[] = []
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let channel: IChannel = yield call(getChannelFromMap, channelId)
@@ -224,6 +370,9 @@ function* sendMessage(action: IAction): any {
       channel = getChannelFromAllChannels(channelId)!
       if (channel) {
         setChannelInMap(channel)
+      }
+      if (!channel) {
+        channel = getChannelFromAllChannelsMap(channelId)!
       }
     }
     if (channel.isMockChannel) {
@@ -254,7 +403,7 @@ function* sendMessage(action: IAction): any {
       const mediaAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
       if (mediaAttachments && mediaAttachments.length) {
         for (let i = 0; i < mediaAttachments.length; i++) {
-          const attachment = mediaAttachments[i]
+          let attachment = mediaAttachments[i]
 
           let uri
           if (attachment.cachedUrl) {
@@ -302,12 +451,14 @@ function* sendMessage(action: IAction): any {
               }
             }
           } else if (customUploader && attachment) {
-            attachment.url = attachment.data
+            attachment = {
+              ...attachment,
+              url: attachment.data
+            }
           }
 
           // not for SDK, for displaying attachments and their progress
           messageAttachment.tid = attachment.tid
-          messageAttachment.attachmentUrl = attachment.attachmentUrl
 
           if (customUploader) {
             messageAttachment.url = attachment.data
@@ -321,8 +472,8 @@ function* sendMessage(action: IAction): any {
               .setBodyAttributes(i === 0 ? message.bodyAttributes : {})
               .setMentionUserIds(i === 0 ? mentionedUserIds : [])
               .setType(message.type)
-              .setDisplayCount(message.type === 'system' ? 0 : 1)
-              .setSilent(message.type === 'system')
+              .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+              .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
               .setMetadata(i === 0 ? JSON.stringify(message.metadata) : '')
             if (message.parentMessage) {
               messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
@@ -330,7 +481,12 @@ function* sendMessage(action: IAction): any {
             if (message.repliedInThread) {
               messageBuilder.setReplyInThread()
             }
-            const messageToSend = messageBuilder.create()
+            // Set view-once only for first message with exactly 1 image/video/voice attachment
+            if (i === 0 && canBeViewOnce(message)) {
+              messageBuilder.setViewOnce(true)
+              messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
+            }
+            const messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
             setPendingAttachment(messageAttachment.tid as string, {
               ...messageAttachment.data,
               messageTid: messageToSend.tid,
@@ -338,12 +494,22 @@ function* sendMessage(action: IAction): any {
             })
             const messageForSend = {
               ...messageToSend,
-              attachments: [messageAttachment]
+              attachments: [messageAttachment],
+              createdAt: new Date(Date.now())
             }
 
             messagesToSend.push(messageForSend)
-            const messageForSendCopy = JSON.parse(JSON.stringify(messageForSend))
-            yield call(addPendingMessage, message, messageForSendCopy, channel)
+            const pending = {
+              ...messageForSend,
+              attachments: [attachment],
+              createdAt: new Date(Date.now()),
+              mentionedUsers: message.mentionedUsers,
+              parentMessage: message.parentMessage || null
+            }
+            pendingMessages.push(pending)
+            if (action.type !== RESEND_MESSAGE) {
+              yield call(updateMessage, action.type, pending, channel.id, true, message)
+            }
           } else {
             attachmentsToSend.push(messageAttachment)
           }
@@ -360,8 +526,8 @@ function* sendMessage(action: IAction): any {
             .setAttachments(message.attachments)
             .setMentionUserIds(mentionedUserIds)
             .setType(message.type)
-            .setDisplayCount(message.type === 'system' ? 0 : 1)
-            .setSilent(message.type === 'system')
+            .setDisplayCount(message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1)
+            .setSilent(message.type === MESSAGE_TYPE.SYSTEM)
             .setMetadata(JSON.stringify(message.metadata))
 
           if (message.parentMessage) {
@@ -372,24 +538,33 @@ function* sendMessage(action: IAction): any {
             messageBuilder.setReplyInThread()
           }
 
-          const messageToSend = messageBuilder.create()
-          const messageCopy = JSON.parse(JSON.stringify(messageToSend))
-
-          if (customUploader) {
-            if (!sendAttachmentsAsSeparateMessage) {
-              yield call(addPendingMessage, message, messageCopy, channel)
-            }
-          } else {
-            yield call(addPendingMessage, message, messageCopy, channel)
+          // Set view-once if message has viewOnce flag and exactly 1 image/video/voice attachment
+          if (canBeViewOnce(message)) {
+            messageBuilder.setViewOnce(true)
+            messageBuilder.setType(MESSAGE_TYPE.VIEW_ONCE)
           }
-          messageToSend.attachments = attachmentsToSend
+
+          let messageToSend = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
+          const pending = {
+            ...messageToSend,
+            attachments: message.attachments,
+            createdAt: new Date(Date.now()),
+            mentionedUsers: message.mentionedUsers,
+            parentMessage: message.parentMessage || null
+          }
+          pendingMessages.push(pending)
+          if (action.type !== RESEND_MESSAGE) {
+            yield call(updateMessage, action.type, pending, channel.id, true, message)
+          }
+
+          messageToSend = { ...messageToSend, attachments: attachmentsToSend }
           messagesToSend.push(messageToSend)
         }
       }
 
       for (let i = 0; i < messagesToSend.length; i++) {
         const messageAttachment = messagesToSend[i].attachments
-        const messageToSend = messagesToSend[i]
+        let messageToSend = messagesToSend[i]
 
         try {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
@@ -407,9 +582,9 @@ function* sendMessage(action: IAction): any {
                 .create()
             }
             if (linkAttachmentToSend) {
-              messageToSend.attachments = [...attachmentsToSend, linkAttachmentToSend]
+              messageToSend = { ...messageToSend, attachments: [...attachmentsToSend, linkAttachmentToSend] }
             } else {
-              messageToSend.attachments = [...attachmentsToSend]
+              messageToSend = { ...messageToSend, attachments: [...attachmentsToSend] }
             }
 
             const messageResponse = yield call(channel.sendMessage, messageToSend)
@@ -418,8 +593,7 @@ function* sendMessage(action: IAction): any {
                 messageResponse.attachments[k] = {
                   ...messageResponse.attachments[k],
                   user: JSON.parse(JSON.stringify(messageResponse.user)),
-                  tid: messageAttachment[k].tid as string,
-                  attachmentUrl: messageAttachment[k].attachmentUrl
+                  tid: messageAttachment[k].tid as string
                 }
                 const pendingAttachment = getPendingAttachment(messageAttachment[k].tid as string)
                 if (!messageAttachment[k].cachedUrl) {
@@ -446,35 +620,28 @@ function* sendMessage(action: IAction): any {
                 currentAttachmentsMap[attachment.tid!] = attachment
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
-                if (currentAttachmentsMap[attachment.tid!]) {
+                if (currentAttachmentsMap[attachment.tid!] && attachment.type !== attachmentTypes.voice) {
                   log.info('set at')
-                  return { ...attachment, attachmentUrl: currentAttachmentsMap[attachment.tid!].attachmentUrl }
+                  return { ...attachment }
+                } else if (attachment.type === attachmentTypes.voice) {
+                  return { ...attachment }
                 }
                 return attachment
               })
             }
             const messageUpdateData = {
-              id: messageResponse.id,
-              body: messageResponse.body,
-              type: messageResponse.type,
-              state: messageResponse.state,
-              displayCount: messageResponse.displayCount,
-              deliveryStatus: messageResponse.deliveryStatus,
+              ...messageResponse,
               attachments: attachmentsToUpdate,
-              mentionedUsers: messageResponse.mentionedUsers,
-              bodyAttributes: messageResponse.bodyAttributes,
-              metadata: messageResponse.metadata,
-              parentMessage: messageResponse.parentMessage,
-              repliedInThread: messageResponse.repliedInThread,
-              createdAt: messageResponse.createdAt
+              channelId: channel.id
             }
-            yield put(updateMessageAC(messageToSend.tid as string, JSON.parse(JSON.stringify(messageUpdateData))))
-            updateMessageOnMap(channel.id, {
-              messageId: messageToSend.tid as string,
-              params: messageUpdateData
-            })
+            const activeChannelId = getActiveChannelId()
+            if (activeChannelId === channel.id) {
+              yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
+            }
+            yield put(removePendingMessageAC(channel.id, messageToSend.tid as string))
             updateMessageOnAllMessages(messageToSend.tid as string, messageUpdateData)
             const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
+            addMessageToMap(channel.id, messageToUpdate)
             updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
             const channelUpdateParam = {
               lastMessage: messageToUpdate,
@@ -486,27 +653,33 @@ function* sendMessage(action: IAction): any {
             yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
             updateChannelOnAllChannels(channel.id, channelUpdateParam)
           } else {
-            // eslint-disable-next-line
-            throw Error('Network error')
+            throw new Error('Connection required to send message')
           }
         } catch (e) {
-          log.error('Error on uploading attachment', messageToSend.tid, e)
-          if (messageToSend.attachments && messageToSend.attachments.length) {
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
-          }
+          const isErrorResendable = isResendableError(e?.type)
+          if (!isErrorResendable && channel?.id && messageToSend?.tid) {
+            yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
+          } else if (channel?.id) {
+            log.error('Error on uploading attachment', messageToSend.tid, e)
+            if (messageToSend.attachments && messageToSend.attachments.length) {
+              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
+            }
 
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid!,
-            params: { state: MESSAGE_STATUS.FAILED }
-          })
-          updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
-          yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+            updateMessageOnMap(channel.id, {
+              messageId: messageToSend.tid!,
+              params: { state: MESSAGE_STATUS.FAILED }
+            })
+            updateMessageOnAllMessages(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED })
+            yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+          }
         }
       }
     }
   } catch (e) {
     log.error('error on send message ... ', e)
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
@@ -522,10 +695,13 @@ function* sendTextMessage(action: IAction): any {
     if (channel) {
       setChannelInMap(channel)
     }
+    if (!channel) {
+      channel = getChannelFromAllChannelsMap(channelId)!
+    }
   }
 
-  let sendMessageTid
-  const activeChannelId = getActiveChannelId()
+  let sendMessageTid: string | null = null
+  let pendingMessage: IMessage | null = null
 
   try {
     if (channel.isMockChannel) {
@@ -556,30 +732,37 @@ function* sendTextMessage(action: IAction): any {
       .setAttachments(attachments)
       .setMentionUserIds(mentionedUserIds)
       .setType(message.type)
-      .setDisplayCount(message?.displayCount !== undefined ? message.displayCount : message.type === 'system' ? 0 : 1)
-      .setSilent(message?.silent !== undefined ? message.silent : message.type === 'system')
+      .setDisplayCount(
+        message?.displayCount !== undefined ? message.displayCount : message.type === MESSAGE_TYPE.SYSTEM ? 0 : 1
+      )
+      .setSilent(message?.silent !== undefined ? message.silent : message.type === MESSAGE_TYPE.SYSTEM)
       .setMetadata(JSON.stringify(message.metadata))
+      .setPollDetails(message.pollDetails ? message.pollDetails : null)
     if (message.parentMessage) {
       messageBuilder.setParentMessageId(message.parentMessage ? message.parentMessage.id : null)
     }
     if (message.repliedInThread) {
       messageBuilder.setReplyInThread()
     }
-    const messageToSend = messageBuilder.create()
-    const pendingMessage = JSON.parse(
-      JSON.stringify({
-        ...messageToSend,
-        createdAt: new Date(Date.now()),
-        mentionedUsers: message.mentionedUsers,
-        parentMessage: message.parentMessage
-      })
-    )
+    const createdMessage = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
+    const messageToSend = {
+      ...createdMessage,
+      ...(action.type === RESEND_MESSAGE ? { attachments: message?.attachments } : {})
+    }
+    pendingMessage = {
+      ...messageToSend,
+      createdAt: new Date(Date.now()),
+      mentionedUsers: message.mentionedUsers,
+      parentMessage: message.parentMessage
+    }
     sendMessageTid = messageToSend.tid
-    if (pendingMessage.metadata) {
+    if (pendingMessage && pendingMessage.metadata) {
       pendingMessage.metadata = JSON.parse(pendingMessage.metadata)
     }
-    if (activeChannelId === channel.id) {
-      yield call(addPendingMessage, message, pendingMessage, channel)
+    if (pendingMessage) {
+      if (action.type !== RESEND_MESSAGE) {
+        yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
+      }
     }
     if (connectionState === CONNECTION_STATUS.CONNECTED) {
       let messageResponse
@@ -589,28 +772,17 @@ function* sendTextMessage(action: IAction): any {
         messageResponse = yield call(channel.sendMessage, messageToSend)
       }
       const messageUpdateData = {
-        id: messageResponse.id,
-        body: messageResponse.body,
-        type: messageResponse.type,
-        state: messageResponse.state,
-        bodyAttributes: messageResponse.bodyAttributes,
-        displayCount: messageResponse.displayCount,
-        deliveryStatus: messageResponse.deliveryStatus,
-        attachments: messageResponse.attachments,
-        mentionedUsers: messageResponse.mentionedUsers,
-        metadata: messageResponse.metadata,
-        parentMessage: messageResponse.parentMessage,
-        repliedInThread: messageResponse.repliedInThread,
-        createdAt: messageResponse.createdAt,
+        ...messageResponse,
         channelId: channel.id
       }
+      const activeChannelId = getActiveChannelId()
       if (activeChannelId === channel.id) {
-        yield put(updateMessageAC(messageToSend.tid, messageUpdateData))
+        yield put(updateMessageAC(messageToSend.tid, messageUpdateData, true))
       }
-      updateMessageOnMap(channel.id, {
-        messageId: messageToSend.tid,
-        params: messageUpdateData
-      })
+      const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
+      yield put(updatePendingPollActionAC(messageToSend.tid as string, stringifiedMessageUpdateData))
+      yield put(removePendingMessageAC(channel.id, messageToSend.tid))
+      addMessageToMap(channel.id, stringifiedMessageUpdateData)
       if (activeChannelId === channel.id) {
         updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
       }
@@ -632,33 +804,44 @@ function* sendTextMessage(action: IAction): any {
       throw new Error('Connection required to send message')
     }
 
-    yield put(getMessagesAC(channel, true, channel.lastMessage.id, undefined, undefined, false))
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // messageForCatch = messageToSend
   } catch (e) {
-    log.error('error on send text message ... ', e)
-    updateMessageOnMap(channel.id, {
-      messageId: sendMessageTid,
-      params: { state: MESSAGE_STATUS.FAILED }
-    })
-    if (activeChannelId === channel.id) {
-      updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
-      yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+    log.error('error on send text message ... ', e?.type, e)
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable && channel?.id && sendMessageTid) {
+      yield put(removePendingMessageAC(channel.id, sendMessageTid!))
+    } else if (channel?.id && sendMessageTid) {
+      updateMessageOnMap(channel.id, {
+        messageId: sendMessageTid,
+        params: { state: MESSAGE_STATUS.FAILED }
+      })
+      const activeChannelId = getActiveChannelId()
+      if (activeChannelId === channel.id) {
+        updateMessageOnAllMessages(sendMessageTid, { state: MESSAGE_STATUS.FAILED })
+        yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
+      }
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 
 function* forwardMessage(action: IAction): any {
-  // let messageForCatch = {}
+  const { payload } = action
+  const { message, channelId, connectionState, isForward } = payload
+  const showOwnMessageForward = getShowOwnMessageForward()
+  const SceytChatClient = getClient()
+  const isNotShowOwnMessageForward = message?.user?.id === SceytChatClient.user.id && !showOwnMessageForward
+  let pendingMessage: IMessage | null = null
+  let channel: IChannel | null = null
+  const activeChannelId = getActiveChannelId()
+  let messageTid: string | null = null
   try {
-    const { payload } = action
-    const { message, channelId, connectionState } = payload
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    let channel = yield call(getChannelFromMap, channelId)
+    channel = yield call(getChannelFromMap, channelId)
     if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
+      channel = getChannelFromAllChannels(channelId) || null
       if (!channel) {
         const SceytChatClient = getClient()
         channel = yield call(SceytChatClient.getChannel, channelId)
@@ -666,8 +849,13 @@ function* forwardMessage(action: IAction): any {
       if (channel) {
         setChannelInMap(channel)
       }
+      if (!channel) {
+        channel = getChannelFromAllChannelsMap(channelId)!
+      }
     }
-    yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
+    if (!channel) {
+      throw new Error('Channel not found')
+    }
     const mentionedUserIds = message.mentionedUsers ? message.mentionedUsers.map((member: any) => member.id) : []
     let attachments = message.attachments
     if (
@@ -676,7 +864,7 @@ function* forwardMessage(action: IAction): any {
         !(channel.userRole === 'admin' || channel.userRole === 'owner')
       )
     ) {
-      if (message.attachments && message.attachments.length) {
+      if (message.attachments && message.attachments.length && action.type !== RESEND_MESSAGE) {
         const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].url, attachments[0].type)
         const att = attachmentBuilder
           .setName(attachments[0].name)
@@ -687,80 +875,86 @@ function* forwardMessage(action: IAction): any {
         attachments = [att]
       }
       const messageBuilder = channel.createMessageBuilder()
-      messageBuilder
-        .setBody(message.body)
-        .setBodyAttributes(message.bodyAttributes)
-        .setAttachments(attachments)
-        .setMentionUserIds(mentionedUserIds)
-        .setType(message.type)
-        .setDisableMentionsCount(getDisableFrowardMentionsCount())
-        .setMetadata(message.metadata ? JSON.stringify(message.metadata) : '')
-        .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
-      const messageToSend = messageBuilder.create()
-      const pendingMessage = JSON.parse(
-        JSON.stringify({
-          ...messageToSend,
-          createdAt: new Date(Date.now())
-        })
-      )
-      if (message.forwardingDetails) {
-        pendingMessage.forwardingDetails.user = message.forwardingDetails.user
-        pendingMessage.forwardingDetails.channelId = message.forwardingDetails.channelId
-      } else {
-        pendingMessage.forwardingDetails.user = message.user
-        pendingMessage.forwardingDetails.channelId = channelId
+      let pollDetails = null
+      if (message.pollDetails) {
+        // should make empty and new ids poll details
+        pollDetails = {
+          id: uuidv4(),
+          name: message.pollDetails.name,
+          description: message.pollDetails.description || '',
+          options: message.pollDetails.options.map((option: IPollOption) => ({
+            id: uuidv4(),
+            name: option.name
+          })),
+          anonymous: message.pollDetails.anonymous,
+          allowMultipleVotes: message.pollDetails.allowMultipleVotes,
+          allowVoteRetract: message.pollDetails.allowVoteRetract
+        }
       }
-      pendingMessage.forwardingDetails.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
-      const activeChannelId = getActiveChannelId()
-      const isCachedChannel = checkChannelExistsOnMessagesMap(channelId)
+      if (action.type !== RESEND_MESSAGE) {
+        messageBuilder
+          .setBody(message.body)
+          .setBodyAttributes(message.bodyAttributes)
+          .setAttachments(attachments)
+          .setMentionUserIds(mentionedUserIds)
+          .setType(message.type)
+          .setDisableMentionsCount(getDisableFrowardMentionsCount())
+          .setMetadata(
+            message.metadata ? (isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata)) : ''
+          )
+          .setForwardingMessageId(message.forwardingDetails ? message.forwardingDetails.messageId : message.id)
+          .setPollDetails(pollDetails)
+      }
+      const messageToSend =
+        action.type === RESEND_MESSAGE
+          ? { ...action.payload.message, attachments: message.attachments }
+          : messageBuilder.create()
+      messageTid = messageToSend.tid
+      pendingMessage = {
+        ...messageToSend,
+        createdAt: new Date(Date.now()),
+        user: message.user
+      }
+      if (isForward && pendingMessage && action.type !== RESEND_MESSAGE) {
+        if (message.forwardingDetails) {
+          pendingMessage.forwardingDetails!.user = message.forwardingDetails.user
+          pendingMessage.forwardingDetails!.channelId = message.forwardingDetails.channelId
+        } else {
+          pendingMessage.forwardingDetails!.user = message.user
+          pendingMessage.forwardingDetails!.channelId = channelId
+        }
+        pendingMessage.forwardingDetails!.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
+      }
+
       if (channelId === activeChannelId) {
         const hasNextMessages = store.getState().MessageReducer.messagesHasNext
         if (!getHasNextCached()) {
           if (hasNextMessages) {
             yield put(getMessagesAC(channel))
-          } else {
-            yield put(addMessageAC(JSON.parse(JSON.stringify(pendingMessage))))
           }
         }
-        addMessageToMap(channelId, pendingMessage)
-        addAllMessages([pendingMessage], MESSAGE_LOAD_DIRECTION.NEXT)
-        yield put(scrollToNewMessageAC(true, true))
-      } else if (isCachedChannel) {
-        addMessageToMap(channelId, pendingMessage)
-      } else {
-        setPendingMessage(channelId, pendingMessage)
+      }
+      if (pendingMessage) {
+        if (action.type !== RESEND_MESSAGE) {
+          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
+        }
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
-        const messageResponse = yield call(channel.sendMessage, messageToSend)
+        const messageResponse = yield call(channel.sendMessage, {
+          ...messageToSend,
+          ...(isNotShowOwnMessageForward ? { forwardingDetails: null } : {})
+        })
         const messageUpdateData = {
-          id: messageResponse.id,
-          type: messageResponse.type,
-          state: messageResponse.state,
-          displayCount: messageResponse.displayCount,
-          deliveryStatus: messageResponse.deliveryStatus,
-          attachments: messageResponse.attachments,
-          mentionedUsers: messageResponse.mentionedUsers,
-          metadata: messageResponse.metadata,
-          parentMessage: messageResponse.parentMessage,
-          repliedInThread: messageResponse.repliedInThread,
-          createdAt: messageResponse.createdAt
+          ...messageResponse,
+          channelId: channel.id
         }
         if (channelId === activeChannelId) {
-          yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData))))
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid,
-            params: messageUpdateData
-          })
+          yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
           updateMessageOnAllMessages(messageToSend.tid, messageUpdateData)
-        } else if (isCachedChannel) {
-          updateMessageOnMap(channel.id, {
-            messageId: messageToSend.tid,
-            params: messageUpdateData
-          })
-        } else {
-          removePendingMessageFromMap(channelId, messageToSend.tid)
         }
+        if (messageToSend.tid) yield put(removePendingMessageAC(channel.id, messageToSend.tid))
 
+        addMessageToMap(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
         const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
         updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
         const channelUpdateParam = {
@@ -772,288 +966,61 @@ function* forwardMessage(action: IAction): any {
         if (channel.unread) {
           yield put(markChannelAsReadAC(channel.id))
         }
+      } else {
+        throw new Error('Connection required to forward message')
       }
     }
-    // messageForCatch = messageToSend
   } catch (e) {
+    const isErrorResendable = isResendableError(e?.type)
+    if (!isErrorResendable && channel?.id && messageTid) {
+      yield put(removePendingMessageAC(channel!.id, messageTid!))
+    } else {
+      if (channel?.id && messageTid) {
+        updateMessageOnMap(channel.id, {
+          messageId: messageTid!,
+          params: { state: MESSAGE_STATUS.FAILED }
+        })
+        const activeChannelId = getActiveChannelId()
+        if (activeChannelId === channel.id) {
+          updateMessageOnAllMessages(messageTid!, { state: MESSAGE_STATUS.FAILED })
+          yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
+        }
+      }
+    }
     log.error('error on forward message ... ', e)
-    // yield put(setErrorNotification(`${e.message} ${e.code}`));
+  } finally {
+    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
-  yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
 }
 
 function* resendMessage(action: IAction): any {
   const { payload } = action
   const { message, connectionState, channelId } = payload
-  yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-  let channel = yield call(getChannelFromMap, channelId)
-  try {
-    if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
-      if (channel) {
-        setChannelInMap(channel)
-      }
-    }
-    yield put(addChannelAC(JSON.parse(JSON.stringify(channel))))
-    // const mentionedUserIds = message.mentionedUsers.map((member: any) => member.id)
-    // let attachmentsToSend: IAttachment[] = []
-    const customUploader = getCustomUploader()
+  const attachments = message?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
 
-    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.UNMODIFIED }))
-    updateMessageOnMap(channel.id, {
-      messageId: message.tid,
-      params: { state: MESSAGE_STATUS.UNMODIFIED }
+  if (message.forwardingDetails) {
+    yield call(forwardMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId, isForward: false }
     })
-    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.UNMODIFIED })
-
-    if (message.attachments && message.attachments.length && message.state === MESSAGE_STATUS.FAILED) {
-      const attachmentCompilation = yield select(attachmentCompilationStateSelector)
-      // const attachmentsCopy = [...message.attachments]
-      // if (isResend) {
-      // }
-      const messageAttachment = { ...message.attachments[0] }
-
-      const messageCopy = {
-        ...message,
-        attachments: [messageAttachment]
+  } else if (attachments && attachments.length) {
+    const sendAttachmentsAsSeparateMessage = getSendAttachmentsAsSeparateMessages()
+    const isVoiceMessage = message.attachments[0].type === attachmentTypes.voice
+    yield call(sendMessage, {
+      type: RESEND_MESSAGE,
+      payload: {
+        message,
+        connectionState,
+        channelId,
+        sendAttachmentsAsSeparateMessage: isVoiceMessage ? false : sendAttachmentsAsSeparateMessage
       }
-      log.info('attachmentCompilation. .. . .', attachmentCompilation)
-      if (
-        connectionState === CONNECTION_STATUS.CONNECTED &&
-        attachmentCompilation[messageAttachment.tid] &&
-        attachmentCompilation[messageAttachment.tid] === UPLOAD_STATE.FAIL
-      ) {
-        yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.UPLOADING, messageAttachment.tid))
-        if (customUploader) {
-          const handleUploadProgress = ({ loaded, total }: IProgress) => {
-            log.info('progress ... ', loaded / total)
-          }
-
-          let uri
-          try {
-            let filePath
-            const handleUpdateLocalPath = (updatedLink: string) => {
-              filePath = updatedLink
-              thumbnailMetas = getVideoThumb(messageAttachment.tid)
-              messageCopy.attachments[0] = { ...messageCopy.attachments[0], attachmentUrl: updatedLink }
-              const updateAttachmentPath = {
-                attachments: [{ ...messageCopy.attachments[0], attachmentUrl: updatedLink }]
-              }
-              store.dispatch(updateMessageAC(message.tid, updateAttachmentPath))
-            }
-            const pendingAttachment = getPendingAttachment(message.attachments[0].tid)
-            log.info('pendingAttachment ... ', pendingAttachment)
-            if (messageAttachment.cachedUrl) {
-              uri = pendingAttachment.file
-            } else {
-              messageAttachment.data = pendingAttachment.file
-              messageAttachment.url = pendingAttachment.file
-              uri = yield call(
-                customUpload,
-                messageAttachment,
-                handleUploadProgress,
-                message.type,
-                handleUpdateLocalPath
-              )
-            }
-            log.info('messageAttachment ... ', messageAttachment)
-
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, messageAttachment.tid))
-
-            delete messageCopy.createdAt
-            let thumbnailMetas: IAttachmentMeta = {}
-            let fileSize = messageAttachment.cachedUrl ? messageAttachment.size : pendingAttachment.file.size
-
-            log.info('uri ... ', uri)
-            if (!messageAttachment.cachedUrl && messageAttachment.url.type.split('/')[0] === 'image') {
-              fileSize = yield call(getImageSize, filePath)
-              thumbnailMetas = yield call(
-                createImageThumbnail,
-                null,
-                filePath,
-                messageAttachment.type === 'file' ? 50 : undefined,
-                messageAttachment.type === 'file' ? 50 : undefined
-              )
-            } else if (!messageAttachment.cachedUrl && messageAttachment.url.type.split('/')[0] === 'video') {
-              if (filePath) {
-                const meta = yield call(getFrame, filePath)
-                thumbnailMetas = {
-                  thumbnail: meta.thumb,
-                  imageWidth: meta.width,
-                  imageHeight: meta.height,
-                  duration: meta.duration
-                }
-              }
-            }
-            let attachmentMeta: string
-            if (messageAttachment.cachedUrl) {
-              attachmentMeta = messageAttachment.metadata
-            } else {
-              attachmentMeta = JSON.stringify({
-                ...(messageAttachment.metadata
-                  ? typeof messageAttachment.metadata === 'string'
-                    ? JSON.parse(messageAttachment.metadata)
-                    : messageAttachment.metadata
-                  : {}),
-                ...(thumbnailMetas &&
-                  thumbnailMetas.thumbnail && {
-                    tmb: thumbnailMetas.thumbnail,
-                    szw: thumbnailMetas.imageWidth,
-                    szh: thumbnailMetas.imageHeight,
-                    ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-                  })
-              })
-            }
-            log.info('attachmentMeta ... ', attachmentMeta)
-            const attachmentBuilder = channel.createAttachmentBuilder(uri, messageAttachment.type)
-
-            /* const attachmentToSend = { ...messageAttachment, url: uri, upload: false } */
-            const attachmentToSend = attachmentBuilder
-              .setName(messageAttachment.name)
-              .setMetadata(attachmentMeta)
-              .setFileSize(fileSize)
-              .setUpload(false)
-              .create()
-            log.info('attachmentToSend ... ', attachmentToSend)
-            // not for SDK, for displaying attachments and their progress
-            attachmentToSend.tid = messageAttachment.tid
-            attachmentToSend.attachmentUrl = messageAttachment.attachmentUrl
-            yield put(
-              updateMessageAC(
-                messageCopy.tid,
-                JSON.parse(JSON.stringify({ ...messageCopy, attachments: [attachmentToSend] }))
-              )
-            )
-            messageCopy.attachments = [attachmentToSend]
-
-            if (connectionState === CONNECTION_STATUS.CONNECTED) {
-              const messageResponse = yield call(channel.sendMessage, messageCopy)
-              deletePendingAttachment(messageAttachment.tid)
-              const messageUpdateData = {
-                id: messageResponse.id,
-                body: messageResponse.body,
-                type: messageResponse.type,
-                state: messageResponse.state,
-                displayCount: messageResponse.displayCount,
-                deliveryStatus: messageResponse.deliveryStatus,
-                attachments: [
-                  {
-                    ...messageResponse.attachments[0],
-                    attachmentUrl: attachmentToSend.attachmentUrl,
-                    tid: attachmentToSend.tid
-                  }
-                ],
-                mentionedUsers: messageResponse.mentionedUsers,
-                metadata: messageResponse.metadata,
-                parentMessage: messageResponse.parentMessage,
-                repliedInThread: messageResponse.repliedInThread,
-                bodyAttributes: messageResponse.bodyAttributes,
-                createdAt: messageResponse.createdAt
-              }
-              removePendingMessageFromMap(channel.id, messageCopy.tid)
-              yield put(updateMessageAC(messageCopy.tid, JSON.parse(JSON.stringify(messageUpdateData))))
-
-              const fileType =
-                messageAttachment.data && messageAttachment.data.type
-                  ? messageAttachment.data.type.split('/')[0]
-                  : messageAttachment.type
-              if (fileType === 'video') {
-                deleteVideoThumb(messageAttachment.tid)
-              }
-              updateMessageOnMap(channel.id, {
-                messageId: messageCopy.tid,
-                params: messageUpdateData
-              })
-              updateMessageOnAllMessages(messageCopy.tid, messageUpdateData)
-
-              const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-              updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-              yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
-            }
-          } catch (e) {
-            log.error('fail upload attachment on resend message ... ', e)
-            yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageAttachment.tid))
-
-            updateMessageOnMap(channel.id, {
-              messageId: messageCopy.tid,
-              params: { state: MESSAGE_STATUS.FAILED }
-            })
-            updateMessageOnAllMessages(messageCopy.tid, { state: MESSAGE_STATUS.FAILED })
-            yield put(updateMessageAC(messageCopy.tid, { state: MESSAGE_STATUS.FAILED }))
-          }
-        }
-      }
-    } else if (message.state === MESSAGE_STATUS.FAILED) {
-      log.info('send failed message ...')
-      const messageCopy = { ...message }
-      delete messageCopy.createdAt
-
-      if (connectionState === CONNECTION_STATUS.CONNECTED) {
-        const messageResponse = yield call(channel.sendMessage, messageCopy)
-        const messageUpdateData = {
-          id: messageResponse.id,
-          body: messageResponse.body,
-          type: messageResponse.type,
-          state: messageResponse.state,
-          displayCount: messageResponse.displayCount,
-          deliveryStatus: messageResponse.deliveryStatus,
-          attachments: [],
-          mentionedUsers: messageResponse.mentionedUsers,
-          metadata: messageResponse.metadata,
-          parentMessage: messageResponse.parentMessage,
-          repliedInThread: messageResponse.repliedInThread,
-          bodyAttributes: messageResponse.bodyAttributes,
-          createdAt: messageResponse.createdAt
-        }
-        const isInActiveChannel = getMessagesFromMap(channelId)?.find(
-          (message: IMessage) => message.id === messageCopy.tid
-        )
-        if (isInActiveChannel) {
-          removePendingMessageFromMap(channel.id, messageCopy.tid)
-        }
-        yield put(updateMessageAC(messageCopy.tid, messageUpdateData))
-
-        updateMessageOnMap(channel.id, {
-          messageId: messageCopy.tid,
-          params: messageUpdateData
-        })
-        const activeChannelId = getActiveChannelId()
-        if (channelId === activeChannelId) {
-          yield put(updateMessageAC(messageCopy.tid, JSON.parse(JSON.stringify(messageResponse))))
-          updateMessageOnMap(channel.id, {
-            messageId: messageCopy.tid,
-            params: messageUpdateData
-          })
-          updateMessageOnAllMessages(messageCopy.tid, messageUpdateData)
-        }
-        updateChannelOnAllChannels(channel.id, channel)
-        const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-        updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-        yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
-      }
-    }
-    yield put(scrollToNewMessageAC(true))
-
-    /* const messageToResend = { ...message }
-    if (messageToResend.createdAt) {
-      delete messageToResend.createdAt
-    }
-    const messageResponse = yield call(channel.reSendMessage, messageToResend)
-    yield put(updateMessageAC(message.id || message.tid, messageResponse)) */
-  } catch (e) {
-    log.error('ERROR in resend message', e.message, 'channel.. . ', channel)
-
-    yield put(updateMessageAC(message.tid, { state: MESSAGE_STATUS.FAILED }))
-
-    updateMessageOnMap(channel.id, {
-      messageId: message.tid,
-      params: { state: MESSAGE_STATUS.FAILED }
     })
-    updateMessageOnAllMessages(message.tid, { state: MESSAGE_STATUS.FAILED })
-
-    // yield put(setErrorNotification(e.message))
+  } else {
+    yield call(sendTextMessage, {
+      type: RESEND_MESSAGE,
+      payload: { message, connectionState, channelId }
+    })
   }
-  yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
 }
 
 function* deleteMessage(action: IAction): any {
@@ -1078,8 +1045,8 @@ function* deleteMessage(action: IAction): any {
     updateMessageOnAllMessages(messageId, deletedMessage)
 
     const messageToUpdate = JSON.parse(JSON.stringify(deletedMessage))
-    updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
     if (channel.lastMessage.id === messageId) {
+      updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
       yield put(updateChannelLastMessageAC(messageToUpdate, channel))
     }
   } catch (e) {
@@ -1139,55 +1106,134 @@ function* editMessage(action: IAction): any {
   }
 }
 
+const sendPendingMessages = function* (connectionState: string) {
+  const pendingMessagesMap = { ...getPendingMessagesMap() }
+  for (const channelId in pendingMessagesMap) {
+    for (const msg of pendingMessagesMap[channelId]) {
+      const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
+
+      try {
+        if (msg?.forwardingDetails) {
+          yield call(forwardMessage, {
+            type: RESEND_MESSAGE,
+            payload: { message: msg, connectionState, channelId, isForward: true }
+          })
+        } else if (attachments && attachments.length > 0) {
+          yield call(sendMessage, {
+            type: RESEND_MESSAGE,
+            payload: {
+              message: msg,
+              connectionState,
+              channelId,
+              sendAttachmentsAsSeparateMessage: false
+            }
+          })
+        } else {
+          yield call(sendTextMessage, {
+            type: RESEND_MESSAGE,
+            payload: { message: msg, connectionState, channelId }
+          })
+        }
+      } catch (error) {
+        log.error(`Failed to send pending message ${msg.tid || msg.id}:`, error)
+        // Continue with next message even if this one fails
+      }
+    }
+  }
+
+  const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
+  if (pendingPollActionsMap && Object.keys(pendingPollActionsMap).length > 0) {
+    yield put(resendPendingPollActionsAC(connectionState))
+  }
+}
+
+const updateMessages = function* (
+  channel: IChannel,
+  updatedMessages: IMessage[],
+  firstMessageId?: string,
+  lastMessageId?: string
+) {
+  const messages = [...updatedMessages]
+  setMessagesToMap(channel.id, messages, firstMessageId, lastMessageId)
+  setAllMessages(messages)
+  yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+}
+
+const getFilteredPendingMessages = (messages: IMessage[]) => {
+  let filteredPendingMessages: IMessage[] = []
+  const activeChannelId = getActiveChannelId()
+  const pendingMessages = JSON.parse(JSON.stringify(getPendingMessages(activeChannelId) || []))
+  if (pendingMessages && pendingMessages.length) {
+    const messagesMap: { [key: string]: IMessage } = {}
+    messages.forEach((msg) => {
+      messagesMap[msg.tid || ''] = msg
+    })
+    filteredPendingMessages = pendingMessages.filter((msg: IMessage) => !messagesMap[msg.tid || ''])
+  }
+  return filteredPendingMessages
+}
+
 function* getMessagesQuery(action: IAction): any {
   try {
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-    const { channel, loadWithLastMessage, messageId, limit, withDeliveredMessages, highlight, behavior } =
+    const { channel, loadWithLastMessage, messageId, limit, highlight, behavior, scrollToMessage, networkChanged } =
       action.payload
-    if (channel.id && !channel.isMockChannel) {
+    let channelNewMessageCount = channel?.newMessageCount || 0
+    const connectionState = store.getState().UserReducer.connectionStatus
+    const messages = store.getState().MessageReducer.activeChannelMessages
+    if (channel?.id && !channel?.isMockChannel) {
       const SceytChatClient = getClient()
+      if (networkChanged) {
+        try {
+          const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
+          if (updatedChannel && updatedChannel?.id) {
+            yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
+            channelNewMessageCount = updatedChannel?.newMessageCount || 0
+
+            if (channelNewMessageCount !== channel.newMessageCount) {
+              yield put(updateChannelDataAC(channel.id, { newMessageCount: channelNewMessageCount }))
+              updateChannelOnAllChannels(channel.id, { newMessageCount: channelNewMessageCount })
+              yield put(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
+            }
+          }
+        } catch (e) {
+          log.error('error to get updated channel in get messages query', e)
+        }
+      }
+
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(limit || MESSAGES_MAX_LENGTH)
       messageQueryBuilder.reverse(true)
-      const messageQuery = yield call(messageQueryBuilder.build)
+      const messageQuery =
+        connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
       query.messageQuery = messageQuery
-      const cachedMessages = getMessagesFromMap(channel.id)
+      const cachedMessages = Object.values(getMessagesFromMap(channel.id) || {}).sort(
+        (a: IMessage, b: IMessage) => Number(a.id) - Number(b.id)
+      )
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
       if (loadWithLastMessage) {
-        const allMessages = getAllMessages()
-        const havLastMessage =
-          allMessages &&
-          allMessages.length &&
-          channel.lastMessage &&
-          allMessages[allMessages.length - 1] &&
-          allMessages[allMessages.length - 1].id === channel.lastMessage.id
-        if ((channel.newMessageCount && channel.newMessageCount > 0) || !havLastMessage) {
-          // if (channel.newMessageCount && channel.newMessageCount > 0) {
+        if (channelNewMessageCount && channelNewMessageCount > 0) {
           setHasPrevCached(false)
-          setMessagesToMap(channel.id, [])
           setAllMessages([])
-          // }
-          result = yield call(messageQuery.loadPreviousMessageId, '0')
-
-          if (result.messages.length === 50) {
-            messageQuery.limit = 30
-            const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-            result.messages = [...secondResult.messages, ...result.messages]
-            result.hasNext = secondResult.hasNext
+          messageQuery.limit = MESSAGES_MAX_LENGTH
+          if (Number(channel.lastDisplayedMessageId)) {
+            result =
+              connectionState === CONNECTION_STATUS.CONNECTED
+                ? yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
+                : { messages: [], hasNext: false }
+          } else {
+            result =
+              connectionState === CONNECTION_STATUS.CONNECTED
+                ? yield call(messageQuery.loadPrevious)
+                : { messages: [], hasNext: false }
           }
-          let sentMessages: IMessage[] = []
-          if (withDeliveredMessages) {
-            sentMessages = getFromAllMessagesByMessageId('', '', true)
-          }
-          const messagesMap: { [key: string]: IMessage } = {}
-          result.messages.forEach((msg) => {
-            messagesMap[msg.tid || ''] = msg
-          })
-          const filteredSentMessages = sentMessages.filter((msg) => !messagesMap[msg.tid || ''])
-
-          result.messages = [...result.messages, ...filteredSentMessages].slice(filteredSentMessages.length)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          setMessagesToMap(channel.id, result.messages)
+          setMessagesToMap(
+            channel.id,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
           setAllMessages(result.messages)
           yield put(setMessagesHasPrevAC(true))
         } else {
@@ -1197,114 +1243,119 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield put(setMessagesHasNextAC(false))
         setHasNextCached(false)
-        if (messageId) {
+        if (messageId && scrollToMessage) {
+          if (channelNewMessageCount && channelNewMessageCount > 0) {
+            yield put(setScrollToMessagesAC(channel.lastDisplayedMessageId, highlight, behavior))
+          } else {
+            yield put(scrollToNewMessageAC(true))
+          }
+        }
+      } else if (messageId && messages?.length) {
+        let loadNextMessageId = ''
+        let loadPreviousMessageId = ''
+        let nextLoadLimit = MESSAGES_MAX_PAGE_COUNT / 2
+        let previousLoadLimit = MESSAGES_MAX_PAGE_COUNT / 2
+        if (networkChanged) {
+          const centerMessageIndex = getCenterTwoMessages(messages)
+          loadPreviousMessageId = centerMessageIndex.mid2.messageId
+          loadNextMessageId = centerMessageIndex.mid1.messageId
+          previousLoadLimit = centerMessageIndex.mid2.index
+          nextLoadLimit = messages.length - centerMessageIndex.mid1.index - 1
+        } else if (messageId) {
+          loadPreviousMessageId = messageId
+        }
+        messageQuery.limit = previousLoadLimit
+        log.info('load by message id from server ...............', messageId)
+        const firstResult =
+          connectionState === CONNECTION_STATUS.CONNECTED
+            ? yield call(messageQuery.loadPreviousMessageId, loadPreviousMessageId)
+            : { messages: [], hasNext: false }
+        if (!networkChanged && firstResult.messages.length > 0) {
+          loadNextMessageId = firstResult.messages[firstResult.messages.length - 1].id
+        } else if (!networkChanged && !firstResult.messages.length) {
+          loadNextMessageId = '0'
+        }
+        messageQuery.reverse = false
+        messageQuery.limit = nextLoadLimit
+        const secondResult =
+          connectionState === CONNECTION_STATUS.CONNECTED
+            ? yield call(messageQuery.loadNextMessageId, loadNextMessageId)
+            : { messages: [], hasNext: false }
+        result.messages = [...firstResult.messages, ...secondResult.messages]
+        yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
+
+        setMessagesToMap(
+          channel.id,
+          result.messages,
+          result.messages[0]?.id,
+          result.messages[result.messages.length - 1]?.id
+        )
+        setAllMessages([...result.messages])
+        setHasPrevCached(false)
+        setHasNextCached(false)
+        yield put(setMessagesHasNextAC(true))
+        if (scrollToMessage && !networkChanged) {
           yield put(setScrollToMessagesAC(messageId, highlight, behavior))
         }
-      } else if (messageId) {
-        const allMessages = getAllMessages()
-        const messageIndex = allMessages.findIndex((msg) => msg.id === messageId)
-        const maxLengthPart = MESSAGES_MAX_LENGTH / 2
-        if (messageIndex >= maxLengthPart) {
-          result.messages = allMessages.slice(messageIndex - maxLengthPart, messageIndex + maxLengthPart)
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          setHasPrevCached(messageIndex > maxLengthPart)
-          setHasNextCached(allMessages.length > maxLengthPart)
-          yield put(setMessagesHasPrevAC(true))
-        } else {
-          messageQuery.limit = MESSAGES_MAX_LENGTH
-          log.info('load by message id from server ...............', messageId)
-          result = yield call(messageQuery.loadNearMessageId, messageId)
-          if (result.messages.length === 50) {
-            messageQuery.limit = MESSAGES_MAX_LENGTH - 50
-            const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-            messageQuery.reverse = false
-            const thirdResult = yield call(
-              messageQuery.loadNextMessageId,
-              result.messages[result.messages.length - 1].id
-            )
-            result.messages = [...secondResult.messages, ...result.messages, ...thirdResult.messages]
-            result.hasNext = secondResult.hasNext
-            messageQuery.reverse = true
-            yield put(setMessagesHasPrevAC(secondResult.hasNext))
-          }
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-          setMessagesToMap(channel.id, result.messages)
-          setAllMessages([...result.messages])
-          setHasPrevCached(false)
-          setHasNextCached(false)
-        }
-        yield put(setMessagesHasNextAC(true))
-        yield put(setScrollToMessagesAC(messageId, true, behavior))
         yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
-      } else if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-        setMessagesToMap(channel.id, [])
+      } else if (channelNewMessageCount && channel.lastDisplayedMessageId) {
         setAllMessages([])
         messageQuery.limit = MESSAGES_MAX_LENGTH
         if (Number(channel.lastDisplayedMessageId)) {
-          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
-          if (result.messages.length === 50) {
-            messageQuery.limit =
-              channel.newMessageCount > 25 ? (MESSAGES_MAX_LENGTH - 50) / 2 : MESSAGES_MAX_LENGTH - 50
-            const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-            if (channel.newMessageCount > 25) {
-              messageQuery.reverse = false
-              const thirdResult = yield call(
-                messageQuery.loadNextMessageId,
-                result.messages[result.messages.length - 1].id
-              )
-              result.messages = [...secondResult.messages, ...result.messages, ...thirdResult.messages]
-              messageQuery.reverse = true
-            } else {
-              result.messages = [...secondResult.messages, ...result.messages]
-            }
-          }
+          result =
+            connectionState === CONNECTION_STATUS.CONNECTED
+              ? yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
+              : { messages: [], hasNext: false }
         } else {
-          result = yield call(messageQuery.loadPrevious)
-          if (result.messages.length === 50) {
-            messageQuery.limit = MESSAGES_MAX_LENGTH - 50
-            const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-            result.messages = [...secondResult.messages, ...result.messages]
-            result.hasNext = secondResult.hasNext
-          }
+          result =
+            connectionState === CONNECTION_STATUS.CONNECTED
+              ? yield call(messageQuery.loadPrevious)
+              : { messages: [], hasNext: false }
         }
         yield put(setMessagesHasPrevAC(true))
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-              result.messages.length > 0 &&
-              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+            result.messages.length > 0 &&
+            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
-        setMessagesToMap(channel.id, result.messages)
+        setMessagesToMap(
+          channel.id,
+          result.messages,
+          result.messages[0]?.id,
+          result.messages[result.messages.length - 1]?.id
+        )
         setAllMessages([...result.messages])
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
-        /*
-        if (channel.lastDisplayedMessageId) {
-          yield put(setMessagesNextCompleteAC(true))
-          yield put(setMessagesPrevCompleteAC(true))
-          messageQuery.limit = 30
-          // result = yield call(messageQuery.loadPreviousMessageId, '0')
-          result = yield call(messageQuery.loadNearMessageId, channel.lastDisplayedMessageId)
-        } else {
-          messageQuery.limit = 20
-          result = yield call(messageQuery.loadNext)
-        }
-        yield put(setMessagesNextCompleteAC(true)) */
+        yield put(scrollToNewMessageAC(false))
+        yield put(setUnreadScrollToAC(true))
       } else {
-        setMessagesToMap(channel.id, [])
-        setAllMessages([])
         if (cachedMessages && cachedMessages.length) {
-          setMessagesToMap(channel.id, [])
-          setAllMessages([...cachedMessages])
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedMessages))))
+          const messages = getFromAllMessagesByMessageId(
+            '',
+            '',
+            true,
+            cachedMessages?.length ? cachedMessages : undefined
+          )
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+          yield delay(0)
+          const filteredPendingMessages = getFilteredPendingMessages(messages)
+          yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
         }
         log.info('load message from server')
-        result = yield call(messageQuery.loadPrevious)
-        if (result.messages.length === 50) {
-          messageQuery.limit = MESSAGES_MAX_LENGTH - 50
-          const secondResult = yield call(messageQuery.loadPreviousMessageId, result.messages[0].id)
-          result.messages = [...secondResult.messages, ...result.messages]
-          result.hasNext = secondResult.hasNext
+
+        result = { messages: [], hasNext: false }
+        if (channel?.lastDisplayedMessageId > channel?.lastMessage?.id) {
+          result =
+            connectionState === CONNECTION_STATUS.CONNECTED
+              ? yield call(messageQuery.loadPreviousMessageId, channel?.lastDisplayedMessageId)
+              : { messages: [], hasNext: false }
+        } else {
+          result =
+            connectionState === CONNECTION_STATUS.CONNECTED
+              ? yield call(messageQuery.loadPrevious)
+              : { messages: [], hasNext: false }
         }
         const updatedMessages: IMessage[] = []
         result.messages.forEach((msg) => {
@@ -1312,25 +1363,33 @@ function* getMessagesQuery(action: IAction): any {
           updateMessageOnAllMessages(msg.id, updatedMessage || msg)
           updatedMessages.push(updatedMessage || msg)
         })
-        setMessagesToMap(channel.id, updatedMessages)
-        setAllMessages([...updatedMessages])
-        yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
-        yield put(setMessagesHasPrevAC(result.hasNext))
-        yield put(setMessagesHasNextAC(false))
-      }
 
-      const pendingMessages = getPendingMessages(channel.id)
-      if (pendingMessages && pendingMessages.length) {
-        const messagesMap: { [key: string]: IMessage } = {}
-        result.messages.forEach((msg) => {
-          messagesMap[msg.tid || ''] = msg
-        })
-        const filteredPendingMessages = pendingMessages.filter((msg) => !messagesMap[msg.tid || ''])
-        yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+        const messageIdForLoad =
+          channel?.lastDisplayedMessageId > channel?.lastMessage?.id
+            ? channel?.lastDisplayedMessageId || '0'
+            : channel?.lastMessage?.id || '0'
+        if (updatedMessages.length) {
+          yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
+          yield put(setMessagesHasPrevAC(true))
+          yield put(setMessagesHasNextAC(false))
+        } else if (!cachedMessages?.length && !result.messages?.length) {
+          yield put(setMessagesAC([]))
+        }
       }
+      const filteredPendingMessages = getFilteredPendingMessages(result.messages)
+      yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
 
-      // yield put(addMessagesAC(result.messages, 1, channel.newMessageCount));
-    } else if (channel.isMockChannel) {
+      const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
+      if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
+        yield put(setWaitToSendPendingMessagesAC(false))
+        yield spawn(sendPendingMessages, connectionState)
+      }
+      const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
+      if (updatedChannel && updatedChannel?.lastMessage) {
+        yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
+        updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
+      }
+    } else if (channel?.isMockChannel) {
       yield put(setMessagesAC([]))
     }
   } catch (e) {
@@ -1348,7 +1407,8 @@ function* getMessageQuery(action: IAction): any {
     const { payload } = action
     const { channelId, messageId } = payload
     const channel = yield call(getChannelFromAllChannels, channelId)
-    if (!channel) {
+    const connectionState = store.getState().UserReducer.connectionStatus
+    if (!channel || connectionState !== CONNECTION_STATUS.CONNECTED) {
       return
     }
     const messages = yield call(channel.getMessagesById, [messageId])
@@ -1380,7 +1440,7 @@ function* loadMoreMessages(action: IAction): any {
     messageQueryBuilder.reverse(true)
     const messageQuery = yield call(messageQueryBuilder.build)
     messageQuery.limit = limit || 5
-
+    const now = Date.now()
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
 
@@ -1391,6 +1451,12 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadPreviousMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.PREV)
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
@@ -1403,6 +1469,12 @@ function* loadMoreMessages(action: IAction): any {
         result = yield call(messageQuery.loadNextMessageId, messageId)
         if (result.messages.length) {
           addAllMessages(result.messages, MESSAGE_LOAD_DIRECTION.NEXT)
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0]?.id,
+            result.messages[result.messages.length - 1]?.id
+          )
         }
         yield put(setMessagesHasNextAC(result.hasNext))
       }
@@ -1417,11 +1489,15 @@ function* loadMoreMessages(action: IAction): any {
       yield put(addMessagesAC([], direction))
       if (direction === MESSAGE_LOAD_DIRECTION.NEXT) {
         yield put(setMessagesHasNextAC(false))
-      } else {
-        yield put(setMessagesHasPrevAC(false))
       }
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    if (Date.now() - now < 10) {
+      setTimeout(() => {
+        store.dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      }, 10)
+    } else {
+      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    }
   } catch (e) {
     log.error('error in load more messages', e)
     /* if (e.code !== 10008) {
@@ -1536,8 +1612,9 @@ function* loadMoreReactions(action: IAction): any {
 }
 
 function* getMessageAttachments(action: IAction): any {
+  const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
   try {
-    const { channelId, attachmentType, limit, direction, attachmentId, forPopup } = action.payload
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     const SceytChatClient = getClient()
     let typeList = [
       attachmentTypes.video,
@@ -1570,39 +1647,79 @@ function* getMessageAttachments(action: IAction): any {
     } else {
       result = yield call(AttachmentByTypeQuery.loadPrevious)
     }
+    const attachments = result.attachments.sort((a: IAttachment, b: IAttachment) =>
+      forPopup ? Number(a.id || 0) - Number(b.id || 0) : Number(b.id || 0) - Number(a.id || 0)
+    )
     if (forPopup) {
       query.AttachmentByTypeQueryForPopup = AttachmentByTypeQuery
-      yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(result.attachments))))
-      yield put(setAttachmentsCompleteForPopupAC(result.hasNext))
+      yield put(setAttachmentsForPopupAC(JSON.parse(JSON.stringify(attachments))))
+      const attachmentIndex = attachments.findIndex((attachment: IAttachment) => attachment.id === attachmentId)
+      let hasPrev = false
+      if (attachmentIndex >= limit / 2 && result.hasNext && limit === attachments.length) {
+        hasPrev = true
+      } else {
+        hasPrev = false
+      }
+      let hasNext = false
+      if (attachmentIndex <= limit / 2 - 1 && result.hasNext && limit === attachments.length) {
+        hasNext = true
+      } else {
+        hasNext = false
+      }
+      yield put(setAttachmentsCompleteForPopupAC(hasPrev, hasNext))
     } else {
       query.AttachmentByTypeQuery = AttachmentByTypeQuery
       yield put(setAttachmentsCompleteAC(result.hasNext))
       // yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
-      yield put(setAttachmentsAC(JSON.parse(JSON.stringify(result.attachments))))
+      yield put(setAttachmentsAC(JSON.parse(JSON.stringify(attachments))))
     }
   } catch (e) {
     log.error('error in message attachment query', e)
     // yield put(setErrorNotification(e.message))
+  } finally {
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
   }
 }
 
 function* loadMoreMessageAttachments(action: any) {
+  const { limit, direction, forPopup, attachmentId } = action.payload
   try {
-    const { limit, direction, forPopup } = action.payload
     let AttachmentQuery
     if (forPopup) {
       AttachmentQuery = query.AttachmentByTypeQueryForPopup
     } else {
       AttachmentQuery = query.AttachmentByTypeQuery
     }
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    if (!AttachmentQuery) {
+      return
+    }
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADING, forPopup))
     AttachmentQuery.limit = limit
-    const { attachments, hasNext } = yield call(AttachmentQuery.loadPrevious)
+    let result = { attachments: [], hasNext: false }
+    if (attachmentId) {
+      if (direction === queryDirection.NEXT) {
+        result = yield call(AttachmentQuery.loadNextAttachmentId, attachmentId)
+      } else {
+        result = yield call(AttachmentQuery.loadPreviousAttachmentId, attachmentId)
+      }
+    } else {
+      if (direction === queryDirection.NEXT) {
+        result = yield call(AttachmentQuery.loadNext)
+      } else {
+        result = yield call(AttachmentQuery.loadPrevious)
+      }
+    }
+    const { attachments, hasNext } = result
     if (forPopup) {
       yield put(addAttachmentsForPopupAC(attachments, direction))
+      if (attachmentId && direction === queryDirection.NEXT) {
+        yield put(setAttachmentsCompleteForPopupAC(undefined, result.hasNext))
+      } else if (attachmentId && direction === queryDirection.PREV) {
+        yield put(setAttachmentsCompleteForPopupAC(result.hasNext, undefined))
+      }
     } else {
       yield put(setAttachmentsCompleteAC(hasNext))
-      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
       yield put(addAttachmentsAC(attachments))
     }
   } catch (e) {
@@ -1610,6 +1727,8 @@ function* loadMoreMessageAttachments(action: any) {
     if (e.code !== 10008) {
       // yield put(setErrorNotification(e.message))
     }
+  } finally {
+    yield put(setAttachmentsLoadingStateAC(LOADING_STATE.LOADED, forPopup))
   }
 }
 
@@ -1651,17 +1770,24 @@ function* resumeAttachmentUploading(action: any) {
 function* getMessageMarkers(action: IAction): any {
   try {
     yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADING))
-    const { messageId, channelId, deliveryStatus } = action.payload
+    const { messageId, channelId, deliveryStatuses } = action.payload
     const sceytChatClient = getClient()
     if (sceytChatClient) {
-      const messageMarkerListQueryBuilder = new sceytChatClient.MessageMarkerListQueryBuilder(
-        channelId,
-        String(messageId),
-        deliveryStatus
-      )
-      const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
-      const messageMarkers = yield call(messageMarkerListQuery.loadNext)
-      yield put(setMessageMarkersAC(channelId, messageId, messageMarkers.markers, deliveryStatus))
+      const deliveryStatusesArray = deliveryStatuses.split(',')
+      const messageMarkers: { [key: string]: IMarker[] } = {}
+      for (const deliveryStatus of deliveryStatusesArray) {
+        const messageMarkerListQueryBuilder = new sceytChatClient.MessageMarkerListQueryBuilder(
+          channelId,
+          String(messageId),
+          deliveryStatus
+        )
+        const messageMarkerListQuery = yield call(messageMarkerListQueryBuilder.build)
+        const messageMarkersResult = yield call(messageMarkerListQuery.loadNext)
+        messageMarkers[deliveryStatus] = messageMarkersResult.markers
+      }
+      if (Object.keys(messageMarkers).length > 0) {
+        yield put(setMessageMarkersAC(channelId, messageId, messageMarkers, deliveryStatusesArray))
+      }
     }
   } catch (e) {
     log.error('error in get message markers', e)
@@ -1672,6 +1798,508 @@ function* getMessageMarkers(action: IAction): any {
     yield put(setMessagesMarkersLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
+
+function* executeAddPollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!message.pollDetails) return
+  if (channel && message.id) {
+    yield call(channel.addVote, message.id, pollId, [optionId])
+    yield put(removePendingPollActionAC(message.id, 'ADD_POLL_VOTE', optionId))
+  }
+}
+
+function* updateMessageOptimisticallyForAddPollVote(channelId: string, message: IMessage, vote: IPollVote): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!channel) return
+  if (!message.pollDetails) return
+  const objs = []
+  if (!message.pollDetails?.allowMultipleVotes && message.pollDetails?.voteDetails?.ownVotes?.length > 0) {
+    objs.push({
+      type: 'deleteOwn' as const,
+      vote: message.pollDetails?.voteDetails?.ownVotes?.[0]
+    })
+  }
+  objs.push({
+    type: 'addOwn' as const,
+    vote
+  })
+
+  for (const obj of objs) {
+    updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+    updateMessageOnAllMessages(message.id, {}, obj)
+    yield put(updateMessageAC(message.id, {}, undefined, obj))
+  }
+}
+
+function* addPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message, isResend } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const user = sceytChatClient.user
+      const vote: IPollVote = {
+        optionId,
+        createdAt: new Date().getTime(),
+        user: {
+          id: user.id,
+          presence: {
+            status: user.presence?.status || 'online'
+          },
+          profile: {
+            avatar: user.avatarUrl || '',
+            firstName: user.firstName,
+            lastName: user.lastName,
+            metadata: user.metadata || '',
+            metadataMap: user.metadataMap || {},
+            updatedAt: new Date().getTime(),
+            username: user.username || '',
+            createdAt: new Date().getTime()
+          },
+          createdAt: new Date().getTime()
+        }
+      }
+      const pendingAction = {
+        type: 'ADD_POLL_VOTE' as const,
+        channelId,
+        pollId,
+        optionId,
+        message
+      }
+      const conflictCheck = checkPendingPollActionConflict(pendingAction)
+
+      // If there's a conflicting pending delete, we need to revert its optimistic update
+      if (conflictCheck.hasConflict && !conflictCheck.shouldSkip) {
+        // Remove the conflicting pending delete action (which had an optimistic update)
+        // The optimistic update for delete needs to be reverted, then we apply the add
+        // Since delete was already applied optimistically, we need to revert it by applying add
+        const channel = yield call(getChannelFromMap, channelId)
+        if (channel) {
+          // Get the current message state (which has the delete applied)
+          const currentMessage =
+            Object.values(getMessagesFromMap(channelId) || {})?.find(
+              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+            ) || message
+          // Apply add on top (which effectively reverts the delete)
+
+          const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
+          yield put(
+            addPollVotesToListAC(
+              pollId,
+              optionId,
+              [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
+              hasNext,
+              message.id
+            )
+          )
+          const obj: { type: 'addOwn'; vote: IPollVote } = {
+            type: 'addOwn' as const,
+            vote
+          }
+          updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+          updateMessageOnAllMessages(message.id, {}, obj)
+          yield put(updateMessageAC(message.id, {}, undefined, obj))
+        }
+      } else if (!conflictCheck.shouldSkip) {
+        // No conflict, update message optimistically so user sees their vote immediately
+        yield call(updateMessageOptimisticallyForAddPollVote, channelId, message, vote)
+      }
+
+      // Store as pending action to send when connected (if not skipped)
+      if (!conflictCheck.shouldSkip && !isResend) {
+        setPendingPollAction(pendingAction)
+      }
+
+      // Execute immediately if connected
+      yield call(executeAddPollVote, channelId, pollId, optionId, message)
+    }
+  } catch (e) {
+    log.error('error in add poll vote', e)
+  }
+}
+
+function* executeDeletePollVote(channelId: string, pollId: string, optionId: string, message: IMessage): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!message.pollDetails) return
+  const vote = message.pollDetails?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId)
+  if (!vote) return
+
+  if (channel && message.id) {
+    yield call(channel.deleteVote, message.id, pollId, [optionId])
+    yield put(removePendingPollActionAC(message.id, 'DELETE_POLL_VOTE', optionId))
+  }
+}
+
+function* updateMessageOptimisticallyForDeletePollVote(channelId: string, message: IMessage, vote: IPollVote): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!channel) return
+  if (!message.pollDetails) return
+  const obj: { type: 'deleteOwn'; vote: IPollVote } = {
+    type: 'deleteOwn' as const,
+    vote
+  }
+  updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+  updateMessageOnAllMessages(message.id, {}, obj)
+  yield put(updateMessageAC(message.id, {}, undefined, obj))
+}
+
+function* deletePollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, optionId, message, isResend } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const vote = message.pollDetails?.voteDetails?.ownVotes?.find((vote: IPollVote) => vote.optionId === optionId)
+      if (!vote) return
+      const pendingAction = {
+        type: 'DELETE_POLL_VOTE' as const,
+        channelId,
+        pollId,
+        optionId,
+        message
+      }
+      const conflictCheck = checkPendingPollActionConflict(pendingAction)
+
+      // If there's a conflicting pending add and we should skip both, revert the add's optimistic update
+      if (conflictCheck.hasConflict && conflictCheck.shouldSkip) {
+        // Revert the optimistic update from the pending addPollVote
+        const channel = yield call(getChannelFromMap, channelId)
+        if (channel) {
+          // Get the current message state (which has the add applied optimistically)
+          const currentMessage =
+            Object.values(getMessagesFromMap(channelId) || {})?.find(
+              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
+            ) || message
+          // Revert by applying delete (which removes the vote that was added optimistically)
+
+          yield put(
+            deletePollVotesFromListAC(
+              pollId,
+              optionId,
+              [currentMessage.pollDetails?.voteDetails?.ownVotes?.[0]],
+              message.id
+            )
+          )
+          const obj: { type: 'deleteOwn'; vote: IPollVote } = {
+            type: 'deleteOwn' as const,
+            vote
+          }
+          updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+          updateMessageOnAllMessages(message.id, {}, obj)
+          yield put(updateMessageAC(message.id, {}, undefined, obj))
+        }
+      } else if (!conflictCheck.shouldSkip) {
+        // No conflict or conflict that doesn't skip, update message optimistically so user sees vote removed immediately
+        yield call(updateMessageOptimisticallyForDeletePollVote, channelId, message, vote)
+      }
+
+      // Store as pending action (conflict resolution is handled in setPendingPollAction)
+      if (!conflictCheck.shouldSkip && !isResend) {
+        setPendingPollAction(pendingAction)
+      }
+
+      // Execute immediately if connected
+      yield call(executeDeletePollVote, channelId, pollId, optionId, message)
+    }
+  } catch (e) {
+    log.error('error in delete poll vote', e)
+  }
+}
+
+function* executeClosePoll(channelId: string, pollId: string, message: IMessage): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  // should update the poll details on the message
+  const obj: { type: 'close' } = {
+    type: 'close' as const
+  }
+  updateMessageOnMap(channel.id, { messageId: message.id, params: {} }, obj)
+  updateMessageOnAllMessages(message.id, {}, obj)
+  yield put(updateMessageAC(message.id, {}, undefined, obj))
+  if (channel && message.id) {
+    yield call(channel.closePoll, message.id, pollId)
+    yield put(removePendingPollActionAC(message.id, 'CLOSE_POLL'))
+  }
+}
+
+function* updateMessageOptimisticallyForClosePoll(channelId: string, message: IMessage): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!channel) return
+
+  const pollDetails = JSON.parse(JSON.stringify(message.pollDetails))
+  pollDetails.closed = true
+  pollDetails.closedAt = new Date().getTime()
+
+  updateMessageOnMap(channelId, {
+    messageId: message.id,
+    params: { pollDetails }
+  })
+  updateMessageOnAllMessages(message.id, { pollDetails })
+  yield put(updateMessageAC(message.id, { pollDetails }))
+}
+
+function* closePoll(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, message } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const connectionState = sceytChatClient.connectionState
+
+      if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+        // Update message optimistically so user sees poll closed immediately
+        yield call(updateMessageOptimisticallyForClosePoll, channelId, message)
+
+        // Store as pending action
+        setPendingPollAction({
+          type: 'CLOSE_POLL',
+          channelId,
+          pollId,
+          message
+        })
+        return
+      }
+
+      // Execute immediately if connected
+      yield call(executeClosePoll, channelId, pollId, message)
+    }
+  } catch (e) {
+    log.error('error in close poll', e)
+  }
+}
+
+function* executeRetractPollVote(
+  channelId: string,
+  pollId: string,
+  message: IMessage,
+  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[],
+  isResend?: boolean
+): any {
+  const channel = yield call(getChannelFromMap, channelId)
+
+  if (!isResend) {
+    for (const obj of objs) {
+      updateMessageOnMap(
+        channelId,
+        {
+          messageId: message.id,
+          params: {}
+        },
+        obj
+      )
+      updateMessageOnAllMessages(message.id, {}, obj)
+      yield put(updateMessageAC(message.id, {}, undefined, obj))
+    }
+  }
+  if (channel && message.id) {
+    yield call(channel.retractVote, message.id, pollId)
+    yield put(removePendingPollActionAC(message.id || '', 'RETRACT_POLL_VOTE'))
+  }
+}
+
+function* updateMessageOptimisticallyForRetractPollVote(
+  channelId: string,
+  message: IMessage,
+  objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[]
+): any {
+  const channel = yield call(getChannelFromMap, channelId)
+  if (!channel) return
+  for (const obj of objs) {
+    updateMessageOnMap(channelId, {
+      messageId: message.id,
+      params: {}
+    })
+    updateMessageOnAllMessages(message.id, {}, obj)
+    yield put(updateMessageAC(message.id, {}, undefined, obj))
+  }
+}
+
+function* retractPollVote(action: IAction): any {
+  try {
+    const { payload } = action
+    const { channelId, pollId, message, isResend } = payload
+    const sceytChatClient = getClient()
+    if (sceytChatClient) {
+      const connectionState = sceytChatClient.connectionState
+      const objs: { type: 'addOwn' | 'deleteOwn'; vote: IPollVote }[] = []
+      for (const vote of message.pollDetails?.voteDetails?.ownVotes || []) {
+        objs.push({
+          type: 'deleteOwn' as const,
+          vote
+        })
+      }
+      if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+        // Update message optimistically so user sees votes retracted immediately
+        yield call(updateMessageOptimisticallyForRetractPollVote, channelId, message, objs)
+
+        // Store as pending action
+        setPendingPollAction({
+          type: 'RETRACT_POLL_VOTE',
+          channelId,
+          pollId,
+          message
+        })
+        return
+      }
+
+      // Execute immediately if connected
+      yield call(executeRetractPollVote, channelId, pollId, message, objs, isResend)
+    }
+  } catch (e) {
+    log.error('error in retract poll vote', e)
+  }
+}
+
+function* resendPendingPollActions(action: IAction): any {
+  try {
+    const { payload } = action
+    const { connectionState } = payload
+    const sceytChatClient = getClient()
+
+    if (!sceytChatClient || connectionState !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
+
+    const pendingPollActionsMap = store.getState().MessageReducer.pendingPollActions
+    const pendingPollActionsMapCopy = JSON.parse(JSON.stringify(pendingPollActionsMap))
+
+    // Use a small delay similar to the message resend pattern
+
+    Object.keys(pendingPollActionsMapCopy).forEach((messageId: string) => {
+      pendingPollActionsMapCopy[messageId].forEach((pendingAction: any) => {
+        const { type, channelId, pollId, optionId, message } = pendingAction
+
+        switch (type) {
+          case 'ADD_POLL_VOTE':
+            if (optionId) {
+              store.dispatch(addPollVoteAC(channelId, pollId, optionId, message, true))
+            }
+            break
+          case 'DELETE_POLL_VOTE':
+            if (optionId) {
+              store.dispatch(deletePollVoteAC(channelId, pollId, optionId, message, true))
+            }
+            break
+          case 'CLOSE_POLL':
+            store.dispatch(closePollAC(channelId, pollId, message))
+            break
+          case 'RETRACT_POLL_VOTE':
+            store.dispatch(retractPollVoteAC(channelId, pollId, message, true))
+            break
+          default:
+            log.warn('Unknown pending poll action type:', type)
+        }
+      })
+    })
+  } catch (e) {
+    log.error('error in resend pending poll actions', e)
+  }
+}
+
+function* getPollVotes(action: IAction): any {
+  try {
+    const { payload } = action
+    const { messageId, pollId, optionId, limit } = payload
+    const key = `${pollId}_${optionId}`
+
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING))
+
+    const SceytChatClient = getClient()
+    if (!SceytChatClient || !SceytChatClient.PollVotesQueryBuilder) {
+      throw new Error('SceytChatClient or PollVotesQueryBuilder not available')
+    }
+
+    const queryBuilder = new SceytChatClient.PollVotesQueryBuilder(messageId, pollId)
+    queryBuilder.setOptionId(optionId)
+    queryBuilder.limit(limit || 20)
+    const pollVotesQuery = yield call(queryBuilder.build)
+
+    const result = yield call(pollVotesQuery.loadNext)
+
+    // Store query for later use
+    if (!query.PollVotesQueries) {
+      query.PollVotesQueries = {}
+    }
+    query.PollVotesQueries[key] = pollVotesQuery
+
+    // Format votes to IPollVote format
+    const formattedVotes: IPollVote[] = (result.votes || []).map((vote: any) => ({
+      optionId: vote.optionId || optionId,
+      createdAt: vote.createdAt || new Date().getTime(),
+      user: vote.user || {
+        id: '',
+        presence: { status: 'offline' },
+        profile: {
+          avatar: '',
+          firstName: '',
+          lastName: '',
+          metadata: '',
+          metadataMap: {},
+          updatedAt: 0,
+          username: '',
+          createdAt: 0
+        },
+        createdAt: 0
+      }
+    }))
+
+    yield put(setPollVotesListAC(pollId, optionId, formattedVotes, result.hasNext || false))
+
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED))
+  } catch (e) {
+    log.error('ERROR in get poll votes', e)
+    yield put(setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED))
+  }
+}
+
+function* loadMorePollVotes(action: IAction): any {
+  try {
+    const { payload } = action
+    const { pollId, optionId, limit } = payload
+    const key = `${pollId}_${optionId}`
+
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADING))
+
+    if (!query.PollVotesQueries || !query.PollVotesQueries[key]) {
+      throw new Error('Poll votes query not found')
+    }
+
+    const pollVotesQuery = query.PollVotesQueries[key]
+    if (limit && pollVotesQuery.limit < limit) {
+      pollVotesQuery.limit = limit
+    }
+
+    const result = yield call(pollVotesQuery.loadNext)
+
+    // Format votes to IPollVote format
+    const formattedVotes: IPollVote[] = (result.votes || []).map((vote: any) => ({
+      optionId: vote.optionId || optionId,
+      createdAt: vote.createdAt || new Date().getTime(),
+      user: vote.user || {
+        id: '',
+        presence: { status: 'offline' },
+        profile: {
+          avatar: '',
+          firstName: '',
+          lastName: '',
+          metadata: '',
+          metadataMap: {},
+          updatedAt: 0,
+          username: '',
+          createdAt: 0
+        },
+        createdAt: 0
+      }
+    }))
+
+    yield put(addPollVotesToListAC(pollId, optionId, formattedVotes, result.hasNext || false))
+
+    yield put(setPollVotesLoadingStateAC(pollId, optionId, LOADING_STATE.LOADED))
+  } catch (e) {
+    log.error('ERROR in load more poll votes', e)
+    yield put(setPollVotesLoadingStateAC(action.payload.pollId, action.payload.optionId, LOADING_STATE.LOADED))
+  }
+}
+
 export default function* MessageSaga() {
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
@@ -1691,4 +2319,11 @@ export default function* MessageSaga() {
   yield takeEvery(LOAD_MORE_REACTIONS, loadMoreReactions)
   yield takeEvery(PAUSE_ATTACHMENT_UPLOADING, pauseAttachmentUploading)
   yield takeEvery(RESUME_ATTACHMENT_UPLOADING, resumeAttachmentUploading)
+  yield takeEvery(ADD_POLL_VOTE, addPollVote)
+  yield takeEvery(DELETE_POLL_VOTE, deletePollVote)
+  yield takeEvery(CLOSE_POLL, closePoll)
+  yield takeEvery(RETRACT_POLL_VOTE, retractPollVote)
+  yield takeEvery(GET_POLL_VOTES, getPollVotes)
+  yield takeEvery(LOAD_MORE_POLL_VOTES, loadMorePollVotes)
+  yield takeEvery(RESEND_PENDING_POLL_ACTIONS, resendPendingPollActions)
 }

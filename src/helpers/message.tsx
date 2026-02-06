@@ -1,8 +1,9 @@
-import { attachmentTypes } from './constants'
-import { IBodyAttribute, IContact, IUser } from '../types'
+import { attachmentTypes, MESSAGE_STATUS } from './constants'
+import { IBodyAttribute, IContact, IMessage, IPollDetails, IPollVote, IUser, IVoteDetails } from '../types'
 import moment from 'moment'
 import { hideUserPresence } from './userHelper'
 import { EditorThemeClasses } from 'lexical'
+import { MESSAGE_TYPE } from 'types/enum'
 export const typingTextFormat = ({
   text,
   formatAttributes,
@@ -281,4 +282,223 @@ export const EditorTheme: EditorThemeClasses = {
     underline: 'text_underline',
     underlineStrikethrough: 'text_underlineStrikethrough'
   }
+}
+
+export const isMessageUnsupported = (message: IMessage) => {
+  if (
+    message?.type !== MESSAGE_TYPE.VIEW_ONCE &&
+    message?.viewOnce &&
+    !(message?.type === MESSAGE_TYPE.DELETED && message.state === MESSAGE_STATUS.DELETE)
+  ) {
+    return true
+  }
+  return (
+    message?.type !== MESSAGE_TYPE.TEXT &&
+    message?.type !== MESSAGE_TYPE.MEDIA &&
+    message?.type !== MESSAGE_TYPE.FILE &&
+    message?.type !== MESSAGE_TYPE.LINK &&
+    message?.type !== MESSAGE_TYPE.POLL &&
+    !(message?.type === MESSAGE_TYPE.DELETED && message.state === MESSAGE_STATUS.DELETE) &&
+    message?.type !== MESSAGE_TYPE.SYSTEM &&
+    message?.type !== MESSAGE_TYPE.VIEW_ONCE
+  )
+}
+
+export const deleteVoteFromPollDetails = (votes: IPollVote[], deletedVote: IPollVote) => {
+  const newVotes = []
+  for (const vote of votes) {
+    if (deletedVote.optionId !== vote.optionId || deletedVote.user.id !== vote.user.id) {
+      newVotes.push(vote)
+    }
+  }
+  return newVotes
+}
+
+export const handleVoteDetails = (
+  voteDetails?: {
+    vote?: IPollVote
+    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
+  },
+  message?: IMessage
+): IPollDetails | undefined => {
+  if (!voteDetails || !message?.pollDetails) {
+    return undefined
+  }
+
+  const existingPollDetails = message.pollDetails
+  const existingVoteDetails = JSON.parse(
+    JSON.stringify(
+      existingPollDetails.voteDetails || {
+        votesPerOption: {},
+        votes: [],
+        ownVotes: []
+      }
+    )
+  )
+
+  if (voteDetails.type === 'close') {
+    return {
+      ...existingPollDetails,
+      closed: true
+    }
+  }
+
+  if (!voteDetails.vote) {
+    return existingPollDetails
+  }
+
+  const vote = voteDetails.vote
+  const optionId = vote.optionId
+  const currentVotesPerOption = existingVoteDetails.votesPerOption || {}
+  let optionVotesCount = currentVotesPerOption[optionId] || 0
+
+  let newVotes: IPollVote[] = existingVoteDetails.votes || []
+  let newOwnVotes: IPollVote[] = existingVoteDetails.ownVotes || []
+
+  if (voteDetails.type === 'add') {
+    newVotes = [...newVotes, vote]
+    optionVotesCount++
+  } else if (voteDetails.type === 'delete') {
+    newVotes = deleteVoteFromPollDetails(newVotes, vote)
+    optionVotesCount--
+  } else if (voteDetails.type === 'addOwn') {
+    const existingOwnVote = existingVoteDetails.ownVotes.find(
+      (v: IPollVote) => v.optionId === vote.optionId && v.user.id === vote.user.id
+    )
+    if (!existingOwnVote) {
+      optionVotesCount++
+      if (existingPollDetails.allowMultipleVotes) {
+        newOwnVotes = [...newOwnVotes, vote]
+      } else {
+        newOwnVotes = [vote]
+      }
+    }
+  } else if (voteDetails.type === 'deleteOwn') {
+    newOwnVotes = deleteVoteFromPollDetails(newOwnVotes, vote)
+    optionVotesCount--
+  }
+
+  const newVotesPerOption = {
+    ...currentVotesPerOption,
+    [optionId]: optionVotesCount >= 0 ? optionVotesCount : 0
+  }
+
+  const newVoteDetails: IVoteDetails = {
+    votesPerOption: newVotesPerOption,
+    votes: newVotes,
+    ownVotes: newOwnVotes
+  }
+
+  return {
+    ...existingPollDetails,
+    voteDetails: newVoteDetails
+  }
+}
+
+export const extractTextFromReactElement = (element: any): string => {
+  if (typeof element === 'string') {
+    return element
+  }
+  if (element === null || element === undefined) {
+    return ''
+  }
+  if (Array.isArray(element)) {
+    return element.map(extractTextFromReactElement).join('')
+  }
+  if (typeof element === 'object' && element.props) {
+    if (typeof element.props.children === 'string') {
+      return element.props.children
+    }
+    if (Array.isArray(element.props.children)) {
+      return element.props.children.map(extractTextFromReactElement).join('')
+    }
+    if (element.props.children) {
+      return extractTextFromReactElement(element.props.children)
+    }
+  }
+  return ''
+}
+
+export const checkIsTypeKeyPressed = (code?: string) => {
+  return !(
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'CapsLock' ||
+    code === 'Shift' ||
+    code === 'ShiftLeft' ||
+    code === 'ShiftRight' ||
+    code === 'Control' ||
+    code === 'ControlLeft' ||
+    code === 'ControlRight' ||
+    code === 'Alt' ||
+    code === 'AltLeft' ||
+    code === 'AltRight' ||
+    code === 'MetaLeft' ||
+    code === 'MetaRight' ||
+    code === 'Space' ||
+    code === 'Enter' ||
+    code === 'NumpadEnter' ||
+    code === 'Backspace' ||
+    code === 'Delete' ||
+    code === 'ArrowLeft' ||
+    code === 'ArrowRight' ||
+    code === 'ArrowUp' ||
+    code === 'ArrowDown' ||
+    code === 'PageUp' ||
+    code === 'PageDown' ||
+    code === 'Home' ||
+    code === 'End' ||
+    code === 'Insert' ||
+    code === 'Escape' ||
+    code === 'Tab' ||
+    code === 'F1' ||
+    code === 'F2' ||
+    code === 'F3' ||
+    code === 'F4' ||
+    code === 'F5' ||
+    code === 'F6' ||
+    code === 'F7' ||
+    code === 'F8' ||
+    code === 'F9' ||
+    code === 'F10' ||
+    code === 'F11' ||
+    code === 'F12' ||
+    code === 'Shift'
+  )
+}
+
+export const canBeViewOnce = (message: IMessage): boolean => {
+  if (!message.viewOnce) return false
+  if (!message.attachments || message.attachments.length !== 1) return false
+  const attachment = message.attachments[0]
+  return (
+    attachment.type === attachmentTypes.image ||
+    attachment.type === attachmentTypes.video ||
+    attachment.type === attachmentTypes.voice
+  )
 }

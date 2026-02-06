@@ -1,22 +1,26 @@
 import styled from 'styled-components'
-import React, { memo, useEffect, useRef, useState } from 'react'
+import React, { memo, useEffect, useMemo, useRef } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
-// import { ReactComponent as DownloadIcon } from '../../assets/svg/download.svg'
-// import { ReactComponent as CancelIcon } from '../../assets/svg/cancel.svg'
-import { AttachmentIconCont, UploadProgress } from '../../UIHelper'
-import { getAttachmentUrlFromCache } from '../../helpers/attachmentsCache'
-import { base64ToToDataURL } from '../../helpers/resizeImage'
+import { AttachmentIconCont } from '../../UIHelper'
+import {
+  getAttachmentUrlFromCache,
+  getAttachmentURLWithVersion,
+  setAttachmentToCache
+} from '../../helpers/attachmentsCache'
+import { base64ToDataURL } from '../../helpers/resizeImage'
+import { getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
-// import { CircularProgressbar } from 'react-circular-progressbar'
-// import { ProgressWrapper } from '../Attachment'
+import { setUpdateMessageAttachmentAC } from 'store/message/actions'
+import { useDispatch, useSelector } from 'store/hooks'
+import { attachmentUpdatedMapSelector } from 'store/message/selector'
+import { calculateRenderedImageWidth } from 'helpers'
 
 interface IVideoPreviewProps {
-  width?: string
-  height?: string
-  theme?: string
+  width: string
+  height: string
   file: IAttachment
   borderRadius?: string
   isPreview?: boolean
@@ -26,9 +30,9 @@ interface IVideoPreviewProps {
   src: string
   uploading?: boolean
   isDetailsView?: boolean
-  // eslint-disable-next-line no-unused-vars
   setVideoIsReadyToSend?: (attachmentId: string) => void
 }
+
 const VideoPreview = memo(function VideoPreview({
   width,
   height,
@@ -37,7 +41,6 @@ const VideoPreview = memo(function VideoPreview({
   borderRadius,
   isPreview,
   uploading,
-  // isCachedFile = true,
   isRepliedMessage,
   backgroundColor,
   isDetailsView,
@@ -48,113 +51,126 @@ const VideoPreview = memo(function VideoPreview({
     [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
   } = useColor()
-  // const { [THEME_COLORS.TEXT_PRIMARY]: background } = useSelector(themeSelector)
-  // const VideoPreview =
-  let currentTime = ''
-  if (file.metadata && file.metadata.dur) {
-    const mins = Math.floor(file.metadata.dur / 60)
-    const seconds = Math.floor(file.metadata.dur % 60)
-    currentTime = `${mins}:${seconds < 10 ? `0${seconds}` : seconds}`
-  }
-  const [videoCurrentTime, setVideoCurrentTime] = useState<string | null>(currentTime)
-  const [loading, setLoading] = useState(true)
-  // const [progress, setProgress] = useState(3)
-  // const [showProgress, setShowProgress] = useState(false)
-  const [videoUrl, setVideoUrl] = useState('')
-  // const [downloadIsCancelled, setDownloadIsCancelled] = useState(false)
-  const videoRef = useRef<HTMLVideoElement>(null)
-  let attachmentThumb
-  let withPrefix = true
+  const dispatch = useDispatch()
 
-  if (file.metadata && file.metadata.tmb) {
-    if (file.metadata.tmb.length < 70) {
-      attachmentThumb = base64ToToDataURL(file.metadata.tmb)
-      withPrefix = false
-    } else {
-      attachmentThumb = file.metadata && file.metadata.tmb
+  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector)
+
+  // Calculate initial duration from metadata
+  const videoCurrentTime = useMemo(() => {
+    if (file.metadata?.dur) {
+      const mins = Math.floor(file.metadata.dur / 60)
+      const seconds = Math.floor(file.metadata.dur % 60)
+      return `${mins}:${seconds < 10 ? `0${seconds}` : seconds}`
     }
-  }
-  /*  const handleVideoProgress = (e: any) => {
-    const loadedPercentage = e.currentTarget.buffered.end(0) / e.currentTarget.duration
-    if (loadedPercentage > 0.03) {
-      setProgress(loadedPercentage * 100)
-    }
-  } */
-  /* const handlePauseResumeDownload = (e: Event) => {
-    e.stopPropagation()
-    if (downloadIsCancelled) {
-      setDownloadIsCancelled(false)
-      if (videoRef.current && videoUrl) {
-        videoRef.current.src = videoUrl
+    return null
+  }, [file.metadata?.dur])
+
+  // Get cached frame from store
+  const attachmentVideoFirstFrame = useMemo(
+    () => attachmentUpdatedMap[getAttachmentURLWithVersion(file.url)],
+    [attachmentUpdatedMap, file.url]
+  )
+
+  // Stable background image state - prevents blinking
+  // Get thumbnail from metadata
+  const attachmentThumb = useMemo(() => {
+    if (file.metadata?.tmb) {
+      if (file.metadata.tmb.length < 70) {
+        return { thumbnail: base64ToDataURL(file.metadata.tmb), withPrefix: false }
       }
-    } else {
-      setDownloadIsCancelled(true)
-      if (videoRef.current) {
-        videoRef.current.src = ''
-      }
+      return { thumbnail: file.metadata.tmb, withPrefix: true }
     }
-  } */
+    return { thumbnail: undefined, withPrefix: false }
+  }, [file.metadata?.tmb])
+
+  const isExtractingRef = useRef(false)
+  const hasExtractionFailedRef = useRef(false)
+
   useEffect(() => {
-    const video = videoRef.current
-    if (!video) return
+    const videoSource = src
+    if (!videoSource || isExtractingRef.current || hasExtractionFailedRef.current) return
 
-    const checkReadyState = () => {
-      if (video.readyState > 3) {
-        // Video is ready
-        setLoading(false)
-        const minutes = Math.floor(video.duration / 60)
-        const seconds = Math.floor(video.duration % 60)
-        if (!videoCurrentTime) {
-          setVideoCurrentTime(`${minutes}:${seconds < 10 ? `0${seconds}` : seconds}`)
+    // If we already have a cached frame from store, skip extraction
+    if (attachmentVideoFirstFrame && !isPreview) return
+
+    const frameCacheKey = file.url
+
+    // Reset extraction failed flag when source changes
+    hasExtractionFailedRef.current = false
+
+    const checkCache = async (): Promise<boolean> => {
+      try {
+        const cachedUrl = await getAttachmentUrlFromCache(frameCacheKey)
+        if (cachedUrl) {
+          if (!isPreview) {
+            dispatch(setUpdateMessageAttachmentAC(file.url, cachedUrl))
+          }
+          return true
         }
-        if (setVideoIsReadyToSend) {
-          setVideoIsReadyToSend(file.tid!)
-        }
-        return true
+      } catch (error) {
+        // Cache miss, continue to extraction
+        console.error('Error checking cache:', error)
       }
       return false
     }
 
-    // Try immediate check
-    if (checkReadyState()) return
+    const extractFirstFrame = async () => {
+      if (isExtractingRef.current) return
 
-    // Set up event listeners
-    const handleCanPlay = () => checkReadyState()
-    const handleLoadedMetadata = () => checkReadyState()
+      try {
+        isExtractingRef.current = true
+        const [newWidth, newHeight] = calculateRenderedImageWidth(
+          file.metadata?.szw || 1280,
+          file.metadata?.szh || 1080
+        )
+        // Use getVideoFirstFrame helper function - it handles everything internally
+        const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)
 
-    video.addEventListener('canplay', handleCanPlay)
-    video.addEventListener('loadedmetadata', handleLoadedMetadata)
-
-    // Fallback interval
-    const interval = setInterval(() => {
-      if (checkReadyState()) {
-        clearInterval(interval)
-      }
-    }, 1000)
-
-    return () => {
-      video.removeEventListener('canplay', handleCanPlay)
-      video.removeEventListener('loadedmetadata', handleLoadedMetadata)
-      clearInterval(interval)
-    }
-  }, [])
-
-  useEffect(() => {
-    getAttachmentUrlFromCache(file.url).then((cachedUrl: string) => {
-      if (!videoUrl) {
-        if (!cachedUrl && src) {
-          setVideoUrl(src)
-        } else if (cachedUrl) {
-          setVideoUrl(cachedUrl)
+        if (!result) {
+          isExtractingRef.current = false
+          return
         }
+        if (isPreview && setVideoIsReadyToSend) {
+          setVideoIsReadyToSend(file.tid!)
+        }
+
+        const { frameBlobUrl, blob } = result
+
+        try {
+          // Cache the frame
+          const response = new Response(blob, {
+            headers: { 'Content-Type': 'image/jpeg' }
+          })
+          if (!isPreview) {
+            setAttachmentToCache(frameCacheKey, response)
+          }
+
+          if (!isPreview) {
+            dispatch(setUpdateMessageAttachmentAC(file.url, frameBlobUrl))
+          }
+        } catch (error) {
+          console.error('Error processing extracted frame:', error)
+          if (frameBlobUrl) {
+            URL.revokeObjectURL(frameBlobUrl)
+          }
+        } finally {
+          isExtractingRef.current = false
+        }
+      } catch (error) {
+        console.error('Error extracting first frame:', error)
+        hasExtractionFailedRef.current = true
+        isExtractingRef.current = false
+      }
+    }
+
+    // Check cache first, then extract if needed
+    checkCache().then((cached) => {
+      if (!cached && !isExtractingRef.current) {
+        extractFirstFrame()
       }
     })
-  }, [src])
+  }, [file.attachmentUrl, file.url, src, dispatch, attachmentVideoFirstFrame, isPreview, setVideoIsReadyToSend])
 
-  /* useEffect(() => {
-    log.info('render video *********************************************')
-  }) */
-  // log.info('!isPreview && loading && !uploading &&. . . .  . . . . . .. ', !isPreview && loading && !uploading)
   return (
     <Component
       width={width}
@@ -165,89 +181,30 @@ const VideoPreview = memo(function VideoPreview({
       backgroundColor={backgroundColor}
       isDetailsView={isDetailsView}
     >
-      {!isPreview && loading && !uploading && (
-        <UploadProgress
-          isDetailsView={isDetailsView}
-          // onClick={handlePauseResumeDownload}
+      {!uploading && (
+        <UploadInProgress
           isRepliedMessage={isRepliedMessage}
-          borderRadius={borderRadius}
-          backgroundImage={attachmentThumb}
-          withPrefix={withPrefix}
+          src={
+            attachmentVideoFirstFrame ||
+            (attachmentThumb?.withPrefix
+              ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
+              : attachmentThumb?.thumbnail)
+          }
+          width={parseInt(width)}
+          height={parseInt(height)}
+          withBorder={!isPreview && !isDetailsView}
+          backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+          isDetailsView={isDetailsView}
           borderColor={border}
-        >
-          {/* {showProgress && (
-            <UploadPercent isRepliedMessage={isRepliedMessage} backgroundColor={'rgba(23, 25, 28, 0.40)'}>
-              <CancelResumeWrapper onClick={handlePauseResumeDownload}>
-                {downloadIsCancelled ? <DownloadIcon /> : <CancelIcon />}
-              </CancelResumeWrapper>
-              <ProgressWrapper>
-                <CircularProgressbar
-                  minValue={0}
-                  maxValue={100}
-                  value={progress}
-                  backgroundPadding={3}
-                  background={true}
-                  text=''
-                  styles={{
-                    // Rotation of path and trail, in number of turns (0-1)
-                    // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-
-                    // Text size
-                    // textSize: '16px',
-                    background: {
-                      fill: 'rgba(23, 25, 28, 0)'
-                    },
-                    path: {
-                      // Path color
-                      stroke: `#fff`,
-                      // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-                      strokeLinecap: 'butt',
-                      strokeWidth: '4px',
-                      // Customize transition animation
-                      transition: 'stroke-dashoffset 0.5s ease 0s',
-                      // Rotate the path
-                      transform: 'rotate(0turn)',
-                      transformOrigin: 'center center'
-                    }
-                    // How long animation takes to go from one percentage to another, in seconds
-                    // pathTransitionDuration: 0.5,
-
-                    // Can specify path transition in more detail, or remove it entirely
-                    // pathTransition: 'none',
-
-                    // Colors
-                    // pathColor: '#fff',
-                    // textColor: '#f88',
-                    // trailColor: 'transparent'
-                  }}
-                />
-              </ProgressWrapper>
-            </UploadPercent>
-          )} */}
-        </UploadProgress>
-      )}
-      <video
-        draggable={false}
-        ref={videoRef}
-        preload='auto'
-        id='video'
-        // crossOrigin='anonymous'
-        src={file.attachmentUrl || videoUrl}
-        // onProgress={handleVideoProgress}
-      />
-      {/* {file.metadata && file.metadata.thumbnail && (
-        <ImageThumbnail
-          src={file.metadata.thumbnail}
-          width={file.metadata.width}
-          height={file.metadata.height}
-          borderRadius={borderRadius}
-          isLoaded={!loading}
+          loading='lazy'
+          decoding='async'
+          fetchpriority='high'
+          isPreview={isPreview}
         />
-      )} */}
-      {videoCurrentTime && !isRepliedMessage && (
-        <VideoControls>
-          {!isPreview && !!videoCurrentTime && !isRepliedMessage && !uploading && !isDetailsView && (
-            // <VideoPlayButton showOnHover={videoPlaying} onClick={() => setVideoPlaying(!videoPlaying)}>
+      )}
+      {!isRepliedMessage && (
+        <VideoControls className='video-controls'>
+          {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
             <VideoPlayButton>
               <PlayIcon />
             </VideoPlayButton>
@@ -277,6 +234,7 @@ const VideoControls = styled.div`
   display: flex;
   align-items: center;
   justify-content: center;
+  z-index: 6;
 `
 
 const VideoTime = styled.div<{
@@ -328,6 +286,7 @@ const Component = styled.div<{
   width: ${(props) => props.width};
   height: ${(props) => props.height};
   min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
 
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
@@ -368,7 +327,7 @@ const DownloadFile = styled.a<any>`
 export const AttachmentFile = styled.div<{
   isPrevious?: boolean
   borderRadius?: string
-  background?: string
+  backgroundColor?: string
   border?: string
   borderColor: string
 }>`
@@ -378,7 +337,7 @@ export const AttachmentFile = styled.div<{
   padding: 6px 12px;
   width: 350px;
   height: 70px;
-  background: ${(props) => props.background || '#ffffff'};
+  background: ${(props) => props.backgroundColor || '#ffffff'};
   border: ${(props) => props.border || `1px solid ${props.borderColor}`};
   box-sizing: border-box;
   margin-right: ${(props) => props.isPrevious && '16px'};
@@ -396,8 +355,47 @@ export const AttachmentFile = styled.div<{
   }
 `
 
-export const AttachmentImg = styled.img<{ borderRadius?: string }>`
-  width: 100%;
-  border-radius: ${(props) => props.borderRadius || '6px'};
-  object-fit: cover;
+const UploadInProgress = styled.img<{
+  withPrefix?: boolean
+  width?: number
+  height?: number
+  borderRadius?: string
+  backgroundColor?: string
+  borderColor?: string
+  isRepliedMessage?: boolean
+  isPreview?: boolean
+  isDetailsView?: boolean
+  withBorder?: boolean
+  fileAttachment?: boolean
+  imageMinWidth?: string
+  fetchpriority?: string
+}>`
+  width: ${(props) =>
+    props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
+  height: ${(props) =>
+    props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
+  min-width: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isPreview ? props.imageMinWidth || '165px' : null};
+  min-height: ${(props) =>
+    !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && !props.isPreview && '165px'};
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-size: cover;
+  background-position: center;
+  border-radius: ${(props) =>
+    props.fileAttachment ? '8px' : props.borderRadius ? props.borderRadius : props.isRepliedMessage ? '4px' : '8px'};
+  cursor: pointer;
+  border: ${(props) =>
+    props.isRepliedMessage
+      ? '0.5px solid rgba(0, 0, 0, 0.1)'
+      : props.withBorder && `2px solid ${props.backgroundColor}`};
+  box-sizing: border-box;
+  ${(props) =>
+    props.isDetailsView &&
+    `
+    width: 100%;
+    height: 100%;
+    min-width: inherit;
+  `}
 `

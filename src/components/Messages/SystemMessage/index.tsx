@@ -8,7 +8,7 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { useColor, useDidUpdate, useOnScreen } from '../../../hooks'
 // Helpers
 import { isJSON, makeUsername } from '../../../helpers/message'
-import { systemMessageUserName } from '../../../helpers'
+import { systemMessageUserName, formatDisappearingMessageTime } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
@@ -16,7 +16,8 @@ import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
 import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
-import { scrollToNewMessageSelector } from 'store/message/selector'
+import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface ISystemMessageProps {
   channel: IChannel
@@ -31,6 +32,7 @@ interface ISystemMessageProps {
   backgroundColor?: string
   borderRadius?: string
   tabIsActive?: boolean
+  setLastVisibleMessageId?: (messageId: string) => void
 }
 
 const Message = ({
@@ -45,7 +47,8 @@ const Message = ({
   border,
   backgroundColor,
   borderRadius,
-  contactsMap
+  contactsMap,
+  setLastVisibleMessageId
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -56,6 +59,7 @@ const Message = ({
   const getFromContacts = getShowOnlyContactUsers()
   const messageItemRef = useRef<any>()
   const isVisible = useOnScreen(messageItemRef)
+  const unreadScrollTo = useSelector(unreadScrollToSelector)
 
   const messageMetas = useMemo(() => {
     return isJSON(message.metadata) ? JSON.parse(message.metadata) : message.metadata
@@ -70,14 +74,20 @@ const Message = ({
         message.userMarkers.length &&
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED
+      channel.newMessageCount &&
+      channel.newMessageCount > 0 &&
+      connectionStatus === CONNECTION_STATUS.CONNECTED &&
+      !unreadScrollTo
     ) {
       dispatch(markMessagesAsReadAC(channel.id, [message.id]))
     }
   }
 
   useEffect(() => {
-    if (isVisible) {
+    if (isVisible && !unreadScrollTo) {
+      if (setLastVisibleMessageId) {
+        setLastVisibleMessageId(message.id)
+      }
       handleSendReadMarker()
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
@@ -92,7 +102,7 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible])
+  }, [isVisible, unreadScrollTo])
 
   useDidUpdate(() => {
     if (tabIsActive) {
@@ -108,9 +118,12 @@ const Message = ({
 
   return (
     <Container
+      id={message.id || message.tid}
       ref={messageItemRef}
       marginTop={differentUserMessageSpacing || '16px'}
-      marginBottom={nextMessage && nextMessage.type !== 'system' ? differentUserMessageSpacing || '16px' : ''}
+      marginBottom={
+        nextMessage && nextMessage.type !== MESSAGE_TYPE.SYSTEM ? differentUserMessageSpacing || '16px' : ''
+      }
       fontSize={fontSize}
       textColor={textColor || textOnPrimary}
       border={border}
@@ -158,7 +171,15 @@ const Message = ({
                   }`
                 : message.body === 'LG'
                   ? ' left the group'
-                  : ''}
+                  : message.body === 'JL'
+                    ? ` joined via invite link`
+                    : message.body === 'ADM'
+                      ? !Number(messageMetas?.autoDeletePeriod)
+                        ? ' disabled disappearing messages'
+                        : ` set the disappearing messages timer to ${formatDisappearingMessageTime(
+                            messageMetas?.autoDeletePeriod ? Number(messageMetas.autoDeletePeriod) : null
+                          )}`
+                      : ''}
       </span>
     </Container>
   )

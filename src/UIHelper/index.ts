@@ -171,12 +171,7 @@ export function generateAvatarColor(itemName: any, theme: 'light' | 'dark') {
   if (itemName && itemName !== '') {
     const hash = md5(itemName).toString().padStart(32, '0').slice(-6)
     const hashInt = parseInt(hash, 16)
-    // if (itemName === 't😀') {
-    // }
     const colorIndex = hashInt % avatarColors.length
-    // if (colorIndex >= avatarColors.length) {
-    //   colorIndex -= avatarColors.length
-    // }
     return avatarColors[colorIndex]
   }
   return null
@@ -278,13 +273,13 @@ export const CustomSelectTrigger = styled.span<{ color: string }>`
   text-transform: capitalize;
 `
 
-export const Label = styled.label<{ color: string }>`
-  display: inline-block;
+export const Label = styled.label<{ color: string; marginTop?: string; display?: string }>`
+  display: ${(props) => props.display || 'inline-block'};
   font-style: normal;
   font-weight: 500;
   font-size: 13px;
   line-height: 20px;
-  margin-top: 20px;
+  margin-top: ${(props) => props.marginTop || '20px'};
   margin-bottom: 4px;
   color: ${(props) => props.color};
 `
@@ -314,6 +309,7 @@ export const CustomInput = styled.input<{
   errorColor: string
   borderColor: string
   disabledColor: string
+  padding?: string
 }>`
   height: 40px;
   width: 100%;
@@ -322,7 +318,7 @@ export const CustomInput = styled.input<{
   color: ${(props) => props.color};
   box-sizing: border-box;
   border-radius: 8px;
-  padding: 11px 14px;
+  padding: ${(props) => props.padding || '11px 14px'};
   font-family: Inter, sans-serif;
   font-style: normal;
   font-weight: normal;
@@ -387,6 +383,7 @@ export const Button = styled.button<{
   borderColor?: string
   borderRadius?: string
   disabled?: boolean
+  disabledOpacity?: number
   margin?: string
 }>`
   display: inline-block;
@@ -407,10 +404,10 @@ export const Button = styled.button<{
   margin: ${(props) => props.margin || '0'};
   user-select: none;
   transition: opacity 0.1s;
-  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
+  opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 1)};
   &:hover,
   &:focus {
-    opacity: ${(props) => (props.disabled ? 0.5 : 0.8)};
+    opacity: ${(props) => (props.disabled ? props.disabledOpacity || 0.5 : 0.8)};
   }
 `
 
@@ -420,11 +417,12 @@ export const PopupName = styled.h3<{
   padding?: string
   isDelete?: boolean
   color: string
+  lineHeight?: string
 }>`
   font-style: normal;
   font-weight: 500;
   font-size: 20px;
-  line-height: 23px;
+  line-height: ${(props) => props.lineHeight || '23px'};
   color: ${(props) => props.color};
   margin: 0;
   margin-top: ${(props: any) => props.marginTop};
@@ -510,9 +508,14 @@ export const Popup = styled.div<{
     `};
 `
 
-export const PopupBody = styled.div<{ withFooter?: boolean; paddingH?: string; paddingV?: string }>`
+export const PopupBody = styled.div<{
+  withFooter?: boolean
+  paddingH?: string
+  paddingV?: string
+  marginBottom?: string
+}>`
   padding: ${(props) => `${props.paddingV || 0} ${props.paddingH || 0}`};
-  margin-bottom: 8px;
+  margin-bottom: ${(props) => props.marginBottom || '8px'};
   height: ${(props) => (props.withFooter ? `calc(100% - (54px + ${props.paddingV}))` : 'calc(100% - 54px)')};
 `
 
@@ -745,6 +748,8 @@ export const MessageText = styled.pre<{
   incomingMessageStyles?: IMessageStyles
   incoming: boolean
   linkColor: string
+  unsupportedMessage?: boolean
+  unsupportedMessageColor?: string
 }>`
   display: flow-root;
   position: relative;
@@ -776,7 +781,12 @@ export const MessageText = styled.pre<{
     props.color};
   user-select: text;
   //overflow: hidden;
-
+  ${(props) =>
+    props.unsupportedMessage &&
+    `
+      color: ${props.unsupportedMessageColor || '#757D8B'};
+      font-style: italic;
+    `}
   ${(props) =>
     props.isRepliedMessage &&
     `
@@ -930,6 +940,8 @@ export const UploadPercent = styled.span<{
   justify-content: center;
   position: absolute;
   color: #fff;
+  left: ${(props) => (props.fileAttachment ? '0' : '')};
+  top: ${(props) => (props.fileAttachment ? '0' : '')};
   width: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   height: ${(props) => (props.fileAttachment || props.isRepliedMessage || props.isDetailsView ? '40px' : '56px')};
   background-color: ${(props) => `${props.backgroundColor}66`};
@@ -962,21 +974,16 @@ export const UploadProgress = styled.div<{
   imageMinWidth?: string
   zIndex?: number
   borderColor: string
+  isPreview?: boolean
 }>`
   position: ${(props) => !props.positionStatic && 'absolute'};
   top: ${(props) => (props.fileAttachment ? '8px' : '0')};
   left: ${(props) => (props.fileAttachment ? '12px' : '0')};
-  width: ${(props) =>
-    props.fileAttachment || props.isRepliedMessage ? '40px' : props.width ? `${props.width}px` : '100%'};
-  height: ${(props) =>
-    props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
-  min-width: ${(props) => (!props.fileAttachment && !props.isRepliedMessage ? props.imageMinWidth || '165px' : null)};
-  min-height: ${(props) => !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && '165px'};
+  width: 100%;
+  height: 100%;
   display: flex;
-  //display: none;
   align-items: center;
   justify-content: center;
-  //border-radius: ${(props) => (props.fileAttachment ? '8px' : props.isRepliedMessage ? '4px' : ' 50%')};
   background-image: url(${(props) =>
     props.backgroundImage && `${props.withPrefix ? 'data:image/jpeg;base64,' : ''}${props.backgroundImage}`});
   background-size: cover;
@@ -1023,4 +1030,52 @@ export const AttachmentPreviewTitle = styled.span<{ color: string; fontSize?: st
   line-height: ${(props) => props.lineHeight || '20px'};
   height: ${(props) => props.lineHeight || '20px'};
   color: ${(props) => props.color};
+`
+
+export const CopiedTooltip = styled.span<{ backgroundColor: string; color: string }>`
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(100% + 6px);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 14px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  animation: slideDownFadeIn 0.3s ease-out;
+  background-color: ${(p) => p.backgroundColor};
+  color: ${(p) => p.color};
+  box-shadow: 0px 4px 12px rgba(0, 0, 0, 0.15);
+
+  @keyframes slideDownFadeIn {
+    from {
+      transform: translateX(-50%) translateY(8px);
+      opacity: 0;
+    }
+    to {
+      transform: translateX(-50%) translateY(0);
+      opacity: 1;
+    }
+  }
+`
+
+export const ViewOnceToggleCont = styled.div<{ order?: number; color: string; textColor: string; height?: string }>`
+  position: relative;
+  cursor: pointer;
+  margin: auto 0px 0px;
+  height: ${(props) => (props.height ? `${props.height}px` : '36px')};
+  align-items: center;
+  display: flex;
+  order: ${(props) => (props.order === 0 || props.order ? props.order : 2)};
+
+  svg {
+    circle {
+      fill: ${(props) => props.color};
+    }
+    path {
+      fill: ${(props) => props.textColor};
+    }
+  }
 `

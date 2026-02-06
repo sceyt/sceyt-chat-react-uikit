@@ -20,6 +20,7 @@ import { messageMarkersSelector, messagesMarkersLoadingStateSelector } from 'sto
 import { LOADING_STATE } from 'helpers/constants'
 import { makeUsername } from 'helpers/message'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
+import {ReactComponent as CircleDashedIcon} from '../../../assets/svg/circle-dashed.svg'
 
 interface IProps {
   message: IMessage
@@ -39,6 +40,7 @@ interface IProps {
   listItemStyles?: IListItemStyles
   handleOpenUserProfile?: (user: IUser) => void
   contacts: { [key: string]: IContact }
+  isP2PChannel?: boolean
 }
 
 const defaultFormatDate = (date: Date) => {
@@ -49,7 +51,7 @@ const defaultFormatDate = (date: Date) => {
   if (m.isSame(moment().subtract(1, 'day'), 'day')) {
     return `Yesterday, ${m.format('HH:mm')}`
   }
-  return m.format('DD.MM.YYYY')
+  return m.format('DD.MM.YYYY, HH:mm')
 }
 
 const MessageInfo = ({
@@ -73,7 +75,8 @@ const MessageInfo = ({
   tabsStyles = {},
   listItemStyles = {},
   handleOpenUserProfile,
-  contacts
+  contacts,
+  isP2PChannel = false
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -103,6 +106,9 @@ const MessageInfo = ({
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
   const [ready, setReady] = useState<boolean>(false)
   const [flipLocked, setFlipLocked] = useState<boolean>(false)
+  const [verticalOffset, setVerticalOffset] = useState<number>(8)
+  const [transformY, setTransformY] = useState<number>(0)
+  const initializingRef = useRef<boolean>(true)
   const getFromContacts = useMemo(() => getShowOnlyContactUsers(), [])
 
   const activeMarkers = useMemo(() => {
@@ -112,6 +118,31 @@ const MessageInfo = ({
   // Calculate a row height and max list height for 5 rows (approx: item height + vertical gaps)
   const rowHeightPx = useMemo(() => (avatarSize || 32) + 24, [avatarSize])
   const listMaxHeightPx = useMemo(() => rowHeightPx * 5 - 16, [rowHeightPx])
+  // For P2P channels: get the first marker from each status type
+  const p2pStatuses = useMemo(() => {
+    if (!isP2PChannel || !markers) return null
+    const receivedMarkers = markers.received
+    const displayedMarkers = markers.displayed
+    const playedMarkers = markers.played
+    return {
+      received: receivedMarkers ? [...receivedMarkers].sort(sortByDateDesc)[0] : null,
+      displayed: displayedMarkers ? [...displayedMarkers].sort(sortByDateDesc)[0] : null,
+      played: playedMarkers ? [...playedMarkers].sort(sortByDateDesc)[0] : null
+    }
+  }, [markers, isP2PChannel])
+
+  // Calculate visible row count for P2P channels
+  const p2pVisibleRowCount = useMemo(() => {
+    if (!isP2PChannel) return 0
+    const shouldShowAllStatuses = !p2pStatuses?.received && !p2pStatuses?.displayed && !p2pStatuses?.played
+    const hasVoiceAttachment =
+      message.attachments && message.attachments.length > 0 && message.attachments[0].type === 'voice'
+    let count = 0
+    if (shouldShowAllStatuses || p2pStatuses?.received) count++
+    if (shouldShowAllStatuses || p2pStatuses?.displayed) count++
+    if (hasVoiceAttachment && (shouldShowAllStatuses || p2pStatuses?.played)) count++
+    return count
+  }, [isP2PChannel, p2pStatuses, message.attachments])
 
   const tabItems: Array<{ key: MessageInfoTab; label: string; data: IMarker[] }> = tabsOrder.map((tab) => {
     switch (tab.key) {
@@ -156,17 +187,28 @@ const MessageInfo = ({
       const containerRect = container.getBoundingClientRect()
       const anchorRect = anchorEl.getBoundingClientRect()
       const contentEl = contentRef.current
-      const tabsEl = tabsRef.current
-      const listEl = listRef.current
       const cs = contentEl ? getComputedStyle(contentEl) : ({} as any)
       const padTop = parseFloat(cs?.paddingTop || '0') || 0
       const padBottom = parseFloat(cs?.paddingBottom || '0') || 0
       const contentPaddingY = padTop + padBottom
-      const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
-      const tabsMarginBottom = 8
-      const listMarginTop = 8
-      const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
-      const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+
+      let desiredHeight = 0
+      if (isP2PChannel) {
+        // For P2P: simple status rows (no tabs, no list)
+        const statusRowHeight = 48 // Approximate height per status row
+        const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
+        desiredHeight = contentPaddingY + statusRowsHeight
+      } else {
+        // For group channels: tabs + list
+        const tabsEl = tabsRef.current
+        const listEl = listRef.current
+        const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
+        const tabsMarginBottom = 8
+        const listMarginTop = 8
+        const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
+        desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+      }
+
       const maxPx = parseInt(String(height || '300'), 10) || 300
       const measuredTarget = Math.min(desiredHeight || 0, maxPx)
       // For flip decision while loading, consider worst-case; but keep visual height to measured
@@ -176,24 +218,69 @@ const MessageInfo = ({
       const availableAbove = anchorRect.top - containerRect.top - 8
       const nextFlip = Boolean(flipTarget > availableBelow && flipTarget <= availableAbove)
       setFlipAbove(nextFlip)
+
+      // Calculate initial vertical offset and transform to keep popup within container boundaries
+      const offset = 8
+      let transform = 0
+
+      if (nextFlip) {
+        const naturalPopupBottom = anchorRect.top - offset
+        const naturalPopupTop = naturalPopupBottom - flipTarget
+        if (naturalPopupTop < containerRect.top) {
+          transform = containerRect.top - naturalPopupTop
+        } else if (naturalPopupBottom > containerRect.bottom) {
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+      } else {
+        const naturalPopupTop = anchorRect.bottom + offset
+        const naturalPopupBottom = naturalPopupTop + flipTarget
+        if (naturalPopupBottom > containerRect.bottom) {
+          transform = containerRect.bottom - naturalPopupBottom
+        } else if (naturalPopupTop < containerRect.top) {
+          transform = containerRect.top - naturalPopupTop
+        }
+      }
+
+      setVerticalOffset(offset)
+      setTransformY(transform)
     }
     setIsTransitioning(true)
     setOpen(true)
     setReady(true)
     setFlipLocked(true)
-  }, [])
+    // Mark initialization as complete after a brief delay to allow DOM to settle
+    setTimeout(() => {
+      initializingRef.current = false
+    }, 150)
+  }, [isP2PChannel, message.attachments, height, messagesMarkersLoadingState, p2pVisibleRowCount])
+
+  // Reset initialization flag when popup closes
+  useEffect(() => {
+    if (!open) {
+      initializingRef.current = true
+    }
+  }, [open])
 
   useEffect(() => {
+    if (!open || !ready) return
+
     const onDown = (e: MouseEvent) => {
+      // Don't close during initialization phase
+      if (initializingRef.current) return
       if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
         togglePopup()
       }
     }
-    document.addEventListener('mousedown', onDown)
+    // Add a small delay to prevent immediate closing on initial open
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', onDown)
+    }, 100)
+
     return () => {
+      clearTimeout(timeoutId)
       document.removeEventListener('mousedown', onDown)
     }
-  }, [])
+  }, [open, ready, togglePopup])
 
   // Recalculate dropdown position to keep it within #scrollableDiv
   useEffect(() => {
@@ -219,18 +306,71 @@ const MessageInfo = ({
       const availableAbove = anchorRect.top - containerRect.top - 8
       const overflowBelow = dropdownHeight > availableBelow
       const overflowAbove = dropdownHeight > availableAbove
+
+      let nextFlip = flipAbove
       if (!isTransitioning && !flipLocked) {
         setFlipAbove((prev) => {
           // If currently above, only switch to below when above overflows and below fits
           if (prev) {
-            if (overflowAbove && !overflowBelow) return false
+            if (overflowAbove && !overflowBelow) {
+              nextFlip = false
+              return false
+            }
+            nextFlip = true
             return true
           }
           // If currently below, only switch to above when below overflows and above fits
-          if (overflowBelow && !overflowAbove) return true
+          if (overflowBelow && !overflowAbove) {
+            nextFlip = true
+            return true
+          }
+          nextFlip = false
           return false
         })
+      } else {
+        nextFlip = flipAbove
       }
+
+      // Calculate vertical offset and transform to keep popup within container boundaries
+      const offset = 8
+      let transform = 0
+
+      if (nextFlip) {
+        // When flipped above: bottom = calc(100% + offset) means popup bottom is at anchor top - offset
+        // Calculate where popup would naturally be positioned
+        const naturalPopupBottom = anchorRect.top - offset
+        const naturalPopupTop = naturalPopupBottom - dropdownHeight
+
+        // Check if popup would overflow container top
+        if (naturalPopupTop < containerRect.top) {
+          // Shift popup down so its top aligns with container top
+          transform = containerRect.top - naturalPopupTop
+        }
+        // Check if popup would overflow container bottom (unlikely when above, but check anyway)
+        else if (naturalPopupBottom > containerRect.bottom) {
+          // Shift popup up so its bottom aligns with container bottom
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+      } else {
+        // When below: top = calc(100% + offset) means popup top is at anchor bottom + offset
+        // Calculate where popup would naturally be positioned
+        const naturalPopupTop = anchorRect.bottom + offset
+        const naturalPopupBottom = naturalPopupTop + dropdownHeight
+
+        // Check if popup would overflow container bottom
+        if (naturalPopupBottom > containerRect.bottom) {
+          // Shift popup up so its bottom aligns with container bottom
+          transform = containerRect.bottom - naturalPopupBottom
+        }
+        // Check if popup would overflow container top (unlikely when below, but check anyway)
+        else if (naturalPopupTop < containerRect.top) {
+          // Shift popup down so its top aligns with container top
+          transform = containerRect.top - naturalPopupTop
+        }
+      }
+
+      setVerticalOffset(offset)
+      setTransformY(transform)
     }
 
     if (open) {
@@ -261,7 +401,17 @@ const MessageInfo = ({
         window.removeEventListener('resize', recalc)
       }
     }
-  }, [open, ready, message.id, panelHeightPx, isTransitioning, flipLocked, height])
+  }, [
+    open,
+    ready,
+    message.id,
+    panelHeightPx,
+    isTransitioning,
+    flipLocked,
+    height,
+    flipAbove,
+    messagesMarkersLoadingState
+  ])
 
   // Measure content on relevant changes and animate height; decide flip before animating (layout phase)
   useLayoutEffect(() => {
@@ -271,17 +421,28 @@ const MessageInfo = ({
     const containerRect = container.getBoundingClientRect()
     const anchorRect = anchorEl.getBoundingClientRect()
     const contentEl = contentRef.current
-    const tabsEl = tabsRef.current
-    const listEl = listRef.current
     const cs = contentEl ? getComputedStyle(contentEl) : ({} as any)
     const padTop = parseFloat(cs?.paddingTop || '0') || 0
     const padBottom = parseFloat(cs?.paddingBottom || '0') || 0
     const contentPaddingY = padTop + padBottom
-    const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
-    const tabsMarginBottom = 8
-    const listMarginTop = 8
-    const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
-    const desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+
+    let desiredHeight = 0
+    if (isP2PChannel) {
+      // For P2P: simple status rows (no tabs, no list)
+      const statusRowHeight = 48 // Approximate height per status row
+      const statusRowsHeight = statusRowHeight * p2pVisibleRowCount
+      desiredHeight = contentPaddingY + statusRowsHeight
+    } else {
+      // For group channels: tabs + list
+      const tabsEl = tabsRef.current
+      const listEl = listRef.current
+      const tabsHeight = tabsEl ? tabsEl.getBoundingClientRect().height : 0
+      const tabsMarginBottom = 8
+      const listMarginTop = 8
+      const desiredListHeight = Math.min(listEl ? listEl.scrollHeight : 0, listMaxHeightPx)
+      desiredHeight = contentPaddingY + tabsHeight + tabsMarginBottom + listMarginTop + desiredListHeight
+    }
+
     const maxPx = parseInt(String(height || '300'), 10)
     const measuredTarget = Math.min(desiredHeight || 0, isNaN(maxPx) ? 300 : Math.min(maxPx, desiredHeight))
     const nextHeight = Math.max(panelHeightPx || 0, measuredTarget)
@@ -290,24 +451,69 @@ const MessageInfo = ({
     const availableAbove = anchorRect.top - containerRect.top - 8
     // Lock flip during this update; set correct flip before painting
     setFlipLocked(true)
+    let currentFlip = flipAbove
     if (messagesMarkersLoadingState !== LOADING_STATE.LOADING) {
       const overflowBelow = nextHeight > availableBelow
       const overflowAbove = nextHeight > availableAbove
       setFlipAbove((prev) => {
         if (prev) {
-          if (overflowAbove && !overflowBelow) return false
+          if (overflowAbove && !overflowBelow) {
+            currentFlip = false
+            return false
+          }
+          currentFlip = true
           return true
         }
-        if (overflowBelow && !overflowAbove) return true
+        if (overflowBelow && !overflowAbove) {
+          currentFlip = true
+          return true
+        }
+        currentFlip = false
         return false
       })
     }
+
+    // Calculate vertical offset and transform to keep popup within container boundaries
+    const offset = 8
+    let transform = 0
+
+    if (currentFlip) {
+      const naturalPopupBottom = anchorRect.top - offset
+      const naturalPopupTop = naturalPopupBottom - nextHeight
+      if (naturalPopupTop < containerRect.top) {
+        transform = containerRect.top - naturalPopupTop
+      } else if (naturalPopupBottom > containerRect.bottom) {
+        transform = containerRect.bottom - naturalPopupBottom
+      }
+    } else {
+      const naturalPopupTop = anchorRect.bottom + offset
+      const naturalPopupBottom = naturalPopupTop + nextHeight
+      if (naturalPopupBottom > containerRect.bottom) {
+        transform = containerRect.bottom - naturalPopupBottom
+      } else if (naturalPopupTop < containerRect.top) {
+        transform = containerRect.top - naturalPopupTop
+      }
+    }
+
+    setVerticalOffset(offset)
+    setTransformY(transform)
 
     if (panelHeightPx !== nextHeight) {
       setIsTransitioning(true)
       setPanelHeightPx(nextHeight)
     }
-  }, [ready, panelHeightPx, activeMarkers.length, messagesMarkersLoadingState, height])
+  }, [
+    ready,
+    panelHeightPx,
+    activeMarkers.length,
+    messagesMarkersLoadingState,
+    height,
+    flipAbove,
+    isP2PChannel,
+    message.attachments,
+    markers,
+    p2pVisibleRowCount
+  ])
 
   // Lock flip while loading; unlock after load completes (transition end handler will also unlock if needed)
   useEffect(() => {
@@ -336,10 +542,24 @@ const MessageInfo = ({
   }, [])
 
   useEffect(() => {
-    if (activeTab && message.id && message.channelId) {
-      dispatch(getMessageMarkersAC(message.id, message.channelId, activeTab))
+    if (message.id && message.channelId) {
+      // For P2P, fetch all marker types
+      let deliveryStatuses = 'received,displayed'
+      if (message.attachments && message.attachments.length > 0 && message.attachments[0].type === 'voice') {
+        deliveryStatuses += ',played'
+      }
+      dispatch(getMessageMarkersAC(message.id, message.channelId, deliveryStatuses))
     }
-  }, [activeTab, message.id, message.channelId])
+  }, [activeTab, message.id, message.channelId, isP2PChannel, message.attachments, dispatch])
+
+  const shouldShowAllStatuses = useMemo(() => {
+    if (!isP2PChannel) return false
+    return !p2pStatuses?.received && !p2pStatuses?.displayed && !p2pStatuses?.played
+  }, [isP2PChannel, p2pStatuses])
+
+  if ((messagesMarkersLoadingState === LOADING_STATE.LOADING || messagesMarkersLoadingState == null) && !markers) {
+    return null
+  }
 
   return (
     <DropdownRoot
@@ -348,6 +568,8 @@ const MessageInfo = ({
       backgroundColor={backgroundSections}
       flip={flipAbove}
       ready={ready}
+      verticalOffset={verticalOffset}
+      transformY={transformY}
     >
       <Panel
         ref={panelRef}
@@ -358,35 +580,69 @@ const MessageInfo = ({
         maxWidth={maxWidth}
         minWidth={minWidth}
       >
-        <Content ref={contentRef}>
-          <Tabs ref={tabsRef}>
-            {tabItems.map((tab) => (
-              <Tab
-                key={tab.key}
-                active={activeTab === tab.key}
-                activeColor={tabsStyles.activeColor || textOnPrimary}
-                inactiveColor={tabsStyles.inactiveColor || textSecondary}
-                onClick={() => setActiveTab(tab.key)}
-                textOnPrimary={textOnPrimary}
-                textSecondary={textSecondary}
-                background={activeTab === tab.key ? accentColor : 'transparent'}
-                borderColor={border}
-              >
-                {tab.label}
-                {showCounts ? ` (${tab.data.length})` : ''}
-              </Tab>
-            ))}
-          </Tabs>
-          <List ref={listRef} maxHeight={listMaxHeightPx}>
-            {activeMarkers.map((marker: IMarker) => (
-              <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
-                {renderRow(marker)}
-              </React.Fragment>
-            ))}
-            {!activeMarkers.length && messagesMarkersLoadingState !== LOADING_STATE.LOADING && (
-              <Empty color={textSecondary}>No results</Empty>
-            )}
-          </List>
+        <Content ref={contentRef} padding={isP2PChannel ? "8px 16px" : "12px 16px"}>
+          {isP2PChannel ? (
+            <P2PStatusList>
+              {(shouldShowAllStatuses || p2pStatuses?.received) && (
+                <P2PStatusRow>
+                  <P2PStatusLabel color={textPrimary}>Delivered</P2PStatusLabel>
+                  <P2PStatusDate color={textSecondary}>
+                    {p2pStatuses?.received ? formatDate(new Date((p2pStatuses.received as any).createdAt)) : <CircleDashedIcon />}
+                  </P2PStatusDate>
+                </P2PStatusRow>
+              )}
+              {(shouldShowAllStatuses || p2pStatuses?.displayed) && (
+                <P2PStatusRow>
+                  <P2PStatusLabel color={textPrimary}>Seen</P2PStatusLabel>
+                  <P2PStatusDate color={textSecondary}>
+                    {p2pStatuses?.displayed ? formatDate(new Date((p2pStatuses.displayed as any).createdAt)) : <CircleDashedIcon />}
+                  </P2PStatusDate>
+                </P2PStatusRow>
+              )}
+              {(shouldShowAllStatuses || p2pStatuses?.played) &&
+                message.attachments &&
+                message.attachments.length > 0 &&
+                message.attachments[0].type === 'voice' && (
+                  <P2PStatusRow>
+                    <P2PStatusLabel color={textPrimary}>Played</P2PStatusLabel>
+                    <P2PStatusDate color={textSecondary}>
+                      {p2pStatuses?.played ? formatDate(new Date((p2pStatuses.played as any).createdAt)) : <CircleDashedIcon />}
+                    </P2PStatusDate>
+                  </P2PStatusRow>
+                )}
+            </P2PStatusList>
+          ) : (
+            <React.Fragment>
+              <Tabs ref={tabsRef}>
+                {tabItems.map((tab) => (
+                  <Tab
+                    key={tab.key}
+                    active={activeTab === tab.key}
+                    activeColor={tabsStyles.activeColor || textOnPrimary}
+                    inactiveColor={tabsStyles.inactiveColor || textSecondary}
+                    onClick={() => setActiveTab(tab.key)}
+                    textOnPrimary={textOnPrimary}
+                    textSecondary={textSecondary}
+                    backgroundColor={activeTab === tab.key ? accentColor : 'transparent'}
+                    borderColor={border}
+                  >
+                    {tab.label}
+                    {showCounts ? ` (${tab.data.length})` : ''}
+                  </Tab>
+                ))}
+              </Tabs>
+              <List ref={listRef} maxHeight={listMaxHeightPx}>
+                {activeMarkers.map((marker: IMarker) => (
+                  <React.Fragment key={`${marker.user?.id || 'deleted'}-${(marker.createdAt as any) || ''}`}>
+                    {renderRow(marker)}
+                  </React.Fragment>
+                ))}
+                {!activeMarkers.length && messagesMarkersLoadingState !== LOADING_STATE.LOADING && (
+                  <Empty color={textSecondary}>No results</Empty>
+                )}
+              </List>
+            </React.Fragment>
+          )}
         </Content>
       </Panel>
     </DropdownRoot>
@@ -416,7 +672,7 @@ const Tab = styled.button<{
   inactiveColor: string
   textOnPrimary: string
   textSecondary: string
-  background: string
+  backgroundColor: string
   borderColor: string
 }>`
   border: none;
@@ -425,8 +681,8 @@ const Tab = styled.button<{
   padding: 6px 11px;
   border-radius: 16px;
   color: ${(p) => (p.active ? p.textOnPrimary : p.textSecondary)};
-  background: ${(p) => p.background};
-  border: 1px solid ${(p) => (p.active ? p.background : p.borderColor)};
+  background: ${(p) => p.backgroundColor};
+  border: 1px solid ${(p) => (p.active ? p.backgroundColor : p.borderColor)};
   &:hover {
     opacity: 0.9;
   }
@@ -496,11 +752,19 @@ const Empty = styled.div<{ color: string }>`
   overflow: hidden;
 `
 
-const DropdownRoot = styled.div<{ rtl: boolean; backgroundColor: string; flip: boolean; ready: boolean }>`
+const DropdownRoot = styled.div<{
+  rtl: boolean
+  backgroundColor: string
+  flip: boolean
+  ready: boolean
+  verticalOffset: number
+  transformY: number
+}>`
   position: absolute;
-  top: ${(p) => (p.flip ? 'auto' : 'calc(100% + 8px)')};
-  bottom: ${(p) => (p.flip ? 'calc(100% + 8px)' : 'auto')};
+  top: ${(p) => (p.flip ? 'auto' : `calc(100% + ${p.verticalOffset}px)`)};
+  bottom: ${(p) => (p.flip ? `calc(100% + ${p.verticalOffset}px)` : 'auto')};
   ${(p) => (p.rtl ? 'left: 4%;' : 'right: 4%;')}
+  transform: ${(p) => (p.transformY !== 0 ? `translateY(${p.transformY}px)` : 'none')};
   z-index: 15;
   background: ${({ backgroundColor }) => backgroundColor};
   box-shadow: 0px 0px 24px 0px #11153929;
@@ -529,10 +793,42 @@ const Panel = styled.div<{
   flex-direction: column;
 `
 
-const Content = styled.div`
-  padding: 16px 12px;
+const Content = styled.div<{ padding?: string }>`
+  padding: ${(p) => p.padding || '16px 12px'};
   height: 100%;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+`
+
+const P2PStatusList = styled.div`
+  display: flex;
+  flex-direction: column;
+`
+
+const P2PStatusRow = styled.div`
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 4px;
+  height: 48px;
+`
+
+const P2PStatusLabel = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  font-family: Inter;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
+`
+
+const P2PStatusDate = styled.div<{ color: string }>`
+  color: ${(p) => p.color};
+  min-width: max-content;
+  font-family: Inter;
+  font-weight: 400;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0px;
 `

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import styled from 'styled-components'
-import { useSelector, useDispatch } from 'store/hooks'
+import { useDispatch } from 'store/hooks'
 
 import {
   Popup,
@@ -25,7 +25,6 @@ import { THEME_COLORS } from '../../../UIHelper/constants'
 import { resizeImage } from '../../../helpers/resizeImage'
 import { AvatarWrapper } from '../../../components/Channel'
 import { getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
-import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 
 interface ICreateChannelPopup {
@@ -71,7 +70,6 @@ export default function CreateChannel({
   const uriRegexp = /^[A-Za-z0-9]*$/
   const fileUploader = useRef<any>(null)
   const uriPrefixRef = useRef<any>(null)
-  const theme = useSelector(themeSelector)
   const [usersPopupVisible, setUsersPopupVisible] = useState(false)
   const [createGroupChannelPopupVisible, setCreateGroupChannelPopupVisible] = useState(true)
   const [selectedMembers, setSelectedMembers] = useState<IAddMember[]>([])
@@ -338,7 +336,6 @@ export default function CreateChannel({
                         value={subjectValue}
                         onChange={handleTypeSubject}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} name`}
-                        theme={theme}
                         color={textPrimary}
                         errorColor={warningColor}
                         placeholderColor={textFootnote}
@@ -357,7 +354,6 @@ export default function CreateChannel({
                         value={metadataValue}
                         onChange={handleTypeMetadata}
                         placeholder={`Enter ${createGroupChannel ? 'group' : 'channel'} description`}
-                        theme={theme}
                         color={textPrimary}
                         errorColor={warningColor}
                         placeholderColor={textFootnote}
@@ -383,7 +379,6 @@ export default function CreateChannel({
                           onBlur={checkURIRegexp}
                           placeholder='chan12'
                           error={!!wrongUri}
-                          theme={theme}
                           color={textPrimary}
                           errorColor={warningColor}
                           placeholderColor={textFootnote}

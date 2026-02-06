@@ -139,7 +139,7 @@ export default function ReactionsPopup({
   }, [reactions])
 
   useEffect(() => {
-    if (reactions) {
+    if (reactions && reactions?.length) {
       if (reactionsPrevLength !== reactions.length) {
         setPopupHeight(reactionsHeight)
         reactionsPrevLength = reactions.length

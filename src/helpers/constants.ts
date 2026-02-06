@@ -10,7 +10,8 @@ export const MESSAGE_DELIVERY_STATUS = {
   SENT: 'sent',
   DELIVERED: 'received',
   READ: 'displayed',
-  PLAYED: 'played'
+  PLAYED: 'played',
+  OPENED: 'opened'
 }
 
 export const MESSAGE_STATUS = {
@@ -110,4 +111,14 @@ export const THEME = {
 export const CHANNEL_GROUP_TYPES = {
   DIRECT_PRIVATE: 'chats_groups',
   PUBLIC: 'channels'
+}
+
+export type TimerOption = 'off' | '1day' | '1week' | '1month' | 'custom'
+
+export const FIXED_TIMER_OPTIONS: Record<TimerOption, number | null> = {
+  off: 0,
+  '1day': 60 * 60 * 24,
+  '1week': 60 * 60 * 24 * 7,
+  '1month': 60 * 60 * 24 * 30,
+  custom: 60 * 60 * 24 * 2
 }

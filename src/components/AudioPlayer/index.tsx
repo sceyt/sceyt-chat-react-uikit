@@ -9,6 +9,7 @@ import { setPlayingAudioIdAC } from '../../store/message/actions'
 // Assets
 import { ReactComponent as PlayIcon } from '../../assets/svg/play.svg'
 import { ReactComponent as PauseIcon } from '../../assets/svg/pause.svg'
+import { ReactComponent as BadgeIcon } from '../../assets/svg/badge.svg'
 // Helpers
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
@@ -16,6 +17,8 @@ import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
 import WaveSurfer from 'wavesurfer.js'
 import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
+import AudioVisualization from './AudioVisualization'
+import { convertAudioForSafari, isSafari } from '../../helpers/audioConversion'
 
 interface Recording {
   recordingSeconds: number
@@ -32,9 +35,25 @@ interface AudioPlayerProps {
   messagePlayed: boolean | undefined
   channelId?: string
   incoming?: boolean
+  viewOnce?: boolean
+  setViewOnceVoiceModalOpen?: (open: boolean) => void
+  bgColor?: string
+  borderRadius?: string
+  onClose?: () => void
 }
 
-const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, channelId, incoming }) => {
+const AudioPlayer: React.FC<AudioPlayerProps> = ({
+  url,
+  file,
+  messagePlayed,
+  channelId,
+  incoming,
+  viewOnce,
+  setViewOnceVoiceModalOpen,
+  bgColor,
+  borderRadius,
+  onClose
+}) => {
   const recordingInitialState = {
     recordingSeconds: 0,
     recordingMilliseconds: 0,
@@ -46,7 +65,9 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections
+    [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
+    [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground
   } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
@@ -55,11 +76,15 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   const [playAudio, setPlayAudio] = useState<any>(false)
 
   const [currentTime, setCurrentTime] = useState<any>('')
+  const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0)
+  const [duration, setDuration] = useState<number>(0)
+  const [realDuration, setRealDuration] = useState<number>(0)
   const [audioRate, setAudioRate] = useState<any>(1)
 
   const wavesurfer = useRef<any>(null)
   const wavesurferContainer = useRef<any>(null)
   const intervalRef = useRef<any>(null)
+  const convertedUrlRef = useRef<string | null>(null)
 
   const handleSetAudioRate = () => {
     if (wavesurfer.current) {
@@ -77,17 +102,20 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
       }
     }
   }
-
   const handlePlayPause = () => {
+    if (setViewOnceVoiceModalOpen) {
+      setViewOnceVoiceModalOpen(true)
+      return
+    }
     if (wavesurfer.current) {
       if (!wavesurfer.current.isPlaying()) {
         setPlayAudio(true)
         dispatch(setPlayingAudioIdAC(`player_${file.id}`))
-        // const audioDuration = wavesurfer.current.getDuration()
         intervalRef.current = setInterval(() => {
           const currentTime = wavesurfer.current.getCurrentTime()
           if (currentTime >= 0) {
             setCurrentTime(formatAudioVideoTime(currentTime))
+            setCurrentTimeSeconds(currentTime)
           }
         }, 10)
       } else {
@@ -149,25 +177,77 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
 
   useEffect(() => {
     if (url) {
+      // Clean up previous converted URL if it exists
+      if (convertedUrlRef.current) {
+        URL.revokeObjectURL(convertedUrlRef.current)
+        convertedUrlRef.current = null
+      }
+
       if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
         wavesurfer.current.destroy()
       }
       const initWaveSurfer = async () => {
         try {
+          // Check if we need to convert for Safari
+          let audioUrl = url
+          const needsConversion =
+            isSafari() &&
+            url &&
+            url !== '_' &&
+            (url.endsWith('.mp3') || file.name?.endsWith('.mp3') || file.type === 'audio/mpeg')
+
+          if (needsConversion) {
+            try {
+              // Clean up any previous converted URL before creating a new one
+              if (convertedUrlRef.current) {
+                URL.revokeObjectURL(convertedUrlRef.current)
+                convertedUrlRef.current = null
+              }
+
+              // Use a unique cache key based on file ID or URL to prevent reuse
+              const cacheKey = file.id || url
+
+              // Fetch the audio file with cache control to ensure fresh data
+              const response = await fetch(url, {
+                cache: 'no-store' // Prevent browser caching
+              })
+
+              if (!response.ok) {
+                throw new Error(`Failed to fetch audio: ${response.statusText}`)
+              }
+
+              const blob = await response.blob()
+
+              // Create a unique file name using file ID to prevent conflicts
+              const uniqueFileName = `${file.id || Date.now()}_${file.name || 'audio.mp3'}`
+              const audioFile = new File([blob], uniqueFileName, {
+                type: blob.type || 'audio/mpeg',
+                lastModified: Date.now()
+              })
+
+              // Convert to Safari-compatible format
+              const convertedFile = await convertAudioForSafari(audioFile, file?.messageId)
+
+              // Create blob URL from converted file
+              const convertedBlobUrl = URL.createObjectURL(convertedFile)
+              audioUrl = convertedBlobUrl
+              convertedUrlRef.current = convertedBlobUrl
+
+              log.info(`Converted audio for Safari: ${cacheKey} -> ${convertedBlobUrl}`)
+            } catch (conversionError) {
+              log.warn('Failed to convert audio for Safari, using original:', conversionError)
+              // Fallback to original URL if conversion fails
+              audioUrl = url
+            }
+          }
+
           wavesurfer.current = WaveSurfer.create({
             container: wavesurferContainer.current,
-            waveColor: textSecondary,
-            progressColor: accentColor,
-            // audioContext,
-            // cursorColor: 'transparent',
-            // splitChannels: true,
-            // barWidth: 1.5,
+            waveColor: 'transparent',
+            progressColor: 'transparent',
             audioRate,
-            // barHeight: 3,
-
             barWidth: 1,
             barHeight: 1,
-
             hideScrollbar: true,
             barRadius: 1.5,
             cursorWidth: 0,
@@ -177,6 +257,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
           let peaks
           if (file.metadata) {
             if (file.metadata.dur) {
+              setDuration(file.metadata.dur)
               setCurrentTime(formatAudioVideoTime(file.metadata.dur))
             }
             if (file.metadata.tmb) {
@@ -191,11 +272,13 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             }
           }
 
-          wavesurfer.current.load(url, peaks)
+          wavesurfer.current.load(audioUrl, peaks)
 
           wavesurfer.current.on('ready', () => {
             const audioDuration = wavesurfer.current.getDuration()
-            setCurrentTime(formatAudioVideoTime(audioDuration))
+            setRealDuration(audioDuration)
+            setDuration(file?.metadata?.dur || audioDuration)
+            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
 
             wavesurfer.current.drawBuffer = (d: any) => {
               log.info('filters --- ', d)
@@ -208,12 +291,17 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             setPlayAudio(false)
             wavesurfer.current.seekTo(0)
             const audioDuration = wavesurfer.current.getDuration()
-            // const currentTime = wavesurfer.current.getCurrentTime()
-            setCurrentTime(formatAudioVideoTime(audioDuration))
+            setRealDuration(audioDuration)
+            setDuration(file?.metadata?.dur || audioDuration)
+            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
+            setCurrentTimeSeconds(0)
             if (playingAudioId === file.id) {
               dispatch(setPlayingAudioIdAC(null))
             }
             clearInterval(intervalRef.current)
+            if (onClose) {
+              onClose()
+            }
           })
 
           wavesurfer.current.on('pause', () => {
@@ -228,6 +316,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
             // const audioDuration = wavesurfer.current.getDuration()
             const currentTime = wavesurfer.current.getCurrentTime()
             setCurrentTime(formatAudioVideoTime(currentTime))
+            setCurrentTimeSeconds(currentTime)
           })
           if (url !== '_') {
             setIsRendered(true)
@@ -240,8 +329,18 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
     }
     return () => {
       clearInterval(intervalRef.current)
+      // Clean up converted blob URL if it exists
+      if (convertedUrlRef.current) {
+        URL.revokeObjectURL(convertedUrlRef.current)
+        convertedUrlRef.current = null
+      }
+      // Destroy wavesurfer instance
+      if (wavesurfer.current) {
+        wavesurfer.current.destroy()
+        wavesurfer.current = null
+      }
     }
-  }, [url])
+  }, [url, file.id])
 
   useEffect(() => {
     if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
@@ -251,35 +350,60 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({ url, file, messagePlayed, cha
   }, [playingAudioId])
 
   return (
-    <Container>
+    <Container backgroundColor={bgColor} borderRadius={borderRadius}>
       <PlayPause onClick={handlePlayPause} iconColor={accentColor}>
         {playAudio ? <PauseIcon /> : <PlayIcon />}
+        {viewOnce && (
+          <DisappearingMessagesBadge
+            color={incoming ? incomingMessageBackground : outgoingMessageBackground}
+            $iconColor={accentColor}
+          />
+        )}
       </PlayPause>
       <WaveContainer>
-        <AudioVisualization ref={wavesurferContainer} />
+        <VisualizationWrapper>
+          <AudioVisualizationPlaceholder
+            ref={wavesurferContainer}
+            hidden={!!(file.metadata?.tmb && Array.isArray(file.metadata.tmb))}
+          />
+          {file.metadata?.tmb && Array.isArray(file.metadata.tmb) && (
+            <AudioVisualization
+              tmb={file.metadata.tmb}
+              duration={realDuration || duration || file.metadata.dur || 0}
+              currentTime={currentTimeSeconds}
+              waveColor={textSecondary}
+              progressColor={accentColor}
+              height={20}
+              barWidth={1}
+              barRadius={1.5}
+            />
+          )}
+        </VisualizationWrapper>
         <AudioRate color={textSecondary} onClick={handleSetAudioRate} backgroundColor={backgroundSections}>
           {audioRate}
           <span>X</span>
         </AudioRate>
       </WaveContainer>
-      <Timer color={textSecondary}>{currentTime}</Timer>
+      <Timer color={textSecondary}>{currentTime || formatAudioVideoTime(file.metadata?.dur || 0)}</Timer>
     </Container>
   )
 }
 
 export default AudioPlayer
 
-const Container = styled.div`
+const Container = styled.div<{ backgroundColor?: string; borderRadius?: string }>`
   position: relative;
   display: flex;
   align-items: flex-start;
   width: 230px;
   padding: 8px 12px;
+  ${(props) => props.backgroundColor && `background-color: ${props.backgroundColor};`}
+  ${(props) => props.borderRadius && `border-radius: ${props.borderRadius};`}
 `
 
 const PlayPause = styled.div<{ iconColor: string }>`
   cursor: pointer;
-
+  position: relative;
   & > svg {
     color: ${(props) => props.iconColor};
     display: flex;
@@ -288,8 +412,18 @@ const PlayPause = styled.div<{ iconColor: string }>`
   }
 `
 
-const AudioVisualization = styled.div`
+const VisualizationWrapper = styled.div`
   width: 100%;
+  display: flex;
+  align-items: center;
+  position: relative;
+`
+
+const AudioVisualizationPlaceholder = styled.div<{ hidden?: boolean }>`
+  width: 100%;
+  position: ${(props) => (props.hidden ? 'absolute' : 'relative')};
+  opacity: ${(props) => (props.hidden ? 0 : 1)};
+  pointer-events: ${(props) => (props.hidden ? 'none' : 'auto')};
 `
 const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   display: flex;
@@ -305,7 +439,7 @@ const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   color: ${(props) => props.color};
   height: 18px;
   box-sizing: border-box;
-  margin-left: 14px;
+  margin-left: auto;
   cursor: pointer;
 
   & > span {
@@ -330,4 +464,26 @@ const Timer = styled.div<{ color: string }>`
   font-size: 11px;
   line-height: 12px;
   color: ${(props) => props.color};
+`
+export const DisappearingMessagesBadge = styled(BadgeIcon)<{ color: string; $iconColor: string }>`
+  position: absolute;
+  bottom: -3px;
+  right: -8px;
+  width: 24px !important;
+  height: 24px !important;
+  transform: scale(0.875);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+  color: ${(props) => props.color};
+  & > path:nth-child(1) {
+    stroke: ${(props) => props.color};
+    fill: ${(props) => props.$iconColor};
+  }
+  g {
+    path {
+      stroke: ${(props) => props.color};
+    }
+  }
 `

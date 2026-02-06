@@ -14,6 +14,7 @@ import Attachment from '../../../Attachment'
 import SliderPopup from '../../../../common/popups/sliderPopup'
 import { useColor } from '../../../../hooks'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channel: IChannel
@@ -25,51 +26,49 @@ const Media = ({ channel }: IProps) => {
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
   const handleMediaItemClick = (file: IAttachment) => {
-    setMediaFile(file)
+    if (file?.id){
+      setMediaFile(file)
+    }
   }
   useEffect(() => {
     dispatch(setAttachmentsAC([]))
-    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media))
+    dispatch(getAttachmentsAC(channel.id, channelDetailsTabs.media, 35))
   }, [channel.id])
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <MediaItem key={file.id}>
-          {file.type === 'image' ? (
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
+      {attachments.map((file: IAttachment, index: number) => {
+        return (
+          <React.Fragment key={file.id}>
+            <MonthHeader
+              currentCreatedAt={file.createdAt}
+              previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
+              isFirst={index === 0}
+              padding='9px 6px'
+              fullWidth
             />
-          ) : (
-            // <img src={file.url} alt='' />
-
-            <Attachment
-              attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
-              handleMediaItemClick={handleMediaItemClick}
-              backgroundColor={background}
-              borderRadius='8px'
-              isDetailsView
-            />
-            /* <video>
-              <source src={file.url} type={`video/${getFileExtension(file.name)}`} />
-              <source src={file.url} type='video/ogg' />
-              <track default kind='captions' srcLang='en' src='/media/examples/friday.vtt' />
-              Your browser does not support the video tag.
-            </video> */
-          )}
-        </MediaItem>
-      ))}
-      {mediaFile && (
-        <SliderPopup
-          channel={channel}
-          setIsSliderOpen={setMediaFile}
-          mediaFiles={attachments}
-          currentMediaFile={mediaFile}
-        />
-      )}
+            <MediaItem>
+              {file.type === 'image' ? (
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+              ) : (
+                <Attachment
+                  attachment={{ ...file, metadata: isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata }}
+                  handleMediaItemClick={handleMediaItemClick}
+                  backgroundColor={background}
+                  borderRadius='8px'
+                  isDetailsView
+                />
+              )}
+            </MediaItem>
+          </React.Fragment>
+        )
+      })}
+      {mediaFile && <SliderPopup channel={channel} setIsSliderOpen={setMediaFile} currentMediaFile={mediaFile} />}
     </Container>
   )
 }
@@ -88,7 +87,7 @@ const Container = styled.div<any>`
 `
 const MediaItem = styled.div`
   width: calc(33.3333% - 4px);
-  height: 110px;
+  aspect-ratio: 1/1;
   box-sizing: border-box;
   //border: 1px solid #ccc;
   border: 0.5px solid rgba(0, 0, 0, 0.1);

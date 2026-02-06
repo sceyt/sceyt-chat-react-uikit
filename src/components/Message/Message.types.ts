@@ -7,7 +7,8 @@ import {
   ITabsStyles,
   IListItemStyles,
   ILabels,
-  MessageInfoTab
+  MessageInfoTab,
+  OGMetadataProps
 } from '../../types'
 import { FC } from 'react'
 
@@ -15,6 +16,8 @@ export interface IMessageActions {
   message: IMessage
   channel: IChannel
   handleSetMessageForEdit?: () => void
+  handleRetractVote?: () => void
+  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -53,6 +56,8 @@ interface ICustomMessageItem {
   messageTextRef: any
   emojisPopupPosition: string
   handleSetMessageForEdit?: () => void
+  handleRetractVote?: () => void
+  handleEndVote?: () => void
   handleResendMessage?: () => void
   handleOpenDeleteMessage?: () => void
   handleOpenForwardMessage?: () => void
@@ -72,6 +77,8 @@ interface ICustomMessageItem {
   handleMediaItemClick?: (attachment: IAttachment) => void
   isThreadMessage?: boolean
   handleOpenUserProfile: (user: IUser) => void
+  unsupportedMessage: boolean
+  onInviteLinkClick?: (key: string) => void
 }
 
 export interface IMessageProps {
@@ -131,6 +138,8 @@ export interface IMessageProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   openFrequentlyUsedReactions?: boolean
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
@@ -201,11 +210,11 @@ export interface IMessageProps {
   openedMessageMenuId?: string
   tabIsActive?: boolean
   connectionStatus: string
-  theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageTimeColorOnAttachment?: string
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: OGMetadataProps
   showInfoMessageProps?: {
     togglePopup?: () => void
     labels?: ILabels
@@ -220,4 +229,5 @@ export interface IMessageProps {
     tabsStyles?: ITabsStyles
     listItemStyles?: IListItemStyles
   }
+  collapsedCharacterLimit?: number
 }

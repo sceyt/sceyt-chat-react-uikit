@@ -136,6 +136,19 @@ export const calculateRenderedImageWidth = (width: number, height: number, maxWi
   }
 }
 
+/**
+ * Format: DD.MM.YY, HH:mm (e.g., "25.09.16, 22:00")
+ * Supports localization based on user's browser locale and timezone
+ * Uses the exact sent/uploaded time from createdAt
+ * @param date - Date object, timestamp, or date string
+ * @returns Formatted date string localized according to browser settings
+ */
+export const formatChannelDetailsDate = (date: Date | number | string): string => {
+  if (!date) return ''
+  const momentDate = moment(date)
+  return momentDate.isValid() ? momentDate.format('DD.MM.YY, HH:mm') : ''
+}
+
 export const userLastActiveDateFormat = (date: Date) => {
   // check for the last hour
   const formattingDate = moment(date).format()
@@ -652,4 +665,98 @@ export const hashString = async (str: string) => {
   }
   const hashArray = Array.from(new Uint8Array(hashBuffer))
   return hashArray.map((byte) => byte.toString(16).padStart(2, '0')).join('')
+}
+
+/**
+ * Formats disappearing message period from milliseconds to human-readable string
+ * @param periodInMilliseconds - Period in milliseconds (or 0/null for "Off")
+ * @returns Formatted string like "1 hour", "1 week", "2 days", etc., or "Off"
+ */
+export const formatDisappearingMessageTime = (periodInMilliseconds: number | null | undefined): string => {
+  if (!periodInMilliseconds) return 'Off'
+
+  const periodInSeconds = periodInMilliseconds / 1000
+
+  const SECONDS_PER_MINUTE = 60
+  const SECONDS_PER_HOUR = SECONDS_PER_MINUTE * 60
+  const SECONDS_PER_DAY = SECONDS_PER_HOUR * 24
+  const DAYS_PER_WEEK = 7
+  const DAYS_PER_MONTH = 30
+  const DAYS_PER_YEAR = 365
+
+  // Calculate all time units
+  let remainingSeconds = Math.floor(periodInSeconds)
+  const years = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_YEAR))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_YEAR
+
+  const months = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_MONTH))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_MONTH
+
+  const weeks = Math.floor(remainingSeconds / (SECONDS_PER_DAY * DAYS_PER_WEEK))
+  remainingSeconds %= SECONDS_PER_DAY * DAYS_PER_WEEK
+
+  const days = Math.floor(remainingSeconds / SECONDS_PER_DAY)
+  remainingSeconds %= SECONDS_PER_DAY
+
+  const hours = Math.floor(remainingSeconds / SECONDS_PER_HOUR)
+  remainingSeconds %= SECONDS_PER_HOUR
+
+  const minutes = Math.floor(remainingSeconds / SECONDS_PER_MINUTE)
+  remainingSeconds %= SECONDS_PER_MINUTE
+
+  const seconds = remainingSeconds
+
+  // Build the formatted string with all non-zero units
+  const parts: string[] = []
+  let partCount = 0
+  if (years > 0) {
+    partCount++
+  }
+  if (months > 0) {
+    partCount++
+  }
+  if (weeks > 0) {
+    partCount++
+  }
+  if (days > 0) {
+    partCount++
+  }
+  if (hours > 0) {
+    partCount++
+  }
+  if (minutes > 0) {
+    partCount++
+  }
+  if (seconds > 0) {
+    partCount++
+  }
+
+  if (years > 0) {
+    parts.push(`${years}${partCount > 1 ? 'y' : years === 1 ? ' year' : ' years'}`)
+  }
+  if (months > 0) {
+    parts.push(`${months}${partCount > 1 ? 'm' : months === 1 ? ' month' : ' months'}`)
+  }
+  if (weeks > 0) {
+    parts.push(`${weeks}${partCount > 1 ? 'w' : weeks === 1 ? ' week' : ' weeks'}`)
+  }
+  if (days > 0) {
+    parts.push(`${days}${partCount > 1 ? 'd' : days === 1 ? ' day' : ' days'}`)
+  }
+  if (hours > 0) {
+    parts.push(`${hours}${partCount > 1 ? 'h' : hours === 1 ? ' hour' : ' hours'}`)
+  }
+  if (minutes > 0) {
+    parts.push(`${minutes}${partCount > 1 ? 'm' : minutes === 1 ? ' minute' : ' minutes'}`)
+  }
+  if (seconds > 0) {
+    parts.push(`${seconds}${partCount > 1 ? 's' : seconds === 1 ? ' second' : ' seconds'}`)
+  }
+
+  // If no parts, return 0 seconds
+  if (parts.length === 0) {
+    return '0 seconds'
+  }
+
+  return parts.join(' ')
 }

@@ -10,6 +10,7 @@ import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 // Components
 import LinkItem from './linkItem'
+import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channelId: string
@@ -32,21 +33,30 @@ const Links = ({
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
-    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link))
+    dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
   }, [channelId])
   return (
     <Container>
-      {attachments.map((file: IAttachment) => (
-        <LinkItem
-          key={file.id}
-          link={file.url}
-          linkPreviewColor={linkPreviewColor}
-          linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
-          linkPreviewHoverIcon={linkPreviewHoverIcon}
-          linkPreviewTitleColor={linkPreviewTitleColor}
-          linkPreviewIcon={linkPreviewIcon}
-        />
-      ))}
+      {attachments.map((file: IAttachment, index: number) => {
+        return (
+          <React.Fragment key={file.id}>
+            <MonthHeader
+              currentCreatedAt={file.createdAt}
+              previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
+              isFirst={index === 0}
+              padding='6px 14px 0'
+            />
+            <LinkItem
+              link={file.url}
+              linkPreviewColor={linkPreviewColor}
+              linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
+              linkPreviewHoverIcon={linkPreviewHoverIcon}
+              linkPreviewTitleColor={linkPreviewTitleColor}
+              linkPreviewIcon={linkPreviewIcon}
+            />
+          </React.Fragment>
+        )
+      })}
     </Container>
   )
 }

@@ -17,13 +17,15 @@ interface IVideoPlayerProps {
   activeFileId?: string
   onMouseDown?: (e: React.MouseEvent) => void
 }
-let timerInterval: any
+
 const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
-  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary } = useColor()
-  const containerRef = useRef<HTMLVideoElement>(null)
+  const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
+  const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
-  const progressRef = useRef<HTMLVideoElement>(null)
-  const volumeRef = useRef<HTMLVideoElement>(null)
+  const progressRef = useRef<HTMLInputElement>(null)
+  const volumeRef = useRef<HTMLInputElement>(null)
+  const timerIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const checkVideoIntervalRef = useRef<NodeJS.Timeout | null>(null)
   const [playing, setPlaying] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [videoTime, setVideoTime] = useState(0)
@@ -36,19 +38,24 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
 
   const videoHandler = (control: string) => {
     if (control === 'play') {
-      videoRef.current && videoRef.current.play()
-      setPlaying(true)
+      videoRef.current
+        ?.play()
+        .then(() => {
+          setPlaying(true)
+        })
+        .catch((error) => {
+          console.error('Error playing video:', error)
+          setPlaying(false)
+        })
     } else if (control === 'pause') {
-      videoRef.current && videoRef.current.pause()
+      videoRef.current?.pause()
       setPlaying(false)
     }
   }
-  const handleProgressInputChange = (e: any) => {
-    const target = e.target
-
-    const val = target.value
+  const handleProgressInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value)
     setProgress(val)
-    if (videoRef.current) {
+    if (videoRef.current && videoTime > 0) {
       videoRef.current.currentTime = (val / 100) * videoTime
     }
   }
@@ -65,49 +72,68 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
       setIsMuted(!isMuted)
     }
   }
-  const handleVolumeInputChange = (e: any) => {
-    const target = e.target
-    const val = target.value
-    if (val === '0') {
+  const handleVolumeInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = parseFloat(e.target.value)
+    if (val === 0) {
       setIsMuted(true)
     } else {
       setIsMuted(false)
     }
     setVolume(val)
     if (videoRef.current) {
-      videoRef.current.volume = parseFloat(val)
+      videoRef.current.volume = val
     }
   }
   const handleOpenFullScreen = () => {
     if (containerRef.current) {
       if (isFullScreen) {
-        document.exitFullscreen().then(() => {
-          setIsFullScreen(false)
-        })
+        document
+          .exitFullscreen()
+          .then(() => {
+            setIsFullScreen(false)
+          })
+          .catch((error) => {
+            console.error('Error exiting fullscreen:', error)
+          })
       } else {
-        containerRef.current.requestFullscreen().then(() => {
-          setIsFullScreen(true)
-        })
+        containerRef.current
+          .requestFullscreen()
+          .then(() => {
+            setIsFullScreen(true)
+          })
+          .catch((error) => {
+            console.error('Error entering fullscreen:', error)
+          })
       }
     }
   }
-  const handleVideoProgress = (e: any) => {
-    if (e.currentTarget.readyState >= 2) {
+  const handleVideoProgress = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const video = e.currentTarget
+    if (video.readyState >= 2) {
       setIsLoaded(true)
-    }
-  }
-  /* const fastForward = () => {
-    if (videoRef.current) {
-      videoRef.current.currentTime += 5
+      if (video.duration && !videoTime) {
+        setVideoTime(video.duration)
+      }
+      if (video.volume !== undefined && volume === 0) {
+        setVolume(video.volume)
+      }
     }
   }
 
-  const revert = () => {
+  const handleVideoEnded = () => {
+    setPlaying(false)
+    setProgress(0)
+    setCurrentTime(0)
     if (videoRef.current) {
-      videoRef.current.currentTime -= 5
+      videoRef.current.currentTime = 0
     }
-  } */
+  }
 
+  const handleVideoError = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    console.error('Video error:', e)
+    setIsLoaded(false)
+    setPlaying(false)
+  }
   useEffect(() => {
     if (progressRef.current) {
       progressRef.current.style.backgroundSize = `${progress}%`
@@ -119,25 +145,30 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
     }
   }, [volume])
   useEffect(() => {
-    if (playing) {
-      const videoDuration = videoRef.current ? videoRef.current.duration : ''
-      timerInterval = setInterval(() => {
-        if (videoRef.current && videoDuration) {
-          setCurrentTime(videoRef.current?.currentTime)
-          setProgress((videoRef.current?.currentTime / videoDuration) * 100)
+    if (playing && videoTime > 0) {
+      timerIntervalRef.current = setInterval(() => {
+        if (videoRef.current && videoTime > 0) {
+          const current = videoRef.current.currentTime
+          setCurrentTime(current)
+          setProgress((current / videoTime) * 100)
           if (videoRef.current.paused) {
-            videoRef.current.currentTime = 0
-            setProgress(0)
-            setCurrentTime(videoRef.current.currentTime)
             setPlaying(false)
-            clearInterval(timerInterval)
           }
         }
       }, 100)
     } else {
-      clearInterval(timerInterval)
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
     }
-  }, [playing])
+    return () => {
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [playing, videoTime])
 
   useEffect(() => {
     if (videoFileId !== activeFileId) {
@@ -145,27 +176,76 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
         videoRef.current.pause()
         setPlaying(false)
       }
+      // Clear intervals when switching videos
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
     }
-  }, [activeFileId])
+  }, [activeFileId, videoFileId])
 
+  // Handle fullscreen changes (e.g., user presses ESC)
   useEffect(() => {
-    let checkVideoInterval: any
-    if (videoRef.current) {
-      checkVideoInterval = setInterval(() => {
-        if (videoRef.current && videoRef.current.readyState > 0) {
-          setVideoTime(videoRef.current.duration)
-          setVolume(videoRef.current.volume)
-          setPlaying(true)
-          videoRef.current.play()
-          clearInterval(checkVideoInterval)
-        }
-      }, 500)
+    const handleFullscreenChange = () => {
+      setIsFullScreen(!!document.fullscreenElement)
     }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
-      clearInterval(timerInterval)
-      clearInterval(checkVideoInterval)
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
     }
   }, [])
+
+  // Initialize video when src changes
+  useEffect(() => {
+    if (videoRef.current && src) {
+      // Reset state when src changes
+      setIsLoaded(false)
+      setPlaying(false)
+      setCurrentTime(0)
+      setProgress(0)
+      setVideoTime(0)
+
+      // Check if video is ready
+      if (videoRef.current.readyState >= 2) {
+        setIsLoaded(true)
+        if (videoRef.current.duration) {
+          setVideoTime(videoRef.current.duration)
+        }
+        if (videoRef.current.volume !== undefined) {
+          setVolume(videoRef.current.volume)
+        }
+      } else {
+        // Wait for video to load
+        checkVideoIntervalRef.current = setInterval(() => {
+          if (videoRef.current && videoRef.current.readyState >= 2) {
+            setIsLoaded(true)
+            if (videoRef.current.duration) {
+              setVideoTime(videoRef.current.duration)
+            }
+            if (videoRef.current.volume !== undefined) {
+              setVolume(videoRef.current.volume)
+            }
+            if (checkVideoIntervalRef.current) {
+              clearInterval(checkVideoIntervalRef.current)
+              checkVideoIntervalRef.current = null
+            }
+          }
+        }, 500)
+      }
+    }
+
+    return () => {
+      if (checkVideoIntervalRef.current) {
+        clearInterval(checkVideoIntervalRef.current)
+        checkVideoIntervalRef.current = null
+      }
+      if (timerIntervalRef.current) {
+        clearInterval(timerIntervalRef.current)
+        timerIntervalRef.current = null
+      }
+    }
+  }, [src])
   return (
     <Component
       ref={containerRef}
@@ -179,11 +259,16 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
         id='video1'
         ref={videoRef}
         className='video'
-        // src='https://res.cloudinary.com/dssvrf9oz/video/upload/v1635662987/pexels-pavel-danilyuk-5359634_1_gmixla.mp4'
         src={src}
         onLoadedData={handleVideoProgress}
-      ></video>
-      {isLoaded ? (
+        onLoadedMetadata={handleVideoProgress}
+        onEnded={handleVideoEnded}
+        onError={handleVideoError}
+        playsInline
+        preload='metadata'
+      />
+
+      {isLoaded && (
         <ControlsContainer>
           {/*  <span onClick={revert} className='controlsIcon'>
           Revert
@@ -213,7 +298,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
             </PlayPauseWrapper>
           )}
 
-          <ControlTime color={textPrimary}>
+          <ControlTime color={textOnPrimary}>
             {formatAudioVideoTime(currentTime)} / {formatAudioVideoTime(videoTime)}
           </ControlTime>
           <VolumeController>
@@ -235,7 +320,8 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
             {isFullScreen ? <FullScreenExitIcon /> : <FullScreenIcon />}
           </FullScreenWrapper>
         </ControlsContainer>
-      ) : (
+      )}
+      {!isLoaded && (
         <UploadCont>
           <UploadingIcon />
         </UploadCont>
@@ -261,15 +347,21 @@ export default VideoPlayer
 const Component = styled.div<{ fullScreen?: boolean; loaded?: boolean; ref?: any }>`
   position: relative;
   display: inline-flex;
+  width: 100%;
+  height: 100%;
   & > video {
+    display: block;
+    width: 100%;
+    height: 100%;
+    max-width: 100%;
+    max-height: 100%;
+    object-fit: contain;
+    background-color: #000;
     ${(props) =>
       props.fullScreen &&
       `
         max-width: inherit !important;
         max-height: inherit !important;
-        width: 100%;
-        height: 100%;
-        object-fit: contain;
     `}
   }
 
@@ -279,7 +371,7 @@ const Component = styled.div<{ fullScreen?: boolean; loaded?: boolean; ref?: any
     bottom: 0;
     height: 70px;
     width: 100%;
-    background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0) 100%);
+    background: linear-gradient(360deg, rgba(23, 25, 28, 0.8) 0%, rgba(23, 25, 28, 0.8) 100%);
   }
 `
 

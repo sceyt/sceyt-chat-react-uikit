@@ -32,12 +32,17 @@ import CustomCheckbox from '../../customCheckbox'
 import { userLastActiveDateFormat } from '../../../helpers'
 import { makeUsername } from '../../../helpers/message'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { useDidUpdate, useColor } from '../../../hooks'
-import { getChannelTypesMemberDisplayTextMap, getDefaultRolesByChannelTypesMap } from '../../../helpers/channelHalper'
+import { useDidUpdate, useColor, useUpdatedUser } from '../../../hooks'
+import {
+  getChannelTypesMemberDisplayTextMap,
+  getDefaultRolesByChannelTypesMap,
+  getUseInviteLink
+} from '../../../helpers/channelHalper'
 import { themeSelector } from '../../../store/theme/selector'
 import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
 import log from 'loglevel'
+import AddMembersListItemInviteLink from '../inviteLink/AddMembersListItemInviteLink'
 
 interface ISelectedUserData {
   id: string
@@ -58,6 +63,25 @@ interface IProps {
   creatChannelSelectedMembers?: any[]
   popupWidth?: string
   popupHeight?: string
+  handleOpenInviteModal?: () => void
+}
+
+const UserItem = ({ user, memberDisplayName }: { user: IUser; memberDisplayName: string }) => {
+  const { [THEME_COLORS.TEXT_PRIMARY]: textPrimary, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
+  const userUpdated = useUpdatedUser(user)
+
+  return (
+    <UserNamePresence>
+      <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
+      <SubTitle color={textSecondary}>
+        {userUpdated.presence && userUpdated.presence.state === USER_PRESENCE_STATUS.ONLINE
+          ? 'Online'
+          : userUpdated.presence &&
+            userUpdated.presence.lastActiveAt &&
+            userLastActiveDateFormat(userUpdated.presence.lastActiveAt)}
+      </SubTitle>
+    </UserNamePresence>
+  )
 }
 
 const UsersPopup = ({
@@ -69,7 +93,8 @@ const UsersPopup = ({
   creatChannelSelectedMembers,
   popupHeight,
   selectIsRequired,
-  popupWidth
+  popupWidth,
+  handleOpenInviteModal
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -108,6 +133,7 @@ const UsersPopup = ({
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -293,8 +319,9 @@ const UsersPopup = ({
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
   }, [])
+
   return (
-    <PopupContainer theme={theme}>
+    <PopupContainer>
       <Popup
         // isLoading={usersLoadingState}
         maxHeight={popupHeight || '721px'}
@@ -309,7 +336,7 @@ const UsersPopup = ({
           <CloseIcon color={textSecondary} onClick={handleClosePopup} />
 
           <PopupName color={textPrimary} padding='0 12px'>
-            {actionType === 'createChat' ? 'Creat a new chat' : popupTitleText}
+            {actionType === 'createChat' ? 'Create a new chat' : popupTitleText}
           </PopupName>
           <SearchUserCont className='p-relative'>
             <StyledSearchSvg color={iconInactive} />
@@ -328,7 +355,13 @@ const UsersPopup = ({
             {userSearchValue && <ClearTypedText color={textPrimary} onClick={() => setUserSearchValue('')} />}
           </SearchUserCont>
           {actionType !== 'createChat' && selectedMembers.length !== 0 && (
-            <SelectedMembersContainer ref={selectedMembersCont}>
+            <SelectedMembersContainer
+              ref={selectedMembersCont}
+              thumbColor={surface2}
+              className={isSelectedMembersScrolling ? 'show-scrollbar' : ''}
+              onMouseEnter={() => setIsSelectedMembersScrolling(true)}
+              onMouseLeave={() => setIsSelectedMembersScrolling(false)}
+            >
               {selectedMembers.map((member) => {
                 return (
                   <SelectedMemberBubble backgroundColor={surface1} key={`selected-${member.id}`}>
@@ -358,6 +391,9 @@ const UsersPopup = ({
             onMouseLeave={() => setIsScrolling(false)}
             thumbColor={surface2}
           >
+            {actionType === 'addMembers' && getUseInviteLink() && (
+              <AddMembersListItemInviteLink onClick={handleOpenInviteModal} />
+            )}
             {filteredUsers.map((user: IUser) => {
               if (actionType === 'addMembers' && memberIds && memberIds.includes(user.id)) {
                 return null
@@ -388,17 +424,7 @@ const UsersPopup = ({
                     textSize={16}
                     setDefaultAvatar
                   />
-
-                  <UserNamePresence>
-                    <MemberName color={textPrimary}>{memberDisplayName}</MemberName>
-                    <SubTitle color={textSecondary}>
-                      {user.presence && user.presence.state === USER_PRESENCE_STATUS.ONLINE
-                        ? 'Online'
-                        : user.presence &&
-                          user.presence.lastActiveAt &&
-                          userLastActiveDateFormat(user.presence.lastActiveAt)}
-                    </SubTitle>
-                  </UserNamePresence>
+                  <UserItem user={user} memberDisplayName={memberDisplayName} />
                   {/* {isAdd && isSelected && (
                     <DropDown
                       withIcon
@@ -507,12 +533,9 @@ const MembersContainer = styled(List)<{
 }>`
   display: flex;
   flex-direction: column;
-  //margin-top: 24px;
   position: relative;
   max-height: ${(props) => `calc(100% - (${(props.isAdd ? 67 : 70) + props.selectedMembersHeight}px))`};
   overflow-y: auto;
-
-  //width: calc(100% + 16px);
   padding-right: 16px;
 
   &::-webkit-scrollbar {
@@ -613,7 +636,7 @@ const MemberName = styled.h4<{ color?: string }>`
   overflow: hidden;
 `
 
-const SelectedMembersContainer = styled.div`
+const SelectedMembersContainer = styled.div<{ thumbColor: string }>`
   display: flex;
   justify-content: flex-start;
   flex-wrap: wrap;
@@ -622,7 +645,23 @@ const SelectedMembersContainer = styled.div`
   overflow-x: hidden;
   padding: 2px 12px 0;
   box-sizing: border-box;
-  //flex: 0 0 auto;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const SelectedMemberBubble = styled.div<{ backgroundColor: string }>`

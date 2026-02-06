@@ -9,7 +9,6 @@ const DropDownContainer = styled.div<{
   center: boolean
   order?: number
   margin?: string
-  theme?: string
 }>`
   position: relative;
   height: ${(props) => (props.height ? props.height : '100%')};
@@ -133,7 +132,6 @@ interface IProps {
   watchToggleState?: (state: boolean) => void
   height?: string
   children?: JSX.Element | JSX.Element[]
-  theme?: string
   zIndex?: string
 }
 
@@ -150,7 +148,6 @@ const DropDown = ({
   watchToggleState,
   height,
   children,
-  theme,
   order,
   zIndex
 }: IProps) => {
@@ -221,7 +218,6 @@ const DropDown = ({
   }, [dropDownState])
   return (
     <DropDownContainer
-      theme={theme}
       order={order}
       margin={margin}
       className='dropdown-wrapper'

@@ -1,10 +1,13 @@
 import styled from 'styled-components'
-import React, { FC, useMemo } from 'react'
+import React, { FC, useMemo, useState, useEffect, useRef } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
+import { useSelector } from '../../../store/hooks'
 // Assets
 import { ReactComponent as ForwardIcon } from '../../../assets/svg/forward.svg'
+import { ReactComponent as ViewOnceIcon } from '../../../assets/svg/view-once.svg'
+import { ReactComponent as ViewOnceIconOpen } from '../../../assets/svg/view-once-open.svg'
 // Helpers
 import { calculateRenderedImageWidth } from 'helpers'
 import { isJSON } from 'helpers/message'
@@ -14,7 +17,7 @@ import { getSendAttachmentsAsSeparateMessages } from 'helpers/customUploader'
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { MessageText } from 'UIHelper'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { IAttachment, IChannel, IMessage, IUser } from 'types'
+import { IAttachment, IChannel, IMarker, IMessage, IUser, OGMetadataProps } from 'types'
 // Components
 import MessageActions from '../MessageActions'
 import RepliedMessage from '../RepliedMessage'
@@ -22,11 +25,13 @@ import MessageHeader from '../MessageHeader'
 import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
-import { MessageTextFormat } from 'messageUtils'
+import { MessageTextFormat, trimReactMessage } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
+import PollMessage from '../PollMessage'
 import log from 'loglevel'
-import { OGMetadata } from '../OGMetadata'
+import { isDescriptionOnlySymbol, OGMetadata } from '../OGMetadata'
+import { MESSAGE_TYPE } from 'types/enum'
 
 interface IMessageBodyProps {
   message: IMessage
@@ -80,6 +85,8 @@ interface IMessageBodyProps {
   starIcon?: JSX.Element
   staredIcon?: JSX.Element
   reportIcon?: JSX.Element
+  retractVoteIcon?: JSX.Element
+  endVoteIcon?: JSX.Element
   fixEmojiCategoriesTitleOnTop?: boolean
   emojisCategoryIconsPosition?: 'top' | 'bottom'
   emojisContainerBorderRadius?: string
@@ -130,11 +137,12 @@ interface IMessageBodyProps {
   contactsMap: { [key: string]: any }
   openedMessageMenuId?: string
   connectionStatus: string
-  theme: string
   messageTextFontSize?: string
   messageTextLineHeight?: string
   messageActionsShow?: boolean
   setMessageActionsShow: (state: boolean) => void
+  handleRetractVote: () => void
+  handleEndVote: () => void
   closeMessageActions: () => void
   handleToggleForwardMessagePopup: () => void
   handleToggleInfoMessagePopupOpen: () => void
@@ -158,6 +166,10 @@ interface IMessageBodyProps {
   messageTextRef: React.RefObject<HTMLSpanElement>
   handleOpenUserProfile: (user: IUser) => void
   shouldOpenUserProfileForMention?: boolean
+  ogMetadataProps?: OGMetadataProps
+  unsupportedMessage: boolean
+  onInviteLinkClick?: (key: string) => void
+  collapsedCharacterLimit?: number
 }
 
 const MessageBody = ({
@@ -208,6 +220,8 @@ const MessageBody = ({
   deleteIcon,
   infoIcon,
   selectIcon,
+  retractVoteIcon,
+  endVoteIcon,
   starIcon,
   staredIcon,
   reportIcon,
@@ -257,12 +271,13 @@ const MessageBody = ({
   fixEmojiCategoriesTitleOnTop,
   selectedMessagesMap,
   contactsMap,
-  theme,
   messageTextFontSize,
   messageTextLineHeight,
   handleToggleForwardMessagePopup,
   handleToggleInfoMessagePopupOpen,
   messageActionsShow,
+  handleRetractVote,
+  handleEndVote,
   closeMessageActions,
   handleDeletePendingMessage,
   handleReplyMessage,
@@ -283,7 +298,11 @@ const MessageBody = ({
   handleCreateChat,
   messageTextRef,
   handleOpenUserProfile,
-  shouldOpenUserProfileForMention
+  shouldOpenUserProfileForMention,
+  ogMetadataProps,
+  unsupportedMessage,
+  onInviteLinkClick,
+  collapsedCharacterLimit
 }: IMessageBodyProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -292,7 +311,9 @@ const MessageBody = ({
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND]: incomingMessageBackground,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.LINK_COLOR]: linkColor
+    [THEME_COLORS.LINK_COLOR]: linkColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive
   } = useColor()
 
   const bubbleOutgoing = outgoingMessageBackground
@@ -302,6 +323,94 @@ const MessageBody = ({
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
   const messageUserID = message.user ? message.user.id : 'deleted'
+  const [isExpanded, setIsExpanded] = useState(false)
+  const textContainerRef = useRef<HTMLDivElement>(null)
+  const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
+
+  const messageText = useMemo(() => {
+    return MessageTextFormat({
+      text: message.body,
+      message,
+      contactsMap,
+      getFromContacts,
+      accentColor,
+      textSecondary,
+      onMentionNameClick: handleOpenUserProfile,
+      shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention,
+      unsupportedMessage,
+      target: ogMetadataProps?.target,
+      isInviteLink: ogMetadataProps?.isInviteLink || false,
+      onInviteLinkClick
+    })
+  }, [
+    message,
+    contactsMap,
+    getFromContacts,
+    accentColor,
+    textSecondary,
+    shouldOpenUserProfileForMention,
+    unsupportedMessage,
+    ogMetadataProps?.target,
+    ogMetadataProps?.isInviteLink,
+    onInviteLinkClick
+  ])
+
+  const viewOnce = useMemo(() => message.viewOnce, [message?.viewOnce])
+  const isViewOnceAndVoiceMessage = useMemo(
+    () => viewOnce && message?.attachments?.[0]?.type === attachmentTypes.voice,
+    [viewOnce, message?.attachments?.[0]?.type]
+  )
+
+  const hasOpened = useMemo(() => {
+    if (!viewOnce) return false
+    if (message?.incoming) {
+      return message?.userMarkers?.some((marker: IMarker) => marker.name === MESSAGE_DELIVERY_STATUS.OPENED)
+    } else {
+      return message?.markerTotals?.some(
+        (marker: { name: string; count: number }) => marker.name === MESSAGE_DELIVERY_STATUS.OPENED && marker.count > 0
+      )
+    }
+  }, [viewOnce, message?.incoming, message?.userMarkers, message?.markerTotals])
+
+  // Get informational message text for view-once media on web
+  const getViewOnceMessage = () => {
+    if (hasOpened) {
+      return 'Message self-destructed'
+    } else if (!message?.incoming) {
+      return 'You sent a one-time view message. For privacy reasons, it can only be viewed on mobile.'
+    } else {
+      return 'You received a one-time view message. For privacy reasons, it can only be viewed on mobile.'
+    }
+  }
+
+  const messageTextTrimmed = useMemo(() => {
+    if (!message.body) return { result: messageText, truncated: false }
+    if (isExpanded) return { result: messageText, truncated: false }
+    return trimReactMessage(messageText, collapsedCharacterLimit)
+  }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
+
+  useEffect(() => {
+    if (textContainerRef.current && typeof collapsedCharacterLimit === 'number' && collapsedCharacterLimit >= 0) {
+      if (messageTextTrimmed.truncated && !isExpanded) {
+        requestAnimationFrame(() => {
+          if (textContainerRef.current) {
+            const height = textContainerRef.current.scrollHeight
+            setTextHeight(height)
+          }
+        })
+      } else if (isExpanded) {
+        requestAnimationFrame(() => {
+          if (textContainerRef.current) {
+            const fullHeight = textContainerRef.current.scrollHeight
+            setTextHeight(fullHeight)
+          }
+        })
+      } else if (!messageTextTrimmed.truncated && textHeight !== 'auto') {
+        setTextHeight('auto')
+      }
+    }
+  }, [isExpanded, messageTextTrimmed.truncated, textHeight, collapsedCharacterLimit])
+
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
     [prevMessage]
@@ -314,14 +423,14 @@ const MessageBody = ({
   const firstMessageInInterval = useMemo(
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-      prevMessage?.type === 'system' ||
+      prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
       unreadMessageId === prevMessage.id,
     [prevMessage, current, unreadMessageId]
   )
   const lastMessageInInterval = useMemo(
     () =>
       !(nextMessage && current.diff(moment(nextMessage.createdAt).startOf('day'), 'days') === 0) ||
-      nextMessage.type === 'system',
+      nextMessage.type === MESSAGE_TYPE.SYSTEM,
     [nextMessage, current]
   )
   const messageTimeVisible = useMemo(
@@ -336,31 +445,53 @@ const MessageBody = ({
       (showMessageStatusForEachMessage || !nextMessage),
     [message.incoming, showMessageStatus, message.state, showMessageStatusForEachMessage, nextMessage]
   )
-  const withAttachments = useMemo(() => message.attachments && message.attachments.length > 0, [message.attachments])
-  const notLinkAttachment = useMemo(
-    () => withAttachments && message.attachments.some((a: IAttachment) => a.type !== attachmentTypes.link),
-    [withAttachments, message.attachments]
+  const withAttachments = useMemo(
+    () => message.attachments && message.attachments.length > 0 && (!viewOnce || isViewOnceAndVoiceMessage),
+    [message.attachments, viewOnce, isViewOnceAndVoiceMessage]
   )
 
-  const linkAttachment = message.attachments.find((a: IAttachment) => a.type === attachmentTypes.link)
+  const notLinkAttachment = useMemo(
+    () =>
+      withAttachments &&
+      message.attachments.some(
+        (a: IAttachment) => a.type !== attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
+      ),
+    [withAttachments, message.attachments, viewOnce]
+  )
+
+  const linkAttachment = message.attachments.find(
+    (a: IAttachment) => a.type === attachmentTypes.link && (!viewOnce || isViewOnceAndVoiceMessage)
+  )
+  const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
+  const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
   const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
   const mediaAttachment = useMemo(
     () =>
       withAttachments &&
+      (!viewOnce || isViewOnceAndVoiceMessage) &&
       message.attachments.find(
         (attachment: IAttachment) =>
           attachment.type === attachmentTypes.video || attachment.type === attachmentTypes.image,
-        [withAttachments, message.attachments]
+        [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
       ),
-    [withAttachments, message.attachments]
+    [withAttachments, message.attachments, viewOnce, isViewOnceAndVoiceMessage]
   )
-  const withMediaAttachment = useMemo(() => !!mediaAttachment, [mediaAttachment])
+  const withMediaAttachment = useMemo(
+    () => !!mediaAttachment && (!viewOnce || isViewOnceAndVoiceMessage),
+    [mediaAttachment, viewOnce, isViewOnceAndVoiceMessage]
+  )
   const attachmentMetas = useMemo(
     () =>
       mediaAttachment &&
       (isJSON(mediaAttachment.metadata) ? JSON.parse(mediaAttachment.metadata) : mediaAttachment.metadata),
     [mediaAttachment]
   )
+
+  const fileAttachment = useMemo(() => {
+    return message.attachments.find(
+      (attachment: IAttachment) => attachment.type === attachmentTypes.file && (!viewOnce || isViewOnceAndVoiceMessage)
+    )
+  }, [message.attachments, viewOnce, isViewOnceAndVoiceMessage])
 
   const borderRadius = useMemo(
     () =>
@@ -410,6 +541,55 @@ const MessageBody = ({
   )
   const selectionIsActive = useMemo(() => selectedMessagesMap && selectedMessagesMap.size > 0, [selectedMessagesMap])
 
+  const hasLongLinkAttachmentUrl = useMemo(() => {
+    if (!linkAttachment || !linkAttachment.url || viewOnce) return false
+    return linkAttachment.url.length > 100
+  }, [linkAttachment, viewOnce])
+
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+  const linkMetadata = useMemo(() => {
+    if (!linkAttachment?.url) return null
+    return oGMetadata?.[linkAttachment.url] || null
+  }, [oGMetadata, linkAttachment?.url])
+
+  const ogMetadataContainerWidth = useMemo(() => {
+    if (!linkMetadata || !linkAttachment) return undefined
+
+    if (hasLongLinkAttachmentUrl) {
+      return 400
+    }
+
+    const hasImage = linkMetadata?.og?.image?.[0]?.url && linkMetadata?.imageWidth && linkMetadata?.imageHeight
+    const imageWidth = linkMetadata?.imageWidth
+    const imageHeight = linkMetadata?.imageHeight
+    const calculatedImageHeight =
+      imageWidth && imageHeight ? imageHeight / (imageWidth / (ogMetadataProps?.maxWidth || 400)) : 0
+    const showImage = hasImage && calculatedImageHeight >= 180 && calculatedImageHeight <= 400
+    const hasDescription =
+      !isDescriptionOnlySymbol(linkMetadata?.og?.description) && linkMetadata?.og?.description?.trim()
+    const hasFavicon = ogMetadataProps?.ogShowFavicon && linkMetadata?.faviconLoaded && linkMetadata?.og?.favicon?.url
+
+    if (!hasDescription) {
+      return undefined
+    }
+    if (showImage) {
+      return 400
+    }
+    if (hasDescription && hasFavicon) {
+      return 336
+    }
+    if (hasDescription) {
+      return 356
+    }
+    return ogMetadataProps?.maxWidth || 400
+  }, [
+    linkMetadata,
+    linkAttachment,
+    ogMetadataProps?.maxWidth,
+    ogMetadataProps?.ogShowFavicon,
+    hasLongLinkAttachmentUrl
+  ])
+
   const handleRemoveFailedAttachment = (attachmentId: string) => {
     log.info('remove attachment .. ', attachmentId)
     // TODO implement remove failed attachment
@@ -432,6 +612,8 @@ const MessageBody = ({
       incomingMessageStyles={incomingMessageStyles || { background: bubbleIncoming }}
       borderRadius={borderRadius}
       withAttachments={notLinkAttachment}
+      hasLinkAttachment={!!linkAttachment}
+      hasLongLinkAttachmentUrl={hasLongLinkAttachmentUrl}
       attachmentWidth={
         withAttachments
           ? mediaAttachment
@@ -447,7 +629,7 @@ const MessageBody = ({
                   // imageAttachmentMaxWidth,
                   // imageAttachmentMaxHeight
                 )[0]) ||
-              420
+              400
             : /*: message.attachments[0].type === attachmentTypes.link
                 ? 324 */
               message.attachments[0].type === attachmentTypes.voice
@@ -457,6 +639,7 @@ const MessageBody = ({
                 : undefined
           : undefined
       }
+      ogMetadataMaxWidth={ogMetadataContainerWidth}
       noBody={!message.body && !withAttachments}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
@@ -497,9 +680,15 @@ const MessageBody = ({
             handleReportMessage={handleToggleReportPopupOpen}
             handleSelectMessage={handleSelectMessage}
             handleOpenEmojis={handleOpenEmojis}
+            handleRetractVote={handleRetractVote}
+            handleEndVote={handleEndVote}
           />
         ) : (
           <MessageActions
+            isPollMessage={message?.type === MESSAGE_TYPE.POLL}
+            allowVoteRetract={message?.pollDetails?.allowVoteRetract}
+            isViewOnceMessage={message?.type === MESSAGE_TYPE.VIEW_ONCE && message?.viewOnce}
+            pollClosed={message?.pollDetails?.closed}
             messageFrom={message.user}
             channel={channel}
             editModeToggle={toggleEditMode}
@@ -513,6 +702,8 @@ const MessageBody = ({
             handleReplyMessage={handleReplyMessage}
             handleReportMessage={handleToggleReportPopupOpen}
             handleSelectMessage={handleSelectMessage}
+            handleRetractVote={handleRetractVote}
+            handleEndVote={handleEndVote}
             handleOpenEmojis={handleOpenEmojis}
             selfMessage={message.user && messageUserID === user.id}
             isThreadMessage={isThreadMessage}
@@ -542,6 +733,8 @@ const MessageBody = ({
             forwardIcon={forwardIcon}
             deleteIcon={deleteIcon}
             selectIcon={selectIcon}
+            retractVoteIcon={retractVoteIcon}
+            endVoteIcon={endVoteIcon}
             allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
             starIcon={starIcon}
             staredIcon={staredIcon}
@@ -578,7 +771,6 @@ const MessageBody = ({
       {message.parentMessage && message.parentMessage.id && !isThreadMessage && (
         <RepliedMessage
           message={message}
-          theme={theme}
           isPendingMessage={isPendingMessage}
           handleScrollToRepliedMessage={handleScrollToRepliedMessage}
           ownMessageOnRightSide={ownMessageOnRightSide}
@@ -624,7 +816,6 @@ const MessageBody = ({
           </ForwardedTitle>
         )}
       <MessageText
-        theme={theme}
         draggable={false}
         color={textPrimary}
         fontSize={messageTextFontSize}
@@ -643,29 +834,86 @@ const MessageBody = ({
         incomingMessageStyles={incomingMessageStyles}
         incoming={message.incoming}
         linkColor={linkColor}
+        unsupportedMessage={unsupportedMessage}
+        unsupportedMessageColor={textSecondary}
       >
-        {linkAttachment && (
-          <OGMetadata attachments={[linkAttachment]} state={message.state} incoming={message.incoming} />
+        {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+          <OGMetadata
+            maxWidth={ogMetadataContainerWidth}
+            maxHeight={ogMetadataProps?.maxHeight}
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 3, title: 1, description: 2, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
+          />
         )}
-        <span ref={messageTextRef}>
-          {MessageTextFormat({
-            text: message.body,
-            message,
-            contactsMap,
-            getFromContacts,
-            accentColor,
-            textSecondary,
-            onMentionNameClick: handleOpenUserProfile,
-            shouldOpenUserProfileForMention: !!shouldOpenUserProfileForMention
-          })}
-        </span>
+        {message.type !== MESSAGE_TYPE.POLL && (
+          <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
+            {viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+              <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
+                {hasOpened ? (
+                  <ViewOnceIconOpen style={{ marginRight: '8px' }} />
+                ) : (
+                  <ViewOnceIconWrapper backgroundColor={background}>
+                    <ViewOnceIcon />
+                  </ViewOnceIconWrapper>
+                )}
+                <ViewOnceInfoText color={textSecondary}>{getViewOnceMessage()}</ViewOnceInfoText>
+              </ViewOnceMessageWrapper>
+            ) : (
+              <React.Fragment>
+                <span ref={messageTextRef}>
+                  {messageTextTrimmed?.result}
+                  {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
+                </span>
+                {messageTextTrimmed.truncated && !isExpanded && (
+                  <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                    Read more
+                  </ReadMoreLink>
+                )}
+              </React.Fragment>
+            )}
+          </TextContentContainer>
+        )}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
           ''
         )}
+        {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+          <OGMetadata
+            maxWidth={ogMetadataContainerWidth}
+            maxHeight={ogMetadataProps?.maxHeight}
+            attachments={[linkAttachment]}
+            state={message.state}
+            incoming={message.incoming}
+            ogShowUrl={ogMetadataProps ? ogMetadataProps.ogShowUrl : undefined}
+            ogShowTitle={ogMetadataProps ? ogMetadataProps.ogShowTitle : undefined}
+            ogShowDescription={ogMetadataProps ? ogMetadataProps.ogShowDescription : undefined}
+            ogShowFavicon={ogMetadataProps ? ogMetadataProps.ogShowFavicon : undefined}
+            order={ogMetadataProps?.order || { image: 1, title: 2, description: 3, link: 4 }}
+            ogContainerBorderRadius={ogMetadataProps?.ogContainerBorderRadius}
+            ogContainerPadding={ogMetadataProps?.ogContainerPadding}
+            ogContainerClassName={ogMetadataProps?.ogContainerClassName}
+            ogContainerShowBackground={ogMetadataProps?.ogContainerShowBackground}
+            ogContainerBackground={ogMetadataProps?.ogContainerBackground}
+            infoPadding={ogMetadataProps?.infoPadding}
+            isInviteLink={ogMetadataProps?.isInviteLink}
+          />
+        )}
         {messageStatusAndTimePosition === 'onMessage' &&
         !notLinkAttachment &&
+        !!linkAttachment &&
         (messageStatusVisible || messageTimeVisible) ? (
           <MessageStatusAndTime
             message={message}
@@ -688,46 +936,50 @@ const MessageBody = ({
       </MessageText>
       {notLinkAttachment &&
         messageStatusAndTimePosition === 'onMessage' &&
-        (messageStatusVisible || messageTimeVisible) && (
-          <MessageStatusAndTime
-            message={message}
-            showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-            messageStatusDisplayingType={messageStatusDisplayingType}
-            messageStatusSize={messageStatusSize}
-            messageStatusColor={
-              message.attachments[0].type === 'voice'
-                ? textSecondary 
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary
-                  : messageStateColor || textSecondary
-            }
-            messageReadStatusColor={messageReadStatusColor}
-            messageStateFontSize={messageStateFontSize}
-            messageStateColor={messageStateColor}
-            messageTimeFontSize={messageTimeFontSize}
-            messageTimeColor={messageTimeColor}
-            messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
-            messageTimeVisible={!!messageTimeVisible}
-            messageStatusVisible={!!messageStatusVisible}
-            withAttachment={withAttachments}
-            leftMargin
-            fileAttachment={
-              withAttachments && (message.attachments[0].type === 'file' || message.attachments[0].type === 'voice')
-            }
-            messageTimeColorOnAttachment={
-              message.attachments[0].type === 'voice'
-                ? textSecondary 
-                : message.attachments[0].type === 'image' || message.attachments[0].type === 'video'
-                  ? textOnPrimary 
-                  : textSecondary
-            }
-          />
-        )}
+        (messageStatusVisible || messageTimeVisible) &&
+        (() => {
+          const nonLinkAttachment = message.attachments.find((a: IAttachment) => a.type !== attachmentTypes.link)
+          const attachmentType = nonLinkAttachment?.type
+          return (
+            <MessageStatusAndTime
+              message={message}
+              showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+              messageStatusDisplayingType={messageStatusDisplayingType}
+              messageStatusSize={messageStatusSize}
+              messageStatusColor={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : messageStateColor || textSecondary
+              }
+              messageReadStatusColor={messageReadStatusColor}
+              messageStateFontSize={messageStateFontSize}
+              messageStateColor={messageStateColor}
+              messageTimeFontSize={messageTimeFontSize}
+              messageTimeColor={messageTimeColor}
+              messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+              messageTimeVisible={!!messageTimeVisible}
+              messageStatusVisible={!!messageStatusVisible}
+              withAttachment={withAttachments}
+              leftMargin
+              fileAttachment={withAttachments && (attachmentType === 'file' || attachmentType === 'voice')}
+              messageTimeColorOnAttachment={
+                attachmentType === 'voice'
+                  ? textSecondary
+                  : attachmentType === 'image' || attachmentType === 'video'
+                    ? textOnPrimary
+                    : textSecondary
+              }
+            />
+          )
+        })()}
 
       {
         withAttachments &&
           (message.attachments as any[]).map((attachment: any) => (
             <Attachment
+              viewOnce={viewOnce}
               key={attachment.tid || attachment.url}
               handleMediaItemClick={selectionIsActive ? undefined : handleMediaItemClick}
               attachment={{
@@ -767,6 +1019,8 @@ const MessageBody = ({
           ))
         // </MessageAttachments>
       }
+
+      {message.type === MESSAGE_TYPE.POLL && <PollMessage message={message} />}
       {emojisPopupOpen && emojisPopupPosition && (
         <EmojiContainer
           id={`${message.id}_emoji_popup_container`}
@@ -898,13 +1152,20 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.imageAttachmentMaxHeight === nextProps.imageAttachmentMaxHeight &&
     prevProps.videoAttachmentMaxWidth === nextProps.videoAttachmentMaxWidth &&
     prevProps.videoAttachmentMaxHeight === nextProps.videoAttachmentMaxHeight &&
-    prevProps.theme === nextProps.theme &&
     prevProps.messageTextFontSize === nextProps.messageTextFontSize &&
     prevProps.messageTextLineHeight === nextProps.messageTextLineHeight &&
     prevProps.messageActionsShow === nextProps.messageActionsShow &&
     prevProps.emojisPopupOpen === nextProps.emojisPopupOpen &&
     prevProps.emojisPopupPosition === nextProps.emojisPopupPosition &&
-    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen
+    prevProps.frequentlyEmojisOpen === nextProps.frequentlyEmojisOpen &&
+    (prevProps.ogMetadataProps?.ogLayoutOrder || 'og-first') ===
+      (nextProps.ogMetadataProps?.ogLayoutOrder || 'og-first') &&
+    prevProps.ogMetadataProps?.ogShowUrl === nextProps.ogMetadataProps?.ogShowUrl &&
+    prevProps.ogMetadataProps?.ogShowTitle === nextProps.ogMetadataProps?.ogShowTitle &&
+    prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
+    prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
+    prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order &&
+    prevProps.collapsedCharacterLimit === nextProps.collapsedCharacterLimit
   )
 })
 
@@ -923,7 +1184,7 @@ const ForwardedTitle = styled.h3<{
   font-size: 13px;
   line-height: 16px;
   color: ${(props) => props.color};
-  //margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
+  // margin: ${(props) => (props.withAttachments && props.withBody ? '0' : '0 0 4px')};
   margin: 0;
   padding: ${(props) => props.withPadding && (props.leftPadding ? '8px 0 0 12px' : '8px 0 0 ')};
   padding-top: ${(props) => props.showSenderName && (props.withBody ? '4px' : '0')};
@@ -954,6 +1215,37 @@ const MessageStatusDeleted = styled.span<{ color: string; fontSize?: string; wit
   font-style: italic;
 `
 
+const ViewOnceInfoText = styled.span<{ color: string }>`
+  color: ${(props) => props.color};
+  font-size: 14px;
+  line-height: 1.4;
+  display: block;
+`
+
+const ViewOnceMessageWrapper = styled.div<{ color: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+
+  svg {
+    path {
+      fill: ${(props) => props.color};
+    }
+  }
+}
+`
+
+const ViewOnceIconWrapper = styled.div<{ backgroundColor: string }>`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  min-width: 40px;
+  height: 40px;
+  background-color: ${(props) => props.backgroundColor};
+  border-radius: 50%;
+  margin-right: 8px;
+`
 const MessageBodyContainer = styled.div<{
   isSelfMessage?: boolean
   outgoingMessageStyles?: {
@@ -969,6 +1261,9 @@ const MessageBodyContainer = styled.div<{
   rtlDirection?: boolean
   parentMessageIsVoice?: any
   attachmentWidth?: number
+  hasLinkAttachment?: boolean
+  hasLongLinkAttachmentUrl?: boolean
+  ogMetadataMaxWidth?: number
 }>`
   position: relative;
   background-color: ${(props: any) =>
@@ -977,28 +1272,60 @@ const MessageBodyContainer = styled.div<{
   border-radius: ${(props) => props.borderRadius || '4px 16px 16px 4px'};
   direction: ${(props) => (props.rtlDirection ? 'initial' : '')};
   max-width: ${(props) =>
-    props.withAttachments
-      ? props.attachmentWidth && props.attachmentWidth < 420
-        ? props.attachmentWidth < 165
-          ? props.isReplyMessage
-            ? '210px'
-            : '165px'
-          : `${props.attachmentWidth}px`
-        : '420px'
-      : '100%'};
-  width: max-content;
+    props.hasLinkAttachment && !props.withAttachments
+      ? props.ogMetadataMaxWidth
+        ? `${props.ogMetadataMaxWidth}px`
+        : '416px'
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
+        ? '400px'
+        : props.withAttachments
+          ? props.attachmentWidth && props.attachmentWidth < 400
+            ? props.attachmentWidth < 165
+              ? props.isReplyMessage
+                ? '210px'
+                : '165px'
+              : `${props.attachmentWidth}px`
+            : '400px'
+          : '100%'};
+  width: ${(props) =>
+    props.hasLinkAttachment && !props.withAttachments && props.ogMetadataMaxWidth
+      ? `${props.ogMetadataMaxWidth}px`
+      : props.hasLongLinkAttachmentUrl && !props.withAttachments
+        ? '416px'
+        : 'max-content'};
+  overflow-wrap: break-word;
+  word-break: break-word;
+
+  ${(props) =>
+    props.hasLongLinkAttachmentUrl &&
+    `
+    & a {
+      overflow-wrap: anywhere;
+      word-break: break-all;
+      white-space: normal;
+      max-width: ${
+        props.withAttachments
+          ? '400px'
+          : props.hasLinkAttachment && props.ogMetadataMaxWidth
+            ? `${props.ogMetadataMaxWidth}px`
+            : '416px'
+      };
+    }
+  `}
   padding: ${(props) =>
     props.withAttachments
       ? props.isReplyMessage
         ? '1px 0 0 '
         : '0'
-      : props.isSelfMessage
-        ? props.outgoingMessageStyles?.background === 'inherit'
-          ? '0'
-          : '8px 12px'
-        : props.incomingMessageStyles?.background === 'inherit'
-          ? ' 0'
-          : '8px 12px'};
+      : props.hasLinkAttachment
+        ? '8px'
+        : props.isSelfMessage
+          ? props.outgoingMessageStyles?.background === 'inherit'
+            ? '0'
+            : '8px 12px'
+          : props.incomingMessageStyles?.background === 'inherit'
+            ? ' 0'
+            : '8px 12px'};
   //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
   //overflow: ${(props) => props.noBody && 'hidden'};
   transition: all 0.3s;
@@ -1021,4 +1348,24 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   right: ${(props) => props.rtlDirection && '0'};
   top: -50px;
   z-index: 99;
+`
+
+const TextContentContainer = styled.div<{ textHeight: number | 'auto' }>`
+  overflow: hidden;
+  height: ${(props) => (props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
+  transition: height 0.3s ease-out;
+`
+
+const ReadMoreLink = styled.span<{ accentColor: string }>`
+  display: block;
+  color: ${(props) => props.accentColor};
+  cursor: pointer;
+  font-weight: 500;
+  margin-top: 8px;
+  font-style: Medium;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.4px;
+  user-select: none;
+  transition: opacity 0.2s ease;
 `

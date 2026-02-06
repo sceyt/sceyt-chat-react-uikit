@@ -3,11 +3,23 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
 // Store
-import { destroySession, setIsDraggingAC, setTabIsActiveAC, watchForEventsAC } from '../../store/channel/actions'
-import { channelListWidthSelector, isDraggingSelector } from '../../store/channel/selector'
-import { contactsMapSelector } from '../../store/user/selector'
+import {
+  destroySession,
+  getChannelByInviteKeyAC,
+  joinChannelWithInviteKeyAC,
+  setIsDraggingAC,
+  setJoinableChannelAC,
+  watchForEventsAC
+} from '../../store/channel/actions'
+import {
+  channelInviteKeyAvailableSelector,
+  channelListWidthSelector,
+  isDraggingSelector,
+  joinableChannelSelector
+} from '../../store/channel/selector'
+import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../store/user/selector'
 import { getRolesAC } from '../../store/member/actions'
-import { getRolesFailSelector } from '../../store/member/selector'
+import { restrictedSelector, getRolesFailSelector } from '../../store/member/selector'
 // Hooks
 import { useDidUpdate, useColor } from '../../hooks'
 // Helpers
@@ -21,7 +33,9 @@ import {
   setDefaultRolesByChannelTypesMap,
   setHandleNewMessages,
   setOpenChatOnUserInteraction,
-  setDisableFrowardMentionsCount
+  setDisableFrowardMentionsCount,
+  getUseInviteLink,
+  setOnUpdateChannel
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
@@ -34,7 +48,7 @@ import {
   initializeNotifications,
   requestPermissionOnUserInteraction
 } from '../../helpers/notifications'
-import { IContactsMap } from '../../types'
+import { IChannel, IContactsMap } from '../../types'
 import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
@@ -43,6 +57,10 @@ import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalpe
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
+import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
+import { CONNECTION_STATUS } from 'store/user/constants'
+import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
+import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
 
 const SceytChat = ({
   client,
@@ -64,8 +82,11 @@ const SceytChat = ({
   autoSelectFirstChannel = false,
   memberCount,
   disableFrowardMentionsCount = false,
-  chatMinWidth
+  chatMinWidth,
+  embeddedJoinGroupPopup = false,
+  onUpdateChannel
 }: IChatClientProps) => {
+  const useInviteLink = getUseInviteLink()
   const { [THEME_COLORS.BACKGROUND]: backgroundColor, [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground } =
     useColor()
   const dispatch = useDispatch()
@@ -73,8 +94,12 @@ const SceytChat = ({
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const channelsListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const getRolesFail = useSelector(getRolesFailSelector, shallowEqual)
+  const joinableChannel = useSelector(joinableChannelSelector, shallowEqual)
   const [SceytChatClient, setSceytChatClient] = useState<any>(null)
-  const [tabIsActive, setTabIsActive] = useState(true)
+  const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+  const restricted = useSelector(restrictedSelector, shallowEqual)
+  const channelInviteKeyAvailable = useSelector(channelInviteKeyAvailableSelector, shallowEqual)
+  const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
 
   let hidden: any = null
   let visibilityChange: any = null
@@ -107,19 +132,16 @@ const SceytChat = ({
 
   const handleVisibilityChange = () => {
     if (document[hidden as keyof Document]) {
-      setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     } else {
-      setTabIsActive(true)
       dispatch(browserTabIsActiveAC(true))
     }
   }
+
   const handleFocusChange = (focus: boolean) => {
     if (focus) {
-      setTabIsActive(true)
       dispatch(browserTabIsActiveAC(true))
     } else {
-      setTabIsActive(false)
       dispatch(browserTabIsActiveAC(false))
     }
   }
@@ -135,11 +157,6 @@ const SceytChat = ({
       } */
 
       dispatch(watchForEventsAC())
-      dispatch(setConnectionStatusAC(client.connectionState))
-      if (showOnlyContactUsers) {
-        dispatch(getContactsAC())
-      }
-      dispatch(getRolesAC())
     } else {
       clearMessagesMap()
       removeAllMessages()
@@ -147,14 +164,20 @@ const SceytChat = ({
       destroyChannelsMap()
       dispatch(destroySession())
     }
-
-    window.onblur = () => {
-      setTabIsActive(false)
-    }
-    window.onfocus = () => {
-      setTabIsActive(true)
-    }
   }, [client])
+
+  useEffect(() => {
+    dispatch(setConnectionStatusAC(client.connectionState))
+  }, [client?.connectionState])
+
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (showOnlyContactUsers) {
+        dispatch(getContactsAC())
+      }
+      dispatch(getRolesAC())
+    }
+  }, [connectionStatus, showOnlyContactUsers])
 
   const handleChangedTheme = (theme: SceytChatUIKitTheme) => {
     const updatedColors = { ...defaultTheme.colors }
@@ -231,13 +254,12 @@ const SceytChat = ({
     }
   }, [])
   useEffect(() => {
-    dispatch(setTabIsActiveAC(tabIsActive))
-    if (tabIsActive && showNotifications) {
+    if (browserTabIsActive && showNotifications) {
       if (window.sceytTabNotifications) {
         window.sceytTabNotifications.close()
       }
     }
-  }, [tabIsActive])
+  }, [browserTabIsActive])
 
   useEffect(() => {
     if (theme) {
@@ -288,6 +310,44 @@ const SceytChat = ({
     setDisableFrowardMentionsCount(disableFrowardMentionsCount)
   }, [disableFrowardMentionsCount])
 
+  const getKeyFromUrl = () => {
+    const join = new URLSearchParams(window.location.search).get('join')
+    if (join) {
+      return join.split('/').pop()
+    }
+    return null
+  }
+
+  useEffect(() => {
+    const key = getKeyFromUrl()
+    if (key && getUseInviteLink()) {
+      dispatch(getChannelByInviteKeyAC(key))
+    }
+  }, [useInviteLink])
+
+  const handleJoinChannel = () => {
+    const key = getKeyFromUrl()
+    if (key && getUseInviteLink()) {
+      dispatch(joinChannelWithInviteKeyAC(key))
+    }
+  }
+
+  const handleCloseJoinPopup = () => {
+    window.history.pushState({}, '', window.location.pathname)
+    dispatch(setJoinableChannelAC(null as unknown as IChannel))
+  }
+
+  const joinPopup =
+    joinableChannel && getUseInviteLink() ? (
+      <JoinGroupPopup onClose={handleCloseJoinPopup} onJoin={handleJoinChannel} channel={joinableChannel} />
+    ) : null
+
+  useEffect(() => {
+    if (onUpdateChannel) {
+      setOnUpdateChannel(onUpdateChannel)
+    }
+  }, [onUpdateChannel])
+
   return (
     <React.Fragment>
       {SceytChatClient ? (
@@ -302,10 +362,20 @@ const SceytChat = ({
           chatMinWidth={chatMinWidth}
         >
           {children}
+          {embeddedJoinGroupPopup && joinPopup && <EmbeddedPopupWrapper>{joinPopup}</EmbeddedPopupWrapper>}
+          {restricted?.isRestricted && (
+            <ActionRestrictedPopup
+              fromChannel={restricted?.fromChannel}
+              members={restricted?.members}
+              contactsMap={contactsMap}
+            />
+          )}
+          {!channelInviteKeyAvailable && <UnavailableInviteKeyPopup />}
         </ChatContainer>
       ) : (
         ''
       )}
+      {!embeddedJoinGroupPopup && joinPopup}
     </React.Fragment>
   )
 }
@@ -317,12 +387,18 @@ export const Container = styled.div`
   height: 100vh;
 `
 
-const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: string; highlightedBackground: string, chatMinWidth?: string }>`
+const ChatContainer = styled.div<{
+  withChannelsList: boolean
+  backgroundColor: string
+  highlightedBackground: string
+  chatMinWidth?: string
+}>`
   display: flex;
   height: 100%;
   max-height: 100vh;
   min-width: ${(props) => props.withChannelsList && (props.chatMinWidth || '1200px')};
   background-color: ${(props) => props.backgroundColor};
+  position: relative;
 
   /* Global highlighted background styles */
   ::selection {
@@ -340,5 +416,28 @@ const ChatContainer = styled.div<{ withChannelsList: boolean; backgroundColor: s
 
   *::-moz-selection {
     background-color: ${(props) => props.highlightedBackground};
+  }
+`
+
+const EmbeddedPopupWrapper = styled.div`
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+
+  > * {
+    pointer-events: all;
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    height: 100% !important;
   }
 `

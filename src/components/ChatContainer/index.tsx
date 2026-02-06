@@ -3,8 +3,18 @@ import { Provider } from 'react-redux'
 import log from 'loglevel'
 import store from '../../store'
 import SceytChat from '../SceytChat'
-import { IAttachment, IChannel, ICustomAvatarColors, IMessage, IUser } from '../../types'
+import { IAttachment, IChannel, ICustomAvatarColors, IMember, IMessage, IUser } from '../../types'
 import { SceytReduxContext } from 'store/context'
+
+import {
+  InviteLinkOptions,
+  setBaseUrlForInviteMembers,
+  setInviteLinkOptions,
+  setUseInviteLink,
+  setDisappearingSettings,
+  setCustomLoadMembersFunctions,
+  setShowOwnMessageForward
+} from '../../helpers/channelHalper'
 export interface IProgress {
   loaded: number
   total: number
@@ -18,7 +28,7 @@ export interface IUploadTask {
   // eslint-disable-next-line no-unused-vars
   failure: (error: Error) => void
   // eslint-disable-next-line no-unused-vars
-  success: (uri: string) => void
+  success: ({ uri, blob }: { uri: string; blob: Blob }) => void
   cancel: () => void
   stop: () => void
   resume: () => void
@@ -111,6 +121,26 @@ export interface IChatClientProps {
   memberCount?: number
   disableFrowardMentionsCount?: boolean
   chatMinWidth?: string
+  baseUrlForInviteMembers?: string
+  useInviteLink?: boolean
+  inviteLinkOptions?: InviteLinkOptions | null
+  embeddedJoinGroupPopup?: boolean
+  onUpdateChannel?: (channel: IChannel, updatedFields: string[]) => void
+  disappearingSettings?: {
+    show?: boolean
+    customOptions?: {
+      label: string
+      seconds: number
+    }[]
+  } | null
+  customLoadMembersFunctions?: {
+    loadMoreMembers?: (channel: IChannel, limit?: number) => Promise<{ hasNext: boolean; members: IMember[] }>
+    getMembers?: (channel: IChannel) => Promise<{ members: IMember[]; hasNext: boolean }>
+    addMembersEvent?: (channelId: string, addedMembers: IMember[], members: IMember[]) => IMember[]
+    joinMembersEvent?: (channelId: string, joinedMembers: IMember[], members: IMember[]) => IMember[]
+    updateMembersEvent?: (channelId: string, updatedMembers: IMember[], members: IMember[]) => IMember[]
+  } | null
+  showOwnMessageForward?: boolean
 }
 
 const SceytChatContainer = ({
@@ -134,11 +164,58 @@ const SceytChatContainer = ({
   logLevel = 'silent',
   memberCount,
   disableFrowardMentionsCount,
-  chatMinWidth
+  chatMinWidth,
+  baseUrlForInviteMembers,
+  useInviteLink = false,
+  inviteLinkOptions = {
+    ListItemInviteLink: {},
+    JoinGroupPopup: {},
+    InviteLinkModal: {},
+    ResetLinkConfirmModal: {}
+  },
+  embeddedJoinGroupPopup = false,
+  onUpdateChannel,
+  disappearingSettings = null,
+  customLoadMembersFunctions = null,
+  showOwnMessageForward = true
 }: IChatClientProps) => {
   useEffect(() => {
     log.setLevel(logLevel)
-  }, [])
+  }, [logLevel])
+
+  useEffect(() => {
+    if (baseUrlForInviteMembers) {
+      setBaseUrlForInviteMembers(baseUrlForInviteMembers)
+    }
+  }, [baseUrlForInviteMembers])
+
+  useEffect(() => {
+    if (useInviteLink) {
+      setUseInviteLink(useInviteLink)
+    }
+  }, [useInviteLink])
+
+  useEffect(() => {
+    if (inviteLinkOptions) {
+      setInviteLinkOptions(inviteLinkOptions)
+    }
+  }, [inviteLinkOptions])
+
+  useEffect(() => {
+    if (disappearingSettings) {
+      setDisappearingSettings(disappearingSettings)
+    }
+  }, [disappearingSettings])
+
+  useEffect(() => {
+    if (customLoadMembersFunctions) {
+      setCustomLoadMembersFunctions(customLoadMembersFunctions)
+    }
+  }, [customLoadMembersFunctions])
+
+  useEffect(() => {
+    setShowOwnMessageForward(showOwnMessageForward)
+  }, [showOwnMessageForward])
 
   return (
     <Provider store={store} context={SceytReduxContext}>
@@ -163,6 +240,8 @@ const SceytChatContainer = ({
         memberCount={memberCount}
         disableFrowardMentionsCount={disableFrowardMentionsCount}
         chatMinWidth={chatMinWidth}
+        embeddedJoinGroupPopup={embeddedJoinGroupPopup}
+        onUpdateChannel={onUpdateChannel}
       />
     </Provider>
   )

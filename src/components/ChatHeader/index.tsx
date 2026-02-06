@@ -7,7 +7,6 @@ import {
   channelInfoIsOpenSelector,
   channelListHiddenSelector
 } from '../../store/channel/selector'
-import { themeSelector } from '../../store/theme/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -50,6 +49,7 @@ interface IProps {
   channelInfoOrder?: number
   infoIconOrder?: number
   customActionsOrder?: number
+  showPhoneNumber?: boolean
 }
 
 export default function ChatHeader({
@@ -72,7 +72,8 @@ export default function ChatHeader({
   backButtonOrder,
   channelInfoOrder,
   infoIconOrder,
-  customActionsOrder
+  customActionsOrder,
+  showPhoneNumber
 }: IProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -89,7 +90,6 @@ export default function ChatHeader({
   const getFromContacts = getShowOnlyContactUsers()
   // const [infoButtonVisible, setInfoButtonVisible] = useState(false)
   const activeChannel = useSelector(activeChannelSelector)
-  const theme = useSelector(themeSelector)
   const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
@@ -144,7 +144,7 @@ export default function ChatHeader({
    }, [channelDetailsOpen]) */
 
   return (
-    <Container background={backgroundColor} borderBottom={borderBottom} borderColor={border}>
+    <Container backgroundColor={backgroundColor} borderBottom={borderBottom} borderColor={border}>
       {/* {LefSideCustomActions && <LefSideCustomActions />} */}
       <MobileButtonWrapper onClick={handleBackToChannels}>
         {MobileBackButton || (
@@ -173,7 +173,9 @@ export default function ChatHeader({
                 (isDirectChannel && directChannelUser
                   ? directChannelUser.firstName || directChannelUser.id
                   : isSelfChannel
-                    ? 'Me'
+                    ? showPhoneNumber
+                      ? `+${user.id} (You)`
+                      : 'Me'
                     : '')
               }
               image={
@@ -194,7 +196,6 @@ export default function ChatHeader({
         <ChannelName>
           <SectionHeader
             color={titleColor || textPrimary}
-            theme={theme}
             fontSize={titleFontSize}
             uppercase={directChannelUser && hideUserPresence && hideUserPresence(directChannelUser)}
             lineHeight={titleLineHeight}
@@ -203,7 +204,9 @@ export default function ChatHeader({
               (isDirectChannel && directChannelUser
                 ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
                 : isSelfChannel
-                  ? 'Me'
+                  ? showPhoneNumber
+                    ? `+${user.id} (You)`
+                    : 'Me'
                   : '')}
           </SectionHeader>
           {showMemberInfo &&
@@ -243,7 +246,7 @@ export default function ChatHeader({
   )
 }
 
-const Container = styled.div<{ background?: string; borderColor: string; borderBottom?: string }>`
+const Container = styled.div<{ backgroundColor?: string; borderColor: string; borderBottom?: string }>`
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -251,7 +254,7 @@ const Container = styled.div<{ background?: string; borderColor: string; borderB
   height: 64px;
   box-sizing: border-box;
   border-bottom: ${(props) => props.borderBottom || `1px solid ${props.borderColor}`};
-  background-color: ${(props) => props.background};
+  background-color: ${(props) => props.backgroundColor};
 `
 
 const ChannelInfo = styled.div<{ clickable?: boolean; onClick: any; order?: number }>`

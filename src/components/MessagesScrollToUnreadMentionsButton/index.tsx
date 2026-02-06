@@ -10,7 +10,6 @@ import {
   showScrollToNewMessageButtonSelector,
   activeChannelMessagesSelector
 } from '../../store/message/selector'
-import { themeSelector } from '../../store/theme/selector'
 // Assets
 import { ReactComponent as MentionIcon } from '../../assets/svg/mention.svg'
 // Helpers
@@ -61,7 +60,6 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
-  const theme = useSelector(themeSelector)
   const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
   const messages = useSelector(activeChannelMessagesSelector) || []
@@ -140,7 +138,7 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
           repliedMessage.classList.remove('highlight')
         }, 1500)
       }
-    } else {
+    } else if (channel?.id) {
       // await handleGetMessages(undefined, messageId)
       dispatch(getMessagesAC(channel, undefined, messageId))
     }
@@ -155,7 +153,6 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
   return (
     <React.Fragment>
       <BottomButton
-        theme={theme}
         animateFrom={animateFrom}
         show={!!channel.newMentionCount}
         width={buttonWidth}
@@ -192,7 +189,6 @@ const MessagesScrollToUnreadMentionsButton: React.FC<MessagesScrollToUnreadMenti
 export default MessagesScrollToUnreadMentionsButton
 
 const BottomButton = styled.div<{
-  theme?: string
   width?: string
   height?: string
   border?: string

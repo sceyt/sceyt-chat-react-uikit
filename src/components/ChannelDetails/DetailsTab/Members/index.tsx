@@ -7,11 +7,11 @@ import {
   changeMemberRoleAC,
   getMembersAC,
   kickMemberAC,
-  loadMoreMembersAC
+  setOpenInviteModalAC
 } from '../../../../store/member/actions'
-import { activeChannelMembersSelector, membersLoadingStateSelector } from '../../../../store/member/selector'
+import { openInviteModalSelector, rolesMapSelector } from '../../../../store/member/selector'
 import { getContactsAC } from '../../../../store/user/actions'
-import { contactsMapSelector } from '../../../../store/user/selector'
+import { connectionStatusSelector, contactsMapSelector } from '../../../../store/user/selector'
 import { createChannelAC } from '../../../../store/channel/actions'
 // Assets
 import { ReactComponent as AddMemberIcon } from '../../../../assets/svg/addMember.svg'
@@ -24,7 +24,7 @@ import {
   getOpenChatOnUserInteraction
 } from '../../../../helpers/channelHalper'
 import { makeUsername } from '../../../../helpers/message'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, USER_PRESENCE_STATUS } from '../../../../helpers/constants'
 import { IChannel, IContact, IContactsMap, IMember } from '../../../../types'
 import { UserStatus } from '../../../Channel'
 import { BoltText, DropdownOptionLi, DropdownOptionsUl, SubTitle } from '../../../../UIHelper'
@@ -37,11 +37,14 @@ import ChangeMemberRole from './change-member-role'
 import Avatar from '../../../Avatar'
 import DropDown from '../../../../common/dropdown'
 import UsersPopup from '../../../../common/popups/users'
+import InviteLinkModal from '../../../../common/popups/inviteLink/InviteLinkModal'
 import { useColor } from '../../../../hooks'
+import { shallowEqual } from 'react-redux'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 interface IProps {
   channel: IChannel
-  theme: string
+  members: IMember[]
   // eslint-disable-next-line no-unused-vars
   checkActionPermission: (permission: string) => boolean
   showChangeMemberRole?: boolean
@@ -54,11 +57,12 @@ interface IProps {
   memberNameFontSize?: string
   memberAvatarSize?: number
   memberPresenceFontSize?: string
+  QRCodeIcon?: JSX.Element
 }
 
 const Members = ({
   channel,
-  theme,
+  members,
   checkActionPermission,
   showChangeMemberRole = true,
   showMakeMemberAdmin = true,
@@ -69,7 +73,8 @@ const Members = ({
   addMemberIcon,
   memberNameFontSize,
   memberAvatarSize,
-  memberPresenceFontSize
+  memberPresenceFontSize,
+  QRCodeIcon
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -92,9 +97,11 @@ const Members = ({
   const [revokeAdminPopup, setRevokeAdminPopup] = useState(false)
   const [addMemberPopupOpen, setAddMemberPopupOpen] = useState(false)
   const [closeMenu, setCloseMenu] = useState<string | undefined>()
-  const members: IMember[] = useSelector(activeChannelMembersSelector) || []
   const contactsMap: IContactsMap = useSelector(contactsMapSelector) || {}
-  const membersLoading = useSelector(membersLoadingStateSelector) || {}
+  const openInviteModal = useSelector(openInviteModalSelector)
+  const rolesMap = useSelector(rolesMapSelector, shallowEqual)
+  const connectionStatus = useSelector(connectionStatusSelector)
+
   const user = getClient().user
   const memberDisplayText = getChannelTypesMemberDisplayTextMap()
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
@@ -108,15 +115,6 @@ const Members = ({
     !checkActionPermission('changeMemberRole') &&
     !checkActionPermission('kickAndBlockMember') &&
     !checkActionPermission('kickMember')
-
-  const handleMembersListScroll = (event: any) => {
-    // setCloseMenu(true)
-    if (event.target.scrollTop >= event.target.scrollHeight - event.target.offsetHeight - 100) {
-      if (membersLoading === LOADING_STATE.LOADED) {
-        dispatch(loadMoreMembersAC(15, channel.id))
-      }
-    }
-  }
 
   const watchDropdownState = (state: boolean, memberId: string) => {
     if (state) {
@@ -234,17 +232,29 @@ const Members = ({
     }
   }
 
+  const handleOpenInviteModal = () => {
+    dispatch(setOpenInviteModalAC(true))
+    setAddMemberPopupOpen(false)
+  }
+
   useEffect(() => {
-    if (getFromContacts) {
-      dispatch(getContactsAC())
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      if (getFromContacts) {
+        dispatch(getContactsAC())
+      }
+      if (channel?.id && !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && channel.memberCount === 2)) {
+        dispatch(getMembersAC(channel.id))
+      }
     }
-    dispatch(getMembersAC(channel.id))
-  }, [channel])
+  }, [channel?.id, connectionStatus])
+
+  const currentUserRole = members.find((member) => member.id === user.id)?.role
+
   return (
-    <Container theme={theme}>
+    <Container>
       <ActionsMenu>
-        <MembersList onScroll={handleMembersListScroll}>
-          {checkActionPermission('addMember') && (
+        <MembersList>
+          {checkActionPermission('addMember') && (currentUserRole === 'owner' || currentUserRole === 'admin') && (
             <MemberItem
               key={1}
               onClick={handleAddMemberPopup}
@@ -308,78 +318,85 @@ const Members = ({
                         userLastActiveDateFormat(member.presence.lastActiveAt)}
                   </SubTitle>
                 </MemberNamePresence>
-                {!noMemberEditPermissions && member.role !== 'owner' && member.id !== user.id && (
-                  <DropDown
-                    theme={theme}
-                    isSelect
-                    forceClose={!!(closeMenu && closeMenu !== member.id)}
-                    watchToggleState={(state) => watchDropdownState(state, member.id)}
-                    trigger={
-                      <EditMemberIcon color={iconInactive}>
-                        <MoreIcon color={iconInactive} />
-                      </EditMemberIcon>
-                    }
-                  >
-                    <DropdownOptionsUl>
-                      {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
-                        <DropdownOptionLi
-                          textColor={textPrimary}
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleChangeRolePopup(e)
-                            setCloseMenu('1')
-                          }}
-                          key={1}
-                          hoverBackground={backgroundHovered}
-                        >
-                          Change role
-                        </DropdownOptionLi>
-                      )}
-                      {showMakeMemberAdmin && checkActionPermission('changeMemberRole') && member.role !== 'owner' && (
-                        <DropdownOptionLi
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleMakeAdminPopup(e, member.role === 'admin')
-                            setCloseMenu('1')
-                          }}
-                          textColor={member.role === 'admin' ? errorColor : ''}
-                          key={2}
-                          hoverBackground={backgroundHovered}
-                        >
-                          {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
-                        </DropdownOptionLi>
-                      )}
-                      {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
-                        <DropdownOptionLi
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleKickMemberPopup(e)
-                            setCloseMenu('1')
-                          }}
-                          textColor={errorColor}
-                          key={3}
-                          hoverBackground={backgroundHovered}
-                        >
-                          Remove
-                        </DropdownOptionLi>
-                      )}
-                      {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
-                        <DropdownOptionLi
-                          textColor={errorColor}
-                          key={4}
-                          hoverBackground={backgroundHovered}
-                          onClick={(e: any) => {
-                            setSelectedMember(member)
-                            toggleBlockMemberPopup(e)
-                            setCloseMenu('1')
-                          }}
-                        >
-                          Remove and Block member
-                        </DropdownOptionLi>
-                      )}
-                    </DropdownOptionsUl>
-                  </DropDown>
-                )}
+                {!noMemberEditPermissions &&
+                  member.role !== 'owner' &&
+                  currentUserRole &&
+                  rolesMap?.[member.role]?.priority &&
+                  rolesMap?.[currentUserRole]?.priority &&
+                  rolesMap?.[member.role]?.priority < rolesMap?.[currentUserRole]?.priority &&
+                  member.id !== user.id && (
+                    <DropDown
+                      isSelect
+                      forceClose={!!(closeMenu && closeMenu !== member.id)}
+                      watchToggleState={(state) => watchDropdownState(state, member.id)}
+                      trigger={
+                        <EditMemberIcon color={iconInactive}>
+                          <MoreIcon color={iconInactive} />
+                        </EditMemberIcon>
+                      }
+                    >
+                      <DropdownOptionsUl>
+                        {showChangeMemberRole && checkActionPermission('changeMemberRole') && (
+                          <DropdownOptionLi
+                            textColor={textPrimary}
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleChangeRolePopup(e)
+                              setCloseMenu('1')
+                            }}
+                            key={1}
+                            hoverBackground={backgroundHovered}
+                          >
+                            Change role
+                          </DropdownOptionLi>
+                        )}
+                        {showMakeMemberAdmin &&
+                          checkActionPermission('changeMemberRole') &&
+                          member.role !== 'owner' && (
+                            <DropdownOptionLi
+                              onClick={(e: any) => {
+                                setSelectedMember(member)
+                                toggleMakeAdminPopup(e, member.role === 'admin')
+                                setCloseMenu('1')
+                              }}
+                              textColor={member.role === 'admin' ? errorColor : ''}
+                              key={2}
+                              hoverBackground={backgroundHovered}
+                            >
+                              {member.role === 'admin' ? 'Revoke Admin' : 'Make Admin'}
+                            </DropdownOptionLi>
+                          )}
+                        {showKickMember && checkActionPermission('kickMember') && member.role !== 'owner' && (
+                          <DropdownOptionLi
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleKickMemberPopup(e)
+                              setCloseMenu('1')
+                            }}
+                            textColor={errorColor}
+                            key={3}
+                            hoverBackground={backgroundHovered}
+                          >
+                            Remove
+                          </DropdownOptionLi>
+                        )}
+                        {showKickAndBlockMember && checkActionPermission('kickAndBlockMember') && (
+                          <DropdownOptionLi
+                            textColor={errorColor}
+                            key={4}
+                            hoverBackground={backgroundHovered}
+                            onClick={(e: any) => {
+                              setSelectedMember(member)
+                              toggleBlockMemberPopup(e)
+                              setCloseMenu('1')
+                            }}
+                          >
+                            Remove and Block member
+                          </DropdownOptionLi>
+                        )}
+                      </DropdownOptionsUl>
+                    </DropDown>
+                  )}
               </MemberItem>
             ))}
         </MembersList>
@@ -387,7 +404,6 @@ const Members = ({
 
       {kickMemberPopupOpen && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleKickMember}
           togglePopup={toggleKickMemberPopup}
           buttonText='Remove'
@@ -413,7 +429,6 @@ const Members = ({
       )}
       {blockMemberPopupOpen && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleBlockMember}
           togglePopup={toggleBlockMemberPopup}
           buttonText='Block'
@@ -425,7 +440,6 @@ const Members = ({
       )}
       {makeAdminPopup && (
         <ConfirmPopup
-          theme={theme}
           handleFunction={handleMakeAdmin}
           togglePopup={() => toggleMakeAdminPopup(undefined, false)}
           buttonText='Promote'
@@ -448,7 +462,6 @@ const Members = ({
           togglePopup={() => toggleMakeAdminPopup(undefined, true)}
           buttonText='Revoke'
           title='Revoke admin'
-          theme={theme}
           description={
             <span>
               Are you sure you want to revoke
@@ -463,12 +476,7 @@ const Members = ({
         />
       )}
       {changeMemberRolePopup && (
-        <ChangeMemberRole
-          theme={theme}
-          channelId={channel.id}
-          member={selectedMember!}
-          handleClosePopup={toggleChangeRolePopup}
-        />
+        <ChangeMemberRole channelId={channel.id} member={selectedMember!} handleClosePopup={toggleChangeRolePopup} />
       )}
       {addMemberPopupOpen && (
         <UsersPopup
@@ -479,6 +487,14 @@ const Members = ({
           selectIsRequired
           memberIds={members.map((mem) => mem.id)}
           toggleCreatePopup={handleAddMemberPopup}
+          handleOpenInviteModal={handleOpenInviteModal}
+        />
+      )}
+      {openInviteModal && (
+        <InviteLinkModal
+          onClose={() => dispatch(setOpenInviteModalAC(false))}
+          SVGOrPNGLogoIcon={QRCodeIcon}
+          channelId={channel.id}
         />
       )}
     </Container>
@@ -487,7 +503,7 @@ const Members = ({
 
 export default Members
 
-const Container = styled.div<{ theme?: string }>``
+const Container = styled.div``
 
 const ActionsMenu = styled.div`
   position: relative;

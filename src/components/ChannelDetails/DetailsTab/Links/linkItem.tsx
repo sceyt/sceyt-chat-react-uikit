@@ -78,14 +78,18 @@ const LinkIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: inline-flex;
   > svg {
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const LinkHoverIconCont = styled.span<{ iconColor?: string; fillColor?: string }>`
   display: none;
   > svg {
     color: ${(props) => props.iconColor};
-    fill: ${(props) => props.fillColor};
+    rect {
+      fill: ${(props) => props.fillColor};
+    }
   }
 `
 const LinkInfoCont = styled.div`
@@ -123,20 +127,3 @@ const LinkUrl = styled.span<{ color: string }>`
   text-decoration: underline;
   color: ${(props) => props.color};
 `
-
-/*
-const LinkMetaImage = styled.img`
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border: 0.5px solid rgba(0, 0, 0, 0.1);
-  box-sizing: border-box;
-  border-radius: 6px;
-`
-
-const Loading = styled.div`
-  width: 40px;
-  height: 40px;
-  min-width: 40px;
-`
-*/

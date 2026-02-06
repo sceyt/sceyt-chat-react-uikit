@@ -1,5 +1,4 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import * as ReactDOM from 'react-dom'
 import { useLexicalComposerContext } from '@lexical/react/LexicalComposerContext'
 import {
   LexicalTypeaheadMenuPlugin,
@@ -12,15 +11,18 @@ import { AvatarWrapper, UserStatus } from '../../Channel'
 import Avatar from '../../Avatar'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { SubTitle } from '../../../UIHelper'
-import { THEME, USER_PRESENCE_STATUS } from '../../../helpers/constants'
+import { THEME, USER_PRESENCE_STATUS, LOADING_STATE } from '../../../helpers/constants'
 import { userLastActiveDateFormat } from '../../../helpers'
 import styled from 'styled-components'
 import { $createTextNode, TextNode } from 'lexical'
 import { IContactsMap, IMember } from '../../../types'
 import { makeUsername } from '../../../helpers/message'
 import { useColor } from '../../../hooks'
-import { useSelector } from 'store/hooks'
+import { useSelector, useDispatch } from 'store/hooks'
 import { themeSelector } from 'store/theme/selector'
+import { loadMoreMembersAC } from '../../../store/member/actions'
+import { channelsMembersLoadingStateSelector, channelsMembersHasNextMapSelector } from '../../../store/member/selector'
+import { shallowEqual } from 'react-redux'
 
 const PUNCTUATION = '\\.,\\+\\*\\?\\$\\@\\|#{}\\(\\)\\^\\-\\[\\]\\\\/!%\'"~=<>_:;'
 const NAME = '\\b[A-Z][^\\s' + PUNCTUATION + ']'
@@ -62,9 +64,6 @@ const AtSignMentionsRegexAliasRegex = new RegExp(
   '(^|\\s|\\()(' + '[' + TRIGGERS + ']' + '((?:' + VALID_CHARS + '){0,' + ALIAS_LENGTH_LIMIT + '})' + ')$'
 )
 
-// At most, 5 suggestions are shown in the popup.
-const SUGGESTION_LIST_LENGTH_LIMIT = 50
-
 const mentionsCache = new Map()
 
 let membersMap: { [key: string]: IMember } = {}
@@ -76,7 +75,6 @@ function useMentionLookupService(
   members: IMember[],
   getFromContacts?: boolean
 ) {
-  // const members = useSelector(activeChannelMembersSelector, shallowEqual)
   const [results, setResults] = useState<Array<{ name: string; avatar?: string; id: string; presence: any }>>([])
   membersMap = useMemo(() => {
     mentionsCache.clear()
@@ -234,10 +232,27 @@ function MentionsContainer({
   selectedIndex,
   selectOptionAndCleanUp,
   setHighlightedIndex,
-  setMentionsIsOpen
+  setMentionsIsOpen,
+  channelId,
+  alignLeft,
+  handleLeftOffset
 }: any) {
   const theme = useSelector(themeSelector)
-  const { [THEME_COLORS.BORDER]: borderColor, [THEME_COLORS.BACKGROUND]: background } = useColor()
+  const {
+    [THEME_COLORS.BORDER]: borderColor,
+    [THEME_COLORS.BACKGROUND]: background,
+    [THEME_COLORS.SURFACE_1]: scrollbarThumbColor
+  } = useColor()
+
+  const dispatch = useDispatch()
+  const channelsMembersHasNext = useSelector(channelsMembersHasNextMapSelector, shallowEqual)
+  const channelsMembersLoadingState = useSelector(channelsMembersLoadingStateSelector, shallowEqual)
+  const membersLoadingState = useMemo(
+    () => channelsMembersLoadingState?.[channelId],
+    [channelsMembersLoadingState?.[channelId]]
+  )
+  const membersHasNext = useMemo(() => channelsMembersHasNext?.[channelId], [channelsMembersHasNext?.[channelId]])
+  const mentionsListRef = useRef<HTMLUListElement>(null)
 
   const contRef: any = useRef()
   // const [editor] = useLexicalComposerContext()
@@ -283,9 +298,36 @@ function MentionsContainer({
       setMentionsIsOpen(false)
     }
   }, [])
+
+  const handleScroll = useCallback(
+    (e: React.UIEvent<HTMLUListElement>) => {
+      const target = e.currentTarget
+      const isScrolledToBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 10 // 10px threshold
+
+      if (isScrolledToBottom && membersHasNext && membersLoadingState !== LOADING_STATE.LOADING && channelId) {
+        dispatch(loadMoreMembersAC(15, channelId))
+      }
+    },
+    [membersHasNext, membersLoadingState, channelId, dispatch]
+  )
+
+  useEffect(() => {
+    if (options?.length < 20 && membersHasNext && membersLoadingState === LOADING_STATE.LOADED && channelId) {
+      dispatch(loadMoreMembersAC(15, channelId))
+    }
+  }, [options?.length, membersHasNext, membersLoadingState, channelId, dispatch])
+
   return (
     <MentionsContainerWrapper className='typeahead-popover mentions-menu' ref={contRef}>
-      <MentionsList borderColor={borderColor} backgroundColor={background} theme={theme}>
+      <MentionsList
+        backgroundColor={background}
+        scrollbarThumbColor={scrollbarThumbColor}
+        theme={theme}
+        ref={mentionsListRef}
+        borderColor={borderColor}
+        onScroll={handleScroll}
+        alignLeft={alignLeft}
+      >
         {options.map((option: any, i: number) => (
           <MentionsTypeaheadMenuItem
             index={i}
@@ -302,6 +344,7 @@ function MentionsContainer({
           />
         ))}
       </MentionsList>
+      <Handle backgroundColor={background} leftOffset={handleLeftOffset} />
     </MentionsContainerWrapper>
   )
 }
@@ -312,7 +355,8 @@ export default function MentionsPlugin({
   getFromContacts,
   setMentionMember,
   setMentionsIsOpen,
-  members
+  members,
+  channelId
 }: {
   contactsMap: IContactsMap
   userId: string
@@ -322,6 +366,7 @@ export default function MentionsPlugin({
   // eslint-disable-next-line no-unused-vars
   setMentionsIsOpen: (state: boolean) => void
   members: IMember[]
+  channelId?: string
 }): JSX.Element | null {
   const [editor] = useLexicalComposerContext()
   const [queryString, setQueryString] = useState<string | null>(null)
@@ -331,11 +376,8 @@ export default function MentionsPlugin({
   })
 
   const options = useMemo(
-    () =>
-      results
-        .map((result) => new MentionTypeaheadOption(result.name, result.id, result.presence, result.avatar))
-        .slice(0, SUGGESTION_LIST_LENGTH_LIMIT),
-    [results]
+    () => results.map((result) => new MentionTypeaheadOption(result.name, result.id, result.presence, result.avatar)),
+    [results?.length]
   )
 
   const handleOnOpen = () => {
@@ -383,28 +425,40 @@ export default function MentionsPlugin({
       triggerFn={checkForMentionMatch}
       options={options}
       onOpen={handleOnOpen}
-      menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) =>
-        anchorElementRef.current && results.length
-          ? ReactDOM.createPortal(
-              <MentionsContainer
-                queryString={queryString}
-                options={options}
-                setMentionsIsOpen={setMentionsIsOpen}
-                selectOptionAndCleanUp={selectOptionAndCleanUp}
-                selectedIndex={selectedIndex}
-                setHighlightedIndex={setHighlightedIndex}
-              />,
-              anchorElementRef.current
-            )
-          : null
-      }
+      menuRenderFn={(anchorElementRef, { selectedIndex, selectOptionAndCleanUp, setHighlightedIndex }) => {
+        const containerRect = anchorElementRef.current?.getBoundingClientRect()
+        const listWidth = 340 // fixed width from styled component
+        const leftOffset = 30 // current left offset
+        const channelDetailsWrapper = document.getElementById('channel_details_wrapper')
+        const channelDetailsWrapperRect = channelDetailsWrapper?.getBoundingClientRect()
+        const channelDetailsWrapperWidth = channelDetailsWrapperRect?.width
+        let alignLeft = 0
+        if (window.innerWidth - (channelDetailsWrapperWidth || 0) - (containerRect?.left || 0) - listWidth < 0) {
+          alignLeft = window.innerWidth - (channelDetailsWrapperWidth || 0) - 10 - listWidth
+        } else {
+          alignLeft = (containerRect?.left || 0) - leftOffset
+        }
+        return anchorElementRef.current ? (
+          <MentionsContainer
+            queryString={queryString}
+            options={options}
+            setMentionsIsOpen={setMentionsIsOpen}
+            selectOptionAndCleanUp={selectOptionAndCleanUp}
+            selectedIndex={selectedIndex}
+            setHighlightedIndex={setHighlightedIndex}
+            channelId={channelId}
+            alignLeft={alignLeft}
+            handleLeftOffset={(containerRect?.left || 0) + 7}
+          />
+        ) : null
+      }}
     />
   )
 }
 
 export const MentionsContainerWrapper = styled.div<{ mentionsIsOpen?: boolean; ref?: any }>`
-  position: relative;
   animation: fadeIn 0.2s ease-in-out;
+  width: 0;
   @keyframes fadeIn {
     from {
       opacity: 0;
@@ -421,16 +475,21 @@ const MentionsList = styled.ul<{
   backgroundColor: string
   withBorder?: boolean
   borderColor: string
+  scrollbarThumbColor: string
   theme: string
+  alignLeft: number
 }>`
-  position: absolute;
-  bottom: 100%;
-  width: 300px;
-  transition: all 0.2s;
-  overflow: auto;
-  max-height: 240px;
+  position: fixed;
+  bottom: 47px;
+  width: 340px;
+  max-height: 268px;
+  transition: height 0.2s ease;
+  overflow-x: hidden;
+  overflow-y: auto;
+  left: ${(props) => `${props.alignLeft}px`};
   z-index: 200;
-  padding: 2px 0 0;
+  padding: 0;
+  margin: 0;
   background: ${(props) => props.backgroundColor};
   border: ${(props) => props.withBorder && `1px solid ${props.borderColor}`};
   box-sizing: border-box;
@@ -438,13 +497,48 @@ const MentionsList = styled.ul<{
     props.theme === THEME.DARK ? '0 0 12px rgba(0, 0, 0, 0.5)' : '0 0 12px rgba(0, 0, 0, 0.08)'};
   border-radius: 6px;
   visibility: ${(props) => (props.hidden ? 'hidden' : 'visible')};
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: ${(props) => props.scrollbarThumbColor};
+    border-radius: 6px;
+  }
+
+  &::-webkit-scrollbar-thumb:hover {
+    background: ${(props) => props.scrollbarThumbColor};
+  }
+`
+
+const Handle = styled.div<{
+  backgroundColor: string
+  leftOffset: number
+}>`
+  position: fixed;
+  bottom: 39px;
+  left: ${(props) => `${props.leftOffset}px`};
+  transform: translateX(-50%);
+  width: 20px;
+  height: 8px;
+  background: ${(props) => props.backgroundColor};
+  z-index: 201;
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
 `
 
 export const MemberItem = styled.li<{ isActiveItem?: boolean; activeBackgroundColor: string }>`
   display: flex;
   align-items: center;
+  max-width: 340px;
+  height: 52px;
   font-size: 15px;
-  padding: 6px 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
   transition: all 0.2s;
   cursor: pointer;
   background-color: ${(props) => props.isActiveItem && props.activeBackgroundColor};
