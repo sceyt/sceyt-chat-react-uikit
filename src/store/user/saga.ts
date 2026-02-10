@@ -16,12 +16,14 @@ import {
   setContactsLoadingStateAC,
   setUsersAC,
   setUsersLoadingStateAC,
-  updateUserProfileAC
+  updateUserProfileAC,
+  updateUserStatusOnMapAC
 } from './actions'
 import { IAction, IMember } from '../../types'
 import { getActiveChannelId, getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { updateChannelDataAC } from '../channel/actions'
+import { updateChannelDataAC, updateUserStatusOnChannelAC } from '../channel/actions'
 import log from 'loglevel'
+import { updateMembersPresenceAC } from 'store/member/actions'
 
 function* getContacts(): any {
   try {
@@ -73,6 +75,11 @@ function* blockUser(action: IAction): any {
         })
       })
     }
+    for (const user of blockedUsers) {
+      yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: true } }))
+    }
   } catch (error) {
     log.error('error in block users', error.message)
     // yield put(setErrorNotification(error.message))
@@ -111,6 +118,11 @@ function* unblockUser(action: IAction): any {
           }
         })
       })
+    }
+    for (const user of unblockedUsers) {
+      yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: false } }))
+      yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: false } }))
+      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: false } }))
     }
   } catch (error) {
     log.error('error in unblock users', error.message)

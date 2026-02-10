@@ -6,6 +6,7 @@ import {
   addUsers,
   setUsersLoadingState,
   updateUserMap,
+  addUserInMapIfNotExists,
   setContacts,
   updateUserProfile,
   setBrowserTabIsActive,
@@ -93,5 +94,7 @@ export const updateUserProfileAC = (profile: any) => updateUserProfile({ profile
 export const browserTabIsActiveAC = (state: boolean) => setBrowserTabIsActive({ state })
 
 export const updateUserStatusOnMapAC = (usersMap: { [key: string]: IUser }) => updateUserMap({ usersMap })
+
+export const addUserInMapIfNotExistsAC = (user: IUser) => addUserInMapIfNotExists({ user })
 
 export const setWaitToSendPendingMessagesAC = (state: boolean) => setWaitToSendPendingMessages({ state })

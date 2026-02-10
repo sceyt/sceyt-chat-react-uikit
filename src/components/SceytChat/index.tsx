@@ -39,7 +39,14 @@ import {
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
-import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
+import {
+  browserTabIsActiveAC,
+  getContactsAC,
+  setConnectionStatusAC,
+  setUserAC,
+  addUserInMapIfNotExistsAC,
+  checkUserStatusAC
+} from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import {
   setContactsMap,
@@ -299,6 +306,12 @@ const SceytChat = ({
     }
     if (contactsMap) {
       setContactsMap(contactsMap)
+      for (const contactId in contactsMap) {
+        const contact = contactsMap[contactId]
+        const user = { ...contact?.user }
+        dispatch(addUserInMapIfNotExistsAC(user))
+      }
+      dispatch(checkUserStatusAC())
     }
   }, [contactsMap])
 

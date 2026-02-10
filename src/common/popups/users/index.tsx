@@ -16,7 +16,7 @@ import {
 import { ReactComponent as CrossIcon } from '../../../assets/svg/cross.svg'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, USER_PRESENCE_STATUS, THEME } from '../../../helpers/constants'
 import Avatar from '../../../components/Avatar'
-import { addMembersAC } from '../../../store/member/actions'
+import { addMembersAC, setUserBlockedForInviteAC } from '../../../store/member/actions'
 import { UserStatus } from '../../../components/Channel'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { IAddMember, IChannel, IContact, IUser } from '../../../types'
@@ -25,7 +25,8 @@ import {
   contactListSelector,
   contactsMapSelector,
   usersListSelector,
-  usersLoadingStateSelector
+  usersLoadingStateSelector,
+  usersMapSelector
 } from '../../../store/user/selector'
 import { createChannelAC } from '../../../store/channel/actions'
 import CustomCheckbox from '../../customCheckbox'
@@ -43,6 +44,8 @@ import PopupContainer from '../popupContainer'
 import { getClient } from '../../client'
 import log from 'loglevel'
 import AddMembersListItemInviteLink from '../inviteLink/AddMembersListItemInviteLink'
+import UserBlockedPopup from '../UserBlockedPopup'
+import { userBlockedForInviteSelector } from 'store/member/selector'
 
 interface ISelectedUserData {
   id: string
@@ -125,7 +128,7 @@ const UsersPopup = ({
   // const users = useSelector(usersSelector)
   const usersLoadingState = useSelector(usersLoadingStateSelector)
   const selectedMembersCont = useRef<any>('')
-
+  const userBlockedForInvite = useSelector(userBlockedForInviteSelector)
   const [userSearchValue, setUserSearchValue] = useState('')
   const [selectedMembers, setSelectedMembers] = useState<ISelectedUserData[]>(creatChannelSelectedMembers || [])
   const [usersContHeight, setUsersContHeight] = useState(0)
@@ -134,6 +137,7 @@ const UsersPopup = ({
   const channelTypeRoleMap = getDefaultRolesByChannelTypesMap()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [isSelectedMembersScrolling, setIsSelectedMembersScrolling] = useState<boolean>(false)
+  const usersMap = useSelector(usersMapSelector)
   const popupTitleText =
     channel &&
     (memberDisplayText && memberDisplayText[channel.type]
@@ -256,7 +260,10 @@ const UsersPopup = ({
   useEffect(() => {
     if (getFromContacts) {
       if (!userSearchValue) {
-        const userList = contactList.map((cont: IContact) => cont.user)
+        const userList = contactList.map((cont: IContact & { blocked?: boolean }) => ({
+          ...cont.user,
+          blocked: !!usersMap?.[cont.id]?.blocked
+        }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
         }
@@ -269,7 +276,7 @@ const UsersPopup = ({
       }
       setFilteredUsers(userList)
     }
-  }, [contactList, usersList])
+  }, [contactList, usersList, usersMap])
 
   useDidUpdate(() => {
     if (getFromContacts) {
@@ -291,9 +298,14 @@ const UsersPopup = ({
         ) {
           filteredContacts.unshift({ user: selfUser })
         }
-        setFilteredUsers(filteredContacts.map((cont: IContact) => cont.user))
+        setFilteredUsers(
+          filteredContacts.map((cont: IContact) => ({ ...cont.user, blocked: !!usersMap?.[cont.id]?.blocked }))
+        )
       } else {
-        const userList = contactList.map((cont: IContact) => cont.user)
+        const userList = contactList.map((cont: IContact) => ({
+          ...cont.user,
+          blocked: !!usersMap?.[cont.id]?.blocked
+        }))
         if (actionType === 'createChat') {
           userList.unshift(selfUser)
         }
@@ -302,7 +314,7 @@ const UsersPopup = ({
     } else {
       dispatch(getUsersAC({ query: userSearchValue, filter: 'all', limit: 50 }))
     }
-  }, [userSearchValue])
+  }, [userSearchValue, usersMap])
 
   useEffect(() => {
     if (selectedMembersCont.current) {
@@ -409,6 +421,10 @@ const UsersPopup = ({
                   hoverBackground={backgroundHovered}
                   key={user.id}
                   onClick={() => {
+                    if (user?.blocked) {
+                      dispatch(setUserBlockedForInviteAC(true, [user.id]))
+                      return
+                    }
                     actionType === 'createChat' && handleAddMember(user)
                     handleUserSelect(!isSelected, {
                       id: user.id,
@@ -416,6 +432,7 @@ const UsersPopup = ({
                       avatarUrl: user.avatarUrl
                     })
                   }}
+                  disabled={user?.blocked}
                 >
                   <Avatar
                     image={user.avatarUrl}
@@ -464,6 +481,7 @@ const UsersPopup = ({
                         e.stopPropagation()
                       }}
                       size='18px'
+                      disabled={user?.blocked}
                     />
                   )}
                 </ListRow>
@@ -496,6 +514,31 @@ const UsersPopup = ({
           </PopupFooter>
         )}
       </Popup>
+      {userBlockedForInvite.show && (
+        <UserBlockedPopup
+          userIds={userBlockedForInvite.userIds}
+          selectUsers={(userIds) => {
+            for (const userId of userIds) {
+              const user = filteredUsers.find((user) => user.id === userId)
+              if (!user) {
+                continue
+              }
+              const memberDisplayName =
+                selfUser.id === userId
+                  ? 'Me'
+                  : makeUsername(contactsMap[userId], user, selfUser.id !== userId && getFromContacts)
+              if (user) {
+                actionType === 'createChat' && handleAddMember(user)
+                handleUserSelect(true, {
+                  id: user.id,
+                  displayName: memberDisplayName,
+                  avatarUrl: user.avatarUrl
+                })
+              }
+            }
+          }}
+        />
+      )}
     </PopupContainer>
   )
 }
@@ -597,7 +640,7 @@ const SearchUsersInput = styled.input<{
   }
 `
 
-const ListRow = styled.div<{ hoverBackground: string }>`
+const ListRow = styled.div<{ hoverBackground: string; disabled?: boolean }>`
   display: flex;
   justify-content: space-between;
   flex-direction: row;
@@ -606,6 +649,7 @@ const ListRow = styled.div<{ hoverBackground: string }>`
   cursor: pointer;
   border-radius: 6px;
   transition: all 0.2s;
+  opacity: ${(props) => (props.disabled ? 0.5 : 1)};
   &:hover {
     background-color: ${(props) => props.hoverBackground};
   }
