@@ -20,10 +20,17 @@ import {
   updateUserStatusOnMapAC
 } from './actions'
 import { IAction, IMember } from '../../types'
-import { getActiveChannelId, getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { updateChannelDataAC, updateUserStatusOnChannelAC } from '../channel/actions'
+import {
+  getActiveChannelId,
+  getChannelFromMap,
+  query,
+  updateChannelMemberInAllChannels,
+  updateChannelOnAllChannels
+} from '../../helpers/channelHalper'
+import { updateChannelDataAC, updateChannelsMembersAC, updateUserStatusOnChannelAC } from '../channel/actions'
 import log from 'loglevel'
 import { updateMembersPresenceAC } from 'store/member/actions'
+import { updateUserOnMap } from 'helpers/userHelper'
 
 function* getContacts(): any {
   try {
@@ -76,9 +83,12 @@ function* blockUser(action: IAction): any {
       })
     }
     for (const user of blockedUsers) {
+      updateUserOnMap({ ...user, blocked: true })
       yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: true } }))
       yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: true } }))
       yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateChannelsMembersAC([{ ...user, blocked: true }]))
+      updateChannelMemberInAllChannels([{ ...user, blocked: true }])
     }
   } catch (error) {
     log.error('error in block users', error.message)
@@ -120,9 +130,13 @@ function* unblockUser(action: IAction): any {
       })
     }
     for (const user of unblockedUsers) {
-      yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: false } }))
-      yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: false } }))
-      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: false } }))
+      const updateData = JSON.parse(JSON.stringify(user))
+      updateUserOnMap({ ...updateData, blocked: false })
+      yield put(updateUserStatusOnMapAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateMembersPresenceAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateChannelsMembersAC([{ ...user, blocked: false }]))
+      updateChannelMemberInAllChannels([{ ...user, blocked: false }])
     }
   } catch (error) {
     log.error('error in unblock users', error.message)

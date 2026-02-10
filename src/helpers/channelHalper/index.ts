@@ -1,4 +1,4 @@
-import { IChannel, IMember, IMessage } from '../../types'
+import { IChannel, IMember, IMessage, IUser } from '../../types'
 import type { ReactNode } from 'react'
 import { isJSON } from '../message'
 import { CHANNEL_GROUP_TYPES, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS } from '../constants'
@@ -192,6 +192,47 @@ export function getInviteLinkOptions(): InviteLinkOptions | null {
 export function setChannelInMap(channel: IChannel) {
   channelsMap[channel.id] = { ...channel }
   allChannelsMap[channel.id] = { ...channel }
+}
+
+export function updateChannelMemberInAllChannels(updatedMembers: IUser[]) {
+  const updatedMembersMap: { [key: string]: IUser } = {}
+  for (const member of updatedMembers) {
+    updatedMembersMap[member.id] = member
+  }
+
+  const updateMembers = (members: IMember[]): IMember[] =>
+    members.map((member) => (updatedMembersMap[member.id] ? { ...member, ...updatedMembersMap[member.id] } : member))
+
+  allChannels = allChannels.map((channel) => {
+    if (channel.members?.length) {
+      const hasMatch = channel.members.some((m) => updatedMembersMap[m.id])
+      if (hasMatch) {
+        return { ...channel, members: updateMembers(channel.members) }
+      }
+    }
+    return channel
+  })
+
+  for (const channelId in channelsMap) {
+    const channel = channelsMap[channelId]
+    if (channel.members?.length && channel.members.some((m) => updatedMembersMap[m.id])) {
+      channelsMap[channelId] = { ...channel, members: updateMembers(channel.members) }
+    }
+  }
+
+  for (const channelId in allChannelsMap) {
+    const channel = allChannelsMap[channelId]
+    if (channel.members?.length && channel.members.some((m) => updatedMembersMap[m.id])) {
+      allChannelsMap[channelId] = { ...channel, members: updateMembers(channel.members) }
+    }
+  }
+
+  for (let i = 0; i < allChannels.length; i++) {
+    const channel = allChannels[i]
+    if (channel.members?.length && channel.members.some((m) => updatedMembersMap[m.id])) {
+      allChannels[i] = { ...channel, members: updateMembers(channel.members) }
+    }
+  }
 }
 
 export function setActiveChannelId(id: string) {

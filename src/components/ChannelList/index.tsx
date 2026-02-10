@@ -61,6 +61,7 @@ import ContactItem from './ContactItem'
 import CreateChannelButton from './CreateChannelButton'
 import ProfileSettings from './ProfileSettings'
 import { clearMessagesAC } from 'store/message/actions'
+import { getClient } from 'common/client'
 
 interface IChannelListProps {
   List?: FC<{
@@ -444,7 +445,20 @@ const ChannelList: React.FC<IChannelListProps> = ({
 
   const setSelectedChannel = (channel: IChannel) => {
     if (activeChannel.id !== channel.id) {
-      dispatch(sendTypingAC(false))
+      if (activeChannel) {
+        const user = getClient()?.user
+        let isAllUsersBlcked = true
+        for (let i = 0; i < activeChannel?.members?.length; i++) {
+          const member = activeChannel?.members[i]
+          if (!member?.blocked && user.id !== member.id) {
+            isAllUsersBlcked = false
+            break
+          }
+        }
+        if (!isAllUsersBlcked) {
+          dispatch(sendTypingAC(false))
+        }
+      }
       dispatch(clearMessagesAC())
       dispatch(switchChannelActionAC(channel))
     }

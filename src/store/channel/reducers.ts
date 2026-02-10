@@ -271,6 +271,34 @@ const channelSlice = createSlice({
       }
     },
 
+    updateChannelsMembers: (state, action: PayloadAction<{ members: IUser[] }>) => {
+      const { members } = action.payload
+      let usersMap: { [key: string]: IUser } = {}
+      for (const member of members) {
+        usersMap = { ...usersMap, [member.id]: member }
+      }
+      const updateMembers = (members: IMember[]): IMember[] =>
+        members.map((member) => (usersMap[member.id] ? { ...member, ...usersMap[member.id] } : member))
+
+      state.channels = state.channels.map((channel) => {
+        if (channel.members?.length && channel.members.some((m) => usersMap[m.id])) {
+          return { ...channel, members: updateMembers(channel.members) }
+        }
+        return channel
+      })
+
+      if (
+        (state.activeChannel as IChannel).id &&
+        (state.activeChannel as IChannel).members?.length &&
+        (state.activeChannel as IChannel).members.some((m) => usersMap[m.id])
+      ) {
+        state.activeChannel = {
+          ...state.activeChannel,
+          members: updateMembers((state.activeChannel as IChannel).members)
+        }
+      }
+    },
+
     updateSearchedChannelData: (
       state,
       action: PayloadAction<{
@@ -539,6 +567,7 @@ export const {
   setChannelsHasNext,
   setActiveChannel,
   updateChannelData,
+  updateChannelsMembers,
   updateSearchedChannelData,
   updateUserStatusOnChannel,
   updateChannelLastMessage,

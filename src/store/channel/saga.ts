@@ -93,7 +93,8 @@ import {
   getOnUpdateChannel,
   setPendingDeleteChannel,
   getPendingDeleteChannels,
-  removePendingDeleteChannel
+  removePendingDeleteChannel,
+  updateChannelMemberInAllChannels
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -1544,6 +1545,7 @@ function* checkUsersStatus(/* action: IAction */): any {
       yield put(updateMembersPresenceAC(updateData))
       yield put(updateUserStatusOnMapAC(updateData))
       yield put(updateUserStatusOnChannelAC(updateData))
+      updateChannelMemberInAllChannels(Object.values(updateData))
     }
   } catch (e) {
     log.error('ERROR in check user status : ', e.message)
