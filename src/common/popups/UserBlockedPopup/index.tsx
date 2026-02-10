@@ -1,11 +1,13 @@
 import React from 'react'
-import { useDispatch } from 'store/hooks'
+import { useDispatch, useSelector } from 'store/hooks'
 import { Popup, PopupDescription, PopupName, CloseIcon, PopupBody, Button, PopupFooter } from '../../../UIHelper'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { useColor } from '../../../hooks'
 import PopupContainer from '../popupContainer'
 import { setUserBlockedForInviteAC } from '../../../store/member/actions'
 import { unblockUserAC } from '../../../store/user/actions'
+import { connectionStatusSelector } from 'store/user/selector'
+import { CONNECTION_STATUS } from 'store/user/constants'
 
 const UserBlockedPopup = ({
   userIds,
@@ -15,6 +17,7 @@ const UserBlockedPopup = ({
   selectUsers?: (userIds: string[]) => void
 }) => {
   const dispatch = useDispatch()
+  const connectionStatus = useSelector(connectionStatusSelector)
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -31,7 +34,9 @@ const UserBlockedPopup = ({
 
   const handleUnblock = () => {
     dispatch(unblockUserAC(userIds))
-    selectUsers?.(userIds)
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+      selectUsers?.(userIds)
+    }
     handleClose()
   }
 
