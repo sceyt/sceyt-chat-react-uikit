@@ -1531,10 +1531,11 @@ function* checkUsersStatus(/* action: IAction */): any {
               new Date(usersMap[updatedUser.id]?.presence?.lastActiveAt || 0).getTime()) ||
           updatedUser.avatarUrl !== usersMap[updatedUser.id]?.avatarUrl ||
           updatedUser.firstName !== usersMap[updatedUser.id]?.firstName ||
-          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName)
+          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName ||
+          !!updatedUser.blocked !== !!usersMap[updatedUser.id]?.blocked)
       ) {
         updateUserOnMap(updatedUser)
-        usersToUpdateMap[updatedUser.id] = updatedUser
+        usersToUpdateMap[updatedUser.id] = { ...updatedUser, blocked: !!updatedUser.blocked }
         update = true
       }
     })
