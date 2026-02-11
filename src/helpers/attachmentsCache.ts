@@ -3,6 +3,7 @@ import log from 'loglevel'
 // Create a new cache
 
 const ATTACHMENTS_CACHE = 'attachments-cache'
+const ATTACHMENT_VERSION_KEY = 'sceyt_attachment_cache_version'
 const isBrowser = typeof window !== 'undefined'
 let cacheAvailable: any
 if (isBrowser) {
@@ -13,7 +14,7 @@ if (isBrowser) {
   cacheAvailable = 'caches' in global
 }
 
-export const ATTACHMENT_VERSION = `_1_0_0`
+export const ATTACHMENT_VERSION = `_1_0_1`
 
 export const setAttachmentToCache = async (attachmentUrl: string, attachmentResponse: Response) => {
   const attachmentURLVersion = attachmentUrl + ATTACHMENT_VERSION
@@ -87,4 +88,45 @@ export const getAttachmentUrlFromCache = async (attachmentUrl: string): Promise<
 
 export const getAttachmentURLWithVersion = (attachmentUrl: string) => {
   return attachmentUrl + ATTACHMENT_VERSION
+}
+
+/**
+ * Cleans up old cached attachments when version changes
+ * Call this once at app initialization
+ */
+export const cleanupOldAttachmentCache = async (): Promise<void> => {
+  if (!cacheAvailable || !isBrowser) {
+    return
+  }
+
+  try {
+    const storedVersion = localStorage.getItem(ATTACHMENT_VERSION_KEY) || '_1_0_0'
+
+    // If version changed, clear all old cached items
+    if (storedVersion && storedVersion !== ATTACHMENT_VERSION) {
+      log.info(
+        `Attachment cache version changed from ${storedVersion} to ${ATTACHMENT_VERSION}, cleaning up old cache...`
+      )
+
+      const cache = await caches.open(ATTACHMENTS_CACHE)
+      const requests = await cache.keys()
+
+      // Delete all cached items with the old version suffix
+      let deletedCount = 0
+      for (const request of requests) {
+        const url = request.url
+        if (url.includes(storedVersion)) {
+          await cache.delete(request)
+          deletedCount++
+        }
+      }
+
+      log.info(`Cleaned up ${deletedCount} old cached attachments`)
+    }
+
+    // Update stored version
+    localStorage.setItem(ATTACHMENT_VERSION_KEY, ATTACHMENT_VERSION)
+  } catch (error) {
+    log.error('Error cleaning up old attachment cache:', error)
+  }
 }

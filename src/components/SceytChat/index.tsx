@@ -68,6 +68,7 @@ import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 import { CONNECTION_STATUS } from 'store/user/constants'
 import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
 import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
+import { cleanupOldAttachmentCache } from '../../helpers/attachmentsCache'
 
 const SceytChat = ({
   client,
@@ -156,6 +157,9 @@ const SceytChat = ({
   useEffect(() => {
     log.info('client is changed.... ', client)
     if (client) {
+      // Clean up old attachment cache if version changed
+      cleanupOldAttachmentCache()
+
       setClient(client)
       setSceytChatClient(client)
       dispatch(setUserAC(client.user))
