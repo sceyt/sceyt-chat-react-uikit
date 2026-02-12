@@ -26,7 +26,9 @@ import {
   RETRACT_POLL_VOTE,
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
-  RESEND_PENDING_POLL_ACTIONS
+  RESEND_PENDING_POLL_ACTIONS,
+  LOAD_OG_METADATA_FOR_LINK,
+  FETCH_OG_METADATA
 } from './constants'
 
 import { IAction, IAttachment, IChannel, IMarker, IMessage, IPollOption, IPollVote } from '../../types'
@@ -89,7 +91,9 @@ import {
   setUnreadScrollToAC,
   setUnreadMessageIdAC,
   setAttachmentsLoadingStateAC,
-  setUpdateMessageAttachmentAC
+  setUpdateMessageAttachmentAC,
+  setOGMetadataAC,
+  fetchOGMetadataForLinkAC
 } from './actions'
 import {
   attachmentTypes,
@@ -153,6 +157,7 @@ import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import { setDataToDB } from '../../services/indexedDB'
+import { getMetadata, storeMetadata } from '../../services/indexedDB/metadataService'
 import log from 'loglevel'
 import { getFrame, getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
@@ -280,19 +285,19 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-          ...(attachment.metadata
-            ? typeof attachment.metadata === 'string'
-              ? JSON.parse(attachment.metadata)
-              : attachment.metadata
-            : {}),
-          ...(thumbnailMetas &&
-            thumbnailMetas.thumbnail && {
-            tmb: thumbnailMetas.thumbnail,
-            szw: thumbnailMetas.imageWidth,
-            szh: thumbnailMetas.imageHeight,
-            ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+            ...(attachment.metadata
+              ? typeof attachment.metadata === 'string'
+                ? JSON.parse(attachment.metadata)
+                : attachment.metadata
+              : {}),
+            ...(thumbnailMetas &&
+              thumbnailMetas.thumbnail && {
+                tmb: thumbnailMetas.thumbnail,
+                szw: thumbnailMetas.imageWidth,
+                szh: thumbnailMetas.imageHeight,
+                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
+              })
           })
-        })
       const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder
         .setName(attachment.name)
@@ -508,6 +513,7 @@ function* sendMessage(action: IAction): any {
             }
             pendingMessages.push(pending)
             if (action.type !== RESEND_MESSAGE) {
+              yield call(loadOGMetadataForLinkMessages, [pending])
               yield call(updateMessage, action.type, pending, channel.id, true, message)
             }
           } else {
@@ -554,6 +560,7 @@ function* sendMessage(action: IAction): any {
           }
           pendingMessages.push(pending)
           if (action.type !== RESEND_MESSAGE) {
+            yield call(loadOGMetadataForLinkMessages, [pending])
             yield call(updateMessage, action.type, pending, channel.id, true, message)
           }
 
@@ -722,6 +729,7 @@ function* sendTextMessage(action: IAction): any {
     let attachments = message.attachments
     if (message.attachments && message.attachments.length) {
       const attachmentBuilder = channel.createAttachmentBuilder(attachments[0].data, attachments[0].type)
+      attachmentBuilder.setMetadata(JSON.stringify(attachments[0].metadata))
       const att = attachmentBuilder.setName('').setUpload(attachments[0].upload).create()
       attachments = [att]
     }
@@ -761,6 +769,7 @@ function* sendTextMessage(action: IAction): any {
     }
     if (pendingMessage) {
       if (action.type !== RESEND_MESSAGE) {
+        yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, true)
         yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
       }
     }
@@ -936,6 +945,7 @@ function* forwardMessage(action: IAction): any {
       }
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
+          yield call(loadOGMetadataForLinkMessages, [pendingMessage])
           yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
         }
       }
@@ -1156,6 +1166,7 @@ const updateMessages = function* (
   const messages = [...updatedMessages]
   setMessagesToMap(channel.id, messages, firstMessageId, lastMessageId)
   setAllMessages(messages)
+  yield call(loadOGMetadataForLinkMessages, messages)
   yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
 }
 
@@ -1171,6 +1182,168 @@ const getFilteredPendingMessages = (messages: IMessage[]) => {
     filteredPendingMessages = pendingMessages.filter((msg: IMessage) => !messagesMap[msg.tid || ''])
   }
   return filteredPendingMessages
+}
+
+function* loadFromMetadata(firstAttachment: IAttachment) {
+  if (firstAttachment?.metadata && isJSON(firstAttachment.metadata)) {
+    const compactMeta = JSON.parse(firstAttachment.metadata)
+    // Convert compact format to full OG format
+    const fullMetadata: any = {
+      og: {
+        title: compactMeta.ttl,
+        description: compactMeta.dsc,
+        image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
+        favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
+      },
+      imageWidth: compactMeta.szw,
+      imageHeight: compactMeta.szh
+    }
+    yield put(setOGMetadataAC(firstAttachment.url, fullMetadata))
+  }
+}
+
+function* loadOGMetadataForLinkMessages(messages: IMessage[], setStore = true, sendMessage?: boolean): any {
+  if (!messages || messages.length === 0) return
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i]
+    if (message?.attachments?.length) {
+      let isOnlyLinkAttachments = true
+      let firstAttachment
+      for (let j = 0; j < message.attachments.length; j++) {
+        const attachment = message.attachments[j]
+        if (attachment.type === attachmentTypes.link) {
+          if (!firstAttachment) {
+            firstAttachment = attachment
+          }
+        } else {
+          isOnlyLinkAttachments = false
+          break
+        }
+      }
+      if (isOnlyLinkAttachments && firstAttachment) {
+        if (firstAttachment?.metadata) {
+          const metadata = isJSON(firstAttachment?.metadata)
+            ? JSON.parse(firstAttachment?.metadata)
+            : firstAttachment?.metadata
+          if (metadata?.hld) {
+            continue
+          }
+        }
+        // Fallback to Redux state
+        const storedData = store.getState().MessageReducer.oGMetadata?.[firstAttachment.url]
+        if (storedData) {
+          if (sendMessage) {
+            if (setStore) yield call(storeMetadata, firstAttachment.url, storedData)
+          }
+          continue
+        }
+        try {
+          const cachedMetadata: any = yield call(getMetadata, firstAttachment.url)
+          if (cachedMetadata) {
+            yield put(setOGMetadataAC(firstAttachment.url, cachedMetadata))
+          } else {
+            yield call(loadFromMetadata, firstAttachment)
+          }
+        } catch (e) {
+          yield call(loadFromMetadata, firstAttachment)
+        }
+        // Fetch metadata from API
+        store.dispatch(fetchOGMetadataForLinkAC(firstAttachment.url, setStore))
+      }
+    }
+  }
+}
+
+function* fetchOGMetadata(action: IAction): any {
+  const { url, setStore } = action.payload
+  const client = getClient()
+  if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
+    try {
+      const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
+      const query = yield call([queryBuilder, queryBuilder.build])
+      const metadata = yield call([query, query.loadOGData])
+
+      // Load image to get dimensions
+      const imageUrl = metadata?.og?.image?.[0]?.url
+      if (imageUrl) {
+        try {
+          let metadataWithImage
+          if (setStore) {
+            const imageDimensions: any = yield call(loadImage, imageUrl)
+            metadataWithImage = {
+              ...metadata,
+              imageWidth: imageDimensions.width,
+              imageHeight: imageDimensions.height
+            }
+          } else {
+            metadataWithImage = metadata
+          }
+          yield put(setOGMetadataAC(url, metadataWithImage))
+          if (setStore) yield call(storeMetadata, url, metadataWithImage)
+        } catch (imageError) {
+          // Image failed to load, try favicon
+          const faviconUrl = metadata?.og?.favicon?.url
+          if (faviconUrl) {
+            try {
+              yield call(loadImage, faviconUrl)
+              const metadataWithFavicon = { ...metadata, faviconLoaded: true }
+              yield put(setOGMetadataAC(url, metadataWithFavicon))
+              if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
+            } catch (faviconError) {
+              const metadataWithFavicon = { ...metadata, faviconLoaded: false }
+              yield put(setOGMetadataAC(url, metadataWithFavicon))
+              if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
+            }
+          }
+        }
+      } else {
+        const faviconUrl = metadata?.og?.favicon?.url
+        if (faviconUrl) {
+          try {
+            yield call(loadImage, faviconUrl)
+            const metadataWithFavicon = { ...metadata, faviconLoaded: true }
+            yield put(setOGMetadataAC(url, metadataWithFavicon))
+            if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
+          } catch (faviconError) {
+            const metadataWithFavicon = { ...metadata, faviconLoaded: false }
+            yield put(setOGMetadataAC(url, metadataWithFavicon))
+            if (setStore) yield call(storeMetadata, url, metadataWithFavicon)
+          }
+        } else {
+          yield put(setOGMetadataAC(url, metadata))
+          if (setStore) yield call(storeMetadata, url, metadata)
+        }
+      }
+    } catch (error) {
+      console.log('Failed to fetch OG metadata', url)
+    }
+  }
+}
+
+function loadImage(src: string): Promise<{ width: number; height: number }> {
+  return new Promise((resolve, reject) => {
+    const img = document.createElement('img')
+
+    img.setAttribute('fetchpriority', 'high')
+
+    img.onload = () => {
+      resolve({
+        width: img.naturalWidth,
+        height: img.naturalHeight
+      })
+      img.remove()
+    }
+
+    img.onerror = reject
+
+    document.body.appendChild(img)
+    img.src = src
+  })
+}
+
+function* loadOGMetadataForLinkSaga(action: IAction): any {
+  const { messages } = action.payload
+  yield call(loadOGMetadataForLinkMessages, messages, false)
 }
 
 function* getMessagesQuery(action: IAction): any {
@@ -1227,6 +1400,7 @@ function* getMessagesQuery(action: IAction): any {
                 ? yield call(messageQuery.loadPrevious)
                 : { messages: [], hasNext: false }
           }
+          yield call(loadOGMetadataForLinkMessages, result.messages)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           setMessagesToMap(
             channel.id,
@@ -1238,6 +1412,7 @@ function* getMessagesQuery(action: IAction): any {
           yield put(setMessagesHasPrevAC(true))
         } else {
           result.messages = getFromAllMessagesByMessageId('', '', true)
+          yield call(loadOGMetadataForLinkMessages, result.messages)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
           yield put(setMessagesHasPrevAC(true))
         }
@@ -1282,6 +1457,7 @@ function* getMessagesQuery(action: IAction): any {
             ? yield call(messageQuery.loadNextMessageId, loadNextMessageId)
             : { messages: [], hasNext: false }
         result.messages = [...firstResult.messages, ...secondResult.messages]
+        yield call(loadOGMetadataForLinkMessages, result.messages)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
 
         setMessagesToMap(
@@ -1316,8 +1492,8 @@ function* getMessagesQuery(action: IAction): any {
         yield put(
           setMessagesHasNextAC(
             channel.lastMessage &&
-            result.messages.length > 0 &&
-            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+              result.messages.length > 0 &&
+              channel.lastMessage.id !== result.messages[result.messages.length - 1].id
           )
         )
         setMessagesToMap(
@@ -1327,6 +1503,7 @@ function* getMessagesQuery(action: IAction): any {
           result.messages[result.messages.length - 1]?.id
         )
         setAllMessages([...result.messages])
+        yield call(loadOGMetadataForLinkMessages, result.messages)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
@@ -1338,10 +1515,13 @@ function* getMessagesQuery(action: IAction): any {
             true,
             cachedMessages?.length ? cachedMessages : undefined
           )
+          yield call(loadOGMetadataForLinkMessages, messages)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
           yield delay(0)
           const filteredPendingMessages = getFilteredPendingMessages(messages)
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+          // Load OG metadata for cached link-only messages
+          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages)
         }
         log.info('load message from server')
 
@@ -1378,6 +1558,9 @@ function* getMessagesQuery(action: IAction): any {
       }
       const filteredPendingMessages = getFilteredPendingMessages(result.messages)
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+
+      // Load OG metadata for link-only messages from cache
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages)
 
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
@@ -1484,6 +1667,7 @@ function* loadMoreMessages(action: IAction): any {
       result.messages.pop()
     } */
     if (result.messages && result.messages.length && result.messages.length > 0) {
+      yield call(loadOGMetadataForLinkMessages, result.messages)
       yield put(addMessagesAC(JSON.parse(JSON.stringify(result.messages)), direction))
     } else {
       yield put(addMessagesAC([], direction))
@@ -2326,4 +2510,6 @@ export default function* MessageSaga() {
   yield takeEvery(GET_POLL_VOTES, getPollVotes)
   yield takeEvery(LOAD_MORE_POLL_VOTES, loadMorePollVotes)
   yield takeEvery(RESEND_PENDING_POLL_ACTIONS, resendPendingPollActions)
+  yield takeEvery(LOAD_OG_METADATA_FOR_LINK, loadOGMetadataForLinkSaga)
+  yield takeEvery(FETCH_OG_METADATA, fetchOGMetadata)
 }

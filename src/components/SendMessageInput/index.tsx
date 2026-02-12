@@ -32,7 +32,9 @@ import {
   sendTextMessageAC,
   setMessageForReplyAC,
   setMessageToEditAC,
-  setSendMessageInputHeightAC
+  setSendMessageInputHeightAC,
+  loadOGMetadataForLinkAC,
+  updateOGMetadataAC
 } from '../../store/message/actions'
 import {
   joinChannelAC,
@@ -117,6 +119,8 @@ import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as DeleteIcon } from '../../assets/svg/deleteIcon.svg'
 import { ReactComponent as ForwardIcon } from '../../assets/svg/forward.svg'
 import { ReactComponent as ViewOnceIconOpen } from '../../assets/svg/view_once_last_message.svg'
+import { isDescriptionOnlySymbol } from '../Message/OGMetadata'
+import { ReactComponent as LinkIcon } from '../../assets/svg/linkIcon.svg'
 
 // Components
 import Attachment, { AttachmentFile, AttachmentImg } from '../Attachment'
@@ -133,6 +137,7 @@ import RecordingAnimation from './RecordingAnimation'
 import CreatePollPopup from './Poll/CreatePollPopup'
 import { MESSAGE_TYPE } from 'types/enum'
 import { getMembersAC } from 'store/member/actions'
+import { storeMetadata } from 'services/indexedDB/metadataService'
 
 function AutoFocusPlugin({ messageForReply }: any) {
   const [editor] = useLexicalComposerContext()
@@ -366,7 +371,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [THEME_COLORS.TEXT_FOOTNOTE]: textFootnote,
     [THEME_COLORS.HIGHLIGHTED_BACKGROUND]: highlightedBackground,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground,
+    [THEME_COLORS.BORDER]: borderColor
   } = useColor()
 
   const dispatch = useDispatch()
@@ -451,16 +457,149 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const messageInputRef = useRef<any>(null)
   const emojiBtnRef = useRef<any>(null)
   const addAttachmentsBtnRef = useRef<any>(null)
+  const metadataDebounceRef = useRef<NodeJS.Timeout | null>(null)
+  const sendMessageWrapperRef = useRef<HTMLDivElement | null>(null)
 
   const [realEditorState, setRealEditorState] = useState()
   const [floatingAnchorElem, setFloatingAnchorElem] = useState<HTMLDivElement | null>(null)
   const [isSmallWidthViewport, setIsSmallWidthViewport] = useState<boolean>(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const [linkPreview, setLinkPreview] = useState<{ url: string; metadata: any } | null>(null)
+  const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
+  const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set())
+  const [isClosingPreview, setIsClosingPreview] = useState(false)
+  const [wrapperWidth, setWrapperWidth] = useState<number>(0)
 
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
+  const linkify = new LinkifyIt()
+  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
+
+  const closePreviewWithAnimation = (callback?: () => void) => {
+    if (linkPreview) {
+      setIsClosingPreview(true)
+      setTimeout(() => {
+        setLinkPreview(null)
+        setIsClosingPreview(false)
+        callback?.()
+      }, 300)
+    } else {
+      callback?.()
+    }
+  }
 
   function onChange(editorState: any) {
     setRealEditorState(editorState)
+
+    // Extract text content from editor state
+    editorState.read(() => {
+      const root = $getRoot()
+      const textContent = root.getTextContent()
+
+      // Detect URLs in the text
+      const matches = linkify.match(textContent)
+      if (matches && matches.length > 0) {
+        // linkify defaults to http:// when no protocol is typed; upgrade to https://
+        const rawUrl = matches[0].url
+        const firstUrl = matches[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
+
+        // If URL changed, clear old preview with animation and set new URL
+        if (firstUrl !== detectedUrl) {
+          closePreviewWithAnimation(() => {
+            // Only fetch metadata if new URL is not dismissed
+            if (!dismissedUrls.has(firstUrl)) {
+              setDetectedUrl(firstUrl)
+
+              // Clear any existing debounce timeout
+              if (metadataDebounceRef.current) {
+                clearTimeout(metadataDebounceRef.current)
+              }
+
+              // Debounce the metadata fetch request
+              metadataDebounceRef.current = setTimeout(() => {
+                dispatch(
+                  loadOGMetadataForLinkAC([
+                    {
+                      attachments: [{ type: attachmentTypes.link, url: firstUrl }]
+                    } as IMessage
+                  ])
+                )
+              }, 500)
+            } else {
+              setDetectedUrl(firstUrl)
+            }
+          })
+        }
+      } else {
+        // Clear preview and dismissed URLs if no URL detected
+        if (detectedUrl) {
+          // Clear any pending metadata request
+          if (metadataDebounceRef.current) {
+            clearTimeout(metadataDebounceRef.current)
+          }
+
+          closePreviewWithAnimation(() => {
+            setDetectedUrl(null)
+            setDismissedUrls(new Set())
+          })
+        }
+      }
+    })
+  }
+
+  // Monitor metadata changes and update link preview
+  useEffect(() => {
+    if (detectedUrl && oGMetadata?.[detectedUrl] && !dismissedUrls.has(detectedUrl)) {
+      setLinkPreview({ url: detectedUrl, metadata: oGMetadata[detectedUrl] })
+    }
+  }, [detectedUrl, oGMetadata, dismissedUrls])
+
+  // Measure wrapper width for link preview
+  useEffect(() => {
+    const updateWidth = () => {
+      if (sendMessageWrapperRef.current) {
+        setWrapperWidth(sendMessageWrapperRef.current.offsetWidth)
+      }
+    }
+
+    updateWidth()
+
+    // Check if ResizeObserver is available
+    const ResizeObserverClass = (window as any).ResizeObserver
+    if (typeof ResizeObserverClass !== 'undefined') {
+      const resizeObserver = new ResizeObserverClass(updateWidth)
+      if (sendMessageWrapperRef.current) {
+        resizeObserver.observe(sendMessageWrapperRef.current)
+      }
+
+      return () => {
+        resizeObserver.disconnect()
+      }
+    }
+
+    return undefined
+  }, [])
+
+  // Hide link preview when attachments are added, restore when removed
+  useEffect(() => {
+    if (attachments.length > 0 && linkPreview) {
+      closePreviewWithAnimation()
+    } else if (
+      attachments.length === 0 &&
+      detectedUrl &&
+      oGMetadata?.[detectedUrl] &&
+      !dismissedUrls.has(detectedUrl)
+    ) {
+      setLinkPreview({ url: detectedUrl, metadata: oGMetadata[detectedUrl] })
+    }
+  }, [attachments.length])
+
+  const handleRemoveLinkPreview = () => {
+    closePreviewWithAnimation(() => {
+      if (detectedUrl) {
+        setDismissedUrls((prev) => new Set(prev).add(detectedUrl))
+      }
+      setDetectedUrl(null)
+    })
   }
 
   const onRef = (_floatingAnchorElem: HTMLDivElement) => {
@@ -573,10 +712,29 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           const linkify = new LinkifyIt()
           const match = linkify.match(messageTexToSend)
           if (match) {
+            const rawUrl = match[0].url
+            const url = match[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
+            const urlMetadata = oGMetadata?.[url]
+            const metadata: any = {}
+
+            if (urlMetadata) {
+              if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
+              if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
+              if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
+              if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description
+              if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
+              if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title
+            }
+
+            if (dismissedUrls.has(url)) {
+              metadata.hld = true
+            }
+
             linkAttachment = {
               type: attachmentTypes.link,
-              data: match[0].url,
-              upload: false
+              data: url,
+              upload: false,
+              ...(Object.keys(metadata).length > 0 ? { metadata } : { metadata: { hld: true } })
             }
           }
         }
@@ -640,6 +798,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setShouldClearEditor({ clear: true })
       setMentionedUsers([])
       setMessageBodyAttributes([])
+      closePreviewWithAnimation(() => {
+        setDetectedUrl(null)
+        setDismissedUrls(new Set())
+      })
       dispatch(setCloseSearchChannelsAC(true))
     } else {
       if (typingTimout) {
@@ -667,10 +829,29 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         const linkify = new LinkifyIt()
         const match = linkify.match(messageTexToSend)
         if (match) {
+          const rawUrl = match[0].url
+          const url = match[0].schema === '' ? rawUrl.replace(/^http:\/\//, 'https://') : rawUrl
+          const urlMetadata = oGMetadata?.[url]
+          const metadata: any = {}
+
+          if (urlMetadata) {
+            if (urlMetadata.imageWidth) metadata.szw = urlMetadata.imageWidth
+            if (urlMetadata.imageHeight) metadata.szh = urlMetadata.imageHeight
+            if (urlMetadata.og?.favicon?.url) metadata.tur = urlMetadata.og.favicon.url
+            if (urlMetadata.og?.description) metadata.dsc = urlMetadata.og.description
+            if (urlMetadata.og?.image?.[0]?.url) metadata.iur = urlMetadata.og.image[0].url
+            if (urlMetadata.og?.title) metadata.ttl = urlMetadata.og.title
+          }
+
+          if (dismissedUrls.has(url)) {
+            metadata.hld = true
+          }
+
           linkAttachment = {
             type: attachmentTypes.link,
-            data: match[0].url,
-            upload: false
+            data: url,
+            upload: false,
+            ...(Object.keys(metadata).length > 0 ? { metadata } : { metadata: { hld: true } })
           }
         }
       }
@@ -787,7 +968,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
     if (skippedCount > 0) {
       showFileUploadError(
-        `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+        `Only ${filesToProcess.length} file${
+          filesToProcess.length !== 1 ? 's' : ''
+        } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
       )
     }
 
@@ -856,7 +1039,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
         if (skippedCount > 0) {
           showFileUploadError(
-            `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+            `Only ${filesToProcess.length} file${
+              filesToProcess.length !== 1 ? 's' : ''
+            } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
           )
         }
 
@@ -1248,7 +1433,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
 
       if (skippedCount > 0) {
         showFileUploadError(
-          `Only ${filesToProcess.length} file${filesToProcess.length !== 1 ? 's' : ''} can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
+          `Only ${filesToProcess.length} file${
+            filesToProcess.length !== 1 ? 's' : ''
+          } can be added. ${skippedCount} file${skippedCount !== 1 ? 's' : ''} will be skipped.`
         )
       }
 
@@ -1637,7 +1824,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   }, [selectedMessagesMap])
 
   return (
-    <SendMessageWrapper backgroundColor={backgroundColor || background}>
+    <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
         margin={margin}
         padding={padding}
@@ -1780,6 +1967,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     padding={replyEditMessageContainerPadding}
                     color={editMessageTextColor || textPrimary}
                     backgroundColor={editMessageBackgroundColor || surface1Background}
+                    borderBottom={linkPreview && linkPreview.metadata}
+                    borderColor={borderColor}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseEditMode}>
                       <CloseIcon />
@@ -1810,6 +1999,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     padding={replyEditMessageContainerPadding}
                     color={replyMessageTextColor || textPrimary}
                     backgroundColor={replyMessageBackgroundColor || surface1Background}
+                    borderBottom={linkPreview && linkPreview.metadata}
+                    borderColor={borderColor}
                   >
                     <CloseEditMode color={textSecondary} onClick={handleCloseReply}>
                       <CloseIcon />
@@ -1910,6 +2101,66 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </ReplyMessageCont>
                   </EditReplyMessageCont>
                 )}
+                {linkPreview &&
+                  linkPreview.metadata &&
+                  !isDescriptionOnlySymbol(linkPreview.metadata.og?.description) &&
+                  (linkPreview.metadata.og?.title ||
+                    linkPreview.metadata.og?.description ||
+                    linkPreview.metadata.og?.image?.[0]?.url ||
+                    linkPreview.metadata.og?.favicon?.url) && (
+                    <LinkPreviewContainer
+                      backgroundColor={surface1Background}
+                      borderColor={borderColor}
+                      isClosing={isClosingPreview}
+                      width={wrapperWidth}
+                    >
+                      <LinkPreviewContent>
+                        {linkPreview.metadata.og?.image?.[0]?.url ? (
+                          <LinkPreviewImage
+                            onLoad={(e: any) => {
+                              if (e.target?.naturalHeight && e.target?.naturalWidth) {
+                                dispatch(
+                                  updateOGMetadataAC(linkPreview.url, {
+                                    ...linkPreview.metadata,
+                                    imageHeight: e.target.naturalHeight,
+                                    imageWidth: e.target.naturalWidth
+                                  })
+                                )
+                                storeMetadata(linkPreview.url, {
+                                  ...linkPreview.metadata,
+                                  imageHeight: e.target.naturalHeight,
+                                  imageWidth: e.target.naturalWidth
+                                })
+                              }
+                            }}
+                            src={linkPreview.metadata.og.image[0].url}
+                            alt='Link preview'
+                          />
+                        ) : linkPreview.metadata.og?.favicon?.url ? (
+                          <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
+                        ) : (
+                          <LinkPreviewIcon color={accentColor} bg={background} />
+                        )}
+                        <LinkPreviewTextContent
+                          hasImage={
+                            !!linkPreview.metadata.og?.image?.[0]?.url || !!linkPreview.metadata.og?.favicon?.url
+                          }
+                        >
+                          {linkPreview.metadata.og?.title && (
+                            <LinkPreviewTitle color={accentColor}>{linkPreview.metadata.og.title}</LinkPreviewTitle>
+                          )}
+                          {linkPreview.metadata.og?.description && (
+                            <LinkPreviewDescription color={textPrimary}>
+                              {linkPreview.metadata.og.description}
+                            </LinkPreviewDescription>
+                          )}
+                        </LinkPreviewTextContent>
+                      </LinkPreviewContent>
+                      <LinkPreviewCloseButton onClick={handleRemoveLinkPreview}>
+                        <CloseIcon style={{ color: textSecondary }} />
+                      </LinkPreviewCloseButton>
+                    </LinkPreviewContainer>
+                  )}
 
                 {!!attachments.length && !sendAttachmentSeparately && (
                   <ChosenAttachments>
@@ -1932,6 +2183,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     ))}
                   </ChosenAttachments>
                 )}
+
                 <SendMessageInputContainer iconColor={accentColor} minHeight={minHeight}>
                   {uploadErrorMessage && (
                     <ViewOnceWarningTooltip backgroundColor={tooltipBackground}>
@@ -2265,6 +2517,8 @@ const EditReplyMessageCont = styled.div<{
   left?: string
   bottom?: string
   padding?: string
+  borderBottom?: boolean
+  borderColor: string
 }>`
   position: relative;
   left: ${(props) => props.left || '0'};
@@ -2280,6 +2534,7 @@ const EditReplyMessageCont = styled.div<{
   background-color: ${(props) => props.backgroundColor};
   z-index: 19;
   box-sizing: content-box;
+  ${(props) => (props.borderBottom ? `border-bottom: 1px solid ${props.borderColor};` : '')}
 `
 
 const EditMessageText = styled.p<any>`
@@ -2847,6 +3102,130 @@ const CloseIconWrapper = styled.span<{ color: string }>`
   margin-left: auto;
   padding: 10px;
   color: ${(props) => props.color};
+`
+
+const linkPreviewSlideIn = keyframes`
+  from {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    max-height: 200px;
+    opacity: 1;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+`
+
+const linkPreviewSlideOut = keyframes`
+  from {
+    max-height: 200px;
+    opacity: 1;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+  to {
+    max-height: 0;
+    opacity: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+`
+
+const LinkPreviewContainer = styled.div<{
+  backgroundColor: string
+  borderColor: string
+  isClosing: boolean
+  width: number
+}>`
+  width: ${(props) => (props.width ? `${props.width}px` : '100%')};
+  display: flex;
+  align-items: flex-start;
+  box-sizing: border-box;
+  gap: 12px;
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-bottom: 0;
+  background-color: ${(props) => props.backgroundColor};
+  animation: ${(props) => (props.isClosing ? linkPreviewSlideOut : linkPreviewSlideIn)} 0.3s ease-in-out forwards;
+  overflow: hidden;
+`
+
+const LinkPreviewContent = styled.div`
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  overflow: hidden;
+`
+
+const LinkPreviewImage = styled.img`
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 8px;
+  flex-shrink: 0;
+`
+
+const LinkPreviewIcon = styled(LinkIcon)<{ color: string; bg: string }>`
+  color: ${(props) => props.color};
+  rect {
+    fill: ${(props) => props.bg};
+    fill-opacity: 1;
+  }
+`
+
+const LinkPreviewTextContent = styled.div<{ hasImage: boolean }>`
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  overflow: hidden;
+  flex: 1;
+  justify-content: center;
+  ${(props) => (props.hasImage ? '' : 'padding-left: 0;')}
+`
+
+const LinkPreviewTitle = styled.div<{ color: string }>`
+  color: ${(props) => props.color};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: Inter;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0px;
+`
+
+const LinkPreviewDescription = styled.div<{ color: string }>`
+  color: ${(props) => props.color};
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: -0.2px;
+`
+const LinkPreviewCloseButton = styled.button`
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 25px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+
+  svg {
+    width: 12px;
+    height: 12px;
+  }
 `
 
 export default SendMessageInput

@@ -24,7 +24,9 @@ import {
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
   RESEND_PENDING_POLL_ACTIONS,
-  queryDirection
+  LOAD_OG_METADATA_FOR_LINK,
+  queryDirection,
+  FETCH_OG_METADATA
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
@@ -617,4 +619,18 @@ export function clearPendingMessagesMapAC() {
 
 export function setUnreadMessageIdAC(messageId: string) {
   return setUnreadMessageId({ messageId })
+}
+
+export function loadOGMetadataForLinkAC(messages: IMessage[]) {
+  return {
+    type: LOAD_OG_METADATA_FOR_LINK,
+    payload: { messages }
+  }
+}
+
+export function fetchOGMetadataForLinkAC(url: string, setStore = true) {
+  return {
+    type: FETCH_OG_METADATA,
+    payload: { url, setStore }
+  }
 }

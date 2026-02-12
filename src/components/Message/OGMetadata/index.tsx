@@ -1,14 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { IAttachment, IOGMetadata } from '../../../types'
 import styled from 'styled-components'
-import { getClient } from '../../../common/client'
-import { getMetadata, storeMetadata } from '../../../services/indexedDB/metadataService'
 import { attachmentTypes } from '../../../helpers/constants'
-import { setOGMetadataAC } from '../../../store/message/actions'
 import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
-import { CONNECTION_STATUS } from 'store/user/constants'
 import { getChannelByInviteKeyAC } from 'store/channel/actions'
 
 const validateUrl = (url: string) => {
@@ -72,7 +68,6 @@ const OGMetadata = ({
 }) => {
   const dispatch = useDispatch()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
-  const [metadataLoaded, setMetadataLoaded] = useState(false)
   const {
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
@@ -85,87 +80,11 @@ const OGMetadata = ({
 
   const metadata = useMemo(() => {
     return oGMetadata?.[attachment?.url] || null
-  }, [oGMetadata, attachment?.url])
+  }, [attachment, oGMetadata])
 
-  const [imageLoadError, setImageLoadError] = useState(false)
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
-  const handleMetadata = useCallback(
-    (metadata: IOGMetadata | null) => {
-      if (metadata) {
-        dispatch(setOGMetadataAC(attachment?.url, metadata))
-      } else {
-        dispatch(setOGMetadataAC(attachment?.url, null))
-      }
-    },
-    [dispatch, attachment]
-  )
-
-  const ogMetadataQueryBuilder = useCallback(async (url: string) => {
-    const client = getClient()
-    if (client && client.connectionState === CONNECTION_STATUS.CONNECTED) {
-      try {
-        const queryBuilder = new client.MessageLinkOGQueryBuilder(url)
-        const query = await queryBuilder.build()
-        const metadata = await query.loadOGData()
-        const image = new Image()
-        image.src = metadata?.og?.image?.[0]?.url
-        if (image.src) {
-          image.onload = async () => {
-            const imageWidth = image.width
-            const imageHeight = image.height
-            await storeMetadata(url, { ...metadata, imageWidth, imageHeight })
-            handleMetadata({ ...metadata, imageWidth, imageHeight })
-          }
-          image.onerror = async () => {
-            setImageLoadError(true)
-
-            const favicon = new Image()
-            favicon.src = metadata?.og?.favicon?.url
-            if (favicon.src) {
-              favicon.onload = async () => {
-                await storeMetadata(url, { ...metadata, faviconLoaded: true })
-                handleMetadata({ ...metadata, faviconLoaded: true })
-              }
-              favicon.onerror = async () => {
-                await storeMetadata(url, { ...metadata, faviconLoaded: false })
-                handleMetadata({ ...metadata, faviconLoaded: false })
-              }
-            }
-          }
-        } else {
-          await storeMetadata(url, { ...metadata })
-          handleMetadata({ ...metadata })
-        }
-      } catch (error) {
-        console.log('Failed to fetch OG metadata', url)
-      } finally {
-        setMetadataLoaded(true)
-      }
-    }
-    return null
-  }, [])
-
-  useEffect(() => {
-    if (attachment?.id && attachment?.url && !oGMetadata?.[attachment?.url]) {
-      setShouldAnimate(true)
-      const url = attachment?.url
-      if (url) {
-        getMetadata(url)
-          .then(async (cachedMetadata) => {
-            if (cachedMetadata) {
-              handleMetadata(cachedMetadata)
-              setMetadataLoaded(true)
-            }
-            ogMetadataQueryBuilder(url)
-          })
-          .catch(() => {
-            ogMetadataQueryBuilder(url)
-            setMetadataLoaded(true)
-          })
-      }
-    }
-  }, [attachment, oGMetadata?.[attachment?.url]])
+  const [imageLoadError] = useState(false)
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -212,7 +131,7 @@ const OGMetadata = ({
     [metadata?.og?.image?.[0]?.url, imageLoadError]
   )
   const faviconUrl = useMemo(
-    () => (ogShowFavicon && metadata?.faviconLoaded ? metadata?.og?.favicon?.url : ''),
+    () => (ogShowFavicon && !hasImage && metadata?.og?.favicon?.url ? metadata?.og?.favicon?.url : ''),
     [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon]
   )
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
@@ -225,14 +144,14 @@ const OGMetadata = ({
   }, [hasImage, calculatedImageHeight])
 
   useEffect(() => {
-    if (metadataLoaded || oGMetadata?.[attachment?.url]) {
+    if (oGMetadata?.[attachment?.url]) {
       if (showOGMetadata && oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
         metadataGetSuccessCallback(attachment?.url, true, showImage, metadata)
       } else {
         metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
     }
-  }, [metadataLoaded, oGMetadata, attachment?.url, metadata, showOGMetadata, showImage])
+  }, [oGMetadata, attachment?.url, metadata, showOGMetadata, showImage])
 
   const elements = useMemo(
     () =>
@@ -346,6 +265,12 @@ const OGMetadata = ({
       dispatch(getChannelByInviteKeyAC(key))
     }
   }, [attachment?.url])
+
+  useEffect(() => {
+    if (!metadata) {
+      setShouldAnimate(true)
+    }
+  }, [metadata])
 
   // If we shouldn't show OG metadata, return null to render as default message
   if (!showOGMetadata) {

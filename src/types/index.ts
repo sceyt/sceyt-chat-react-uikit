@@ -326,6 +326,8 @@ export interface IOGMetadata {
   }
   imageWidth?: number
   imageHeight?: number
+  containerHeight?: number
+  faviconLoaded?: boolean
 }
 
 export type MuteTime = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 24

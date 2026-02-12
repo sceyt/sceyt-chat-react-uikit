@@ -668,6 +668,7 @@ const Message = ({
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
       showOwnAvatar={showOwnAvatar}
+      transition={!!reactionsCount}
       hoverBackground={
         hoverBackground
           ? message.incoming
@@ -927,36 +928,40 @@ const Message = ({
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
-        <MessageReactions
-          message={message}
-          reactionsCount={reactionsCount}
-          reactionsPopupOpen={reactionsPopupOpen}
-          reactionsPopupPosition={reactionsPopupPosition}
-          reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
-          rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
-          backgroundSections={backgroundSections}
-          textPrimary={textPrimary}
-          reactionsDisplayCount={reactionsDisplayCount || 5}
-          showEachReactionCount={showEachReactionCount ?? true}
-          showTotalReactionCount={!!showTotalReactionCount}
-          reactionItemBorder={reactionItemBorder}
-          reactionItemBorderRadius={reactionItemBorderRadius}
-          reactionItemBackground={reactionItemBackground}
-          reactionItemPadding={reactionItemPadding}
-          reactionItemMargin={reactionItemMargin}
-          reactionsFontSize={reactionsFontSize}
-          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
-          reactionsContainerBorder={reactionsContainerBorder}
-          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
-          reactionsContainerBackground={reactionsContainerBackground}
-          reactionsContainerTopPosition={reactionsContainerTopPosition}
-          reactionsContainerPadding={reactionsContainerPadding}
-          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
-          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
-          onToggleReactionsPopup={handleToggleReactionsPopup}
-          onReactionAddDelete={handleReactionAddDelete}
-          onOpenUserProfile={handleOpenUserProfile}
-        />
+        {reactionsCount ? (
+          <MessageReactions
+            message={message}
+            reactionsCount={reactionsCount}
+            reactionsPopupOpen={reactionsPopupOpen}
+            reactionsPopupPosition={reactionsPopupPosition}
+            reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
+            rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
+            backgroundSections={backgroundSections}
+            textPrimary={textPrimary}
+            reactionsDisplayCount={reactionsDisplayCount || 5}
+            showEachReactionCount={showEachReactionCount ?? true}
+            showTotalReactionCount={!!showTotalReactionCount}
+            reactionItemBorder={reactionItemBorder}
+            reactionItemBorderRadius={reactionItemBorderRadius}
+            reactionItemBackground={reactionItemBackground}
+            reactionItemPadding={reactionItemPadding}
+            reactionItemMargin={reactionItemMargin}
+            reactionsFontSize={reactionsFontSize}
+            reactionsContainerBoxShadow={reactionsContainerBoxShadow}
+            reactionsContainerBorder={reactionsContainerBorder}
+            reactionsContainerBorderRadius={reactionsContainerBorderRadius}
+            reactionsContainerBackground={reactionsContainerBackground}
+            reactionsContainerTopPosition={reactionsContainerTopPosition}
+            reactionsContainerPadding={reactionsContainerPadding}
+            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+            onToggleReactionsPopup={handleToggleReactionsPopup}
+            onReactionAddDelete={handleReactionAddDelete}
+            onOpenUserProfile={handleOpenUserProfile}
+          />
+        ) : (
+          <React.Fragment />
+        )}
       </MessageContent>
       <MessagePopups
         message={message}
@@ -1100,6 +1105,7 @@ const MessageItem = styled.div<{
   withAvatar?: boolean
   selectMessagesIsActive?: boolean
   showOwnAvatar?: boolean
+  transition: boolean
 }>`
   display: flex;
   position: relative;
@@ -1115,7 +1121,7 @@ const MessageItem = styled.div<{
   transition: padding-left 0.2s;
   cursor: ${(props) => props.selectMessagesIsActive && 'pointer'};
   ${(props) => props.rtl && 'direction: rtl;'};
-
+  ${(props) => (props.transition ? 'transition: all 0.2s ease-in-out;' : '')}
   &:hover {
     background-color: ${(props) => props.hoverBackground || ''};
   }

@@ -493,6 +493,18 @@ const MessageBody = ({
     )
   }, [message.attachments, viewOnce, isViewOnceAndVoiceMessage])
 
+  const showOGMetadata = useMemo(() => {
+    if (!(linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment)) {
+      return false
+    }
+    const attachment = message.attachments[0]
+    const attachmentMetadata = isJSON(attachment?.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
+    if (attachmentMetadata && !attachmentMetadata?.hld) {
+      return false
+    }
+    return true
+  }, [linkAttachment, mediaAttachment, withMediaAttachment, fileAttachment])
+
   const borderRadius = useMemo(
     () =>
       message.incoming && incomingMessageStyles?.background === 'inherit'
@@ -579,7 +591,7 @@ const MessageBody = ({
       return 336
     }
     if (hasDescription) {
-      return 356
+      return 336
     }
     return ogMetadataProps?.maxWidth || 400
   }, [
@@ -837,7 +849,7 @@ const MessageBody = ({
         unsupportedMessage={unsupportedMessage}
         unsupportedMessageColor={textSecondary}
       >
-        {ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+        {ogContainerFirst && showOGMetadata && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}
@@ -890,7 +902,7 @@ const MessageBody = ({
         ) : (
           ''
         )}
-        {!ogContainerFirst && linkAttachment && !mediaAttachment && !withMediaAttachment && !fileAttachment && (
+        {!ogContainerFirst && showOGMetadata && linkAttachment && (
           <OGMetadata
             maxWidth={ogMetadataContainerWidth}
             maxHeight={ogMetadataProps?.maxHeight}

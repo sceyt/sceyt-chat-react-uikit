@@ -203,39 +203,6 @@ export const checkArraysEqual = (arr1: any[], arr2: any[]) => {
   return true
 }
 
-export const getMetadataFromUrl = (url: string): Promise<any> => {
-  return fetch(url)
-    .then((response) => response.text())
-    .then((data) => {
-      // Extract metadata from the HTML
-      const parser = new DOMParser()
-      const doc = parser.parseFromString(data, 'text/html')
-      // @ts-ignore
-      const title = doc.querySelector('title').innerText
-
-      // Extract the description
-      // @ts-ignore
-      const description = (
-        doc.querySelector("meta[name='twitter:description']") ||
-        doc.querySelector("meta[property='og:description']") ||
-        doc.querySelector("meta[name='description']")
-      ).getAttribute('content')
-      let image
-      // Extract the image
-      // @ts-ignore
-      const imageSrc = (
-        doc.querySelector("meta[name='twitter:image']") || doc.querySelector("meta[property='og:image']")
-      ).getAttribute('content')
-      if (!(imageSrc && imageSrc.startsWith('http'))) {
-        image = `${url.slice(0, -1)}${imageSrc}`
-      } else {
-        image = imageSrc
-      }
-      return { title, description, image }
-    })
-    .catch((error) => log.error(error))
-}
-
 export const formatAudioVideoTime = (currentTime: number) => {
   const minutes = Math.floor(currentTime / 60)
   const seconds = Math.floor(currentTime % 60)

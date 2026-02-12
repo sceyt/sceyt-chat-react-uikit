@@ -2,7 +2,6 @@ import { getDataFromDB, setDataToDB, getAllStoreNames, deleteStore } from './ind
 import { IOGMetadata } from '../../types'
 
 const METADATA_DB_NAME = 'sceyt-metadata-db'
-const CACHE_DURATION = 24 * 60 * 60 * 1000 // 24 hours in milliseconds
 
 const getCurrentMonthKey = (): string => {
   const now = new Date()
@@ -18,11 +17,10 @@ const getPreviousMonthKey = (): string => {
 export const storeMetadata = async (url: string, metadata: IOGMetadata): Promise<void> => {
   const currentMonth = getCurrentMonthKey()
 
-  const metadataRecord: IOGMetadata & { timestamp: number; expiresAt: number } = {
+  const metadataRecord: IOGMetadata & { timestamp: number } = {
     ...metadata,
     url,
-    timestamp: Date.now(),
-    expiresAt: Date.now() + CACHE_DURATION
+    timestamp: Date.now()
   }
 
   try {
