@@ -43,14 +43,14 @@ export const getContactsAC = () => ({
   payload: {}
 })
 
-export const blockUserAC = (userIds: string[]) => ({
+export const blockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: BLOCK_USERS,
-  payload: { userIds }
+  payload: { userIds, callback }
 })
 
-export const unblockUserAC = (userIds: string[]) => ({
+export const unblockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: UNBLOCK_USERS,
-  payload: { userIds }
+  payload: { userIds, callback }
 })
 
 export const setContactsLoadingStateAC = (status: number) => ({

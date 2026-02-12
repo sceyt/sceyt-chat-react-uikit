@@ -52,7 +52,7 @@ function* blockUser(action: IAction): any {
   try {
     const SceytChatClient = getClient()
     const { payload } = action
-    const { userIds } = payload
+    const { userIds, callback } = payload
     const blockedUsers = yield call(SceytChatClient.blockUsers, userIds)
 
     const activeChannelId = yield call(getActiveChannelId)
@@ -90,8 +90,17 @@ function* blockUser(action: IAction): any {
       yield put(updateChannelsMembersAC([{ ...user, blocked: true }]))
       updateChannelMemberInAllChannels([{ ...user, blocked: true }])
     }
+
+    if (callback) {
+      callback(blockedUsers)
+    }
   } catch (error) {
     log.error('error in block users', error.message)
+    const { payload } = action
+    const { callback } = payload
+    if (callback) {
+      callback(null, error)
+    }
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -100,7 +109,7 @@ function* unblockUser(action: IAction): any {
   try {
     const SceytChatClient = getClient()
     const { payload } = action
-    const { userIds } = payload
+    const { userIds, callback } = payload
     const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
@@ -138,8 +147,16 @@ function* unblockUser(action: IAction): any {
       yield put(updateChannelsMembersAC([{ ...user, blocked: false }]))
       updateChannelMemberInAllChannels([{ ...user, blocked: false }])
     }
+    if (callback) {
+      callback(unblockedUsers)
+    }
   } catch (error) {
     log.error('error in unblock users', error.message)
+    const { payload } = action
+    const { callback } = payload
+    if (callback) {
+      callback(null, error)
+    }
     // yield put(setErrorNotification(error.message))
   }
 }
