@@ -928,40 +928,36 @@ const Message = ({
             {`${message.replyCount} replies`}
           </ThreadMessageCountContainer>
         )}
-        {reactionsCount ? (
-          <MessageReactions
-            message={message}
-            reactionsCount={reactionsCount}
-            reactionsPopupOpen={reactionsPopupOpen}
-            reactionsPopupPosition={reactionsPopupPosition}
-            reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
-            rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
-            backgroundSections={backgroundSections}
-            textPrimary={textPrimary}
-            reactionsDisplayCount={reactionsDisplayCount || 5}
-            showEachReactionCount={showEachReactionCount ?? true}
-            showTotalReactionCount={!!showTotalReactionCount}
-            reactionItemBorder={reactionItemBorder}
-            reactionItemBorderRadius={reactionItemBorderRadius}
-            reactionItemBackground={reactionItemBackground}
-            reactionItemPadding={reactionItemPadding}
-            reactionItemMargin={reactionItemMargin}
-            reactionsFontSize={reactionsFontSize}
-            reactionsContainerBoxShadow={reactionsContainerBoxShadow}
-            reactionsContainerBorder={reactionsContainerBorder}
-            reactionsContainerBorderRadius={reactionsContainerBorderRadius}
-            reactionsContainerBackground={reactionsContainerBackground}
-            reactionsContainerTopPosition={reactionsContainerTopPosition}
-            reactionsContainerPadding={reactionsContainerPadding}
-            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
-            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
-            onToggleReactionsPopup={handleToggleReactionsPopup}
-            onReactionAddDelete={handleReactionAddDelete}
-            onOpenUserProfile={handleOpenUserProfile}
-          />
-        ) : (
-          <React.Fragment />
-        )}
+        <MessageReactions
+          message={message}
+          reactionsCount={reactionsCount}
+          reactionsPopupOpen={reactionsPopupOpen}
+          reactionsPopupPosition={reactionsPopupPosition}
+          reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
+          rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
+          backgroundSections={backgroundSections}
+          textPrimary={textPrimary}
+          reactionsDisplayCount={reactionsDisplayCount || 5}
+          showEachReactionCount={showEachReactionCount ?? true}
+          showTotalReactionCount={!!showTotalReactionCount}
+          reactionItemBorder={reactionItemBorder}
+          reactionItemBorderRadius={reactionItemBorderRadius}
+          reactionItemBackground={reactionItemBackground}
+          reactionItemPadding={reactionItemPadding}
+          reactionItemMargin={reactionItemMargin}
+          reactionsFontSize={reactionsFontSize}
+          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
+          reactionsContainerBorder={reactionsContainerBorder}
+          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
+          reactionsContainerBackground={reactionsContainerBackground}
+          reactionsContainerTopPosition={reactionsContainerTopPosition}
+          reactionsContainerPadding={reactionsContainerPadding}
+          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+          onToggleReactionsPopup={handleToggleReactionsPopup}
+          onReactionAddDelete={handleReactionAddDelete}
+          onOpenUserProfile={handleOpenUserProfile}
+        />
       </MessageContent>
       <MessagePopups
         message={message}

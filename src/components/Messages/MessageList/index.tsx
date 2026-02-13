@@ -1692,10 +1692,15 @@ export const DropAttachmentArea = styled.div<{
 export const MessageWrapper = styled.div<{ highlightBg: string }>`
   &.highlight {
     & .message_item {
+      transition: all 0.2s ease-in-out;
       padding-top: 4px;
       padding-bottom: 4px;
       background-color: ${(props) => props.highlightBg || '#d5d5d5'};
     }
+  }
+
+  & .message_item {
+    transition: all 0.2s ease-in-out;
   }
 `
 

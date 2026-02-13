@@ -1325,13 +1325,15 @@ function loadImage(src: string): Promise<{ width: number; height: number }> {
     const img = document.createElement('img')
 
     img.setAttribute('fetchpriority', 'high')
+    img.style.display = 'none'
 
     img.onload = () => {
-      resolve({
+      const sizes = {
         width: img.naturalWidth,
         height: img.naturalHeight
-      })
+      }
       img.remove()
+      resolve(sizes)
     }
 
     img.onerror = reject
