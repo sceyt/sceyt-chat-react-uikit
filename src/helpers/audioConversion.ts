@@ -70,7 +70,27 @@ const initFFmpeg = async (): Promise<FFmpeg> => {
  * @param file - The MP3 file to convert
  * @returns Promise resolving to converted File object (m4a format)
  */
-export const convertMp3ToAac = async (file: File, messageId: string): Promise<File> => {
+/**
+ * Gets the file extension based on MIME type
+ */
+const getExtensionForType = (mimeType: string): string => {
+  const typeMap: Record<string, string> = {
+    'audio/mpeg': 'mp3',
+    'audio/mp3': 'mp3',
+    'audio/webm': 'webm',
+    'audio/ogg': 'ogg',
+    'audio/opus': 'opus',
+    'audio/wav': 'wav',
+    'audio/x-wav': 'wav',
+    'audio/mp4': 'm4a',
+    'audio/aac': 'aac'
+  }
+  // Handle types with codecs like "audio/webm;codecs=opus"
+  const baseType = mimeType.split(';')[0].trim().toLowerCase()
+  return typeMap[baseType] || 'bin'
+}
+
+export const convertToAac = async (file: File, messageId: string): Promise<File> => {
   try {
     // Validate file size (limit to 50MB to avoid memory issues)
     const maxSize = 50 * 1024 * 1024 // 50MB
@@ -84,58 +104,50 @@ export const convertMp3ToAac = async (file: File, messageId: string): Promise<Fi
 
     const ffmpeg = await initFFmpeg()
 
+    // Determine input extension from file type so FFmpeg can detect the format
+    const inputExt = getExtensionForType(file.type)
+    const inputName = `${messageId}_input.${inputExt}`
+    const outputName = `${messageId}_output.m4a`
+
     // Clean up any existing files first to avoid conflicts
     try {
-      await ffmpeg.deleteFile(`${messageId}_input.mp3`)
+      await ffmpeg.deleteFile(inputName)
     } catch (e) {
       // File doesn't exist, that's fine
     }
     try {
-      await ffmpeg.deleteFile(`${messageId}_output.m4a`)
+      await ffmpeg.deleteFile(outputName)
     } catch (e) {
       // File doesn't exist, that's fine
     }
 
     // Write input file to FFmpeg's virtual filesystem
     const inputData = await fetchFile(file)
-    await ffmpeg.writeFile(`${messageId}_input.mp3`, inputData)
+    await ffmpeg.writeFile(inputName, inputData)
 
-    // Convert MP3 to AAC (m4a) with Safari-compatible settings
-    await ffmpeg.exec([
-      '-i',
-      `${messageId}_input.mp3`,
-      '-c:a',
-      'aac',
-      '-b:a',
-      '128k',
-      '-movflags',
-      '+faststart',
-      `${messageId}_output.m4a`
-    ])
+    // Convert to AAC (m4a) with Safari-compatible settings
+    await ffmpeg.exec(['-i', inputName, '-c:a', 'aac', '-b:a', '128k', '-movflags', '+faststart', outputName])
 
     // Read the converted file
-    const data = await ffmpeg.readFile(`${messageId}_output.m4a`)
+    const data = await ffmpeg.readFile(outputName)
 
     // Clean up virtual filesystem
     try {
-      await ffmpeg.deleteFile(`${messageId}_input.mp3`)
+      await ffmpeg.deleteFile(inputName)
     } catch (e) {
       // Ignore cleanup errors
     }
     try {
-      await ffmpeg.deleteFile(`${messageId}_output.m4a`)
+      await ffmpeg.deleteFile(outputName)
     } catch (e) {
       // Ignore cleanup errors
     }
 
     // Create a new File object with the converted data
-    // FileData from FFmpeg can be Uint8Array, ArrayBuffer, or string
-    // Convert to Uint8Array for consistent handling
     let dataArray: Uint8Array
     if (data instanceof Uint8Array) {
       dataArray = data
     } else if (typeof data === 'string') {
-      // If it's a string (base64), convert to Uint8Array
       const binaryString = atob(data)
       const bytes = new Uint8Array(binaryString.length)
       for (let i = 0; i < binaryString.length; i++) {
@@ -143,46 +155,61 @@ export const convertMp3ToAac = async (file: File, messageId: string): Promise<Fi
       }
       dataArray = bytes
     } else {
-      // Assume ArrayBuffer or ArrayBufferLike
       dataArray = new Uint8Array(data as unknown as ArrayBufferLike)
     }
-    // Create ArrayBuffer from Uint8Array to avoid SharedArrayBuffer issues
     const arrayBuffer = dataArray.buffer.slice(
       dataArray.byteOffset,
       dataArray.byteOffset + dataArray.byteLength
     ) as ArrayBuffer
     const blob = new Blob([arrayBuffer], { type: 'audio/mp4' })
-    const convertedFile = new File([blob], `${messageId}_${file.name.replace('.mp3', '.m4a')}`, {
+    const convertedFile = new File([blob], `${messageId}_converted.m4a`, {
       type: 'audio/mp4',
       lastModified: file.lastModified
     })
 
     return convertedFile
   } catch (error) {
-    log.error('Failed to convert MP3 to AAC:', error)
+    log.error('Failed to convert audio to AAC:', error)
     throw error
   }
 }
 
+// Keep old name for backwards compatibility
+export const convertMp3ToAac = convertToAac
+
+// Safari-supported audio MIME types (no conversion needed)
+const SAFARI_SUPPORTED_TYPES = new Set([
+  'audio/mp4',
+  'audio/aac',
+  'audio/x-m4a',
+  'audio/wav',
+  'audio/x-wav',
+  'audio/aiff'
+])
+
 /**
  * Converts audio file to Safari-compatible format if needed
- * For Safari: converts MP3 to AAC (m4a)
+ * For Safari: converts unsupported formats (webm, ogg, opus, mp3) to AAC (m4a)
  * For other browsers: returns original file
  * @param file - The audio file to potentially convert
  * @returns Promise resolving to the file (converted if Safari, original otherwise)
  */
 export const convertAudioForSafari = async (file: File, messageId: string): Promise<File> => {
-  // Only convert if it's Safari and the file is MP3
-  if (isSafari() && file.type === 'audio/mpeg' && file.name.endsWith('.mp3')) {
-    try {
-      return await convertMp3ToAac(file, messageId)
-    } catch (error) {
-      log.warn('Audio conversion failed, using original file:', error)
-      // Fallback to original file if conversion fails
-      return file
-    }
+  if (!isSafari()) {
+    return file
   }
 
-  // Return original file for non-Safari browsers or non-MP3 files
-  return file
+  // Check if the format is already Safari-compatible
+  const baseType = file.type.split(';')[0].trim().toLowerCase()
+  if (SAFARI_SUPPORTED_TYPES.has(baseType)) {
+    return file
+  }
+
+  // Convert unsupported format to AAC
+  try {
+    return await convertToAac(file, messageId)
+  } catch (error) {
+    log.warn('Audio conversion failed, using original file:', error)
+    return file
+  }
 }

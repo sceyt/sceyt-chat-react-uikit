@@ -15,19 +15,9 @@ import { THEME_COLORS } from '../../UIHelper/constants'
 import { IAttachment } from '../../types'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
-import WaveSurfer from 'wavesurfer.js'
 import { markVoiceMessageAsPlayedAC } from 'store/channel/actions'
 import AudioVisualization from './AudioVisualization'
 import { convertAudioForSafari, isSafari } from '../../helpers/audioConversion'
-
-interface Recording {
-  recordingSeconds: number
-  recordingMilliseconds: number
-  initRecording: boolean
-  mediaStream: null | MediaStream
-  mediaRecorder: null | MediaRecorder
-  audio?: string
-}
 
 interface AudioPlayerProps {
   url: string
@@ -54,14 +44,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   borderRadius,
   onClose
 }) => {
-  const recordingInitialState = {
-    recordingSeconds: 0,
-    recordingMilliseconds: 0,
-    initRecording: false,
-    mediaStream: null,
-    mediaRecorder: null,
-    audio: undefined
-  }
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
@@ -71,281 +53,188 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   } = useColor()
   const dispatch = useDispatch()
   const playingAudioId = useSelector(playingAudioIdSelector)
-  const [recording, setRecording] = useState<Recording>(recordingInitialState)
-  const [isRendered, setIsRendered] = useState<any>(false)
-  const [playAudio, setPlayAudio] = useState<any>(false)
+  const [playAudio, setPlayAudio] = useState(false)
 
-  const [currentTime, setCurrentTime] = useState<any>('')
+  const [currentTime, setCurrentTime] = useState<string>('')
   const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0)
   const [duration, setDuration] = useState<number>(0)
   const [realDuration, setRealDuration] = useState<number>(0)
-  const [audioRate, setAudioRate] = useState<any>(1)
+  const [audioRate, setAudioRate] = useState<number>(1)
 
-  const wavesurfer = useRef<any>(null)
-  const wavesurferContainer = useRef<any>(null)
+  const audioRef = useRef<HTMLAudioElement | null>(null)
   const intervalRef = useRef<any>(null)
   const convertedUrlRef = useRef<string | null>(null)
+  const visualizationRef = useRef<HTMLDivElement>(null)
 
   const handleSetAudioRate = () => {
-    if (wavesurfer.current) {
+    if (audioRef.current) {
       if (audioRate === 1) {
         setAudioRate(1.5)
-        wavesurfer.current.setPlaybackRate(1.5)
+        audioRef.current.playbackRate = 1.5
       } else if (audioRate === 1.5) {
         setAudioRate(2)
-        wavesurfer.current.audioRate = 2
-        wavesurfer.current.setPlaybackRate(2)
+        audioRef.current.playbackRate = 2
       } else {
         setAudioRate(1)
-        wavesurfer.current.audioRate = 1
-        wavesurfer.current.setPlaybackRate(1)
+        audioRef.current.playbackRate = 1
       }
     }
   }
+
+  const startTimeTracking = () => {
+    clearInterval(intervalRef.current)
+    intervalRef.current = setInterval(() => {
+      if (audioRef.current) {
+        const time = audioRef.current.currentTime
+        if (time >= 0) {
+          setCurrentTime(formatAudioVideoTime(time))
+          setCurrentTimeSeconds(time)
+        }
+      }
+    }, 10)
+  }
+
   const handlePlayPause = () => {
     if (setViewOnceVoiceModalOpen) {
       setViewOnceVoiceModalOpen(true)
       return
     }
-    if (wavesurfer.current) {
-      if (!wavesurfer.current.isPlaying()) {
+    if (audioRef.current) {
+      if (audioRef.current.paused) {
         setPlayAudio(true)
         dispatch(setPlayingAudioIdAC(`player_${file.id}`))
-        intervalRef.current = setInterval(() => {
-          const currentTime = wavesurfer.current.getCurrentTime()
-          if (currentTime >= 0) {
-            setCurrentTime(formatAudioVideoTime(currentTime))
-            setCurrentTimeSeconds(currentTime)
-          }
-        }, 10)
+        startTimeTracking()
+        audioRef.current.play().catch((e) => {
+          log.error('Audio play failed:', e)
+          setPlayAudio(false)
+        })
       } else {
+        audioRef.current.pause()
         if (playingAudioId === file.id) {
           dispatch(setPlayingAudioIdAC(null))
         }
       }
-      wavesurfer.current.playPause()
       if (!messagePlayed && incoming) {
         dispatch(markVoiceMessageAsPlayedAC(channelId!, [file.messageId]))
       }
     }
   }
-  useEffect(() => {
-    if (recording.mediaStream) {
-      setRecording({
-        ...recording,
-        mediaRecorder: new MediaRecorder(recording.mediaStream, {
-          mimeType: 'audio/webm'
-        })
-      })
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!audioRef.current || !visualizationRef.current) return
+    const rect = visualizationRef.current.getBoundingClientRect()
+    const clickX = e.clientX - rect.left
+    const ratio = Math.max(0, Math.min(1, clickX / rect.width))
+    const audioDuration = audioRef.current.duration
+    if (audioDuration && isFinite(audioDuration)) {
+      audioRef.current.currentTime = ratio * audioDuration
+      setCurrentTime(formatAudioVideoTime(audioRef.current.currentTime))
+      setCurrentTimeSeconds(audioRef.current.currentTime)
     }
-  }, [recording.mediaStream])
+  }
 
   useEffect(() => {
-    const MAX_RECORDER_TIME = 15
-    let recordingInterval: any = null
-
-    if (recording.initRecording) {
-      recordingInterval = setInterval(() => {
-        setRecording((prevState) => {
-          if (prevState.recordingSeconds === MAX_RECORDER_TIME && prevState.recordingMilliseconds === 0) {
-            clearInterval(recordingInterval)
-            return prevState
-          }
-
-          if (prevState.recordingMilliseconds >= 0 && prevState.recordingMilliseconds < 99) {
-            return {
-              ...prevState,
-              recordingMilliseconds: prevState.recordingMilliseconds + 1
-            }
-          }
-
-          if (prevState.recordingMilliseconds === 99) {
-            return {
-              ...prevState,
-              recordingSeconds: prevState.recordingSeconds + 1,
-              recordingMilliseconds: 0
-            }
-          }
-
-          return prevState
-        })
-      }, 10)
-    } else clearInterval(recordingInterval)
-
-    return () => clearInterval(recordingInterval)
-  }, [recording.initRecording])
-
-  useEffect(() => {
-    if (url) {
-      // Clean up previous converted URL if it exists
+    if (url && url !== '_') {
+      // Clean up previous converted URL
       if (convertedUrlRef.current) {
         URL.revokeObjectURL(convertedUrlRef.current)
         convertedUrlRef.current = null
       }
 
-      if (url !== '_' && !isRendered && wavesurfer && wavesurfer.current) {
-        wavesurfer.current.destroy()
+      const audio = new Audio()
+      audioRef.current = audio
+      audio.playbackRate = audioRate
+      audio.preload = 'metadata'
+
+      // Set duration from metadata if available
+      if (file.metadata?.dur) {
+        setDuration(file.metadata.dur)
+        setCurrentTime(formatAudioVideoTime(file.metadata.dur))
       }
-      const initWaveSurfer = async () => {
-        try {
-          // Check if we need to convert for Safari
-          let audioUrl = url
-          const needsConversion =
-            isSafari() &&
-            url &&
-            url !== '_' &&
-            (url.endsWith('.mp3') || file.name?.endsWith('.mp3') || file.type === 'audio/mpeg')
 
-          if (needsConversion) {
-            try {
-              // Clean up any previous converted URL before creating a new one
-              if (convertedUrlRef.current) {
-                URL.revokeObjectURL(convertedUrlRef.current)
-                convertedUrlRef.current = null
-              }
+      audio.addEventListener('loadedmetadata', () => {
+        const audioDuration = audio.duration
+        if (audioDuration && isFinite(audioDuration)) {
+          setRealDuration(audioDuration)
+          setDuration(file?.metadata?.dur || audioDuration)
+          setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
+        }
+      })
 
-              // Use a unique cache key based on file ID or URL to prevent reuse
-              const cacheKey = file.id || url
+      audio.addEventListener('ended', () => {
+        setPlayAudio(false)
+        audio.currentTime = 0
+        const audioDuration = audio.duration
+        if (audioDuration && isFinite(audioDuration)) {
+          setRealDuration(audioDuration)
+          setDuration(file?.metadata?.dur || audioDuration)
+          setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
+        }
+        setCurrentTimeSeconds(0)
+        if (playingAudioId === file.id) {
+          dispatch(setPlayingAudioIdAC(null))
+        }
+        clearInterval(intervalRef.current)
+        if (onClose) {
+          onClose()
+        }
+      })
 
-              // Fetch the audio file with cache control to ensure fresh data
-              const response = await fetch(url, {
-                cache: 'no-store' // Prevent browser caching
-              })
+      audio.addEventListener('pause', () => {
+        setPlayAudio(false)
+        if (playingAudioId === file.id) {
+          dispatch(setPlayingAudioIdAC(null))
+        }
+        clearInterval(intervalRef.current)
+      })
 
-              if (!response.ok) {
-                throw new Error(`Failed to fetch audio: ${response.statusText}`)
-              }
-
-              const blob = await response.blob()
-
-              // Create a unique file name using file ID to prevent conflicts
-              const uniqueFileName = `${file.id || Date.now()}_${file.name || 'audio.mp3'}`
-              const audioFile = new File([blob], uniqueFileName, {
+      audio.addEventListener('error', () => {
+        log.error('Audio element error:', audio.error?.message, 'code:', audio.error?.code)
+        // On Safari, try converting unsupported formats
+        if (isSafari() && !convertedUrlRef.current) {
+          log.info('Attempting Safari audio conversion fallback...')
+          fetch(url)
+            .then((response) => response.blob())
+            .then((blob) => {
+              const audioFile = new File([blob], file.name || 'audio', {
                 type: blob.type || 'audio/mpeg',
                 lastModified: Date.now()
               })
-
-              // Convert to Safari-compatible format
-              const convertedFile = await convertAudioForSafari(audioFile, file?.messageId)
-
-              // Create blob URL from converted file
-              const convertedBlobUrl = URL.createObjectURL(convertedFile)
-              audioUrl = convertedBlobUrl
-              convertedUrlRef.current = convertedBlobUrl
-
-              log.info(`Converted audio for Safari: ${cacheKey} -> ${convertedBlobUrl}`)
-            } catch (conversionError) {
-              log.warn('Failed to convert audio for Safari, using original:', conversionError)
-              // Fallback to original URL if conversion fails
-              audioUrl = url
-            }
-          }
-
-          wavesurfer.current = WaveSurfer.create({
-            container: wavesurferContainer.current,
-            waveColor: 'transparent',
-            progressColor: 'transparent',
-            audioRate,
-            barWidth: 1,
-            barHeight: 1,
-            hideScrollbar: true,
-            barRadius: 1.5,
-            cursorWidth: 0,
-            barGap: 2,
-            height: 20
-          })
-          let peaks
-          if (file.metadata) {
-            if (file.metadata.dur) {
-              setDuration(file.metadata.dur)
-              setCurrentTime(formatAudioVideoTime(file.metadata.dur))
-            }
-            if (file.metadata.tmb) {
-              const maxVal =
-                Array.isArray(file.metadata.tmb) && file.metadata.tmb.length > 0
-                  ? (file.metadata.tmb as number[]).reduce((acc: number, n: number) => (n > acc ? n : acc), -Infinity)
-                  : 0
-              const dec = maxVal / 100
-              peaks = file.metadata.tmb.map((peak: number) => {
-                return peak / dec / 100
-              })
-            }
-          }
-
-          wavesurfer.current.load(audioUrl, peaks)
-
-          wavesurfer.current.on('ready', () => {
-            const audioDuration = wavesurfer.current.getDuration()
-            setRealDuration(audioDuration)
-            setDuration(file?.metadata?.dur || audioDuration)
-            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
-
-            wavesurfer.current.drawBuffer = (d: any) => {
-              log.info('filters --- ', d)
-            }
-          })
-          /* wavesurfer.current.drawBuffer = () => {
-           return file.metadata.tmb
-         } */
-          wavesurfer.current.on('finish', () => {
-            setPlayAudio(false)
-            wavesurfer.current.seekTo(0)
-            const audioDuration = wavesurfer.current.getDuration()
-            setRealDuration(audioDuration)
-            setDuration(file?.metadata?.dur || audioDuration)
-            setCurrentTime(formatAudioVideoTime(file?.metadata?.dur || audioDuration))
-            setCurrentTimeSeconds(0)
-            if (playingAudioId === file.id) {
-              dispatch(setPlayingAudioIdAC(null))
-            }
-            clearInterval(intervalRef.current)
-            if (onClose) {
-              onClose()
-            }
-          })
-
-          wavesurfer.current.on('pause', () => {
-            setPlayAudio(false)
-            if (playingAudioId === file.id) {
-              dispatch(setPlayingAudioIdAC(null))
-            }
-            clearInterval(intervalRef.current)
-          })
-
-          wavesurfer.current.on('interaction', () => {
-            // const audioDuration = wavesurfer.current.getDuration()
-            const currentTime = wavesurfer.current.getCurrentTime()
-            setCurrentTime(formatAudioVideoTime(currentTime))
-            setCurrentTimeSeconds(currentTime)
-          })
-          if (url !== '_') {
-            setIsRendered(true)
-          }
-        } catch (e) {
-          log.error('Failed to init wavesurfer', e)
+              return convertAudioForSafari(audioFile, file?.messageId)
+            })
+            .then((convertedFile) => {
+              const blobUrl = URL.createObjectURL(convertedFile)
+              convertedUrlRef.current = blobUrl
+              audio.src = blobUrl
+            })
+            .catch((conversionError) => {
+              log.error('Safari audio conversion fallback failed:', conversionError)
+            })
         }
-      }
-      initWaveSurfer()
+      })
+
+      audio.src = url
     }
+
     return () => {
       clearInterval(intervalRef.current)
-      // Clean up converted blob URL if it exists
       if (convertedUrlRef.current) {
         URL.revokeObjectURL(convertedUrlRef.current)
         convertedUrlRef.current = null
       }
-      // Destroy wavesurfer instance
-      if (wavesurfer.current) {
-        wavesurfer.current.destroy()
-        wavesurfer.current = null
+      if (audioRef.current) {
+        audioRef.current.pause()
+        audioRef.current.src = ''
+        audioRef.current = null
       }
     }
   }, [url, file.id])
 
+  // Pause when another audio starts playing
   useEffect(() => {
-    if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && wavesurfer.current) {
+    if (playAudio && playingAudioId && playingAudioId !== `player_${file.id}` && audioRef.current) {
       setPlayAudio(false)
-      wavesurfer.current.pause()
+      audioRef.current.pause()
     }
   }, [playingAudioId])
 
@@ -361,11 +250,7 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
         )}
       </PlayPause>
       <WaveContainer>
-        <VisualizationWrapper>
-          <AudioVisualizationPlaceholder
-            ref={wavesurferContainer}
-            hidden={!!(file.metadata?.tmb && Array.isArray(file.metadata.tmb))}
-          />
+        <VisualizationWrapper ref={visualizationRef} onClick={handleSeek}>
           {file.metadata?.tmb && Array.isArray(file.metadata.tmb) && (
             <AudioVisualization
               tmb={file.metadata.tmb}
@@ -417,14 +302,9 @@ const VisualizationWrapper = styled.div`
   display: flex;
   align-items: center;
   position: relative;
+  cursor: pointer;
 `
 
-const AudioVisualizationPlaceholder = styled.div<{ hidden?: boolean }>`
-  width: 100%;
-  position: ${(props) => (props.hidden ? 'absolute' : 'relative')};
-  opacity: ${(props) => (props.hidden ? 0 : 1)};
-  pointer-events: ${(props) => (props.hidden ? 'none' : 'auto')};
-`
 const AudioRate = styled.div<{ color: string; backgroundColor: string }>`
   display: flex;
   align-items: center;

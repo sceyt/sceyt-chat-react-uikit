@@ -15,19 +15,18 @@ import { ReactComponent as ViewOnceSelectedIcon } from '../../assets/svg/view_on
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { formatAudioVideoTime } from '../../helpers'
 import log from 'loglevel'
-import WaveSurfer from 'wavesurfer.js'
 import MicRecorder from 'mic-recorder-to-mp3'
 import { useDispatch } from 'store/hooks'
 import { sendRecordingAC, setChannelDraftMessageIsRemovedAC } from '../../store/channel/actions'
 import { getAudioRecordingFromMap, removeAudioRecordingFromMap, setAudioRecordingToMap } from 'helpers/messagesHalper'
 import { ViewOnceToggleCont } from 'UIHelper'
+import AudioVisualizationComponent from '../AudioPlayer/AudioVisualization'
 
 const fieldsObject = {
   channelId: '',
   currentRecordedFile: null,
   recording: null,
-  recorder: null,
-  wavesurferContainer: null
+  recorder: null
 }
 
 interface AudioPlayerProps {
@@ -77,12 +76,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   const [recordedFile, setRecordedFile] = useState<any>(null)
   const [recordingIsReadyToPlay, setRecordingIsReadyToPlay] = useState<any>(false)
   const [currentTime, setCurrentTime] = useState<any>(0)
+  const [currentTimeSeconds, setCurrentTimeSeconds] = useState<number>(0)
   const [sendingInterval, setSendingInterval] = useState<any>(null)
   const [currentChannelId, setCurrentChannelId] = useState<string>('')
   const [playAudio, setPlayAudio] = useState<any>(false)
-  const wavesurferContainer = useRef<any>(null)
   const recordButtonRef = useRef<any>(null)
-  const wavesurfer = useRef<any>({})
+  const audioElements = useRef<Record<string, HTMLAudioElement>>({})
   const intervalRef = useRef<any>({})
 
   const currentRecordedFile = useMemo(() => {
@@ -119,6 +118,70 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     }
   }
 
+  const cleanupAudioElement = (id: string) => {
+    if (intervalRef.current[id]) {
+      clearInterval(intervalRef.current[id])
+      intervalRef.current[id] = null
+    }
+    if (audioElements.current[id]) {
+      audioElements.current[id].pause()
+      audioElements.current[id].src = ''
+      delete audioElements.current[id]
+    }
+  }
+
+  const initAudioPlayback = (draft?: boolean, cId?: string, audioRecording?: any) => {
+    if (draft) return
+
+    const id = cId || currentChannelId
+    const fileData = audioRecording || currentRecordedFile
+
+    if (!fileData?.objectUrl) return
+
+    // If audio element already exists for this channel, just update state
+    if (audioElements.current[id]) {
+      setRecordingIsReadyToPlay(true)
+      const audioDuration = audioElements.current[id].duration
+      if (audioDuration && isFinite(audioDuration)) {
+        setCurrentTime(audioDuration)
+      }
+      return
+    }
+
+    const audio = new Audio()
+    audioElements.current[id] = audio
+
+    audio.addEventListener('loadedmetadata', () => {
+      setRecordingIsReadyToPlay(true)
+      const audioDuration = audio.duration
+      if (audioDuration && isFinite(audioDuration)) {
+        setCurrentTime(audioDuration)
+      }
+    })
+
+    audio.addEventListener('ended', () => {
+      setPlayAudio(false)
+      audio.currentTime = 0
+      const audioDuration = audio.duration
+      if (audioDuration && isFinite(audioDuration)) {
+        setCurrentTime(audioDuration)
+      }
+      setCurrentTimeSeconds(0)
+      clearInterval(intervalRef.current[id])
+    })
+
+    audio.addEventListener('pause', () => {
+      setPlayAudio(false)
+      clearInterval(intervalRef.current[id])
+    })
+
+    audio.addEventListener('error', () => {
+      log.error('Audio playback error:', audio.error?.message)
+    })
+
+    audio.src = fileData.objectUrl
+  }
+
   const startRecording = async (cId?: string) => {
     const id = cId || currentChannelId
     try {
@@ -134,9 +197,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         removeAudioRecordingFromMap(id)
         setRecordedFile(null)
         setPlayAudio(false)
-        if (wavesurfer.current?.[id]) {
-          wavesurfer.current[id].destroy()
-        }
+        cleanupAudioElement(id)
         setStartRecording(false)
         setShowRecording(false)
         dispatch(setChannelDraftMessageIsRemovedAC(id))
@@ -176,10 +237,9 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
 
             const loop = () => {
               if (!shouldDraw) {
-                obj.x = 0 // reset x to start drawing from the start again
+                obj.x = 0
                 // @ts-ignore
-                obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height) // clear the canvas
-
+                obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
                 return
               }
               obj.ctx.clearRect(0, 0, obj.canvas.width, obj.canvas.height)
@@ -216,7 +276,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                 const bar = obj.bars[i]
                 obj.ctx.fillStyle = textSecondary
                 obj.ctx.fillRect(bar.x, bar.y, bar.width, bar.height)
-                bar.x = bar.x - 1 // spacing between bars
+                bar.x = bar.x - 1
 
                 if (bar.x < 1) {
                   obj.bars.splice(i, 1)
@@ -257,9 +317,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       dispatch(setChannelDraftMessageIsRemovedAC(currentChannelId))
       setRecordedFile(null)
       setPlayAudio(false)
-      if (wavesurfer.current?.[currentChannelId]) {
-        wavesurfer.current[currentChannelId].destroy()
-      }
+      cleanupAudioElement(currentChannelId)
     } else {
       shouldDraw = false
       recorder?.stop()
@@ -268,121 +326,12 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
     setRecordingIsReadyToPlay(false)
     setStartRecording(false)
     setCurrentTime(0)
+    setCurrentTimeSeconds(0)
     setShowRecording(false)
-  }, [currentRecordedFile, currentChannelId, wavesurfer, setShowRecording, setRecordedFile])
-
-  const initWaveSurfer = async (draft?: boolean, cId?: string, audioRecording?: any, container?: any) => {
-    try {
-      if (draft) {
-        return
-      }
-      const id = cId || currentChannelId
-      if (wavesurfer.current?.[id]) {
-        setRecordingIsReadyToPlay(true)
-        const audioDuration = wavesurfer.current[id].getDuration()
-        setCurrentTime(audioDuration)
-      }
-
-      if (!wavesurfer.current?.[id]) {
-        // Validate container before creating WaveSurfer
-        const containerElement = wavesurferContainer.current || container
-        if (!containerElement) {
-          // Retry after a short delay in case container is not ready yet
-          setTimeout(() => initWaveSurfer(draft, cId, audioRecording, container), 100)
-          return
-        }
-
-        // Check if container has valid dimensions
-        const rect = containerElement.getBoundingClientRect()
-        if (rect.width === 0 || rect.height === 0) {
-          // Retry after a short delay in case container dimensions are not set yet
-          setTimeout(() => initWaveSurfer(draft, cId, audioRecording, container), 100)
-          return
-        }
-
-        const ws = WaveSurfer.create({
-          container: containerElement,
-          waveColor: textSecondary,
-          progressColor: accentColor,
-          barWidth: 1,
-          barHeight: 2,
-          audioRate: 1,
-          hideScrollbar: true,
-          barRadius: 1.5,
-          cursorWidth: 0,
-          barGap: 2.5,
-          height: 28
-        })
-        let peaks: number[] = []
-        if ((audioRecording || currentRecordedFile)?.thumb) {
-          const thumbData = (audioRecording || currentRecordedFile)?.thumb
-          // Validate thumb data is an array and has valid length
-          if (Array.isArray(thumbData) && thumbData.length > 0) {
-            const maxVal = thumbData.reduce((acc: number, n: number) => (n > acc ? n : acc), -Infinity)
-            // Check if maxVal is a valid number and not zero
-            if (maxVal > 0 && isFinite(maxVal)) {
-              const dec = maxVal / 100
-              peaks = thumbData
-                .map((peak: number) => {
-                  const normalizedPeak = peak / dec / 100
-                  // Ensure each peak is a valid finite number
-                  return isFinite(normalizedPeak) ? normalizedPeak : 0
-                })
-                .filter((peak: number) => isFinite(peak)) // Remove any invalid values
-
-              // Ensure peaks array is not empty after filtering
-              if (peaks.length === 0) {
-                peaks = []
-              }
-            }
-          }
-        }
-        wavesurfer.current[id] = ws
-        try {
-          // Only pass peaks if it's a valid non-empty array
-          const validPeaks = peaks.length > 0 ? peaks : undefined
-          await wavesurfer.current[id].loadBlob(audioRecording?.file || currentRecordedFile?.file, validPeaks)
-        } catch (error) {
-          // Fallback: try loading without peaks if there's an error
-          try {
-            await wavesurfer.current[id].loadBlob(audioRecording?.file || currentRecordedFile?.file)
-          } catch (fallbackError) {
-            console.error('Failed to load audio completely:', fallbackError)
-            throw fallbackError
-          }
-        }
-      }
-
-      setCurrentTime(wavesurfer.current[id]?.decodedData?.duration || 0)
-      wavesurfer.current[id].on('ready', () => {
-        setRecordingIsReadyToPlay(true)
-        const audioDuration = wavesurfer.current[id].getDuration()
-        setCurrentTime(audioDuration)
-      })
-      wavesurfer.current[id].on('finish', () => {
-        setPlayAudio(false)
-        wavesurfer.current[id].seekTo(0)
-        const audioDuration = wavesurfer.current[id].getDuration()
-        setCurrentTime(audioDuration)
-        clearInterval(intervalRef.current[id])
-      })
-
-      wavesurfer.current[id].on('pause', () => {
-        setPlayAudio(false)
-        clearInterval(intervalRef.current[id])
-      })
-
-      wavesurfer.current[id].on('interaction', () => {
-        const currentTime = wavesurfer.current[id].getCurrentTime()
-        setCurrentTime(currentTime)
-      })
-    } catch (e) {
-      log.error('Failed to init wavesurfer', e)
-    }
-  }
+  }, [currentRecordedFile, currentChannelId, setShowRecording, setRecordedFile])
 
   const stopRecording = useCallback(
-    (send?: boolean, cId?: string, draft?: boolean, recorder?: any, container?: any) => {
+    (send?: boolean, cId?: string, draft?: boolean, recorder?: any) => {
       handleStopRecording()
       shouldDraw = false
       const id = cId || channelId
@@ -404,24 +353,15 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
               // @ts-ignore
               event.target.result,
               (audioBuffer: any) => {
-                // Number of segments to split the audio buffer into.
-                // This number should be adjusted based on the desired "resolution" of the final waveform data.
                 const numberOfSegments = 50
-
-                // Determine the size of each segment in terms of audio samples.
                 const segmentSize = Math.floor(audioBuffer.length / numberOfSegments)
-
                 const waveform = []
 
                 for (let i = 0; i < numberOfSegments; i++) {
-                  // Calculate the start and end points for this segment.
                   const start = i * segmentSize
                   const end = start + segmentSize
-
-                  // Extract the segment of audio data from the buffer.
                   const segment = audioBuffer.getChannelData(0).slice(start, end)
 
-                  // Find the peak amplitude for this segment without spreading large arrays
                   let maxAmplitude = 0
                   for (let j = 0; j < segment.length; j++) {
                     const val = segment[j]
@@ -431,7 +371,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                     }
                   }
 
-                  // Convert the peak amplitude to a value in your desired range (e.g., 0-1000) and add it to the waveform array.
                   waveform.push(Math.floor(maxAmplitude * 1000))
                 }
                 setStartRecording(false)
@@ -454,12 +393,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
                   }
                   setAudioRecordingToMap(id, audioRecording)
                   if (draft) {
-                    initWaveSurfer(draft, id, audioRecording, container)
+                    initAudioPlayback(draft, id, audioRecording)
                   }
                 }
               },
               (e: any) => {
-                // Handle decoding error
                 log.info('Error decoding audio data: ' + e.err)
               }
             )
@@ -475,17 +413,25 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   )
 
   const handlePlayPause = (cId?: string) => {
-    if (wavesurfer.current?.[cId || currentChannelId]) {
-      if (!wavesurfer.current[cId || currentChannelId].isPlaying()) {
-        setPlayAudio(true)
-        intervalRef.current[cId || currentChannelId] = setInterval(() => {
-          const currentTime = wavesurfer.current[cId || currentChannelId].getCurrentTime()
-          if (currentTime >= 0) {
-            setCurrentTime(currentTime)
-          }
-        }, 10)
-      }
-      wavesurfer.current[cId || currentChannelId].playPause()
+    const id = cId || currentChannelId
+    const audio = audioElements.current[id]
+    if (!audio) return
+
+    if (audio.paused) {
+      setPlayAudio(true)
+      intervalRef.current[id] = setInterval(() => {
+        const time = audioElements.current[id]?.currentTime
+        if (time !== undefined && time >= 0) {
+          setCurrentTime(time)
+          setCurrentTimeSeconds(time)
+        }
+      }, 10)
+      audio.play().catch((e) => {
+        log.error('Audio play failed:', e)
+        setPlayAudio(false)
+      })
+    } else {
+      audio.pause()
     }
   }
 
@@ -548,10 +494,6 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   }, [recording])
 
   useEffect(() => {
-    fieldsObject.wavesurferContainer = wavesurferContainer.current
-  }, [wavesurferContainer.current])
-
-  useEffect(() => {
     return () => {
       if (
         fieldsObject.channelId &&
@@ -559,7 +501,7 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         fieldsObject.recorder &&
         fieldsObject.recording
       ) {
-        stopRecording(false, fieldsObject.channelId, true, fieldsObject.recorder, fieldsObject.wavesurferContainer)
+        stopRecording(false, fieldsObject.channelId, true, fieldsObject.recorder)
         handleStopRecording()
       }
     }
@@ -567,17 +509,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
 
   useEffect(() => {
     if (currentRecordedFile) {
-      initWaveSurfer()
+      initAudioPlayback()
     } else {
       setRecordingIsReadyToPlay(false)
-      if (intervalRef.current[currentChannelId]) {
-        clearInterval(intervalRef.current[currentChannelId])
-        intervalRef.current[currentChannelId] = null
-      }
-      if (wavesurfer.current?.[currentChannelId]) {
-        wavesurfer.current[currentChannelId].destroy()
-        wavesurfer.current[currentChannelId] = null
-      }
+      cleanupAudioElement(currentChannelId)
     }
     return () => {
       for (const key in intervalRef.current) {
@@ -586,10 +521,11 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
           intervalRef.current[key] = null
         }
       }
-      for (const key in wavesurfer.current) {
-        if (wavesurfer.current[key]) {
-          wavesurfer.current[key].destroy()
-          wavesurfer.current[key] = null
+      for (const key in audioElements.current) {
+        if (audioElements.current[key]) {
+          audioElements.current[key].pause()
+          audioElements.current[key].src = ''
+          delete audioElements.current[key]
         }
       }
     }
@@ -615,17 +551,19 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
   useEffect(() => {
     if (!showRecording) {
       setCurrentTime(0)
+      setCurrentTimeSeconds(0)
     }
     return () => {
       handleStopRecording()
       setCurrentTime(0)
+      setCurrentTimeSeconds(0)
     }
   }, [showRecording])
 
   useEffect(() => {
     if (channelId && (showRecording || currentRecordedFile)) {
       if (!currentRecordedFile) {
-        stopRecording(false, currentChannelId, true, recorder, wavesurferContainer.current)
+        stopRecording(false, currentChannelId, true, recorder)
       }
       if (playAudio) {
         handlePlayPause(channelId)
@@ -634,9 +572,10 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
         clearInterval(intervalRef.current[key])
         intervalRef.current[key] = null
       }
-      for (const key in wavesurfer.current) {
-        wavesurfer.current[key]?.destroy()
-        wavesurfer.current[key] = null
+      for (const key in audioElements.current) {
+        audioElements.current[key]?.pause()
+        audioElements.current[key].src = ''
+        delete audioElements.current[key]
       }
       setShowRecording(false)
       setStartRecording(false)
@@ -646,10 +585,13 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
       setRecordingIsReadyToPlay(!!audioRecording)
     }
     setCurrentTime(0)
+    setCurrentTimeSeconds(0)
     handleStopRecording()
 
     setCurrentChannelId(channelId)
   }, [channelId])
+
+  const recordedFileDuration = currentRecordedFile?.dur || 0
 
   return (
     <Container recording={showRecording || currentRecordedFile}>
@@ -686,7 +628,21 @@ const AudioRecord: React.FC<AudioPlayerProps> = ({
             {playAudio ? <PauseIcon /> : <PlayIcon />}
           </PlayPause>
         )}
-        <AudioVisualization ref={wavesurferContainer} show={currentRecordedFile} />
+        {currentRecordedFile?.thumb && Array.isArray(currentRecordedFile.thumb) && (
+          <RecordedVisualizationWrapper>
+            <AudioVisualizationComponent
+              tmb={currentRecordedFile.thumb}
+              duration={recordedFileDuration}
+              currentTime={currentTimeSeconds}
+              waveColor={textSecondary}
+              progressColor={accentColor}
+              height={28}
+              barWidth={1}
+              barRadius={1.5}
+              containerWidth={190}
+            />
+          </RecordedVisualizationWrapper>
+        )}
         {(recordingIsReadyToPlay || currentRecordedFile) && (
           <Timer color={textSecondary}>{formatAudioVideoTime(currentTime)}</Timer>
         )}
@@ -743,16 +699,14 @@ const RecordIconWrapper = styled.span<{ iconColor?: string }>`
   }
 `
 
-const AudioVisualization = styled.div<{ show?: boolean }>`
+const RecordedVisualizationWrapper = styled.div`
   position: absolute;
-  opacity: ${({ show }) => (show ? '1' : '0')};
-  z-index: ${({ show }) => !show && '-1'};
-  visibility: ${({ show }) => (show ? 'visible' : 'hidden')};
+  left: 40px;
   width: 300px;
   height: 28px;
   max-width: calc(100% - 100px);
-  left: 40px;
-  background-color: ${(props) => props.color};
+  display: flex;
+  align-items: center;
 `
 
 const PlayPause = styled.div<{ iconColor?: string }>`
