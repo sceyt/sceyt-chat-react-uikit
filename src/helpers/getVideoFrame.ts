@@ -7,50 +7,66 @@ import log from 'loglevel'
 
 export async function getFrame(
   videoSrc: any,
-  time?: number
+  _time?: number
 ): Promise<{ thumb: string; width: number; height: number; duration: number }> {
-  const video = document.createElement('video')
-  video.src = videoSrc
-  video.crossOrigin = 'anonymous'
-  video.preload = 'auto'
-  video.muted = true
   return new Promise((resolve, reject) => {
-    if (videoSrc) {
-      video.onloadedmetadata = () => {
-        // Set the time before drawing
-        video.currentTime = time || 0
+    if (!videoSrc) {
+      reject(new Error('src not found'))
+      return
+    }
 
-        video.onseeked = () => {
-          const [newWidth, newHeight] = calculateSize(video.videoWidth, video.videoHeight, 100, 100)
+    // Phase 1: read metadata (dimensions + duration) only — no seeking needed
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.muted = true
+    video.setAttribute('playsinline', 'true')
+    video.src = videoSrc
+
+    video.onloadedmetadata = async () => {
+      const origWidth = video.videoWidth
+      const origHeight = video.videoHeight
+      const duration = Number(video.duration?.toFixed(0))
+      const [newWidth, newHeight] = calculateSize(origWidth, origHeight, 100, 100)
+
+      try {
+        // Phase 2: use getVideoFirstFrame which handles Safari seek quirks reliably
+        const frameResult = await getVideoFirstFrame(videoSrc, newWidth, newHeight)
+        if (!frameResult) {
+          reject(new Error('Failed to extract video frame'))
+          return
+        }
+
+        // Phase 3: draw the JPEG blob onto a canvas to produce thumbhash pixel data
+        const img = document.createElement('img')
+        img.onload = () => {
           const canvas = document.createElement('canvas')
           canvas.width = newWidth
           canvas.height = newHeight
-
           const ctx = canvas.getContext('2d')
           if (!ctx) {
+            URL.revokeObjectURL(frameResult.frameBlobUrl)
             reject(new Error('Failed to get canvas context'))
             return
           }
-
-          ctx.drawImage(video, 0, 0, newWidth, newHeight)
+          ctx.drawImage(img, 0, 0, newWidth, newHeight)
           const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height)
           const binaryThumbHash = rgbaToThumbHash(pixels.width, pixels.height, pixels.data)
           const thumb = binaryToBase64(binaryThumbHash)
-          const duration = Number(video.duration?.toFixed(0))
-
-          resolve({ thumb, width: video.videoWidth, height: video.videoHeight, duration })
+          URL.revokeObjectURL(frameResult.frameBlobUrl)
+          resolve({ thumb, width: origWidth, height: origHeight, duration })
         }
-
-        video.onerror = () => {
-          reject(new Error('Failed to seek video'))
+        img.onerror = () => {
+          URL.revokeObjectURL(frameResult.frameBlobUrl)
+          reject(new Error('Failed to load frame image'))
         }
+        img.src = frameResult.frameBlobUrl
+      } catch (err) {
+        reject(err)
       }
+    }
 
-      video.onerror = () => {
-        reject(new Error('Failed to load video'))
-      }
-    } else {
-      reject(new Error('src not found'))
+    video.onerror = () => {
+      reject(new Error('Failed to load video'))
     }
   })
 }
@@ -76,7 +92,7 @@ export async function getVideoFirstFrame(
       const video = document.createElement('video')
       video.preload = 'metadata'
       video.muted = true
-      video.crossOrigin = 'anonymous'
+      video.setAttribute('playsinline', 'true')
 
       // Set video source
       if (videoSrc instanceof Blob) {
@@ -150,9 +166,39 @@ export async function getVideoFirstFrame(
         // Seek to first frame (0.1 seconds to ensure we get a decodable frame)
         video.currentTime = 0.01
 
-        // Wait for seek to complete
+        // Wait for seek to complete.
+        // Safari fix: 'seeked' fires when the seek is done at the network/buffer level,
+        // but AVFoundation hasn't decoded or committed the frame to the video element's
+        // rendering surface yet — drawImage captures a black canvas.
+        // Calling play() forces the decoding pipeline to actually render the frame.
+        // After pause() the frame is committed and drawImage works correctly.
+        // play() without user gesture is permitted when muted + playsinline are set.
         video.onseeked = () => {
-          extractFrame()
+          video.onseeked = null
+          const capture = () => requestAnimationFrame(extractFrame)
+
+          video
+            .play()
+            .then(() => {
+              // Wait for timeupdate which fires when currentTime has actually advanced,
+              // meaning at least one frame has been decoded and painted by Safari.
+              // play() resolving only means playback can begin — not that a frame is rendered.
+              let done = false
+              const finish = () => {
+                if (done) return
+                done = true
+                video.removeEventListener('timeupdate', finish)
+                video.removeEventListener('ended', finish)
+                video.pause()
+                capture()
+              }
+              video.addEventListener('timeupdate', finish)
+              // For very short videos that reach 'ended' before timeupdate fires
+              video.addEventListener('ended', finish)
+              // Safety fallback in case neither event fires (unsupported codec, etc.)
+              setTimeout(finish, 500)
+            })
+            .catch(capture)
         }
 
         video.onerror = (error) => {

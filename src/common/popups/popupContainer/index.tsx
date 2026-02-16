@@ -1,9 +1,10 @@
 import { useColor } from 'hooks'
 import React, { useEffect } from 'react'
+import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import { THEME_COLORS } from 'UIHelper/constants'
 
-const PopupContainer = ({ children, bgColor }: { children: React.ReactNode; bgColor?: string }) => {
+const PopupContainer = ({ children, bgColor }: { children: React.ReactNode; bgColor?: string }): JSX.Element => {
   const { [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } = useColor()
   useEffect(() => {
     const body = document.querySelector('body')
@@ -17,7 +18,7 @@ const PopupContainer = ({ children, bgColor }: { children: React.ReactNode; bgCo
       }
     }
   }, [])
-  return <Container backgroundColor={bgColor || overlayBackground}>{children}</Container>
+  return createPortal(<Container backgroundColor={bgColor || overlayBackground}>{children}</Container>, document.body)
 }
 
 export default PopupContainer
