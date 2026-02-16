@@ -419,6 +419,100 @@ export const extractTextFromReactElement = (element: any): string => {
   return ''
 }
 
+const escapeHTML = (str: string): string => {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+}
+
+const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
+  if (a.size !== b.size) return false
+  let equal = true
+  a.forEach((item) => {
+    if (!b.has(item)) equal = false
+  })
+  return equal
+}
+
+const wrapWithFormatTags = (text: string, formats: Set<string>): string => {
+  let result = text
+  if (formats.has('monospace')) result = `<code>${result}</code>`
+  if (formats.has('strikethrough')) result = `<s>${result}</s>`
+  if (formats.has('underline')) result = `<u>${result}</u>`
+  if (formats.has('italic')) result = `<i>${result}</i>`
+  if (formats.has('bold')) result = `<b>${result}</b>`
+  return result
+}
+
+export const bodyAttributesToHTML = (
+  body: string,
+  bodyAttributes: IBodyAttribute[],
+  mentionedUsers?: IUser[],
+  contactsMap?: { [key: string]: IContact },
+  getFromContacts?: boolean
+): string => {
+  if (!body) return ''
+  if (!bodyAttributes || bodyAttributes.length === 0) {
+    return escapeHTML(body)
+  }
+
+  const charFormats: Array<Set<string>> = Array.from({ length: body.length }, () => new Set())
+  const mentionRanges = new Map<number, { userId: string; displayName: string; length: number }>()
+
+  for (const attr of bodyAttributes) {
+    const start = attr.offset
+    const end = Math.min(attr.offset + attr.length, body.length)
+    if (attr.type === 'mention') {
+      const mentionUser = mentionedUsers?.find((u) => u.id === attr.metadata)
+      let displayName: string
+      if (mentionUser) {
+        const contact = contactsMap?.[mentionUser.id]
+        displayName = `@${makeUsername(contact, mentionUser, getFromContacts).trim()}`
+      } else {
+        displayName = body.slice(start, end)
+      }
+      mentionRanges.set(start, { userId: attr.metadata, displayName, length: attr.length })
+    } else {
+      const types = attr.type.split(' ')
+      for (let i = start; i < end; i++) {
+        types.forEach((t) => charFormats[i].add(t))
+      }
+    }
+  }
+
+  let html = ''
+  let i = 0
+  while (i < body.length) {
+    const mention = mentionRanges.get(i)
+    if (mention) {
+      const formats = new Set(charFormats[i])
+      let wrapped = `<span data-mention="${escapeHTML(mention.userId)}">${escapeHTML(mention.displayName)}</span>`
+      if (formats.size > 0) {
+        wrapped = wrapWithFormatTags(wrapped, formats)
+      }
+      html += wrapped
+      i += mention.length
+      continue
+    }
+
+    const currentFormats = charFormats[i]
+    let segmentEnd = i + 1
+    while (segmentEnd < body.length && !mentionRanges.has(segmentEnd) && setsEqual(charFormats[segmentEnd], currentFormats)) {
+      segmentEnd++
+    }
+    const segmentText = body.slice(i, segmentEnd)
+    if (currentFormats.size === 0) {
+      html += escapeHTML(segmentText)
+    } else {
+      html += wrapWithFormatTags(escapeHTML(segmentText), currentFormats)
+    }
+    i = segmentEnd
+  }
+  return html
+}
+
 export const checkIsTypeKeyPressed = (code?: string) => {
   return !(
     code === 'Enter' ||

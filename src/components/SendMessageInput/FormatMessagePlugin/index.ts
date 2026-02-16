@@ -21,6 +21,73 @@ import { useCallback, useEffect } from 'react'
 import { $createMentionNode, $isMentionNode } from '../MentionNode'
 import { getSelectedNode, mergeRegister } from '../FloatingTextFormatToolbarPlugin'
 
+interface FormattedSegment {
+  text: string
+  format: number
+  mentionUserId?: string
+}
+
+function parseHTMLToFormattedSegments(html: string): FormattedSegment[] {
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const segments: FormattedSegment[] = []
+
+  function walkNode(node: Node, inheritedFormat: number): void {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || ''
+      if (text) {
+        segments.push({ text, format: inheritedFormat })
+      }
+      return
+    }
+
+    if (node.nodeType !== Node.ELEMENT_NODE) return
+
+    const el = node as HTMLElement
+    let format = inheritedFormat
+
+    // Detect formatting from semantic HTML tags
+    const tag = el.tagName.toLowerCase()
+    if (tag === 'b' || tag === 'strong') format |= 1
+    if (tag === 'i' || tag === 'em') format |= 2
+    if (tag === 's' || tag === 'del' || tag === 'strike') format |= 4
+    if (tag === 'u') format |= 8
+    if (tag === 'code') format |= 16
+
+    // Detect formatting from inline styles (browser native copy)
+    const style = el.style
+    if (style) {
+      const fontWeight = style.fontWeight
+      if (fontWeight === 'bold' || fontWeight === 'bolder' || (fontWeight && parseInt(fontWeight, 10) >= 600)) {
+        format |= 1
+      }
+      if (style.fontStyle === 'italic') format |= 2
+      const textDecoration = style.textDecoration || style.textDecorationLine || ''
+      if (textDecoration.indexOf('line-through') !== -1) format |= 4
+      if (textDecoration.indexOf('underline') !== -1) format |= 8
+      if (style.letterSpacing === '4px' || tag === 'code') format |= 16
+    }
+
+    const mentionId = el.getAttribute('data-mention')
+    if (mentionId) {
+      const text = el.textContent || ''
+      segments.push({ text, format, mentionUserId: mentionId })
+      return
+    }
+
+    const childNodes = el.childNodes
+    for (let i = 0; i < childNodes.length; i++) {
+      walkNode(childNodes[i], format)
+    }
+  }
+
+  const bodyChildNodes = doc.body.childNodes
+  for (let i = 0; i < bodyChildNodes.length; i++) {
+    walkNode(bodyChildNodes[i], 0)
+  }
+  return segments
+}
+
 function useFormatMessage(
   editor: LexicalEditor,
   editorState: any,
@@ -145,13 +212,60 @@ function useFormatMessage(
       if (!('clipboardData' in e) || !e.clipboardData) {
         return false
       }
+
+      const pastedHTML = e.clipboardData.getData('text/html')
       const pastedText = e.clipboardData.getData('text/plain')
+
+      if (pastedHTML) {
+        const segments = parseHTMLToFormattedSegments(pastedHTML)
+        const hasFormatting = segments.some((s) => s.format > 0 || s.mentionUserId)
+
+        if (hasFormatting && segments.length > 0) {
+          editor.update(() => {
+            const selection = $getSelection()
+            if (!$isRangeSelection(selection)) return
+
+            const nodes: any[] = []
+
+            segments.forEach((segment) => {
+              if (segment.mentionUserId) {
+                const member = activeChannelMembers.find((m: any) => m.id === segment.mentionUserId)
+                if (member) {
+                  setMentionedMember(member)
+                  const mentionNode = $createMentionNode({ ...member, name: segment.text })
+                  if (segment.format > 0) {
+                    mentionNode.setFormat(segment.format)
+                  }
+                  nodes.push(mentionNode)
+                } else {
+                  const textNode = $createTextNode(segment.text)
+                  if (segment.format > 0) {
+                    textNode.setFormat(segment.format)
+                  }
+                  nodes.push(textNode)
+                }
+              } else {
+                const textNode = $createTextNode(segment.text)
+                if (segment.format > 0) {
+                  textNode.setFormat(segment.format)
+                }
+                nodes.push(textNode)
+              }
+            })
+
+            if (nodes.length > 0) {
+              selection.insertNodes(nodes)
+            }
+          })
+          return true
+        }
+      }
+
+      // Fallback: plain text + mention processing
       if (pastedText) {
-        // Process paste and mentions in a single update to create one undo step
         editor.update(() => {
           const selection = $getSelection()
           if ($isRangeSelection(selection)) {
-            // Process mentions only in the pasted text and insert the processed content
             processMentionsInPastedText(
               pastedText,
               activeChannelMembers,

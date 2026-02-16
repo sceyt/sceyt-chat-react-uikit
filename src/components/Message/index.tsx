@@ -55,7 +55,8 @@ import MessagePopups from './MessagePopups'
 import MessageSelection from './MessageSelection'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
-import { extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
+import { bodyAttributesToHTML, extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
+import { copyRichTextToClipboard } from 'helpers/clipboard'
 import { MessageTextFormat } from 'messageUtils'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
 import { useMessageState } from './hooks/useMessageState'
@@ -388,8 +389,20 @@ const Message = ({
       accentColor: '',
       textSecondary: ''
     })
-    const textToCopy = typeof textToCopyHTML === 'string' ? textToCopyHTML : extractTextFromReactElement(textToCopyHTML)
-    navigator.clipboard.writeText(textToCopy)
+    const plainText = typeof textToCopyHTML === 'string' ? textToCopyHTML : extractTextFromReactElement(textToCopyHTML)
+
+    if (message.bodyAttributes && message.bodyAttributes.length > 0) {
+      const html = bodyAttributesToHTML(
+        message.body,
+        message.bodyAttributes,
+        message.mentionedUsers,
+        contactsMap,
+        getFromContacts
+      )
+      copyRichTextToClipboard(html, plainText)
+    } else {
+      navigator.clipboard.writeText(plainText)
+    }
     setMessageActionsShow(false)
   }, [message, contactsMap])
 
