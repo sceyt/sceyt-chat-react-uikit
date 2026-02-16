@@ -22,7 +22,6 @@ export interface IMessageStore {
   threadMessagesHasNext: boolean
   threadMessagesHasPrev: boolean
   activeChannelMessages: IMessage[]
-  pendingMessages: { [key: string]: IMessage[] }
   activeChannelNewMessage: IMessage | null
   activeTabAttachments: any[]
   attachmentsForPopup: any[]
@@ -89,7 +88,6 @@ const initialState: IMessageStore = {
   attachmentForPopupLoadingState: null,
   messageToEdit: null,
   activeChannelNewMessage: null,
-  pendingMessages: {},
   activeChannelMessageUpdated: null,
   scrollToNewMessage: {
     scrollToBottom: false,

@@ -20,7 +20,6 @@ export const attachmentsForPopupHasPrevSelector = (store: any) => store.MessageR
 export const messageForReplySelector = (store: any) => store.MessageReducer.messageForReply
 export const messageForThreadReplySelector = (store: any) => store.MessageReducer.messageForThreadReply
 export const messageToEditSelector = (store: any) => store.MessageReducer.messageToEdit
-export const pendingMessagesSelector = (store: any) => store.MessageReducer.pendingMessages
 export const channelNewMessageSelector = (store: any) => store.MessageReducer.activeChannelNewMessage
 export const messageUpdatedSelector = (store: any) => store.MessageReducer.activeChannelMessageUpdated
 export const scrollToNewMessageSelector = (store: any) => store.MessageReducer.scrollToNewMessage
