@@ -27,13 +27,13 @@ const VotesResultsPopup = ({ onClose, poll, messageId, onViewMoreOption }: Votes
   const user = getClient().user
   const contactsMap = useSelector(contactsMapSelector)
   const titleWrapperRef = React.useRef<HTMLDivElement>(null)
-const [titleHeight, setTitleHeight] = useState(0)
+  const [titleHeight, setTitleHeight] = useState(0)
 
-useEffect(() => {
-  if (titleWrapperRef.current) {
-    setTitleHeight(titleWrapperRef.current.offsetHeight)
-  }
-}, [])
+  useEffect(() => {
+    if (titleWrapperRef.current) {
+      setTitleHeight(titleWrapperRef.current.offsetHeight)
+    }
+  }, [])
   const {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -181,7 +181,7 @@ useEffect(() => {
 
 export default VotesResultsPopup
 
-const OptionsList = styled.div<{ thumbColor: string, titleHeight: number }>`
+const OptionsList = styled.div<{ thumbColor: string; titleHeight: number }>`
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -232,6 +232,7 @@ const OptionTitle = styled.div<{ color: string }>`
   font-size: 15px;
   line-height: 20px;
   letter-spacing: -0.4px;
+  overflow-wrap: break-word;
 `
 
 const OptionCount = styled.div<{ color: string }>`

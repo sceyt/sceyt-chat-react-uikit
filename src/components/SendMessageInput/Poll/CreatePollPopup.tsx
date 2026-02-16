@@ -40,7 +40,8 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
     [THEME_COLORS.ICON_INACTIVE]: iconInactive,
     [THEME_COLORS.BORDER]: borderColor,
     [THEME_COLORS.ACCENT]: accentColor,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.SURFACE_2]: surface2
   } = useColor()
 
   const [question, setQuestion] = useState('')
@@ -53,6 +54,7 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
   // const [allowVoteRetract, setAllowVoteRetract] = useState(false)
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverId, setDragOverId] = useState<string | null>(null)
+  const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const optionsListRef = useRef<HTMLDivElement>(null)
   const optionInputRefs = useRef<Record<string, HTMLInputElement | null>>({})
@@ -232,7 +234,14 @@ const CreatePollPopup = ({ togglePopup, onCreate }: IProps) => {
           </QuestionInputWrapper>
 
           <Label color={textSecondary}>Options</Label>
-          <OptionsList ref={optionsListRef} onDragOver={handleAutoScroll}>
+          <OptionsList
+            ref={optionsListRef}
+            onDragOver={handleAutoScroll}
+            className={isScrolling ? 'show-scrollbar' : ''}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
+            thumbColor={surface2}
+          >
             {options.map((opt) => (
               <OptionRow
                 key={opt.id}
@@ -427,11 +436,26 @@ const TextCounter = styled.span<{ color: string }>`
   margin-left: auto;
 `
 
-const OptionsList = styled.div`
+const OptionsList = styled.div<{ thumbColor: string }>`
   max-height: 200px;
   overflow-y: auto;
   margin-top: 8px;
   padding-right: 6px;
+  &::-webkit-scrollbar {
+    width: 8px;
+    background: transparent;
+  }
+  &::-webkit-scrollbar-thumb {
+    background: transparent;
+  }
+
+  &.show-scrollbar::-webkit-scrollbar-thumb {
+    background: ${(props) => props.thumbColor};
+    border-radius: 4px;
+  }
+  &.show-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
 `
 
 const OptionRow = styled.div<{
