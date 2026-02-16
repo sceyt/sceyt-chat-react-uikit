@@ -263,6 +263,7 @@ const MessageTextFormat = ({
                       isLastMessage={isLastMessage}
                       color={isLastMessage ? textSecondary : accentColor}
                       key={attributeOffset + index}
+                      data-mention={attribute.metadata}
                       onClick={() => {
                         if (onMentionNameClick && shouldOpenUserProfileForMention) {
                           onMentionNameClick(mentionDisplay)
@@ -289,6 +290,7 @@ const MessageTextFormat = ({
                     isLastMessage={isLastMessage}
                     color={isLastMessage ? textSecondary : accentColor}
                     key={attributeOffset}
+                    data-mention={attribute.metadata}
                     onClick={() => {
                       if (onMentionNameClick && shouldOpenUserProfileForMention) {
                         onMentionNameClick(mentionDisplay)
