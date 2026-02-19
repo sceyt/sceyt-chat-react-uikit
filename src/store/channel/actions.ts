@@ -18,6 +18,7 @@ import {
   setChannelsHasNext,
   setActiveChannel,
   updateChannelData,
+  updateChannelsMembers,
   updateSearchedChannelData,
   updateUserStatusOnChannel,
   updateChannelLastMessage,
@@ -203,6 +204,8 @@ export const updateChannelAC = (channelId: string, config: any) => ({
 
 export const updateChannelDataAC = (channelId: string, config: any, moveUp?: boolean, sort?: boolean) =>
   updateChannelData({ config, channelId, moveUp, sort })
+
+export const updateChannelsMembersAC = (members: IUser[]) => updateChannelsMembers({ members })
 
 export const updateSearchedChannelDataAC = (channelId: string, config: any, groupName: string) =>
   updateSearchedChannelData({ updateData: config, groupName, channelId })

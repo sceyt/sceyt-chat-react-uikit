@@ -22,7 +22,9 @@ import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
   handleSendMessage,
-  handleGetMessage
+  handleGetMessage,
+  blockUsers,
+  unBlockUsers
 } from 'helpers/methods'
 import { MESSAGE_TYPE } from 'types/enum'
 
@@ -53,7 +55,9 @@ export {
   handleSendMessage,
   handleGetMessage,
   createOrGetDirectChannel,
-  switchChannelActiveChannel
+  switchChannelActiveChannel,
+  blockUsers,
+  unBlockUsers
 }
 
 declare global {

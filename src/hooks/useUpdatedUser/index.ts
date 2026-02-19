@@ -4,6 +4,7 @@ import { usersMapSelector } from '../../store/user/selector'
 import { updateUserStatusOnMapAC } from '../../store/user/actions'
 import { setUserToMap } from '../../helpers/userHelper'
 import { IUser, IMember } from '../../types'
+import { updateChannelMemberInAllChannels } from 'helpers/channelHalper'
 
 export default function useUpdatedUser<T extends IUser | IMember | null | undefined>(user: T): T {
   const dispatch = useDispatch()
@@ -13,6 +14,7 @@ export default function useUpdatedUser<T extends IUser | IMember | null | undefi
     if (user?.id && !usersMap[user.id]) {
       setUserToMap(user as IUser)
       dispatch(updateUserStatusOnMapAC({ [user.id]: user as IUser }))
+      updateChannelMemberInAllChannels([user as IUser])
     }
   }, [user?.id])
 

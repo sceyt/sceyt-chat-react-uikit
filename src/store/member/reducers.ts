@@ -13,6 +13,10 @@ export interface IMembersStore {
     fromChannel: boolean
     members: IMember[] | null
   }
+  userBlockedForInvite: {
+    show: boolean
+    userIds: string[]
+  }
   openInviteModal: boolean
 }
 
@@ -27,6 +31,10 @@ const initialState: IMembersStore = {
     isRestricted: false,
     fromChannel: false,
     members: []
+  },
+  userBlockedForInvite: {
+    show: false,
+    userIds: []
   },
   openInviteModal: false
 }
@@ -142,6 +150,12 @@ const memberSlice = createSlice({
       state.restricted.members = members
     },
 
+    setUserBlockedForInvite: (state, action: PayloadAction<{ show: boolean; userIds: string[] }>) => {
+      const { show, userIds } = action.payload
+      state.userBlockedForInvite.show = show
+      state.userBlockedForInvite.userIds = userIds
+    },
+
     setOpenInviteModal: (state, action: PayloadAction<{ open: boolean }>) => {
       state.openInviteModal = action.payload.open
     }
@@ -166,6 +180,7 @@ export const {
   getRolesFail,
   setMembersHasNext,
   setActionIsRestricted,
+  setUserBlockedForInvite,
   setOpenInviteModal
 } = memberSlice.actions
 

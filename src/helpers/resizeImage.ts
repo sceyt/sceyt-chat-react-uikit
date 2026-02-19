@@ -294,20 +294,28 @@ export async function resizeImageWithPica(
       }
     }
 
+    // Draw image to source canvas first to ensure correct pixel data
+    // (passing img directly to Pica can misalign rows for certain dimensions)
+    const srcCanvas = document.createElement('canvas')
+    srcCanvas.width = img.width
+    srcCanvas.height = img.height
+    const srcCtx = srcCanvas.getContext('2d')!
+    srcCtx.drawImage(img, 0, 0)
+
+    URL.revokeObjectURL(url)
+
     // Create canvas for output
     const canvas = document.createElement('canvas')
     canvas.width = newWidth
     canvas.height = newHeight
 
     // Resize with Pica (high-quality Lanczos resampling)
-    await pica.resize(img, canvas, {
+    await pica.resize(srcCanvas, canvas, {
       quality: 3, // max quality
       unsharpAmount: 80, // sharpen slightly
       unsharpRadius: 0.6,
       unsharpThreshold: 2
     })
-
-    URL.revokeObjectURL(url)
 
     // Determine output type - prefer WebP but fallback to original type if not supported
     const originalType = file.type || 'image/jpeg'

@@ -6,6 +6,7 @@ import {
   addUsers,
   setUsersLoadingState,
   updateUserMap,
+  addUserInMapIfNotExists,
   setContacts,
   updateUserProfile,
   setBrowserTabIsActive,
@@ -42,14 +43,14 @@ export const getContactsAC = () => ({
   payload: {}
 })
 
-export const blockUserAC = (userIds: string[]) => ({
+export const blockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: BLOCK_USERS,
-  payload: { userIds }
+  payload: { userIds, callback }
 })
 
-export const unblockUserAC = (userIds: string[]) => ({
+export const unblockUserAC = (userIds: string[], callback?: (users: any, error?: any) => void) => ({
   type: UNBLOCK_USERS,
-  payload: { userIds }
+  payload: { userIds, callback }
 })
 
 export const setContactsLoadingStateAC = (status: number) => ({
@@ -93,5 +94,7 @@ export const updateUserProfileAC = (profile: any) => updateUserProfile({ profile
 export const browserTabIsActiveAC = (state: boolean) => setBrowserTabIsActive({ state })
 
 export const updateUserStatusOnMapAC = (usersMap: { [key: string]: IUser }) => updateUserMap({ usersMap })
+
+export const addUserInMapIfNotExistsAC = (user: IUser) => addUserInMapIfNotExists({ user })
 
 export const setWaitToSendPendingMessagesAC = (state: boolean) => setWaitToSendPendingMessages({ state })

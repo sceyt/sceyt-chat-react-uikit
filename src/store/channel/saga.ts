@@ -93,7 +93,8 @@ import {
   getOnUpdateChannel,
   setPendingDeleteChannel,
   getPendingDeleteChannels,
-  removePendingDeleteChannel
+  removePendingDeleteChannel,
+  updateChannelMemberInAllChannels
 } from '../../helpers/channelHalper'
 import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../helpers/constants'
 import { IAction, IChannel, IContact, IMember, IMessage } from '../../types'
@@ -1531,10 +1532,11 @@ function* checkUsersStatus(/* action: IAction */): any {
               new Date(usersMap[updatedUser.id]?.presence?.lastActiveAt || 0).getTime()) ||
           updatedUser.avatarUrl !== usersMap[updatedUser.id]?.avatarUrl ||
           updatedUser.firstName !== usersMap[updatedUser.id]?.firstName ||
-          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName)
+          updatedUser.lastName !== usersMap[updatedUser.id]?.lastName ||
+          !!updatedUser.blocked !== !!usersMap[updatedUser.id]?.blocked)
       ) {
         updateUserOnMap(updatedUser)
-        usersToUpdateMap[updatedUser.id] = updatedUser
+        usersToUpdateMap[updatedUser.id] = { ...updatedUser, blocked: !!updatedUser.blocked }
         update = true
       }
     })
@@ -1543,6 +1545,7 @@ function* checkUsersStatus(/* action: IAction */): any {
       yield put(updateMembersPresenceAC(updateData))
       yield put(updateUserStatusOnMapAC(updateData))
       yield put(updateUserStatusOnChannelAC(updateData))
+      updateChannelMemberInAllChannels(Object.values(updateData))
     }
   } catch (e) {
     log.error('ERROR in check user status : ', e.message)

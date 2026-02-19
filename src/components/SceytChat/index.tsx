@@ -39,7 +39,14 @@ import {
 } from '../../helpers/channelHalper'
 import { setClient } from '../../common/client'
 import { setAvatarColor } from '../../UIHelper/avatarColors'
-import { browserTabIsActiveAC, getContactsAC, setConnectionStatusAC, setUserAC } from '../../store/user/actions'
+import {
+  browserTabIsActiveAC,
+  getContactsAC,
+  setConnectionStatusAC,
+  setUserAC,
+  addUserInMapIfNotExistsAC,
+  checkUserStatusAC
+} from '../../store/user/actions'
 import { setShowOnlyContactUsers } from '../../helpers/contacts'
 import {
   setContactsMap,
@@ -61,6 +68,7 @@ import JoinGroupPopup from 'common/popups/inviteLink/JoinGroupPopup'
 import { CONNECTION_STATUS } from 'store/user/constants'
 import ActionRestrictedPopup from 'common/popups/actionRestrictedPopup'
 import UnavailableInviteKeyPopup from 'common/popups/unavailableInviteKeyPopup'
+import { cleanupOldAttachmentCache } from '../../helpers/attachmentsCache'
 
 const SceytChat = ({
   client,
@@ -149,6 +157,9 @@ const SceytChat = ({
   useEffect(() => {
     log.info('client is changed.... ', client)
     if (client) {
+      // Clean up old attachment cache if version changed
+      cleanupOldAttachmentCache()
+
       setClient(client)
       setSceytChatClient(client)
       dispatch(setUserAC(client.user))
@@ -299,6 +310,12 @@ const SceytChat = ({
     }
     if (contactsMap) {
       setContactsMap(contactsMap)
+      for (const contactId in contactsMap) {
+        const contact = contactsMap[contactId]
+        const user = { ...contact?.user }
+        dispatch(addUserInMapIfNotExistsAC(user))
+      }
+      dispatch(checkUserStatusAC())
     }
   }, [contactsMap])
 

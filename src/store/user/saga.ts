@@ -16,12 +16,21 @@ import {
   setContactsLoadingStateAC,
   setUsersAC,
   setUsersLoadingStateAC,
-  updateUserProfileAC
+  updateUserProfileAC,
+  updateUserStatusOnMapAC
 } from './actions'
 import { IAction, IMember } from '../../types'
-import { getActiveChannelId, getChannelFromMap, query, updateChannelOnAllChannels } from '../../helpers/channelHalper'
-import { updateChannelDataAC } from '../channel/actions'
+import {
+  getActiveChannelId,
+  getChannelFromMap,
+  query,
+  updateChannelMemberInAllChannels,
+  updateChannelOnAllChannels
+} from '../../helpers/channelHalper'
+import { updateChannelDataAC, updateChannelsMembersAC, updateUserStatusOnChannelAC } from '../channel/actions'
 import log from 'loglevel'
+import { updateMembersPresenceAC } from 'store/member/actions'
+import { updateUserOnMap } from 'helpers/userHelper'
 
 function* getContacts(): any {
   try {
@@ -43,7 +52,7 @@ function* blockUser(action: IAction): any {
   try {
     const SceytChatClient = getClient()
     const { payload } = action
-    const { userIds } = payload
+    const { userIds, callback } = payload
     const blockedUsers = yield call(SceytChatClient.blockUsers, userIds)
 
     const activeChannelId = yield call(getActiveChannelId)
@@ -73,8 +82,25 @@ function* blockUser(action: IAction): any {
         })
       })
     }
+    for (const user of blockedUsers) {
+      updateUserOnMap({ ...user, blocked: true })
+      yield put(updateUserStatusOnMapAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateMembersPresenceAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...user, blocked: true } }))
+      yield put(updateChannelsMembersAC([{ ...user, blocked: true }]))
+      updateChannelMemberInAllChannels([{ ...user, blocked: true }])
+    }
+
+    if (callback) {
+      callback(blockedUsers)
+    }
   } catch (error) {
     log.error('error in block users', error.message)
+    const { payload } = action
+    const { callback } = payload
+    if (callback) {
+      callback(null, error)
+    }
     // yield put(setErrorNotification(error.message))
   }
 }
@@ -83,7 +109,7 @@ function* unblockUser(action: IAction): any {
   try {
     const SceytChatClient = getClient()
     const { payload } = action
-    const { userIds } = payload
+    const { userIds, callback } = payload
     const unblockedUsers = yield call(SceytChatClient.unblockUsers, userIds)
     const activeChannelId = yield call(getActiveChannelId)
     const activeChannel = yield call(getChannelFromMap, activeChannelId)
@@ -112,8 +138,25 @@ function* unblockUser(action: IAction): any {
         })
       })
     }
+    for (const user of unblockedUsers) {
+      const updateData = JSON.parse(JSON.stringify(user))
+      updateUserOnMap({ ...updateData, blocked: false })
+      yield put(updateUserStatusOnMapAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateMembersPresenceAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateUserStatusOnChannelAC({ [user.id]: { ...updateData, blocked: false } }))
+      yield put(updateChannelsMembersAC([{ ...user, blocked: false }]))
+      updateChannelMemberInAllChannels([{ ...user, blocked: false }])
+    }
+    if (callback) {
+      callback(unblockedUsers)
+    }
   } catch (error) {
     log.error('error in unblock users', error.message)
+    const { payload } = action
+    const { callback } = payload
+    if (callback) {
+      callback(null, error)
+    }
     // yield put(setErrorNotification(error.message))
   }
 }

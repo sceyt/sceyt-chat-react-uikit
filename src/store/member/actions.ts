@@ -11,6 +11,7 @@ import {
   getRolesFail,
   setMembersHasNext,
   setActionIsRestricted,
+  setUserBlockedForInvite,
   setOpenInviteModal
 } from './reducers'
 
@@ -94,5 +95,8 @@ export const setMembersHasNextAC = (hasNext: boolean, channelId: string) => setM
 
 export const setActionIsRestrictedAC = (isRestricted: boolean, fromChannel: boolean, members: IMember[] | null) =>
   setActionIsRestricted({ isRestricted, fromChannel, members: members || [] })
+
+export const setUserBlockedForInviteAC = (show: boolean, userIds: string[]) =>
+  setUserBlockedForInvite({ show, userIds })
 
 export const setOpenInviteModalAC = (open: boolean) => setOpenInviteModal({ open })

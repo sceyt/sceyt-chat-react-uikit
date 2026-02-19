@@ -58,6 +58,14 @@ const userSlice = createSlice({
       state.updatedUserMap = { ...state.updatedUserMap, ...action.payload.usersMap }
     },
 
+    addUserInMapIfNotExists: (state, action: PayloadAction<{ user: IUser }>) => {
+      // Merge updates instead of replacing the entire map
+      const { user } = action.payload
+      if (!state.updatedUserMap?.[user?.id]) {
+        state.updatedUserMap = { ...state.updatedUserMap, [user.id]: user }
+      }
+    },
+
     setContacts: (state, action: PayloadAction<{ contacts: IContact[] }>) => {
       const { contacts } = action.payload
       state.contactList = [...contacts]
@@ -95,6 +103,7 @@ export const {
   addUsers,
   setUsersLoadingState,
   updateUserMap,
+  addUserInMapIfNotExists,
   setContacts,
   updateUserProfile,
   setBrowserTabIsActive,
