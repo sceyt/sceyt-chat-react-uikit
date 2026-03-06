@@ -705,7 +705,7 @@ const Container = styled.div`
   right: 0;
   bottom: 0;
   height: 100vh;
-  z-index: 999;
+  z-index: 199;
 `
 const ProgressWrapper = styled.span`
   display: inline-block;
