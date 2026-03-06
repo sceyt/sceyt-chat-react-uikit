@@ -230,4 +230,5 @@ export interface IMessageProps {
     listItemStyles?: IListItemStyles
   }
   collapsedCharacterLimit?: number
+  createChatOnAvatarTap?: boolean
 }

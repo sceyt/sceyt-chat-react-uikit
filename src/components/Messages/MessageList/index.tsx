@@ -336,6 +336,7 @@ interface MessagesProps {
   }
   ogMetadataProps?: OGMetadataProps
   collapsedCharacterLimit?: number
+  createChatOnAvatarTap?: boolean
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -477,7 +478,8 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps,
-  collapsedCharacterLimit
+  collapsedCharacterLimit,
+  createChatOnAvatarTap = true
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1471,6 +1473,7 @@ const MessageList: React.FC<MessagesProps> = ({
                           showInfoMessageProps={showInfoMessageProps}
                           ogMetadataProps={ogMetadataProps}
                           collapsedCharacterLimit={collapsedCharacterLimit}
+                          createChatOnAvatarTap={createChatOnAvatarTap}
                         />
                       </MessageWrapper>
                     )}

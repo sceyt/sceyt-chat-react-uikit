@@ -212,6 +212,7 @@ interface MessagesProps {
   }
   ogMetadataProps?: OGMetadataProps
   collapsedCharacterLimit?: number
+  createChatOnAvatarTap?: boolean
 }
 
 const MessagesContainer: React.FC<MessagesProps> = ({
@@ -364,7 +365,8 @@ const MessagesContainer: React.FC<MessagesProps> = ({
     infoPadding: '0 8px',
     isInviteLink: false
   },
-  collapsedCharacterLimit
+  collapsedCharacterLimit,
+  createChatOnAvatarTap = true
 }) => {
   return (
     <React.Fragment>
@@ -503,6 +505,7 @@ const MessagesContainer: React.FC<MessagesProps> = ({
         showInfoMessageProps={showInfoMessageProps}
         ogMetadataProps={ogMetadataProps}
         collapsedCharacterLimit={collapsedCharacterLimit}
+        createChatOnAvatarTap={createChatOnAvatarTap}
       />
     </React.Fragment>
   )

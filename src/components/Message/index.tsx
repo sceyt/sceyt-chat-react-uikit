@@ -200,7 +200,8 @@ const Message = ({
   shouldOpenUserProfileForMention,
   ogMetadataProps,
   showInfoMessageProps = {},
-  collapsedCharacterLimit
+  collapsedCharacterLimit,
+  createChatOnAvatarTap = true
 }: IMessageProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -720,7 +721,7 @@ const Message = ({
           size={32}
           textSize={14}
           setDefaultAvatar
-          handleAvatarClick={() => handleCreateChat(message.user)}
+          handleAvatarClick={() => createChatOnAvatarTap && handleCreateChat(message.user)}
         />
       )}
       {/* <MessageBoby /> */}
