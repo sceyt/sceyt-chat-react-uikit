@@ -290,14 +290,7 @@ function useFormatMessage(
         if ($isRangeSelection(selection)) {
           const node = getSelectedNode(selection)
           if ($isMentionNode(node)) {
-            const parent = node.getParent()
-            if (parent) {
-              const space = $createTextNode(' ')
-              node.replace(space)
-              space.select() // Move the selection to the new space node
-            } else {
-              node.remove()
-            }
+            node.remove()
           }
         }
       })

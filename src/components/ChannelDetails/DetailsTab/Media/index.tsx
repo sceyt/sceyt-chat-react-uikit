@@ -26,7 +26,7 @@ const Media = ({ channel }: IProps) => {
   const [mediaFile, setMediaFile] = useState<any>(null)
   const dispatch = useDispatch()
   const handleMediaItemClick = (file: IAttachment) => {
-    if (file?.id){
+    if (file?.id) {
       setMediaFile(file)
     }
   }
@@ -38,7 +38,7 @@ const Media = ({ channel }: IProps) => {
     <Container>
       {attachments.map((file: IAttachment, index: number) => {
         return (
-          <React.Fragment key={file.id}>
+          <React.Fragment key={`${file.id}_${index}`}>
             <MonthHeader
               currentCreatedAt={file.createdAt}
               previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}

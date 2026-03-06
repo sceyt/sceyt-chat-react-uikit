@@ -31,6 +31,7 @@ interface IVideoPreviewProps {
   uploading?: boolean
   isDetailsView?: boolean
   setVideoIsReadyToSend?: (attachmentId: string) => void
+  downloading: boolean
 }
 
 const VideoPreview = memo(function VideoPreview({
@@ -44,6 +45,7 @@ const VideoPreview = memo(function VideoPreview({
   isRepliedMessage,
   backgroundColor,
   isDetailsView,
+  downloading,
   setVideoIsReadyToSend
 }: IVideoPreviewProps) {
   const {
@@ -202,7 +204,7 @@ const VideoPreview = memo(function VideoPreview({
           isPreview={isPreview}
         />
       )}
-      {!isRepliedMessage && (
+      {!isRepliedMessage && !downloading && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
             <VideoPlayButton>
@@ -286,7 +288,7 @@ const Component = styled.div<{
   width: ${(props) => props.width};
   height: ${(props) => props.height};
   min-height: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
-  min-width: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '165px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.isPreview && !props.isDetailsView && '100%'};
 
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
@@ -375,7 +377,7 @@ const UploadInProgress = styled.img<{
   height: ${(props) =>
     props.fileAttachment || props.isRepliedMessage ? '40px' : props.height ? `${props.height}px` : '100%'};
   min-width: ${(props) =>
-    !props.fileAttachment && !props.isRepliedMessage && !props.isPreview ? props.imageMinWidth || '165px' : null};
+    !props.fileAttachment && !props.isRepliedMessage && !props.isPreview ? props.imageMinWidth || '100%' : null};
   min-height: ${(props) =>
     !props.fileAttachment && !props.isRepliedMessage && !props.isDetailsView && !props.isPreview && '165px'};
   display: flex;
@@ -398,4 +400,5 @@ const UploadInProgress = styled.img<{
     height: 100%;
     min-width: inherit;
   `}
+  object-fit: cover;
 `

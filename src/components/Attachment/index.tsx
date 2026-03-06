@@ -859,6 +859,7 @@ const Attachment = ({
                       ? '100%'
                       : `${renderHeight || videoAttachmentMaxHeight || 240}px`
                 }
+                downloading={downloadingFile}
                 file={attachment}
                 src={attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
@@ -881,6 +882,7 @@ const Attachment = ({
               <VideoPreview
                 width='48px'
                 height='48px'
+                downloading={downloadingFile}
                 file={attachment}
                 src={attachment.attachmentUrl || attachmentUrl}
                 borderRadius={borderRadius}
@@ -954,6 +956,7 @@ const Attachment = ({
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
+                  downloading={downloadingFile}
                   file={attachment}
                   backgroundColor={
                     backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2
@@ -1113,7 +1116,7 @@ const AttachmentImgCont = styled.div<{
   align-items: center;
   justify-content: flex-end;
   margin-right: ${(props) => (props.isPreview ? '16px' : props.isRepliedMessage ? '8px' : '')};
-  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '165px'};
+  min-width: ${(props) => !props.isRepliedMessage && !props.fitTheContainer && '100%'};
   height: ${(props) => props.fitTheContainer && '100%'};
   width: ${(props) =>
     props.fitTheContainer ? '100%' : props.isRepliedMessage ? '40px' : props.width && `${props.width}px`};
