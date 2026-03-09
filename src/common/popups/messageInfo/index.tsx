@@ -20,7 +20,7 @@ import { messageMarkersSelector, messagesMarkersLoadingStateSelector } from 'sto
 import { LOADING_STATE } from 'helpers/constants'
 import { makeUsername } from 'helpers/message'
 import { getShowOnlyContactUsers } from 'helpers/contacts'
-import {ReactComponent as CircleDashedIcon} from '../../../assets/svg/circle-dashed.svg'
+import { ReactComponent as CircleDashedIcon } from '../../../assets/svg/circle-dashed.svg'
 
 interface IProps {
   message: IMessage
@@ -109,6 +109,10 @@ const MessageInfo = ({
   const [verticalOffset, setVerticalOffset] = useState<number>(8)
   const [transformY, setTransformY] = useState<number>(0)
   const initializingRef = useRef<boolean>(true)
+  const flipAboveRef = useRef<boolean>(false)
+  flipAboveRef.current = flipAbove
+  const readyRef = useRef<boolean>(false)
+  readyRef.current = ready
   const getFromContacts = useMemo(() => getShowOnlyContactUsers(), [])
 
   const activeMarkers = useMemo(() => {
@@ -180,6 +184,8 @@ const MessageInfo = ({
   }
 
   useLayoutEffect(() => {
+    // Once the popup is positioned and visible, skip re-initialization (e.g. on tab-switch loading state changes)
+    if (readyRef.current) return
     // Pre-measure content and decide flip before opening to avoid position jump
     const container = document.getElementById('scrollableDiv')
     const anchorEl = rootRef.current?.parentElement as HTMLElement | null
@@ -447,31 +453,10 @@ const MessageInfo = ({
     const measuredTarget = Math.min(desiredHeight || 0, isNaN(maxPx) ? 300 : Math.min(maxPx, desiredHeight))
     const nextHeight = Math.max(panelHeightPx || 0, measuredTarget)
 
-    const availableBelow = containerRect.bottom - anchorRect.bottom - 8
-    const availableAbove = anchorRect.top - containerRect.top - 8
-    // Lock flip during this update; set correct flip before painting
+    // Lock flip during height animation to prevent position jumps
     setFlipLocked(true)
-    let currentFlip = flipAbove
-    if (messagesMarkersLoadingState !== LOADING_STATE.LOADING) {
-      const overflowBelow = nextHeight > availableBelow
-      const overflowAbove = nextHeight > availableAbove
-      setFlipAbove((prev) => {
-        if (prev) {
-          if (overflowAbove && !overflowBelow) {
-            currentFlip = false
-            return false
-          }
-          currentFlip = true
-          return true
-        }
-        if (overflowBelow && !overflowAbove) {
-          currentFlip = true
-          return true
-        }
-        currentFlip = false
-        return false
-      })
-    }
+    // Use the ref so that reading the current flip direction does not add flipAbove to deps
+    const currentFlip = flipAboveRef.current
 
     // Calculate vertical offset and transform to keep popup within container boundaries
     const offset = 8
@@ -508,7 +493,6 @@ const MessageInfo = ({
     activeMarkers.length,
     messagesMarkersLoadingState,
     height,
-    flipAbove,
     isP2PChannel,
     message.attachments,
     markers,
@@ -580,14 +564,18 @@ const MessageInfo = ({
         maxWidth={maxWidth}
         minWidth={minWidth}
       >
-        <Content ref={contentRef} padding={isP2PChannel ? "8px 16px" : "12px 16px"}>
+        <Content ref={contentRef} padding={isP2PChannel ? '8px 16px' : '12px 16px'}>
           {isP2PChannel ? (
             <P2PStatusList>
               {(shouldShowAllStatuses || p2pStatuses?.received) && (
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Delivered</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {p2pStatuses?.received ? formatDate(new Date((p2pStatuses.received as any).createdAt)) : <CircleDashedIcon />}
+                    {p2pStatuses?.received ? (
+                      formatDate(new Date((p2pStatuses.received as any).createdAt))
+                    ) : (
+                      <CircleDashedIcon />
+                    )}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
@@ -595,7 +583,11 @@ const MessageInfo = ({
                 <P2PStatusRow>
                   <P2PStatusLabel color={textPrimary}>Seen</P2PStatusLabel>
                   <P2PStatusDate color={textSecondary}>
-                    {p2pStatuses?.displayed ? formatDate(new Date((p2pStatuses.displayed as any).createdAt)) : <CircleDashedIcon />}
+                    {p2pStatuses?.displayed ? (
+                      formatDate(new Date((p2pStatuses.displayed as any).createdAt))
+                    ) : (
+                      <CircleDashedIcon />
+                    )}
                   </P2PStatusDate>
                 </P2PStatusRow>
               )}
@@ -606,7 +598,11 @@ const MessageInfo = ({
                   <P2PStatusRow>
                     <P2PStatusLabel color={textPrimary}>Played</P2PStatusLabel>
                     <P2PStatusDate color={textSecondary}>
-                      {p2pStatuses?.played ? formatDate(new Date((p2pStatuses.played as any).createdAt)) : <CircleDashedIcon />}
+                      {p2pStatuses?.played ? (
+                        formatDate(new Date((p2pStatuses.played as any).createdAt))
+                      ) : (
+                        <CircleDashedIcon />
+                      )}
                     </P2PStatusDate>
                   </P2PStatusRow>
                 )}
