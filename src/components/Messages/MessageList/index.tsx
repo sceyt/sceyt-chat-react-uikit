@@ -337,6 +337,7 @@ interface MessagesProps {
   ogMetadataProps?: OGMetadataProps
   collapsedCharacterLimit?: number
   createChatOnAvatarTap?: boolean
+  allowSendAttachment?: boolean
 }
 
 const MessageList: React.FC<MessagesProps> = ({
@@ -479,7 +480,8 @@ const MessageList: React.FC<MessagesProps> = ({
   showInfoMessageProps = {},
   ogMetadataProps,
   collapsedCharacterLimit,
-  createChatOnAvatarTap = true
+  createChatOnAvatarTap = true,
+  allowSendAttachment = true
 }) => {
   const {
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND]: outgoingMessageBackground,
@@ -1196,7 +1198,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   return (
     <React.Fragment>
-      {isDragging && !(attachmentsPreview?.show && mediaFile) && (
+      {allowSendAttachment && isDragging && !(attachmentsPreview?.show && mediaFile) && (
         <DragAndDropContainer
           id='draggingContainer'
           draggable
