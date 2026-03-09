@@ -184,6 +184,29 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
     }
   }, [activeFileId, videoFileId])
 
+  // Autoplay when the video finishes loading (after a 1-second delay)
+  useEffect(() => {
+    if (!isLoaded) return
+    const timer = setTimeout(() => {
+      if (!videoRef.current) return
+      videoRef.current
+        .play()
+        .then(() => setPlaying(true))
+        .catch(() => {
+          // Browser blocked unmuted autoplay — retry muted
+          if (videoRef.current) {
+            videoRef.current.muted = true
+            setIsMuted(true)
+            videoRef.current
+              .play()
+              .then(() => setPlaying(true))
+              .catch(() => {})
+          }
+        })
+    }, 1000)
+    return () => clearTimeout(timer)
+  }, [isLoaded])
+
   // Handle fullscreen changes (e.g., user presses ESC)
   useEffect(() => {
     const handleFullscreenChange = () => {
