@@ -85,26 +85,27 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
     }
   }
   const handleOpenFullScreen = () => {
-    if (containerRef.current) {
-      if (isFullScreen) {
-        document
-          .exitFullscreen()
-          .then(() => {
-            setIsFullScreen(false)
-          })
-          .catch((error) => {
-            console.error('Error exiting fullscreen:', error)
-          })
-      } else {
-        containerRef.current
-          .requestFullscreen()
-          .then(() => {
-            setIsFullScreen(true)
-          })
-          .catch((error) => {
-            console.error('Error entering fullscreen:', error)
-          })
-      }
+    if (isFullScreen) {
+      document
+        .exitFullscreen()
+        .then(() => {
+          setIsFullScreen(false)
+        })
+        .catch((error) => {
+          console.error('Error exiting fullscreen:', error)
+        })
+    } else {
+      // Request fullscreen on the <video> element directly to avoid rendering
+      // artifacts (e.g. upside-down video) caused by CSS transforms on ancestor
+      // elements (such as the Carousel track's translateX).
+      videoRef.current
+        ?.requestFullscreen()
+        .then(() => {
+          setIsFullScreen(true)
+        })
+        .catch((error) => {
+          console.error('Error entering fullscreen:', error)
+        })
     }
   }
   const handleVideoProgress = (e: React.SyntheticEvent<HTMLVideoElement>) => {
@@ -289,6 +290,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
         onError={handleVideoError}
         playsInline
         preload='metadata'
+        controls={isFullScreen}
       />
 
       {isLoaded && (
