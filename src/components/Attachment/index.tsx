@@ -415,10 +415,38 @@ const Attachment = ({
         }
         setIsCached(true)
       } else {
-        fetch(attachment.url).then(async (response) => {
-          setAttachmentToCache(attachment.url, response)
-          setIsCached(true)
-        })
+        fetch(attachment.url)
+          .then(async (response) => {
+            const blob = await response.blob()
+            const blobUrl = URL.createObjectURL(blob)
+            if (attachment.type === attachmentTypes.video) {
+              const frameResult = await getVideoFirstFrame(blobUrl, renderWidth, renderHeight, 0.8)
+              if (frameResult) {
+                const { frameBlobUrl, blob: frameBlob } = frameResult
+                await setAttachmentToCache(
+                  attachment.url,
+                  new Response(frameBlob, { headers: { 'Content-Type': 'image/jpeg' } })
+                )
+                dispatch(setUpdateMessageAttachmentAC(getAttachmentURLWithVersion(attachment.url), frameBlobUrl))
+              }
+              setAttachmentToCache(
+                attachment.url + '_original_video_url',
+                new Response(blob, { headers: { 'Content-Type': blob.type || 'video/mp4' } })
+              )
+              dispatch(setUpdateMessageAttachmentAC(attachment.url + '_original_video_url', blobUrl))
+            } else {
+              setAttachmentToCache(
+                attachment.url,
+                new Response(blob, { headers: { 'Content-Type': blob.type || 'application/octet-stream' } })
+              )
+            }
+            setAttachmentUrl(blobUrl)
+            setIsCached(true)
+          })
+          .catch((error) => {
+            log.error('Error fetching attachment:', error)
+          })
+        return
       }
       setAttachmentUrl(downloadingUrl)
     }

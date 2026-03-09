@@ -450,6 +450,77 @@ function* sendMessage(action: IAction): any {
                     'checksum'
                   )
                 }
+
+                const uriLocal = updatedAttachment.url
+                const fileType = attachment.data?.type?.split('/')[0]
+
+                const updateImage = async () => {
+                  if (!attachment.cachedUrl && fileType === 'image' && attachment.data) {
+                    try {
+                      const parsedMetadata = isJSON(attachment.metadata)
+                        ? JSON.parse(attachment.metadata)
+                        : attachment.metadata
+                      const [newWidth, newHeight] = calculateRenderedImageWidth(
+                        parsedMetadata?.szw || 1280,
+                        parsedMetadata?.szh || 1080
+                      )
+                      const file =
+                        attachment.data instanceof File
+                          ? attachment.data
+                          : new File([attachment.data], attachment.name || 'image', { type: attachment.data.type })
+                      const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
+                      if (resizedBlob) {
+                        await setAttachmentToCache(
+                          uriLocal,
+                          new Response(resizedBlob, { headers: { 'Content-Type': resizedBlob.type || file.type } })
+                        )
+                        const resizedUrl = URL.createObjectURL(resizedBlob)
+                        store.dispatch(setUpdateMessageAttachmentAC(uriLocal, resizedUrl))
+                        setAttachmentToCache(
+                          uriLocal + '_original_image_url',
+                          new Response(file, { headers: { 'Content-Type': file.type } })
+                        )
+                        store.dispatch(
+                          setUpdateMessageAttachmentAC(uriLocal + '_original_image_url', URL.createObjectURL(file))
+                        )
+                      }
+                    } catch (err) {
+                      log.error('Error caching resized image on upload completion:', err)
+                    }
+                  } else if (!attachment.cachedUrl && fileType === 'video' && attachment.data) {
+                    try {
+                      const parsedMetadata = isJSON(attachment.metadata)
+                        ? JSON.parse(attachment.metadata)
+                        : attachment.metadata
+                      const [newWidth, newHeight] = calculateRenderedImageWidth(
+                        parsedMetadata?.szw || 1280,
+                        parsedMetadata?.szh || 1080
+                      )
+                      const result = await getVideoFirstFrame(attachment.data, newWidth, newHeight, 0.8)
+                      if (result) {
+                        const { frameBlobUrl, blob } = result
+                        await setAttachmentToCache(
+                          uriLocal,
+                          new Response(blob, { headers: { 'Content-Type': blob.type } })
+                        )
+                        store.dispatch(setUpdateMessageAttachmentAC(uriLocal, frameBlobUrl))
+                        if (attachment.data) {
+                          await setAttachmentToCache(
+                            uriLocal + '_original_video_url',
+                            new Response(attachment.data, {
+                              headers: { 'Content-Type': attachment.data.type || 'video/mp4' }
+                            })
+                          )
+                          store.dispatch(setUpdateMessageAttachmentAC(uriLocal + '_original_video_url', uriLocal))
+                        }
+                      }
+                    } catch (err) {
+                      log.error('Error caching video frame on upload completion:', err)
+                    }
+                  }
+                }
+                updateImage()
+
                 store.dispatch(removeAttachmentProgressAC(attachment.tid))
                 deletePendingAttachment(attachment.tid)
                 store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))

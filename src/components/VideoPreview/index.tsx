@@ -17,6 +17,7 @@ import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { useDispatch, useSelector } from 'store/hooks'
 import { attachmentUpdatedMapSelector } from 'store/message/selector'
 import { calculateRenderedImageWidth } from 'helpers'
+import { isJSON } from 'helpers/message'
 
 interface IVideoPreviewProps {
   width: string
@@ -57,15 +58,20 @@ const VideoPreview = memo(function VideoPreview({
 
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector)
 
+  const parsedMetadata = useMemo(() => {
+    if (!file.metadata) return null
+    return isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+  }, [file.metadata])
+
   // Calculate initial duration from metadata
   const videoCurrentTime = useMemo(() => {
-    if (file.metadata?.dur) {
-      const mins = Math.floor(file.metadata.dur / 60)
-      const seconds = Math.floor(file.metadata.dur % 60)
+    if (parsedMetadata?.dur) {
+      const mins = Math.floor(parsedMetadata.dur / 60)
+      const seconds = Math.floor(parsedMetadata.dur % 60)
       return `${mins}:${seconds < 10 ? `0${seconds}` : seconds}`
     }
     return null
-  }, [file.metadata?.dur])
+  }, [parsedMetadata])
 
   // Get cached frame from store
   const attachmentVideoFirstFrame = useMemo(
@@ -76,14 +82,14 @@ const VideoPreview = memo(function VideoPreview({
   // Stable background image state - prevents blinking
   // Get thumbnail from metadata
   const attachmentThumb = useMemo(() => {
-    if (file.metadata?.tmb) {
-      if (file.metadata.tmb.length < 70) {
-        return { thumbnail: base64ToDataURL(file.metadata.tmb), withPrefix: false }
+    if (parsedMetadata?.tmb) {
+      if (parsedMetadata.tmb.length < 70) {
+        return { thumbnail: base64ToDataURL(parsedMetadata.tmb), withPrefix: false }
       }
-      return { thumbnail: file.metadata.tmb, withPrefix: true }
+      return { thumbnail: parsedMetadata.tmb, withPrefix: true }
     }
     return { thumbnail: undefined, withPrefix: false }
-  }, [file.metadata?.tmb])
+  }, [parsedMetadata])
 
   const isExtractingRef = useRef(false)
   const hasExtractionFailedRef = useRef(false)
@@ -122,8 +128,8 @@ const VideoPreview = memo(function VideoPreview({
       try {
         isExtractingRef.current = true
         const [newWidth, newHeight] = calculateRenderedImageWidth(
-          file.metadata?.szw || 1280,
-          file.metadata?.szh || 1080
+          parsedMetadata?.szw || 1280,
+          parsedMetadata?.szh || 1080
         )
         // Use getVideoFirstFrame helper function - it handles everything internally
         const result = await getVideoFirstFrame(videoSource, newWidth, newHeight, 0.8)

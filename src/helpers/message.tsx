@@ -420,11 +420,7 @@ export const extractTextFromReactElement = (element: any): string => {
 }
 
 const escapeHTML = (str: string): string => {
-  return str
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
 }
 
 const setsEqual = (a: Set<string>, b: Set<string>): boolean => {
@@ -499,7 +495,11 @@ export const bodyAttributesToHTML = (
 
     const currentFormats = charFormats[i]
     let segmentEnd = i + 1
-    while (segmentEnd < body.length && !mentionRanges.has(segmentEnd) && setsEqual(charFormats[segmentEnd], currentFormats)) {
+    while (
+      segmentEnd < body.length &&
+      !mentionRanges.has(segmentEnd) &&
+      setsEqual(charFormats[segmentEnd], currentFormats)
+    ) {
       segmentEnd++
     }
     const segmentText = body.slice(i, segmentEnd)
