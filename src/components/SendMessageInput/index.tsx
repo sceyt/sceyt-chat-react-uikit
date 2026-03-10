@@ -1216,7 +1216,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ])
           })
         } else if (fileType === 'video') {
-          const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
+          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
@@ -1231,7 +1231,8 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                 ...(dataFromDb && dataFromDb.metadata),
                 szw: width,
                 szh: height,
-                tmb: thumb
+                tmb: thumb,
+                dur: duration
               }
             }
           ])
@@ -1352,10 +1353,11 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
           if (dataFromDb) {
             metas = dataFromDb.metadata
           } else {
-            const { thumb, width, height } = await getFrame(URL.createObjectURL(file as any), 0)
+            const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
             metas.tmb = thumb
             metas.width = width
             metas.height = height
+            metas.dur = duration
             metas = JSON.stringify(metas)
           }
           setAttachments((prevState: any[]) => [
