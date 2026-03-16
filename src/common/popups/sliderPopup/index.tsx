@@ -91,6 +91,7 @@ const SliderPopup = ({
   const [nextButtonDisabled, setNextButtonDisabled] = useState(true)
   const [prevButtonDisabled, setPrevButtonDisabled] = useState(true)
   const [forwardPopupOpen, setForwardPopupOpen] = useState(false)
+  const [readyToPlay, setReadyToPlay] = useState(true)
   const [messageToDelete, setMessageToDelete] = useState<IMessage | undefined>()
   const attachmentLoadingStateForPopup = useSelector(attachmentForPopupLoadingStateSelector)
   const attachmentsForPopupHasPrev = useSelector(attachmentsForPopupHasPrevSelector)
@@ -562,14 +563,20 @@ const SliderPopup = ({
             initialActiveIndex={activeFileIndex >= 0 ? activeFileIndex : 0}
             skipTransition={skipTransition}
             onNextStart={() => {
+              setReadyToPlay(false)
               // Loading state will be set when currentFile changes in useDidUpdate
               loadNextMoreAttachments()
             }}
             onPrevStart={() => {
+              setReadyToPlay(false)
               // Loading state will be set when currentFile changes in useDidUpdate
               loadPrevMoreAttachments()
             }}
             onChange={(pageIndex: number) => {
+              const timeout = setTimeout(() => {
+                setReadyToPlay(true)
+                clearTimeout(timeout)
+              }, 400)
               if (pageIndex >= 0 && pageIndex < attachmentsList.length) {
                 setCurrentFile(attachmentsList[pageIndex])
                 setNextButtonDisabled(!attachmentsList[pageIndex + 1])
@@ -653,6 +660,7 @@ const SliderPopup = ({
                   <React.Fragment>
                     {attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')] && (
                       <VideoPlayer
+                        readyToPlay={readyToPlay}
                         activeFileId={currentFile?.id || ''}
                         videoFileId={file.id || ''}
                         src={attachmentUpdatedMap[getAttachmentURLWithVersion(file.url + '_original_video_url')]}

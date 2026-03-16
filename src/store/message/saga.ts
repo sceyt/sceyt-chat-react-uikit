@@ -1415,8 +1415,8 @@ function loadImage(src: string): Promise<{ width: number; height: number }> {
 }
 
 function* loadOGMetadataForLinkSaga(action: IAction): any {
-  const { messages } = action.payload
-  yield call(loadOGMetadataForLinkMessages, messages, false)
+  const { messages, setStore } = action.payload
+  yield call(loadOGMetadataForLinkMessages, messages, setStore)
 }
 
 function* getMessagesQuery(action: IAction): any {

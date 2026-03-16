@@ -47,6 +47,7 @@ import {
   clearMessagesAC,
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
+  loadOGMetadataForLinkAC,
   removePendingMessageAC,
   scrollToNewMessageAC,
   updateMessageAC,
@@ -830,6 +831,7 @@ export default function* watchForEvents(): any {
             if (channel.id === activeChannelId) {
               if (!getHasNextCached()) {
                 yield put(addMessageAC(message))
+                yield put(loadOGMetadataForLinkAC([message], true))
               }
               addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
               // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)

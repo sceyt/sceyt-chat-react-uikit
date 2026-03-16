@@ -16,9 +16,10 @@ interface IVideoPlayerProps {
   videoFileId?: string
   activeFileId?: string
   onMouseDown?: (e: React.MouseEvent) => void
+  readyToPlay: boolean
 }
 
-const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlayerProps) => {
+const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay }: IVideoPlayerProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary } = useColor()
   const containerRef = useRef<HTMLDivElement>(null)
   const videoRef = useRef<HTMLVideoElement>(null)
@@ -188,25 +189,23 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown }: IVideoPlay
   // Autoplay when the video finishes loading (after a 1-second delay)
   useEffect(() => {
     if (!isLoaded) return
-    const timer = setTimeout(() => {
-      if (!videoRef.current) return
-      videoRef.current
-        .play()
-        .then(() => setPlaying(true))
-        .catch(() => {
-          // Browser blocked unmuted autoplay — retry muted
-          if (videoRef.current) {
-            videoRef.current.muted = true
-            setIsMuted(true)
-            videoRef.current
-              .play()
-              .then(() => setPlaying(true))
-              .catch(() => {})
-          }
-        })
-    }, 1000)
-    return () => clearTimeout(timer)
-  }, [isLoaded])
+    if (!videoRef.current) return
+    if (!readyToPlay) return
+    videoRef.current
+      .play()
+      .then(() => setPlaying(true))
+      .catch(() => {
+        // Browser blocked unmuted autoplay — retry muted
+        if (videoRef.current) {
+          videoRef.current.muted = true
+          setIsMuted(true)
+          videoRef.current
+            .play()
+            .then(() => setPlaying(true))
+            .catch(() => {})
+        }
+      })
+  }, [isLoaded, readyToPlay])
 
   // Handle fullscreen changes (e.g., user presses ESC)
   useEffect(() => {

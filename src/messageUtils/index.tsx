@@ -128,7 +128,10 @@ const linkifyTextPart = (
             ? {
                 onClick: () => {
                   const splitedKey = matchItem.url.split('/')
-                  const key = splitedKey[splitedKey.length - 1]
+                  let key = splitedKey[splitedKey.length - 1]
+                  if (!key) {
+                    key = splitedKey[splitedKey.length - 2]
+                  }
                   if (key) {
                     onInviteLinkClick?.(key)
                   }

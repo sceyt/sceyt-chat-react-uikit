@@ -23,6 +23,8 @@ export const isDescriptionOnlySymbol = (description: string | undefined): boolea
   return !!trimmed && !/[a-zA-Z0-9]/.test(trimmed)
 }
 
+const MIN_IMAGE_SIZE = 200
+
 const OGMetadata = ({
   attachments,
   state,
@@ -43,6 +45,7 @@ const OGMetadata = ({
   ogContainerMargin,
   target = '_blank',
   isInviteLink = false,
+  onClick,
   metadataGetSuccessCallback
 }: {
   attachments: IAttachment[]
@@ -64,6 +67,7 @@ const OGMetadata = ({
   ogContainerMargin?: string
   target?: string
   isInviteLink?: boolean
+  onClick?: () => void
   metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean, metadata: IOGMetadata | null) => void
 }) => {
   const dispatch = useDispatch()
@@ -84,7 +88,11 @@ const OGMetadata = ({
 
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
-  const [imageLoadError] = useState(false)
+  const [imageLoadError, setImageLoadError] = useState(false)
+
+  useEffect(() => {
+    setImageLoadError(false)
+  }, [attachment?.url])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -117,23 +125,34 @@ const OGMetadata = ({
         metadata?.og?.favicon?.url) &&
       metadata
     )
-  }, [state, metadata, shouldShowTitle, shouldShowDescription])
+  }, [state, metadata])
 
   const calculatedImageHeight = useMemo(() => {
     if (!metadata?.imageWidth || !metadata?.imageHeight) {
       return 0
     }
-    return metadata?.imageHeight / (metadata?.imageWidth / maxWidth)
+    let maxSize = maxWidth
+    if (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE) {
+      maxSize = 52
+    }
+    return metadata?.imageHeight / (metadata?.imageWidth / maxSize)
   }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
   const hasImage = useMemo(
     () => metadata?.og?.image?.[0]?.url && !imageLoadError,
     [metadata?.og?.image?.[0]?.url, imageLoadError]
   )
-  const faviconUrl = useMemo(
-    () => (ogShowFavicon && !hasImage && metadata?.og?.favicon?.url ? metadata?.og?.favicon?.url : ''),
-    [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon]
-  )
+  const faviconUrl = useMemo(() => {
+    if (
+      ogShowFavicon &&
+      hasImage &&
+      (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE)
+    ) {
+      return metadata?.og?.image?.[0]?.url
+    }
+
+    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url ? metadata?.og?.favicon?.url : ''
+  }, [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon, hasImage])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
   const MIN_IMAGE_HEIGHT = 180
@@ -146,7 +165,12 @@ const OGMetadata = ({
   useEffect(() => {
     if (oGMetadata?.[attachment?.url]) {
       if (showOGMetadata && oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
-        metadataGetSuccessCallback(attachment?.url, true, showImage, metadata)
+        metadataGetSuccessCallback(
+          attachment?.url,
+          true,
+          showImage || (hasImage && (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE)),
+          metadata
+        )
       } else {
         metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
@@ -169,7 +193,12 @@ const OGMetadata = ({
                   maxWidth={maxWidth}
                   maxHeight={maxHeight || calculatedImageHeight}
                 >
-                  <Img src={metadata?.og?.image?.[0]?.url} alt='OG image' shouldAnimate={shouldAnimate} />
+                  <Img
+                    src={metadata?.og?.image?.[0]?.url}
+                    alt='OG image'
+                    shouldAnimate={shouldAnimate}
+                    onError={() => setImageLoadError(true)}
+                  />
                 </ImageContainer>
               )
             }
@@ -239,7 +268,7 @@ const OGMetadata = ({
 
   const content = useMemo(
     () =>
-      hasImage ? (
+      hasImage && metadata?.imageWidth > MIN_IMAGE_SIZE && metadata?.imageHeight > MIN_IMAGE_SIZE ? (
         <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
           {elements.map((el) => (
             <React.Fragment key={el.key}>{el.render}</React.Fragment>
@@ -267,10 +296,10 @@ const OGMetadata = ({
   }, [attachment?.url])
 
   useEffect(() => {
-    if (!metadata) {
+    if (!oGMetadata?.[attachment?.url]) {
       setShouldAnimate(true)
     }
-  }, [metadata])
+  }, [oGMetadata, attachment?.url])
 
   // If we shouldn't show OG metadata, return null to render as default message
   if (!showOGMetadata) {
@@ -288,19 +317,24 @@ const OGMetadata = ({
       className={ogContainerClassName}
       containerMargin={ogContainerMargin}
       maxWidth={maxWidth}
-      {...(isInviteLink
+      {...(onClick
         ? {
             as: 'div',
-            onClick: () => {
-              getChannel()
-            }
+            onClick
           }
-        : {
-            as: 'a',
-            href: attachment?.url,
-            target,
-            rel: target === '_blank' ? 'noopener noreferrer' : undefined
-          })}
+        : isInviteLink
+          ? {
+              as: 'div',
+              onClick: () => {
+                getChannel()
+              }
+            }
+          : {
+              as: 'a',
+              href: attachment?.url,
+              target,
+              rel: target === '_blank' ? 'noopener noreferrer' : undefined
+            })}
     >
       {content}
     </OGMetadataContainer>
@@ -358,15 +392,12 @@ const OGMetadataContainer = styled.div<{
   width: 100%;
   display: grid;
   grid-template-columns: 1fr;
-  border-radius: 8px;
   background-color: ${({ showBackground, customBg, bgColor }) =>
     showBackground ? customBg ?? bgColor : 'transparent'};
   border-radius: ${({ borderRadius }) => (borderRadius !== undefined ? borderRadius : '8px')};
   margin: ${({ containerMargin }) => containerMargin ?? '0.8rem auto 0'};
-  // margin-bottom: ${({ showOGMetadata }) => (showOGMetadata ? '0.4rem' : '0')};
   padding: ${({ padding }) => padding ?? '0'};
   text-decoration: none;
-  // color: inherit;
   &:hover {
     opacity: 0.9;
     cursor: pointer;
@@ -407,7 +438,7 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
     `
     animation: fadeInSlideUp 0.3s ease-out forwards;
   `}
-  ${({ margin }) => (margin ? '12px' : '0')};
+  ${({ margin }) => margin && 'padding: 12px;'}
 `
 
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
@@ -489,9 +520,6 @@ const Img = styled.img<{ shouldAnimate: boolean }>`
   height: 100%;
   object-fit: cover;
   display: block;
-  // object-fit: cover;
-  // object-position: center;
-  // image-rendering: auto;
   border-radius: inherit;
   ${({ shouldAnimate }) =>
     shouldAnimate &&

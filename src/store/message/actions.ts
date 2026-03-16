@@ -621,10 +621,10 @@ export function setUnreadMessageIdAC(messageId: string) {
   return setUnreadMessageId({ messageId })
 }
 
-export function loadOGMetadataForLinkAC(messages: IMessage[]) {
+export function loadOGMetadataForLinkAC(messages: IMessage[], setStore = false) {
   return {
     type: LOAD_OG_METADATA_FOR_LINK,
-    payload: { messages }
+    payload: { messages, setStore }
   }
 }
 

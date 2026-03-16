@@ -18,6 +18,7 @@ import DropDown from '../common/dropdown'
 import { THEME_COLORS } from '../UIHelper/constants'
 import { OGMetadata } from './Message/OGMetadata'
 import PollMessage from './Message/PollMessage'
+import ForwardMessagePopup from 'common/popups/forwardMessage'
 import {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
@@ -57,7 +58,8 @@ export {
   createOrGetDirectChannel,
   switchChannelActiveChannel,
   blockUsers,
-  unBlockUsers
+  unBlockUsers,
+  ForwardMessagePopup
 }
 
 declare global {
