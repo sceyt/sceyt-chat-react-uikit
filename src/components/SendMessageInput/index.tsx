@@ -70,7 +70,7 @@ import {
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
-import { detectBrowser, detectOS, hashString } from '../../helpers'
+import { detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
@@ -85,14 +85,7 @@ import {
   setPendingAttachment,
   setSendMessageHandler
 } from '../../helpers/messagesHalper'
-import {
-  attachmentTypes,
-  DEFAULT_CHANNEL_TYPE,
-  DB_NAMES,
-  DB_STORE_NAMES,
-  MESSAGE_DELIVERY_STATUS,
-  USER_STATE
-} from '../../helpers/constants'
+import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
 import { getFrame } from '../../helpers/getVideoFrame'
@@ -130,7 +123,6 @@ import ForwardMessagePopup from '../../common/popups/forwardMessage'
 import AudioRecord from '../AudioRecord'
 
 import { getClient } from '../../common/client'
-import { getDataFromDB } from '../../services/indexedDB'
 import { HistoryPlugin } from '@lexical/react/LexicalHistoryPlugin'
 import { MessageTextFormat } from '../../messageUtils'
 import RecordingAnimation from './RecordingAnimation'
@@ -1165,33 +1157,10 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const customUploader = getCustomUploader()
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
-    let cachedUrl: any
     const reader = new FileReader()
     reader.onload = async () => {
       // @ts-ignore
-      const length = reader.result && reader.result.length
-      let fileChecksum
-      if (length > 3000) {
-        const firstPart = reader.result && reader.result.slice(0, 1000)
-        const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
-        const lastPart = reader.result && reader.result.slice(length - 1000, length)
-        fileChecksum = `${firstPart}${middlePart}${lastPart}`
-      } else {
-        fileChecksum = `${reader.result}`
-      }
-      const checksumHash = await hashString(fileChecksum || '')
-      let dataFromDb: any
-      try {
-        dataFromDb = await getDataFromDB(DB_NAMES.FILES_STORAGE, DB_STORE_NAMES.ATTACHMENTS, checksumHash, 'checksum')
-      } catch (e) {
-        log.error('error in get data from db . . . . ', e)
-      }
-      if (dataFromDb) {
-        cachedUrl = dataFromDb.url
-        setPendingAttachment(tid, { file: cachedUrl })
-      } else {
-        setPendingAttachment(tid, { file, checksum: checksumHash })
-      }
+      setPendingAttachment(tid, { file })
       if (customUploader) {
         if (fileType === 'image') {
           resizeImage(file).then(async (resizedFile: any) => {
@@ -1200,14 +1169,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
               ...prevState,
               {
                 data: file,
-                cachedUrl,
                 upload: false,
                 type: isMediaAttachment ? fileType : 'file',
                 attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
                 tid,
                 size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
                 metadata: {
-                  ...(dataFromDb && dataFromDb.metadata),
                   szw: imageWidth,
                   szh: imageHeight,
                   tmb: thumbnail
@@ -1221,14 +1188,12 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ...prevState,
             {
               data: file,
-              cachedUrl,
               upload: false,
               type: isMediaAttachment ? fileType : 'file',
               attachmentUrl: URL.createObjectURL(file),
               tid,
-              size: dataFromDb ? dataFromDb.size : file.size,
+              size: file.size,
               metadata: {
-                ...(dataFromDb && dataFromDb.metadata),
                 szw: width,
                 szh: height,
                 tmb: thumb,
@@ -1241,134 +1206,83 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ...prevState,
             {
               data: file,
-              cachedUrl,
               upload: false,
               type: 'file',
               tid,
-              size: dataFromDb ? dataFromDb.size : file.size,
-              metadata: dataFromDb && dataFromDb.metadata
+              size: file.size
             }
           ])
         }
       } else {
         if (fileType === 'image') {
           if (isMediaAttachment) {
-            let metas: any = {}
-            if (dataFromDb) {
-              metas = dataFromDb.metadata
-            } else {
-              const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-              metas.imageHeight = imageHeight
-              metas.imageWidth = imageWidth
-              metas.thumbnail = thumbnail
-            }
+            const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
+            const metas = { thumbnail, imageWidth, imageHeight }
             if (file.type === 'image/gif') {
               setAttachments((prevState: any[]) => [
                 ...prevState,
                 {
                   data: file,
-                  cachedUrl,
-                  upload: !cachedUrl,
+                  upload: true,
                   attachmentUrl: URL.createObjectURL(file),
                   tid,
                   type: fileType,
-                  size: dataFromDb ? dataFromDb.size : file.size,
-                  metadata: dataFromDb
-                    ? metas
-                    : JSON.stringify({
-                        tmb: metas.thumbnail,
-                        szw: metas.imageWidth,
-                        szh: metas.imageHeight
-                      })
+                  size: file.size,
+                  metadata: JSON.stringify({
+                    tmb: metas.thumbnail,
+                    szw: metas.imageWidth,
+                    szh: metas.imageHeight
+                  })
                 }
               ])
             } else {
-              if (dataFromDb) {
+              resizeImage(file).then(async (resizedFileData: any) => {
+                const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
                 setAttachments((prevState: any[]) => [
                   ...prevState,
                   {
-                    data: file,
-                    cachedUrl,
-                    upload: false,
-                    attachmentUrl: URL.createObjectURL(file),
+                    data: resizedFile,
+                    upload: true,
+                    attachmentUrl: URL.createObjectURL(resizedFile),
                     tid,
                     type: fileType,
-                    size: dataFromDb.size,
-                    metadata: metas
+                    size: resizedFile.size,
+                    metadata: JSON.stringify({
+                      tmb: metas.thumbnail,
+                      szw: resizedFileData.newWidth,
+                      szh: resizedFileData.newHeight
+                    })
                   }
                 ])
-              } else {
-                resizeImage(file).then(async (resizedFileData: any) => {
-                  // resizedFiles.forEach((file: any, index: number) => {
-                  const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
-                  setAttachments((prevState: any[]) => [
-                    ...prevState,
-                    {
-                      data: resizedFile,
-                      upload: true,
-                      attachmentUrl: URL.createObjectURL(resizedFile),
-                      tid,
-                      type: fileType,
-                      size: resizedFile.size,
-                      metadata: JSON.stringify({
-                        tmb: metas.thumbnail,
-                        szw: resizedFileData.newWidth,
-                        szh: resizedFileData.newHeight
-                      })
-                    }
-                  ])
-                  // })
-                })
-              }
+              })
             }
           } else {
-            let metas: any = {}
-            if (dataFromDb) {
-              metas = dataFromDb.metadata
-            } else {
-              const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
-              metas.thumbnail = thumbnail
-            }
+            const { thumbnail } = await createImageThumbnail(file, undefined, 50, 50)
             setAttachments((prevState: any[]) => [
               ...prevState,
               {
                 data: file,
-                // type: file.type.split('/')[0],
                 type: 'file',
-                cachedUrl,
-                upload: !cachedUrl,
+                upload: true,
                 attachmentUrl: URL.createObjectURL(file as any),
                 tid,
-                size: dataFromDb ? dataFromDb.size : file.size,
-                metadata: dataFromDb
-                  ? metas
-                  : JSON.stringify({
-                      tmb: metas.thumbnail
-                    })
+                size: file.size,
+                metadata: JSON.stringify({
+                  tmb: thumbnail
+                })
               }
             ])
           }
         } else if (fileType === 'video') {
-          let metas: any = {}
-          if (dataFromDb) {
-            metas = dataFromDb.metadata
-          } else {
-            const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
-            metas.tmb = thumb
-            metas.width = width
-            metas.height = height
-            metas.dur = duration
-            metas = JSON.stringify(metas)
-          }
+          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
+          const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
           setAttachments((prevState: any[]) => [
             ...prevState,
             {
               data: file,
-              // type: file.type.split('/')[0],
               type: 'video',
-              cachedUrl,
-              upload: !cachedUrl,
-              size: dataFromDb ? dataFromDb.size : file.size,
+              upload: true,
+              size: file.size,
               attachmentUrl: URL.createObjectURL(file as any),
               tid,
               metadata: metas
@@ -1379,11 +1293,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             ...prevState,
             {
               data: file,
-              cachedUrl,
-              upload: !cachedUrl,
+              upload: true,
               type: 'file',
-              size: dataFromDb ? dataFromDb.size : file.size,
-              metadata: dataFromDb && dataFromDb.metadata,
+              size: file.size,
               tid
             }
           ])
@@ -1481,19 +1393,7 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       const reader = new FileReader()
       reader.onload = async () => {
         // @ts-ignore
-        const length = reader.result && reader.result.length
-        let fileChecksum
-        if (length > 3000) {
-          const firstPart = reader.result && reader.result.slice(0, 1000)
-          const middlePart = reader.result && reader.result.slice(length / 2 - 500, length / 2 + 500)
-          const lastPart = reader.result && reader.result.slice(length - 1000, length)
-          fileChecksum = `${firstPart}${middlePart}${lastPart}`
-        } else {
-          fileChecksum = `${reader.result}`
-        }
-        const checksumHash = await hashString(fileChecksum || '')
-
-        setPendingAttachment(tid, { file: recordedFile, checksum: checksumHash })
+        setPendingAttachment(tid, { file: recordedFile })
         const messageToSend = {
           metadata: '',
           body: '',

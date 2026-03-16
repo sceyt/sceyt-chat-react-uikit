@@ -230,6 +230,9 @@ export const compressAndCacheImage = async (
 ): Promise<string> => {
   try {
     const response = await fetch(url)
+    if (!response.ok) {
+      return ''
+    }
     const blob = await response.blob()
     // Only compress if it's an image
     if (blob.type.startsWith('image/')) {
@@ -262,14 +265,6 @@ export const compressAndCacheImage = async (
     return ''
   } catch (error) {
     log.error('Error compressing and caching image:', error)
-    // Fallback to caching original
-    try {
-      const response = await fetch(url)
-      setAttachmentToCache(cacheKey, response)
-      return ''
-    } catch (fetchError) {
-      log.error('Error caching image:', fetchError)
-      return ''
-    }
+    return ''
   }
 }

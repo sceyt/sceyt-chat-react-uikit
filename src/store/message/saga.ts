@@ -99,8 +99,6 @@ import {
   attachmentTypes,
   DEFAULT_CHANNEL_TYPE,
   channelDetailsTabs,
-  DB_NAMES,
-  DB_STORE_NAMES,
   LOADING_STATE,
   MESSAGE_STATUS,
   UPLOAD_STATE
@@ -129,7 +127,6 @@ import {
   updateMessageOnAllMessages,
   deletePendingAttachment,
   setPendingAttachment,
-  getPendingAttachment,
   removeReactionToMessageOnMap,
   addReactionOnAllMessages,
   removeReactionOnAllMessages,
@@ -156,7 +153,6 @@ import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
-import { setDataToDB } from '../../services/indexedDB'
 import { getMetadata, storeMetadata } from '../../services/indexedDB/metadataService'
 import log from 'loglevel'
 import { getFrame, getVideoFirstFrame } from 'helpers/getVideoFrame'
@@ -183,13 +179,18 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       let blobLocal: Blob | null = null
       if (attachment.cachedUrl) {
         uriLocal = attachment.cachedUrl
-        store.dispatch(updateAttachmentUploadingProgressAC(attachment.data.size, attachment.data.size, attachment.tid))
+        const dataSize = attachment.data?.size || 0
+        store.dispatch(updateAttachmentUploadingProgressAC(dataSize, dataSize, attachment.tid))
       } else {
         const { uri, blob } = await customUpload(attachment, handleUploadProgress, message.type, handleUpdateLocalPath)
         uriLocal = uri
         blobLocal = blob
-        fileSize = blobLocal.size
-        filePath = URL.createObjectURL(blobLocal)
+        if (blobLocal) {
+          fileSize = blobLocal.size
+          filePath = URL.createObjectURL(blobLocal)
+        } else {
+          log.warn('Upload returned null blob for attachment:', attachment.name)
+        }
       }
       let thumbnailMetas: any
       if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'image') {
@@ -203,8 +204,13 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         // Resize and cache the image for display
         try {
           if (blobLocal && blobLocal.type.startsWith('image/')) {
-            // Convert blob to File for resizeImageWithPica
-            const file = new File([blobLocal], attachment.name || 'image', { type: blobLocal.type })
+            // Use the original file for pica resize — blobLocal is already AWS-resized, re-resizing it degrades quality
+            const file =
+              attachment.url instanceof File
+                ? attachment.url
+                : new File([attachment.url], attachment.name || 'image', {
+                    type: (attachment.url as File).type || blobLocal.type
+                  })
 
             // Resize with Pica (high-quality resizing)
             const [newWidth, newHeight] = calculateRenderedImageWidth(
@@ -282,14 +288,20 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       }
       store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.SUCCESS, attachment.tid))
 
+      const parsedAttachmentMeta = (() => {
+        if (!attachment.metadata) return {}
+        try {
+          const parsed = typeof attachment.metadata === 'string' ? JSON.parse(attachment.metadata) : attachment.metadata
+          // Guard against double-stringified JSON (JSON.parse returning a string instead of object)
+          return typeof parsed === 'string' ? JSON.parse(parsed) : parsed || {}
+        } catch {
+          return {}
+        }
+      })()
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...(attachment.metadata
-              ? typeof attachment.metadata === 'string'
-                ? JSON.parse(attachment.metadata)
-                : attachment.metadata
-              : {}),
+            ...parsedAttachmentMeta,
             ...(thumbnailMetas &&
               thumbnailMetas.thumbnail && {
                 tmb: thumbnailMetas.thumbnail,
@@ -305,6 +317,10 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
         .setFileSize(fileSize || attachment.size)
         .setUpload(false)
         .create()
+      // Preserve the original tid so currentAttachmentsMap lookup works after sendMessage
+      if (attachment.tid) {
+        attachmentToSend.tid = attachment.tid
+      }
       return attachmentToSend
     })
   )
@@ -441,16 +457,6 @@ function* sendMessage(action: IAction): any {
                 log.info('fail to upload attachment ... ', error)
                 store.dispatch(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, attachment.tid))
               } else {
-                const pendingAttachment = getPendingAttachment(attachment.tid)
-                if (!attachment.cachedUrl) {
-                  setDataToDB(
-                    DB_NAMES.FILES_STORAGE,
-                    DB_STORE_NAMES.ATTACHMENTS,
-                    [{ ...updatedAttachment, checksum: pendingAttachment.checksum }],
-                    'checksum'
-                  )
-                }
-
                 const uriLocal = updatedAttachment.url
                 const fileType = attachment.data?.type?.split('/')[0]
 
@@ -644,6 +650,16 @@ function* sendMessage(action: IAction): any {
         const messageAttachment = messagesToSend[i].attachments
         let messageToSend = messagesToSend[i]
 
+        if (action.type === RESEND_MESSAGE) {
+          // Clear the failed state while re-uploading so the UI shows uploading progress
+          const pendingState = { state: MESSAGE_STATUS.UNMODIFIED }
+          updateMessageOnMap(channel.id, { messageId: messageToSend.tid!, params: pendingState })
+          updateMessageOnAllMessages(messageToSend.tid!, pendingState)
+          yield put(updateMessageAC(messageToSend.tid!, pendingState))
+          // Also clear it on the local variable so the SDK doesn't echo "failed" back in the response
+          messageToSend = { ...messageToSend, ...pendingState }
+        }
+
         try {
           const messageCopy = JSON.parse(JSON.stringify(messagesToSend[i]))
           if (connectionState === CONNECTION_STATUS.CONNECTED) {
@@ -673,20 +689,6 @@ function* sendMessage(action: IAction): any {
                   user: JSON.parse(JSON.stringify(messageResponse.user)),
                   tid: messageAttachment[k].tid as string
                 }
-                const pendingAttachment = getPendingAttachment(messageAttachment[k].tid as string)
-                if (!messageAttachment[k].cachedUrl) {
-                  setDataToDB(
-                    DB_NAMES.FILES_STORAGE,
-                    DB_STORE_NAMES.ATTACHMENTS,
-                    [
-                      {
-                        ...messageResponse.attachments[k],
-                        checksum: pendingAttachment.checksum || pendingAttachment?.file
-                      }
-                    ],
-                    'checksum'
-                  )
-                }
                 yield put(removeAttachmentProgressAC(messageAttachment[k].tid))
                 deletePendingAttachment(messageAttachment[k].tid!)
               }
@@ -698,9 +700,21 @@ function* sendMessage(action: IAction): any {
                 currentAttachmentsMap[attachment.tid!] = attachment
               })
               attachmentsToUpdate = messageResponse.attachments.map((attachment: IAttachment) => {
-                if (currentAttachmentsMap[attachment.tid!] && attachment.type !== attachmentTypes.voice) {
-                  log.info('set at')
-                  return { ...attachment }
+                const localAttachment = currentAttachmentsMap[attachment.tid!]
+
+                // Preserve local metadata (especially size) when the server response
+                // does not yet contain it or reports it as 0. This avoids showing
+                // "0 Bytes" in the UI until the backend has finalized attachment size.
+                if (localAttachment && attachment.type !== attachmentTypes.voice) {
+                  const merged: IAttachment = {
+                    ...attachment
+                  }
+
+                  if (!+merged.size && localAttachment.size) {
+                    merged.size = localAttachment.size
+                  }
+
+                  return merged
                 } else if (attachment.type === attachmentTypes.voice) {
                   return { ...attachment }
                 }
@@ -739,8 +753,10 @@ function* sendMessage(action: IAction): any {
             yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
           } else if (channel?.id) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
-            if (messageToSend.attachments && messageToSend.attachments.length) {
-              yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, messageToSend.attachments[0].tid))
+            if (messageToSend.attachments?.length) {
+              for (const att of messageToSend.attachments) {
+                if (att.tid) yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, att.tid))
+              }
             }
 
             updateMessageOnMap(channel.id, {
@@ -826,7 +842,7 @@ function* sendTextMessage(action: IAction): any {
     const createdMessage = action.type === RESEND_MESSAGE ? action.payload.message : messageBuilder.create()
     const messageToSend = {
       ...createdMessage,
-      ...(action.type === RESEND_MESSAGE ? { attachments: message?.attachments } : {})
+      ...(action.type === RESEND_MESSAGE ? { attachments: message?.attachments, state: MESSAGE_STATUS.UNMODIFIED } : {})
     }
     pendingMessage = {
       ...messageToSend,

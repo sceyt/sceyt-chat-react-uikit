@@ -191,6 +191,7 @@ const VideoPlayer = ({ src, videoFileId, activeFileId, onMouseDown, readyToPlay 
     if (!isLoaded) return
     if (!videoRef.current) return
     if (!readyToPlay) return
+    if (activeFileId !== videoFileId) return
     videoRef.current
       .play()
       .then(() => setPlaying(true))
