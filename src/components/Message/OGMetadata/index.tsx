@@ -135,7 +135,7 @@ const OGMetadata = ({
     if (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE) {
       maxSize = 52
     }
-    return metadata?.imageHeight / (metadata?.imageWidth / maxSize)
+    return Math.floor(metadata?.imageHeight / (metadata?.imageWidth / maxSize))
   }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
   const hasImage = useMemo(
@@ -438,7 +438,6 @@ const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
     `
     animation: fadeInSlideUp 0.3s ease-out forwards;
   `}
-  ${({ margin }) => margin && 'padding: 12px;'}
 `
 
 const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
