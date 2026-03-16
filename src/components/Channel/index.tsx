@@ -776,6 +776,18 @@ const Channel: React.FC<IChannelProps> = ({
         </LastMessageDate>
       </ChannelStatus>
       <UnreadInfo bottom={!(lastMessage || typingOrRecording.items.length > 0 || draftMessageText) ? '5px' : ''}>
+        {channel.pinnedAt && (
+          <PinnedIconWrapper
+            color={iconInactive}
+            margin={
+              channel.newMessageCount || channel.unread || (channel.newMentionCount && channel.newMentionCount > 0)
+                ? '0 4px 0 4px'
+                : ''
+            }
+          >
+            {pinedIcon || <PinedIcon />}
+          </PinnedIconWrapper>
+        )}
         {!!(channel.newMentionCount && channel.newMentionCount > 0) && (
           <UnreadMentionIconWrapper iconColor={accentColor} rightMargin={!!(channel.newMessageCount || channel.unread)}>
             <MentionIcon />
@@ -791,11 +803,6 @@ const Channel: React.FC<IChannelProps> = ({
             {channel.newMessageCount ? (channel.newMessageCount > 99 ? '99+' : channel.newMessageCount) : ''}
           </UnreadCount>
         )}
-        {channel.pinnedAt &&
-          !(channel.newMessageCount || channel.unread) &&
-          !(channel.newMentionCount && channel.newMentionCount > 0) && (
-            <PinnedIconWrapper color={iconInactive}>{pinedIcon || <PinedIcon />}</PinnedIconWrapper>
-          )}
       </UnreadInfo>
     </Container>
   )
@@ -1150,7 +1157,9 @@ const UnreadCount = styled.span<UnreadCountProps & { backgroundColor: string; te
   ${(props: any) => props.isMuted && `background-color: ${props.mutedBackgroundColor};`}
 `
 
-const PinnedIconWrapper = styled.span<{ color: string }>`
+const PinnedIconWrapper = styled.span<{ color: string; margin?: string }>`
+  display: flex;
+  ${(props) => props.margin && `margin: ${props.margin}`};
   & > svg {
     color: ${(props) => props.color};
   }
