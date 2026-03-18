@@ -211,8 +211,8 @@ export function addMessagesAC(messages: any, direction: string) {
   return addMessages({ messages, direction })
 }
 
-export function setMessagesAC(messages: any) {
-  return setMessages({ messages })
+export function setMessagesAC(messages: any, channelId?: string) {
+  return setMessages({ messages, channelId })
 }
 
 export function addReactionAC(

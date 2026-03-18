@@ -336,20 +336,12 @@ const updateMessage = function* (
     if (scrollToNewMessage) {
       const channel = yield call(getChannelFromAllChannels, channelId)
       const messages = store.getState().MessageReducer.activeChannelMessages
-      if (messages.findIndex((msg: IMessage) => msg.id === channel?.lastMessage?.id) >= 10) {
+      const lastMsgIdx = messages.findIndex((msg: IMessage) => msg.id === channel?.lastMessage?.id)
+      if (lastMsgIdx >= 0) {
+        // Last message is already in the current window — just scroll to it
         yield put(scrollToNewMessageAC(true, false, false))
-        yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
-        const repliedMessage = document.getElementById(channel?.lastMessage?.id)
-        if (repliedMessage) {
-          const scrollRef = document.getElementById('scrollableDiv')
-          if (scrollRef) {
-            scrollRef.scrollTo({
-              top: 1000,
-              behavior: 'smooth'
-            })
-          }
-        }
       } else if (channel?.id) {
+        // Latest messages are not loaded yet — fetch them, scroll happens after load
         yield put(getMessagesAC(channel, true, channel?.lastMessage?.id, undefined, false, 'smooth', true))
       }
     }
@@ -1467,7 +1459,7 @@ function* getMessagesQuery(action: IAction): any {
                 : { messages: [], hasNext: false }
           }
           yield call(loadOGMetadataForLinkMessages, result.messages)
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
           setMessagesToMap(
             channel.id,
             result.messages,
@@ -1477,9 +1469,25 @@ function* getMessagesQuery(action: IAction): any {
           setAllMessages(result.messages)
           yield put(setMessagesHasPrevAC(true))
         } else {
-          result.messages = getFromAllMessagesByMessageId('', '', true)
+          // Fetch latest messages from server to avoid showing a stale window that may have been
+          // set by a "jump to message" operation which replaces the helper cache.
+          if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            messageQuery.limit = MESSAGES_MAX_LENGTH
+            result = yield call(messageQuery.loadPrevious)
+            if (result.messages.length) {
+              setMessagesToMap(
+                channel.id,
+                result.messages,
+                result.messages[0]?.id,
+                result.messages[result.messages.length - 1]?.id
+              )
+              setAllMessages(result.messages)
+            }
+          } else {
+            result.messages = getFromAllMessagesByMessageId('', '', true)
+          }
           yield call(loadOGMetadataForLinkMessages, result.messages)
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
           yield put(setMessagesHasPrevAC(true))
         }
         yield put(setMessagesHasNextAC(false))
@@ -1506,7 +1514,6 @@ function* getMessagesQuery(action: IAction): any {
           loadPreviousMessageId = messageId
         }
         messageQuery.limit = previousLoadLimit
-        log.info('load by message id from server ...............', messageId)
         const firstResult =
           connectionState === CONNECTION_STATUS.CONNECTED
             ? yield call(messageQuery.loadPreviousMessageId, loadPreviousMessageId)
@@ -1524,7 +1531,7 @@ function* getMessagesQuery(action: IAction): any {
             : { messages: [], hasNext: false }
         result.messages = [...firstResult.messages, ...secondResult.messages]
         yield call(loadOGMetadataForLinkMessages, result.messages)
-        yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
+        yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
 
         setMessagesToMap(
           channel.id,
@@ -1570,7 +1577,7 @@ function* getMessagesQuery(action: IAction): any {
         )
         setAllMessages([...result.messages])
         yield call(loadOGMetadataForLinkMessages, result.messages)
-        yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages))))
+        yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
       } else {
@@ -1582,14 +1589,13 @@ function* getMessagesQuery(action: IAction): any {
             cachedMessages?.length ? cachedMessages : undefined
           )
           yield call(loadOGMetadataForLinkMessages, messages)
-          yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(messages)), channel.id))
           yield delay(0)
           const filteredPendingMessages = getFilteredPendingMessages(messages)
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
           // Load OG metadata for cached link-only messages
           yield call(loadOGMetadataForLinkMessages, filteredPendingMessages)
         }
-        log.info('load message from server')
 
         result = { messages: [], hasNext: false }
         if (channel?.lastDisplayedMessageId > channel?.lastMessage?.id) {
@@ -1616,6 +1622,10 @@ function* getMessagesQuery(action: IAction): any {
             : channel?.lastMessage?.id || '0'
         if (updatedMessages.length) {
           yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
+          // The cached-display phase (above) may have set hasPrevCached=true based on the old cache size.
+          // Now that the server window is authoritative, clear both flags so pagination hits the server.
+          setHasPrevCached(false)
+          setHasNextCached(false)
           yield put(setMessagesHasPrevAC(true))
           yield put(setMessagesHasNextAC(false))
         } else if (!cachedMessages?.length && !result.messages?.length) {
@@ -1689,7 +1699,6 @@ function* loadMoreMessages(action: IAction): any {
     messageQueryBuilder.reverse(true)
     const messageQuery = yield call(messageQueryBuilder.build)
     messageQuery.limit = limit || 5
-    const now = Date.now()
     yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
 
@@ -1713,7 +1722,6 @@ function* loadMoreMessages(action: IAction): any {
       if (getHasNextCached()) {
         result.messages = getFromAllMessagesByMessageId(messageId, MESSAGE_LOAD_DIRECTION.NEXT)
       } else if (hasNext) {
-        log.info('saga load next from server ... ', messageId)
         messageQuery.reverse = false
         result = yield call(messageQuery.loadNextMessageId, messageId)
         if (result.messages.length) {
@@ -1729,9 +1737,6 @@ function* loadMoreMessages(action: IAction): any {
       }
       yield put(setMessagesHasPrevAC(true))
     }
-    /*   if (result.messages[result.messages.length - 1].id === messageId) {
-      result.messages.pop()
-    } */
     if (result.messages && result.messages.length && result.messages.length > 0) {
       yield call(loadOGMetadataForLinkMessages, result.messages)
       yield put(addMessagesAC(JSON.parse(JSON.stringify(result.messages)), direction))
@@ -1741,18 +1746,11 @@ function* loadMoreMessages(action: IAction): any {
         yield put(setMessagesHasNextAC(false))
       }
     }
-    if (Date.now() - now < 10) {
-      setTimeout(() => {
-        store.dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
-      }, 10)
-    } else {
-      yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
-    }
   } catch (e) {
-    log.error('error in load more messages', e)
-    /* if (e.code !== 10008) {
-      yield put(setErrorNotification(e.message));
-    } */
+    log.error('[MESSAGE_LIST] loadMoreMessages ERROR:', e)
+  } finally {
+    // Always release loading state — even on error — so pagination guards never get stuck
+    store.dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
   }
 }
 

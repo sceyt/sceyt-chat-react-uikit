@@ -77,7 +77,6 @@ import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
-import log from 'loglevel'
 
 const CreateMessageDateDivider = ({
   lastIndex,
@@ -546,6 +545,7 @@ const MessageList: React.FC<MessagesProps> = ({
   const loadingRef = useRef<boolean>(false)
   const messagesIndexMapRef = useRef<Record<string, number>>({})
   const scrollRafRef = useRef<number | null>(null)
+  const preserveScrollRafRef = useRef<number | null>(null)
   const loadingMessagesTimeoutRef = useRef<any>(null)
   const renderTopDate = () => {
     const container = scrollRef.current
@@ -618,6 +618,9 @@ const MessageList: React.FC<MessagesProps> = ({
       if (showScrollToNewMessageButton) {
         dispatch(showScrollToNewMessageButtonAC(false))
       }
+      // Reset pagination guards when user is at the bottom so they are not stuck
+      nextDisableRef.current = false
+      prevDisableRef.current = false
     }
     if (scrollToReply) {
       target.scrollTop = scrollToReply
@@ -694,13 +697,18 @@ const MessageList: React.FC<MessagesProps> = ({
         cancelAnimationFrame(scrollRafRef.current)
         scrollRafRef.current = null
       }
+      if (preserveScrollRafRef.current !== null) {
+        cancelAnimationFrame(preserveScrollRafRef.current)
+        preserveScrollRafRef.current = null
+      }
     }
   }, [])
 
   const handleScrollToRepliedMessage = async (messageId: string) => {
+    const idx = messages.findIndex((msg: IMessage) => msg.id === messageId)
     prevDisableRef.current = true
     nextDisableRef.current = true
-    if (messages.findIndex((msg: IMessage) => msg.id === messageId) >= 10) {
+    if (idx >= 10) {
       const repliedMessage = document.getElementById(messageId)
       if (repliedMessage) {
         scrollRef.current.scrollTo({
@@ -862,16 +870,33 @@ const MessageList: React.FC<MessagesProps> = ({
     if (scrollToRepliedMessage) {
       loadingRef.current = false
       scrollRef.current.style.scrollBehavior = 'inherit'
+      dispatch(setScrollToMessagesAC(null))
+      // Defer calculation and scroll so the DOM has fully rendered the new message
+      // window before we read offsetTop and set scroll position.
       const repliedMessage = document.getElementById(scrollToRepliedMessage)
       if (repliedMessage) {
-        setScrollToReply(repliedMessage && repliedMessage.offsetTop - (channel.backToLinkedChannel ? 0 : 200))
+        // Use the same centering formula as the in-window handler so the message
+        // is centered in the viewport rather than using a fixed 200px offset.
+        const targetTop = channel.backToLinkedChannel
+          ? repliedMessage.offsetTop
+          : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
+        setScrollToReply(targetTop)
+        // Disable pagination BEFORE changing scrollTop. Setting scrollTop=0 fires a
+        // synchronous scroll event; React state (scrollToReply) isn't set yet so the
+        // scroll handler's guard won't block it. Refs are synchronous and will block
+        // PREV/NEXT loads immediately.
+        prevDisableRef.current = true
+        nextDisableRef.current = true
+        // The new message window may start with the scroll at the top (oldest messages visible).
+        // Snap to the bottom (scrollTop=0 = newest) first so the smooth animation always
+        // travels bottom→top (from newer toward the older replied message), not top→bottom.
         scrollRef.current.scrollTo({
-          top: repliedMessage && repliedMessage.offsetTop - (channel.backToLinkedChannel ? 0 : 200),
+          top: targetTop,
           behavior: scrollToMessageBehavior
         })
         scrollRef.current.style.scrollBehavior = scrollToMessageBehavior
         if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
-          repliedMessage && repliedMessage.classList.add('highlight')
+          repliedMessage.classList.add('highlight')
         }
         const positiveValue =
           repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2 < 0
@@ -880,17 +905,19 @@ const MessageList: React.FC<MessagesProps> = ({
         setTimeout(
           () => {
             if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
-              const repliedMessage = document.getElementById(scrollToRepliedMessage)
-              repliedMessage && repliedMessage.classList.remove('highlight')
+              const el = document.getElementById(scrollToRepliedMessage)
+              el && el.classList.remove('highlight')
             }
             prevDisableRef.current = false
+            nextDisableRef.current = false
+            // Discard any deferred pagination that was queued while refs were locked.
+            shouldLoadMessagesRef.current = ''
             setScrollToReply(null)
             scrollRef.current.style.scrollBehavior = 'instant'
           },
           1000 + positiveValue * 0.1
         )
       }
-      dispatch(setScrollToMessagesAC(null))
     }
   }, [scrollToRepliedMessage])
 
@@ -904,8 +931,6 @@ const MessageList: React.FC<MessagesProps> = ({
           })
         }
       } else {
-        nextDisableRef.current = true
-        prevDisableRef.current = true
         scrollRef.current.scrollTo({
           top: 0,
           behavior: 'smooth'
@@ -987,7 +1012,14 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [messages, hiddenMessagesProperties, user?.id])
 
   useEffect(() => {
-    if (scrollRef.current) {
+    // Only run scroll preservation and restoration when a pagination load is actively in progress
+    // AND the user has not expressed intent to scroll to the bottom (e.g. after sending a message).
+    // If we allowed restoration while scrollToBottom is true, the anchor-scroll would override
+    // the send-scroll intent and show an old position instead of the latest messages.
+    const isPaginating = loadingRef.current && loadDirectionRef.current !== ''
+    const isSendScrollToBottom = scrollToNewMessage.scrollToBottom && !scrollToNewMessage.isIncomingMessage
+    const shouldRestore = isPaginating && !isSendScrollToBottom
+    if (shouldRestore && scrollRef.current) {
       const isAtBottom = scrollRef.current.scrollTop > -50
       if (!isAtBottom) {
         setPreviousScrollTop(scrollRef.current.scrollTop)
@@ -995,7 +1027,7 @@ const MessageList: React.FC<MessagesProps> = ({
       }
     }
 
-    if (loadingRef.current) {
+    if (shouldRestore) {
       if (loadDirectionRef.current !== 'next') {
         const lastVisibleMessage: any = document.getElementById(lastVisibleMessageIdRef.current)
         if (lastVisibleMessage) {
@@ -1067,7 +1099,11 @@ const MessageList: React.FC<MessagesProps> = ({
     }
 
     if (shouldPreserveScroll && scrollRef.current && previousScrollTop > 0) {
-      requestAnimationFrame(() => {
+      if (preserveScrollRafRef.current !== null) {
+        cancelAnimationFrame(preserveScrollRafRef.current)
+      }
+      preserveScrollRafRef.current = requestAnimationFrame(() => {
+        preserveScrollRafRef.current = null
         if (scrollRef.current) {
           scrollRef.current.style.scrollBehavior = 'inherit'
           scrollRef.current.scrollTop = previousScrollTop
@@ -1086,13 +1122,30 @@ const MessageList: React.FC<MessagesProps> = ({
 
   useEffect(() => {
     if (messagesLoading === LOADING_STATE.LOADED) {
+      // If a pagination load finished while the user had sent a message (scrollToBottom is active)
+      // and the window does NOT contain the channel's latest message, jump to the latest now.
+      // We check the window directly instead of relying on hasNextMessages because a PREV load
+      // can slice the newest messages off the end of the window while hasNextMessages stays false.
+      const windowHasLatest = messages.length > 0 && messages[messages.length - 1]?.id === channel?.lastMessage?.id
+      if (
+        scrollToNewMessage.scrollToBottom &&
+        !scrollToNewMessage.isIncomingMessage &&
+        !windowHasLatest &&
+        connectionStatus === CONNECTION_STATUS.CONNECTED &&
+        channel?.id
+      ) {
+        dispatch(getMessagesAC(channel, true))
+      }
       const timeout = setTimeout(() => {
         loadingRef.current = false
         loadFromServerRef.current = false
+        loadDirectionRef.current = ''
         nextDisableRef.current = false
+        prevDisableRef.current = false
         const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
         if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
+          shouldLoadMessagesRef.current = ''
         }
         if (
           shouldLoadMessagesRef.current === 'next' &&
@@ -1100,6 +1153,7 @@ const MessageList: React.FC<MessagesProps> = ({
           currentIndex > messages.length - 15
         ) {
           handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
+          shouldLoadMessagesRef.current = ''
         }
       }, 50)
       if (loadingMessagesTimeoutRef.current) {
@@ -1112,10 +1166,17 @@ const MessageList: React.FC<MessagesProps> = ({
         clearTimeout(loadingMessagesTimeoutRef.current)
       }
     }
-  }, [messagesLoading, messages, lastVisibleMessageIdRef])
+  }, [
+    messagesLoading,
+    messages,
+    lastVisibleMessageIdRef,
+    scrollToNewMessage,
+    hasNextMessages,
+    connectionStatus,
+    channel?.id
+  ])
 
   useEffect(() => {
-    log.info('connection status is changed.. .... ', connectionStatus, 'channel  ... ', channel)
     if (connectionStatus === CONNECTION_STATUS.CONNECTED && channel?.id) {
       loadingRef.current = false
       prevDisableRef.current = false

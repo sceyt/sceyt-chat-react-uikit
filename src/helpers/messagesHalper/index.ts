@@ -150,13 +150,16 @@ export const setAllMessages = (messages: IMessage[]) => {
   activeChannelAllMessages = messages
 }
 export const addAllMessages = (messages: IMessage[], direction: string) => {
+  const toAdd = messages.filter(
+    (m) => !activeChannelAllMessages.some((e) => e.tid === m.tid || (m.id && e.id === m.id))
+  )
   if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-    activeChannelAllMessages = [...messages, ...activeChannelAllMessages]
+    activeChannelAllMessages = [...toAdd, ...activeChannelAllMessages]
     if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
       setHasNextCached(true)
     }
   } else {
-    activeChannelAllMessages = [...activeChannelAllMessages, ...messages]
+    activeChannelAllMessages = [...activeChannelAllMessages, ...toAdd]
     if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
       setHasPrevCached(true)
     }

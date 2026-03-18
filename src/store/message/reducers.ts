@@ -175,8 +175,20 @@ const messageSlice = createSlice({
       state.unreadScrollTo = action.payload.state
     },
 
-    setMessages: (state, action: PayloadAction<{ messages: IMessage[] }>) => {
-      state.activeChannelMessages = action.payload.messages
+    setMessages: (state, action: PayloadAction<{ messages: IMessage[]; channelId?: string }>) => {
+      const { messages, channelId } = action.payload
+      const pendingForChannel = channelId ? state.pendingMessagesMap[channelId] : undefined
+      if (pendingForChannel?.length) {
+        const merged = [...messages]
+        for (const pending of pendingForChannel) {
+          if (!merged.some((m) => m.tid === pending.tid || (pending.id && m.id === pending.id))) {
+            merged.push(pending)
+          }
+        }
+        state.activeChannelMessages = merged
+      } else {
+        state.activeChannelMessages = messages
+      }
     },
 
     addMessages: (
@@ -248,7 +260,11 @@ const messageSlice = createSlice({
           }
         }
       }
-      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
+      state.activeChannelMessages.sort((a, b) => {
+        if (!a?.id) return 1
+        if (!b?.id) return -1
+        return BigInt(a.id) < BigInt(b.id) ? -1 : 1
+      })
     },
 
     updateMessage: (
@@ -308,7 +324,11 @@ const messageSlice = createSlice({
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }
-      state.activeChannelMessages.sort((a, b) => (!a?.id ? 1 : a?.id < b?.id ? -1 : 1))
+      state.activeChannelMessages.sort((a, b) => {
+        if (!a?.id) return 1
+        if (!b?.id) return -1
+        return BigInt(a.id) < BigInt(b.id) ? -1 : 1
+      })
     },
 
     updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
