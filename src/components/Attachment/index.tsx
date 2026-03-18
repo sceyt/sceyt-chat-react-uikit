@@ -139,7 +139,9 @@ const Attachment = ({
   const imageContRef = useRef<HTMLDivElement>(null)
   const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
   const attachmentUrlFromMap = useMemo(
-    () => attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
+    () =>
+      attachmentUpdatedMap[getAttachmentURLWithVersion(attachment?.metadata?.tmb || '')] ||
+      attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
     [attachmentUpdatedMap, attachment.url]
   )
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
@@ -187,7 +189,7 @@ const Attachment = ({
       attachmentCompilationState[attachment.tid!] === UPLOAD_STATE.PAUSED)
   // const attachmentThumb = attachmentMetadata && attachmentMetadata.tmb
 
-  let attachmentThumb: string | undefined
+  let attachmentThumb: string | undefined = ''
   let withPrefix = true
   if (
     attachment.type !== attachmentTypes.voice &&
@@ -665,7 +667,7 @@ const Attachment = ({
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
-            src={attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb}
+            src={attachmentUrlFromMap || attachmentUrl || attachmentThumb}
             fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
@@ -679,12 +681,12 @@ const Attachment = ({
             $shouldAnimate={shouldAnimateImage}
             $isLoaded={imageLoaded}
             onLoad={() => {
-              const currentSrc = attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl || attachmentThumb
+              const currentSrc = attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb
               const wasThumbnail = previousImageSrcRef.current === attachmentThumb
               const isNowFullImage =
                 currentSrc &&
                 currentSrc !== attachmentThumb &&
-                (attachment.attachmentUrl || attachmentUrlFromMap || attachmentUrl)
+                (attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl)
 
               if (wasThumbnail && isNowFullImage) {
                 setShouldAnimateImage(true)
@@ -698,11 +700,12 @@ const Attachment = ({
           (isInUploadingState ||
             !(attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl || attachmentThumb)) ? (
             <UploadProgress
-              backgroundImage={attachmentThumb}
+              backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
               isRepliedMessage={isRepliedMessage}
               width={renderWidth}
               height={renderHeight}
               withBorder={!isPreview && !isDetailsView}
+              borderRadius={borderRadius}
               backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
               isDetailsView={isDetailsView}
               imageMinWidth={imageMinWidth}
@@ -814,9 +817,13 @@ const Attachment = ({
                   isDetailsView={isDetailsView}
                   isRepliedMessage={isRepliedMessage}
                   withPrefix={withPrefix}
-                  backgroundImage={attachmentThumb || ''}
+                  backgroundImage={!attachmentUrlFromMap ? attachmentThumb : ''}
                   zIndex={9}
                   borderColor={borderColor}
+                  withBorder={!isPreview && !isDetailsView}
+                  borderRadius={borderRadius}
+                  width={renderWidth}
+                  height={renderHeight}
                 >
                   <UploadPercent
                     isRepliedMessage={isRepliedMessage}
@@ -889,7 +896,7 @@ const Attachment = ({
                 }
                 downloading={downloadingFile}
                 file={attachment}
-                src={attachment.attachmentUrl || attachmentUrl}
+                src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}
                 isCachedFile={isCached}
                 uploading={
                   attachmentCompilationState[attachment.tid!] &&
@@ -912,7 +919,7 @@ const Attachment = ({
                 height='48px'
                 downloading={downloadingFile}
                 file={attachment}
-                src={attachment.attachmentUrl || attachmentUrl}
+                src={attachmentUrlFromMap || attachment.attachmentUrl || attachmentUrl}
                 borderRadius={borderRadius}
                 setVideoIsReadyToSend={setVideoIsReadyToSend}
                 backgroundColor={

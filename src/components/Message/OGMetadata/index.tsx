@@ -6,6 +6,84 @@ import { useDispatch, useSelector } from '../../../store/hooks'
 import { useColor } from 'hooks'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { getChannelByInviteKeyAC } from 'store/channel/actions'
+import { setUpdateMessageAttachmentAC } from 'store/message/actions'
+import { attachmentUpdatedMapSelector } from 'store/message/selector'
+import { getAttachmentURLWithVersion } from 'helpers/attachmentsCache'
+
+const OG_IMAGE_CACHE = 'og-images-v1'
+
+const useCachedOGImage = (url: string | undefined) => {
+  const dispatch = useDispatch()
+  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector)
+  const reduxCached = url ? attachmentUpdatedMap[getAttachmentURLWithVersion(url)] : undefined
+  const [src, setSrc] = useState<string | undefined>(reduxCached || url)
+
+  useEffect(() => {
+    if (!url) return
+    // If Redux already has a blob URL for this image, use it immediately
+    if (reduxCached) {
+      setSrc(reduxCached)
+      return
+    }
+    setSrc(url)
+    if (!('caches' in window)) return
+    caches
+      .open(OG_IMAGE_CACHE)
+      .then((cache) => cache.match(url))
+      .then((cached) => {
+        if (cached) {
+          cached.blob().then((blob) => {
+            const blobUrl = URL.createObjectURL(blob)
+            setSrc(blobUrl)
+            dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
+          })
+        }
+      })
+      .catch(() => {})
+  }, [url, reduxCached])
+
+  const onImageLoad = useCallback(() => {
+    if (!url || !('caches' in window)) return
+    try {
+      if (new URL(url).origin !== window.location.origin) return
+    } catch {
+      return
+    }
+    fetch(url, { credentials: 'omit' })
+      .then((response) => {
+        if (response.ok) {
+          response
+            .clone()
+            .blob()
+            .then((blob) => {
+              const blobUrl = URL.createObjectURL(blob)
+              dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
+              caches.open(OG_IMAGE_CACHE).then((cache) => cache.put(url, response))
+            })
+        }
+      })
+      .catch(() => {})
+  }, [url])
+
+  const onImageError = useCallback(() => {
+    if (!url || !('caches' in window)) return
+    caches
+      .open(OG_IMAGE_CACHE)
+      .then((cache) => cache.match(url))
+      .then((cached) => {
+        if (cached) {
+          cached.blob().then((blob) => {
+            const blobUrl = URL.createObjectURL(blob)
+            setSrc(blobUrl)
+            dispatch(setUpdateMessageAttachmentAC(url, blobUrl))
+          })
+        }
+      })
+      .catch(() => {})
+  }, [url])
+
+  return { src, onImageLoad, onImageError }
+}
 
 const validateUrl = (url: string) => {
   try {
@@ -89,10 +167,18 @@ const OGMetadata = ({
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
   const [imageLoadError, setImageLoadError] = useState(false)
+  const { src: cachedImageSrc, onImageLoad, onImageError } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
+  const { src: cachedFaviconSrc, onImageLoad: onFaviconLoad } = useCachedOGImage(metadata?.og?.favicon?.url)
 
   useEffect(() => {
     setImageLoadError(false)
   }, [attachment?.url])
+
+  useEffect(() => {
+    if (cachedImageSrc?.startsWith('blob:')) {
+      setImageLoadError(false)
+    }
+  }, [cachedImageSrc])
 
   const ogUrl = useMemo(() => {
     const url = attachment?.url
@@ -139,8 +225,8 @@ const OGMetadata = ({
   }, [metadata?.imageWidth, metadata?.imageHeight, maxWidth])
 
   const hasImage = useMemo(
-    () => metadata?.og?.image?.[0]?.url && !imageLoadError,
-    [metadata?.og?.image?.[0]?.url, imageLoadError]
+    () => metadata?.og?.image?.[0]?.url && (!imageLoadError || cachedImageSrc?.startsWith('blob:')),
+    [metadata?.og?.image?.[0]?.url, imageLoadError, cachedImageSrc]
   )
   const faviconUrl = useMemo(() => {
     if (
@@ -148,11 +234,13 @@ const OGMetadata = ({
       hasImage &&
       (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE)
     ) {
-      return metadata?.og?.image?.[0]?.url
+      return cachedImageSrc || metadata?.og?.image?.[0]?.url
     }
 
-    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url ? metadata?.og?.favicon?.url : ''
-  }, [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon, hasImage])
+    return ogShowFavicon && !hasImage && metadata?.og?.favicon?.url
+      ? cachedFaviconSrc || metadata?.og?.favicon?.url
+      : ''
+  }, [metadata?.og?.favicon?.url, metadata?.faviconLoaded, ogShowFavicon, hasImage, cachedImageSrc, cachedFaviconSrc])
   const resolvedOrder = useMemo(() => order || { image: 1, title: 2, description: 3, link: 4 }, [order])
 
   const MIN_IMAGE_HEIGHT = 180
@@ -165,12 +253,9 @@ const OGMetadata = ({
   useEffect(() => {
     if (oGMetadata?.[attachment?.url]) {
       if (showOGMetadata && oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
-        metadataGetSuccessCallback(
-          attachment?.url,
-          true,
-          showImage || (hasImage && (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE)),
-          metadata
-        )
+        const show =
+          showImage || (hasImage && (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE))
+        metadataGetSuccessCallback(attachment?.url, true, !!show, metadata)
       } else {
         metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
       }
@@ -194,10 +279,14 @@ const OGMetadata = ({
                   maxHeight={maxHeight || calculatedImageHeight}
                 >
                   <Img
-                    src={metadata?.og?.image?.[0]?.url}
+                    src={cachedImageSrc}
                     alt='OG image'
                     shouldAnimate={shouldAnimate}
-                    onError={() => setImageLoadError(true)}
+                    onLoad={onImageLoad}
+                    onError={() => {
+                      onImageError()
+                      setImageLoadError(true)
+                    }}
                   />
                 </ImageContainer>
               )
@@ -278,7 +367,7 @@ const OGMetadata = ({
         <OGRow>
           <OGTextWrapper>{textContent}</OGTextWrapper>
           <FaviconContainer aria-hidden='true'>
-            <FaviconImg src={faviconUrl} alt='' loading='lazy' decoding='async' />
+            <FaviconImg src={faviconUrl} alt='' loading='lazy' decoding='async' onLoad={onFaviconLoad} />
           </FaviconContainer>
         </OGRow>
       ) : (

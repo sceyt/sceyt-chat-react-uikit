@@ -75,7 +75,9 @@ const VideoPreview = memo(function VideoPreview({
 
   // Get cached frame from store
   const attachmentVideoFirstFrame = useMemo(
-    () => attachmentUpdatedMap[getAttachmentURLWithVersion(file.url)],
+    () =>
+      attachmentUpdatedMap[getAttachmentURLWithVersion(file.metadata?.tmb)] ||
+      attachmentUpdatedMap[getAttachmentURLWithVersion(file.url)],
     [attachmentUpdatedMap, file.url]
   )
 
@@ -189,27 +191,26 @@ const VideoPreview = memo(function VideoPreview({
       backgroundColor={backgroundColor}
       isDetailsView={isDetailsView}
     >
-      {!uploading && (
-        <UploadInProgress
-          isRepliedMessage={isRepliedMessage}
-          src={
-            attachmentVideoFirstFrame ||
-            (attachmentThumb?.withPrefix
-              ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
-              : attachmentThumb?.thumbnail)
-          }
-          width={parseInt(width)}
-          height={parseInt(height)}
-          withBorder={!isPreview && !isDetailsView}
-          backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
-          isDetailsView={isDetailsView}
-          borderColor={border}
-          loading='lazy'
-          decoding='async'
-          fetchpriority='high'
-          isPreview={isPreview}
-        />
-      )}
+      <UploadInProgress
+        isRepliedMessage={isRepliedMessage}
+        src={
+          attachmentVideoFirstFrame ||
+          (attachmentThumb?.withPrefix
+            ? `data:image/jpeg;base64,${attachmentThumb.thumbnail}`
+            : attachmentThumb?.thumbnail)
+        }
+        width={parseInt(width)}
+        height={parseInt(height)}
+        withBorder={!isPreview && !isDetailsView}
+        backgroundColor={backgroundColor && backgroundColor !== 'inherit' ? backgroundColor : overlayBackground2}
+        isDetailsView={isDetailsView}
+        borderColor={border}
+        loading='lazy'
+        decoding='async'
+        fetchpriority='high'
+        isPreview={isPreview}
+        borderRadius={borderRadius}
+      />
       {!isRepliedMessage && !downloading && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (

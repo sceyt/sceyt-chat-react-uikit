@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, ReactNode } from 'react'
+import React, { useState, useEffect, useLayoutEffect, useRef, useCallback, ReactNode } from 'react'
 import styled from 'styled-components'
 
 export interface RenderArrowProps {
@@ -58,7 +58,7 @@ const Carousel: React.FC<CarouselProps> = ({
   const totalItems = items.length
 
   // Update current index when initialActiveIndex changes externally (but not from internal navigation)
-  useEffect(() => {
+  useLayoutEffect(() => {
     // Only update if initialActiveIndex changed externally (not from our own navigation)
     if (
       !isInternalNavigationRef.current &&
@@ -368,7 +368,7 @@ const Carousel: React.FC<CarouselProps> = ({
   }, [goToNext, goToPrev, isRTL])
 
   // Update transform on index change with smooth animation
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (containerRef.current && !isDraggingRef.current && totalItems > 0) {
       // Translate by the percentage of the wrapper width (which is totalItems * 100%)
       // Each item is 100/totalItems % of the wrapper
@@ -394,7 +394,7 @@ const Carousel: React.FC<CarouselProps> = ({
 
   // Initialize transform on mount/remount (instant if skipTransition, otherwise smooth)
   const isFirstRenderRef = useRef(true)
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (containerRef.current && totalItems > 0) {
       const translateX = (-currentIndex * 100) / totalItems
       containerRef.current.style.transform = `translateX(${translateX}%)`

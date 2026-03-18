@@ -148,14 +148,14 @@ import {
   pauseUpload,
   resumeUpload
 } from '../../helpers/customUploader'
-import { createImageThumbnail, resizeImageWithPica } from '../../helpers/resizeImage'
+import { resizeImageWithPica } from '../../helpers/resizeImage'
 import { setAttachmentToCache } from '../../helpers/attachmentsCache'
 import store from '../index'
 import { IProgress } from '../../components/ChatContainer'
 import { canBeViewOnce, isJSON } from '../../helpers/message'
 import { getMetadata, storeMetadata } from '../../services/indexedDB/metadataService'
 import log from 'loglevel'
-import { getFrame, getVideoFirstFrame } from 'helpers/getVideoFrame'
+import { getVideoFirstFrame } from 'helpers/getVideoFrame'
 import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { isResendableError } from 'helpers/error'
@@ -192,16 +192,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           log.warn('Upload returned null blob for attachment:', attachment.name)
         }
       }
-      let thumbnailMetas: any
       if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'image') {
-        thumbnailMetas = await createImageThumbnail(
-          null,
-          filePath,
-          attachment.type === 'file' ? 50 : undefined,
-          attachment.type === 'file' ? 50 : undefined
-        )
-
-        // Resize and cache the image for display
         try {
           if (blobLocal && blobLocal.type.startsWith('image/')) {
             // Use the original file for pica resize — blobLocal is already AWS-resized, re-resizing it degrades quality
@@ -214,8 +205,8 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
 
             // Resize with Pica (high-quality resizing)
             const [newWidth, newHeight] = calculateRenderedImageWidth(
-              thumbnailMetas.imageWidth || 1280,
-              thumbnailMetas.imageHeight || 1080
+              attachment?.metadata.szw || 1280,
+              attachment?.metadata.szh || 1080
             )
             const { blob: resizedBlob } = await resizeImageWithPica(file, newWidth, newHeight, 1)
             if (resizedBlob) {
@@ -246,17 +237,10 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
           // Continue even if caching fails
         }
       } else if (!attachment.cachedUrl && attachment.url.type.split('/')[0] === 'video') {
-        const meta = await getFrame(filePath)
-        thumbnailMetas = {
-          thumbnail: meta.thumb,
-          imageWidth: meta.width,
-          imageHeight: meta.height,
-          duration: meta.duration
-        }
         if (blobLocal) {
           const [newWidth, newHeight] = calculateRenderedImageWidth(
-            thumbnailMetas.imageWidth || 1280,
-            thumbnailMetas.imageHeight || 1080
+            attachment?.metadata.szw || 1280,
+            attachment?.metadata.szh || 1080
           )
           const result = await getVideoFirstFrame(blobLocal, newWidth, newHeight, 0.8)
           if (result) {
@@ -301,14 +285,7 @@ export const handleUploadAttachments = async (attachments: IAttachment[], messag
       const attachmentMeta = attachment.cachedUrl
         ? attachment.metadata
         : JSON.stringify({
-            ...parsedAttachmentMeta,
-            ...(thumbnailMetas &&
-              thumbnailMetas.thumbnail && {
-                tmb: thumbnailMetas.thumbnail,
-                szw: thumbnailMetas.imageWidth,
-                szh: thumbnailMetas.imageHeight,
-                ...(thumbnailMetas.duration ? { dur: thumbnailMetas.duration } : {})
-              })
+            ...parsedAttachmentMeta
           })
       const attachmentBuilder = channel.createAttachmentBuilder(uriLocal, attachment.type)
       const attachmentToSend = attachmentBuilder

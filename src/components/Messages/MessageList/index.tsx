@@ -114,9 +114,7 @@ const CreateMessageDateDivider = ({
   let dividerText = ''
   if (differentDays && !today.diff(current, 'days')) {
     dividerText = 'Today'
-  } /* else if (differentDays && !today.add(-1, 'days').diff(current, 'days')) {
-    dividerText = 'Yesterday'
-  } */ else if (differentDays) {
+  } else if (differentDays) {
     dividerText = moment().year() === moment(current).year() ? current.format('MMMM D') : current.format('MMMM D YYYY')
   }
   return !differentDays ? null : (

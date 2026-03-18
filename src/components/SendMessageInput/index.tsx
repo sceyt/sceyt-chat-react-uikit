@@ -34,7 +34,8 @@ import {
   setMessageToEditAC,
   setSendMessageInputHeightAC,
   loadOGMetadataForLinkAC,
-  updateOGMetadataAC
+  updateOGMetadataAC,
+  setUpdateMessageAttachmentAC
 } from '../../store/message/actions'
 import {
   joinChannelAC,
@@ -70,7 +71,7 @@ import {
 import { DropdownOptionLi, DropdownOptionsUl, TextInOneLine, UploadFile, ViewOnceToggleCont } from '../../UIHelper'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { createImageThumbnail, resizeImage } from '../../helpers/resizeImage'
-import { detectBrowser, detectOS } from '../../helpers'
+import { calculateRenderedImageWidth, detectBrowser, detectOS } from '../../helpers'
 import { IMember, IMessage } from '../../types'
 import { getCustomUploader, getSendAttachmentsAsSeparateMessages } from '../../helpers/customUploader'
 import {
@@ -88,7 +89,7 @@ import {
 import { attachmentTypes, DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, USER_STATE } from '../../helpers/constants'
 import { hideUserPresence } from '../../helpers/userHelper'
 import { getShowOnlyContactUsers } from '../../helpers/contacts'
-import { getFrame } from '../../helpers/getVideoFrame'
+import { getFrame, getVideoFirstFrame } from '../../helpers/getVideoFrame'
 import { CAN_USE_DOM } from '../../helpers/canUseDOM'
 
 // Hooks
@@ -1158,6 +1159,23 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     const fileType = file.type.split('/')[0]
     const tid = uuidv4()
     const reader = new FileReader()
+
+    const handleAttachmentImageForCache = async (attachment: any) => {
+      const url = URL.createObjectURL(attachment.data)
+      dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', url))
+    }
+    const handleAttachmentVideoForCache = async (attachment: any) => {
+      const [newWidth, newHeight] = calculateRenderedImageWidth(
+        attachment.metadata.szh || 400,
+        attachment.metadata.szh || 400
+      )
+      const url = URL.createObjectURL(attachment.data)
+      const result = await getVideoFirstFrame(url, newWidth, newHeight, 0.8)
+      if (result) {
+        const { frameBlobUrl } = result
+        dispatch(setUpdateMessageAttachmentAC(attachment?.metadata?.tmb || '', frameBlobUrl))
+      }
+    }
     reader.onload = async () => {
       // @ts-ignore
       setPendingAttachment(tid, { file })
@@ -1165,42 +1183,40 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         if (fileType === 'image') {
           resizeImage(file).then(async (resizedFile: any) => {
             const { thumbnail, imageWidth, imageHeight } = await createImageThumbnail(file)
-            setAttachments((prevState: any[]) => [
-              ...prevState,
-              {
-                data: file,
-                upload: false,
-                type: isMediaAttachment ? fileType : 'file',
-                attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
-                tid,
-                size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
-                metadata: {
-                  szw: imageWidth,
-                  szh: imageHeight,
-                  tmb: thumbnail
-                }
-              }
-            ])
-          })
-        } else if (fileType === 'video') {
-          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
+            const attachment = {
               data: file,
               upload: false,
               type: isMediaAttachment ? fileType : 'file',
-              attachmentUrl: URL.createObjectURL(file),
+              attachmentUrl: URL.createObjectURL(resizedFile.blob as any),
               tid,
-              size: file.size,
+              size: isMediaAttachment ? (resizedFile?.blob ? resizedFile?.blob?.size : file.size) : file.size,
               metadata: {
-                szw: width,
-                szh: height,
-                tmb: thumb,
-                dur: duration
+                szw: imageWidth,
+                szh: imageHeight,
+                tmb: thumbnail
               }
             }
-          ])
+            handleAttachmentImageForCache(attachment)
+            setAttachments((prevState: any[]) => [...prevState, attachment])
+          })
+        } else if (fileType === 'video') {
+          const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
+          const attachment = {
+            data: file,
+            upload: false,
+            type: isMediaAttachment ? fileType : 'file',
+            attachmentUrl: URL.createObjectURL(file),
+            tid,
+            size: file.size,
+            metadata: {
+              szw: width,
+              szh: height,
+              tmb: thumb,
+              dur: duration
+            }
+          }
+          handleAttachmentVideoForCache(attachment)
+          setAttachments((prevState: any[]) => [...prevState, attachment])
         } else {
           setAttachments((prevState: any[]) => [
             ...prevState,
@@ -1238,22 +1254,21 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
             } else {
               resizeImage(file).then(async (resizedFileData: any) => {
                 const resizedFile = new File([resizedFileData.blob], resizedFileData.file.name)
-                setAttachments((prevState: any[]) => [
-                  ...prevState,
-                  {
-                    data: resizedFile,
-                    upload: true,
-                    attachmentUrl: URL.createObjectURL(resizedFile),
-                    tid,
-                    type: fileType,
-                    size: resizedFile.size,
-                    metadata: JSON.stringify({
-                      tmb: metas.thumbnail,
-                      szw: resizedFileData.newWidth,
-                      szh: resizedFileData.newHeight
-                    })
-                  }
-                ])
+                const attachment = {
+                  data: resizedFile,
+                  upload: true,
+                  attachmentUrl: URL.createObjectURL(resizedFile),
+                  tid,
+                  type: fileType,
+                  size: resizedFile.size,
+                  metadata: JSON.stringify({
+                    tmb: metas.thumbnail,
+                    szw: resizedFileData.newWidth,
+                    szh: resizedFileData.newHeight
+                  })
+                }
+                handleAttachmentImageForCache(attachment)
+                setAttachments((prevState: any[]) => [...prevState, attachment])
               })
             }
           } else {
@@ -1276,18 +1291,17 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
         } else if (fileType === 'video') {
           const { thumb, width, height, duration } = await getFrame(URL.createObjectURL(file as any), 0)
           const metas = JSON.stringify({ tmb: thumb, width, height, dur: duration })
-          setAttachments((prevState: any[]) => [
-            ...prevState,
-            {
-              data: file,
-              type: 'video',
-              upload: true,
-              size: file.size,
-              attachmentUrl: URL.createObjectURL(file as any),
-              tid,
-              metadata: metas
-            }
-          ])
+          const attachment = {
+            data: file,
+            type: 'video',
+            upload: true,
+            size: file.size,
+            attachmentUrl: URL.createObjectURL(file as any),
+            tid,
+            metadata: metas
+          }
+          handleAttachmentVideoForCache(attachment)
+          setAttachments((prevState: any[]) => [...prevState, attachment])
         } else {
           setAttachments((prevState: any[]) => [
             ...prevState,
