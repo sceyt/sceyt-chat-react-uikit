@@ -7,7 +7,8 @@ import { switchMessageSearchAC } from '../../store/channel/actions'
 import { getMessagesAC } from '../../store/message/actions'
 import { getClient } from '../../common/client'
 import { makeUsername } from '../../helpers/message'
-import { contactsMapSelector } from '../../store/user/selector'
+import { contactsMapSelector, connectionStatusSelector } from '../../store/user/selector'
+import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IContactsMap, IMessage } from '../../types'
 import Avatar from '../Avatar'
 import Attachment from '../Attachment'
@@ -79,6 +80,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
   const dispatch = useDispatch()
   const activeChannel = useSelector(activeChannelSelector, shallowEqual) as any
   const contactsMap: IContactsMap = useSelector(contactsMapSelector)
+  const connectionStatus = useSelector(connectionStatusSelector)
 
   const [searchText, setSearchText] = useState('')
   const [results, setResults] = useState<IMessage[]>([])
@@ -118,6 +120,37 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
         console.error('[MessagesSearch] search error', e)
       } finally {
         setLoading(false)
+      }
+    },
+    [activeChannel?.id]
+  )
+
+  const refreshSearch = useCallback(
+    async (text: string, currentCount: number) => {
+      if (!text.trim() || !activeChannel?.id) return
+      try {
+        const SceytChatClient = getClient()
+        const pagesToLoad = Math.max(1, Math.ceil(currentCount / 20))
+        const builder = new (SceytChatClient.MessageListSearchQueryBuilder as any)()
+        builder.setChannelId(activeChannel?.id)
+        builder.addField({ key: 0, value: { word: text, op: 1 } })
+        builder.setCount(20)
+        const query = await builder.build()
+        const refreshed: IMessage[] = []
+        let hasNextRefresh = false
+        for (let i = 0; i < pagesToLoad; i++) {
+          const result = await query.loadNext()
+          if (result) {
+            refreshed.push(...(result.messages || []))
+            hasNextRefresh = result.hasNext || false
+            if (!result.hasNext) break
+          }
+        }
+        queryRef.current = query
+        setResults(refreshed)
+        setHasNext(hasNextRefresh)
+      } catch (e) {
+        console.error('[MessagesSearch] refresh error', e)
       }
     },
     [activeChannel?.id]
@@ -223,6 +256,17 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     setHasNext(false)
     queryRef.current = null
   }, [activeChannel?.id])
+
+  // Re-run search on reconnect
+  useEffect(() => {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && searchText.trim()) {
+      if (results.length > 0) {
+        refreshSearch(searchText, results.length)
+      } else {
+        buildAndSearch(searchText)
+      }
+    }
+  }, [connectionStatus])
 
   // Group results by month
   const grouped = useMemo(() => {
