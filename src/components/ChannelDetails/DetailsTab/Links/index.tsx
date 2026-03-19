@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React, { useEffect, useMemo } from 'react'
 import styled from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
@@ -10,7 +10,8 @@ import { IAttachment } from '../../../../types'
 import { channelDetailsTabs } from '../../../../helpers/constants'
 // Components
 import LinkItem from './linkItem'
-import MonthHeader from '../MonthHeader'
+import { THEME_COLORS } from '../../../../UIHelper/constants'
+import { useColor } from '../../../../hooks'
 
 interface IProps {
   channelId: string
@@ -29,24 +30,39 @@ const Links = ({
   linkPreviewColor,
   linkPreviewHoverBackgroundColor
 }: IProps) => {
+  const { [THEME_COLORS.BACKGROUND]: background, [THEME_COLORS.TEXT_SECONDARY]: textSecondary } = useColor()
   const dispatch = useDispatch()
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
 
   useEffect(() => {
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.link, 35))
   }, [channelId])
+
+  const groups = useMemo(() => {
+    const result: { key: string; date: Date; items: IAttachment[] }[] = []
+    attachments.forEach((att: IAttachment) => {
+      const date = new Date(att.createdAt)
+      const key = `${date.getFullYear()}-${date.getMonth()}`
+      const existing = result.find((g) => g.key === key)
+      if (existing) {
+        existing.items.push(att)
+      } else {
+        result.push({ key, date, items: [att] })
+      }
+    })
+    return result
+  }, [attachments])
+
   return (
     <Container>
-      {attachments.map((file: IAttachment, index: number) => {
-        return (
-          <React.Fragment key={file.id}>
-            <MonthHeader
-              currentCreatedAt={file.createdAt}
-              previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
-              isFirst={index === 0}
-              padding='6px 14px 0'
-            />
+      {groups.map((group) => (
+        <MonthSection key={group.key}>
+          <StickyMonthHeader color={textSecondary} background={background}>
+            {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </StickyMonthHeader>
+          {group.items.map((file: IAttachment) => (
             <LinkItem
+              key={file.id}
               link={file.url}
               linkPreviewColor={linkPreviewColor}
               linkPreviewHoverBackgroundColor={linkPreviewHoverBackgroundColor}
@@ -54,9 +70,9 @@ const Links = ({
               linkPreviewTitleColor={linkPreviewTitleColor}
               linkPreviewIcon={linkPreviewIcon}
             />
-          </React.Fragment>
-        )
-      })}
+          ))}
+        </MonthSection>
+      ))}
     </Container>
   )
 }
@@ -65,9 +81,24 @@ export default Links
 
 const Container = styled.ul`
   margin: 0;
-  padding: 11px 0 0;
-  overflow-x: hidden;
-  overflow-y: auto;
+  padding: 0;
   list-style: none;
   transition: all 0.2s;
+`
+
+const MonthSection = styled.div`
+  width: 100%;
+`
+
+const StickyMonthHeader = styled.div<{ color: string; background: string }>`
+  position: sticky;
+  top: 44px;
+  z-index: 10;
+  background: ${(props) => props.background};
+  padding: 9px 14px;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  color: ${(props) => props.color};
+  text-transform: capitalize;
 `

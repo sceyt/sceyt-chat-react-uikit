@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -18,7 +18,6 @@ import { channelDetailsTabs } from '../../../../helpers/constants'
 import { AttachmentPreviewTitle } from '../../../../UIHelper'
 import { THEME_COLORS } from '../../../../UIHelper/constants'
 import { useColor } from '../../../../hooks'
-import MonthHeader from '../MonthHeader'
 
 interface IProps {
   channelId: string
@@ -49,6 +48,7 @@ const Files = ({
 }: IProps) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
+    [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
@@ -61,11 +61,13 @@ const Files = ({
   const attachments = useSelector(activeTabAttachmentsSelector, shallowEqual) || []
   const nameSizeNum = fileNameFontSize && Number(fileNameFontSize.slice(0, -2))
   const nameMaxLength = nameSizeNum ? 32 - (nameSizeNum - 15) * (nameSizeNum < 20 ? 2 : 1) : 32
+
   const handleCompleteDownload = (attachmentId: string) => {
     const stateCopy = { ...downloadingFilesMap }
     delete stateCopy[attachmentId]
     setDownloadingFilesMap(stateCopy)
   }
+
   const handleDownloadFile = (attachment: IAttachment) => {
     if (attachment.id) {
       setDownloadingFilesMap((prevState) => ({ ...prevState, [attachment.id!]: { uploadPercent: 1 } }))
@@ -81,36 +83,44 @@ const Files = ({
     dispatch(getAttachmentsAC(channelId, channelDetailsTabs.file, 35))
   }, [channelId])
 
+  const groups = useMemo(() => {
+    const result: { key: string; date: Date; items: IAttachment[] }[] = []
+    attachments.forEach((att: IAttachment) => {
+      const date = new Date(att.createdAt)
+      const key = `${date.getFullYear()}-${date.getMonth()}`
+      const existing = result.find((g) => g.key === key)
+      if (existing) {
+        existing.items.push(att)
+      } else {
+        result.push({ key, date, items: [att] })
+      }
+    })
+    return result
+  }, [attachments])
+
   return (
     <Container>
-      {attachments.map(
-        (file: IAttachment, index: number) => {
-          const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
-          let withPrefix = true
-          let attachmentThumb = ''
+      {groups.map((group) => (
+        <MonthSection key={group.key}>
+          <StickyMonthHeader color={textSecondary} background={background}>
+            {group.date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+          </StickyMonthHeader>
+          {group.items.map((file: IAttachment) => {
+            const metas = file.metadata && isJSON(file.metadata) ? JSON.parse(file.metadata) : file.metadata
+            let withPrefix = true
+            let attachmentThumb = ''
 
-          if (metas && metas.tmb) {
-            if (metas.tmb.length < 70) {
-              attachmentThumb = base64ToDataURL(metas.tmb)
-              withPrefix = false
-            } else {
-              attachmentThumb = metas.tmb
+            if (metas && metas.tmb) {
+              if (metas.tmb.length < 70) {
+                attachmentThumb = base64ToDataURL(metas.tmb)
+                withPrefix = false
+              } else {
+                attachmentThumb = metas.tmb
+              }
             }
-          }
 
-          return (
-            <React.Fragment key={file.id}>
-              <MonthHeader
-                currentCreatedAt={file.createdAt}
-                previousCreatedAt={index > 0 ? attachments[index - 1].createdAt : undefined}
-                isFirst={index === 0}
-                padding='14px 14px 0'
-              />
-              <FileItem
-                // onMouseEnter={(e: any) => e.currentTarget.classList.add('isHover')}
-                // onMouseLeave={(e: any) => e.currentTarget.classList.remove('isHover')}
-                hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}
-              >
+            return (
+              <FileItem key={file.id} hoverBackgroundColor={filePreviewHoverBackgroundColor || backgroundHovered}>
                 {metas && metas.tmb ? (
                   <FileThumb
                     draggable={false}
@@ -180,13 +190,10 @@ const Files = ({
                   )}
                 </DownloadWrapper>
               </FileItem>
-            </React.Fragment>
-          )
-        }
-        // <FileItemWrapper >
-
-        // </FileItemWrapper>
-      )}
+            )
+          })}
+        </MonthSection>
+      ))}
     </Container>
   )
 }
@@ -196,13 +203,27 @@ export default Files
 const Container = styled.ul`
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
-  overflow-y: auto;
   list-style: none;
   transition: all 0.2s;
 `
-// eslint-disable-next-line max-len
-// ${(props) => (props.optionsMenuIsOpen ? 'height: calc(100vh - 495px)' : (props.noActions ? 'height: calc(100vh - 544px)' : 'height: calc(100vh - 445px)'))}
+
+const MonthSection = styled.div`
+  width: 100%;
+`
+
+const StickyMonthHeader = styled.div<{ color: string; background: string }>`
+  position: sticky;
+  top: 44px;
+  z-index: 10;
+  background: ${(props) => props.background};
+  padding: 9px 14px;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  color: ${(props) => props.color};
+  text-transform: capitalize;
+`
+
 const DownloadWrapper = styled.a<{ visible?: boolean; iconColor?: string }>`
   text-decoration: none;
   visibility: ${(props) => (props.visible ? 'visible' : 'hidden')};
@@ -233,15 +254,6 @@ const ProgressWrapper = styled.span`
     }
   }
 `
-/* const FileItemWrapper = styled.li`
-  padding: 0 16px;
-  &:hover {
-    background-color: ${colors.gray0};
-    ${DownloadWrapper} {
-      visibility: visible;
-    }
-  }
-` */
 
 const FileIconCont = styled.span<{ iconColor: string; fillColor: string }>`
   display: inline-flex;
@@ -296,9 +308,6 @@ const FileItem = styled.div<{ hoverBackgroundColor: string }>`
       display: inline-flex;
     }
   }
-  /*&.isHover {
-
-  }*/
 `
 const FileSizeAndDate = styled.span<{ fontSize?: string; lineHeight?: string; color: string }>`
   display: block;

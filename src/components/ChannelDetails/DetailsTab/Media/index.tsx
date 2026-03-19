@@ -81,7 +81,7 @@ const Media = ({ channel }: IProps) => {
 export default Media
 
 const Container = styled.div`
-  padding: 6px 4px;
+  padding: 0 4px;
   list-style: none;
   transition: all 0.2s;
 `
