@@ -434,7 +434,6 @@ const SearchInput = styled.input<{ color: string; placeholderColor: string }>`
 const NavButtons = styled.div`
   display: flex;
   align-items: center;
-  gap: 2px;
   margin-right: 4px;
 `
 
@@ -446,6 +445,7 @@ const NavButton = styled.button<{ hoverBackground: string; iconColor: string }>`
   border: none;
   cursor: pointer;
   border-radius: 50%;
+  margin: -2px;
   transition: background-color 0.15s;
   &:hover:not(:disabled) {
     background-color: ${(p) => p.hoverBackground};
