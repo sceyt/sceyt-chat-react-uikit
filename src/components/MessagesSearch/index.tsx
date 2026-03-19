@@ -24,7 +24,7 @@ const SEARCH_DEBOUNCE_MS = 400
 function formatMessageDate(date: Date): string {
   if (!date) return ''
   const d = new Date(date)
-  return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  return d.toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function formatGroupDate(date: Date): string {
