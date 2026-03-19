@@ -3,7 +3,8 @@ import styled from 'styled-components'
 import { shallowEqual } from 'react-redux'
 import { useSelector } from 'store/hooks'
 import Details from '../ChannelDetails'
-import { channelInfoIsOpenSelector } from '../../store/channel/selector'
+import MessagesSearch from '../MessagesSearch'
+import { channelInfoIsOpenSelector, messageSearchIsOpenSelector } from '../../store/channel/selector'
 import { MuteTime } from '../../types'
 import { setShowChannelDetails } from '../../helpers/channelHalper'
 export interface IDetailsProps {
@@ -268,13 +269,15 @@ const ChannelDetailsContainer = ({
   showGroupsInCommon
 }: IDetailsProps) => {
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
 
   useEffect(() => {
     setShowChannelDetails(true)
   }, [])
   return (
-    <DetailsWrapper id='channel_details_wrapper'>
-      {channelDetailsIsOpen && (
+    <DetailsWrapper id={messageSearchIsOpen ? 'messages_search_wrapper' : 'channel_details_wrapper'}>
+      {messageSearchIsOpen && <MessagesSearch size={size} />}
+      {channelDetailsIsOpen && !messageSearchIsOpen && (
         <Details
           size={size}
           showAboutChannel={showAboutChannel}

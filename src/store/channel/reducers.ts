@@ -39,6 +39,7 @@ export interface IChannelState {
   hiddenChannel: IChannel | null
   visibleChannel: IChannel | null
   channelInfoIsOpen: boolean
+  messageSearchIsOpen: boolean
   channelEditMode: boolean
   channelListWidth: number
   isDragging: boolean
@@ -84,6 +85,7 @@ const initialState: IChannelState = {
   hiddenChannel: null,
   visibleChannel: null,
   channelInfoIsOpen: false,
+  messageSearchIsOpen: false,
   channelEditMode: false,
   channelListWidth: 0,
   isDragging: false,
@@ -411,6 +413,10 @@ const channelSlice = createSlice({
       state.channelInfoIsOpen = action.payload.open
     },
 
+    setMessageSearchOpenClose: (state, action: PayloadAction<{ open: boolean }>) => {
+      state.messageSearchIsOpen = action.payload.open
+    },
+
     toggleEditChannel: (state, action: PayloadAction<{ state: boolean }>) => {
       state.channelEditMode = action.payload.state
     },
@@ -573,6 +579,7 @@ export const {
   updateChannelLastMessage,
   updateChannelLastMessageStatus,
   setChannelInfoOpenClose,
+  setMessageSearchOpenClose,
   toggleEditChannel,
   switchTypingIndicator,
   switchRecordingIndicator,

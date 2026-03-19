@@ -24,6 +24,7 @@ import {
   updateChannelLastMessage,
   updateChannelLastMessageStatus,
   setChannelInfoOpenClose,
+  setMessageSearchOpenClose,
   toggleEditChannel,
   switchTypingIndicator,
   switchRecordingIndicator,
@@ -299,6 +300,8 @@ export const unpinChannelAC = (channelId: string) => ({
 })
 
 export const switchChannelInfoAC = (open: boolean) => setChannelInfoOpenClose({ open })
+
+export const switchMessageSearchAC = (open: boolean) => setMessageSearchOpenClose({ open })
 
 export const leaveChannelAC = (channelId: string) => ({
   type: LEAVE_CHANNEL,

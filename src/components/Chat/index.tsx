@@ -8,7 +8,8 @@ import {
   addedChannelSelector,
   addedToChannelSelector,
   channelInfoIsOpenSelector,
-  channelListWidthSelector
+  channelListWidthSelector,
+  messageSearchIsOpenSelector
 } from '../../store/channel/selector'
 import {
   getChannelsAC,
@@ -58,6 +59,7 @@ export default function Chat({
   const dispatch = useDispatch()
   const channelListWidth = useSelector(channelListWidthSelector, shallowEqual)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
   const addedChannel = useSelector(addedToChannelSelector)
   const channelCreated = useSelector(addedChannelSelector)
   const activeChannel = useSelector(activeChannelSelector)
@@ -103,18 +105,19 @@ export default function Chat({
   }, [selectedChannelId])
 
   useDidUpdate(() => {
-    if (channelDetailsIsOpen) {
+    if (channelDetailsIsOpen || messageSearchIsOpen) {
       detailsSwitcherTimeout = setTimeout(() => {
-        const detailsContainer = document.getElementById('channel_details_wrapper')
-        if (detailsContainer) {
-          setChannelDetailsWidth(detailsContainer.offsetWidth)
+        const panelId = messageSearchIsOpen ? 'messages_search_wrapper' : 'channel_details_wrapper'
+        const panelContainer = document.getElementById(panelId)
+        if (panelContainer) {
+          setChannelDetailsWidth(panelContainer.offsetWidth)
         }
       }, 1)
     } else {
       clearTimeout(detailsSwitcherTimeout)
       setChannelDetailsWidth(0)
     }
-  }, [channelDetailsIsOpen])
+  }, [channelDetailsIsOpen, messageSearchIsOpen])
 
   return (
     <Container className={className} widthOffset={channelListWidth} channelDetailsWidth={channelDetailsWidth}>

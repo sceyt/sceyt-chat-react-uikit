@@ -1,11 +1,12 @@
 import styled from 'styled-components'
 import React from 'react'
 // Store
-import { switchChannelActionAC, switchChannelInfoAC } from '../../store/channel/actions'
+import { switchChannelActionAC, switchChannelInfoAC, switchMessageSearchAC } from '../../store/channel/actions'
 import {
   activeChannelSelector,
   channelInfoIsOpenSelector,
-  channelListHiddenSelector
+  channelListHiddenSelector,
+  messageSearchIsOpenSelector
 } from '../../store/channel/selector'
 import { contactsMapSelector } from '../../store/user/selector'
 import { shallowEqual } from 'react-redux'
@@ -13,6 +14,7 @@ import { useSelector, useDispatch } from 'store/hooks'
 // Assets
 import { ReactComponent as InfoIconD } from '../../assets/svg/info.svg'
 import { ReactComponent as ArrowLeftIcon } from '../../assets/svg/arrowLeft.svg'
+import { ReactComponent as SearchIconSvg } from '../../assets/svg/search-messages.svg'
 // Helpers
 import { userLastActiveDateFormat } from '../../helpers'
 import { makeUsername } from '../../helpers/message'
@@ -50,6 +52,9 @@ interface IProps {
   infoIconOrder?: number
   customActionsOrder?: number
   showPhoneNumber?: boolean
+  showSearchMessages?: boolean
+  searchMessagesIcon?: JSX.Element
+  searchMessagesIconOrder?: number
 }
 
 export default function ChatHeader({
@@ -73,7 +78,10 @@ export default function ChatHeader({
   channelInfoOrder,
   infoIconOrder,
   customActionsOrder,
-  showPhoneNumber
+  showPhoneNumber,
+  showSearchMessages = false,
+  searchMessagesIcon,
+  searchMessagesIconOrder
 }: IProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -93,6 +101,7 @@ export default function ChatHeader({
   const showChannelDetails = getShowChannelDetails()
   const channelListHidden = useSelector(channelListHiddenSelector)
   const channelDetailsIsOpen = useSelector(channelInfoIsOpenSelector, shallowEqual)
+  const messageSearchIsOpen = useSelector(messageSearchIsOpenSelector, shallowEqual)
   const isDirectChannel = activeChannel.type === DEFAULT_CHANNEL_TYPE.DIRECT
   const isSelfChannel =
     isDirectChannel &&
@@ -117,7 +126,21 @@ export default function ChatHeader({
           : 'member'
   const channelDetailsOnOpen = () => {
     if (!channelListHidden && showChannelDetails) {
-      dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
+      if (messageSearchIsOpen) {
+        dispatch(switchMessageSearchAC(false))
+        dispatch(switchChannelInfoAC(true))
+      } else {
+        dispatch(switchChannelInfoAC(!channelDetailsIsOpen))
+      }
+    }
+  }
+
+  const handleToggleMessageSearch = () => {
+    if (messageSearchIsOpen) {
+      dispatch(switchMessageSearchAC(false))
+    } else {
+      dispatch(switchChannelInfoAC(false))
+      dispatch(switchMessageSearchAC(true))
     }
   }
   const handleSwitchChannel = () => {
@@ -242,6 +265,17 @@ export default function ChatHeader({
           {infoIcon || <DefaultInfoIcon color={iconPrimary} />}
         </ChanelInfo>
       )}
+      {showSearchMessages && (
+        <SearchMessagesButton
+          onClick={handleToggleMessageSearch}
+          isActive={messageSearchIsOpen}
+          activeColor={accentColor}
+          order={searchMessagesIconOrder}
+          hoverBackground={backgroundHovered}
+        >
+          {searchMessagesIcon || <SearchIconSvg color={messageSearchIsOpen ? accentColor : iconPrimary} />}
+        </SearchMessagesButton>
+      )}
     </Container>
   )
 }
@@ -333,3 +367,17 @@ const MobileBackButtonWrapper = styled.span<{ hoverBackground: string; order?: n
 
 const DefaultInfoIcon = styled(InfoIconD)``
 const WrapArrowLeftIcon = styled(ArrowLeftIcon)``
+
+const SearchMessagesButton = styled.span<{
+  isActive: boolean
+  activeColor: string
+  hoverBackground: string
+  order?: number
+}>`
+  display: flex;
+  cursor: pointer;
+  margin-left: 16px;
+  border-radius: 50%;
+  transition: background-color 0.15s;
+  order: ${(p) => p.order};
+`

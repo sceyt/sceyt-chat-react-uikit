@@ -7,6 +7,7 @@ import MessageList from './Messages'
 import SendMessage from './SendMessageInput'
 import ChannelDetails from './ChannelDetailsContainer'
 import MessagesScrollToBottomButton from './MessagesScrollToBottomButton'
+import MessagesSearch from './MessagesSearch'
 import MessagesScrollToUnreadMentionsButton from './MessagesScrollToUnreadMentionsButton'
 import CreateChannel from './../common/popups/createChannel'
 import ChannelSearch from './ChannelList/ChannelSearch'
@@ -40,6 +41,7 @@ export {
   ChannelDetails,
   MessagesScrollToBottomButton,
   MessagesScrollToUnreadMentionsButton,
+  MessagesSearch,
   CreateChannel,
   ChannelSearch,
   Avatar,
