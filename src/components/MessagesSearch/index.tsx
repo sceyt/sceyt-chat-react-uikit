@@ -10,6 +10,7 @@ import { makeUsername } from '../../helpers/message'
 import { contactsMapSelector } from '../../store/user/selector'
 import { IContactsMap, IMessage } from '../../types'
 import Avatar from '../Avatar'
+import Attachment from '../Attachment'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as SearchIcon } from '../../assets/svg/search.svg'
 import { ReactComponent as SearchViewIcon } from '../../assets/svg/search-view.svg'
@@ -166,12 +167,19 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
         if (scrollContainer) {
           const elRect = el.getBoundingClientRect()
           const containerRect = scrollContainer.getBoundingClientRect()
-          const isVisible = elRect.top >= containerRect.top && elRect.bottom <= containerRect.bottom
-          if (!isVisible) {
+          const isNearBottom = elRect.bottom >= containerRect.bottom - 80
+          if (isNearBottom) {
             el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          } else {
+            const containerCenter = containerRect.top + containerRect.height / 2
+            const elCenter = elRect.top + elRect.height / 2
+            const isCentered = Math.abs(elCenter - containerCenter) < containerRect.height / 4
+            if (!isCentered) {
+              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+            }
           }
         } else {
-          el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
         el.classList.remove('highlight')
         el.getBoundingClientRect() // force reflow to restart animation
@@ -316,6 +324,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                 const msgFlatIndex = flatIndex
                 const sender = msg.user
                 const senderName = sender ? makeUsername(contactsMap[sender.id], sender, false) : ''
+                const firstImage = msg.attachments?.find((a) => a.type === 'image')
                 return (
                   <ResultItem
                     key={msg.id}
@@ -331,13 +340,26 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                         <ResultSender color={textPrimary}>{senderName}</ResultSender>
                         <ResultTime color={textSecondary}>{formatMessageDate(msg.createdAt)}</ResultTime>
                       </ResultMeta>
-                      <ResultBody color={textSecondary}>
-                        {msg.body
-                          ? highlightText(msg.body, searchText, highlightedBackground)
-                          : msg.attachments?.length
-                            ? 'Attachment'
-                            : ''}
-                      </ResultBody>
+                      <ResultBodyRow>
+                        <ResultBody color={textSecondary}>
+                          {msg.body
+                            ? highlightText(msg.body, searchText?.trim(), highlightedBackground)
+                            : msg.attachments?.length
+                              ? 'Attachment'
+                              : ''}
+                        </ResultBody>
+                        {firstImage && (
+                          <ResultAttachmentWrapper>
+                            <Attachment
+                              attachment={firstImage}
+                              backgroundColor={background}
+                              imageAttachmentMaxWidth={28}
+                              imageAttachmentMaxHeight={28}
+                              isDetailsView
+                            />
+                          </ResultAttachmentWrapper>
+                        )}
+                      </ResultBodyRow>
                     </ResultContent>
                   </ResultItem>
                 )
@@ -520,7 +542,7 @@ const ResultItem = styled.div<{ hoverBackground: string; isActive: boolean }>`
   display: flex;
   align-items: flex-start;
   gap: 10px;
-  padding: 10px 16px;
+  padding: 7px 8px;
   cursor: pointer;
   transition: background-color 0.1s;
   border-radius: 12px;
@@ -534,16 +556,25 @@ const ResultAvatar = styled.div`
   flex-shrink: 0;
 `
 
+const ResultAttachmentWrapper = styled.div`
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  overflow: hidden;
+  align-self: center;
+  margin-top: -4px;
+`
+
 const ResultContent = styled.div`
   flex: 1;
   min-width: 0;
-  padding: 5px 0;
   gap: 4px;
 `
 
 const ResultMeta = styled.div`
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 8px;
   margin-bottom: 2px;
@@ -558,6 +589,7 @@ const ResultSender = styled.span<{ color: string }>`
   font-size: 15px;
   line-height: 18px;
   letter-spacing: -0.2px;
+  padding-top: 3px;
 `
 
 const ResultTime = styled.span<{ color: string }>`
@@ -567,6 +599,14 @@ const ResultTime = styled.span<{ color: string }>`
   font-size: 12px;
   line-height: 14px;
   letter-spacing: 0px;
+  margin-top: 4px;
+`
+
+const ResultBodyRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 `
 
 const ResultBody = styled.div<{ color: string }>`
@@ -578,6 +618,7 @@ const ResultBody = styled.div<{ color: string }>`
   font-size: 14px;
   line-height: 16px;
   letter-spacing: -0.08px;
+  width: 100%;
 `
 
 const Highlight = styled.mark<{ bgColor: string }>`
