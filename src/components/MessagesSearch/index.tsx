@@ -506,12 +506,14 @@ const GroupLabel = styled.div<{ color: string; backgroundColor: string }>`
   top: 0;
   z-index: 1;
   background-color: ${(p) => p.backgroundColor};
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
+  text-transform: capitalize;
   letter-spacing: 0.5px;
   color: ${(p) => p.color};
   padding: 12px 16px 4px;
+  font-weight: 500;
+  font-size: 13px;
+  line-height: 16px;
+  letter-spacing: 0px;
 `
 
 const ResultItem = styled.div<{ hoverBackground: string; isActive: boolean }>`
@@ -535,6 +537,8 @@ const ResultAvatar = styled.div`
 const ResultContent = styled.div`
   flex: 1;
   min-width: 0;
+  padding: 5px 0;
+  gap: 4px;
 `
 
 const ResultMeta = styled.div`
@@ -546,26 +550,34 @@ const ResultMeta = styled.div`
 `
 
 const ResultSender = styled.span<{ color: string }>`
-  font-size: 14px;
-  font-weight: 600;
   color: ${(p) => p.color};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 500;
+  font-size: 15px;
+  line-height: 18px;
+  letter-spacing: -0.2px;
 `
 
 const ResultTime = styled.span<{ color: string }>`
-  font-size: 11px;
   color: ${(p) => p.color};
   flex-shrink: 0;
+  font-weight: 400;
+  font-size: 12px;
+  line-height: 14px;
+  letter-spacing: 0px;
 `
 
 const ResultBody = styled.div<{ color: string }>`
-  font-size: 13px;
   color: ${(p) => p.color};
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  font-weight: 400;
+  font-size: 14px;
+  line-height: 16px;
+  letter-spacing: -0.08px;
 `
 
 const Highlight = styled.mark<{ bgColor: string }>`
