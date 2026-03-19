@@ -17,6 +17,7 @@ import { ReactComponent as SearchViewIcon } from '../../assets/svg/search-view.s
 import { ReactComponent as ChevronDownIcon } from '../../assets/svg/chevron_down.svg'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
+import { attachmentTypes } from 'helpers/constants'
 
 const SEARCH_DEBOUNCE_MS = 400
 
@@ -324,7 +325,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                 const msgFlatIndex = flatIndex
                 const sender = msg.user
                 const senderName = sender ? makeUsername(contactsMap[sender.id], sender, false) : ''
-                const firstImage = msg.attachments?.find((a) => a.type === 'image')
+                const firstImage = msg.attachments?.find((a) => a.type === attachmentTypes.image)
                 return (
                   <ResultItem
                     key={msg.id}
@@ -563,7 +564,7 @@ const ResultAttachmentWrapper = styled.div`
   border-radius: 8px;
   overflow: hidden;
   align-self: center;
-  margin-top: -4px;
+  margin-top: 4px;
 `
 
 const ResultContent = styled.div`
@@ -607,6 +608,7 @@ const ResultBodyRow = styled.div`
   align-items: center;
   gap: 8px;
   min-width: 0;
+  max-height: 16px;
 `
 
 const ResultBody = styled.div<{ color: string }>`
@@ -619,6 +621,7 @@ const ResultBody = styled.div<{ color: string }>`
   line-height: 16px;
   letter-spacing: -0.08px;
   width: 100%;
+  margin-top: 4px;
 `
 
 const Highlight = styled.mark<{ bgColor: string }>`
