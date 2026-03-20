@@ -15,7 +15,7 @@ import Attachment from '../Attachment'
 import { ReactComponent as CloseIcon } from '../../assets/svg/close.svg'
 import { ReactComponent as SearchIcon } from '../../assets/svg/search.svg'
 import { ReactComponent as SearchViewIcon } from '../../assets/svg/search-view.svg'
-import { ReactComponent as ChevronDownIcon } from '../../assets/svg/chevron_down.svg'
+import { ReactComponent as ChevronDownIcon } from '../../assets/svg/chevron_down_search.svg'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
 import { attachmentTypes } from 'helpers/constants'
@@ -45,14 +45,19 @@ function getSnippet(text: string, keyword: string): string {
   return (start > 0 ? '…' : '') + text.slice(start, end) + (end < text.length ? '…' : '')
 }
 
-function highlightText(text: string, keyword: string, highlightedBackground: string): React.ReactNode {
+function highlightText(
+  text: string,
+  keyword: string,
+  highlightedBackground: string,
+  textColor: string
+): React.ReactNode {
   if (!keyword.trim()) return text
   const snippet = getSnippet(text, keyword)
   const regex = new RegExp(`(${keyword.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi')
   const parts = snippet.split(regex)
   return parts.map((part, i) =>
     regex.test(part) ? (
-      <Highlight key={i} bgColor={highlightedBackground}>
+      <Highlight key={i} bgColor={highlightedBackground} color={textColor}>
         {part}
       </Highlight>
     ) : (
@@ -70,7 +75,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     [THEME_COLORS.BACKGROUND]: background,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
-    [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
+    [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BORDER]: border,
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
     [THEME_COLORS.SURFACE_1]: surface1,
@@ -288,57 +293,57 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
       <Header borderColor={border}>
         <Title color={textPrimary}>Search messages</Title>
         <CloseButton onClick={handleClose} hoverBackground={backgroundHovered}>
-          <CloseIcon color={iconPrimary} />
+          <CloseIcon color={accentColor} />
         </CloseButton>
       </Header>
 
-      <SearchInputWrapper backgroundColor={surface1}>
-        <SearchIconWrapper>
-          <SearchIcon color={textSecondary} />
-        </SearchIconWrapper>
-        <SearchInput
-          type='text'
-          placeholder='Search...'
-          value={searchText}
-          onChange={handleInputChange}
-          color={textPrimary}
-          placeholderColor={textSecondary}
-        />
-        {searchText && results.length > 0 && (
-          <NavButtons>
-            <NavButton
-              onClick={handleNavNext}
-              disabled={currentIndex >= results.length - 1 && !hasNext}
+      <SearchRow>
+        <SearchInputWrapper backgroundColor={surface1}>
+          <SearchIconWrapper>
+            <SearchIcon color={textSecondary} />
+          </SearchIconWrapper>
+          <SearchInput
+            type='text'
+            placeholder='Search...'
+            value={searchText}
+            onChange={handleInputChange}
+            color={textPrimary}
+            placeholderColor={textSecondary}
+          />
+          {searchText && (
+            <ClearButton
+              onClick={() => {
+                setSearchText('')
+                setResults([])
+                setHasNext(false)
+                setCurrentIndex(-1)
+                queryRef.current = null
+              }}
               hoverBackground={backgroundHovered}
-              iconColor={textSecondary}
             >
-              <ChevronDownIcon />
-            </NavButton>
-            <NavButton
-              onClick={handleNavPrev}
-              disabled={currentIndex <= 0}
-              hoverBackground={backgroundHovered}
-              iconColor={textSecondary}
-            >
-              <ChevronDownIcon style={{ transform: 'rotate(180deg)' }} />
-            </NavButton>
-          </NavButtons>
-        )}
-        {searchText && (
-          <ClearButton
-            onClick={() => {
-              setSearchText('')
-              setResults([])
-              setHasNext(false)
-              setCurrentIndex(-1)
-              queryRef.current = null
-            }}
-            hoverBackground={backgroundHovered}
+              <CloseIcon color={textSecondary} width={14} height={14} />
+            </ClearButton>
+          )}
+        </SearchInputWrapper>
+        <NavButtons backgroundColor={surface1}>
+          <NavButton
+            onClick={handleNavNext}
+            disabled={currentIndex >= results.length - 1 && !hasNext}
+            hoverBackground={background}
+            iconColor={textSecondary}
           >
-            <CloseIcon color={textSecondary} width={14} height={14} />
-          </ClearButton>
-        )}
-      </SearchInputWrapper>
+            <ChevronDownIcon />
+          </NavButton>
+          <NavButton
+            onClick={handleNavPrev}
+            disabled={currentIndex <= 0}
+            hoverBackground={background}
+            iconColor={textSecondary}
+          >
+            <ChevronDownIcon style={{ transform: 'rotate(180deg)' }} />
+          </NavButton>
+        </NavButtons>
+      </SearchRow>
 
       <ResultsList ref={listRef} onScroll={handleScroll}>
         {!searchText && (
@@ -388,7 +393,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                       <ResultBodyRow>
                         <ResultBody color={textSecondary}>
                           {msg.body
-                            ? highlightText(msg.body, searchText?.trim(), highlightedBackground)
+                            ? highlightText(msg.body, searchText?.trim(), highlightedBackground, textSecondary)
                             : msg.attachments?.length
                               ? 'Attachment'
                               : ''}
@@ -465,14 +470,22 @@ const CloseButton = styled.button<{ hoverBackground: string }>`
   }
 `
 
+const SearchRow = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  flex-shrink: 0;
+`
+
 const SearchInputWrapper = styled.div<{ backgroundColor: string }>`
   display: flex;
   align-items: center;
-  margin: 12px;
+  flex: 1;
   padding: 8px 12px;
   background-color: ${(p) => p.backgroundColor};
   border-radius: 10px;
-  flex-shrink: 0;
+  min-width: 0;
 `
 
 const SearchIconWrapper = styled.span`
@@ -498,10 +511,13 @@ const SearchInput = styled.input<{ color: string; placeholderColor: string }>`
   }
 `
 
-const NavButtons = styled.div`
+const NavButtons = styled.div<{ backgroundColor: string }>`
   display: flex;
   align-items: center;
-  margin-right: 4px;
+  flex-shrink: 0;
+  background-color: ${(p) => p.backgroundColor};
+  border-radius: 10px;
+  padding: 8px;
 `
 
 const NavButton = styled.button<{ hoverBackground: string; iconColor: string }>`
@@ -512,8 +528,8 @@ const NavButton = styled.button<{ hoverBackground: string; iconColor: string }>`
   border: none;
   cursor: pointer;
   border-radius: 50%;
-  margin: -2px;
   transition: background-color 0.15s;
+  padding: 3px;
   &:hover:not(:disabled) {
     background-color: ${(p) => p.hoverBackground};
   }
@@ -522,8 +538,9 @@ const NavButton = styled.button<{ hoverBackground: string; iconColor: string }>`
     opacity: 0.35;
   }
   & > svg {
-    margin: -6px;
-    color: ${(p) => p.iconColor};
+    path {
+      fill: ${(p) => p.iconColor};
+    }
   }
 `
 
@@ -668,8 +685,9 @@ const ResultBody = styled.div<{ color: string }>`
   margin-top: 4px;
 `
 
-const Highlight = styled.mark<{ bgColor: string }>`
+const Highlight = styled.mark<{ bgColor: string; color: string }>`
   background-color: ${(p) => p.bgColor};
+  color: ${(p) => p.color};
   border-radius: 3px;
   padding: 0 2px;
 `

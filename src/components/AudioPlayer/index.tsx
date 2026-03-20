@@ -189,8 +189,6 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
       })
 
       audio.addEventListener('error', () => {
-        log.error('Audio element error:', audio.error?.message, 'code:', audio.error?.code)
-        // On Safari, try converting unsupported formats
         if (isSafari() && !convertedUrlRef.current) {
           log.info('Attempting Safari audio conversion fallback...')
           fetch(url)

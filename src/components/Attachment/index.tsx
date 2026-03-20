@@ -667,7 +667,11 @@ const Attachment = ({
             isPreview={isPreview}
             isRepliedMessage={isRepliedMessage}
             withBorder={!isPreview && !isDetailsView}
-            src={attachmentUrlFromMap || attachmentUrl || attachmentThumb}
+            src={
+              attachmentUrlFromMap ||
+              attachmentUrl ||
+              (withPrefix && attachmentThumb ? `data:image/jpeg;base64,${attachmentThumb}` : attachmentThumb)
+            }
             fitTheContainer
             imageMaxHeight={
               `${renderHeight || 400}px`
@@ -1214,7 +1218,7 @@ const DownloadFile = styled.span<{ backgroundColor: string; widthThumb?: boolean
   max-width: 40px;
   height: 40px;
   position: ${(props) => props.widthThumb && 'absolute'};
-  border-radius: ${(props) => (props.widthThumb ? '8px' : '50%')};
+  border-radius: ${(props) => (props.widthThumb ? '7.3px' : '50%')};
 
   & > svg {
     width: 20px;
