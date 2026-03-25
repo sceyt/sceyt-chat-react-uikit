@@ -42,6 +42,7 @@ interface IProps {
   // eslint-disable-next-line no-unused-vars
   handleForward: (channelIds: string[]) => void
   loading?: boolean
+  maxSelectedCount?: number
 }
 
 const ChannelMembersItem = ({
@@ -85,7 +86,7 @@ const ChannelMembersItem = ({
   )
 }
 
-function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading }: IProps) {
+function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, loading, maxSelectedCount = 5 }: IProps) {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -154,7 +155,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     const isSelfChannel =
       isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
-    if (isSelected && selectedChannels.length < 5) {
+    if (isSelected && selectedChannels.length < maxSelectedCount) {
       newSelectedChannels.push({
         id: channel.id,
         displayName:
@@ -269,7 +270,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                         <ChannelItem
                           key={channel.id}
                           onClick={() => handleChannelSelect(!isSelected, channel)}
-                          disabled={selectedChannels.length >= 5 && !isSelected}
+                          disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                           backgroundHover={backgroundHovered}
                         >
                           <Avatar
@@ -310,7 +311,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           <CustomCheckbox
                             borderColor={iconInactive}
                             index={channel.id}
-                            disabled={selectedChannels.length >= 5 && !isSelected}
+                            disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                             state={isSelected}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -343,7 +344,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                         <ChannelItem
                           key={channel.id}
                           onClick={() => handleChannelSelect(!isSelected, channel)}
-                          disabled={selectedChannels.length >= 5 && !isSelected}
+                          disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                           backgroundHover={backgroundHovered}
                         >
                           <Avatar
@@ -364,7 +365,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           <CustomCheckbox
                             borderColor={iconInactive}
                             index={channel.id}
-                            disabled={selectedChannels.length >= 5 && !isSelected}
+                            disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                             state={isSelected}
                             onClick={(e) => {
                               e.stopPropagation()
@@ -399,7 +400,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                   <ChannelItem
                     key={channel.id}
                     onClick={() => handleChannelSelect(!isSelected, channel)}
-                    disabled={selectedChannels.length >= 5 && !isSelected}
+                    disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                     backgroundHover={backgroundHovered}
                   >
                     <Avatar
@@ -434,7 +435,7 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     <CustomCheckbox
                       borderColor={iconInactive}
                       index={channel.id}
-                      disabled={selectedChannels.length >= 5 && !isSelected}
+                      disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
                       state={isSelected}
                       onClick={(e) => {
                         e.stopPropagation()
@@ -498,13 +499,16 @@ const ChannelItem = styled.div<{ backgroundHover?: string; disabled?: boolean }>
   padding: 8px 12px;
   cursor: pointer;
   border-radius: 8px;
-  &:hover {
-    background-color: ${(props) => props.backgroundHover};
-  }
-  &:disabled {
+
+  ${({ disabled, backgroundHover }) =>
+    disabled
+      ? `
     cursor: not-allowed;
     opacity: 0.5;
-  }
+  `
+      : `  &:hover {
+    background-color: ${backgroundHover};
+  }`}
 `
 
 const ChannelInfo = styled.div<any>`

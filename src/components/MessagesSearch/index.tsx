@@ -254,6 +254,15 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     }
   }, [currentIndex, results, activeChannel, dispatch])
 
+  // Auto-scroll results list to keep active item visible
+  useEffect(() => {
+    if (currentIndex < 0 || !listRef.current) return
+    const item = listRef.current.querySelector<HTMLElement>(`[data-result-index="${currentIndex}"]`)
+    if (item) {
+      item.scrollIntoView({ block: 'nearest' })
+    }
+  }, [currentIndex])
+
   // Reset when channel changes
   useEffect(() => {
     setSearchText('')
@@ -364,8 +373,8 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
         )}
         {(() => {
           let flatIndex = -1
-          return grouped.map((group) => (
-            <GroupSection key={group.label}>
+          return grouped.map((group, index) => (
+            <GroupSection key={group.label + '_' + index}>
               <GroupLabel color={textSecondary} backgroundColor={background}>
                 {group.label}
               </GroupLabel>
@@ -374,10 +383,13 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                 const msgFlatIndex = flatIndex
                 const sender = msg.user
                 const senderName = sender ? makeUsername(contactsMap[sender.id], sender, false) : ''
-                const firstImage = msg.attachments?.find((a) => a.type === attachmentTypes.image)
+                const firstImage = msg.attachments?.find(
+                  (a) => a.type === attachmentTypes.image || a.type === attachmentTypes.video
+                )
                 return (
                   <ResultItem
                     key={msg.id}
+                    data-result-index={msgFlatIndex}
                     onClick={() => handleResultClick(msg)}
                     hoverBackground={backgroundHovered}
                     isActive={msgFlatIndex === currentIndex}
@@ -406,6 +418,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
                               imageAttachmentMaxWidth={28}
                               imageAttachmentMaxHeight={28}
                               isDetailsView
+                              onlyVideoImage
                             />
                           </ResultAttachmentWrapper>
                         )}
@@ -700,17 +713,15 @@ const EmptyState = styled.div`
   height: 100%;
   padding: 0 24px;
   gap: 12px;
-  & > svg {
-    width: 56px;
-    height: 56px;
-  }
 `
 
 const EmptyStateText = styled.p<{ color: string }>`
   margin: 0;
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 20px;
   color: ${(p) => p.color};
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 20px;
+  letter-spacing: 0px;
   text-align: center;
+  max-width: 247px;
 `

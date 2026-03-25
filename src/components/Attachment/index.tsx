@@ -86,6 +86,7 @@ interface AttachmentPops {
   channelId?: string
   incoming?: boolean
   viewOnce?: boolean
+  onlyVideoImage?: boolean
 }
 
 const Attachment = ({
@@ -113,7 +114,8 @@ const Attachment = ({
   messagePlayed,
   channelId,
   incoming,
-  viewOnce
+  viewOnce,
+  onlyVideoImage
 }: AttachmentPops) => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
@@ -884,6 +886,7 @@ const Attachment = ({
                 </UploadProgress>
               ) : null}
               <VideoPreview
+                onlyVideoImage={onlyVideoImage}
                 width={
                   isRepliedMessage
                     ? '40px'
@@ -919,6 +922,7 @@ const Attachment = ({
             <AttachmentImgCont isPreview={isPreview} backgroundColor={overlayBackground2}>
               {/* <PlayIcon /> */}
               <VideoPreview
+                onlyVideoImage={onlyVideoImage}
                 width='48px'
                 height='48px'
                 downloading={downloadingFile}
@@ -995,6 +999,7 @@ const Attachment = ({
             <AttachmentIconCont backgroundColor={accentColor} className='icon-warpper'>
               {previewFileType && previewFileType === attachmentTypes.video ? (
                 <VideoPreview
+                  onlyVideoImage={onlyVideoImage}
                   downloading={downloadingFile}
                   file={attachment}
                   backgroundColor={

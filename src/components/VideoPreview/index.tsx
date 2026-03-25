@@ -33,6 +33,7 @@ interface IVideoPreviewProps {
   isDetailsView?: boolean
   setVideoIsReadyToSend?: (attachmentId: string) => void
   downloading: boolean
+  onlyVideoImage?: boolean
 }
 
 const VideoPreview = memo(function VideoPreview({
@@ -47,7 +48,8 @@ const VideoPreview = memo(function VideoPreview({
   backgroundColor,
   isDetailsView,
   downloading,
-  setVideoIsReadyToSend
+  setVideoIsReadyToSend,
+  onlyVideoImage
 }: IVideoPreviewProps) {
   const {
     [THEME_COLORS.BORDER]: border,
@@ -211,7 +213,7 @@ const VideoPreview = memo(function VideoPreview({
         isPreview={isPreview}
         borderRadius={borderRadius}
       />
-      {!isRepliedMessage && !downloading && (
+      {!isRepliedMessage && !downloading && !onlyVideoImage && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
             <VideoPlayButton>

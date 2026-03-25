@@ -559,7 +559,7 @@ function* sendMessage(action: IAction): any {
             }
             pendingMessages.push(pending)
             if (action.type !== RESEND_MESSAGE) {
-              yield call(loadOGMetadataForLinkMessages, [pending])
+              yield call(loadOGMetadataForLinkMessages, [pending], true, false, false)
               yield call(updateMessage, action.type, pending, channel.id, true, message)
             }
           } else {
@@ -606,7 +606,7 @@ function* sendMessage(action: IAction): any {
           }
           pendingMessages.push(pending)
           if (action.type !== RESEND_MESSAGE) {
-            yield call(loadOGMetadataForLinkMessages, [pending])
+            yield call(loadOGMetadataForLinkMessages, [pending], true, false, false)
             yield call(updateMessage, action.type, pending, channel.id, true, message)
           }
 
@@ -825,7 +825,7 @@ function* sendTextMessage(action: IAction): any {
     }
     if (pendingMessage) {
       if (action.type !== RESEND_MESSAGE) {
-        yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, true)
+        yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, true, false)
         yield call(updateMessage, action.type, pendingMessage, channel.id, true, message)
       }
     }
@@ -1001,7 +1001,7 @@ function* forwardMessage(action: IAction): any {
       }
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
-          yield call(loadOGMetadataForLinkMessages, [pendingMessage])
+          yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, false, false)
           yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
         }
       }
@@ -1222,7 +1222,7 @@ const updateMessages = function* (
   const messages = [...updatedMessages]
   setMessagesToMap(channel.id, messages, firstMessageId, lastMessageId)
   setAllMessages(messages)
-  yield call(loadOGMetadataForLinkMessages, messages)
+  yield call(loadOGMetadataForLinkMessages, messages, true, false, false)
   yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
 }
 
@@ -1258,7 +1258,12 @@ function* loadFromMetadata(firstAttachment: IAttachment) {
   }
 }
 
-function* loadOGMetadataForLinkMessages(messages: IMessage[], setStore = true, sendMessage?: boolean): any {
+function* loadOGMetadataForLinkMessages(
+  messages: IMessage[],
+  setStore = true,
+  sendMessage?: boolean,
+  getFromServer = true
+): any {
   if (!messages || messages.length === 0) return
   for (let i = 0; i < messages.length; i++) {
     const message = messages[i]
@@ -1304,7 +1309,9 @@ function* loadOGMetadataForLinkMessages(messages: IMessage[], setStore = true, s
           yield call(loadFromMetadata, firstAttachment)
         }
         // Fetch metadata from API
-        store.dispatch(fetchOGMetadataForLinkAC(firstAttachment.url, setStore))
+        if (getFromServer) {
+          store.dispatch(fetchOGMetadataForLinkAC(firstAttachment.url, setStore))
+        }
       }
     }
   }
@@ -1458,7 +1465,7 @@ function* getMessagesQuery(action: IAction): any {
                 ? yield call(messageQuery.loadPrevious)
                 : { messages: [], hasNext: false }
           }
-          yield call(loadOGMetadataForLinkMessages, result.messages)
+          yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
           setMessagesToMap(
             channel.id,
@@ -1486,7 +1493,7 @@ function* getMessagesQuery(action: IAction): any {
           } else {
             result.messages = getFromAllMessagesByMessageId('', '', true)
           }
-          yield call(loadOGMetadataForLinkMessages, result.messages)
+          yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
           yield put(setMessagesHasPrevAC(true))
         }
@@ -1530,7 +1537,7 @@ function* getMessagesQuery(action: IAction): any {
             ? yield call(messageQuery.loadNextMessageId, loadNextMessageId)
             : { messages: [], hasNext: false }
         result.messages = [...firstResult.messages, ...secondResult.messages]
-        yield call(loadOGMetadataForLinkMessages, result.messages)
+        yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
 
         setMessagesToMap(
@@ -1576,7 +1583,7 @@ function* getMessagesQuery(action: IAction): any {
           result.messages[result.messages.length - 1]?.id
         )
         setAllMessages([...result.messages])
-        yield call(loadOGMetadataForLinkMessages, result.messages)
+        yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
         yield put(scrollToNewMessageAC(false))
         yield put(setUnreadScrollToAC(true))
@@ -1588,13 +1595,13 @@ function* getMessagesQuery(action: IAction): any {
             true,
             cachedMessages?.length ? cachedMessages : undefined
           )
-          yield call(loadOGMetadataForLinkMessages, messages)
+          yield call(loadOGMetadataForLinkMessages, messages, true, false, false)
           yield put(setMessagesAC(JSON.parse(JSON.stringify(messages)), channel.id))
           yield delay(0)
           const filteredPendingMessages = getFilteredPendingMessages(messages)
           yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
           // Load OG metadata for cached link-only messages
-          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages)
+          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
         }
 
         result = { messages: [], hasNext: false }
@@ -1636,7 +1643,7 @@ function* getMessagesQuery(action: IAction): any {
       yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
 
       // Load OG metadata for link-only messages from cache
-      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages)
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
 
       const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
       if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
@@ -1738,7 +1745,7 @@ function* loadMoreMessages(action: IAction): any {
       yield put(setMessagesHasPrevAC(true))
     }
     if (result.messages && result.messages.length && result.messages.length > 0) {
-      yield call(loadOGMetadataForLinkMessages, result.messages)
+      yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
       yield put(addMessagesAC(JSON.parse(JSON.stringify(result.messages)), direction))
     } else {
       yield put(addMessagesAC([], direction))

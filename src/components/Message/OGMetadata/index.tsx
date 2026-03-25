@@ -9,8 +9,31 @@ import { getChannelByInviteKeyAC } from 'store/channel/actions'
 import { setUpdateMessageAttachmentAC } from 'store/message/actions'
 import { attachmentUpdatedMapSelector } from 'store/message/selector'
 import { getAttachmentURLWithVersion } from 'helpers/attachmentsCache'
+import { isJSON } from 'helpers/message'
 
 const OG_IMAGE_CACHE = 'og-images-v1'
+
+const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
+  if (!firstAttachment) {
+    return null
+  }
+  if (firstAttachment?.metadata && isJSON(firstAttachment.metadata)) {
+    const compactMeta = JSON.parse(firstAttachment.metadata)
+    // Convert compact format to full OG format
+    const fullMetadata: any = {
+      og: {
+        title: compactMeta.ttl,
+        description: compactMeta.dsc,
+        image: compactMeta.iur ? [{ url: compactMeta.iur }] : undefined,
+        favicon: compactMeta.tur ? { url: compactMeta.tur } : undefined
+      },
+      imageWidth: compactMeta.szw,
+      imageHeight: compactMeta.szh
+    }
+    return fullMetadata
+  }
+  return null
+}
 
 const useCachedOGImage = (url: string | undefined) => {
   const dispatch = useDispatch()
@@ -123,8 +146,7 @@ const OGMetadata = ({
   ogContainerMargin,
   target = '_blank',
   isInviteLink = false,
-  onClick,
-  metadataGetSuccessCallback
+  onClick
 }: {
   attachments: IAttachment[]
   state: string
@@ -149,7 +171,6 @@ const OGMetadata = ({
   metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean, metadata: IOGMetadata | null) => void
 }) => {
   const dispatch = useDispatch()
-  const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
   const {
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.OUTGOING_MESSAGE_BACKGROUND_X]: outgoingMessageBackgroundX,
@@ -161,8 +182,8 @@ const OGMetadata = ({
   }, [attachments])
 
   const metadata = useMemo(() => {
-    return oGMetadata?.[attachment?.url] || null
-  }, [attachment, oGMetadata])
+    return loadFromMetadata(attachment)
+  }, [attachment])
 
   const [shouldAnimate, setShouldAnimate] = useState(false)
 
@@ -249,18 +270,6 @@ const OGMetadata = ({
   const showImage = useMemo(() => {
     return hasImage && calculatedImageHeight >= MIN_IMAGE_HEIGHT && calculatedImageHeight <= MAX_IMAGE_HEIGHT
   }, [hasImage, calculatedImageHeight])
-
-  useEffect(() => {
-    if (oGMetadata?.[attachment?.url]) {
-      if (showOGMetadata && oGMetadata?.[attachment?.url] && metadataGetSuccessCallback && metadata) {
-        const show =
-          showImage || (hasImage && (metadata?.imageWidth < MIN_IMAGE_SIZE || metadata?.imageHeight < MIN_IMAGE_SIZE))
-        metadataGetSuccessCallback(attachment?.url, true, !!show, metadata)
-      } else {
-        metadataGetSuccessCallback?.(attachment?.url, false, false, metadata)
-      }
-    }
-  }, [oGMetadata, attachment?.url, metadata, showOGMetadata, showImage])
 
   const elements = useMemo(
     () =>
@@ -385,10 +394,10 @@ const OGMetadata = ({
   }, [attachment?.url])
 
   useEffect(() => {
-    if (!oGMetadata?.[attachment?.url]) {
+    if (!metadata) {
       setShouldAnimate(true)
     }
-  }, [oGMetadata, attachment?.url])
+  }, [metadata])
 
   // If we shouldn't show OG metadata, return null to render as default message
   if (!showOGMetadata) {
