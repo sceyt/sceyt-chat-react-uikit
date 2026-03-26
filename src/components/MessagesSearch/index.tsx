@@ -263,12 +263,15 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     }
   }, [currentIndex])
 
-  // Reset when channel changes
+  // On channel change: keep search text, clear results, re-search for new channel
   useEffect(() => {
-    setSearchText('')
     setResults([])
     setHasNext(false)
+    setCurrentIndex(-1)
     queryRef.current = null
+    if (searchText.trim()) {
+      buildAndSearch(searchText)
+    }
   }, [activeChannel?.id])
 
   // Re-run search on reconnect
