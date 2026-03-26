@@ -444,7 +444,6 @@ const Container = styled.div<{ size: 'small' | 'medium' | 'large'; backgroundCol
   height: 100%;
   background-color: ${(p) => p.backgroundColor};
   border-left: 1px solid ${(p) => p.borderColor};
-  box-sizing: border-box;
   user-select: text;
 `
 

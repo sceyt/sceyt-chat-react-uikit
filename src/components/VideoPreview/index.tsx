@@ -1,6 +1,7 @@
 import styled from 'styled-components'
 import React, { memo, useEffect, useMemo, useRef } from 'react'
 import { ReactComponent as PlayIcon } from '../../assets/svg/playVideo.svg'
+import { ReactComponent as VideoPlayerPlay } from '../../assets/svg/videoPlayerPlay.svg'
 import { ReactComponent as VideoCamIcon } from '../../assets/svg/video-call.svg'
 import { IAttachment } from '../../types'
 import { AttachmentIconCont } from '../../UIHelper'
@@ -213,6 +214,11 @@ const VideoPreview = memo(function VideoPreview({
         isPreview={isPreview}
         borderRadius={borderRadius}
       />
+      {onlyVideoImage && (
+        <VideoIcon bg={overlayBackground2}>
+          <VideoPlayerPlay />
+        </VideoIcon>
+      )}
       {!isRepliedMessage && !downloading && !onlyVideoImage && (
         <VideoControls className='video-controls'>
           {!isPreview && !isRepliedMessage && !uploading && !isDetailsView && (
@@ -410,4 +416,23 @@ const UploadInProgress = styled.img<{
     min-width: inherit;
   `}
   object-fit: cover;
+`
+
+const VideoIcon = styled.div<{ bg: string }>`
+  position: absolute;
+  z-index: 1;
+  left: 0px;
+  top: 0px;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: ${({ bg }) => bg}66;
+
+  & > svg {
+    width: 16px;
+    height: 16px;
+  }
 `
