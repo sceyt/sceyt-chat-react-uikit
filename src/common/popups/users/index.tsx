@@ -145,18 +145,6 @@ const UsersPopup = ({
       : channel.type === DEFAULT_CHANNEL_TYPE.BROADCAST || channel.type === DEFAULT_CHANNEL_TYPE.PUBLIC
         ? 'Subscribers'
         : 'Members')
-  /* const handleGetUsers = (option) => {
-    dispatch(
-      getUsers({
-        query: userSearchValue,
-        filter: option || searchIn,
-        limit: 15
-      })
-    )
-  }
-  useEffect(() => {
-    dispatch(getRoles())
-  }, [channel]) */
 
   const handleMembersListScroll = (event: any) => {
     if (!userSearchValue && event.target.scrollHeight - event.target.scrollTop <= event.target.offsetHeight + 300) {
@@ -487,6 +475,9 @@ const UsersPopup = ({
                 </ListRow>
               )
             })}
+            {userSearchValue && filteredUsers.length === 0 && usersLoadingState !== LOADING_STATE.LOADING && (
+              <NoResults color={textSecondary}>No members found</NoResults>
+            )}
           </MembersContainer>
         </PopupBody>
 
@@ -726,6 +717,15 @@ const SelectedMemberName = styled.span`
   font-size: 14px;
   line-height: 16px;
   margin-left: 8px;
+  color: ${(props) => props.color};
+`
+
+const NoResults = styled.div<{ color: string }>`
+  font-size: 15px;
+  line-height: 16px;
+  font-weight: 500;
+  text-align: center;
+  margin-top: 20px;
   color: ${(props) => props.color};
 `
 
