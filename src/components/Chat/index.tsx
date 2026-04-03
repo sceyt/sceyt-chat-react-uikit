@@ -147,9 +147,9 @@ const Container = styled.div<{ widthOffset: number; channelDetailsWidth?: number
       ? `calc(100% - ${props.widthOffset + (props.channelDetailsWidth ? props.channelDetailsWidth + 1 : 0)}px)`
       : ''};
   display: flex;
-  transition: all 0.1s;
   flex-direction: column;
   overflow: hidden;
+  justify-content: space-between;
 `
 
 const SelectChatContainer = styled.div<{ backgroundColor: string }>`

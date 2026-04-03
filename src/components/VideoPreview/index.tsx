@@ -308,7 +308,6 @@ const Component = styled.div<{
   ${(props) => props.isRepliedMessage && 'margin-right: 8px'};
   /*width: 100vw;
   background-color: transparent;
-  margin-top: -50vw;
   padding: 0 40px;
   z-index: 20;*/
 

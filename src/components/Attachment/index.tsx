@@ -44,7 +44,7 @@ import {
   setAttachmentToCache
 } from '../../helpers/attachmentsCache'
 import { base64ToDataURL } from '../../helpers/resizeImage'
-import { getPendingAttachment, updateMessageOnAllMessages, updateMessageOnMap } from '../../helpers/messagesHalper'
+import { getPendingAttachment, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../store/user/constants'
 import { IAttachment } from '../../types'
 import ViewOnceVoiceModal from '../../common/popups/viewOnceMedia/ViewOnceVoiceModal'
@@ -170,6 +170,14 @@ const Attachment = ({
   const attachmentMetadata = useMemo(() => {
     return isJSON(attachment.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
   }, [attachment.metadata])
+
+  const hasRequiredMediaMetadata = useMemo(() => {
+    if (!(attachment.type === attachmentTypes.image || attachment.type === attachmentTypes.video)) {
+      return true
+    }
+
+    return Boolean(attachmentMetadata?.szw && attachmentMetadata?.szh)
+  }, [attachment.type, attachmentMetadata])
 
   const [renderWidth, renderHeight] = useMemo(() => {
     let attachmentData = null
@@ -592,7 +600,6 @@ const Attachment = ({
               messageId: pendingAttachment.messageTid,
               params: { state: MESSAGE_STATUS.FAILED }
             })
-            updateMessageOnAllMessages(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED })
             dispatch(updateMessageAC(pendingAttachment.messageTid, { state: MESSAGE_STATUS.FAILED }))
           }
           // }
@@ -621,6 +628,10 @@ const Attachment = ({
       }
     }
   }, [attachmentsUploadProgress])
+
+  if (!hasRequiredMediaMetadata) {
+    return <React.Fragment></React.Fragment>
+  }
 
   return (
     <React.Fragment>
@@ -962,17 +973,6 @@ const Attachment = ({
           }
         />
       ) : attachment.type === attachmentTypes.link ? null : (
-        /* <LinkAttachmentCont href={attachment.url} target='_blank' rel='noreferrer'>
-          {linkTitle ? (
-            <React.Fragment>
-              <LinkTitle>{linkTitle}</LinkTitle>
-              <LinkDescription>{linkDescription}</LinkDescription>
-              <LinkImage src={linkImage} />
-            </React.Fragment>
-          ) : (
-            <div />
-          )}
-        </LinkAttachmentCont> */
         <AttachmentFile
           draggable={false}
           isPreview={isPreview}
@@ -1271,7 +1271,6 @@ export const AttachmentFile = styled.div<{
   padding: ${(props) => !props.isRepliedMessage && '8px 12px;'};
   //width: ${(props) => !props.isRepliedMessage && (props.width ? `${props.width}px` : '350px')};
   min-width: ${(props) => !props.isRepliedMessage && (props.width || (props.isUploading ? '260px' : '205px'))};
-  transition: all 0.1s;
   //height: 70px;
   background: ${(props) => props.backgroundColor};
   border: ${(props) => props.border || `1px solid  ${props.borderColor}`};

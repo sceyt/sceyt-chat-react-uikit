@@ -60,7 +60,7 @@ import { setCustomUploader, setSendAttachmentsAsSeparateMessages } from '../../h
 import { IChatClientProps } from '../ChatContainer'
 import { defaultTheme, THEME_COLORS } from '../../UIHelper/constants'
 import { setHideUserPresence } from '../../helpers/userHelper'
-import { clearMessagesMap, removeAllMessages } from '../../helpers/messagesHalper'
+import { clearMessagesMap } from '../../helpers/messagesHalper'
 import { setTheme, setThemeAC } from '../../store/theme/actions'
 import { SceytChatUIKitTheme, ThemeMode } from '../../components'
 import log from 'loglevel'
@@ -170,7 +170,6 @@ const SceytChat = ({
       dispatch(watchForEventsAC())
     } else {
       clearMessagesMap()
-      removeAllMessages()
       setActiveChannelId('')
       destroyChannelsMap()
       dispatch(destroySession())
@@ -258,7 +257,6 @@ const SceytChat = ({
       window.removeEventListener('blur', () => handleFocusChange(false))
       document.removeEventListener(visibilityChange, handleVisibilityChange)
       clearMessagesMap()
-      removeAllMessages()
       setActiveChannelId('')
       destroyChannelsMap()
       dispatch(destroySession())

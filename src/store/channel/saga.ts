@@ -113,7 +113,6 @@ import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
 import {
   removeAllMessages,
   removeMessagesFromMap,
-  updateMessageOnAllMessages,
   updateMessageOnMap
 } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
@@ -1011,7 +1010,6 @@ function* markMessagesRead(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {
@@ -1051,7 +1049,6 @@ function* markVoiceMessageAsPlayed(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {
@@ -1088,7 +1085,6 @@ function* updateMessageAsOpened(action: IAction): any {
       }
       yield put(updateMessageAC(messageId, updateParams))
       updateMessageOnMap(channel.id, { messageId, params: updateParams })
-      updateMessageOnAllMessages(messageId, updateParams)
     }
   }
 }
@@ -1152,7 +1148,6 @@ function* markMessagesDelivered(action: IAction): any {
         }
         yield put(updateMessageAC(messageId, updateParams))
         updateMessageOnMap(channel.id, { messageId, params: updateParams })
-        updateMessageOnAllMessages(messageId, updateParams)
       }
     }
   } catch (e) {

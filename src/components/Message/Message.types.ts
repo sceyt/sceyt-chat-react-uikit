@@ -96,6 +96,7 @@ export interface IMessageProps {
   unreadMessageId: string
   isUnreadMessage: boolean
   isThreadMessage: boolean
+  disableAutoReadTracking?: boolean
   fontFamily?: string
   ownMessageOnRightSide?: boolean
   messageWidthPercent?: string | number

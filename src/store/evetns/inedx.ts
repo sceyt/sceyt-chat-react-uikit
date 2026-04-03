@@ -57,24 +57,16 @@ import {
 import { CONNECTION_EVENT_TYPES, CONNECTION_STATUS } from '../user/constants'
 import { getContactsAC, setConnectionStatusAC } from '../user/actions'
 import {
-  addAllMessages,
   addMessageToMap,
-  addReactionOnAllMessages,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
-  getHasNextCached,
   getMessageFromPendingMessagesMap,
   getMessagesFromMap,
-  MESSAGE_LOAD_DIRECTION,
   removeAllMessages,
   removeMessagesFromMap,
-  removeReactionOnAllMessages,
   removeReactionToMessageOnMap,
-  updateMarkersOnAllMessages,
   updateMessageDeliveryStatusAndMarkers,
-  updateMessageOnAllMessages,
   updateMessageOnMap,
-  updateMessageStatusOnAllMessages,
   updateMessageStatusOnMap,
   updatePendingMessageOnMap
 } from '../../helpers/messagesHalper'
@@ -829,18 +821,10 @@ export default function* watchForEvents(): any {
             }
 
             if (channel.id === activeChannelId) {
-              if (!getHasNextCached()) {
+              const hasNextMessage = store.getState().MessageReducer.messagesHasNext
+              if (!hasNextMessage) {
                 yield put(addMessageAC(message))
                 yield put(loadOGMetadataForLinkAC([message], true))
-              }
-              addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-              // addAllMessages([message], MESSAGE_LOAD_DIRECTION.NEXT)
-              // }
-              if (message.user.id !== SceytChatClient.user.id) {
-                // yield put(markMessagesAsReadAC(channel.id, [message.id]))
-              }
-              const hasNextMessage = store.getState().MessageReducer.messagesHasNext
-              if (!getHasNextCached() && !hasNextMessage) {
                 yield put(scrollToNewMessageAC(true, false, true))
               }
             }
@@ -991,11 +975,9 @@ export default function* watchForEvents(): any {
             }
             if (activeChannelId === channelId) {
               yield put(updateMessagesStatusAC(markerList.name, markersMap, isOwnMarker))
-              updateMarkersOnAllMessages(markersMap, markerList.name, isOwnMarker)
             }
 
             updateMessageStatusOnMap(channel.id, { name: markerList.name, markersMap })
-            updateMessageStatusOnAllMessages(markerList.name, markersMap, isOwnMarker)
             if (!isOwnMarker) {
               yield put(updateMessagesMarkersAC(channelId, markerList.name, markerList))
             }
@@ -1018,7 +1000,6 @@ export default function* watchForEvents(): any {
           const channelExists = checkChannelExists(channel.id)
 
           if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(deletedMessage.id, deletedMessage)
             yield put(updateMessageAC(deletedMessage.id, deletedMessage))
           }
           updateMessageOnMap(channel.id, {
@@ -1063,14 +1044,6 @@ export default function* watchForEvents(): any {
                 updatedAt: message.updatedAt
               })
             )
-            updateMessageOnAllMessages(message.id, {
-              body: message.body,
-              state: message.state,
-              attachments: message.attachments,
-              bodyAttributes: message.bodyAttributes,
-              mentionedUsers: message.mentionedUsers,
-              updatedAt: message.updatedAt
-            })
           }
           if (channelExists) {
             if (channel.lastMessage.id === message.id) {
@@ -1093,7 +1066,6 @@ export default function* watchForEvents(): any {
 
           if (channel.id === activeChannelId) {
             yield put(addReactionToMessageAC(message, reaction, isSelf))
-            addReactionOnAllMessages(message, reaction, true)
           }
           if (message.user.id === SceytChatClient.user.id) {
             if (!isSelf && Notification.permission === 'granted') {
@@ -1197,7 +1169,6 @@ export default function* watchForEvents(): any {
               }
             )
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1233,7 +1204,6 @@ export default function* watchForEvents(): any {
               obj
             )
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1268,7 +1238,6 @@ export default function* watchForEvents(): any {
             }
 
             if (channel.id === activeChannelId) {
-              updateMessageOnAllMessages(messageId, {}, obj)
               yield put(updateMessageAC(messageId, {}, undefined, obj))
             }
           }
@@ -1289,7 +1258,6 @@ export default function* watchForEvents(): any {
           )
 
           if (channel.id === activeChannelId) {
-            updateMessageOnAllMessages(messageId, {}, obj)
             yield put(updateMessageAC(messageId, {}, undefined, obj))
             break
           }
@@ -1304,7 +1272,6 @@ export default function* watchForEvents(): any {
 
           if (channel.id === activeChannelId) {
             yield put(deleteReactionFromMessageAC(message, reaction, isSelf))
-            removeReactionOnAllMessages(message, reaction, true)
           }
           const channelUpdateParams = JSON.parse(JSON.stringify(channel))
           if (

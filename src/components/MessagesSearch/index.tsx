@@ -4,7 +4,7 @@ import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import { activeChannelSelector } from '../../store/channel/selector'
 import { switchMessageSearchAC } from '../../store/channel/actions'
-import { getMessagesAC } from '../../store/message/actions'
+import { navigateToMessage } from '../../helpers/messageListNavigator'
 import { getClient } from '../../common/client'
 import { makeUsername } from '../../helpers/message'
 import { contactsMapSelector, connectionStatusSelector } from '../../store/user/selector'
@@ -200,33 +200,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     if (activeChannel?.id) {
       const idx = results.findIndex((m) => m.id === message.id)
       if (idx !== -1) setCurrentIndex(idx)
-      const el = document.getElementById(message.id)
-      if (el) {
-        const scrollContainer = document.getElementById('scrollableDiv')
-        if (scrollContainer) {
-          const elRect = el.getBoundingClientRect()
-          const containerRect = scrollContainer.getBoundingClientRect()
-          const isNearBottom = elRect.bottom >= containerRect.bottom - 80
-          if (isNearBottom) {
-            el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
-          } else {
-            const containerCenter = containerRect.top + containerRect.height / 2
-            const elCenter = elRect.top + elRect.height / 2
-            const isCentered = Math.abs(elCenter - containerCenter) < containerRect.height / 4
-            if (!isCentered) {
-              el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-            }
-          }
-        } else {
-          el.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-        el.classList.remove('highlight')
-        el.getBoundingClientRect() // force reflow to restart animation
-        el.classList.add('highlight')
-        setTimeout(() => el.classList.remove('highlight'), 1000)
-      } else {
-        dispatch(getMessagesAC(activeChannel, undefined, message.id, undefined, true, 'smooth', true))
-      }
+      navigateToMessage(message.id)
     }
   }
 
@@ -235,7 +209,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     const nextIndex = currentIndex + 1
     if (nextIndex < results.length) {
       setCurrentIndex(nextIndex)
-      dispatch(getMessagesAC(activeChannel, undefined, results[nextIndex].id, undefined, true, 'smooth', true))
+      navigateToMessage(results[nextIndex].id)
     } else if (hasNext) {
       await handleLoadMore()
       setCurrentIndex((prev) => {
@@ -250,7 +224,7 @@ export default function MessagesSearch({ size = 'large' }: IProps) {
     const prevIndex = currentIndex - 1
     if (prevIndex >= 0) {
       setCurrentIndex(prevIndex)
-      dispatch(getMessagesAC(activeChannel, undefined, results[prevIndex].id, undefined, true, 'smooth', true))
+      navigateToMessage(results[prevIndex].id)
     }
   }, [currentIndex, results, activeChannel, dispatch])
 

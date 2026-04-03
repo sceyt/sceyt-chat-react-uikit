@@ -3,12 +3,8 @@ import { useSelector, useDispatch } from 'store/hooks'
 import React from 'react'
 // Store
 import { activeChannelSelector } from '../../store/channel/selector'
-import { getMessagesAC, scrollToNewMessageAC } from '../../store/message/actions'
-import {
-  activeChannelMessagesSelector,
-  sendMessageInputHeightSelector,
-  showScrollToNewMessageButtonSelector
-} from '../../store/message/selector'
+import { scrollToNewMessageAC } from '../../store/message/actions'
+import { sendMessageInputHeightSelector, showScrollToNewMessageButtonSelector } from '../../store/message/selector'
 // Assets
 import { ReactComponent as BottomIcon } from '../../assets/svg/chevron_down.svg'
 // Helpers
@@ -61,20 +57,17 @@ const MessagesScrollToBottomButton: React.FC<MessagesScrollToBottomButtonProps> 
   const channel: IChannel = useSelector(activeChannelSelector)
   const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const showScrollToNewMessageButton: IChannel = useSelector(showScrollToNewMessageButtonSelector)
-  const messages = useSelector(activeChannelMessagesSelector) || []
   const handleScrollToBottom = () => {
+    if (!channel?.lastMessage?.id) {
+      return
+    }
+
     const user = getClient().user
     if (channel.lastMessage.user.id !== user.id) {
       dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
     }
-    handleScrollToLastMessage(channel.lastMessage.id)
-  }
-  const handleScrollToLastMessage = async (messageId: string) => {
-    if (messages.findIndex((msg) => msg.id === messageId) >= 10) {
-      dispatch(scrollToNewMessageAC(true, false, false))
-    } else if (channel?.id) {
-      dispatch(getMessagesAC(channel, true, messageId, undefined, false, 'smooth', true))
-    }
+
+    dispatch(scrollToNewMessageAC(true, true, false))
   }
 
   return (

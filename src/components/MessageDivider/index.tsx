@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import styled from 'styled-components'
 import { THEME_COLORS } from '../../UIHelper/constants'
 import { useColor } from '../../hooks'
@@ -17,7 +17,6 @@ export const Container = styled.div<{
   newMessagesSeparatorSpaceColor: string
   dateDividerBorderRadius?: string
   newMessagesSeparatorLeftRightSpaceWidth?: string
-  height?: number
 }>`
   text-align: center;
   margin: ${(props) => (props.noMargin ? '0 auto' : `${props.marginTop || '16px'} auto 0`)};
@@ -25,7 +24,7 @@ export const Container = styled.div<{
   display: ${(props) => (props.dividerVisibility ? 'flex' : 'none')};
   align-items: center;
   width: ${(props) => props.width || '100%'};
-  height: ${(props) => (props.height ? `${props.height}px` : '25px')};
+  min-height: 25px;
   z-index: 5;
   top: 0;
   background: transparent;
@@ -85,6 +84,7 @@ interface IProps {
   dividerText: string
   visibility?: boolean
   unread?: boolean
+  index?: number
   dateDividerFontSize?: string
   dateDividerTextColor?: string
   dateDividerBorder?: string
@@ -108,6 +108,7 @@ export default function MessageDivider({
   dividerText,
   visibility,
   unread,
+  index,
   dateDividerFontSize,
   dateDividerTextColor,
   dateDividerBorder,
@@ -132,14 +133,10 @@ export default function MessageDivider({
     [THEME_COLORS.BORDER]: border
   } = useColor()
 
-  const textRef = React.useRef<HTMLSpanElement | null>(null)
-  const [textHeight, setTextHeight] = React.useState<number>(0)
+  if (index === 0 && !unread) {
+    return <div className='divider'></div>
+  }
 
-  useEffect(() => {
-    if (textRef.current) {
-      setTextHeight(textRef.current.offsetHeight)
-    }
-  }, [textRef])
   return (
     <Container
       className={unread ? 'unread' : 'divider'}
@@ -156,10 +153,9 @@ export default function MessageDivider({
       newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor || border}
       noMargin={noMargin}
       marginBottom={marginBottom}
-      height={textHeight}
     >
       <div>
-        <span ref={textRef}>{dividerText}</span>
+        <span>{dividerText}</span>
       </div>
     </Container>
   )

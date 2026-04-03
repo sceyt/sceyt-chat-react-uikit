@@ -12,9 +12,10 @@ import {
   updatePendingMessageAC,
   clearPendingMessagesMapAC
 } from 'store/message/actions'
-export const MESSAGES_MAX_PAGE_COUNT = 80
+export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
-export const LOAD_MAX_MESSAGE_COUNT = 30
+export const LOAD_MAX_MESSAGE_COUNT = 20
+export const LOAD_MAX_MESSAGE_COUNT_PREFETCH = 50
 export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
@@ -142,141 +143,129 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
 
 const pendingAttachments: { [key: string]: { file: File; messageTid?: string; channelId: string } } = {}
 let messagesMap: messagesMap = {}
-let activeChannelAllMessages: IMessage[] = []
-let prevCached: boolean = false
-let nextCached = false
-
-export const setAllMessages = (messages: IMessage[]) => {
-  activeChannelAllMessages = messages
-}
-export const addAllMessages = (messages: IMessage[], direction: string) => {
-  const toAdd = messages.filter(
-    (m) => !activeChannelAllMessages.some((e) => e.tid === m.tid || (m.id && e.id === m.id))
-  )
-  if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-    activeChannelAllMessages = [...toAdd, ...activeChannelAllMessages]
-    if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
-      setHasNextCached(true)
-    }
-  } else {
-    activeChannelAllMessages = [...activeChannelAllMessages, ...toAdd]
-    if (activeChannelAllMessages.length > MESSAGES_MAX_PAGE_COUNT) {
-      setHasPrevCached(true)
-    }
-  }
-}
-
-export const updateMessageOnAllMessages = (
-  messageId: string,
-  updatedParams: any,
-  voteDetails?: {
-    type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
-    vote?: IPollVote
-  }
-) => {
-  activeChannelAllMessages = activeChannelAllMessages.map((message) => {
-    if (message.tid === messageId || message.id === messageId) {
-      if (updatedParams.state === MESSAGE_STATUS.DELETE) {
-        return { ...updatedParams }
-      }
-      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, updatedParams.deliveryStatus)
-      let updatedMessage = {
-        ...message,
-        ...updatedParams,
-        userMarkers: [...(message.userMarkers || []), ...(updatedParams.userMarkers || [])],
-        ...statusUpdatedMessage
-      }
-      if (voteDetails) {
-        updatedMessage = {
-          ...updatedMessage,
-          pollDetails: handleVoteDetails(voteDetails, updatedMessage)
-        }
-      }
-      return updatedMessage
-    }
-    return message
-  })
-}
-
-export const updateMessageStatusOnAllMessages = (name: string, markersMap: any, isOwnMarker?: boolean) => {
-  activeChannelAllMessages = activeChannelAllMessages.map((message) => {
-    if (markersMap[message.id]) {
-      const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name, isOwnMarker)
-      return { ...message, ...statusUpdatedMessage }
-    }
-    return message
-  })
-}
-
-export const removeMessageFromAllMessages = (messageId: string) => {
-  activeChannelAllMessages = [...activeChannelAllMessages].filter(
-    (msg) => !(msg.id === messageId || msg.tid === messageId)
-  )
-}
-
-export const updateMarkersOnAllMessages = (markersMap: any, name: string, isOwnMarker?: boolean) => {
-  activeChannelAllMessages = activeChannelAllMessages.map((message) => {
-    if (!markersMap[message.id]) {
-      return message
-    }
-    const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(message, name, isOwnMarker)
-    return { ...message, ...statusUpdatedMessage }
-  })
-}
-
-export const getAllMessages = () => activeChannelAllMessages
+let activeSegment: { startId: string; endId: string } | null = null
+// Per-channel registry of contiguous loaded ranges, kept sorted ascending by startId.
+// "Contiguous" means the messages in a range were loaded via adjacent server pages
+// (either a single fresh-load window or that window extended by loadMoreMessages pagination).
+// A jump to a different position creates a new separate entry; pagination extends the existing one.
+let loadedSegmentsMap: { [channelId: string]: Array<{ startId: string; endId: string }> } = {}
 
 export const removeAllMessages = () => {
-  activeChannelAllMessages = []
-  setHasPrevCached(false)
-  setHasNextCached(false)
+  clearActiveSegment()
 }
 
-export const setHasPrevCached = (state: boolean) => {
-  prevCached = state
-}
-export const getHasPrevCached = () => prevCached
-
-export const setHasNextCached = (state: boolean) => (nextCached = state)
-export const getHasNextCached = () => nextCached
-
-export const getFromAllMessagesByMessageId = (
-  messageId: string,
-  direction: string,
-  getWithLastMessage?: boolean,
-  messagesArray?: IMessage[]
-) => {
-  const messages = activeChannelAllMessages?.length ? activeChannelAllMessages : messagesArray || []
-  let messagesForAdd: IMessage[] = []
-  if (getWithLastMessage) {
-    messagesForAdd = [...messages.slice(-MESSAGES_MAX_PAGE_COUNT)]
-    setHasPrevCached(messages.length > MESSAGES_MAX_PAGE_COUNT)
-    setHasNextCached(false)
+// Inserts {startId, endId} into loadedSegmentsMap[channelId], merging any overlapping entries.
+function upsertSegment(channelId: string, startId: string, endId: string) {
+  if (!loadedSegmentsMap[channelId]) {
+    loadedSegmentsMap[channelId] = []
+  }
+  const bigStart = BigInt(startId)
+  const bigEnd = BigInt(endId)
+  const overlapping = loadedSegmentsMap[channelId].filter(
+    (s) => BigInt(s.startId) <= bigEnd && BigInt(s.endId) >= bigStart
+  )
+  if (overlapping.length > 0) {
+    const mergedStart = [bigStart, ...overlapping.map((s) => BigInt(s.startId))].reduce((a, b) => (a < b ? a : b))
+    const mergedEnd = [bigEnd, ...overlapping.map((s) => BigInt(s.endId))].reduce((a, b) => (a > b ? a : b))
+    loadedSegmentsMap[channelId] = loadedSegmentsMap[channelId].filter(
+      (s) => BigInt(s.startId) > bigEnd || BigInt(s.endId) < bigStart
+    )
+    loadedSegmentsMap[channelId].push({ startId: mergedStart.toString(), endId: mergedEnd.toString() })
   } else {
-    const fromMessageIndex = messages.findIndex((mes) => mes.id === messageId)
-    if (fromMessageIndex !== 0) {
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-        const sliceFromIndex =
-          fromMessageIndex <= LOAD_MAX_MESSAGE_COUNT ? 0 : fromMessageIndex - (LOAD_MAX_MESSAGE_COUNT + 1)
-        messagesForAdd = messages.slice(sliceFromIndex, fromMessageIndex)
-        setHasPrevCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT || sliceFromIndex === 0))
-        setHasNextCached(true)
-      } else {
-        const toMessage = fromMessageIndex + LOAD_MAX_MESSAGE_COUNT + 1
-        messagesForAdd = messages.slice(fromMessageIndex + 1, toMessage)
-        if (toMessage > messages.length - 1) {
-          setHasNextCached(false)
-        } else {
-          setHasNextCached(!(messagesForAdd.length < LOAD_MAX_MESSAGE_COUNT))
-        }
-        setHasPrevCached(true)
-      }
-    } else {
-      setHasPrevCached(false)
+    loadedSegmentsMap[channelId].push({ startId, endId })
+  }
+  loadedSegmentsMap[channelId].sort((a, b) => (BigInt(a.startId) < BigInt(b.startId) ? -1 : 1))
+}
+
+export const setActiveSegment = (channelId: string, startId: string, endId: string) => {
+  upsertSegment(channelId, startId, endId)
+  // After potential merge, find the merged segment that contains our range
+  const merged = (loadedSegmentsMap[channelId] || []).find(
+    (s) => BigInt(s.startId) <= BigInt(startId) && BigInt(s.endId) >= BigInt(endId)
+  )
+  activeSegment = merged || { startId, endId }
+}
+
+export const extendActiveSegment = (channelId: string, startId: string, endId: string, direction: string) => {
+  if (!activeSegment) {
+    setActiveSegment(channelId, startId, endId)
+    return
+  }
+  // The new page is server-guaranteed contiguous with activeSegment on one side.
+  // Update the matching entry in loadedSegmentsMap in-place (find by the stable boundary).
+  const segments = loadedSegmentsMap[channelId] || []
+  if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+    // Stable side: endId stays the same
+    const idx = segments.findIndex((s) => s.endId === activeSegment!.endId)
+    activeSegment = { startId, endId: activeSegment.endId }
+    if (idx >= 0) {
+      loadedSegmentsMap[channelId][idx] = { ...activeSegment }
+    }
+  } else {
+    // Stable side: startId stays the same
+    const idx = segments.findIndex((s) => s.startId === activeSegment!.startId)
+    activeSegment = { startId: activeSegment.startId, endId }
+    if (idx >= 0) {
+      loadedSegmentsMap[channelId][idx] = { ...activeSegment }
     }
   }
+}
 
-  return messagesForAdd
+export const clearActiveSegment = () => {
+  activeSegment = null
+}
+
+export const getActiveSegment = () => activeSegment
+
+/**
+ * Returns up to `limit` cached messages contiguous with and immediately before `fromMessageId`
+ * within the loaded segment that contains `fromMessageId`. Returns [] if there is a gap.
+ */
+export function getContiguousPrevMessages(channelId: string, fromMessageId: string, limit: number): IMessage[] {
+  const segments = loadedSegmentsMap[channelId] || []
+  const bigFrom = BigInt(fromMessageId)
+  const seg = segments.find((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) >= bigFrom)
+  if (!seg || BigInt(seg.startId) >= bigFrom) return []
+  return Object.values(messagesMap[channelId] || {})
+    .filter((msg) => msg.id && BigInt(msg.id) >= BigInt(seg.startId) && BigInt(msg.id) < bigFrom)
+    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .slice(-limit)
+}
+
+/**
+ * Returns up to `limit` cached messages contiguous with and immediately after `fromMessageId`
+ * within the loaded segment that contains `fromMessageId`. Returns [] if there is a gap.
+ */
+export function getContiguousNextMessages(channelId: string, fromMessageId: string, limit: number): IMessage[] {
+  const segments = loadedSegmentsMap[channelId] || []
+  const bigFrom = BigInt(fromMessageId)
+  const seg = segments.find((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) >= bigFrom)
+  if (!seg || BigInt(seg.endId) <= bigFrom) return []
+  return Object.values(messagesMap[channelId] || {})
+    .filter((msg) => msg.id && BigInt(msg.id) > bigFrom && BigInt(msg.id) <= BigInt(seg.endId))
+    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .slice(0, limit)
+}
+
+/** True if the map has contiguous messages before `fromMessageId` in the same segment. */
+export function hasPrevContiguousInMap(channelId: string, fromMessageId: string): boolean {
+  const segments = loadedSegmentsMap[channelId] || []
+  const bigFrom = BigInt(fromMessageId)
+  return segments.some((s) => BigInt(s.startId) < bigFrom && BigInt(s.endId) >= bigFrom)
+}
+
+/** True if the map has contiguous messages after `fromMessageId` in the same segment. */
+export function hasNextContiguousInMap(channelId: string, fromMessageId: string): boolean {
+  const segments = loadedSegmentsMap[channelId] || []
+  const bigFrom = BigInt(fromMessageId)
+  return segments.some((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) > bigFrom)
+}
+
+export function getLatestMessagesFromMap(channelId: string, limit: number): IMessage[] {
+  return Object.values(messagesMap[channelId] || {})
+    .filter((m) => !!m.id)
+    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .slice(-limit)
 }
 
 export function setMessagesToMap(
@@ -412,27 +401,6 @@ export function addReactionToMessageOnMap(channelId: string, message: IMessage, 
   }
 }
 
-export const addReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
-  activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
-    if (msg.id === message.id) {
-      let slfReactions = [...msg.userReactions]
-      if (isSelf) {
-        if (slfReactions) {
-          slfReactions.push(reaction)
-        } else {
-          slfReactions = [reaction]
-        }
-      }
-      return {
-        ...msg,
-        userReactions: slfReactions,
-        reactionTotals: message.reactionTotals
-      }
-    }
-    return msg
-  })
-}
-
 export function removeReactionToMessageOnMap(
   channelId: string,
   message: IMessage,
@@ -456,23 +424,6 @@ export function removeReactionToMessageOnMap(
       userReactions
     }
   }
-}
-
-export const removeReactionOnAllMessages = (message: IMessage, reaction: IReaction, isSelf: boolean) => {
-  activeChannelAllMessages = activeChannelAllMessages.map((msg) => {
-    if (msg.id === message.id) {
-      let { userReactions } = msg
-      if (isSelf) {
-        userReactions = msg.userReactions.filter((selfReaction: IReaction) => selfReaction.key !== reaction.key)
-      }
-      return {
-        ...msg,
-        reactionTotals: message.reactionTotals,
-        userReactions
-      }
-    }
-    return msg
-  })
 }
 
 export function updateMessageStatusOnMap(channelId: string, newMarkers: { name: string; markersMap: any }) {
@@ -505,6 +456,7 @@ export function getMessagesFromMap(channelId: string) {
 
 export function removeMessagesFromMap(channelId: string) {
   delete messagesMap[channelId]
+  delete loadedSegmentsMap[channelId]
 }
 
 export function removeMessageFromMap(channelId: string, messageId: string) {
@@ -533,6 +485,8 @@ export function getMessageFromPendingMessagesMap(channelId: string, messageId: s
 
 export function clearMessagesMap() {
   messagesMap = {}
+  loadedSegmentsMap = {}
+  clearActiveSegment()
 }
 
 export function checkChannelExistsOnMessagesMap(channelId: string) {
@@ -584,7 +538,6 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
     })
   }
   removeMessageFromMap(channelId, message.id || message.tid!)
-  removeMessageFromAllMessages(message.id || message.tid!)
 }
 
 export const getPendingMessages = (channelId: string) => {

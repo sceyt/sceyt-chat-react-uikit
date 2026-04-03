@@ -33,6 +33,7 @@ interface ISystemMessageProps {
   borderRadius?: string
   tabIsActive?: boolean
   setLastVisibleMessageId?: (messageId: string) => void
+  disableAutoReadTracking?: boolean
 }
 
 const Message = ({
@@ -48,7 +49,8 @@ const Message = ({
   backgroundColor,
   borderRadius,
   contactsMap,
-  setLastVisibleMessageId
+  setLastVisibleMessageId,
+  disableAutoReadTracking = false
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
     useColor()
@@ -88,7 +90,9 @@ const Message = ({
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message.id)
       }
-      handleSendReadMarker()
+      if (!disableAutoReadTracking) {
+        handleSendReadMarker()
+      }
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
       }
@@ -102,19 +106,19 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible, unreadScrollTo])
+  }, [isVisible, unreadScrollTo, disableAutoReadTracking])
 
   useDidUpdate(() => {
-    if (tabIsActive) {
+    if (tabIsActive && !disableAutoReadTracking) {
       handleSendReadMarker()
     }
-  }, [tabIsActive])
+  }, [tabIsActive, disableAutoReadTracking])
 
   useDidUpdate(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !disableAutoReadTracking) {
       handleSendReadMarker()
     }
-  }, [connectionStatus])
+  }, [connectionStatus, disableAutoReadTracking])
 
   return (
     <Container
@@ -215,7 +219,6 @@ export const Container = styled.div<{
   text-align: center;
   z-index: 10;
   background: transparent;
-  transition: all 0.2s ease-in-out;
   span {
     display: inline-block;
     max-width: 380px;

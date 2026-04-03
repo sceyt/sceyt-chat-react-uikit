@@ -5,7 +5,10 @@ import {
   EDIT_MESSAGE,
   FORWARD_MESSAGE,
   GET_MESSAGE,
-  GET_MESSAGES,
+  LOAD_LATEST_MESSAGES,
+  LOAD_AROUND_MESSAGE,
+  LOAD_NEAR_UNREAD,
+  LOAD_DEFAULT_MESSAGES,
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
@@ -157,28 +160,45 @@ export function setMessageToEditAC(message: IMessage | null) {
   return setMessageToEdit({ message })
 }
 
-export function getMessagesAC(
+export function loadLatestMessagesAC(
   channel: IChannel,
-  loadWithLastMessage?: boolean,
   messageId?: string,
-  limit?: number,
-  highlight = true,
+  highlight?: boolean,
   behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage: boolean = true,
-  networkChanged: boolean = false
+  scrollToMessage?: boolean,
+  networkChanged?: boolean
 ) {
   return {
-    type: GET_MESSAGES,
-    payload: {
-      channel,
-      loadWithLastMessage,
-      messageId,
-      limit,
-      highlight,
-      behavior,
-      scrollToMessage,
-      networkChanged
-    }
+    type: LOAD_LATEST_MESSAGES,
+    payload: { channel, messageId, highlight, behavior, scrollToMessage, networkChanged }
+  }
+}
+
+export function loadAroundMessageAC(
+  channel: IChannel,
+  messageId: string,
+  highlight?: boolean,
+  behavior?: 'smooth' | 'instant' | 'auto',
+  scrollToMessage?: boolean,
+  networkChanged?: boolean
+) {
+  return {
+    type: LOAD_AROUND_MESSAGE,
+    payload: { channel, messageId, highlight, behavior, scrollToMessage, networkChanged }
+  }
+}
+
+export function loadNearUnreadAC(channel: IChannel) {
+  return {
+    type: LOAD_NEAR_UNREAD,
+    payload: { channel }
+  }
+}
+
+export function loadDefaultMessagesAC(channel: IChannel) {
+  return {
+    type: LOAD_DEFAULT_MESSAGES,
+    payload: { channel }
   }
 }
 

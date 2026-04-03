@@ -52,7 +52,7 @@ import {
 import VideoPlayer from '../../../components/VideoPlayer'
 import { CircularProgressbar } from 'react-circular-progressbar'
 import ForwardMessagePopup from '../forwardMessage'
-import { deletePendingMessage, getAllMessages } from '../../../helpers/messagesHalper'
+import { deletePendingMessage, getMessagesFromMap } from '../../../helpers/messagesHalper'
 import { getChannelFromMap } from '../../../helpers/channelHalper'
 import ConfirmPopup from '../delete'
 import { IAttachmentProperties } from '../../../components/Message/Message.types'
@@ -176,7 +176,9 @@ const SliderPopup = ({
   const handleForwardMessage = useCallback(
     async (channelIds: string[]) => {
       try {
-        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        let message = Object.values(getMessagesFromMap(channel.id) || {}).find(
+          (message) => message.id === currentFile.messageId
+        )
         if (!message) {
           let channelInstance = getChannelFromMap(channel.id)
           if (!channelInstance) {
@@ -209,7 +211,9 @@ const SliderPopup = ({
   const handleToggleDeleteMessagePopup = useCallback(async () => {
     if (!messageToDelete) {
       try {
-        let message = getAllMessages().find((message) => message.id === currentFile.messageId)
+        let message = Object.values(getMessagesFromMap(channel.id) || {}).find(
+          (message) => message.id === currentFile.messageId
+        )
         if (!message) {
           let channelInstance = getChannelFromMap(channel.id)
           if (!channelInstance) {

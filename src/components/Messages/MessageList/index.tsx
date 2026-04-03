@@ -1,25 +1,22 @@
 import styled from 'styled-components'
-import React, { useRef, useEffect, useState, FC, useCallback } from 'react'
+import React, { useCallback, useEffect, useState, FC } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useDispatch, useSelector } from 'store/hooks'
-import moment from 'moment'
 // Store
+import { setUnreadMessageIdAC } from '../../../store/message/actions'
 import {
-  clearSelectedMessagesAC,
-  getMessagesAC,
-  loadMoreMessagesAC,
-  scrollToNewMessageAC,
-  setScrollToMessagesAC,
-  showScrollToNewMessageButtonAC,
-  setUnreadScrollToAC,
-  setUnreadMessageIdAC
-} from '../../../store/message/actions'
+  getChannelMentionsAC,
+  markMessagesAsReadAC,
+  setDraggedAttachmentsAC,
+  updateChannelDataAC
+} from '../../../store/channel/actions'
 import {
   activeChannelMessagesSelector,
   messagesHasNextSelector,
   messagesHasPrevSelector,
   messagesLoadingState,
   openedMessageMenuSelector,
+  sendMessageInputHeightSelector,
   scrollToMentionedMessageSelector,
   scrollToMessageHighlightSelector,
   scrollToMessageBehaviorSelector,
@@ -30,30 +27,14 @@ import {
   unreadScrollToSelector,
   unreadMessageIdSelector
 } from '../../../store/message/selector'
-import { setDraggedAttachmentsAC } from '../../../store/channel/actions'
 import { activeChannelSelector, isDraggingSelector } from '../../../store/channel/selector'
 import { browserTabIsActiveSelector, connectionStatusSelector, contactsMapSelector } from '../../../store/user/selector'
-import { CONNECTION_STATUS } from '../../../store/user/constants'
 // Hooks
 import { useColor } from '../../../hooks'
 // Assets
 import { ReactComponent as ChooseFileIcon } from '../../../assets/svg/choseFile.svg'
 import { ReactComponent as ChooseMediaIcon } from '../../../assets/svg/choseMedia.svg'
 import { ReactComponent as NoMessagesIcon } from '../../../assets/svg/noMessagesIcon.svg'
-// Helpers
-import {
-  clearMessagesMap,
-  clearVisibleMessagesMap,
-  getHasNextCached,
-  getHasPrevCached,
-  getVisibleMessagesMap,
-  LOAD_MAX_MESSAGE_COUNT,
-  MESSAGE_LOAD_DIRECTION,
-  removeAllMessages,
-  setHasNextCached,
-  setHasPrevCached
-} from '../../../helpers/messagesHalper'
-import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import {
   IAttachment,
@@ -68,7 +49,7 @@ import {
   IListItemStyles,
   OGMetadataProps
 } from '../../../types'
-import { LOADING_STATE } from '../../../helpers/constants'
+import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 // Components
 import MessageDivider from '../../MessageDivider'
 import SliderPopup from '../../../common/popups/sliderPopup'
@@ -77,61 +58,10 @@ import Message from '../../Message'
 import { IAttachmentProperties, IMessageStyles } from '../../Message/Message.types'
 import { HiddenMessageProperty, MESSAGE_TYPE } from 'types/enum'
 import { getClient } from 'common/client'
-
-const CreateMessageDateDivider = ({
-  lastIndex,
-  currentMessageDate,
-  nextMessageDate,
-  messagesHasNext,
-  dateDividerFontSize,
-  dateDividerTextColor,
-  dateDividerBorder,
-  dateDividerBackgroundColor,
-  dateDividerBorderRadius,
-  noMargin,
-  marginBottom,
-  marginTop,
-  chatBackgroundColor
-}: {
-  lastIndex: boolean
-  currentMessageDate: Date
-  nextMessageDate: Date
-  messagesHasNext: boolean
-  dateDividerFontSize?: string
-  dateDividerTextColor?: string
-  dateDividerBorder?: string
-  dateDividerBackgroundColor?: string
-  dateDividerBorderRadius?: string
-  noMargin?: boolean
-  marginBottom?: string
-  marginTop?: string
-  chatBackgroundColor?: string
-}) => {
-  const today = moment().endOf('day')
-  const current = moment(currentMessageDate).endOf('day')
-  const differentDays = !(nextMessageDate && current.diff(moment(nextMessageDate).endOf('day'), 'days') === 0)
-  let dividerText = ''
-  if (differentDays && !today.diff(current, 'days')) {
-    dividerText = 'Today'
-  } else if (differentDays) {
-    dividerText = moment().year() === moment(current).year() ? current.format('MMMM D') : current.format('MMMM D YYYY')
-  }
-  return !differentDays ? null : (
-    <MessageDivider
-      dividerText={dividerText}
-      visibility={messagesHasNext && lastIndex}
-      dateDividerFontSize={dateDividerFontSize}
-      dateDividerTextColor={dateDividerTextColor}
-      dateDividerBorder={dateDividerBorder}
-      dateDividerBackgroundColor={dateDividerBackgroundColor}
-      dateDividerBorderRadius={dateDividerBorderRadius}
-      noMargin={noMargin}
-      marginBottom={marginBottom}
-      marginTop={marginTop}
-      chatBackgroundColor={chatBackgroundColor}
-    />
-  )
-}
+import { useChatController } from './useChatController'
+import ScrollToBottomButton from './ScrollToBottomButton'
+import ScrollToUnreadMentionsButton from './ScrollToUnreadMentionsButton'
+import { registerMessageListNavigator, unregisterMessageListNavigator } from '../../../helpers/messageListNavigator'
 
 interface MessagesProps {
   fontFamily?: string
@@ -486,13 +416,13 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.SURFACE_1]: surface1,
     [THEME_COLORS.BACKGROUND]: background,
-    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
-    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.TEXT_SECONDARY]: textSecondary,
     [THEME_COLORS.SURFACE_2]: surface2,
     [THEME_COLORS.BORDER]: border,
-    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX
+    [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
+    [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
+    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground
   } = useColor()
 
   const ChatClient = getClient()
@@ -500,9 +430,9 @@ const MessageList: React.FC<MessagesProps> = ({
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
-  const [scrollIntoView, setScrollIntoView] = useState(false)
   const contactsMap: IContactsMap = useSelector(contactsMapSelector, shallowEqual)
   const connectionStatus = useSelector(connectionStatusSelector, shallowEqual)
+  const sendMessageInputHeight: number = useSelector(sendMessageInputHeightSelector)
   const openedMessageMenuId = useSelector(openedMessageMenuSelector, shallowEqual)
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
@@ -521,237 +451,141 @@ const MessageList: React.FC<MessagesProps> = ({
   const unreadMessageId = useSelector(unreadMessageIdSelector, shallowEqual)
   const [mediaFile, setMediaFile] = useState<any>(null)
   const [isDragging, setIsDragging] = useState<any>(null)
-  const [showTopDate, setShowTopDate] = useState<any>(null)
   const [stopScrolling, setStopScrolling] = useState<any>(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
-  const hideTopDateTimeout = useRef<any>(null)
+  const [stickyDate, setStickyDate] = useState<string>('')
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
-  const lastVisibleMessageIdRef = useRef<string>('')
-  const [scrollToReply, setScrollToReply] = useState<any>(null)
-  const [previousScrollTop, setPreviousScrollTop] = useState(0)
-  const [shouldPreserveScroll, setShouldPreserveScroll] = useState(false)
-  const messageForReply: any = {}
-  const attachmentsSelected = false
-  const [topDateLabel, setTopDateLabel] = useState<string>('')
-  const scrollRef = useRef<any>(null)
-  // Refs replacing former module-scope mutable state
-  const loadFromServerRef = useRef<boolean>(false)
-  const loadDirectionRef = useRef<string>('')
-  const nextDisableRef = useRef<boolean>(false)
-  const prevDisableRef = useRef<boolean>(false)
-  const scrollToBottomRef = useRef<boolean>(false)
-  const shouldLoadMessagesRef = useRef<'next' | 'prev' | ''>('')
-  const loadingRef = useRef<boolean>(false)
-  const messagesIndexMapRef = useRef<Record<string, number>>({})
-  const scrollRafRef = useRef<number | null>(null)
-  const preserveScrollRafRef = useRef<number | null>(null)
-  const loadingMessagesTimeoutRef = useRef<any>(null)
-  const renderTopDate = () => {
-    const container = scrollRef.current
-    if (!container) return
-    const dateLabels: NodeListOf<HTMLElement> = container.querySelectorAll('.divider')
-    let text = ''
-    for (let i = dateLabels.length - 1; i >= 0; i--) {
-      const dateLabel = dateLabels[i]
-      // If scroll position is around the divider itself, hide the fixed top date label
-      const aroundThreshold = 40
-      const labelTop = dateLabel.offsetTop - 28
-      const labelBottom = labelTop + (dateLabel.offsetHeight || 0) - 28
-      if (container.scrollTop >= labelTop - aroundThreshold && container.scrollTop <= labelBottom + aroundThreshold) {
-        setShowTopDate(false)
-        break
-      }
-      if (!text && container.scrollTop > labelTop - 28) {
-        const span = dateLabel?.firstChild && ((dateLabel.firstChild as HTMLElement).firstChild as HTMLElement)
-        text = span ? span.innerText || '' : ''
-        if (text !== topDateLabel) {
-          setTopDateLabel(text)
-        }
-        break
-      }
-    }
-  }
 
-  // @ts-ignore
-  const handleMessagesListScroll = useCallback(async () => {
-    const target = scrollRef.current
-    const messageBox = document.getElementById('messageBox')
-    if (!target || !messageBox) return
-    if (scrollToMentionedMessage) {
-      if (target.scrollTop <= -50 || channel.lastMessage.id !== messages[messages.length - 1].id) {
-        dispatch(showScrollToNewMessageButtonAC(true))
-      } else {
-        dispatch(showScrollToNewMessageButtonAC(false))
-      }
-      return
-    }
-    if (!showTopDate) {
-      setShowTopDate(true)
-    }
-    clearTimeout(hideTopDateTimeout.current)
-    // hideTopDateTimeout.current = setTimeout(() => {
-    //   setShowTopDate(false)
-    // }, 1000)
-    renderTopDate()
-    let forceLoadPrevMessages = false
-    if (-target.scrollTop + target.offsetHeight + 300 > messageBox.scrollHeight) {
-      forceLoadPrevMessages = true
-    }
-    if (unreadScrollTo) {
-      return
-    }
-    if (
-      target.scrollTop === 0 &&
-      scrollToNewMessage.scrollToBottom &&
-      scrollToNewMessage.updateMessageList &&
-      messagesLoading !== LOADING_STATE.LOADING &&
-      channel?.id
-    ) {
-      dispatch(getMessagesAC(channel, true))
-    }
-    if (target.scrollTop <= -50) {
-      if (!showScrollToNewMessageButton) {
-        dispatch(showScrollToNewMessageButtonAC(true))
-      }
-    } else {
-      if (showScrollToNewMessageButton) {
-        dispatch(showScrollToNewMessageButtonAC(false))
-      }
-      // Reset pagination guards when user is at the bottom so they are not stuck
-      nextDisableRef.current = false
-      prevDisableRef.current = false
-    }
-    if (scrollToReply) {
-      target.scrollTop = scrollToReply
-      return
-    }
-    const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
-    const hasIndex = typeof currentIndex === 'number'
-    if ((hasIndex && currentIndex < 10) || forceLoadPrevMessages) {
-      if (connectionStatus === CONNECTION_STATUS.CONNECTED && !scrollToNewMessage.scrollToBottom && hasPrevMessages) {
-        if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || prevDisableRef.current) {
-          shouldLoadMessagesRef.current = 'prev'
-        } else {
-          if (shouldLoadMessagesRef.current === 'prev') {
-            shouldLoadMessagesRef.current = ''
-          }
-          loadDirectionRef.current = 'prev'
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-          if (!getHasPrevCached()) {
-            loadFromServerRef.current = true
-          }
-          nextDisableRef.current = true
-        }
-      }
-    }
-    if ((hasIndex && currentIndex >= messages.length - 10) || target.scrollTop > -300) {
-      if (
-        connectionStatus === CONNECTION_STATUS.CONNECTED &&
-        !scrollToNewMessage.scrollToBottom &&
-        (hasNextMessages || getHasNextCached())
-      ) {
-        if (loadingRef.current || messagesLoading === LOADING_STATE.LOADING || nextDisableRef.current) {
-          shouldLoadMessagesRef.current = 'next'
-        } else {
-          if (shouldLoadMessagesRef.current === 'next') {
-            shouldLoadMessagesRef.current = ''
-          }
-          loadDirectionRef.current = 'next'
-          prevDisableRef.current = true
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-        }
-      }
-    }
-    if (hasIndex && currentIndex > messages.length - 10) {
-      nextDisableRef.current = false
-    }
-  }, [
-    channel?.lastMessage?.id,
+  const {
+    scrollRef,
+    setLastVisibleMessageId,
+    handleScrollToRepliedMessage,
+    messagesIndexMapRef,
+    timelineItems,
+    pendingNewestCount,
+    jumpToLatest,
+    jumpToItem
+  } = useChatController({
     messages,
-    scrollToMentionedMessage,
-    scrollToNewMessage,
-    messagesLoading,
+    channel,
     hasPrevMessages,
     hasNextMessages,
-    lastVisibleMessageIdRef,
+    messagesLoading,
     connectionStatus,
-    getHasPrevCached,
-    getHasNextCached,
-    scrollToReply,
+    scrollToNewMessage,
+    scrollToMentionedMessage,
+    scrollToRepliedMessageId: scrollToRepliedMessage,
+    scrollToMessageHighlight,
+    scrollToMessageBehavior,
     showScrollToNewMessageButton,
-    showTopDate
-  ])
+    unreadScrollTo,
+    unreadMessageId,
+    selectedMessagesMap,
+    allowEditDeleteIncomingMessage,
+    dispatch
+  })
 
-  const onScroll = useCallback(() => {
-    if (scrollRafRef.current !== null) return
-    scrollRafRef.current = window.requestAnimationFrame(() => {
-      scrollRafRef.current = null
-      handleMessagesListScroll()
-    })
-  }, [handleMessagesListScroll])
-
-  useEffect(() => {
-    return () => {
-      if (scrollRafRef.current !== null) {
-        cancelAnimationFrame(scrollRafRef.current)
-        scrollRafRef.current = null
+  const updateStickyDate = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) return
+    const containerRect = container.getBoundingClientRect()
+    const dividers = Array.from(container.querySelectorAll<HTMLElement>('[data-date-label]'))
+    const STICKY_ZONE = 40
+    let currentDate = ''
+    let closestTop = -Infinity
+    for (const el of dividers) {
+      const rect = el.getBoundingClientRect()
+      const distFromTop = rect.top - containerRect.top
+      const inFlowEl = el.querySelector<HTMLElement>('.divider')
+      const wasInZone = inFlowEl?.dataset.stickyZone === '1'
+      // Hysteresis: enter zone at STICKY_ZONE, only exit when STICKY_ZONE + 16px away
+      // Prevents rapid blinking when the divider hovers near the boundary (e.g. at history edge)
+      const inZone = wasInZone ? distFromTop <= STICKY_ZONE + 16 : distFromTop <= STICKY_ZONE
+      // Fade the in-flow divider with a CSS transition (only update when zone status changes)
+      if (inFlowEl) {
+        if (inZone !== wasInZone) {
+          inFlowEl.dataset.stickyZone = inZone ? '1' : '0'
+          inFlowEl.style.transition = 'opacity 0.2s ease'
+          inFlowEl.style.opacity = inZone ? '0' : '1'
+        }
       }
-      if (preserveScrollRafRef.current !== null) {
-        cancelAnimationFrame(preserveScrollRafRef.current)
-        preserveScrollRafRef.current = null
+      // Sticky label tracks whichever divider is deepest inside the zone (highest rect.top)
+      if (inZone && rect.top >= closestTop) {
+        closestTop = rect.top
+        currentDate = el.getAttribute('data-date-label') || ''
       }
     }
+    setStickyDate((prev) => (prev !== currentDate ? currentDate : prev))
   }, [])
 
-  const handleScrollToRepliedMessage = async (messageId: string) => {
-    const idx = messages.findIndex((msg: IMessage) => msg.id === messageId)
-    prevDisableRef.current = true
-    nextDisableRef.current = true
-    if (idx >= 10) {
-      const repliedMessage = document.getElementById(messageId)
-      if (repliedMessage) {
-        scrollRef.current.scrollTo({
-          top: repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2,
-          behavior: 'smooth'
-        })
-        repliedMessage.classList.add('highlight')
-        const positiveValue =
-          repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2 < 0
-            ? repliedMessage.offsetTop - scrollRef.current.offsetHeight * -1
-            : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
-        setTimeout(
-          () => {
-            repliedMessage.classList.remove('highlight')
-            prevDisableRef.current = false
-            nextDisableRef.current = false
-          },
-          1000 + positiveValue * 0.1
-        )
-      }
-    } else if (channel?.id) {
-      dispatch(getMessagesAC(channel, undefined, messageId, undefined, true, 'smooth', true))
-    }
-  }
+  useEffect(() => {
+    const container = scrollRef.current
+    if (!container) return
+    container.addEventListener('scroll', updateStickyDate, { passive: true })
+    return () => container.removeEventListener('scroll', updateStickyDate)
+  }, [updateStickyDate])
 
-  const handleLoadMoreMessages = (direction: string, limit: number) => {
-    if (scrollToMentionedMessage || scrollToNewMessage.scrollToBottom) {
+  useEffect(() => {
+    updateStickyDate()
+  }, [messages, updateStickyDate])
+
+  const handleScrollToBottom = () => {
+    if (!channel?.lastMessage?.id) {
       return
     }
-    const lastMessageId = messages.length && messages[messages.length - 1].id
-    const firstMessageId = messages.length && messages[0].id
-    const hasPrevCached = getHasPrevCached()
-    const hasNextCached = getHasNextCached()
-    if (messagesLoading === LOADING_STATE.LOADED && connectionStatus === CONNECTION_STATUS.CONNECTED) {
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV && firstMessageId && (hasPrevMessages || hasPrevCached)) {
-        loadingRef.current = true
-        dispatch(loadMoreMessagesAC(channel.id, limit, direction, firstMessageId, hasPrevMessages))
-      } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && lastMessageId && (hasNextMessages || hasNextCached)) {
-        loadingRef.current = true
-        dispatch(loadMoreMessagesAC(channel.id, limit, direction, lastMessageId, hasNextMessages))
-      }
+
+    if (channel.lastMessage.user.id !== user.id) {
+      dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
     }
+
+    jumpToLatest(true)
   }
+
+  const isMessageRead = useCallback(
+    (messageId: string) => {
+      const message = messages.find((msg: any) => msg.id === messageId)
+      return message?.userMarkers?.some((marker: any) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
+    },
+    [messages]
+  )
+
+  const handleScrollToMentions = useCallback(
+    (mentionIds: string[]) => {
+      if (!channel?.id || !mentionIds.length) {
+        return
+      }
+
+      const nextUnreadMentionId = mentionIds.find((mentionId) => !isMessageRead(mentionId))
+      if (!nextUnreadMentionId) {
+        dispatch(updateChannelDataAC(channel.id, { mentionsIds: [] }))
+        return
+      }
+
+      const remainingMentionIds = mentionIds.filter((mentionId) => mentionId !== nextUnreadMentionId)
+      handleScrollToRepliedMessage(nextUnreadMentionId)
+      dispatch(markMessagesAsReadAC(channel.id, [nextUnreadMentionId]))
+      dispatch(updateChannelDataAC(channel.id, { mentionsIds: remainingMentionIds }))
+
+      if (channel.newMentionCount >= 3 && remainingMentionIds.length < 3) {
+        dispatch(getChannelMentionsAC(channel.id))
+      }
+    },
+    [channel?.id, channel.newMentionCount, dispatch, handleScrollToRepliedMessage, isMessageRead]
+  )
+
+  const pendingLatestCount = pendingNewestCount || channel.newMessageCount || 0
+
+  useEffect(() => {
+    registerMessageListNavigator(jumpToItem)
+    return () => unregisterMessageListNavigator()
+  }, [jumpToItem])
+
+  useEffect(() => {
+    if (channel.newMentionCount && (!channel.mentionsIds || channel.mentionsIds.length < 3)) {
+      dispatch(getChannelMentionsAC(channel.id))
+    }
+  }, [channel.id, channel.mentionsIds, channel.newMentionCount, dispatch])
 
   const handleDragIn = (e: React.DragEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -854,93 +688,6 @@ const MessageList: React.FC<MessagesProps> = ({
   }
 
   useEffect(() => {
-    if (
-      messages.length > 0 &&
-      messages[messages.length - 1]?.id === channel.lastMessage?.id &&
-      scrollRef.current &&
-      scrollRef.current.scrollTop > -50 &&
-      !showScrollToNewMessageButton
-    ) {
-      dispatch(showScrollToNewMessageButtonAC(false))
-      prevDisableRef.current = false
-    }
-  }, [messages, channel?.lastMessage?.id, scrollRef?.current?.scrollTop, showScrollToNewMessageButton])
-
-  useEffect(() => {
-    if (scrollToRepliedMessage) {
-      loadingRef.current = false
-      scrollRef.current.style.scrollBehavior = 'inherit'
-      dispatch(setScrollToMessagesAC(null))
-      // Defer calculation and scroll so the DOM has fully rendered the new message
-      // window before we read offsetTop and set scroll position.
-      const repliedMessage = document.getElementById(scrollToRepliedMessage)
-      if (repliedMessage) {
-        // Use the same centering formula as the in-window handler so the message
-        // is centered in the viewport rather than using a fixed 200px offset.
-        const targetTop = channel.backToLinkedChannel
-          ? repliedMessage.offsetTop
-          : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
-        setScrollToReply(targetTop)
-        // Disable pagination BEFORE changing scrollTop. Setting scrollTop=0 fires a
-        // synchronous scroll event; React state (scrollToReply) isn't set yet so the
-        // scroll handler's guard won't block it. Refs are synchronous and will block
-        // PREV/NEXT loads immediately.
-        prevDisableRef.current = true
-        nextDisableRef.current = true
-        // The new message window may start with the scroll at the top (oldest messages visible).
-        // Snap to the bottom (scrollTop=0 = newest) first so the smooth animation always
-        // travels bottom→top (from newer toward the older replied message), not top→bottom.
-        scrollRef.current.scrollTo({
-          top: targetTop,
-          behavior: scrollToMessageBehavior
-        })
-        scrollRef.current.style.scrollBehavior = scrollToMessageBehavior
-        if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
-          repliedMessage.classList.add('highlight')
-        }
-        const positiveValue =
-          repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2 < 0
-            ? repliedMessage.offsetTop - scrollRef.current.offsetHeight * -1
-            : repliedMessage.offsetTop - scrollRef.current.offsetHeight / 2
-        setTimeout(
-          () => {
-            if (!channel.backToLinkedChannel && scrollToMessageHighlight) {
-              const el = document.getElementById(scrollToRepliedMessage)
-              el && el.classList.remove('highlight')
-            }
-            prevDisableRef.current = false
-            nextDisableRef.current = false
-            // Discard any deferred pagination that was queued while refs were locked.
-            shouldLoadMessagesRef.current = ''
-            setScrollToReply(null)
-            scrollRef.current.style.scrollBehavior = 'instant'
-          },
-          1000 + positiveValue * 0.1
-        )
-      }
-    }
-  }, [scrollToRepliedMessage])
-
-  useEffect(() => {
-    if (scrollToNewMessage.scrollToBottom) {
-      if (scrollToNewMessage.isIncomingMessage) {
-        if (scrollRef.current.scrollTop > -100) {
-          scrollRef.current.scrollTo({
-            top: 0,
-            behavior: 'smooth'
-          })
-        }
-      } else {
-        scrollRef.current.scrollTo({
-          top: 0,
-          behavior: 'smooth'
-        })
-        dispatch(showScrollToNewMessageButtonAC(false))
-      }
-    }
-  }, [scrollToNewMessage])
-
-  useEffect(() => {
     if (!mediaFile && isDragging) {
       setIsDragging(false)
     }
@@ -953,54 +700,8 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [draggingSelector])
 
   useEffect(() => {
-    setHasNextCached(false)
-    setHasPrevCached(false)
-    // reset per-channel scroll flags and indexes
-    messagesIndexMapRef.current = {}
-    loadFromServerRef.current = false
-    loadDirectionRef.current = ''
-    nextDisableRef.current = false
-    prevDisableRef.current = false
-    shouldLoadMessagesRef.current = ''
-    loadingRef.current = false
-    if (channel.backToLinkedChannel && channel?.id) {
-      const visibleMessages = getVisibleMessagesMap()
-      const visibleMessagesIds = Object.keys(visibleMessages)
-      const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
-      dispatch(getMessagesAC(channel, undefined, messageId, undefined, undefined, 'instant'))
-      dispatch(setUnreadMessageIdAC(messageId))
-    } else {
-      if (!channel.isLinkedChannel) {
-        clearVisibleMessagesMap()
-      }
-      if (channel && channel?.id) {
-        dispatch(getMessagesAC(channel, undefined, undefined, undefined, true))
-      }
-      if (channel.id) {
-        if (channel.newMessageCount && channel.newMessageCount > 0) {
-          dispatch(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
-        } else {
-          dispatch(setUnreadMessageIdAC(''))
-        }
-      }
-    }
     setMediaFile(null)
-    if (selectedMessagesMap && selectedMessagesMap.size) {
-      dispatch(clearSelectedMessagesAC())
-    }
-    setPreviousScrollTop(0)
-    setShouldPreserveScroll(false)
-    nextDisableRef.current = false
-    prevDisableRef.current = false
-    scrollToBottomRef.current = true
-    setAllowEditDeleteIncomingMessage(allowEditDeleteIncomingMessage)
   }, [channel.id])
-
-  useEffect(() => {
-    if (!isDragging) {
-      renderTopDate()
-    }
-  }, [isDragging])
 
   useEffect(() => {
     if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage)) {
@@ -1011,249 +712,193 @@ const MessageList: React.FC<MessagesProps> = ({
     }
   }, [messages, hiddenMessagesProperties, user?.id])
 
-  useEffect(() => {
-    // Only run scroll preservation and restoration when a pagination load is actively in progress
-    // AND the user has not expressed intent to scroll to the bottom (e.g. after sending a message).
-    // If we allowed restoration while scrollToBottom is true, the anchor-scroll would override
-    // the send-scroll intent and show an old position instead of the latest messages.
-    const isPaginating = loadingRef.current && loadDirectionRef.current !== ''
-    const isSendScrollToBottom = scrollToNewMessage.scrollToBottom && !scrollToNewMessage.isIncomingMessage
-    const shouldRestore = isPaginating && !isSendScrollToBottom
-    if (shouldRestore && scrollRef.current) {
-      const isAtBottom = scrollRef.current.scrollTop > -50
-      if (!isAtBottom) {
-        setPreviousScrollTop(scrollRef.current.scrollTop)
-        setShouldPreserveScroll(true)
-      }
+  const renderTimelineMessage = ({
+    message,
+    prevMessage,
+    nextMessage,
+    index,
+    isUnreadMessage,
+    isHighlighted
+  }: {
+    message: IMessage
+    prevMessage: IMessage | null
+    nextMessage: IMessage | null
+    index: number
+    isUnreadMessage: boolean
+    isHighlighted: boolean
+  }) => {
+    messagesIndexMapRef.current[message.id] = index
+
+    if (message.type === MESSAGE_TYPE.SYSTEM) {
+      return (
+        <SystemMessage
+          key={message.id || message.tid}
+          channel={channel}
+          message={message}
+          nextMessage={nextMessage as IMessage}
+          connectionStatus={connectionStatus}
+          differentUserMessageSpacing={differentUserMessageSpacing}
+          tabIsActive={browserTabIsActive}
+          contactsMap={contactsMap}
+          fontSize={dateDividerFontSize}
+          textColor={dateDividerTextColor}
+          border={dateDividerBorder}
+          backgroundColor={dateDividerBackgroundColor}
+          borderRadius={dateDividerBorderRadius}
+          setLastVisibleMessageId={setLastVisibleMessageId}
+          disableAutoReadTracking
+        />
+      )
     }
 
-    if (shouldRestore) {
-      if (loadDirectionRef.current !== 'next') {
-        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageIdRef.current)
-        if (lastVisibleMessage) {
-          scrollRef.current.style.scrollBehavior = 'inherit'
-          scrollRef.current.scrollTop = lastVisibleMessage.offsetTop
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }
-        if (loadFromServerRef.current) {
-          const timeout = setTimeout(() => {
-            loadingRef.current = false
-            loadFromServerRef.current = false
-            nextDisableRef.current = false
-            const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
-            if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
-              handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-            }
-            if (
-              shouldLoadMessagesRef.current === 'next' &&
-              typeof currentIndex === 'number' &&
-              currentIndex > messages.length - 15
-            ) {
-              handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-            }
-          }, 50)
-          if (loadingMessagesTimeoutRef.current) {
-            clearTimeout(loadingMessagesTimeoutRef.current)
-          }
-          loadingMessagesTimeoutRef.current = timeout
-        } else {
-          loadingRef.current = false
-          if (shouldLoadMessagesRef.current === 'prev') {
-            handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-            shouldLoadMessagesRef.current = ''
-          }
-          if (shouldLoadMessagesRef.current === 'next') {
-            handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-            shouldLoadMessagesRef.current = ''
-          }
-        }
-      } else {
-        const lastVisibleMessage: any = document.getElementById(lastVisibleMessageIdRef.current)
-        if (lastVisibleMessage) {
-          scrollRef.current.style.scrollBehavior = 'inherit'
-          scrollRef.current.scrollTop =
-            lastVisibleMessage.offsetTop - scrollRef.current.offsetHeight + lastVisibleMessage.offsetHeight
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }
-        loadingRef.current = false
-        prevDisableRef.current = false
-        if (shouldLoadMessagesRef.current === 'prev') {
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessagesRef.current = ''
-        }
-        if (shouldLoadMessagesRef.current === 'next') {
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessagesRef.current = ''
-        }
-      }
-    }
-
-    renderTopDate()
-    if (scrollToBottomRef.current) {
-      if (channel.backToLinkedChannel) {
-        dispatch(scrollToNewMessageAC(false))
-      } else {
-        dispatch(scrollToNewMessageAC(true))
-      }
-      scrollToBottomRef.current = false
-    }
-
-    if (shouldPreserveScroll && scrollRef.current && previousScrollTop > 0) {
-      if (preserveScrollRafRef.current !== null) {
-        cancelAnimationFrame(preserveScrollRafRef.current)
-      }
-      preserveScrollRafRef.current = requestAnimationFrame(() => {
-        preserveScrollRafRef.current = null
-        if (scrollRef.current) {
-          scrollRef.current.style.scrollBehavior = 'inherit'
-          scrollRef.current.scrollTop = previousScrollTop
-          scrollRef.current.style.scrollBehavior = 'smooth'
-        }
-        setShouldPreserveScroll(false)
-        setPreviousScrollTop(0)
-      })
-    }
-    return () => {
-      if (loadingMessagesTimeoutRef.current) {
-        clearTimeout(loadingMessagesTimeoutRef.current)
-      }
-    }
-  }, [messages])
-
-  useEffect(() => {
-    if (messagesLoading === LOADING_STATE.LOADED) {
-      // If a pagination load finished while the user had sent a message (scrollToBottom is active)
-      // and the window does NOT contain the channel's latest message, jump to the latest now.
-      // We check the window directly instead of relying on hasNextMessages because a PREV load
-      // can slice the newest messages off the end of the window while hasNextMessages stays false.
-      const windowHasLatest = messages.length > 0 && messages[messages.length - 1]?.id === channel?.lastMessage?.id
-      if (
-        scrollToNewMessage.scrollToBottom &&
-        !scrollToNewMessage.isIncomingMessage &&
-        !windowHasLatest &&
-        connectionStatus === CONNECTION_STATUS.CONNECTED &&
-        channel?.id
-      ) {
-        dispatch(getMessagesAC(channel, true))
-      }
-      const timeout = setTimeout(() => {
-        loadingRef.current = false
-        loadFromServerRef.current = false
-        loadDirectionRef.current = ''
-        nextDisableRef.current = false
-        prevDisableRef.current = false
-        const currentIndex = messagesIndexMapRef.current[lastVisibleMessageIdRef.current]
-        if (shouldLoadMessagesRef.current === 'prev' && typeof currentIndex === 'number' && currentIndex < 15) {
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.PREV, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessagesRef.current = ''
-        }
-        if (
-          shouldLoadMessagesRef.current === 'next' &&
-          typeof currentIndex === 'number' &&
-          currentIndex > messages.length - 15
-        ) {
-          handleLoadMoreMessages(MESSAGE_LOAD_DIRECTION.NEXT, LOAD_MAX_MESSAGE_COUNT)
-          shouldLoadMessagesRef.current = ''
-        }
-      }, 50)
-      if (loadingMessagesTimeoutRef.current) {
-        clearTimeout(loadingMessagesTimeoutRef.current)
-      }
-      loadingMessagesTimeoutRef.current = timeout
-    }
-    return () => {
-      if (loadingMessagesTimeoutRef.current) {
-        clearTimeout(loadingMessagesTimeoutRef.current)
-      }
-    }
-  }, [
-    messagesLoading,
-    messages,
-    lastVisibleMessageIdRef,
-    scrollToNewMessage,
-    hasNextMessages,
-    connectionStatus,
-    channel?.id
-  ])
-
-  useEffect(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED && channel?.id) {
-      loadingRef.current = false
-      prevDisableRef.current = false
-      nextDisableRef.current = false
-      clearMessagesMap()
-      removeAllMessages()
-      const isWithLastVisibleMessageId =
-        lastVisibleMessageIdRef.current !== channel.lastMessage?.id && lastVisibleMessageIdRef.current
-          ? lastVisibleMessageIdRef.current
-          : ''
-      dispatch(getMessagesAC(channel, false, isWithLastVisibleMessageId, 0, false, 'instant', false, true))
-    }
-  }, [connectionStatus])
-
-  useEffect(() => {
-    if (channel.newMessageCount && channel.newMessageCount > 0 && unreadScrollTo) {
-      const scrollElement = document.getElementById('scrollableDiv')
-      if (scrollElement) {
-        scrollElement.style.scrollBehavior = 'inherit'
-      }
-      setScrollIntoView(true)
-      let lastReadMessageNode: any = document.getElementById(channel.lastDisplayedMessageId) || null
-      let newLastDisplayedMessageId = channel.lastDisplayedMessageId
-      if (!lastReadMessageNode && channel.lastDisplayedMessageId && channel.lastDisplayedMessageId !== '0') {
-        for (let index = 0; index < messages.length; index++) {
-          const message = messages[index]
-          if (
-            channel.lastDisplayedMessageId >= message.id &&
-            (messages.length < index + 2 || channel.lastDisplayedMessageId <= messages[index + 1].id)
-          ) {
-            newLastDisplayedMessageId = message.id
-            lastReadMessageNode = document.getElementById(newLastDisplayedMessageId)
-            break
-          }
-        }
-      } else if (
-        !lastReadMessageNode &&
-        (!channel.lastDisplayedMessageId || channel.lastDisplayedMessageId === '0') &&
-        messages?.length
-      ) {
-        newLastDisplayedMessageId = messages[0].id
-        lastReadMessageNode = document.getElementById(newLastDisplayedMessageId)
-      }
-
-      if (lastReadMessageNode && scrollElement) {
-        dispatch(scrollToNewMessageAC(false))
-        scrollElement.scrollTo({
-          top: lastReadMessageNode.offsetTop - 200,
-          behavior: 'auto'
-        })
-        setTimeout(() => {
-          dispatch(setUnreadScrollToAC(false))
-          setScrollIntoView(false)
-        }, 100)
-      }
-    } else {
-      dispatch(setUnreadScrollToAC(false))
-      setScrollIntoView(false)
-    }
-  }, [
-    channel.id,
-    channel.newMessageCount,
-    scrollRef.current,
-    unreadScrollTo,
-    channel.lastDisplayedMessageId,
-    scrollIntoView,
-    messages.length
-  ])
-
-  // Cleanup hideTopDate timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (hideTopDateTimeout.current) {
-        clearTimeout(hideTopDateTimeout.current)
-      }
-    }
-  }, [])
+    return (
+      <MessageWrapper
+        key={message.id || message.tid}
+        id={message.id}
+        className={`${(message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''} ${
+          isHighlighted ? 'highlight' : ''
+        }`.trim()}
+        highlightBg={incomingMessageBackgroundX}
+      >
+        <Message
+          message={message}
+          channel={channel}
+          stopScrolling={setStopScrolling}
+          handleMediaItemClick={(attachment) => attachment?.id && setMediaFile(attachment)}
+          handleScrollToRepliedMessage={handleScrollToRepliedMessage}
+          prevMessage={prevMessage as IMessage}
+          nextMessage={nextMessage as IMessage}
+          isUnreadMessage={isUnreadMessage}
+          unreadMessageId={unreadMessageId}
+          setLastVisibleMessageId={setLastVisibleMessageId}
+          isThreadMessage={false}
+          disableAutoReadTracking
+          fontFamily={fontFamily}
+          ownMessageOnRightSide={ownMessageOnRightSide}
+          messageWidthPercent={messageWidthPercent}
+          messageStatusAndTimePosition={messageStatusAndTimePosition}
+          messageStatusDisplayingType={messageStatusDisplayingType}
+          outgoingMessageStyles={outgoingMessageStyles}
+          ownRepliedMessageBackground={ownRepliedMessageBackground}
+          incomingMessageStyles={incomingMessageStyles}
+          incomingRepliedMessageBackground={incomingRepliedMessageBackground}
+          showMessageStatus={showMessageStatus}
+          showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
+          showMessageTime={showMessageTime}
+          showMessageStatusForEachMessage={showMessageStatusForEachMessage}
+          showMessageTimeForEachMessage={showMessageTimeForEachMessage}
+          hoverBackground={hoverBackground}
+          showOwnAvatar={showOwnAvatar}
+          showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
+          showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
+          showSenderNameOnGroupChannel={showSenderNameOnGroupChannel}
+          MessageActionsMenu={MessageActionsMenu}
+          CustomMessageItem={CustomMessageItem}
+          messageReaction={messageReaction}
+          editMessage={editMessage}
+          copyMessage={copyMessage}
+          replyMessage={replyMessage}
+          replyMessageInThread={replyMessageInThread}
+          deleteMessage={deleteMessage}
+          selectMessage={selectMessage}
+          showInfoMessage={showInfoMessage}
+          allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
+          reportMessage={reportMessage}
+          reactionIcon={reactionIcon}
+          editIcon={editIcon}
+          copyIcon={copyIcon}
+          replyIcon={replyIcon}
+          replyInThreadIcon={replyInThreadIcon}
+          forwardIcon={forwardIcon}
+          deleteIcon={deleteIcon}
+          selectIcon={selectIcon}
+          retractVoteIcon={retractVoteIcon}
+          endVoteIcon={endVoteIcon}
+          forwardMessage={forwardMessage}
+          starIcon={starIcon}
+          staredIcon={staredIcon}
+          reportIcon={reportIcon}
+          reactionIconOrder={reactionIconOrder}
+          openFrequentlyUsedReactions={openFrequentlyUsedReactions}
+          emojisCategoryIconsPosition={emojisCategoryIconsPosition}
+          emojisContainerBorderRadius={emojisContainerBorderRadius}
+          fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
+          editIconOrder={editIconOrder}
+          copyIconOrder={copyIconOrder}
+          replyIconOrder={replyIconOrder}
+          replyInThreadIconOrder={replyInThreadIconOrder}
+          forwardIconOrder={forwardIconOrder}
+          deleteIconOrder={deleteIconOrder}
+          infoIconOrder={infoIconOrder}
+          selectIconOrder={selectIconOrder}
+          starIconOrder={starIconOrder}
+          reportIconOrder={reportIconOrder}
+          reactionIconTooltipText={reactionIconTooltipText}
+          editIconTooltipText={editIconTooltipText}
+          copyIconTooltipText={copyIconTooltipText}
+          replyIconTooltipText={replyIconTooltipText}
+          replyInThreadIconTooltipText={replyInThreadIconTooltipText}
+          forwardIconTooltipText={forwardIconTooltipText}
+          deleteIconTooltipText={deleteIconTooltipText}
+          infoIconTooltipText={infoIconTooltipText}
+          selectIconTooltipText={selectIconTooltipText}
+          starIconTooltipText={starIconTooltipText}
+          reportIconTooltipText={reportIconTooltipText}
+          messageActionIconsColor={messageActionIconsColor}
+          inlineReactionIcon={inlineReactionIcon}
+          fileAttachmentsIcon={fileAttachmentsIcon}
+          fileAttachmentsBoxWidth={fileAttachmentsBoxWidth}
+          fileAttachmentsBoxBackground={fileAttachmentsBoxBackground}
+          fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
+          fileAttachmentsTitleColor={fileAttachmentsTitleColor}
+          fileAttachmentsSizeColor={fileAttachmentsSizeColor}
+          imageAttachmentMaxWidth={imageAttachmentMaxWidth}
+          imageAttachmentMaxHeight={imageAttachmentMaxHeight}
+          videoAttachmentMaxWidth={videoAttachmentMaxWidth}
+          videoAttachmentMaxHeight={videoAttachmentMaxHeight}
+          reactionsDisplayCount={reactionsDisplayCount}
+          showEachReactionCount={showEachReactionCount}
+          showTotalReactionCount={showTotalReactionCount}
+          reactionItemBorder={reactionItemBorder}
+          reactionItemBorderRadius={reactionItemBorderRadius}
+          reactionItemBackground={reactionItemBackground}
+          reactionItemPadding={reactionItemPadding}
+          reactionItemMargin={reactionItemMargin}
+          reactionsFontSize={reactionsFontSize}
+          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
+          reactionsContainerBorder={reactionsContainerBorder}
+          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
+          reactionsContainerPadding={reactionsContainerPadding}
+          reactionsContainerBackground={reactionsContainerBackground}
+          reactionsContainerTopPosition={reactionsContainerTopPosition}
+          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+          sameUserMessageSpacing={sameUserMessageSpacing}
+          differentUserMessageSpacing={differentUserMessageSpacing}
+          selectedMessagesMap={selectedMessagesMap}
+          contactsMap={contactsMap}
+          connectionStatus={connectionStatus}
+          openedMessageMenuId={openedMessageMenuId}
+          tabIsActive={browserTabIsActive}
+          messageTextFontSize={messageTextFontSize}
+          messageTextLineHeight={messageTextLineHeight}
+          messageStatusSize={messageStatusSize}
+          messageStatusColor={messageStatusColor}
+          messageReadStatusColor={messageReadStatusColor}
+          messageStateFontSize={messageStateFontSize}
+          messageStateColor={messageStateColor}
+          messageTimeFontSize={messageTimeFontSize}
+          messageTimeColor={messageTimeColor}
+          messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
+          shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
+          showInfoMessageProps={showInfoMessageProps}
+          ogMetadataProps={ogMetadataProps}
+          collapsedCharacterLimit={collapsedCharacterLimit}
+          createChatOnAvatarTap={createChatOnAvatarTap}
+        />
+      </MessageWrapper>
+    )
+  }
 
   return (
     <React.Fragment>
@@ -1262,8 +907,8 @@ const MessageList: React.FC<MessagesProps> = ({
           id='draggingContainer'
           draggable
           onDragLeave={handleDragOut}
-          topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
-          height={scrollRef && scrollRef.current && scrollRef.current.offsetHeight}
+          topOffset={scrollRef.current?.offsetTop}
+          height={scrollRef.current?.offsetHeight}
           backgroundColor={backgroundColor || background}
         >
           {/* {isDragging === 'media' ? ( */}
@@ -1301,33 +946,15 @@ const MessageList: React.FC<MessagesProps> = ({
               Drag & drop to send as media
             </DropAttachmentArea>
           )}
-          {/* </React.Fragment> */}
-          {/* ) : ( */}
-          {/*  <div>File</div> */}
-          {/* )} */}
         </DragAndDropContainer>
       )}
       <React.Fragment>
-        {showTopFixedDate && topDateLabel && (
-          <MessageTopDate
-            visible={showTopDate}
-            dateDividerFontSize={dateDividerFontSize}
-            dateDividerTextColor={dateDividerTextColor || textOnPrimary}
-            dateDividerBorder={dateDividerBorder}
-            dateDividerBackgroundColor={dateDividerBackgroundColor || overlayBackground}
-            dateDividerBorderRadius={dateDividerBorderRadius}
-            topOffset={scrollRef && scrollRef.current && scrollRef.current.offsetTop}
-          >
-            <span>{topDateLabel}</span>
-          </MessageTopDate>
-        )}
         {/* {!hideMessages && ( */}
         <Container
           id='scrollableDiv'
           className={isScrolling ? 'show-scrollbar' : ''}
           ref={scrollRef}
           stopScrolling={stopScrolling}
-          onScroll={onScroll}
           onMouseEnter={() => setIsScrolling(true)}
           onMouseLeave={() => setIsScrolling(false)}
           onDragEnter={handleDragIn}
@@ -1335,210 +962,29 @@ const MessageList: React.FC<MessagesProps> = ({
           thumbColor={surface2}
         >
           {messages.length && messages.length > 0 ? (
-            <MessagesBox
-              enableResetScrollToCoords={false}
-              replyMessage={messageForReply && messageForReply.id}
-              attachmentsSelected={attachmentsSelected}
-              className='messageBox'
-              id='messageBox'
-            >
-              {messages.map((message: any, index: number) => {
-                const prevMessage = messages[index - 1]
-                const nextMessage = messages[index + 1]
-                const isUnreadMessage =
-                  !!(unreadMessageId && unreadMessageId === message.id && nextMessage) && !channel.backToLinkedChannel
-                messagesIndexMapRef.current[message.id] = index
-                return (
-                  <React.Fragment key={message.id || message.tid}>
-                    <CreateMessageDateDivider
-                      // lastIndex={index === 0}
-                      noMargin={
-                        !isUnreadMessage &&
-                        prevMessage &&
-                        prevMessage.type === MESSAGE_TYPE.SYSTEM &&
-                        message.type !== MESSAGE_TYPE.SYSTEM
-                      }
-                      lastIndex={false}
-                      currentMessageDate={message.createdAt}
-                      nextMessageDate={prevMessage && prevMessage.createdAt}
-                      messagesHasNext={hasPrevMessages}
-                      dateDividerFontSize={dateDividerFontSize}
-                      dateDividerTextColor={dateDividerTextColor}
-                      dateDividerBorder={dateDividerBorder}
-                      dateDividerBackgroundColor={dateDividerBackgroundColor}
-                      chatBackgroundColor={backgroundColor || themeBackgroundColor}
-                      dateDividerBorderRadius={dateDividerBorderRadius}
-                      marginBottom={
-                        prevMessage && prevMessage.type === MESSAGE_TYPE.SYSTEM && message.type !== MESSAGE_TYPE.SYSTEM
-                          ? '16px'
-                          : '0'
-                      }
-                      marginTop={differentUserMessageSpacing}
-                    />
-                    {message.type === MESSAGE_TYPE.SYSTEM ? (
-                      <SystemMessage
-                        key={message.id || message.tid}
-                        channel={channel}
-                        message={message}
-                        nextMessage={nextMessage}
-                        connectionStatus={connectionStatus}
-                        differentUserMessageSpacing={differentUserMessageSpacing}
-                        tabIsActive={browserTabIsActive}
-                        contactsMap={contactsMap}
-                        fontSize={dateDividerFontSize}
-                        textColor={dateDividerTextColor}
-                        border={dateDividerBorder}
-                        backgroundColor={dateDividerBackgroundColor}
-                        borderRadius={dateDividerBorderRadius}
-                        setLastVisibleMessageId={(msgId) => (lastVisibleMessageIdRef.current = msgId)}
+            <MessagesBox className='messageBox' id='messageBox'>
+              {timelineItems.map((timelineItem, index) => {
+                if (timelineItem.type === 'date-divider') {
+                  return (
+                    <div key={timelineItem.key} data-date-label={timelineItem.label}>
+                      <MessageDivider
+                        index={index}
+                        dividerText={timelineItem.label}
+                        dateDividerFontSize={dateDividerFontSize}
+                        dateDividerTextColor={dateDividerTextColor}
+                        dateDividerBorder={dateDividerBorder}
+                        dateDividerBackgroundColor={dateDividerBackgroundColor}
+                        dateDividerBorderRadius={dateDividerBorderRadius}
+                        marginTop={differentUserMessageSpacing}
+                        chatBackgroundColor={backgroundColor || themeBackgroundColor}
                       />
-                    ) : (
-                      <MessageWrapper
-                        key={message.id || message.tid}
-                        id={message.id}
-                        className={
-                          (message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''
-                        }
-                        highlightBg={incomingMessageBackgroundX}
-                      >
-                        <Message
-                          message={message}
-                          channel={channel}
-                          stopScrolling={setStopScrolling}
-                          handleMediaItemClick={(attachment) => attachment?.id && setMediaFile(attachment)}
-                          handleScrollToRepliedMessage={handleScrollToRepliedMessage}
-                          prevMessage={prevMessage}
-                          nextMessage={nextMessage}
-                          isUnreadMessage={isUnreadMessage}
-                          unreadMessageId={unreadMessageId}
-                          setLastVisibleMessageId={(msgId) => (lastVisibleMessageIdRef.current = msgId)}
-                          isThreadMessage={false}
-                          fontFamily={fontFamily}
-                          ownMessageOnRightSide={ownMessageOnRightSide}
-                          messageWidthPercent={messageWidthPercent}
-                          messageStatusAndTimePosition={messageStatusAndTimePosition}
-                          messageStatusDisplayingType={messageStatusDisplayingType}
-                          outgoingMessageStyles={outgoingMessageStyles}
-                          ownRepliedMessageBackground={ownRepliedMessageBackground}
-                          incomingMessageStyles={incomingMessageStyles}
-                          incomingRepliedMessageBackground={incomingRepliedMessageBackground}
-                          showMessageStatus={showMessageStatus}
-                          showMessageTimeAndStatusOnlyOnHover={showMessageTimeAndStatusOnlyOnHover}
-                          showMessageTime={showMessageTime}
-                          showMessageStatusForEachMessage={showMessageStatusForEachMessage}
-                          showMessageTimeForEachMessage={showMessageTimeForEachMessage}
-                          hoverBackground={hoverBackground}
-                          showOwnAvatar={showOwnAvatar}
-                          showSenderNameOnDirectChannel={showSenderNameOnDirectChannel}
-                          showSenderNameOnOwnMessages={showSenderNameOnOwnMessages}
-                          showSenderNameOnGroupChannel={showSenderNameOnGroupChannel}
-                          MessageActionsMenu={MessageActionsMenu}
-                          CustomMessageItem={CustomMessageItem}
-                          messageReaction={messageReaction}
-                          editMessage={editMessage}
-                          copyMessage={copyMessage}
-                          replyMessage={replyMessage}
-                          replyMessageInThread={replyMessageInThread}
-                          deleteMessage={deleteMessage}
-                          selectMessage={selectMessage}
-                          showInfoMessage={showInfoMessage}
-                          allowEditDeleteIncomingMessage={allowEditDeleteIncomingMessage}
-                          reportMessage={reportMessage}
-                          reactionIcon={reactionIcon}
-                          editIcon={editIcon}
-                          copyIcon={copyIcon}
-                          replyIcon={replyIcon}
-                          replyInThreadIcon={replyInThreadIcon}
-                          forwardIcon={forwardIcon}
-                          deleteIcon={deleteIcon}
-                          selectIcon={selectIcon}
-                          retractVoteIcon={retractVoteIcon}
-                          endVoteIcon={endVoteIcon}
-                          forwardMessage={forwardMessage}
-                          starIcon={starIcon}
-                          staredIcon={staredIcon}
-                          reportIcon={reportIcon}
-                          reactionIconOrder={reactionIconOrder}
-                          openFrequentlyUsedReactions={openFrequentlyUsedReactions}
-                          emojisCategoryIconsPosition={emojisCategoryIconsPosition}
-                          emojisContainerBorderRadius={emojisContainerBorderRadius}
-                          fixEmojiCategoriesTitleOnTop={fixEmojiCategoriesTitleOnTop}
-                          editIconOrder={editIconOrder}
-                          copyIconOrder={copyIconOrder}
-                          replyIconOrder={replyIconOrder}
-                          replyInThreadIconOrder={replyInThreadIconOrder}
-                          forwardIconOrder={forwardIconOrder}
-                          deleteIconOrder={deleteIconOrder}
-                          infoIconOrder={infoIconOrder}
-                          selectIconOrder={selectIconOrder}
-                          starIconOrder={starIconOrder}
-                          reportIconOrder={reportIconOrder}
-                          reactionIconTooltipText={reactionIconTooltipText}
-                          editIconTooltipText={editIconTooltipText}
-                          copyIconTooltipText={copyIconTooltipText}
-                          replyIconTooltipText={replyIconTooltipText}
-                          replyInThreadIconTooltipText={replyInThreadIconTooltipText}
-                          forwardIconTooltipText={forwardIconTooltipText}
-                          deleteIconTooltipText={deleteIconTooltipText}
-                          infoIconTooltipText={infoIconTooltipText}
-                          selectIconTooltipText={selectIconTooltipText}
-                          starIconTooltipText={starIconTooltipText}
-                          reportIconTooltipText={reportIconTooltipText}
-                          messageActionIconsColor={messageActionIconsColor}
-                          inlineReactionIcon={inlineReactionIcon}
-                          fileAttachmentsIcon={fileAttachmentsIcon}
-                          fileAttachmentsBoxWidth={fileAttachmentsBoxWidth}
-                          fileAttachmentsBoxBackground={fileAttachmentsBoxBackground}
-                          fileAttachmentsBoxBorder={fileAttachmentsBoxBorder}
-                          fileAttachmentsTitleColor={fileAttachmentsTitleColor}
-                          fileAttachmentsSizeColor={fileAttachmentsSizeColor}
-                          imageAttachmentMaxWidth={imageAttachmentMaxWidth}
-                          imageAttachmentMaxHeight={imageAttachmentMaxHeight}
-                          videoAttachmentMaxWidth={videoAttachmentMaxWidth}
-                          videoAttachmentMaxHeight={videoAttachmentMaxHeight}
-                          reactionsDisplayCount={reactionsDisplayCount}
-                          showEachReactionCount={showEachReactionCount}
-                          showTotalReactionCount={showTotalReactionCount}
-                          reactionItemBorder={reactionItemBorder}
-                          reactionItemBorderRadius={reactionItemBorderRadius}
-                          reactionItemBackground={reactionItemBackground}
-                          reactionItemPadding={reactionItemPadding}
-                          reactionItemMargin={reactionItemMargin}
-                          reactionsFontSize={reactionsFontSize}
-                          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
-                          reactionsContainerBorder={reactionsContainerBorder}
-                          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
-                          reactionsContainerPadding={reactionsContainerPadding}
-                          reactionsContainerBackground={reactionsContainerBackground}
-                          reactionsContainerTopPosition={reactionsContainerTopPosition}
-                          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
-                          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
-                          sameUserMessageSpacing={sameUserMessageSpacing}
-                          differentUserMessageSpacing={differentUserMessageSpacing}
-                          selectedMessagesMap={selectedMessagesMap}
-                          contactsMap={contactsMap}
-                          connectionStatus={connectionStatus}
-                          openedMessageMenuId={openedMessageMenuId}
-                          tabIsActive={browserTabIsActive}
-                          messageTextFontSize={messageTextFontSize}
-                          messageTextLineHeight={messageTextLineHeight}
-                          messageStatusSize={messageStatusSize}
-                          messageStatusColor={messageStatusColor}
-                          messageReadStatusColor={messageReadStatusColor}
-                          messageStateFontSize={messageStateFontSize}
-                          messageStateColor={messageStateColor}
-                          messageTimeFontSize={messageTimeFontSize}
-                          messageTimeColor={messageTimeColor}
-                          messageStatusAndTimeLineHeight={messageStatusAndTimeLineHeight}
-                          shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
-                          showInfoMessageProps={showInfoMessageProps}
-                          ogMetadataProps={ogMetadataProps}
-                          collapsedCharacterLimit={collapsedCharacterLimit}
-                          createChatOnAvatarTap={createChatOnAvatarTap}
-                        />
-                      </MessageWrapper>
-                    )}
-                    {isUnreadMessage ? (
+                    </div>
+                  )
+                }
+
+                if (timelineItem.type === 'unread-divider') {
+                  return (
+                    <div data-message-list-unread-divider='true' key={timelineItem.key}>
                       <MessageDivider
                         newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
                         newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
@@ -1549,13 +995,28 @@ const MessageList: React.FC<MessagesProps> = ({
                         newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
                         newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
                         dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                        marginTop={message.type === MESSAGE_TYPE.SYSTEM ? '0px' : ''}
-                        marginBottom={message.type === MESSAGE_TYPE.SYSTEM ? '16px' : '0'}
                         chatBackgroundColor={backgroundColor || themeBackgroundColor}
                         unread
                       />
-                    ) : null}
-                  </React.Fragment>
+                    </div>
+                  )
+                }
+
+                return (
+                  <div
+                    data-message-list-item-id={timelineItem.item.id}
+                    key={timelineItem.key}
+                    ref={timelineItem.registerItemElement}
+                  >
+                    {renderTimelineMessage({
+                      message: timelineItem.item,
+                      prevMessage: timelineItem.prevItem,
+                      nextMessage: timelineItem.nextItem,
+                      index: timelineItem.index,
+                      isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
+                      isHighlighted: timelineItem.isHighlighted
+                    })}
+                  </div>
                 )
               })}
             </MessagesBox>
@@ -1573,6 +1034,16 @@ const MessageList: React.FC<MessagesProps> = ({
               </NoMessagesContainer>
             )
           )}
+          {showTopFixedDate && stickyDate && (
+            <StickyDateLabel
+              dateDividerFontSize={dateDividerFontSize}
+              dateDividerTextColor={dateDividerTextColor || textOnPrimary}
+              dateDividerBackgroundColor={dateDividerBackgroundColor || overlayBackground}
+              dateDividerBorderRadius={dateDividerBorderRadius}
+            >
+              <span>{stickyDate}</span>
+            </StickyDateLabel>
+          )}
           {attachmentsPreview?.show && mediaFile && (
             <SliderPopup
               channel={channel}
@@ -1582,6 +1053,23 @@ const MessageList: React.FC<MessagesProps> = ({
             />
           )}
         </Container>
+        <ScrollToBottomButton
+          show={!!showScrollToNewMessageButton && messages?.length}
+          bottomOffset={sendMessageInputHeight}
+          backgroundColor={surface1}
+          badgeBackgroundColor={accentColor}
+          count={pendingLatestCount}
+          onClick={handleScrollToBottom}
+        />
+        <ScrollToUnreadMentionsButton
+          show={!!channel.newMentionCount && messages?.length}
+          bottomOffset={sendMessageInputHeight}
+          backgroundColor={surface1}
+          badgeBackgroundColor={accentColor}
+          count={channel.newMentionCount || 0}
+          stackedAbove={!!showScrollToNewMessageButton}
+          onClick={() => handleScrollToMentions(channel.mentionsIds || [])}
+        />
       </React.Fragment>
 
       {/* // )} */}
@@ -1592,22 +1080,13 @@ const MessageList: React.FC<MessagesProps> = ({
 
 export default MessageList
 
-interface MessageBoxProps {
-  readonly enableResetScrollToCoords: boolean
-  readonly replyMessage: boolean | string
-  readonly attachmentsSelected: boolean
-}
-
 export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string; thumbColor: string }>`
   display: flex;
-  flex-direction: column-reverse;
-  flex-grow: 1;
-  position: relative;
-  overflow: scroll;
-  scroll-behavior: smooth;
-  will-change: left, top;
+  flex-direction: column;
+  transform: scaleY(-1);
   background-color: ${(props) => props.backgroundColor};
-  overflow-x: hidden;
+  overflow-y: overlay;
+  overscroll-behavior-y: contain;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -1625,62 +1104,42 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
     background: transparent;
   }
 `
-export const EmptyDiv = styled.div`
-  height: 300px;
-`
 
-const MessagesBox = styled.div<MessageBoxProps>`
-  //height: auto;
+const MessagesBox = styled.div`
   display: flex;
-  //flex-direction: column-reverse;
   flex-direction: column;
-  padding-bottom: 20px;
-  //overflow: auto;
-  //scroll-behavior: unset;
+  padding-top: 40px;
+  padding-bottom: 40px;
+  width: 100%;
+  transform: scaleY(-1);
+  backface-visibility: hidden;
 `
 
-export const MessageTopDate = styled.div<{
-  topOffset?: number
-  marginTop?: string
-  marginBottom?: string
-  visible?: boolean
+const StickyDateLabel = styled.div<{
   dateDividerFontSize?: string
   dateDividerTextColor?: string
   dateDividerBackgroundColor?: string
-  dateDividerBorder?: string
   dateDividerBorderRadius?: string
 }>`
-  position: absolute;
-  justify-content: center;
-  width: 100%;
-  top: ${(props) => (props.topOffset ? `${props.topOffset + 22}px` : '22px')};
-  left: 0;
-  margin-top: ${(props) => props.marginTop};
-  margin-bottom: ${(props) => props.marginBottom};
-  text-align: center;
+  position: sticky;
+  bottom: 28px;
+  height: 0;
   z-index: 10;
-  background: transparent;
-  opacity: ${(props) => (props.visible ? '1' : '0')};
-  transition: all 0.2s ease-in-out;
-  width: calc(100% - 8px);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  pointer-events: none;
+  transform: scaleY(-1);
 
   span {
     display: inline-block;
-    max-width: 380px;
-    font-style: normal;
-    font-weight: normal;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
     color: ${(props) => props.dateDividerTextColor};
-    background-color: ${(props) => `${props.dateDividerBackgroundColor}66`};
-    border: ${(props) => props.dateDividerBorder};
+    background-color: ${(props) =>
+      props.dateDividerBackgroundColor ? `${props.dateDividerBackgroundColor}99` : 'rgba(0,0,0,0.3)'};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;
-    box-shadow:
-      0 0 2px rgba(0, 0, 0, 0.08),
-      0 2px 24px rgba(0, 0, 0, 0.08);
-    text-overflow: ellipsis;
-    overflow: hidden;
   }
 `
 
@@ -1756,8 +1215,6 @@ export const DropAttachmentArea = styled.div<{
 export const MessageWrapper = styled.div<{ highlightBg: string }>`
   &.highlight {
     & .message_item {
-      padding-top: 4px;
-      padding-bottom: 4px;
       background-color: ${(props) => props.highlightBg || '#d5d5d5'};
     }
   }
@@ -1770,6 +1227,7 @@ export const NoMessagesContainer = styled.div<{ color: string }>`
   flex-direction: column;
   height: 100%;
   width: 100%;
+  transform: scaleY(-1);
   font-weight: 400;
   font-size: 15px;
   line-height: 18px;

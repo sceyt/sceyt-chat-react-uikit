@@ -82,6 +82,7 @@ const Message = ({
   isUnreadMessage,
   unreadMessageId,
   isThreadMessage,
+  disableAutoReadTracking = false,
   fontFamily,
   ownMessageOnRightSide,
   messageWidthPercent,
@@ -568,7 +569,9 @@ const Message = ({
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message.id)
       }
-      handleSendReadMarker()
+      if (!disableAutoReadTracking) {
+        handleSendReadMarker()
+      }
       if (!channel.isLinkedChannel) {
         setMessageToVisibleMessagesMap(message)
       }
@@ -588,6 +591,7 @@ const Message = ({
     setLastVisibleMessageId,
     message.id,
     handleSendReadMarker,
+    disableAutoReadTracking,
     channel.isLinkedChannel,
     channel.lastMessage?.id,
     scrollToNewMessage.scrollToBottom,
@@ -602,16 +606,16 @@ const Message = ({
   }, [isVisible, infoPopupOpen])
 
   useDidUpdate(() => {
-    if (tabIsActive) {
+    if (tabIsActive && !disableAutoReadTracking) {
       handleSendReadMarker()
     }
-  }, [tabIsActive])
+  }, [tabIsActive, disableAutoReadTracking])
 
   useDidUpdate(() => {
-    if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
+    if (connectionStatus === CONNECTION_STATUS.CONNECTED && !disableAutoReadTracking) {
       handleSendReadMarker()
     }
-  }, [connectionStatus])
+  }, [connectionStatus, disableAutoReadTracking])
 
   useEffect(() => {
     if (emojisPopupOpen) {
@@ -937,11 +941,6 @@ const Message = ({
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
-        {message.replyCount && message.replyCount > 0 && !isThreadMessage && (
-          <ThreadMessageCountContainer color={accentColor} onClick={() => handleReplyMessage(true)}>
-            {`${message.replyCount} replies`}
-          </ThreadMessageCountContainer>
-        )}
         <MessageReactions
           message={message}
           reactionsCount={reactionsCount}
@@ -1034,28 +1033,6 @@ export default React.memo(Message, (prevProps, nextProps) => {
   return true
 })
 
-const ThreadMessageCountContainer = styled.div<{ color: string }>`
-  position: relative;
-  color: ${(props) => props.color};
-  font-weight: 500;
-  font-size: 13px;
-  line-height: 15px;
-  margin: 12px;
-  cursor: pointer;
-
-  &::before {
-    content: '';
-    position: absolute;
-    left: -25px;
-    top: -21px;
-    width: 16px;
-    height: 26px;
-    border-left: 2px solid #cdcdcf;
-    border-bottom: 2px solid #cdcdcf;
-    border-radius: 0 0 0 14px;
-  }
-`
-
 const FailedMessageIcon = styled.div<{ rtl?: boolean }>`
   position: absolute;
   top: -6px;
@@ -1098,7 +1075,6 @@ const MessageContent = styled.div<{
   position: relative;
   margin-left: ${(props: any) => props.withAvatar && '13px'};
   margin-right: ${(props) => props.withAvatar && '13px'};
-  //transform: ${(props) => !props.withAvatar && (props.rtl ? 'translate(-32px,0)  ' : 'translate(32px,0)')};
   max-width: ${(props) => (props.messageWidthPercent ? `${props.messageWidthPercent}%` : '100%')};
 
   display: flex;
@@ -1125,13 +1101,10 @@ const MessageItem = styled.div<{
   padding-left: ${(props) =>
     !props.withAvatar && !props.rtl && `calc(4% + ${props.selectMessagesIsActive ? '84px' : '32px'})`};
   padding-right: ${(props) => !props.withAvatar && props.rtl && `calc(4% + ${props.showOwnAvatar ? '32px' : '0'})`};
-  //transition: all 0.2s;
   width: 100%;
   box-sizing: border-box;
-  transition: padding-left 0.2s;
   cursor: ${(props) => props.selectMessagesIsActive && 'pointer'};
-  ${(props) => props.rtl && 'direction: rtl;'};
-  ${(props) => (props.transition ? 'transition: all 0.2s ease-in-out;' : '')}
+  ${(props) => props.rtl && 'justify-content: flex-end;'};
   &:hover {
     background-color: ${(props) => props.hoverBackground || ''};
   }

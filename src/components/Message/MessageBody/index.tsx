@@ -1,5 +1,5 @@
 import styled from 'styled-components'
-import React, { FC, useMemo, useState, useEffect, useRef } from 'react'
+import React, { FC, useMemo, useState } from 'react'
 import moment from 'moment'
 // Hooks
 import { useColor } from 'hooks'
@@ -324,8 +324,6 @@ const MessageBody = ({
   const getFromContacts = getShowOnlyContactUsers()
   const messageUserID = message.user ? message.user.id : 'deleted'
   const [isExpanded, setIsExpanded] = useState(false)
-  const textContainerRef = useRef<HTMLDivElement>(null)
-  const [textHeight, setTextHeight] = useState<number | 'auto'>('auto')
 
   const messageText = useMemo(() => {
     return MessageTextFormat({
@@ -388,28 +386,6 @@ const MessageBody = ({
     if (isExpanded) return { result: messageText, truncated: false }
     return trimReactMessage(messageText, collapsedCharacterLimit)
   }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
-
-  useEffect(() => {
-    if (textContainerRef.current && typeof collapsedCharacterLimit === 'number' && collapsedCharacterLimit >= 0) {
-      if (messageTextTrimmed.truncated && !isExpanded) {
-        requestAnimationFrame(() => {
-          if (textContainerRef.current) {
-            const height = textContainerRef.current.scrollHeight
-            setTextHeight(height)
-          }
-        })
-      } else if (isExpanded) {
-        requestAnimationFrame(() => {
-          if (textContainerRef.current) {
-            const fullHeight = textContainerRef.current.scrollHeight
-            setTextHeight(fullHeight)
-          }
-        })
-      } else if (!messageTextTrimmed.truncated && textHeight !== 'auto') {
-        setTextHeight('auto')
-      }
-    }
-  }, [isExpanded, messageTextTrimmed.truncated, textHeight, collapsedCharacterLimit])
 
   const prevMessageUserID = useMemo(
     () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
@@ -499,7 +475,7 @@ const MessageBody = ({
     }
     const attachment = message.attachments[0]
     const attachmentMetadata = isJSON(attachment?.metadata) ? JSON.parse(attachment.metadata) : attachment.metadata
-    if (attachmentMetadata && !attachmentMetadata?.hld) {
+    if (!attachmentMetadata || attachmentMetadata?.hld) {
       return false
     }
     return true
@@ -870,7 +846,7 @@ const MessageBody = ({
           />
         )}
         {message.type !== MESSAGE_TYPE.POLL && (
-          <TextContentContainer ref={textContainerRef} textHeight={textHeight}>
+          <TextContentContainer>
             {viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
               <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
                 {hasOpened ? (
@@ -1338,9 +1314,6 @@ const MessageBodyContainer = styled.div<{
           : props.incomingMessageStyles?.background === 'inherit'
             ? ' 0'
             : '8px 12px'};
-  //direction: ${(props) => (props.isSelfMessage ? 'initial' : '')};
-  //overflow: ${(props) => props.noBody && 'hidden'};
-  transition: all 0.3s;
   transform-origin: right;
 `
 
@@ -1362,10 +1335,8 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   z-index: 99;
 `
 
-const TextContentContainer = styled.div<{ textHeight: number | 'auto' }>`
+const TextContentContainer = styled.div`
   overflow: hidden;
-  height: ${(props) => (props.textHeight !== 'auto' ? `${props.textHeight}px` : 'auto')};
-  transition: height 0.3s ease-out;
 `
 
 const ReadMoreLink = styled.span<{ accentColor: string }>`

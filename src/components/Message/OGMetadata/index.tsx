@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { IAttachment, IOGMetadata } from '../../../types'
+import { IAttachment } from '../../../types'
 import styled from 'styled-components'
 import { attachmentTypes } from '../../../helpers/constants'
 import { useDispatch, useSelector } from '../../../store/hooks'
@@ -20,6 +20,9 @@ const loadFromMetadata = (firstAttachment: IAttachment | undefined) => {
   if (firstAttachment?.metadata && isJSON(firstAttachment.metadata)) {
     const compactMeta = JSON.parse(firstAttachment.metadata)
     // Convert compact format to full OG format
+    if (compactMeta?.hld) {
+      return false
+    }
     const fullMetadata: any = {
       og: {
         title: compactMeta.ttl,
@@ -168,7 +171,6 @@ const OGMetadata = ({
   target?: string
   isInviteLink?: boolean
   onClick?: () => void
-  metadataGetSuccessCallback?: (url: string, success: boolean, hasImage: boolean, metadata: IOGMetadata | null) => void
 }) => {
   const dispatch = useDispatch()
   const {
@@ -184,8 +186,6 @@ const OGMetadata = ({
   const metadata = useMemo(() => {
     return loadFromMetadata(attachment)
   }, [attachment])
-
-  const [shouldAnimate, setShouldAnimate] = useState(false)
 
   const [imageLoadError, setImageLoadError] = useState(false)
   const { src: cachedImageSrc, onImageLoad, onImageError } = useCachedOGImage(metadata?.og?.image?.[0]?.url)
@@ -221,6 +221,13 @@ const OGMetadata = ({
   const showOGMetadata = useMemo(() => {
     const descriptionIsSymbol = isDescriptionOnlySymbol(metadata?.og?.description)
     if (descriptionIsSymbol) {
+      return false
+    }
+
+    if (!metadata?.og?.title || !metadata?.og?.description) {
+      return false
+    }
+    if (!(metadata?.og?.image?.[0]?.url || metadata?.og?.favicon?.url)) {
       return false
     }
 
@@ -283,14 +290,12 @@ const OGMetadata = ({
                   showOGMetadata={!!showOGMetadata}
                   containerWidth={maxWidth}
                   containerHeight={calculatedImageHeight}
-                  shouldAnimate={shouldAnimate}
                   maxWidth={maxWidth}
                   maxHeight={maxHeight || calculatedImageHeight}
                 >
                   <Img
                     src={cachedImageSrc}
                     alt='OG image'
-                    shouldAnimate={shouldAnimate}
                     onLoad={onImageLoad}
                     onError={() => {
                       onImageError()
@@ -305,7 +310,7 @@ const OGMetadata = ({
           key: 'title',
           order: resolvedOrder?.title ?? 2,
           render: shouldShowTitle && (
-            <Title maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding} color={textPrimary}>
+            <Title maxWidth={maxWidth} padding={infoPadding} color={textPrimary}>
               <span>{metadata?.og?.title?.trim()}</span>
             </Title>
           )
@@ -314,7 +319,7 @@ const OGMetadata = ({
           key: 'description',
           order: resolvedOrder?.description ?? 3,
           render: shouldShowDescription && (
-            <Desc maxWidth={maxWidth} shouldAnimate={shouldAnimate} color={textSecondary} padding={infoPadding}>
+            <Desc maxWidth={maxWidth} color={textSecondary} padding={infoPadding}>
               {metadata?.og?.description?.trim()}
             </Desc>
           )
@@ -323,7 +328,7 @@ const OGMetadata = ({
           key: 'link',
           order: resolvedOrder?.link ?? 4,
           render: ogShowUrl && (
-            <Url maxWidth={maxWidth} shouldAnimate={shouldAnimate} padding={infoPadding}>
+            <Url maxWidth={maxWidth} padding={infoPadding}>
               {ogUrl}
             </Url>
           )
@@ -339,7 +344,6 @@ const OGMetadata = ({
       calculatedImageHeight,
       maxHeight,
       metadata?.og?.image,
-      shouldAnimate,
       shouldShowTitle,
       metadata?.og?.title,
       infoPadding,
@@ -353,7 +357,7 @@ const OGMetadata = ({
 
   const textContent = useMemo(
     () => (
-      <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
+      <OGText margin={ogContainerShowBackground}>
         {elements
           .filter((el) => el.key !== 'image')
           .map((el) => (
@@ -361,13 +365,13 @@ const OGMetadata = ({
           ))}
       </OGText>
     ),
-    [elements, shouldAnimate, ogContainerShowBackground]
+    [elements, ogContainerShowBackground]
   )
 
   const content = useMemo(
     () =>
       hasImage && metadata?.imageWidth > MIN_IMAGE_SIZE && metadata?.imageHeight > MIN_IMAGE_SIZE ? (
-        <OGText shouldAnimate={shouldAnimate} margin={ogContainerShowBackground}>
+        <OGText margin={ogContainerShowBackground}>
           {elements.map((el) => (
             <React.Fragment key={el.key}>{el.render}</React.Fragment>
           ))}
@@ -382,7 +386,7 @@ const OGMetadata = ({
       ) : (
         textContent
       ),
-    [hasImage, elements, shouldAnimate, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
+    [hasImage, elements, ogContainerShowBackground, ogShowFavicon, faviconUrl, textContent]
   )
 
   const getChannel = useCallback(() => {
@@ -392,12 +396,6 @@ const OGMetadata = ({
       dispatch(getChannelByInviteKeyAC(key))
     }
   }, [attachment?.url])
-
-  useEffect(() => {
-    if (!metadata) {
-      setShouldAnimate(true)
-    }
-  }, [metadata])
 
   // If we shouldn't show OG metadata, return null to render as default message
   if (!showOGMetadata) {
@@ -441,40 +439,6 @@ const OGMetadata = ({
 
 export { OGMetadata }
 
-// Shared keyframes to avoid duplication
-const sharedKeyframes = `
-  @keyframes fadeInSlideUp {
-    from {
-      opacity: 0;
-      transform: translateY(10px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
-  @keyframes fadeIn {
-    from {
-      opacity: 0;
-    }
-    to {
-      opacity: 1;
-    }
-  }
-
-  @keyframes expandHeight {
-    from {
-      max-height: 0;
-      opacity: 0;
-    }
-    to {
-      max-height: 1000px;
-      opacity: 1;
-    }
-  }
-`
-
 const OGMetadataContainer = styled.div<{
   showOGMetadata: boolean
   bgColor: string
@@ -506,40 +470,24 @@ const ImageContainer = styled.div<{
   showOGMetadata: boolean
   containerWidth: number
   containerHeight: number
-  shouldAnimate: boolean
   maxWidth: number
   maxHeight: number
 }>`
-  ${sharedKeyframes}
   width: 100%;
   height: ${({ containerHeight }) => (containerHeight ? `${containerHeight}px` : '0px')};
   opacity: ${({ showOGMetadata, containerHeight }) => (showOGMetadata && containerHeight ? 1 : 0)};
   margin: 0 auto;
   border-radius: 8px 8px 0 0;
   overflow: hidden;
-  ${({ shouldAnimate, showOGMetadata, containerHeight }) =>
-    shouldAnimate &&
-    showOGMetadata &&
-    containerHeight &&
-    `
-    animation: expandHeight 0.3s ease-out forwards;
-  `}
 `
 
-const OGText = styled.div<{ shouldAnimate: boolean; margin: boolean }>`
-  ${sharedKeyframes}
+const OGText = styled.div<{ margin: boolean }>`
   display: flex;
   flex-direction: column;
   gap: 0;
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    animation: fadeInSlideUp 0.3s ease-out forwards;
-  `}
 `
 
-const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string; color: string }>`
-  ${sharedKeyframes}
+const Title = styled.p<{ maxWidth: number; padding?: string; color: string }>`
   font-weight: bold;
   font-size: 14px;
   line-height: 18px;
@@ -553,20 +501,13 @@ const Title = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: str
     `
     max-width: ${maxWidth}px;
   `}
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    animation: fadeInSlideUp 0.3s ease-out 0.1s backwards;
-  `}
 `
 
 const Desc = styled.p<{
   maxWidth: number
-  shouldAnimate: boolean
   color: string
   padding?: string
 }>`
-  ${sharedKeyframes}
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
@@ -583,15 +524,9 @@ const Desc = styled.p<{
     `
     max-width: ${maxWidth}px;
   `}
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    animation: fadeInSlideUp 0.3s ease-out 0.2s backwards;
-  `}
 `
 
-const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: string }>`
-  ${sharedKeyframes}
+const Url = styled.p<{ maxWidth: number; padding?: string }>`
   font-weight: normal;
   font-size: 13px;
   line-height: 16px;
@@ -604,25 +539,14 @@ const Url = styled.p<{ maxWidth: number; shouldAnimate: boolean; padding?: strin
     `
     max-width: ${maxWidth}px;
   `}
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    animation: fadeInSlideUp 0.3s ease-out 0.3s backwards;
-  `}
 `
 
-const Img = styled.img<{ shouldAnimate: boolean }>`
-  ${sharedKeyframes}
+const Img = styled.img`
   width: 100%;
   height: 100%;
   object-fit: cover;
   display: block;
   border-radius: inherit;
-  ${({ shouldAnimate }) =>
-    shouldAnimate &&
-    `
-    animation: fadeIn 0.4s ease-out forwards;
-  `}
 `
 
 const OGRow = styled.div`
