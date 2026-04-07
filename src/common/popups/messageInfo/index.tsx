@@ -1,4 +1,5 @@
 import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import styled from 'styled-components'
 import moment from 'moment'
 import {
@@ -25,6 +26,7 @@ import { ReactComponent as CircleDashedIcon } from '../../../assets/svg/circle-d
 interface IProps {
   message: IMessage
   togglePopup: () => void
+  anchorRef: React.RefObject<HTMLElement>
   labels?: ILabels
   tabsOrder?: { key: MessageInfoTab; label: string; data: IMarker[] }[]
   showCounts?: boolean
@@ -57,6 +59,7 @@ const defaultFormatDate = (date: Date) => {
 const MessageInfo = ({
   message,
   togglePopup,
+  anchorRef,
   labels,
   tabsOrder = [
     { key: 'received' as const, label: 'Delivered to', data: [] as IMarker[] },
@@ -77,7 +80,7 @@ const MessageInfo = ({
   handleOpenUserProfile,
   contacts,
   isP2PChannel = false
-}: IProps) => {
+}: IProps): React.ReactElement | null => {
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.TEXT_PRIMARY]: textPrimary,
@@ -106,8 +109,11 @@ const MessageInfo = ({
   const [isTransitioning, setIsTransitioning] = useState<boolean>(false)
   const [ready, setReady] = useState<boolean>(false)
   const [flipLocked, setFlipLocked] = useState<boolean>(false)
-  const [verticalOffset, setVerticalOffset] = useState<number>(8)
   const [transformY, setTransformY] = useState<number>(0)
+  const [fixedTop, setFixedTop] = useState<number | undefined>(undefined)
+  const [fixedBottom, setFixedBottom] = useState<number | undefined>(undefined)
+  const [fixedLeft, setFixedLeft] = useState<number | undefined>(undefined)
+  const [fixedRight, setFixedRight] = useState<number | undefined>(undefined)
   const initializingRef = useRef<boolean>(true)
   const flipAboveRef = useRef<boolean>(false)
   flipAboveRef.current = flipAbove
@@ -188,7 +194,7 @@ const MessageInfo = ({
     if (readyRef.current) return
     // Pre-measure content and decide flip before opening to avoid position jump
     const container = document.getElementById('scrollableDiv')
-    const anchorEl = rootRef.current?.parentElement as HTMLElement | null
+    const anchorEl = anchorRef.current as HTMLElement | null
     if (container && anchorEl) {
       const containerRect = container.getBoundingClientRect()
       const anchorRect = anchorEl.getBoundingClientRect()
@@ -247,8 +253,23 @@ const MessageInfo = ({
         }
       }
 
-      setVerticalOffset(offset)
       setTransformY(transform)
+
+      // Fixed positioning values
+      if (nextFlip) {
+        setFixedBottom(window.innerHeight - anchorRect.top + offset)
+        setFixedTop(undefined)
+      } else {
+        setFixedTop(anchorRect.bottom + offset)
+        setFixedBottom(undefined)
+      }
+      if (message.incoming) {
+        setFixedLeft(anchorRect.left + anchorRect.width * 0.04)
+        setFixedRight(undefined)
+      } else {
+        setFixedRight(window.innerWidth - anchorRect.right + anchorRect.width * 0.04)
+        setFixedLeft(undefined)
+      }
     }
     setIsTransitioning(true)
     setOpen(true)
@@ -297,7 +318,7 @@ const MessageInfo = ({
       if (!rootRef.current || !ready) return
       if (messagesMarkersLoadingState === LOADING_STATE.LOADING) return
       const containerRect = container.getBoundingClientRect()
-      const anchorEl = rootRef.current.parentElement as HTMLElement | null
+      const anchorEl = anchorRef.current as HTMLElement | null
       if (!anchorEl) return
       const anchorRect = anchorEl.getBoundingClientRect()
 
@@ -375,8 +396,23 @@ const MessageInfo = ({
         }
       }
 
-      setVerticalOffset(offset)
       setTransformY(transform)
+
+      // Update fixed positioning based on current anchor position
+      if (nextFlip) {
+        setFixedBottom(window.innerHeight - anchorRect.top + offset)
+        setFixedTop(undefined)
+      } else {
+        setFixedTop(anchorRect.bottom + offset)
+        setFixedBottom(undefined)
+      }
+      if (message.incoming) {
+        setFixedLeft(anchorRect.left + anchorRect.width * 0.04)
+        setFixedRight(undefined)
+      } else {
+        setFixedRight(window.innerWidth - anchorRect.right + anchorRect.width * 0.04)
+        setFixedLeft(undefined)
+      }
     }
 
     if (open) {
@@ -422,7 +458,7 @@ const MessageInfo = ({
   // Measure content on relevant changes and animate height; decide flip before animating (layout phase)
   useLayoutEffect(() => {
     const container = document.getElementById('scrollableDiv')
-    const anchorEl = rootRef.current?.parentElement as HTMLElement | null
+    const anchorEl = anchorRef.current as HTMLElement | null
     if (!container || !anchorEl || !ready) return
     const containerRect = container.getBoundingClientRect()
     const anchorRect = anchorEl.getBoundingClientRect()
@@ -480,8 +516,23 @@ const MessageInfo = ({
       }
     }
 
-    setVerticalOffset(offset)
     setTransformY(transform)
+
+    // Update fixed positioning based on current anchor position
+    if (currentFlip) {
+      setFixedBottom(window.innerHeight - anchorRect.top + offset)
+      setFixedTop(undefined)
+    } else {
+      setFixedTop(anchorRect.bottom + offset)
+      setFixedBottom(undefined)
+    }
+    if (message.incoming) {
+      setFixedLeft(anchorRect.left + anchorRect.width * 0.04)
+      setFixedRight(undefined)
+    } else {
+      setFixedRight(window.innerWidth - anchorRect.right + anchorRect.width * 0.04)
+      setFixedLeft(undefined)
+    }
 
     if (panelHeightPx !== nextHeight) {
       setIsTransitioning(true)
@@ -545,15 +596,16 @@ const MessageInfo = ({
     return null
   }
 
-  return (
+  return createPortal(
     <DropdownRoot
       ref={rootRef}
-      rtl={message.incoming}
       backgroundColor={backgroundSections}
-      flip={flipAbove}
       ready={ready}
-      verticalOffset={verticalOffset}
       transformY={transformY}
+      fixedTop={fixedTop}
+      fixedBottom={fixedBottom}
+      fixedLeft={fixedLeft}
+      fixedRight={fixedRight}
     >
       <Panel
         ref={panelRef}
@@ -641,8 +693,9 @@ const MessageInfo = ({
           )}
         </Content>
       </Panel>
-    </DropdownRoot>
-  )
+    </DropdownRoot>,
+    document.body
+  ) as unknown as React.ReactElement
 }
 
 export default MessageInfo
@@ -749,17 +802,19 @@ const Empty = styled.div<{ color: string }>`
 `
 
 const DropdownRoot = styled.div<{
-  rtl: boolean
   backgroundColor: string
-  flip: boolean
   ready: boolean
-  verticalOffset: number
   transformY: number
+  fixedTop?: number
+  fixedBottom?: number
+  fixedLeft?: number
+  fixedRight?: number
 }>`
-  position: absolute;
-  top: ${(p) => (p.flip ? 'auto' : `calc(100% + ${p.verticalOffset}px)`)};
-  bottom: ${(p) => (p.flip ? `calc(100% + ${p.verticalOffset}px)` : 'auto')};
-  ${(p) => (p.rtl ? 'left: 4%;' : 'right: 4%;')}
+  position: fixed;
+  top: ${(p) => (p.fixedTop !== undefined ? `${p.fixedTop}px` : 'auto')};
+  bottom: ${(p) => (p.fixedBottom !== undefined ? `${p.fixedBottom}px` : 'auto')};
+  left: ${(p) => (p.fixedLeft !== undefined ? `${p.fixedLeft}px` : 'auto')};
+  right: ${(p) => (p.fixedRight !== undefined ? `${p.fixedRight}px` : 'auto')};
   transform: ${(p) => (p.transformY !== 0 ? `translateY(${p.transformY}px)` : 'none')};
   z-index: 15;
   background: ${({ backgroundColor }) => backgroundColor};

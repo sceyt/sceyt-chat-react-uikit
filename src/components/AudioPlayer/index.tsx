@@ -272,7 +272,14 @@ const AudioPlayer: React.FC<AudioPlayerProps> = ({
   )
 }
 
-export default AudioPlayer
+export default React.memo(AudioPlayer, (prev, next) => {
+  if (prev.url !== next.url) return false
+  if (prev.file?.url !== next.file?.url) return false
+  if (prev.messagePlayed !== next.messagePlayed) return false
+  if (prev.incoming !== next.incoming) return false
+  if (prev.viewOnce !== next.viewOnce) return false
+  return true
+})
 
 const Container = styled.div<{ backgroundColor?: string; borderRadius?: string }>`
   position: relative;

@@ -422,6 +422,12 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
         return chan
       })
     }
+    if (channelsMap[channelId]?.lastMessage?.id === message.id) {
+      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: message }
+    }
+    if (allChannelsMap[channelId]?.lastMessage?.id === message.id) {
+      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: message }
+    }
   } else {
     const updatedChannels = allChannels.filter((chan) => chan.id !== channelId)
     if (updateChannel) {
@@ -439,6 +445,12 @@ export function updateChannelLastMessageOnAllChannels(channelId: string, message
       allChannelsMap[channelId] = updateChannel
       // update channel on all channels
       allChannels = [updateChannel, ...updatedChannels]
+    }
+    if (channelsMap[channelId]) {
+      channelsMap[channelId] = { ...channelsMap[channelId], lastMessage: message }
+    }
+    if (allChannelsMap[channelId]) {
+      allChannelsMap[channelId] = { ...allChannelsMap[channelId], lastMessage: message }
     }
   }
 }

@@ -14,7 +14,11 @@ import { getShowOnlyContactUsers } from '../../../helpers/contacts'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
-import { removeMessageFromVisibleMessagesMap, setMessageToVisibleMessagesMap } from 'helpers/messagesHalper'
+import {
+  compareMessagesForList,
+  removeMessageFromVisibleMessagesMap,
+  setMessageToVisibleMessagesMap
+} from 'helpers/messagesHalper'
 import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
@@ -32,7 +36,8 @@ interface ISystemMessageProps {
   backgroundColor?: string
   borderRadius?: string
   tabIsActive?: boolean
-  setLastVisibleMessageId?: (messageId: string) => void
+  setLastVisibleMessageId?: (message: IMessage) => void
+  queueReadMarker?: (channelId: string, messageId?: string) => void
   disableAutoReadTracking?: boolean
 }
 
@@ -50,6 +55,7 @@ const Message = ({
   borderRadius,
   contactsMap,
   setLastVisibleMessageId,
+  queueReadMarker,
   disableAutoReadTracking = false
 }: ISystemMessageProps) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground } =
@@ -81,14 +87,18 @@ const Message = ({
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       !unreadScrollTo
     ) {
-      dispatch(markMessagesAsReadAC(channel.id, [message.id]))
+      if (queueReadMarker) {
+        queueReadMarker(channel.id, message.id)
+      } else {
+        dispatch(markMessagesAsReadAC(channel.id, [message.id]))
+      }
     }
   }
 
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
-        setLastVisibleMessageId(message.id)
+        setLastVisibleMessageId(message)
       }
       if (!disableAutoReadTracking) {
         handleSendReadMarker()
@@ -97,7 +107,11 @@ const Message = ({
         setMessageToVisibleMessagesMap(message)
       }
 
-      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+      if (
+        scrollToNewMessage.scrollToBottom &&
+        channel.lastMessage &&
+        compareMessagesForList(message, channel.lastMessage) >= 0
+      ) {
         dispatch(scrollToNewMessageAC(false, false, false))
         dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
@@ -106,7 +120,18 @@ const Message = ({
         removeMessageFromVisibleMessagesMap(message)
       }
     }
-  }, [isVisible, unreadScrollTo, disableAutoReadTracking])
+  }, [
+    channel.isLinkedChannel,
+    channel.lastMessage,
+    disableAutoReadTracking,
+    dispatch,
+    isVisible,
+    message,
+    scrollToNewMessage.scrollToBottom,
+    unreadScrollTo,
+    setLastVisibleMessageId,
+    queueReadMarker
+  ])
 
   useDidUpdate(() => {
     if (tabIsActive && !disableAutoReadTracking) {

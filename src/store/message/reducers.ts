@@ -2,12 +2,13 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
 import {
+  compareMessagesForList,
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
   PendingPollAction,
   updateMessageDeliveryStatusAndMarkers
 } from '../../helpers/messagesHalper'
-import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../../helpers/constants'
+import { MESSAGE_STATUS } from '../../helpers/constants'
 import log from 'loglevel'
 import { handleVoteDetails } from '../../helpers/message'
 import store from 'store'
@@ -15,6 +16,8 @@ import { getPollVotesAC } from './actions'
 
 export interface IMessageStore {
   messagesLoadingState: number | null
+  loadingPrevMessagesState: number | null
+  loadingNextMessagesState: number | null
   messagesHasNext: boolean
   messagesHasPrev: boolean
   threadMessagesHasNext: boolean
@@ -65,13 +68,14 @@ export interface IMessageStore {
   pollVotesLoadingState: { [key: string]: number | null }
   pollVotesInitialCount: number | null
   pendingPollActions: { [key: string]: PendingPollAction[] }
-  pendingMessagesMap: { [key: string]: IMessage[] }
   unreadScrollTo: boolean
   unreadMessageId: string
 }
 
 const initialState: IMessageStore = {
   messagesLoadingState: null,
+  loadingPrevMessagesState: null,
+  loadingNextMessagesState: null,
   messagesHasNext: false,
   messagesHasPrev: true,
   threadMessagesHasNext: false,
@@ -116,9 +120,75 @@ const initialState: IMessageStore = {
   pollVotesLoadingState: {},
   pollVotesInitialCount: null,
   pendingPollActions: {},
-  pendingMessagesMap: {},
   unreadScrollTo: true,
   unreadMessageId: ''
+}
+
+const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
+
+const messagesMatch = (left: IMessage, right: IMessage) => {
+  const leftRefs = [left.id, left.tid].filter(Boolean)
+  const rightRefs = [right.id, right.tid].filter(Boolean)
+
+  return leftRefs.some((leftRef) => rightRefs.includes(leftRef))
+}
+
+const mergeEquivalentMessages = (existingMessage: IMessage, nextMessage: IMessage) => {
+  if (!!existingMessage.id !== !!nextMessage.id) {
+    return nextMessage.id ? { ...existingMessage, ...nextMessage } : { ...nextMessage, ...existingMessage }
+  }
+
+  return { ...existingMessage, ...nextMessage }
+}
+
+const getTrimmedConfirmedMessages = (messages: IMessage[], direction?: string) => {
+  if (messages.length <= MESSAGES_MAX_PAGE_COUNT) {
+    return messages
+  }
+
+  if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+    return messages.slice(0, MESSAGES_MAX_PAGE_COUNT)
+  }
+
+  return messages.slice(-MESSAGES_MAX_PAGE_COUNT)
+}
+
+const shouldIncludePendingMessages = (confirmedMessages: IMessage[], trimmedConfirmedMessages: IMessage[]) => {
+  if (trimmedConfirmedMessages.length === 0) {
+    return true
+  }
+
+  const latestConfirmedMessage = confirmedMessages[confirmedMessages.length - 1]
+  if (!latestConfirmedMessage?.id) {
+    return true
+  }
+
+  return trimmedConfirmedMessages.some((message) => message.id === latestConfirmedMessage.id)
+}
+
+const normalizeActiveChannelMessages = (messages: IMessage[], direction?: string) => {
+  const deduplicatedMessages = messages.reduce<IMessage[]>((result, message) => {
+    const existingMessageIndex = result.findIndex((item) => messagesMatch(item, message))
+
+    if (existingMessageIndex === -1) {
+      result.push(message)
+      return result
+    }
+
+    result[existingMessageIndex] = mergeEquivalentMessages(result[existingMessageIndex], message)
+    return result
+  }, [])
+
+  const confirmedMessages = deduplicatedMessages.filter((message) => !!message.id).sort(compareMessagesForList)
+  const pendingMessages = deduplicatedMessages
+    .filter((message) => isPendingMessage(message))
+    .sort(compareMessagesForList)
+  const trimmedConfirmedMessages = getTrimmedConfirmedMessages(confirmedMessages, direction)
+
+  return [
+    ...trimmedConfirmedMessages,
+    ...(shouldIncludePendingMessages(confirmedMessages, trimmedConfirmedMessages) ? pendingMessages : [])
+  ]
 }
 
 const messageSlice = createSlice({
@@ -127,7 +197,7 @@ const messageSlice = createSlice({
   reducers: {
     addMessage: (state, action: PayloadAction<{ message: IMessage }>) => {
       const { message } = action.payload
-      state.activeChannelMessages.push(message)
+      state.activeChannelMessages = normalizeActiveChannelMessages([...state.activeChannelMessages, message])
     },
 
     deleteMessageFromList: (state, action: PayloadAction<{ messageId: string }>) => {
@@ -174,19 +244,8 @@ const messageSlice = createSlice({
     },
 
     setMessages: (state, action: PayloadAction<{ messages: IMessage[]; channelId?: string }>) => {
-      const { messages, channelId } = action.payload
-      const pendingForChannel = channelId ? state.pendingMessagesMap[channelId] : undefined
-      if (pendingForChannel?.length) {
-        const merged = [...messages]
-        for (const pending of pendingForChannel) {
-          if (!merged.some((m) => m.tid === pending.tid || (pending.id && m.id === pending.id))) {
-            merged.push(pending)
-          }
-        }
-        state.activeChannelMessages = merged
-      } else {
-        state.activeChannelMessages = messages
-      }
+      const { messages } = action.payload
+      state.activeChannelMessages = normalizeActiveChannelMessages(messages)
     },
 
     addMessages: (
@@ -197,39 +256,10 @@ const messageSlice = createSlice({
       }>
     ) => {
       const { messages, direction } = action.payload
-      const currentMessagesLength = state.activeChannelMessages.length
-      const messagesIsNotIncludeInActiveChannelMessages = messages.filter(
-        (message) => !state.activeChannelMessages.some((msg) => msg.tid === message.tid || msg.id === message.id)
+      state.activeChannelMessages = normalizeActiveChannelMessages(
+        [...state.activeChannelMessages, ...messages],
+        direction
       )
-      const insertedMessagesLength = messagesIsNotIncludeInActiveChannelMessages.length
-
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV && insertedMessagesLength > 0) {
-        if (currentMessagesLength + insertedMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
-          if (insertedMessagesLength > 0) {
-            if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
-              state.activeChannelMessages.splice(-insertedMessagesLength)
-            } else {
-              state.activeChannelMessages.splice(
-                -(currentMessagesLength - currentMessagesLength + insertedMessagesLength - MESSAGES_MAX_PAGE_COUNT)
-              )
-            }
-          }
-          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
-        } else {
-          state.activeChannelMessages.splice(0, 0, ...messagesIsNotIncludeInActiveChannelMessages)
-        }
-      } else if (direction === MESSAGE_LOAD_DIRECTION.NEXT && insertedMessagesLength > 0) {
-        if (currentMessagesLength >= MESSAGES_MAX_PAGE_COUNT) {
-          state.activeChannelMessages.splice(0, insertedMessagesLength)
-          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
-        } else if (insertedMessagesLength + currentMessagesLength > MESSAGES_MAX_PAGE_COUNT) {
-          const sliceElementCount = insertedMessagesLength + currentMessagesLength - MESSAGES_MAX_PAGE_COUNT
-          state.activeChannelMessages.splice(0, sliceElementCount)
-          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
-        } else {
-          state.activeChannelMessages.push(...messagesIsNotIncludeInActiveChannelMessages)
-        }
-      }
     },
 
     updateMessagesStatus: (
@@ -255,11 +285,7 @@ const messageSlice = createSlice({
           }
         }
       }
-      state.activeChannelMessages.sort((a, b) => {
-        if (!a?.id) return 1
-        if (!b?.id) return -1
-        return BigInt(a.id) < BigInt(b.id) ? -1 : 1
-      })
+      state.activeChannelMessages = normalizeActiveChannelMessages(state.activeChannelMessages)
     },
 
     updateMessage: (
@@ -299,18 +325,6 @@ const messageSlice = createSlice({
                 pollDetails: handleVoteDetails(voteDetails, messageOldData)
               }
             }
-            if (messageData.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING) {
-              const channelId = messageData.channelId
-              const messageId = messageData.tid || messageData.id
-              if (state.pendingMessagesMap[channelId]) {
-                state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
-                  (msg) => !(msg.id === messageId || msg.tid === messageId)
-                )
-                if (state.pendingMessagesMap[channelId].length === 0) {
-                  delete state.pendingMessagesMap[channelId]
-                }
-              }
-            }
             return messageData
           }
         }
@@ -319,11 +333,7 @@ const messageSlice = createSlice({
       if (!messageFound && addIfNotExists) {
         state.activeChannelMessages.push(params)
       }
-      state.activeChannelMessages.sort((a, b) => {
-        if (!a?.id) return 1
-        if (!b?.id) return -1
-        return BigInt(a.id) < BigInt(b.id) ? -1 : 1
-      })
+      state.activeChannelMessages = normalizeActiveChannelMessages(state.activeChannelMessages)
     },
 
     updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
@@ -474,6 +484,14 @@ const messageSlice = createSlice({
 
     setMessagesLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
       state.messagesLoadingState = action.payload.state
+    },
+
+    setLoadingPrevMessagesState: (state, action: PayloadAction<{ state: number | null }>) => {
+      state.loadingPrevMessagesState = action.payload.state
+    },
+
+    setLoadingNextMessagesState: (state, action: PayloadAction<{ state: number | null }>) => {
+      state.loadingNextMessagesState = action.payload.state
     },
 
     setAttachmentsLoadingState: (state, action: PayloadAction<{ state: number | null; forPopup?: boolean }>) => {
@@ -779,44 +797,6 @@ const messageSlice = createSlice({
         return action.message?.id === messageId || action.message?.tid === messageId ? { ...action, message } : action
       })
     },
-    setPendingMessage: (state, action: PayloadAction<{ channelId: string; message: IMessage }>) => {
-      const { channelId, message } = action.payload
-      if (!state.pendingMessagesMap[channelId]) {
-        state.pendingMessagesMap[channelId] = []
-      }
-      const existingIndex = state.pendingMessagesMap[channelId].findIndex((msg) => msg.tid === message.tid)
-      if (existingIndex === -1) {
-        state.pendingMessagesMap[channelId].push(message)
-      }
-    },
-    removePendingMessage: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
-      const { channelId, messageId } = action.payload
-      if (state.pendingMessagesMap[channelId]) {
-        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].filter(
-          (msg) => !(msg.id === messageId || msg.tid === messageId)
-        )
-        if (state.pendingMessagesMap[channelId].length === 0) {
-          delete state.pendingMessagesMap[channelId]
-        }
-      }
-    },
-    updatePendingMessage: (
-      state,
-      action: PayloadAction<{ channelId: string; messageId: string; updatedMessage: Partial<IMessage> }>
-    ) => {
-      const { channelId, messageId, updatedMessage } = action.payload
-      if (state.pendingMessagesMap[channelId]) {
-        state.pendingMessagesMap[channelId] = state.pendingMessagesMap[channelId].map((msg) => {
-          if (msg.id === messageId || msg.tid === messageId) {
-            return { ...msg, ...updatedMessage }
-          }
-          return msg
-        })
-      }
-    },
-    clearPendingMessagesMap: (state) => {
-      state.pendingMessagesMap = {}
-    },
     setUnreadMessageId: (state, action: PayloadAction<{ messageId: string }>) => {
       state.unreadMessageId = action.payload.messageId
     }
@@ -859,6 +839,8 @@ export const {
   removeUploadProgress,
   setMessageToEdit,
   setMessagesLoadingState,
+  setLoadingPrevMessagesState,
+  setLoadingNextMessagesState,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
@@ -885,10 +867,6 @@ export const {
   setPollVotesInitialCount,
   removePendingPollAction,
   setPendingPollActionsMap,
-  setPendingMessage,
-  removePendingMessage,
-  updatePendingMessage,
-  clearPendingMessagesMap,
   updatePendingPollAction,
   setUnreadMessageId
 } = messageSlice.actions

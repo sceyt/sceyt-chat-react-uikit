@@ -44,6 +44,7 @@ interface IMessageBodyProps {
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
+  startsUnreadSection: boolean
   isUnreadMessage: boolean
   isThreadMessage: boolean
   fontFamily?: string
@@ -181,8 +182,7 @@ const MessageBody = ({
   isPendingMessage,
   prevMessage,
   nextMessage,
-  isUnreadMessage,
-  unreadMessageId,
+  startsUnreadSection = false,
   isThreadMessage,
   fontFamily,
   ownMessageOnRightSide,
@@ -322,7 +322,8 @@ const MessageBody = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const getFromContacts = getShowOnlyContactUsers()
-  const messageUserID = message.user ? message.user.id : 'deleted'
+  const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
+  const messageUserID = getComparableUserId(message.user)
   const [isExpanded, setIsExpanded] = useState(false)
 
   const messageText = useMemo(() => {
@@ -387,21 +388,15 @@ const MessageBody = ({
     return trimReactMessage(messageText, collapsedCharacterLimit)
   }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
 
-  const prevMessageUserID = useMemo(
-    () => (prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null),
-    [prevMessage]
-  )
-  const nextMessageUserID = useMemo(
-    () => (nextMessage ? (nextMessage.user ? nextMessage.user.id : 'deleted') : null),
-    [nextMessage]
-  )
+  const prevMessageUserID = useMemo(() => (prevMessage ? getComparableUserId(prevMessage.user) : null), [prevMessage])
+  const nextMessageUserID = useMemo(() => (nextMessage ? getComparableUserId(nextMessage.user) : null), [nextMessage])
   const current = useMemo(() => moment(message.createdAt).startOf('day'), [message.createdAt])
   const firstMessageInInterval = useMemo(
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-      unreadMessageId === prevMessage.id,
-    [prevMessage, current, unreadMessageId]
+      startsUnreadSection,
+    [prevMessage, current, startsUnreadSection]
   )
   const lastMessageInInterval = useMemo(
     () =>
@@ -440,7 +435,11 @@ const MessageBody = ({
   )
   const ogContainerOrder = (ogMetadataProps && ogMetadataProps.ogLayoutOrder) || 'og-first'
   const ogContainerFirst = useMemo(() => ogContainerOrder === 'og-first', [ogContainerOrder])
-  const messageOwnerIsNotCurrentUser = !!(message.user && message.user.id !== user.id && message.user.id)
+  const messageOwnerIsNotCurrentUser = !!(
+    message.user &&
+    getComparableUserId(message.user) !== getComparableUserId(user) &&
+    message.user.id
+  )
   const mediaAttachment = useMemo(
     () =>
       withAttachments &&
@@ -488,12 +487,12 @@ const MessageBody = ({
         : !message.incoming && outgoingMessageStyles?.background === 'inherit'
           ? '0px'
           : !message.incoming && ownMessageOnRightSide
-            ? prevMessageUserID !== messageUserID || firstMessageInInterval
+            ? prevMessageUserID && (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 4px 16px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '16px 4px 16px 16px'
                 : '16px 4px 4px 16px'
-            : prevMessageUserID !== messageUserID || firstMessageInInterval
+            : prevMessageUserID && (prevMessageUserID !== messageUserID || firstMessageInInterval)
               ? '16px 16px 16px 4px'
               : nextMessageUserID !== messageUserID || lastMessageInInterval
                 ? '4px 16px 16px 16px'
@@ -512,11 +511,10 @@ const MessageBody = ({
   )
   const showMessageSenderName = useMemo(
     () =>
-      (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+      (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
       (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT ? showSenderNameOnDirectChannel : showSenderNameOnGroupChannel) &&
       (message.incoming || showSenderNameOnOwnMessages),
     [
-      isUnreadMessage,
       prevMessageUserID,
       messageUserID,
       firstMessageInInterval,
@@ -693,7 +691,7 @@ const MessageBody = ({
             handleRetractVote={handleRetractVote}
             handleEndVote={handleEndVote}
             handleOpenEmojis={handleOpenEmojis}
-            selfMessage={message.user && messageUserID === user.id}
+            selfMessage={message.user && messageUserID === getComparableUserId(user)}
             isThreadMessage={isThreadMessage}
             rtlDirection={ownMessageOnRightSide && !message.incoming}
             showMessageReaction={messageReaction}
@@ -1065,6 +1063,9 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.showSenderNameOnDirectChannel === nextProps.showSenderNameOnDirectChannel &&
     prevProps.showSenderNameOnGroupChannel === nextProps.showSenderNameOnGroupChannel &&
     prevProps.showSenderNameOnOwnMessages === nextProps.showSenderNameOnOwnMessages &&
+    prevProps.isUnreadMessage === nextProps.isUnreadMessage &&
+    prevProps.startsUnreadSection === nextProps.startsUnreadSection &&
+    prevProps.unreadMessageId === nextProps.unreadMessageId &&
     prevProps.messageStatusAndTimePosition === nextProps.messageStatusAndTimePosition &&
     prevProps.messageStatusDisplayingType === nextProps.messageStatusDisplayingType &&
     prevProps.outgoingMessageStyles === nextProps.outgoingMessageStyles &&

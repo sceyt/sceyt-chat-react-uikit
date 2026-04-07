@@ -292,7 +292,7 @@ const TimerOptionItem = styled.div<{ color: string }>`
 `
 
 const CustomTimerSection = styled.div`
-  margin: 16px auto 0 auto;
+  margin: 0 auto 16px auto;
 `
 
 const CustomSelectWrapper = styled.div<{ accentColor: string }>`

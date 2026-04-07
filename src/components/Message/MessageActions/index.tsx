@@ -403,7 +403,7 @@ const EditMessageContainer = styled.div<EditMessageContainerProps>`
   //opacity: 0;
   //visibility: hidden;
   transition: all 0.2s;
-  z-index: 100;
+  z-index: 10;
 `
 
 const Action = styled.div<{

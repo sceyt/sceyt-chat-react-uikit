@@ -37,6 +37,7 @@ import { useDidUpdate, useOnScreen, useColor } from 'hooks'
 import { ReactComponent as ErrorIcon } from '../../assets/svg/errorIcon.svg'
 // Helpers
 import {
+  compareMessagesForList,
   deletePendingMessage,
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
@@ -79,7 +80,11 @@ const Message = ({
   prevMessage,
   nextMessage,
   setLastVisibleMessageId,
+  queueReadMarker,
+  queueDeliveredMarker,
   isUnreadMessage,
+  startsUnreadSection = false,
+  nextMessageStartsUnreadSection = false,
   unreadMessageId,
   isThreadMessage,
   disableAutoReadTracking = false,
@@ -204,6 +209,7 @@ const Message = ({
   collapsedCharacterLimit,
   createChatOnAvatarTap = true
 }: IMessageProps) => {
+  const getComparableUserId = (messageUser?: IUser | null) => (messageUser?.id ? String(messageUser.id) : 'deleted')
   const {
     [THEME_COLORS.ACCENT]: accentColor,
     [THEME_COLORS.BACKGROUND_SECTIONS]: backgroundSections,
@@ -230,7 +236,9 @@ const Message = ({
     reactionsPopupOpen,
     reactionsPopupPosition,
     emojisPopupPosition,
-    reactionsPopupHorizontalPosition
+    reactionsPopupHorizontalPosition,
+    reactionsAnchorTop,
+    reactionsAnchorBottom
   } = messageState
   const {
     setDeletePopupOpen,
@@ -244,6 +252,8 @@ const Message = ({
     setReactionsPopupPosition,
     setEmojisPopupPosition,
     setReactionsPopupHorizontalPosition,
+    setReactionsAnchorTop,
+    setReactionsAnchorBottom,
     setReportPopupOpen
   } = stateSetters
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
@@ -255,14 +265,24 @@ const Message = ({
       ? message.reactionTotals.reduce((prevValue, currentValue) => prevValue + currentValue.count, 0)
       : 0
   }, [message.reactionTotals])
+  const hasEverReactedRef = useRef(reactionsCount > 0)
+  if (reactionsCount > 0) hasEverReactedRef.current = true
   const messageTextRef = useRef<HTMLDivElement>(null)
-  const messageUserID = message.user ? message.user.id : 'deleted'
-  const prevMessageUserID = prevMessage ? (prevMessage.user ? prevMessage.user.id : 'deleted') : null
+  const messageUserID = getComparableUserId(message.user)
+  const prevMessageUserID = prevMessage ? getComparableUserId(prevMessage.user) : null
   const current = moment(message.createdAt).startOf('day')
   const firstMessageInInterval =
     !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
     prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-    unreadMessageId === prevMessage.id
+    startsUnreadSection
+
+  const nextMessageUserID = nextMessage ? getComparableUserId(nextMessage.user) : null
+  const nextDay = nextMessage ? moment(nextMessage.createdAt).startOf('day') : null
+  const nextMessageFirstInInterval =
+    !nextMessage ||
+    (nextDay !== null && nextDay.diff(current, 'days') !== 0) ||
+    nextMessage.type === MESSAGE_TYPE.SYSTEM ||
+    nextMessageStartsUnreadSection
 
   const messageTimeVisible = showMessageTime && (showMessageTimeForEachMessage || !nextMessage)
   const messageStatusVisible =
@@ -272,7 +292,8 @@ const Message = ({
     (showMessageStatusForEachMessage || !nextMessage)
 
   const renderAvatar =
-    (isUnreadMessage || prevMessageUserID !== messageUserID || firstMessageInInterval) &&
+    !!prevMessageUserID &&
+    (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
 
@@ -415,9 +436,11 @@ const Message = ({
     const offsetBottom = bottomPos ? window.innerHeight - bottomPos : 0
     setReactionsPopupPosition(offsetBottom)
     setReactionsPopupHorizontalPosition({
-      left: reactionsContainer ? reactionsContainer.getBoundingClientRect().left : 0,
+      left: reactionsContPos ? reactionsContPos.left : 0,
       right: reactionsContPos ? window.innerWidth - reactionsContPos.left - reactionsContPos.width : 0
     })
+    setReactionsAnchorTop(reactionsContPos ? reactionsContPos.top : 0)
+    setReactionsAnchorBottom(reactionsContPos ? reactionsContPos.bottom : 0)
     dispatch(setReactionsListAC([], false))
     setReactionsPopupOpen((prev) => !prev)
   }, [dispatch, message.id])
@@ -479,7 +502,11 @@ const Message = ({
         message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
         !unreadScrollTo
       ) {
-        dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
+        if (queueDeliveredMarker) {
+          queueDeliveredMarker(channel.id, message.id)
+        } else {
+          dispatch(markMessagesAsDeliveredAC(channel.id, [message.id]))
+        }
       }
     }
 
@@ -496,7 +523,11 @@ const Message = ({
       connectionStatus === CONNECTION_STATUS.CONNECTED &&
       !unreadScrollTo
     ) {
-      dispatch(markMessagesAsReadAC(channel.id, [message.id]))
+      if (queueReadMarker) {
+        queueReadMarker(channel.id, message.id)
+      } else {
+        dispatch(markMessagesAsReadAC(channel.id, [message.id]))
+      }
     }
   }, [
     dispatch,
@@ -507,7 +538,9 @@ const Message = ({
     channel.id,
     channel.newMessageCount,
     connectionStatus,
-    unreadScrollTo
+    unreadScrollTo,
+    queueReadMarker,
+    queueDeliveredMarker
   ])
 
   const handleForwardMessage = useCallback(
@@ -567,7 +600,7 @@ const Message = ({
   useEffect(() => {
     if (isVisible && !unreadScrollTo) {
       if (setLastVisibleMessageId) {
-        setLastVisibleMessageId(message.id)
+        setLastVisibleMessageId(message)
       }
       if (!disableAutoReadTracking) {
         handleSendReadMarker()
@@ -576,7 +609,11 @@ const Message = ({
         setMessageToVisibleMessagesMap(message)
       }
 
-      if (scrollToNewMessage.scrollToBottom && (message?.id === channel.lastMessage?.id || !message?.id)) {
+      if (
+        scrollToNewMessage.scrollToBottom &&
+        channel.lastMessage &&
+        compareMessagesForList(message, channel.lastMessage) >= 0
+      ) {
         dispatch(scrollToNewMessageAC(false, false, false))
         dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
@@ -593,7 +630,7 @@ const Message = ({
     handleSendReadMarker,
     disableAutoReadTracking,
     channel.isLinkedChannel,
-    channel.lastMessage?.id,
+    channel.lastMessage,
     scrollToNewMessage.scrollToBottom,
     dispatch,
     message
@@ -680,13 +717,30 @@ const Message = ({
     [dispatch]
   )
 
+  const margins = useMemo(() => {
+    let spacingBottom = ''
+    let spacingTop = ''
+    if (!nextMessage || nextMessage.type === MESSAGE_TYPE.SYSTEM) {
+      spacingBottom = ''
+    } else if (nextMessageStartsUnreadSection) {
+      spacingBottom = differentUserMessageSpacing || '16px'
+    } else if (nextMessageUserID && (nextMessageUserID !== messageUserID || nextMessageFirstInInterval)) {
+      spacingBottom = differentUserMessageSpacing || '16px'
+    }
+    spacingTop = sameUserMessageSpacing || '6px'
+    const reactionsMargin =
+      message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition || '' : ''
+    if (spacingBottom && reactionsMargin)
+      return { bottom: `calc(${spacingBottom} + ${reactionsMargin})`, top: spacingTop }
+    return { bottom: reactionsMargin || spacingBottom, top: spacingTop }
+  }, [nextMessageUserID, messageUserID, nextMessageFirstInInterval, message.reactionTotals?.length])
+
   return (
     <MessageItem
       className='message_item'
       rtl={ownMessageOnRightSide && !message.incoming}
       withAvatar={renderAvatar}
       showOwnAvatar={showOwnAvatar}
-      transition={!!reactionsCount}
       hoverBackground={
         hoverBackground
           ? message.incoming
@@ -694,16 +748,8 @@ const Message = ({
             : outgoingMessageStyles?.background || bubbleOutgoing
           : ''
       }
-      topMargin={
-        prevMessage?.type === MESSAGE_TYPE.SYSTEM
-          ? '0'
-          : prevMessage && unreadMessageId === prevMessage.id
-            ? '16px'
-            : prevMessageUserID !== messageUserID || firstMessageInInterval
-              ? differentUserMessageSpacing || '16px'
-              : sameUserMessageSpacing || '6px'
-      }
-      bottomMargin={message.reactionTotals && message.reactionTotals.length ? reactionsContainerTopPosition : ''}
+      bottomMargin={margins?.bottom}
+      topMargin={margins?.top}
       ref={messageItemRef}
       selectMessagesIsActive={selectionIsActive}
       onClick={(e: React.MouseEvent<HTMLDivElement>) => selectionIsActive && handleSelectMessage(e)}
@@ -753,6 +799,7 @@ const Message = ({
             nextMessage={nextMessage}
             unreadMessageId={unreadMessageId}
             isUnreadMessage={isUnreadMessage}
+            startsUnreadSection={startsUnreadSection}
             messageActionsShow={messageActionsShow}
             selectionIsActive={selectionIsActive}
             emojisPopupOpen={emojisPopupOpen}
@@ -798,6 +845,7 @@ const Message = ({
             prevMessage={prevMessage}
             nextMessage={nextMessage}
             isUnreadMessage={isUnreadMessage}
+            startsUnreadSection={startsUnreadSection}
             unreadMessageId={unreadMessageId}
             isThreadMessage={isThreadMessage}
             fontFamily={fontFamily}
@@ -941,36 +989,40 @@ const Message = ({
             messageTimeColorOnAttachment={messageTimeColorOnAttachment || textOnPrimary}
           />
         )}
-        <MessageReactions
-          message={message}
-          reactionsCount={reactionsCount}
-          reactionsPopupOpen={reactionsPopupOpen}
-          reactionsPopupPosition={reactionsPopupPosition}
-          reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
-          rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
-          backgroundSections={backgroundSections}
-          textPrimary={textPrimary}
-          reactionsDisplayCount={reactionsDisplayCount || 5}
-          showEachReactionCount={showEachReactionCount ?? true}
-          showTotalReactionCount={!!showTotalReactionCount}
-          reactionItemBorder={reactionItemBorder}
-          reactionItemBorderRadius={reactionItemBorderRadius}
-          reactionItemBackground={reactionItemBackground}
-          reactionItemPadding={reactionItemPadding}
-          reactionItemMargin={reactionItemMargin}
-          reactionsFontSize={reactionsFontSize}
-          reactionsContainerBoxShadow={reactionsContainerBoxShadow}
-          reactionsContainerBorder={reactionsContainerBorder}
-          reactionsContainerBorderRadius={reactionsContainerBorderRadius}
-          reactionsContainerBackground={reactionsContainerBackground}
-          reactionsContainerTopPosition={reactionsContainerTopPosition}
-          reactionsContainerPadding={reactionsContainerPadding}
-          reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
-          reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
-          onToggleReactionsPopup={handleToggleReactionsPopup}
-          onReactionAddDelete={handleReactionAddDelete}
-          onOpenUserProfile={handleOpenUserProfile}
-        />
+        {hasEverReactedRef.current && (
+          <MessageReactions
+            message={message}
+            reactionsCount={reactionsCount}
+            reactionsPopupOpen={reactionsPopupOpen}
+            reactionsPopupPosition={reactionsPopupPosition}
+            reactionsPopupHorizontalPosition={reactionsPopupHorizontalPosition}
+            reactionsAnchorTop={reactionsAnchorTop}
+            reactionsAnchorBottom={reactionsAnchorBottom}
+            rtlDirection={!!(ownMessageOnRightSide && !message.incoming)}
+            backgroundSections={backgroundSections}
+            textPrimary={textPrimary}
+            reactionsDisplayCount={reactionsDisplayCount || 5}
+            showEachReactionCount={showEachReactionCount ?? true}
+            showTotalReactionCount={!!showTotalReactionCount}
+            reactionItemBorder={reactionItemBorder}
+            reactionItemBorderRadius={reactionItemBorderRadius}
+            reactionItemBackground={reactionItemBackground}
+            reactionItemPadding={reactionItemPadding}
+            reactionItemMargin={reactionItemMargin}
+            reactionsFontSize={reactionsFontSize}
+            reactionsContainerBoxShadow={reactionsContainerBoxShadow}
+            reactionsContainerBorder={reactionsContainerBorder}
+            reactionsContainerBorderRadius={reactionsContainerBorderRadius}
+            reactionsContainerBackground={reactionsContainerBackground}
+            reactionsContainerTopPosition={reactionsContainerTopPosition}
+            reactionsContainerPadding={reactionsContainerPadding}
+            reactionsDetailsPopupBorderRadius={reactionsDetailsPopupBorderRadius}
+            reactionsDetailsPopupHeaderItemsStyle={reactionsDetailsPopupHeaderItemsStyle}
+            onToggleReactionsPopup={handleToggleReactionsPopup}
+            onReactionAddDelete={handleReactionAddDelete}
+            onOpenUserProfile={handleOpenUserProfile}
+          />
+        )}
       </MessageContent>
       <MessagePopups
         message={message}
@@ -990,45 +1042,54 @@ const Message = ({
         onEndVote={endVote}
         onToggleEndVotePopup={() => setShowEndVoteConfirmPopup(false)}
         onOpenUserProfile={handleOpenUserProfile}
+        anchorRef={messageItemRef}
       />
     </MessageItem>
   )
 }
 
-export default React.memo(Message, (prevProps, nextProps) => {
-  // Custom comparison function - using shallow comparison for arrays/objects
-  // For arrays/objects, we check reference equality which is acceptable
-  // since Redux should maintain referential stability for unchanged data
+export default React.memo(Message, (prev, next) => {
+  // Message content
+  if (prev.message.id !== next.message.id) return false
+  if (prev.message.deliveryStatus !== next.message.deliveryStatus) return false
+  if (prev.message.state !== next.message.state) return false
+  if (prev.message.body !== next.message.body) return false
+  if (prev.message.incoming !== next.message.incoming) return false
+  if (prev.message.replyCount !== next.message.replyCount) return false
+  if (prev.message.userReactions !== next.message.userReactions) return false
+  if (prev.message.reactionTotals !== next.message.reactionTotals) return false
+  if (prev.message.attachments !== next.message.attachments) return false
+  if (prev.message.metadata !== next.message.metadata) return false
+  if (prev.message.userMarkers !== next.message.userMarkers) return false
+  if (prev.message.pollDetails !== next.message.pollDetails) return false
 
-  // Compare message properties
-  if (prevProps.message.id !== nextProps.message.id) return false
-  if (prevProps.message.deliveryStatus !== nextProps.message.deliveryStatus) return false
-  if (prevProps.message.state !== nextProps.message.state) return false
-  if (prevProps.message.body !== nextProps.message.body) return false
-  if (prevProps.message.incoming !== nextProps.message.incoming) return false
+  // Neighbor messages — only semantically relevant fields
+  if (prev.prevMessage?.id !== next.prevMessage?.id) return false
+  if (prev.prevMessage?.user?.id !== next.prevMessage?.user?.id) return false
+  if (prev.prevMessage?.type !== next.prevMessage?.type) return false
+  if (prev.nextMessage?.id !== next.nextMessage?.id) return false
+  if (prev.nextMessage?.user?.id !== next.nextMessage?.user?.id) return false
+  if (prev.nextMessage?.type !== next.nextMessage?.type) return false
+  if (prev.nextMessageStartsUnreadSection !== next.nextMessageStartsUnreadSection) return false
 
-  // Shallow comparison for arrays/objects (reference equality)
-  if (prevProps.message.userReactions !== nextProps.message.userReactions) return false
-  if (prevProps.message.reactionTotals !== nextProps.message.reactionTotals) return false
-  if (prevProps.message.attachments !== nextProps.message.attachments) return false
-  if (prevProps.message.metadata !== nextProps.message.metadata) return false
-  if (prevProps.message.userMarkers !== nextProps.message.userMarkers) return false
-  if (prevProps.message.pollDetails !== nextProps.message.pollDetails) return false
-  if (prevProps.message.replyCount !== nextProps.message.replyCount) return false
+  // Channel — avoid lastMessage which changes on every new message
+  if (prev.channel.id !== next.channel.id) return false
+  if (prev.channel.userRole !== next.channel.userRole) return false
+  if (prev.channel.newMessageCount !== next.channel.newMessageCount) return false
 
-  // Compare other props
-  if (prevProps.prevMessage?.id !== nextProps.prevMessage?.id) return false
-  if (prevProps.nextMessage?.id !== nextProps.nextMessage?.id) return false
-  if (prevProps.channel.id !== nextProps.channel.id) return false
-  if (prevProps.channel.lastMessage?.id !== nextProps.channel.lastMessage?.id) return false
-  if (prevProps.channel.newMessageCount !== nextProps.channel.newMessageCount) return false
-  if (prevProps.selectedMessagesMap !== nextProps.selectedMessagesMap) return false
-  if (prevProps.contactsMap !== nextProps.contactsMap) return false
-  if (prevProps.connectionStatus !== nextProps.connectionStatus) return false
-  if (prevProps.openedMessageMenuId !== nextProps.openedMessageMenuId) return false
-  if (prevProps.isUnreadMessage !== nextProps.isUnreadMessage) return false
-  if (prevProps.unreadMessageId !== nextProps.unreadMessageId) return false
-  if (prevProps.tabIsActive !== nextProps.tabIsActive) return false
+  // List state
+  if (prev.isUnreadMessage !== next.isUnreadMessage) return false
+  if (prev.startsUnreadSection !== next.startsUnreadSection) return false
+  if (prev.unreadMessageId !== next.unreadMessageId) return false
+  if (prev.selectedMessagesMap !== next.selectedMessagesMap) return false
+  if (prev.contactsMap !== next.contactsMap) return false
+  if (prev.connectionStatus !== next.connectionStatus) return false
+  if (prev.tabIsActive !== next.tabIsActive) return false
+
+  // Only re-render when THIS message's menu open-state changes, not when any other message opens its menu
+  const prevMenuOpen = prev.openedMessageMenuId === (prev.message.id || prev.message.tid)
+  const nextMenuOpen = next.openedMessageMenuId === (next.message.id || next.message.tid)
+  if (prevMenuOpen !== nextMenuOpen) return false
 
   return true
 })
@@ -1080,6 +1141,7 @@ const MessageContent = styled.div<{
   display: flex;
   flex-direction: column;
   pointer-events: ${(props) => props.selectionIsActive && 'none'};
+  align-items: flex-end;
 `
 
 const MessageItem = styled.div<{
@@ -1091,11 +1153,10 @@ const MessageItem = styled.div<{
   withAvatar?: boolean
   selectMessagesIsActive?: boolean
   showOwnAvatar?: boolean
-  transition: boolean
 }>`
   display: flex;
   position: relative;
-  margin-top: ${(props: any) => props.topMargin || '12px'};
+  margin-top: ${(props: any) => props.topMargin};
   margin-bottom: ${(props) => props.bottomMargin};
   padding: ${(props) => (props.selectMessagesIsActive ? '0 calc(4% + 52px)' : '0 4%')};
   padding-left: ${(props) =>

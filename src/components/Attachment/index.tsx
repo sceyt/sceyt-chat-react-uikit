@@ -3,11 +3,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { useSelector, useDispatch } from 'store/hooks'
 import { CircularProgressbar } from 'react-circular-progressbar'
 // Store
-import {
-  attachmentCompilationStateSelector,
-  attachmentsUploadProgressSelector,
-  attachmentUpdatedMapSelector
-} from '../../store/message/selector'
+import { attachmentCompilationStateSelector, attachmentsUploadProgressSelector } from '../../store/message/selector'
 import { connectionStatusSelector } from '../../store/user/selector'
 import { themeSelector } from '../../store/theme/selector'
 import {
@@ -139,13 +135,14 @@ const Attachment = ({
   const theme = useSelector(themeSelector)
   // const attachmentUploadProgress = useSelector(attachmentUploadProgressSelector) || {}
   const imageContRef = useRef<HTMLDivElement>(null)
-  const attachmentUpdatedMap = useSelector(attachmentUpdatedMapSelector) || {}
-  const attachmentUrlFromMap = useMemo(
-    () =>
-      attachmentUpdatedMap[getAttachmentURLWithVersion(attachment?.metadata?.tmb || '')] ||
-      attachmentUpdatedMap[getAttachmentURLWithVersion(attachment.url)],
-    [attachmentUpdatedMap, attachment.url]
-  )
+  const attachmentUrlFromMap = useSelector((store: any) => {
+    const map = store.MessageReducer.attachmentUpdatedMap
+    return (
+      map[getAttachmentURLWithVersion(attachment?.metadata?.tmb || '')] ||
+      map[getAttachmentURLWithVersion(attachment.url)] ||
+      undefined
+    )
+  })
   const [viewOnceVoiceModalOpen, setViewOnceVoiceModalOpen] = useState(false)
   const [downloadingFile, setDownloadingFile] = useState(false)
   const [attachmentUrl, setAttachmentUrl] = useState(attachmentUrlFromMap)
@@ -1115,12 +1112,14 @@ const Attachment = ({
 }
 
 export default React.memo(Attachment, (prevProps, nextProps) => {
-  // Custom comparison function to check if only 'messages' prop has changed
-  return (
-    prevProps.attachment.url === nextProps.attachment.url &&
-    prevProps.handleMediaItemClick === nextProps.handleMediaItemClick &&
-    prevProps.attachment.attachmentUrl === nextProps.attachment.attachmentUrl
-  )
+  if (prevProps.attachment.url !== nextProps.attachment.url) return false
+  if (prevProps.attachment.attachmentUrl !== nextProps.attachment.attachmentUrl) return false
+  if (prevProps.handleMediaItemClick !== nextProps.handleMediaItemClick) return false
+  if (prevProps.borderRadius !== nextProps.borderRadius) return false
+  if (prevProps.isRepliedMessage !== nextProps.isRepliedMessage) return false
+  if (prevProps.messagePlayed !== nextProps.messagePlayed) return false
+  if (prevProps.attachment.metadata !== nextProps.attachment.metadata) return false
+  return true
 })
 
 const DownloadImage = styled.div<any>`
@@ -1369,24 +1368,10 @@ export const AttachmentImg = styled.img<{
   border-radius: ${(props) => (props.isRepliedMessage ? '4px' : props.borderRadius || '6px')};
   padding: ${(props) => (props.isRepliedMessage ? '0.5px' : props.withBorder && `2px`)};
   box-sizing: border-box;
-  max-width: 100%;
-  max-height: ${(props) => (props.imageMaxHeight && !props.isDetailsView ? '400px' : '100%')};
   width: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
   height: ${(props) =>
     props.isRepliedMessage ? '40px' : props.isPreview ? '48px' : props.fitTheContainer ? '100%' : ''};
-  min-height: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
-      ? '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
-  min-width: ${(props) =>
-    !props.isRepliedMessage && !props.isPreview && !props.fitTheContainer && !props.isDetailsView
-      ? props.imageMinWidth || '165px'
-      : props.isRepliedMessage
-        ? '40px'
-        : ''};
   object-fit: cover;
   visibility: ${(props) => props.hidden && 'hidden'};
   z-index: 2;

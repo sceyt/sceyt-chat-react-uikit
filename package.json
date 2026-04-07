@@ -45,6 +45,7 @@
     "test": "run-s test:unit test:lint test:build",
     "test:build": "run-s build",
     "test:lint": "eslint .",
+    "test:message-list": "NODE_PATH=examples/sceyt-livechat-demo/node_modules react-scripts test --env=jsdom --runTestsByPath src/helpers/messageMarkerBatcher.test.ts src/store/message/reducers.test.ts src/store/message/saga.test.ts src/store/evetns/inedx.test.ts src/components/Message/index.test.tsx src/components/Messages/MessageList/MessageList.test.tsx src/components/Messages/MessageList/useChatController.test.tsx --watch=false",
     "test:unit": "cross-env CI=1 react-scripts test --env=jsdom",
     "test:watch": "react-scripts test --env=jsdom",
     "predeploy": "cd example && yarn install && yarn run build",

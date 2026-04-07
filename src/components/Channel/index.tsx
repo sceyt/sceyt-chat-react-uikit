@@ -38,7 +38,6 @@ import { IChannel, IContact, IMessage, IUser } from '../../types'
 import { MessageStatusIcon, MessageTextFormat } from '../../messageUtils'
 import { useColor } from '../../hooks'
 import { MESSAGE_TYPE } from '../../types/enum'
-import { pendingMessagesMapSelector } from 'store/message/selector'
 
 interface IChannelProps {
   channel: IChannel
@@ -341,17 +340,9 @@ const Channel: React.FC<IChannelProps> = ({
   const typingOrRecordingIndicator = useSelector(typingOrRecordingIndicatorArraySelector(channel.id))
   const [draftMessageText, setDraftMessageText] = useState<any>()
   const [draftMessage, setDraftMessage] = useState<any>()
-  const pendingMessagesMap = useSelector(pendingMessagesMapSelector)
-  const channelPendingLastMessage = useMemo(() => {
-    const messages = pendingMessagesMap[channel.id]
-    if (messages && messages?.length) {
-      return messages[messages?.length - 1]
-    }
-    return null
-  }, [pendingMessagesMap])
   const lastMessage = useMemo(
-    () => channelPendingLastMessage || channel.lastReactedMessage || channel.lastMessage,
-    [channelPendingLastMessage, channel.lastReactedMessage, channel.lastMessage]
+    () => channel.lastReactedMessage || channel.lastMessage,
+    [channel.lastReactedMessage, channel.lastMessage]
   )
   const lastMessageMetas =
     lastMessage &&

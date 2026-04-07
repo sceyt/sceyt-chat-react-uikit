@@ -9,6 +9,8 @@ interface MessageReactionsProps {
   reactionsPopupOpen: boolean
   reactionsPopupPosition: number
   reactionsPopupHorizontalPosition: { left: number; right: number }
+  reactionsAnchorTop: number
+  reactionsAnchorBottom: number
   rtlDirection: boolean
   backgroundSections: string
   textPrimary: string
@@ -40,6 +42,8 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   reactionsPopupOpen,
   reactionsPopupPosition,
   reactionsPopupHorizontalPosition,
+  reactionsAnchorTop,
+  reactionsAnchorBottom,
   rtlDirection,
   backgroundSections,
   textPrimary,
@@ -64,6 +68,15 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
   onReactionAddDelete,
   onOpenUserProfile
 }) => {
+  // Enable height transition only after the first paint so the initial render
+  // jumps instantly to the correct height without animating.
+  const enableTransitionRef = React.useCallback((el: HTMLDivElement | null) => {
+    if (!el) return
+    window.requestAnimationFrame(() => {
+      el.style.transition = 'height 0.2s ease, padding 0.2s ease, margin-top 0.2s ease'
+    })
+  }, [])
+
   return (
     <React.Fragment>
       {reactionsPopupOpen && (
@@ -71,6 +84,8 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
           openUserProfile={onOpenUserProfile}
           bottomPosition={reactionsPopupPosition}
           horizontalPositions={reactionsPopupHorizontalPosition}
+          anchorTop={reactionsAnchorTop}
+          anchorBottom={reactionsAnchorBottom}
           reactionTotals={message.reactionTotals || []}
           messageId={message.id}
           handleReactionsPopupClose={onToggleReactionsPopup}
@@ -81,6 +96,7 @@ const MessageReactions: React.FC<MessageReactionsProps> = ({
         />
       )}
       <ReactionsContainer
+        ref={enableTransitionRef}
         id={`${message.id}_reactions_container`}
         border={reactionsContainerBorder}
         boxShadow={reactionsContainerBoxShadow}
@@ -217,7 +233,6 @@ const ReactionsContainer = styled.div<{
   `};
   overflow: hidden;
   height: ${(props) => (props.isReacted ? '16px' : '0')};
-  transition: all 0.3s;
 `
 
 const MessageReactionsCont = styled.div<{ rtlDirection?: boolean }>`

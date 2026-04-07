@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { shallowEqual } from 'react-redux'
 import { useSelector, useDispatch } from 'store/hooks'
 import styled from 'styled-components'
@@ -68,14 +69,14 @@ interface IProps {
   messageType?: string | null | undefined
 }
 
-const SliderPopup = ({
+const SliderPopup: React.FC<IProps> = ({
   channel,
   setIsSliderOpen,
   currentMediaFile,
   allowEditDeleteIncomingMessage,
   attachmentsPreview,
   messageType
-}: IProps) => {
+}) => {
   const { [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary, [THEME_COLORS.OVERLAY_BACKGROUND_2]: overlayBackground2 } =
     useColor()
 
@@ -479,7 +480,7 @@ const SliderPopup = ({
     [itemsLoadedMap]
   )
 
-  return (
+  return createPortal(
     <Container draggable={false}>
       <SliderHeader>
         <FileInfo>
@@ -702,8 +703,9 @@ const SliderPopup = ({
           title='Delete message'
         />
       )}
-    </Container>
-  )
+    </Container>,
+    document.body
+  ) as unknown as React.ReactElement
 }
 
 export default SliderPopup

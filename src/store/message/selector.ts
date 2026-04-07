@@ -5,6 +5,8 @@ export const activeChannelMessagesSelector = (store: { MessageReducer: IMessageS
   store.MessageReducer.activeChannelMessages
 export const threadReplyMessagesSelector = (store: any) => store.MessageReducer.threadReplyMessages
 export const messagesLoadingState = (store: any) => store.MessageReducer.messagesLoadingState
+export const loadingPrevMessagesStateSelector = (store: any) => store.MessageReducer.loadingPrevMessagesState
+export const loadingNextMessagesStateSelector = (store: any) => store.MessageReducer.loadingNextMessagesState
 
 export const messagesHasNextSelector = (store: any) => store.MessageReducer.messagesHasNext
 export const messagesHasPrevSelector = (store: any) => store.MessageReducer.messagesHasPrev
@@ -45,6 +47,5 @@ export const pollVotesListSelector = (store: any) => store.MessageReducer.pollVo
 export const pollVotesHasMoreSelector = (store: any) => store.MessageReducer.pollVotesHasMore
 export const pollVotesLoadingStateSelector = (store: any) => store.MessageReducer.pollVotesLoadingState
 export const pendingPollActionsSelector = (store: any) => store.MessageReducer.pendingPollActions
-export const pendingMessagesMapSelector = (store: any) => store.MessageReducer.pendingMessagesMap
 export const unreadScrollToSelector = (store: any) => store.MessageReducer.unreadScrollTo
 export const unreadMessageIdSelector = (store: any) => store.MessageReducer.unreadMessageId

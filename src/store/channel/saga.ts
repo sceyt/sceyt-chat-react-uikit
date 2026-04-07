@@ -110,11 +110,7 @@ import {
 } from '../message/actions'
 import watchForEvents from '../evetns/inedx'
 import { CHECK_USER_STATUS, CONNECTION_STATUS } from '../user/constants'
-import {
-  removeAllMessages,
-  removeMessagesFromMap,
-  updateMessageOnMap
-} from '../../helpers/messagesHalper'
+import { removeAllMessages, removeMessagesFromMap, updateMessageOnMap } from '../../helpers/messagesHalper'
 import { setActionIsRestrictedAC, updateMembersPresenceAC } from '../member/actions'
 import { updateUserStatusOnMapAC } from '../user/actions'
 import { isJSON, makeUsername } from '../../helpers/message'
@@ -985,6 +981,7 @@ function* markMessagesRead(action: IAction): any {
     }
     // const activeChannelId = yield call(getActiveChannelId)
     if (channel) {
+      console.log('Mark Messages As Read', messageIds)
       const messageListMarker = yield call(channel.markMessagesAsDisplayed, messageIds)
       // use updateChannelDataAC already changes unreadMessageCount no need in setChannelUnreadCount
       // yield put(setChannelUnreadCount(0, channel.id));

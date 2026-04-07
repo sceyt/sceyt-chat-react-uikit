@@ -158,7 +158,11 @@ const channelSlice = createSlice({
     },
 
     addChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
-      state.channels.push(...action.payload.channels)
+      const existingIds = new Set(state.channels.map((c) => c.id))
+      const newChannels = action.payload.channels.filter((c) => !existingIds.has(c.id))
+      if (newChannels.length) {
+        state.channels.push(...newChannels)
+      }
     },
 
     addChannelsForForward: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
@@ -210,6 +214,7 @@ const channelSlice = createSlice({
 
     setActiveChannel: (state, action: PayloadAction<{ channel: IChannel | {} }>) => {
       state.activeChannel = action.payload.channel || {}
+      state.messageSearchIsOpen = false
       if ((action.payload.channel as IChannel).type === DEFAULT_CHANNEL_TYPE.DIRECT) {
         const ChatClient = getClient()
         const { user } = ChatClient

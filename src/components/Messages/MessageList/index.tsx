@@ -3,18 +3,19 @@ import React, { useCallback, useEffect, useState, FC } from 'react'
 import { shallowEqual } from 'react-redux'
 import { useDispatch, useSelector } from 'store/hooks'
 // Store
-import { setUnreadMessageIdAC } from '../../../store/message/actions'
 import {
   getChannelMentionsAC,
+  markMessagesAsDeliveredAC,
   markMessagesAsReadAC,
   setDraggedAttachmentsAC,
   updateChannelDataAC
 } from '../../../store/channel/actions'
 import {
   activeChannelMessagesSelector,
+  loadingNextMessagesStateSelector,
+  loadingPrevMessagesStateSelector,
   messagesHasNextSelector,
   messagesHasPrevSelector,
-  messagesLoadingState,
   openedMessageMenuSelector,
   sendMessageInputHeightSelector,
   scrollToMentionedMessageSelector,
@@ -61,7 +62,14 @@ import { getClient } from 'common/client'
 import { useChatController } from './useChatController'
 import ScrollToBottomButton from './ScrollToBottomButton'
 import ScrollToUnreadMentionsButton from './ScrollToUnreadMentionsButton'
-import { registerMessageListNavigator, unregisterMessageListNavigator } from '../../../helpers/messageListNavigator'
+import {
+  registerMessageListNavigator,
+  unregisterMessageListNavigator,
+  registerJumpToLatest,
+  unregisterJumpToLatest
+} from '../../../helpers/messageListNavigator'
+import { getMessageLocalRef } from '../../../helpers/messagesHalper'
+import { createMessageMarkerBatcher, DEFAULT_MARKER_BATCH_DEBOUNCE_MS } from '../../../helpers/messageMarkerBatcher'
 
 interface MessagesProps {
   fontFamily?: string
@@ -402,7 +410,6 @@ const MessageList: React.FC<MessagesProps> = ({
   messageTimeFontSize,
   messageTimeColor,
   messageStatusAndTimeLineHeight,
-  hiddenMessagesProperties,
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps,
@@ -427,6 +434,7 @@ const MessageList: React.FC<MessagesProps> = ({
 
   const ChatClient = getClient()
   const { user } = ChatClient
+  const currentUserId = user?.id ? String(user.id) : ''
 
   const dispatch = useDispatch()
   const channel: IChannel = useSelector(activeChannelSelector)
@@ -443,7 +451,8 @@ const MessageList: React.FC<MessagesProps> = ({
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
   const hasNextMessages = useSelector(messagesHasNextSelector, shallowEqual)
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
-  const messagesLoading = useSelector(messagesLoadingState)
+  const loadingPrevMessages = useSelector(loadingPrevMessagesStateSelector)
+  const loadingNextMessages = useSelector(loadingNextMessagesStateSelector)
   const draggingSelector = useSelector(isDraggingSelector, shallowEqual)
   const showScrollToNewMessageButton = useSelector(showScrollToNewMessageButtonSelector, shallowEqual)
   const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
@@ -454,6 +463,18 @@ const MessageList: React.FC<MessagesProps> = ({
   const [stopScrolling, setStopScrolling] = useState<any>(false)
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
   const [stickyDate, setStickyDate] = useState<string>('')
+  const markerBatcherRef = React.useRef<ReturnType<typeof createMessageMarkerBatcher> | null>(null)
+  if (!markerBatcherRef.current) {
+    markerBatcherRef.current = createMessageMarkerBatcher({
+      debounceMs: DEFAULT_MARKER_BATCH_DEBOUNCE_MS,
+      onFlushRead: (channelId, messageIds) => {
+        dispatch(markMessagesAsReadAC(channelId, messageIds))
+      },
+      onFlushDelivered: (channelId, messageIds) => {
+        dispatch(markMessagesAsDeliveredAC(channelId, messageIds))
+      }
+    })
+  }
   // const [hideMessages, setHideMessages] = useState<any>(false)
   // const [activeChannel, setActiveChannel] = useState<any>(channel)
 
@@ -463,7 +484,6 @@ const MessageList: React.FC<MessagesProps> = ({
     handleScrollToRepliedMessage,
     messagesIndexMapRef,
     timelineItems,
-    pendingNewestCount,
     jumpToLatest,
     jumpToItem
   } = useChatController({
@@ -471,7 +491,8 @@ const MessageList: React.FC<MessagesProps> = ({
     channel,
     hasPrevMessages,
     hasNextMessages,
-    messagesLoading,
+    loadingPrevMessages,
+    loadingNextMessages,
     connectionStatus,
     scrollToNewMessage,
     scrollToMentionedMessage,
@@ -485,6 +506,14 @@ const MessageList: React.FC<MessagesProps> = ({
     allowEditDeleteIncomingMessage,
     dispatch
   })
+
+  const queueReadMarker = useCallback((channelId: string, messageId?: string) => {
+    markerBatcherRef.current?.enqueueRead(channelId, messageId)
+  }, [])
+
+  const queueDeliveredMarker = useCallback((channelId: string, messageId?: string) => {
+    markerBatcherRef.current?.enqueueDelivered(channelId, messageId)
+  }, [])
 
   const updateStickyDate = useCallback(() => {
     const container = scrollRef.current
@@ -527,15 +556,22 @@ const MessageList: React.FC<MessagesProps> = ({
   }, [updateStickyDate])
 
   useEffect(() => {
+    return () => {
+      markerBatcherRef.current?.flushAll()
+      markerBatcherRef.current?.clearAll()
+    }
+  }, [])
+
+  useEffect(() => {
     updateStickyDate()
   }, [messages, updateStickyDate])
 
   const handleScrollToBottom = () => {
-    if (!channel?.lastMessage?.id) {
+    if (!channel?.lastMessage) {
       return
     }
 
-    if (channel.lastMessage.user.id !== user.id) {
+    if (channel.lastMessage.id && String(channel.lastMessage.user.id) !== currentUserId) {
       dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
     }
 
@@ -574,12 +610,15 @@ const MessageList: React.FC<MessagesProps> = ({
     [channel?.id, channel.newMentionCount, dispatch, handleScrollToRepliedMessage, isMessageRead]
   )
 
-  const pendingLatestCount = pendingNewestCount || channel.newMessageCount || 0
-
   useEffect(() => {
     registerMessageListNavigator(jumpToItem)
     return () => unregisterMessageListNavigator()
   }, [jumpToItem])
+
+  useEffect(() => {
+    registerJumpToLatest(jumpToLatest)
+    return () => unregisterJumpToLatest()
+  }, [jumpToLatest])
 
   useEffect(() => {
     if (channel.newMentionCount && (!channel.mentionsIds || channel.mentionsIds.length < 3)) {
@@ -703,14 +742,9 @@ const MessageList: React.FC<MessagesProps> = ({
     setMediaFile(null)
   }, [channel.id])
 
-  useEffect(() => {
-    if (messages.length > 0 && hiddenMessagesProperties?.includes(HiddenMessageProperty.hideAfterSendMessage)) {
-      const lastMessage = messages[messages.length - 1]
-      if (lastMessage.user.id === user.id) {
-        dispatch(setUnreadMessageIdAC(''))
-      }
-    }
-  }, [messages, hiddenMessagesProperties, user?.id])
+  const handleMediaItemClickStable = useCallback((attachment: IAttachment) => {
+    if (attachment?.id) setMediaFile(attachment)
+  }, [])
 
   const renderTimelineMessage = ({
     message,
@@ -718,6 +752,8 @@ const MessageList: React.FC<MessagesProps> = ({
     nextMessage,
     index,
     isUnreadMessage,
+    startsUnreadSection,
+    nextMessageStartsUnreadSection,
     isHighlighted
   }: {
     message: IMessage
@@ -725,14 +761,17 @@ const MessageList: React.FC<MessagesProps> = ({
     nextMessage: IMessage | null
     index: number
     isUnreadMessage: boolean
+    startsUnreadSection: boolean
+    nextMessageStartsUnreadSection: boolean
     isHighlighted: boolean
   }) => {
-    messagesIndexMapRef.current[message.id] = index
+    const localRef = getMessageLocalRef(message)
+    messagesIndexMapRef.current[localRef] = index
 
     if (message.type === MESSAGE_TYPE.SYSTEM) {
       return (
         <SystemMessage
-          key={message.id || message.tid}
+          key={localRef}
           channel={channel}
           message={message}
           nextMessage={nextMessage as IMessage}
@@ -746,6 +785,7 @@ const MessageList: React.FC<MessagesProps> = ({
           backgroundColor={dateDividerBackgroundColor}
           borderRadius={dateDividerBorderRadius}
           setLastVisibleMessageId={setLastVisibleMessageId}
+          queueReadMarker={queueReadMarker}
           disableAutoReadTracking
         />
       )
@@ -753,8 +793,8 @@ const MessageList: React.FC<MessagesProps> = ({
 
     return (
       <MessageWrapper
-        key={message.id || message.tid}
-        id={message.id}
+        key={localRef}
+        id={localRef || undefined}
         className={`${(message.incoming ? incomingMessageStyles?.classname : outgoingMessageStyles?.classname) || ''} ${
           isHighlighted ? 'highlight' : ''
         }`.trim()}
@@ -764,13 +804,17 @@ const MessageList: React.FC<MessagesProps> = ({
           message={message}
           channel={channel}
           stopScrolling={setStopScrolling}
-          handleMediaItemClick={(attachment) => attachment?.id && setMediaFile(attachment)}
+          handleMediaItemClick={handleMediaItemClickStable}
           handleScrollToRepliedMessage={handleScrollToRepliedMessage}
           prevMessage={prevMessage as IMessage}
           nextMessage={nextMessage as IMessage}
           isUnreadMessage={isUnreadMessage}
+          startsUnreadSection={startsUnreadSection}
+          nextMessageStartsUnreadSection={nextMessageStartsUnreadSection}
           unreadMessageId={unreadMessageId}
           setLastVisibleMessageId={setLastVisibleMessageId}
+          queueReadMarker={queueReadMarker}
+          queueDeliveredMarker={queueDeliveredMarker}
           isThreadMessage={false}
           disableAutoReadTracking
           fontFamily={fontFamily}
@@ -950,90 +994,104 @@ const MessageList: React.FC<MessagesProps> = ({
       )}
       <React.Fragment>
         {/* {!hideMessages && ( */}
-        <Container
-          id='scrollableDiv'
-          className={isScrolling ? 'show-scrollbar' : ''}
-          ref={scrollRef}
-          stopScrolling={stopScrolling}
-          onMouseEnter={() => setIsScrolling(true)}
-          onMouseLeave={() => setIsScrolling(false)}
-          onDragEnter={handleDragIn}
-          backgroundColor={backgroundColor || themeBackgroundColor}
-          thumbColor={surface2}
-        >
-          {messages.length && messages.length > 0 ? (
-            <MessagesBox className='messageBox' id='messageBox'>
-              {timelineItems.map((timelineItem, index) => {
-                if (timelineItem.type === 'date-divider') {
+        <ScrollViewport>
+          <Container
+            id='scrollableDiv'
+            className={isScrolling ? 'show-scrollbar' : ''}
+            ref={scrollRef}
+            stopScrolling={stopScrolling}
+            onMouseEnter={() => setIsScrolling(true)}
+            onMouseLeave={() => setIsScrolling(false)}
+            onDragEnter={handleDragIn}
+            backgroundColor={backgroundColor || themeBackgroundColor}
+            thumbColor={surface2}
+          >
+            {messages.length && messages.length > 0 ? (
+              <MessagesBox className='messageBox' id='messageBox'>
+                {timelineItems.map((timelineItem, index) => {
+                  if (timelineItem.type === 'date-divider') {
+                    return (
+                      <div key={timelineItem.key} data-date-label={timelineItem.label}>
+                        <MessageDivider
+                          index={index}
+                          dividerText={timelineItem.label}
+                          dateDividerFontSize={dateDividerFontSize}
+                          dateDividerTextColor={dateDividerTextColor}
+                          dateDividerBorder={dateDividerBorder}
+                          dateDividerBackgroundColor={dateDividerBackgroundColor}
+                          dateDividerBorderRadius={dateDividerBorderRadius}
+                          marginTop={differentUserMessageSpacing}
+                          chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                        />
+                      </div>
+                    )
+                  }
+
+                  if (timelineItem.type === 'unread-divider') {
+                    return (
+                      <div data-message-list-unread-divider='true' key={timelineItem.key}>
+                        <MessageDivider
+                          newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
+                          newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
+                          newMessagesSeparatorWidth={newMessagesSeparatorWidth}
+                          newMessagesSeparatorBorder={newMessagesSeparatorBorder}
+                          newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
+                          newMessagesSeparatorBackground={newMessagesSeparatorBackground}
+                          newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
+                          newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
+                          dividerText={newMessagesSeparatorText || 'Unread Messages'}
+                          chatBackgroundColor={backgroundColor || themeBackgroundColor}
+                          unread
+                        />
+                      </div>
+                    )
+                  }
+
                   return (
-                    <div key={timelineItem.key} data-date-label={timelineItem.label}>
-                      <MessageDivider
-                        index={index}
-                        dividerText={timelineItem.label}
-                        dateDividerFontSize={dateDividerFontSize}
-                        dateDividerTextColor={dateDividerTextColor}
-                        dateDividerBorder={dateDividerBorder}
-                        dateDividerBackgroundColor={dateDividerBackgroundColor}
-                        dateDividerBorderRadius={dateDividerBorderRadius}
-                        marginTop={differentUserMessageSpacing}
-                        chatBackgroundColor={backgroundColor || themeBackgroundColor}
-                      />
+                    <div
+                      data-message-list-item-id={timelineItem.localRef}
+                      key={timelineItem.key}
+                      ref={timelineItem.registerItemElement}
+                    >
+                      {renderTimelineMessage({
+                        message: timelineItem.item,
+                        prevMessage: timelineItem.prevItem,
+                        nextMessage: timelineItem.nextItem,
+                        index: timelineItem.index,
+                        isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
+                        startsUnreadSection: timelineItem.startsUnreadSection && !channel.backToLinkedChannel,
+                        nextMessageStartsUnreadSection:
+                          timelineItem.nextItemStartsUnreadSection && !channel.backToLinkedChannel,
+                        isHighlighted: timelineItem.isHighlighted
+                      })}
                     </div>
                   )
-                }
-
-                if (timelineItem.type === 'unread-divider') {
-                  return (
-                    <div data-message-list-unread-divider='true' key={timelineItem.key}>
-                      <MessageDivider
-                        newMessagesSeparatorTextColor={newMessagesSeparatorTextColor}
-                        newMessagesSeparatorFontSize={newMessagesSeparatorFontSize}
-                        newMessagesSeparatorWidth={newMessagesSeparatorWidth}
-                        newMessagesSeparatorBorder={newMessagesSeparatorBorder}
-                        newMessagesSeparatorBorderRadius={newMessagesSeparatorBorderRadius}
-                        newMessagesSeparatorBackground={newMessagesSeparatorBackground}
-                        newMessagesSeparatorLeftRightSpaceWidth={newMessagesSeparatorTextLeftRightSpacesWidth}
-                        newMessagesSeparatorSpaceColor={newMessagesSeparatorSpaceColor}
-                        dividerText={newMessagesSeparatorText || 'Unread Messages'}
-                        chatBackgroundColor={backgroundColor || themeBackgroundColor}
-                        unread
-                      />
-                    </div>
-                  )
-                }
-
-                return (
-                  <div
-                    data-message-list-item-id={timelineItem.item.id}
-                    key={timelineItem.key}
-                    ref={timelineItem.registerItemElement}
-                  >
-                    {renderTimelineMessage({
-                      message: timelineItem.item,
-                      prevMessage: timelineItem.prevItem,
-                      nextMessage: timelineItem.nextItem,
-                      index: timelineItem.index,
-                      isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
-                      isHighlighted: timelineItem.isHighlighted
-                    })}
-                  </div>
-                )
-              })}
-            </MessagesBox>
-          ) : (
-            messagesLoading === LOADING_STATE.LOADED && (
-              <NoMessagesContainer color={textPrimary}>
-                <NoMessagesIcon />
-                <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
-                <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
-                {/* {channel.type === CHANNEL_TYPE.DIRECT
+                })}
+              </MessagesBox>
+            ) : (
+              loadingPrevMessages === LOADING_STATE.LOADED &&
+              loadingNextMessages === LOADING_STATE.LOADED && (
+                <NoMessagesContainer color={textPrimary}>
+                  <NoMessagesIcon />
+                  <NoMessagesTitle color={textPrimary}>No Messages yet</NoMessagesTitle>
+                  <NoMessagesText color={textSecondary}>No messages yet, start the chat</NoMessagesText>
+                  {/* {channel.type === CHANNEL_TYPE.DIRECT
                   ? ' chat'
                   : channel.type === CHANNEL_TYPE.GROUP || channel.type === CHANNEL_TYPE.PRIVATE
                   ? ' group chat'
                   : ' channel'} */}
-              </NoMessagesContainer>
-            )
-          )}
+                </NoMessagesContainer>
+              )
+            )}
+            {attachmentsPreview?.show && mediaFile && (
+              <SliderPopup
+                channel={channel}
+                setIsSliderOpen={setMediaFile}
+                currentMediaFile={mediaFile}
+                attachmentsPreview={attachmentsPreview}
+              />
+            )}
+          </Container>
           {showTopFixedDate && stickyDate && (
             <StickyDateLabel
               dateDividerFontSize={dateDividerFontSize}
@@ -1044,21 +1102,13 @@ const MessageList: React.FC<MessagesProps> = ({
               <span>{stickyDate}</span>
             </StickyDateLabel>
           )}
-          {attachmentsPreview?.show && mediaFile && (
-            <SliderPopup
-              channel={channel}
-              setIsSliderOpen={setMediaFile}
-              currentMediaFile={mediaFile}
-              attachmentsPreview={attachmentsPreview}
-            />
-          )}
-        </Container>
+        </ScrollViewport>
         <ScrollToBottomButton
           show={!!showScrollToNewMessageButton && messages?.length}
           bottomOffset={sendMessageInputHeight}
           backgroundColor={surface1}
           badgeBackgroundColor={accentColor}
-          count={pendingLatestCount}
+          count={channel?.newMessageCount}
           onClick={handleScrollToBottom}
         />
         <ScrollToUnreadMentionsButton
@@ -1083,10 +1133,13 @@ export default MessageList
 export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?: string; thumbColor: string }>`
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
   transform: scaleY(-1);
   background-color: ${(props) => props.backgroundColor};
   overflow-y: overlay;
   overscroll-behavior-y: contain;
+  margin-top: auto;
 
   &::-webkit-scrollbar {
     width: 8px;
@@ -1108,11 +1161,18 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
 const MessagesBox = styled.div`
   display: flex;
   flex-direction: column;
-  padding-top: 40px;
   padding-bottom: 40px;
   width: 100%;
   transform: scaleY(-1);
   backface-visibility: hidden;
+`
+
+const ScrollViewport = styled.div`
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
 `
 
 const StickyDateLabel = styled.div<{
@@ -1121,15 +1181,16 @@ const StickyDateLabel = styled.div<{
   dateDividerBackgroundColor?: string
   dateDividerBorderRadius?: string
 }>`
-  position: sticky;
-  bottom: 28px;
+  position: absolute;
+  top: 18px;
+  left: 0;
+  right: 0;
   height: 0;
   z-index: 10;
   display: flex;
   justify-content: center;
   align-items: center;
   pointer-events: none;
-  transform: scaleY(-1);
 
   span {
     display: inline-block;

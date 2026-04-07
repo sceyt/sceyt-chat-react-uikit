@@ -61,6 +61,8 @@ import {
   removeUploadProgress,
   setMessageToEdit,
   setMessagesLoadingState,
+  setLoadingPrevMessagesState,
+  setLoadingNextMessagesState,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
@@ -88,10 +90,6 @@ import {
   setPollVotesInitialCount,
   removePendingPollAction,
   setPendingPollActionsMap,
-  setPendingMessage,
-  removePendingMessage,
-  updatePendingMessage,
-  clearPendingMessagesMap,
   updatePendingPollAction,
   setUnreadMessageId
 } from './reducers'
@@ -223,6 +221,12 @@ export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolea
 
 export function setMessagesLoadingStateAC(state: number) {
   return setMessagesLoadingState({ state })
+}
+export function setLoadingPrevMessagesStateAC(state: number | null) {
+  return setLoadingPrevMessagesState({ state })
+}
+export function setLoadingNextMessagesStateAC(state: number | null) {
+  return setLoadingNextMessagesState({ state })
 }
 export function setAttachmentsLoadingStateAC(state: number, forPopup?: boolean) {
   return setAttachmentsLoadingState({ state, forPopup: forPopup || false })
@@ -619,22 +623,6 @@ export function setPendingPollActionsMapAC(messageId: string, event: PendingPoll
 
 export function updatePendingPollActionAC(messageId: string, message: IMessage) {
   return updatePendingPollAction({ messageId, message })
-}
-
-export function setPendingMessageAC(channelId: string, message: IMessage) {
-  return setPendingMessage({ channelId, message })
-}
-
-export function removePendingMessageAC(channelId: string, messageId: string) {
-  return removePendingMessage({ channelId, messageId })
-}
-
-export function updatePendingMessageAC(channelId: string, messageId: string, updatedMessage: Partial<IMessage>) {
-  return updatePendingMessage({ channelId, messageId, updatedMessage })
-}
-
-export function clearPendingMessagesMapAC() {
-  return clearPendingMessagesMap()
 }
 
 export function setUnreadMessageIdAC(messageId: string) {

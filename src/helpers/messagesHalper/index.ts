@@ -4,14 +4,7 @@ import { MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from '../constants'
 import { cancelUpload, getCustomUploader } from '../customUploader'
 import { handleVoteDetails } from '../message'
 import store from 'store'
-import {
-  removePendingPollActionAC,
-  setPendingPollActionsMapAC,
-  setPendingMessageAC,
-  removePendingMessageAC,
-  updatePendingMessageAC,
-  clearPendingMessagesMapAC
-} from 'store/message/actions'
+import { removePendingPollActionAC, setPendingPollActionsMapAC } from 'store/message/actions'
 export const MESSAGES_MAX_PAGE_COUNT = 60
 export const MESSAGES_MAX_LENGTH = 40
 export const LOAD_MAX_MESSAGE_COUNT = 20
@@ -20,6 +13,7 @@ export const MESSAGE_LOAD_DIRECTION = {
   PREV: 'prev',
   NEXT: 'next'
 }
+const PENDING_MESSAGE_SORT_MULTIPLIER = BigInt(1000000)
 
 /**
  * Checks if a message should be skipped when updating delivery status.
@@ -127,7 +121,13 @@ type draftMessagesMap = {
   [key: string]: { text: string; mentionedUsers: any; messageForReply?: IMessage; bodyAttributes?: any }
 }
 type audioRecordingMap = { [key: string]: any }
-type visibleMessagesMap = { [key: string]: { id: string } }
+type visibleMessagesMap = {
+  [key: string]: {
+    id?: string
+    localRef: string
+    sortKey: string
+  }
+}
 
 type messagesMap = {
   [key: string]: { [key: string]: IMessage }
@@ -144,6 +144,7 @@ export const setSendMessageHandler = (handler: (message: IMessage, channelId: st
 const pendingAttachments: { [key: string]: { file: File; messageTid?: string; channelId: string } } = {}
 let messagesMap: messagesMap = {}
 let activeSegment: { startId: string; endId: string } | null = null
+let activeSegmentChannelId: string | null = null
 // Per-channel registry of contiguous loaded ranges, kept sorted ascending by startId.
 // "Contiguous" means the messages in a range were loaded via adjacent server pages
 // (either a single fresh-load window or that window extended by loadMoreMessages pagination).
@@ -184,38 +185,94 @@ export const setActiveSegment = (channelId: string, startId: string, endId: stri
     (s) => BigInt(s.startId) <= BigInt(startId) && BigInt(s.endId) >= BigInt(endId)
   )
   activeSegment = merged || { startId, endId }
+  activeSegmentChannelId = channelId
 }
 
 export const extendActiveSegment = (channelId: string, startId: string, endId: string, direction: string) => {
-  if (!activeSegment) {
-    setActiveSegment(channelId, startId, endId)
+  if (!activeSegment || activeSegmentChannelId !== channelId) {
+    upsertSegment(channelId, startId, endId)
     return
   }
-  // The new page is server-guaranteed contiguous with activeSegment on one side.
-  // Update the matching entry in loadedSegmentsMap in-place (find by the stable boundary).
-  const segments = loadedSegmentsMap[channelId] || []
-  if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-    // Stable side: endId stays the same
-    const idx = segments.findIndex((s) => s.endId === activeSegment!.endId)
-    activeSegment = { startId, endId: activeSegment.endId }
-    if (idx >= 0) {
-      loadedSegmentsMap[channelId][idx] = { ...activeSegment }
-    }
-  } else {
-    // Stable side: startId stays the same
-    const idx = segments.findIndex((s) => s.startId === activeSegment!.startId)
-    activeSegment = { startId: activeSegment.startId, endId }
-    if (idx >= 0) {
-      loadedSegmentsMap[channelId][idx] = { ...activeSegment }
-    }
+
+  const nextActiveSegment =
+    direction === MESSAGE_LOAD_DIRECTION.PREV
+      ? { startId, endId: activeSegment.endId }
+      : { startId: activeSegment.startId, endId }
+
+  upsertSegment(channelId, nextActiveSegment.startId, nextActiveSegment.endId)
+
+  activeSegment =
+    (loadedSegmentsMap[channelId] || []).find(
+      (segment) =>
+        BigInt(segment.startId) <= BigInt(nextActiveSegment.startId) &&
+        BigInt(segment.endId) >= BigInt(nextActiveSegment.endId)
+    ) || nextActiveSegment
+  activeSegmentChannelId = channelId
+}
+
+export const appendMessageToLatestSegment = (channelId: string, messageId?: string | null) => {
+  if (!messageId) {
+    return false
   }
+
+  const segments = loadedSegmentsMap[channelId]
+  if (!segments?.length) {
+    return false
+  }
+
+  const latestIndex = segments.length - 1
+  const latestSegment = segments[latestIndex]
+  if (compareMessageIds(messageId, latestSegment.endId) <= 0) {
+    return false
+  }
+
+  const updatedSegment = {
+    startId: latestSegment.startId,
+    endId: messageId
+  }
+  loadedSegmentsMap[channelId][latestIndex] = updatedSegment
+
+  if (
+    activeSegment &&
+    activeSegmentChannelId === channelId &&
+    activeSegment.startId === latestSegment.startId &&
+    activeSegment.endId === latestSegment.endId
+  ) {
+    activeSegment = updatedSegment
+  }
+
+  return true
 }
 
 export const clearActiveSegment = () => {
   activeSegment = null
+  activeSegmentChannelId = null
 }
 
 export const getActiveSegment = () => activeSegment
+
+const getCreatedAtSortKey = (createdAt?: IMessage['createdAt']) => {
+  const createdAtValue = new Date(createdAt || 0).getTime()
+  return BigInt(Number.isNaN(createdAtValue) ? 0 : createdAtValue) * PENDING_MESSAGE_SORT_MULTIPLIER
+}
+
+export const compareMessageIds = (leftId?: string | null, rightId?: string | null) => {
+  if (!leftId && !rightId) {
+    return 0
+  }
+  if (!leftId) {
+    return -1
+  }
+  if (!rightId) {
+    return 1
+  }
+  const leftValue = BigInt(leftId)
+  const rightValue = BigInt(rightId)
+  if (leftValue === rightValue) {
+    return 0
+  }
+  return leftValue < rightValue ? -1 : 1
+}
 
 /**
  * Returns up to `limit` cached messages contiguous with and immediately before `fromMessageId`
@@ -228,7 +285,7 @@ export function getContiguousPrevMessages(channelId: string, fromMessageId: stri
   if (!seg || BigInt(seg.startId) >= bigFrom) return []
   return Object.values(messagesMap[channelId] || {})
     .filter((msg) => msg.id && BigInt(msg.id) >= BigInt(seg.startId) && BigInt(msg.id) < bigFrom)
-    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .sort(compareMessagesForList)
     .slice(-limit)
 }
 
@@ -243,7 +300,7 @@ export function getContiguousNextMessages(channelId: string, fromMessageId: stri
   if (!seg || BigInt(seg.endId) <= bigFrom) return []
   return Object.values(messagesMap[channelId] || {})
     .filter((msg) => msg.id && BigInt(msg.id) > bigFrom && BigInt(msg.id) <= BigInt(seg.endId))
-    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .sort(compareMessagesForList)
     .slice(0, limit)
 }
 
@@ -261,10 +318,112 @@ export function hasNextContiguousInMap(channelId: string, fromMessageId: string)
   return segments.some((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) > bigFrom)
 }
 
+export const getMessageSortKey = (message: IMessage): bigint => {
+  if (message.id) {
+    return BigInt(message.id)
+  }
+  return getCreatedAtSortKey(message.createdAt)
+}
+
+export const getMessageLocalRef = (message?: Partial<Pick<IMessage, 'id' | 'tid' | 'createdAt'>> | null) => {
+  if (!message) {
+    return ''
+  }
+  if (message.id) {
+    return message.id
+  }
+  if (message.tid) {
+    return message.tid
+  }
+  return getCreatedAtSortKey(message.createdAt).toString()
+}
+
+export const messagesShareReference = (
+  left?: Partial<Pick<IMessage, 'id' | 'tid'>> | null,
+  right?: Partial<Pick<IMessage, 'id' | 'tid'>> | null
+) => {
+  if (!left || !right) {
+    return false
+  }
+
+  const leftRefs = [left.id, left.tid].filter(Boolean)
+  const rightRefs = [right.id, right.tid].filter(Boolean)
+
+  return leftRefs.some((leftRef) => rightRefs.includes(leftRef))
+}
+
+export const compareMessagesForList = (a: IMessage, b: IMessage) => {
+  const aKey = getMessageSortKey(a)
+  const bKey = getMessageSortKey(b)
+  if (aKey === bKey) {
+    return (a.tid || a.id || '').localeCompare(b.tid || b.id || '')
+  }
+  return aKey < bKey ? -1 : 1
+}
+
+export const shouldReplaceLastMessage = (
+  currentLastMessage: IMessage | null | undefined,
+  nextLastMessage: IMessage,
+  sourceMessage?: IMessage | null
+) => {
+  if (!currentLastMessage) {
+    return true
+  }
+
+  if (sourceMessage && getMessageLocalRef(currentLastMessage) === getMessageLocalRef(sourceMessage)) {
+    return true
+  }
+
+  return compareMessagesForList(nextLastMessage, currentLastMessage) >= 0
+}
+
+export const getFirstConfirmedMessageId = (messages: IMessage[]) => messages.find((message) => !!message.id)?.id || ''
+
+export const getLastConfirmedMessageId = (messages: IMessage[]) => {
+  for (let index = messages.length - 1; index >= 0; index--) {
+    if (messages[index]?.id) {
+      return messages[index].id
+    }
+  }
+  return ''
+}
+
+export const getClosestConfirmedMessageId = (
+  messages: IMessage[],
+  index: number,
+  preferredDirection: 'previous' | 'next' | 'nearest' = 'nearest'
+) => {
+  if (!messages.length) {
+    return ''
+  }
+
+  const safeIndex = Math.max(0, Math.min(index, messages.length - 1))
+
+  for (let offset = 0; offset < messages.length; offset++) {
+    const candidates =
+      preferredDirection === 'previous'
+        ? [safeIndex - offset, safeIndex + offset]
+        : preferredDirection === 'next'
+          ? [safeIndex + offset, safeIndex - offset]
+          : [safeIndex - offset, safeIndex + offset]
+
+    for (const candidateIndex of candidates) {
+      if (candidateIndex < 0 || candidateIndex >= messages.length) {
+        continue
+      }
+      if (messages[candidateIndex]?.id) {
+        return messages[candidateIndex].id
+      }
+    }
+  }
+
+  return ''
+}
+
 export function getLatestMessagesFromMap(channelId: string, limit: number): IMessage[] {
   return Object.values(messagesMap[channelId] || {})
-    .filter((m) => !!m.id)
-    .sort((a, b) => (BigInt(a.id) < BigInt(b.id) ? -1 : 1))
+    .filter((m) => !!m.id || m.tid)
+    .sort(compareMessagesForList)
     .slice(-limit)
 }
 
@@ -280,7 +439,11 @@ export function setMessagesToMap(
   for (const key in messagesMap[channelId]) {
     if (Object.prototype.hasOwnProperty.call(messagesMap[channelId], key)) {
       const element = messagesMap[channelId][key]
-      if (element.id >= firstMessageId && element.id <= lastMessageId) {
+      if (
+        element.id &&
+        compareMessageIds(element.id, firstMessageId) >= 0 &&
+        compareMessageIds(element.id, lastMessageId) <= 0
+      ) {
         delete messagesMap[channelId][key]
       }
     }
@@ -311,29 +474,6 @@ export function updateMessageOnMap(
     type: 'add' | 'delete' | 'addOwn' | 'deleteOwn' | 'close'
   }
 ) {
-  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
-  if (updatedMessage.params.deliveryStatus !== MESSAGE_DELIVERY_STATUS.PENDING && pendingMessagesMap[channelId]) {
-    if (
-      updatedMessage.params.state === MESSAGE_STATUS.FAILED ||
-      updatedMessage.params.state === MESSAGE_STATUS.UNMODIFIED
-    ) {
-      const updatedPendingMessages = pendingMessagesMap[channelId]?.map((msg: IMessage) => {
-        if (msg.tid === updatedMessage.messageId) {
-          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(msg, updatedMessage.params.deliveryStatus)
-          return {
-            ...msg,
-            ...updatedMessage.params,
-            userMarkers: [...(msg.userMarkers || []), ...(updatedMessage.params.userMarkers || [])],
-            ...statusUpdatedMessage
-          }
-        }
-        return msg
-      })
-      updatedPendingMessages.forEach((msg: IMessage) => {
-        store.dispatch(updatePendingMessageAC(channelId, msg.tid || msg.id, msg))
-      })
-    }
-  }
   let updatedMessageData = null
   if (messagesMap[channelId]) {
     const messagesList: IMessage[] = []
@@ -344,7 +484,9 @@ export function updateMessageOnMap(
           messagesList.push({ ...mes, ...updatedMessageData })
           continue
         } else {
-          const statusUpdatedMessage = updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params.deliveryStatus)
+          const statusUpdatedMessage = updatedMessage.params?.deliveryStatus
+            ? updateMessageDeliveryStatusAndMarkers(mes, updatedMessage.params.deliveryStatus)
+            : {}
           updatedMessageData = {
             ...mes,
             ...updatedMessage.params,
@@ -454,6 +596,17 @@ export function getMessagesFromMap(channelId: string) {
   return messagesMap[channelId]
 }
 
+export function getMessageFromMap(channelId: string, messageId: string) {
+  const channelMessages = messagesMap[channelId]
+  if (!channelMessages) {
+    return null
+  }
+  if (channelMessages[messageId]) {
+    return channelMessages[messageId]
+  }
+  return Object.values(channelMessages).find((message) => message.id === messageId || message.tid === messageId) || null
+}
+
 export function removeMessagesFromMap(channelId: string) {
   delete messagesMap[channelId]
   delete loadedSegmentsMap[channelId]
@@ -462,25 +615,20 @@ export function removeMessagesFromMap(channelId: string) {
 export function removeMessageFromMap(channelId: string, messageId: string) {
   if (messagesMap[channelId] && messagesMap[channelId][messageId]) {
     delete messagesMap[channelId][messageId]
+    return
   }
-
-  store.dispatch(removePendingMessageAC(channelId, messageId))
-}
-
-export function updatePendingMessageOnMap(
-  channelId: string,
-  messageId: string,
-  updatedMessage: Partial<IMessage & { isOwnMarker?: boolean }>
-) {
-  store.dispatch(updatePendingMessageAC(channelId, messageId, updatedMessage))
-}
-
-export function getMessageFromPendingMessagesMap(channelId: string, messageId: string) {
-  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
-  if (pendingMessagesMap[channelId]) {
-    return pendingMessagesMap[channelId].find((msg: IMessage) => msg.id === messageId || msg.tid === messageId)
+  if (messagesMap[channelId]) {
+    for (const key in messagesMap[channelId]) {
+      if (!Object.prototype.hasOwnProperty.call(messagesMap[channelId], key)) {
+        continue
+      }
+      const message = messagesMap[channelId][key]
+      if (message.id === messageId || message.tid === messageId) {
+        delete messagesMap[channelId][key]
+        return
+      }
+    }
   }
-  return null
 }
 
 export function clearMessagesMap() {
@@ -540,21 +688,39 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
   removeMessageFromMap(channelId, message.id || message.tid!)
 }
 
-export const getPendingMessages = (channelId: string) => {
-  const pendingMessagesMap = store.getState().MessageReducer.pendingMessagesMap
-  return pendingMessagesMap[channelId]
+export function getPendingMessagesFromMap(channelId: string): IMessage[] {
+  return Object.values(messagesMap[channelId] || {})
+    .filter((message) => !message.id && !!message.tid)
+    .sort(compareMessagesForList)
 }
 
-export const setPendingMessage = (channelId: string, pendingMessage: IMessage) => {
-  store.dispatch(setPendingMessageAC(channelId, pendingMessage))
+export function getAllPendingFromMap(): { [channelId: string]: IMessage[] } {
+  const result: { [channelId: string]: IMessage[] } = {}
+  for (const channelId in messagesMap) {
+    if (!Object.prototype.hasOwnProperty.call(messagesMap, channelId)) {
+      continue
+    }
+    const pendingMessages = getPendingMessagesFromMap(channelId)
+    if (pendingMessages.length > 0) {
+      result[channelId] = pendingMessages
+    }
+  }
+  return result
 }
 
-export const getPendingMessagesMap = () => {
-  return store.getState().MessageReducer.pendingMessagesMap
-}
+export function getLatestPendingMessageFromMap(
+  channelId: string,
+  excludeMessage?: Partial<Pick<IMessage, 'id' | 'tid'>> | null
+): IMessage | null {
+  const pendingMessages = getPendingMessagesFromMap(channelId)
 
-export const clearPendingMessagesMap = () => {
-  store.dispatch(clearPendingMessagesMapAC())
+  for (let index = pendingMessages.length - 1; index >= 0; index--) {
+    if (!excludeMessage || !messagesShareReference(pendingMessages[index], excludeMessage)) {
+      return pendingMessages[index]
+    }
+  }
+
+  return null
 }
 
 export const draftMessagesMap: draftMessagesMap = {}
@@ -598,11 +764,19 @@ export const clearVisibleMessagesMap = () => {
 }
 
 export const setMessageToVisibleMessagesMap = (message: IMessage) => {
-  visibleMessagesMap[message.id] = { id: message.id }
+  const localRef = getMessageLocalRef(message)
+  if (!localRef) {
+    return
+  }
+  visibleMessagesMap[localRef] = {
+    id: message.id,
+    localRef,
+    sortKey: getMessageSortKey(message).toString()
+  }
 }
 
 export const removeMessageFromVisibleMessagesMap = (message: IMessage) => {
-  delete visibleMessagesMap[message.id]
+  delete visibleMessagesMap[getMessageLocalRef(message)]
 }
 
 export type PendingPollAction = {
@@ -690,16 +864,36 @@ export const getCenterTwoMessages = (
   mid1: { messageId: string; index: number }
   mid2: { messageId: string; index: number }
 } => {
+  if (!messages.length) {
+    return {
+      mid1: { messageId: '', index: 0 },
+      mid2: { messageId: '', index: 0 }
+    }
+  }
+
   const mid = Math.floor(messages.length / 2)
+
+  if (messages.length === 1) {
+    return {
+      mid1: {
+        messageId: getClosestConfirmedMessageId(messages, 0, 'previous'),
+        index: 0
+      },
+      mid2: {
+        messageId: getClosestConfirmedMessageId(messages, 0, 'next'),
+        index: 0
+      }
+    }
+  }
 
   if (messages.length % 2 === 0) {
     return {
       mid1: {
-        messageId: messages[mid - 1].id,
+        messageId: getClosestConfirmedMessageId(messages, mid - 1, 'previous'),
         index: mid - 1
       },
       mid2: {
-        messageId: messages[mid].id,
+        messageId: getClosestConfirmedMessageId(messages, mid, 'next'),
         index: mid
       }
     }
@@ -707,11 +901,11 @@ export const getCenterTwoMessages = (
 
   return {
     mid1: {
-      messageId: messages[mid - 1].id,
+      messageId: getClosestConfirmedMessageId(messages, mid - 1, 'previous'),
       index: mid - 1
     },
     mid2: {
-      messageId: messages[mid + 1].id,
+      messageId: getClosestConfirmedMessageId(messages, mid + 1, 'next'),
       index: mid + 1
     }
   }

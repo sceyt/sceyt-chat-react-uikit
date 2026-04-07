@@ -41,6 +41,8 @@ const MessageHeader = ({
   const ChatClient = getClient()
   const { user } = ChatClient
   const { [THEME_COLORS.ACCENT]: accentColor } = useColor()
+  const currentUserId = user?.id ? String(user.id) : ''
+  const messageUserId = message.user?.id ? String(message.user.id) : ''
 
   return (
     <MessageHeaderCont
@@ -64,7 +66,7 @@ const MessageHeader = ({
           clickable={messageOwnerIsNotCurrentUser}
           onClick={() => handleCreateChat((messageOwnerIsNotCurrentUser as any) && message.user)}
         >
-          {message.user.id === user.id && message.user.firstName
+          {messageUserId === currentUserId && message.user.firstName
             ? `${message.user.firstName} ${message.user.lastName}`
             : makeUsername(contactsMap[message.user.id], message.user, getFromContacts)}
         </MessageOwner>

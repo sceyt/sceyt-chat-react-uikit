@@ -1,4 +1,4 @@
-import { put, call, spawn, takeLatest, takeEvery, delay } from 'redux-saga/effects'
+import { put, call, spawn, takeLatest, takeEvery } from 'redux-saga/effects'
 import { v4 as uuidv4 } from 'uuid'
 import {
   ADD_REACTION,
@@ -7,7 +7,6 @@ import {
   EDIT_MESSAGE,
   FORWARD_MESSAGE,
   GET_MESSAGE,
-  GET_MESSAGES,
   LOAD_LATEST_MESSAGES,
   LOAD_AROUND_MESSAGE,
   LOAD_NEAR_UNREAD,
@@ -54,15 +53,12 @@ import {
 import {
   addAttachmentsAC,
   addAttachmentsForPopupAC,
-  addMessageAC,
   addMessagesAC,
   addReactionsToListAC,
   addReactionToListAC,
   addReactionToMessageAC,
   deleteReactionFromListAC,
   deleteReactionFromMessageAC,
-  loadLatestMessagesAC,
-  loadDefaultMessagesAC,
   removeAttachmentProgressAC,
   scrollToNewMessageAC,
   setAttachmentsAC,
@@ -72,6 +68,8 @@ import {
   setMessagesAC,
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
+  setLoadingNextMessagesStateAC,
+  setLoadingPrevMessagesStateAC,
   setMessagesLoadingStateAC,
   setReactionsListAC,
   setReactionsLoadingStateAC,
@@ -91,7 +89,6 @@ import {
   deletePollVotesFromListAC,
   removePendingPollActionAC,
   resendPendingPollActionsAC,
-  removePendingMessageAC,
   updatePendingPollActionAC,
   setUnreadScrollToAC,
   setUnreadMessageIdAC,
@@ -117,7 +114,7 @@ import {
 } from '../channel/actions'
 import {
   addReactionToMessageOnMap,
-  getMessagesFromMap,
+  compareMessageIds,
   setMessagesToMap,
   updateMessageOnMap,
   MESSAGES_MAX_LENGTH,
@@ -126,23 +123,31 @@ import {
   setPendingAttachment,
   removeReactionToMessageOnMap,
   sendMessageHandler,
-  setPendingMessage,
   setPendingPollAction,
   checkPendingPollActionConflict,
-  getPendingMessagesMap,
-  getPendingMessages,
   addMessageToMap,
+  appendMessageToLatestSegment,
+  getAllPendingFromMap,
+  getFirstConfirmedMessageId,
+  getMessageFromMap,
   getLatestMessagesFromMap,
+  getLatestPendingMessageFromMap,
+  getLastConfirmedMessageId,
+  getPendingMessagesFromMap,
   MESSAGES_MAX_PAGE_COUNT,
+  messagesShareReference,
   getCenterTwoMessages,
+  shouldReplaceLastMessage,
   setActiveSegment,
   extendActiveSegment,
   getContiguousPrevMessages,
   getContiguousNextMessages,
   hasPrevContiguousInMap,
   hasNextContiguousInMap,
-  LOAD_MAX_MESSAGE_COUNT_PREFETCH
+  LOAD_MAX_MESSAGE_COUNT_PREFETCH,
+  removeMessageFromMap
 } from '../../helpers/messagesHalper'
+import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { CONNECTION_STATUS } from '../user/constants'
 import {
   customUpload,
@@ -166,6 +171,64 @@ import { calculateRenderedImageWidth } from 'helpers'
 
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
+const queuedPrefetchRequests = new Map<string, { fromMessageId: string; pages: number }>()
+const prefetchCompletionWaiters = new Map<string, Array<() => void>>()
+
+type MessageListLoadScope = 'previous' | 'next' | 'both'
+
+function* setMessageListLoading(scope: MessageListLoadScope, state: number | null): any {
+  yield put(setMessagesLoadingStateAC((state ?? LOADING_STATE.LOADED) as number))
+
+  if (scope === 'previous' || scope === 'both') {
+    yield put(setLoadingPrevMessagesStateAC(state))
+  }
+
+  if (scope === 'next' || scope === 'both') {
+    yield put(setLoadingNextMessagesStateAC(state))
+  }
+}
+
+const shouldAdvancePrefetchAnchor = (direction: string, currentId: string, nextId: string) => {
+  try {
+    return direction === MESSAGE_LOAD_DIRECTION.PREV
+      ? BigInt(nextId) < BigInt(currentId)
+      : BigInt(nextId) > BigInt(currentId)
+  } catch (_error) {
+    return nextId !== currentId
+  }
+}
+
+const queuePrefetchRequest = (key: string, direction: string, fromMessageId: string, pages: number) => {
+  const existingRequest = queuedPrefetchRequests.get(key)
+  if (!existingRequest) {
+    queuedPrefetchRequests.set(key, { fromMessageId, pages })
+    return
+  }
+
+  queuedPrefetchRequests.set(key, {
+    fromMessageId: shouldAdvancePrefetchAnchor(direction, existingRequest.fromMessageId, fromMessageId)
+      ? fromMessageId
+      : existingRequest.fromMessageId,
+    pages: Math.max(existingRequest.pages, pages)
+  })
+}
+
+const waitForPrefetchCompletion = (key: string) =>
+  new Promise<void>((resolve) => {
+    const currentWaiters = prefetchCompletionWaiters.get(key) || []
+    currentWaiters.push(resolve)
+    prefetchCompletionWaiters.set(key, currentWaiters)
+  })
+
+const notifyPrefetchCompletion = (key: string) => {
+  const waiters = prefetchCompletionWaiters.get(key)
+  if (!waiters?.length) {
+    return
+  }
+
+  prefetchCompletionWaiters.delete(key)
+  waiters.forEach((resolve) => resolve())
+}
 
 export const handleUploadAttachments = async (attachments: IAttachment[], message: IMessage, channel: IChannel) => {
   return await Promise.all(
@@ -316,7 +379,87 @@ const addPendingMessage = async (message: any, messageCopy: IMessage, channelId:
     mentionedUsers: message.mentionedUsers,
     parentMessage: message.parentMessage
   }
-  setPendingMessage(channelId, messageToAdd)
+  addMessageToMap(channelId, messageToAdd)
+}
+
+const addConfirmedMessageToCache = (channelId: string, message: IMessage) => {
+  addMessageToMap(channelId, message)
+  appendMessageToLatestSegment(channelId, message.id)
+}
+
+const getStoredChannel = (channelId: string): IChannel | null =>
+  getChannelFromMap(channelId) ||
+  getChannelFromAllChannels(channelId) ||
+  getChannelFromAllChannelsMap(channelId) ||
+  null
+
+const shouldReplaceChannelLastMessage = (
+  channelId: string,
+  nextLastMessage: IMessage,
+  sourceMessage?: IMessage | null
+) => {
+  return shouldReplaceLastMessage(getStoredChannel(channelId)?.lastMessage, nextLastMessage, sourceMessage)
+}
+
+const getResolvedChannelLastMessage = (
+  channelId: string,
+  nextLastMessage: IMessage,
+  sourceMessage?: IMessage | null,
+  excludeSourceMessageFromPending: boolean = true
+) => {
+  const latestRemainingPendingMessage = getLatestPendingMessageFromMap(
+    channelId,
+    excludeSourceMessageFromPending ? sourceMessage : null
+  )
+  if (latestRemainingPendingMessage) {
+    return latestRemainingPendingMessage
+  }
+
+  const currentLastMessage = getStoredChannel(channelId)?.lastMessage
+  if (shouldReplaceChannelLastMessage(channelId, nextLastMessage, sourceMessage)) {
+    return nextLastMessage
+  }
+
+  return currentLastMessage || null
+}
+
+const getResolvedChannelUpdateData = (channelId: string, channelUpdateData: Partial<IChannel>) => {
+  if (!channelUpdateData.lastMessage) {
+    return channelUpdateData
+  }
+
+  const { lastMessage, ...restChannelUpdateData } = channelUpdateData
+  const resolvedLastMessage = getResolvedChannelLastMessage(channelId, lastMessage, lastMessage)
+
+  if (!lastMessageNeedsUpdate(getStoredChannel(channelId)?.lastMessage, resolvedLastMessage)) {
+    return restChannelUpdateData
+  }
+
+  return {
+    ...restChannelUpdateData,
+    lastMessage: resolvedLastMessage
+  }
+}
+
+const lastMessageNeedsUpdate = (
+  currentLastMessage: IMessage | null | undefined,
+  nextLastMessage: IMessage | null | undefined
+) => {
+  if (!nextLastMessage) {
+    return false
+  }
+
+  if (!currentLastMessage) {
+    return true
+  }
+
+  return !(
+    messagesShareReference(currentLastMessage, nextLastMessage) &&
+    currentLastMessage.id === nextLastMessage.id &&
+    currentLastMessage.tid === nextLastMessage.tid &&
+    currentLastMessage.state === nextLastMessage.state &&
+    currentLastMessage.deliveryStatus === nextLastMessage.deliveryStatus
+  )
 }
 
 const updateMessage = function* (
@@ -329,22 +472,52 @@ const updateMessage = function* (
 ): any {
   const activeChannelId = getActiveChannelId()
   if (actionType !== RESEND_MESSAGE) {
-    if (activeChannelId === channelId) {
-      yield put(addMessageAC({ ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }))
-    }
     yield call(addPendingMessage, message, pending, channelId)
     if (scrollToNewMessage) {
-      const channel = yield call(getChannelFromAllChannels, channelId)
-      const messages = store.getState().MessageReducer.activeChannelMessages
-      const lastMsgIdx = messages.findIndex((msg: IMessage) => msg.id === channel?.lastMessage?.id)
-      if (lastMsgIdx >= 0) {
-        // Last message is already in the current window — just scroll to it
-        yield put(scrollToNewMessageAC(true, false, false))
-      } else if (channel?.id) {
-        // Latest messages are not loaded yet — fetch them, scroll happens after load
-        yield put(loadLatestMessagesAC(channel, channel?.lastMessage?.id, false, 'smooth', true))
-      }
+      navigateToLatest(true)
     }
+    if (activeChannelId === channelId) {
+      const updatedMessage = { ...pending, ...(isNotShowOwnMessageForward ? { forwardingDetails: undefined } : {}) }
+      updateChannelLastMessageOnAllChannels(activeChannelId, updatedMessage)
+      yield put(updateChannelDataAC(activeChannelId, { lastMessage: updatedMessage }, true))
+      // yield put(addMessageAC(updatedMessage))
+    }
+  }
+}
+
+const syncFailedMessageState = function* (
+  channel: IChannel,
+  messageId: string,
+  message: IMessage,
+  shouldKeepInMap: boolean
+): any {
+  if (shouldKeepInMap) {
+    updateMessageOnMap(channel.id, {
+      messageId,
+      params: { state: MESSAGE_STATUS.FAILED }
+    })
+  } else {
+    removeMessageFromMap(channel.id, messageId)
+  }
+
+  const activeChannelId = getActiveChannelId()
+  if (activeChannelId === channel.id) {
+    yield put(updateMessageAC(messageId, { state: MESSAGE_STATUS.FAILED }))
+  }
+
+  const failedMessage = {
+    ...message,
+    state: MESSAGE_STATUS.FAILED
+  }
+  const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, failedMessage, message, !shouldKeepInMap)
+  if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+    updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
+    const channelUpdateParam = {
+      lastMessage: resolvedLastMessage,
+      lastReactedMessage: null
+    }
+    yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+    updateChannelOnAllChannels(channel.id, channelUpdateParam)
   }
 }
 
@@ -698,39 +871,40 @@ function* sendMessage(action: IAction): any {
             if (activeChannelId === channel.id) {
               yield put(updateMessageAC(messageToSend.tid as string, messageUpdateData, true))
             }
-            yield put(removePendingMessageAC(channel.id, messageToSend.tid as string))
             const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-            addMessageToMap(channel.id, messageToUpdate)
-            updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-            const channelUpdateParam = {
-              lastMessage: messageToUpdate,
-              lastReactedMessage: null
-            }
+            addConfirmedMessageToCache(channel.id, messageToUpdate)
             if (channel.unread) {
               yield put(markChannelAsReadAC(channel.id))
             }
-            yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
-            updateChannelOnAllChannels(channel.id, channelUpdateParam)
+            const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
+            if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+              updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
+              const channelUpdateParam = {
+                lastMessage: resolvedLastMessage,
+                lastReactedMessage: null
+              }
+              yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+              updateChannelOnAllChannels(channel.id, channelUpdateParam)
+            }
           } else {
             throw new Error('Connection required to send message')
           }
         } catch (e) {
           const isErrorResendable = isResendableError(e?.type)
-          if (!isErrorResendable && channel?.id && messageToSend?.tid) {
-            yield put(removePendingMessageAC(channel.id, messageToSend.tid!))
-          } else if (channel?.id) {
+          if (channel?.id && messageToSend?.tid) {
             log.error('Error on uploading attachment', messageToSend.tid, e)
             if (messageToSend.attachments?.length) {
               for (const att of messageToSend.attachments) {
                 if (att.tid) yield put(updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, att.tid))
               }
             }
-
-            updateMessageOnMap(channel.id, {
-              messageId: messageToSend.tid!,
-              params: { state: MESSAGE_STATUS.FAILED }
-            })
-            yield put(updateMessageAC(messageToSend.tid!, { state: MESSAGE_STATUS.FAILED }))
+            yield call(
+              syncFailedMessageState,
+              channel,
+              messageToSend.tid!,
+              pendingMessages[i] || messageToSend,
+              isErrorResendable
+            )
           }
         }
       }
@@ -843,21 +1017,23 @@ function* sendTextMessage(action: IAction): any {
       }
       const stringifiedMessageUpdateData = JSON.parse(JSON.stringify(messageUpdateData))
       yield put(updatePendingPollActionAC(messageToSend.tid as string, stringifiedMessageUpdateData))
-      yield put(removePendingMessageAC(channel.id, messageToSend.tid))
-      addMessageToMap(channel.id, stringifiedMessageUpdateData)
+      addConfirmedMessageToCache(channel.id, stringifiedMessageUpdateData)
       const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-      updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-      // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
-      const channelUpdateParam = {
-        lastMessage: messageToUpdate,
-        lastReactedMessage: null
-      }
-      yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
-      updateChannelOnAllChannels(channel.id, channelUpdateParam)
       if (channel.unread) {
         yield put(markChannelAsReadAC(channel.id))
       }
-      channel.lastMessage = messageToUpdate
+      const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
+      if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+        updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
+        // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
+        const channelUpdateParam = {
+          lastMessage: resolvedLastMessage,
+          lastReactedMessage: null
+        }
+        yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+        updateChannelOnAllChannels(channel.id, channelUpdateParam)
+        channel.lastMessage = resolvedLastMessage!
+      }
     } else {
       // eslint-disable-next-line
       throw new Error('Connection required to send message')
@@ -867,17 +1043,17 @@ function* sendTextMessage(action: IAction): any {
   } catch (e) {
     log.error('error on send text message ... ', e?.type, e)
     const isErrorResendable = isResendableError(e?.type)
-    if (!isErrorResendable && channel?.id && sendMessageTid) {
-      yield put(removePendingMessageAC(channel.id, sendMessageTid!))
-    } else if (channel?.id && sendMessageTid) {
-      updateMessageOnMap(channel.id, {
-        messageId: sendMessageTid,
-        params: { state: MESSAGE_STATUS.FAILED }
-      })
-      const activeChannelId = getActiveChannelId()
-      if (activeChannelId === channel.id) {
-        yield put(updateMessageAC(sendMessageTid, { state: MESSAGE_STATUS.FAILED }))
-      }
+    if (channel?.id && sendMessageTid) {
+      yield call(
+        syncFailedMessageState,
+        channel,
+        sendMessageTid,
+        pendingMessage || {
+          ...message,
+          tid: sendMessageTid
+        },
+        isErrorResendable
+      )
     }
     // yield put(setErrorNotification(`${e.message} ${e.code}`));
   } finally {
@@ -984,16 +1160,18 @@ function* forwardMessage(action: IAction): any {
         pendingMessage.forwardingDetails!.hops = message.forwardingDetails ? message.forwardingDetails.hops : 1
       }
 
-      if (channelId === activeChannelId) {
-        const hasNextMessages = store.getState().MessageReducer.messagesHasNext
-        if (hasNextMessages) {
-          yield put(loadDefaultMessagesAC(channel))
-        }
-      }
       if (pendingMessage) {
         if (action.type !== RESEND_MESSAGE) {
           yield call(loadOGMetadataForLinkMessages, [pendingMessage], true, false, false)
-          yield call(updateMessage, action.type, pendingMessage, channel.id, false, message, isNotShowOwnMessageForward)
+          yield call(
+            updateMessage,
+            action.type,
+            pendingMessage,
+            channel.id,
+            channelId === activeChannelId,
+            message,
+            isNotShowOwnMessageForward
+          )
         }
       }
       if (connectionState === CONNECTION_STATUS.CONNECTED) {
@@ -1008,19 +1186,20 @@ function* forwardMessage(action: IAction): any {
         if (channelId === activeChannelId) {
           yield put(updateMessageAC(messageToSend.tid, JSON.parse(JSON.stringify(messageUpdateData)), true))
         }
-        if (messageToSend.tid) yield put(removePendingMessageAC(channel.id, messageToSend.tid))
-
-        addMessageToMap(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
+        addConfirmedMessageToCache(channel.id, JSON.parse(JSON.stringify(messageUpdateData)))
         const messageToUpdate = JSON.parse(JSON.stringify(messageResponse))
-        updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-        const channelUpdateParam = {
-          lastMessage: messageToUpdate,
-          lastReactedMessage: null
-        }
-        yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
-        updateChannelOnAllChannels(channel.id, channelUpdateParam)
         if (channel.unread) {
           yield put(markChannelAsReadAC(channel.id))
+        }
+        const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
+        if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
+          updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
+          const channelUpdateParam = {
+            lastMessage: resolvedLastMessage,
+            lastReactedMessage: null
+          }
+          yield put(updateChannelDataAC(channel.id, channelUpdateParam, true))
+          updateChannelOnAllChannels(channel.id, channelUpdateParam)
         }
       } else {
         throw new Error('Connection required to forward message')
@@ -1028,19 +1207,17 @@ function* forwardMessage(action: IAction): any {
     }
   } catch (e) {
     const isErrorResendable = isResendableError(e?.type)
-    if (!isErrorResendable && channel?.id && messageTid) {
-      yield put(removePendingMessageAC(channel!.id, messageTid!))
-    } else {
-      if (channel?.id && messageTid) {
-        updateMessageOnMap(channel.id, {
-          messageId: messageTid!,
-          params: { state: MESSAGE_STATUS.FAILED }
-        })
-        const activeChannelId = getActiveChannelId()
-        if (activeChannelId === channel.id) {
-          yield put(updateMessageAC(messageTid!, { state: MESSAGE_STATUS.FAILED }))
-        }
-      }
+    if (channel?.id && messageTid) {
+      yield call(
+        syncFailedMessageState,
+        channel,
+        messageTid,
+        pendingMessage || {
+          ...message,
+          tid: messageTid
+        },
+        isErrorResendable
+      )
     }
     log.error('error on forward message ... ', e)
   } finally {
@@ -1159,7 +1336,7 @@ function* editMessage(action: IAction): any {
 }
 
 const sendPendingMessages = function* (connectionState: string) {
-  const pendingMessagesMap = { ...getPendingMessagesMap() }
+  const pendingMessagesMap = getAllPendingFromMap()
   for (const channelId in pendingMessagesMap) {
     for (const msg of pendingMessagesMap[channelId]) {
       const attachments = msg?.attachments?.filter((att: IAttachment) => att?.type !== attachmentTypes.link)
@@ -1199,22 +1376,10 @@ const sendPendingMessages = function* (connectionState: string) {
   }
 }
 
-const updateMessages = function* (
-  channel: IChannel,
-  updatedMessages: IMessage[],
-  firstMessageId?: string,
-  lastMessageId?: string
-) {
-  const messages = [...updatedMessages]
-  setMessagesToMap(channel.id, messages, firstMessageId, lastMessageId)
-  yield call(loadOGMetadataForLinkMessages, messages, true, false, false)
-  yield put(setMessagesAC(JSON.parse(JSON.stringify(messages))))
-}
-
 const getFilteredPendingMessages = (messages: IMessage[]) => {
   let filteredPendingMessages: IMessage[] = []
   const activeChannelId = getActiveChannelId()
-  const pendingMessages = JSON.parse(JSON.stringify(getPendingMessages(activeChannelId) || []))
+  const pendingMessages = JSON.parse(JSON.stringify(getPendingMessagesFromMap(activeChannelId)))
   if (pendingMessages && pendingMessages.length) {
     const messagesMap: { [key: string]: IMessage } = {}
     messages.forEach((msg) => {
@@ -1398,7 +1563,7 @@ function* loadOGMetadataForLinkSaga(action: IAction): any {
 
 function* loadAroundMessage(action: IAction): any {
   try {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel, messageId, highlight, behavior, scrollToMessage, networkChanged } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     const messages = store.getState().MessageReducer.activeChannelMessages
@@ -1416,53 +1581,48 @@ function* loadAroundMessage(action: IAction): any {
       let loadPreviousMessageId = ''
       let nextLoadLimit = MESSAGES_MAX_PAGE_COUNT / 2
       let previousLoadLimit = MESSAGES_MAX_PAGE_COUNT / 2
-      if (networkChanged) {
+      if (messageId) {
+        loadPreviousMessageId = messageId
+      } else if (networkChanged) {
         const centerMessageIndex = getCenterTwoMessages(messages)
         loadPreviousMessageId = centerMessageIndex.mid2.messageId
         loadNextMessageId = centerMessageIndex.mid1.messageId
         previousLoadLimit = centerMessageIndex.mid2.index
         nextLoadLimit = messages.length - centerMessageIndex.mid1.index - 1
-      } else if (messageId) {
-        loadPreviousMessageId = messageId
       }
       messageQuery.limit = previousLoadLimit
       const firstResult =
-        connectionState === CONNECTION_STATUS.CONNECTED
+        loadPreviousMessageId && connectionState === CONNECTION_STATUS.CONNECTED
           ? yield call(messageQuery.loadPreviousMessageId, loadPreviousMessageId)
           : { messages: [], hasNext: false }
-      if (!networkChanged && firstResult.messages.length > 0) {
-        loadNextMessageId = firstResult.messages[firstResult.messages.length - 1].id
-      } else if (!networkChanged && !firstResult.messages.length) {
+      if (!loadNextMessageId && firstResult.messages.length > 0) {
+        loadNextMessageId = getLastConfirmedMessageId(firstResult.messages)
+      } else if (!networkChanged && !loadNextMessageId && !firstResult.messages.length) {
         loadNextMessageId = '0'
       }
       messageQuery.reverse = false
       messageQuery.limit = nextLoadLimit
       const secondResult =
-        connectionState === CONNECTION_STATUS.CONNECTED
+        loadNextMessageId && connectionState === CONNECTION_STATUS.CONNECTED
           ? yield call(messageQuery.loadNextMessageId, loadNextMessageId)
           : { messages: [], hasNext: false }
+      const resultMessages =
+        networkChanged && !firstResult.messages.length && !secondResult.messages.length
+          ? messages
+          : [...firstResult.messages, ...secondResult.messages]
       const result = {
-        messages: [...firstResult.messages, ...secondResult.messages],
+        messages: resultMessages,
         hasNext: true
       }
       yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
       yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
-      setMessagesToMap(
-        channel.id,
-        result.messages,
-        result.messages[0]?.id,
-        result.messages[result.messages.length - 1]?.id
-      )
-      if (result.messages.length > 0) {
-        setActiveSegment(channel.id, result.messages[0].id, result.messages[result.messages.length - 1].id)
-        yield spawn(prefetchMessages, channel.id, result.messages[0].id, MESSAGE_LOAD_DIRECTION.PREV, 2)
-        yield spawn(
-          prefetchMessages,
-          channel.id,
-          result.messages[result.messages.length - 1].id,
-          MESSAGE_LOAD_DIRECTION.NEXT,
-          2
-        )
+      const firstConfirmedMessageId = getFirstConfirmedMessageId(result.messages)
+      const lastConfirmedMessageId = getLastConfirmedMessageId(result.messages)
+      if (firstConfirmedMessageId && lastConfirmedMessageId) {
+        setMessagesToMap(channel.id, result.messages, firstConfirmedMessageId, lastConfirmedMessageId)
+        setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+        yield spawn(prefetchMessages, channel.id, firstConfirmedMessageId, MESSAGE_LOAD_DIRECTION.PREV, 2)
+        yield spawn(prefetchMessages, channel.id, lastConfirmedMessageId, MESSAGE_LOAD_DIRECTION.NEXT, 2)
       }
       yield put(setMessagesHasNextAC(true))
       if (scrollToMessage && !networkChanged) {
@@ -1478,7 +1638,7 @@ function* loadAroundMessage(action: IAction): any {
         yield spawn(sendPendingMessages, connectionState)
       }
       const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
-      if (updatedChannel?.lastMessage) {
+      if (updatedChannel?.lastMessage && shouldReplaceChannelLastMessage(channel.id, updatedChannel.lastMessage)) {
         yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
         updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
       }
@@ -1486,13 +1646,13 @@ function* loadAroundMessage(action: IAction): any {
   } catch (e) {
     log.error('error in loadAroundMessage', e)
   } finally {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
 }
 
 function* loadNearUnread(action: IAction): any {
   try {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -1519,21 +1679,16 @@ function* loadNearUnread(action: IAction): any {
             : { messages: [], hasNext: false }
       }
       yield put(setMessagesHasPrevAC(true))
+      const lastConfirmedMessageId = getLastConfirmedMessageId(result.messages)
       yield put(
         setMessagesHasNextAC(
-          channel.lastMessage &&
-            result.messages.length > 0 &&
-            channel.lastMessage.id !== result.messages[result.messages.length - 1].id
+          !!channel.lastMessage?.id && !!lastConfirmedMessageId && channel.lastMessage.id !== lastConfirmedMessageId
         )
       )
-      setMessagesToMap(
-        channel.id,
-        result.messages,
-        result.messages[0]?.id,
-        result.messages[result.messages.length - 1]?.id
-      )
-      if (result.messages.length > 0) {
-        setActiveSegment(channel.id, result.messages[0].id, result.messages[result.messages.length - 1].id)
+      const firstConfirmedMessageId = getFirstConfirmedMessageId(result.messages)
+      if (firstConfirmedMessageId && lastConfirmedMessageId) {
+        setMessagesToMap(channel.id, result.messages, firstConfirmedMessageId, lastConfirmedMessageId)
+        setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
       }
       yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
       yield put(setMessagesAC(result.messages, channel.id))
@@ -1549,7 +1704,7 @@ function* loadNearUnread(action: IAction): any {
         yield spawn(sendPendingMessages, connectionState)
       }
       const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
-      if (updatedChannel?.lastMessage) {
+      if (updatedChannel?.lastMessage && shouldReplaceChannelLastMessage(channel.id, updatedChannel.lastMessage)) {
         yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
         updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
       }
@@ -1557,13 +1712,12 @@ function* loadNearUnread(action: IAction): any {
   } catch (e) {
     log.error('error in loadNearUnread', e)
   } finally {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
 }
 
 function* loadDefaultMessages(action: IAction): any {
   try {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
     const { channel } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
 
@@ -1575,23 +1729,23 @@ function* loadDefaultMessages(action: IAction): any {
       const messageQuery =
         connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
       query.messageQuery = messageQuery
-      const cachedMessages = Object.values(getMessagesFromMap(channel.id) || {}).sort(
-        (a: IMessage, b: IMessage) => Number(a.id) - Number(b.id)
-      )
+      const cachedMessages = getLatestMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
 
       if (cachedMessages && cachedMessages.length) {
-        const messages = cachedMessages.slice(-MESSAGES_MAX_PAGE_COUNT)
+        // Cache available — show it immediately without a loading state
+        const messages = cachedMessages
         yield call(loadOGMetadataForLinkMessages, messages, true, false, false)
         yield put(setMessagesAC(messages, channel.id))
-        yield delay(0)
         const filteredPendingMessages = getFilteredPendingMessages(messages)
         yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
-        // Load OG metadata for cached link-only messages
         yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      } else {
+        // No cache — show loading spinner while we wait for the server
+        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
       }
 
       let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
-      if (channel?.lastDisplayedMessageId > channel?.lastMessage?.id) {
+      if (compareMessageIds(channel?.lastDisplayedMessageId, channel?.lastMessage?.id) > 0) {
         result =
           connectionState === CONNECTION_STATUS.CONNECTED
             ? yield call(messageQuery.loadPreviousMessageId, channel?.lastDisplayedMessageId)
@@ -1609,15 +1763,44 @@ function* loadDefaultMessages(action: IAction): any {
       })
 
       const messageIdForLoad =
-        channel?.lastDisplayedMessageId > channel?.lastMessage?.id
+        compareMessageIds(channel?.lastDisplayedMessageId, channel?.lastMessage?.id) > 0
           ? channel?.lastDisplayedMessageId || '0'
           : channel?.lastMessage?.id || '0'
       if (updatedMessages.length) {
-        yield call(updateMessages, channel, updatedMessages, updatedMessages[0]?.id, messageIdForLoad)
-        setActiveSegment(channel.id, updatedMessages[0].id, updatedMessages[updatedMessages.length - 1].id)
+        const firstConfirmedMessageId = getFirstConfirmedMessageId(updatedMessages)
+        const lastConfirmedMessageId = getLastConfirmedMessageId(updatedMessages)
+        setMessagesToMap(channel.id, updatedMessages, firstConfirmedMessageId || '0', messageIdForLoad)
+        yield call(loadOGMetadataForLinkMessages, updatedMessages, true, false, false)
+        if (firstConfirmedMessageId && lastConfirmedMessageId) {
+          setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+          yield spawn(prefetchMessages, channel.id, firstConfirmedMessageId, MESSAGE_LOAD_DIRECTION.PREV, 2)
+        }
         yield put(setMessagesHasPrevAC(true))
         yield put(setMessagesHasNextAC(false))
-        yield spawn(prefetchMessages, channel.id, updatedMessages[0].id, MESSAGE_LOAD_DIRECTION.PREV, 2)
+        if (cachedMessages?.length) {
+          // Cache was already shown — only dispatch updates for messages that changed
+          const cachedById: Record<string, IMessage> = {}
+          cachedMessages.forEach((m: IMessage) => {
+            cachedById[m.id] = m
+          })
+          for (const msg of updatedMessages) {
+            const cached = cachedById[msg.id]
+            if (
+              !cached ||
+              cached.deliveryStatus !== msg.deliveryStatus ||
+              cached.state !== msg.state ||
+              cached.body !== msg.body ||
+              cached.userReactions !== msg.userReactions ||
+              cached.reactionTotals !== msg.reactionTotals ||
+              cached.userMarkers !== msg.userMarkers
+            ) {
+              yield put(updateMessageAC(msg.id, msg))
+            }
+          }
+        } else {
+          // No cache was shown — do a full replace
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(updatedMessages))))
+        }
       } else if (!cachedMessages?.length && !result.messages?.length) {
         yield put(setMessagesAC([]))
       }
@@ -1632,7 +1815,7 @@ function* loadDefaultMessages(action: IAction): any {
         yield spawn(sendPendingMessages, connectionState)
       }
       const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
-      if (updatedChannel?.lastMessage) {
+      if (updatedChannel?.lastMessage && shouldReplaceChannelLastMessage(channel.id, updatedChannel.lastMessage)) {
         yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
         updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
       }
@@ -1640,13 +1823,13 @@ function* loadDefaultMessages(action: IAction): any {
   } catch (e) {
     log.error('error in loadDefaultMessages', e)
   } finally {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
 }
 
 function* getMessagesQuery(action: IAction): any {
   try {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
     const { channel, messageId, limit, highlight, behavior, scrollToMessage, networkChanged } = action.payload
     let channelNewMessageCount = channel?.newMessageCount || 0
     const connectionState = store.getState().UserReducer.connectionStatus
@@ -1656,7 +1839,9 @@ function* getMessagesQuery(action: IAction): any {
         try {
           const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
           if (updatedChannel && updatedChannel?.id) {
-            yield put(updateChannelDataAC(channel.id, { ...updatedChannel }))
+            const resolvedChannelUpdateData = getResolvedChannelUpdateData(channel.id, { ...updatedChannel })
+            yield put(updateChannelDataAC(channel.id, resolvedChannelUpdateData))
+            updateChannelOnAllChannels(channel.id, resolvedChannelUpdateData)
             channelNewMessageCount = updatedChannel?.newMessageCount || 0
 
             if (channelNewMessageCount !== channel.newMessageCount) {
@@ -1692,20 +1877,17 @@ function* getMessagesQuery(action: IAction): any {
         }
         yield call(loadOGMetadataForLinkMessages, result.messages, true, false, false)
         yield put(setMessagesAC(JSON.parse(JSON.stringify(result.messages)), channel.id))
-        setMessagesToMap(
-          channel.id,
-          result.messages,
-          result.messages[0]?.id,
-          result.messages[result.messages.length - 1]?.id
-        )
-        if (result.messages.length > 0) {
-          setActiveSegment(channel.id, result.messages[0].id, result.messages[result.messages.length - 1].id)
+        const firstConfirmedMessageId = getFirstConfirmedMessageId(result.messages)
+        const lastConfirmedMessageId = getLastConfirmedMessageId(result.messages)
+        if (firstConfirmedMessageId && lastConfirmedMessageId) {
+          setMessagesToMap(channel.id, result.messages, firstConfirmedMessageId, lastConfirmedMessageId)
+          setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
         }
         yield put(setMessagesHasPrevAC(true))
       } else {
         const cachedMessages = getLatestMessagesFromMap(channel.id, MESSAGES_MAX_PAGE_COUNT)
         const cacheIsCurrent =
-          cachedMessages.length > 0 && cachedMessages[cachedMessages.length - 1]?.id === channel.lastMessage?.id
+          cachedMessages.length > 0 && getLastConfirmedMessageId(cachedMessages) === channel.lastMessage?.id
 
         if (cacheIsCurrent) {
           result.messages = cachedMessages
@@ -1713,13 +1895,12 @@ function* getMessagesQuery(action: IAction): any {
           messageQuery.limit = MESSAGES_MAX_LENGTH
           result = yield call(messageQuery.loadPrevious)
           if (result.messages.length) {
-            setMessagesToMap(
-              channel.id,
-              result.messages,
-              result.messages[0]?.id,
-              result.messages[result.messages.length - 1]?.id
-            )
-            setActiveSegment(channel.id, result.messages[0].id, result.messages[result.messages.length - 1].id)
+            const firstConfirmedMessageId = getFirstConfirmedMessageId(result.messages)
+            const lastConfirmedMessageId = getLastConfirmedMessageId(result.messages)
+            if (firstConfirmedMessageId && lastConfirmedMessageId) {
+              setMessagesToMap(channel.id, result.messages, firstConfirmedMessageId, lastConfirmedMessageId)
+              setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+            }
           }
         } else {
           result.messages = cachedMessages
@@ -1732,8 +1913,6 @@ function* getMessagesQuery(action: IAction): any {
       if (messageId && scrollToMessage) {
         if (channelNewMessageCount && channelNewMessageCount > 0) {
           yield put(setScrollToMessagesAC(channel.lastDisplayedMessageId, highlight, behavior))
-        } else {
-          yield put(scrollToNewMessageAC(true))
         }
       }
       const filteredPendingMessages = getFilteredPendingMessages(result.messages)
@@ -1747,11 +1926,6 @@ function* getMessagesQuery(action: IAction): any {
         yield put(setWaitToSendPendingMessagesAC(false))
         yield spawn(sendPendingMessages, connectionState)
       }
-      const updatedChannel = yield call(SceytChatClient.getChannel, channel.id, true)
-      if (updatedChannel && updatedChannel?.lastMessage) {
-        yield put(updateChannelLastMessageAC(updatedChannel.lastMessage, updatedChannel))
-        updateChannelLastMessageOnAllChannels(channel.id, updatedChannel.lastMessage)
-      }
     } else if (channel?.isMockChannel) {
       yield put(setMessagesAC([]))
     }
@@ -1761,7 +1935,7 @@ function* getMessagesQuery(action: IAction): any {
       yield put(setErrorNotification(e.message));
     } */
   } finally {
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADED)
   }
 }
 
@@ -1782,7 +1956,6 @@ function* getMessageQuery(action: IAction): any {
         messageId,
         params: fetchedMessage
       })
-      yield put(setScrollToMessagesAC(messageId, false))
       if (channel.lastMessage && channel.lastMessage.id === messageId) {
         updateChannelLastMessageOnAllChannels(channel.id, fetchedMessage)
         yield put(updateChannelLastMessageAC(fetchedMessage, channel))
@@ -1795,79 +1968,94 @@ function* getMessageQuery(action: IAction): any {
 
 function* prefetchMessages(channelId: string, fromMessageId: string, direction: string, pages: number): any {
   const key = `${channelId}:${direction}`
-  if (prefetchInFlight.has(key)) return
+  if (prefetchInFlight.has(key)) {
+    queuePrefetchRequest(key, direction, fromMessageId, pages)
+    return
+  }
   prefetchInFlight.add(key)
   try {
     const SceytChatClient = getClient()
-    let currentFromId = fromMessageId
-    for (let i = 0; i < pages; i++) {
-      if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-        if (hasPrevContiguousInMap(channelId, currentFromId)) {
-          const cached = getContiguousPrevMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
-          if (cached.length > 0) {
-            currentFromId = cached[0].id
-            continue
+    let request: { fromMessageId: string; pages: number } | null = { fromMessageId, pages }
+
+    while (request) {
+      let currentFromId = request.fromMessageId
+      for (let i = 0; i < request.pages; i++) {
+        if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
+          if (hasPrevContiguousInMap(channelId, currentFromId)) {
+            const cached = getContiguousPrevMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+            if (cached.length > 0) {
+              currentFromId = cached[0].id
+              continue
+            }
           }
-        }
-        const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
-        mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
-        mqb.reverse(true)
-        const mq = yield call(mqb.build)
-        const result = yield call(mq.loadPreviousMessageId, currentFromId)
-        if (!result.messages.length) break
-        setMessagesToMap(
-          channelId,
-          result.messages,
-          result.messages[0].id,
-          result.messages[result.messages.length - 1].id
-        )
-        extendActiveSegment(
-          channelId,
-          result.messages[0].id,
-          result.messages[result.messages.length - 1].id,
-          MESSAGE_LOAD_DIRECTION.PREV
-        )
-        currentFromId = result.messages[0].id
-        if (!result.hasNext) break
-      } else {
-        if (hasNextContiguousInMap(channelId, currentFromId)) {
-          const cached = getContiguousNextMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
-          if (cached.length > 0) {
-            currentFromId = cached[cached.length - 1].id
-            continue
+          const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
+          mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+          mqb.reverse(true)
+          const mq = yield call(mqb.build)
+          const result = yield call(mq.loadPreviousMessageId, currentFromId)
+          if (!result.messages.length) break
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0].id,
+            result.messages[result.messages.length - 1].id
+          )
+          extendActiveSegment(
+            channelId,
+            result.messages[0].id,
+            result.messages[result.messages.length - 1].id,
+            MESSAGE_LOAD_DIRECTION.PREV
+          )
+          currentFromId = result.messages[0].id
+          if (!result.hasNext) break
+        } else {
+          if (hasNextContiguousInMap(channelId, currentFromId)) {
+            const cached = getContiguousNextMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+            if (cached.length > 0) {
+              currentFromId = cached[cached.length - 1].id
+              continue
+            }
           }
+          const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
+          mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+          mqb.reverse(false)
+          const mq = yield call(mqb.build)
+          const result = yield call(mq.loadNextMessageId, currentFromId)
+          if (!result.messages.length) break
+          setMessagesToMap(
+            channelId,
+            result.messages,
+            result.messages[0].id,
+            result.messages[result.messages.length - 1].id
+          )
+          extendActiveSegment(
+            channelId,
+            result.messages[0].id,
+            result.messages[result.messages.length - 1].id,
+            MESSAGE_LOAD_DIRECTION.NEXT
+          )
+          currentFromId = result.messages[result.messages.length - 1].id
+          if (!result.hasNext) break
         }
-        const mqb = new (SceytChatClient.MessageListQueryBuilder as any)(channelId)
-        mqb.limit(LOAD_MAX_MESSAGE_COUNT_PREFETCH)
-        mqb.reverse(false)
-        const mq = yield call(mqb.build)
-        const result = yield call(mq.loadNextMessageId, currentFromId)
-        if (!result.messages.length) break
-        setMessagesToMap(
-          channelId,
-          result.messages,
-          result.messages[0].id,
-          result.messages[result.messages.length - 1].id
-        )
-        extendActiveSegment(
-          channelId,
-          result.messages[0].id,
-          result.messages[result.messages.length - 1].id,
-          MESSAGE_LOAD_DIRECTION.NEXT
-        )
-        currentFromId = result.messages[result.messages.length - 1].id
-        if (!result.hasNext) break
+      }
+
+      request = queuedPrefetchRequests.get(key) || null
+      if (request) {
+        queuedPrefetchRequests.delete(key)
       }
     }
   } catch (e) {
     log.error('[PREFETCH] prefetchMessages error:', e)
   } finally {
+    queuedPrefetchRequests.delete(key)
     prefetchInFlight.delete(key)
+    notifyPrefetchCompletion(key)
   }
 }
 
 function* loadMoreMessages(action: IAction): any {
   let acquiredLock = false
+  let loadingScope: MessageListLoadScope = 'both'
   try {
     const { payload } = action
     const { limit, direction, channelId, messageId, hasNext } = payload
@@ -1882,12 +2070,23 @@ function* loadMoreMessages(action: IAction): any {
     messageQueryBuilder.reverse(true)
     const messageQuery = yield call(messageQueryBuilder.build)
     messageQuery.limit = 20
-    yield put(setMessagesLoadingStateAC(LOADING_STATE.LOADING))
+    loadingScope = direction === MESSAGE_LOAD_DIRECTION.PREV ? 'previous' : 'next'
+    yield call(setMessageListLoading, loadingScope, LOADING_STATE.LOADING)
+    const connectionState = store.getState().UserReducer.connectionStatus
     let result: { messages: IMessage[]; hasNext: boolean } = { messages: [], hasNext: false }
+    let reachedLatestConfirmedEdge = false
+    const currentConfirmedMessages = store
+      .getState()
+      .MessageReducer.activeChannelMessages.filter((message: IMessage) => !!message.id)
+    const prefetchKey = `${channelId}:${direction}`
 
     if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
       // Segment-map cache: check if the map has contiguous messages before messageId
-      const mapCached = getContiguousPrevMessages(channelId, messageId, limit || 30)
+      let mapCached = getContiguousPrevMessages(channelId, messageId, limit || 30)
+      if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
+        yield call(waitForPrefetchCompletion, prefetchKey)
+        mapCached = getContiguousPrevMessages(channelId, messageId, limit || 30)
+      }
       if (mapCached.length > 0) {
         result.messages = mapCached
         const aheadCached = getContiguousPrevMessages(channelId, mapCached[0].id, LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
@@ -1916,22 +2115,37 @@ function* loadMoreMessages(action: IAction): any {
         }
         yield put(setMessagesHasPrevAC(result.hasNext))
       }
+
+      const nextWindowConfirmedCount =
+        currentConfirmedMessages.length + result.messages.filter((message) => !!message.id).length
+      if (nextWindowConfirmedCount > MESSAGES_MAX_PAGE_COUNT) {
+        yield put(setMessagesHasNextAC(true))
+      }
     } else {
       // Segment-map cache: check if the map has contiguous messages after messageId
-      const mapCached = getContiguousNextMessages(channelId, messageId, limit || 30)
+      let mapCached = getContiguousNextMessages(channelId, messageId, limit || 30)
+      if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
+        yield call(waitForPrefetchCompletion, prefetchKey)
+        mapCached = getContiguousNextMessages(channelId, messageId, limit || 30)
+      }
       if (mapCached.length > 0) {
         result.messages = mapCached
-        const aheadCached = getContiguousNextMessages(
-          channelId,
-          mapCached[mapCached.length - 1].id,
-          LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2
-        )
-        yield put(setMessagesHasNextAC(aheadCached.length > 0 || hasNext))
-        const pagesToFetch = 2 - Math.floor(aheadCached.length / LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+        const lastConfirmedId = [...mapCached].reverse().find((m) => !!m.id)?.id
+        const aheadCached = lastConfirmedId
+          ? getContiguousNextMessages(channelId, lastConfirmedId, LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
+          : []
+        const confirmedAheadCount = aheadCached.filter((m) => !!m.id).length
+        const hasCachedNext = confirmedAheadCount > 0
+        const canLoadServerNext = connectionState === CONNECTION_STATUS.CONNECTED && hasNext
+        reachedLatestConfirmedEdge = !hasCachedNext && !canLoadServerNext
+        yield put(setMessagesHasNextAC(hasCachedNext || canLoadServerNext))
+        const pagesToFetch = 2 - Math.floor(confirmedAheadCount / LOAD_MAX_MESSAGE_COUNT_PREFETCH)
         if (pagesToFetch > 0 && hasNext) {
-          const fromId =
-            aheadCached.length > 0 ? aheadCached[aheadCached.length - 1].id : mapCached[mapCached.length - 1].id
-          yield spawn(prefetchMessages, channelId, fromId, MESSAGE_LOAD_DIRECTION.NEXT, pagesToFetch)
+          const lastAheadConfirmedId = [...aheadCached].reverse().find((m) => !!m.id)?.id
+          const fromId = lastAheadConfirmedId || lastConfirmedId
+          if (fromId) {
+            yield spawn(prefetchMessages, channelId, fromId, MESSAGE_LOAD_DIRECTION.NEXT, pagesToFetch)
+          }
         }
       } else if (hasNext) {
         messageQuery.reverse = false
@@ -1957,7 +2171,10 @@ function* loadMoreMessages(action: IAction): any {
             2
           )
         }
+        reachedLatestConfirmedEdge = !result.hasNext
         yield put(setMessagesHasNextAC(result.hasNext))
+      } else {
+        reachedLatestConfirmedEdge = true
       }
       yield put(setMessagesHasPrevAC(true))
     }
@@ -1970,6 +2187,14 @@ function* loadMoreMessages(action: IAction): any {
         yield put(setMessagesHasNextAC(false))
       }
     }
+
+    if (direction === MESSAGE_LOAD_DIRECTION.NEXT && reachedLatestConfirmedEdge) {
+      const filteredPendingMessages = getFilteredPendingMessages(result.messages)
+      if (filteredPendingMessages.length) {
+        yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+        yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+      }
+    }
   } catch (e) {
     log.error('[MESSAGE_LIST] loadMoreMessages ERROR:', e)
   } finally {
@@ -1977,6 +2202,11 @@ function* loadMoreMessages(action: IAction): any {
       loadMoreMessagesInFlight.delete(action.payload.channelId)
       // Always release loading state — even on error — so pagination guards never get stuck
       store.dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+      if (loadingScope === 'previous') {
+        store.dispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADED))
+      } else if (loadingScope === 'next') {
+        store.dispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
+      }
     }
   }
 }
@@ -2348,10 +2578,7 @@ function* addPollVote(action: IAction): any {
         const channel = yield call(getChannelFromMap, channelId)
         if (channel) {
           // Get the current message state (which has the delete applied)
-          const currentMessage =
-            Object.values(getMessagesFromMap(channelId) || {})?.find(
-              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
-            ) || message
+          const currentMessage = getMessageFromMap(channelId, message.id) || message
           // Apply add on top (which effectively reverts the delete)
 
           const hasNext = store.getState().MessageReducer.pollVotesHasMore?.[pollId] || false
@@ -2436,10 +2663,7 @@ function* deletePollVote(action: IAction): any {
         const channel = yield call(getChannelFromMap, channelId)
         if (channel) {
           // Get the current message state (which has the add applied optimistically)
-          const currentMessage =
-            Object.values(getMessagesFromMap(channelId) || {})?.find(
-              (msg: IMessage) => msg.id === message.id || msg.tid === message.id
-            ) || message
+          const currentMessage = getMessageFromMap(channelId, message.id) || message
           // Revert by applying delete (which removes the vote that was added optimistically)
 
           yield put(
@@ -2765,6 +2989,28 @@ function* loadMorePollVotes(action: IAction): any {
   }
 }
 
+export const __messageSagaTestables = {
+  sendMessage,
+  sendTextMessage,
+  forwardMessage,
+  resendMessage,
+  editMessage,
+  sendPendingMessages,
+  loadNearUnread,
+  loadDefaultMessages,
+  loadMoreMessages,
+  loadAroundMessage,
+  getMessagesQuery,
+  prefetchMessages
+}
+
+export const __resetMessageSagaTestState = () => {
+  loadMoreMessagesInFlight.clear()
+  prefetchInFlight.clear()
+  queuedPrefetchRequests.clear()
+  prefetchCompletionWaiters.clear()
+}
+
 export default function* MessageSaga() {
   yield takeEvery(SEND_MESSAGE, sendMessage)
   yield takeEvery(SEND_TEXT_MESSAGE, sendTextMessage)
@@ -2772,7 +3018,6 @@ export default function* MessageSaga() {
   yield takeEvery(RESEND_MESSAGE, resendMessage)
   yield takeLatest(EDIT_MESSAGE, editMessage)
   yield takeEvery(DELETE_MESSAGE, deleteMessage)
-  yield takeLatest(GET_MESSAGES, getMessagesQuery)
   yield takeLatest(LOAD_LATEST_MESSAGES, getMessagesQuery)
   yield takeLatest(LOAD_AROUND_MESSAGE, loadAroundMessage)
   yield takeLatest(LOAD_NEAR_UNREAD, loadNearUnread)

@@ -17,3 +17,22 @@ export function unregisterMessageListNavigator(): void {
 export function navigateToMessage(itemId: string): void {
   jumpFn?.(itemId)
 }
+
+/**
+ * Registry for jumpToLatest — lets the saga scroll the message list to the
+ * bottom (loading latest messages if needed) without Redux round-trips.
+ */
+
+let jumpToLatestFn: ((smooth?: boolean) => Promise<void>) | null = null
+
+export function registerJumpToLatest(fn: (smooth?: boolean) => Promise<void>): void {
+  jumpToLatestFn = fn
+}
+
+export function unregisterJumpToLatest(): void {
+  jumpToLatestFn = null
+}
+
+export function navigateToLatest(smooth = true): void {
+  jumpToLatestFn?.(smooth)
+}

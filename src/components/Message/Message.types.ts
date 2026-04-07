@@ -49,6 +49,7 @@ interface ICustomMessageItem {
   nextMessage?: IMessage
   unreadMessageId: string
   isUnreadMessage: boolean
+  startsUnreadSection?: boolean
   messageActionsShow: boolean
   selectionIsActive?: boolean
   emojisPopupOpen: boolean
@@ -90,11 +91,15 @@ export interface IMessageProps {
   prevMessage?: IMessage
   nextMessage: IMessage
   stopScrolling: (stop: boolean) => void
-  setLastVisibleMessageId?: (msgId: string) => void
+  setLastVisibleMessageId?: (message: IMessage) => void
+  queueReadMarker?: (channelId: string, messageId?: string) => void
+  queueDeliveredMarker?: (channelId: string, messageId?: string) => void
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
   isUnreadMessage: boolean
+  startsUnreadSection?: boolean
+  nextMessageStartsUnreadSection?: boolean
   isThreadMessage: boolean
   disableAutoReadTracking?: boolean
   fontFamily?: string
