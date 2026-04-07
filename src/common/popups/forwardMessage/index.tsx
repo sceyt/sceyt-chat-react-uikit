@@ -97,7 +97,8 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
     [THEME_COLORS.ICON_PRIMARY]: iconPrimary,
     [THEME_COLORS.BACKGROUND_HOVERED]: backgroundHovered,
-    [THEME_COLORS.SURFACE_2]: surface2
+    [THEME_COLORS.SURFACE_2]: surface2,
+    [THEME_COLORS.TOOLTIP_BACKGROUND]: tooltipBackground
   } = useColor()
 
   const ChatClient = getClient()
@@ -114,7 +115,15 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
   const [selectedChannels, setSelectedChannels] = useState<ISelectedChannelsData[]>([])
   const selectedChannelsContRef = useRef<any>()
   const [isScrolling, setIsScrolling] = useState<boolean>(false)
+  const [warningChannelId, setWarningChannelId] = useState<string | null>(null)
   const loadingRef = useRef(false)
+  const warningTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const showWarning = (channelId: string) => {
+    if (warningTimeoutRef.current) clearTimeout(warningTimeoutRef.current)
+    setWarningChannelId(channelId)
+    warningTimeoutRef.current = setTimeout(() => setWarningChannelId(null), 3000)
+  }
 
   const handleForwardMessage = () => {
     handleForward(selectedChannels.map((channel) => channel.id))
@@ -155,6 +164,10 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
     const isSelfChannel =
       isDirectChannel && channel.memberCount === 1 && channel.members.length > 0 && channel.members[0].id === user.id
     const directChannelUser = isDirectChannel && channel.members.find((member: IMember) => member.id !== user.id)
+    if (isSelected && selectedChannels.length >= maxSelectedCount) {
+      showWarning(channel.id)
+      return
+    }
     if (isSelected && selectedChannels.length < maxSelectedCount) {
       newSelectedChannels.push({
         id: channel.id,
@@ -191,6 +204,9 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
       setSelectedChannelsHeight(selectedChannelsContRef.current.offsetHeight)
     } else {
       setSelectedChannelsHeight(0)
+    }
+    if (selectedChannels.length < maxSelectedCount) {
+      setWarningChannelId(null)
     }
   }, [selectedChannels])
 
@@ -267,60 +283,68 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           ? user
                           : channel.members.find((member: IMember) => member.id !== user.id)
                       return (
-                        <ChannelItem
-                          key={channel.id}
-                          onClick={() => handleChannelSelect(!isSelected, channel)}
-                          disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                          backgroundHover={backgroundHovered}
-                        >
-                          <Avatar
-                            name={
-                              channel.subject ||
-                              (isDirectChannel && directChannelUser
-                                ? directChannelUser.firstName || directChannelUser.id
-                                : '')
-                            }
-                            image={
-                              channel.avatarUrl ||
-                              (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
-                            }
-                            size={40}
-                            textSize={12}
-                            setDefaultAvatar={isDirectChannel}
-                          />
-                          <ChannelInfo>
-                            <ChannelTitle color={textPrimary}>
-                              {isDirectChannel
-                                ? isSelfChannel
-                                  ? 'Me'
-                                  : directChannelUser
-                                    ? makeUsername(
-                                        contactsMap[directChannelUser.id],
-                                        directChannelUser,
-                                        getFromContacts
-                                      )
-                                    : 'Deleted User'
-                                : channel.subject}
-                            </ChannelTitle>
-                            <ChannelMembersItem
-                              channel={channel}
-                              directChannelUser={directChannelUser}
-                              isDirectChannel={isDirectChannel}
-                            />
-                          </ChannelInfo>
-                          <CustomCheckbox
-                            borderColor={iconInactive}
-                            index={channel.id}
+                        <ChannelItemWrapper key={channel.id}>
+                          {warningChannelId === channel.id && selectedChannels.length >= maxSelectedCount && (
+                            <WarningTooltip color={textOnPrimary} backgroundColor={tooltipBackground}>
+                              {`You can select up to ${maxSelectedCount} conversation${
+                                maxSelectedCount === 1 ? '' : 's'
+                              }. To add more, remove an existing one.`}
+                            </WarningTooltip>
+                          )}
+                          <ChannelItem
+                            onClick={() => handleChannelSelect(!isSelected, channel)}
                             disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                            state={isSelected}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                            }}
-                            size='18px'
-                            backgroundColor={'transparent'}
-                            checkedBackgroundColor={accentColor}
-                          />
-                        </ChannelItem>
+                            backgroundHover={backgroundHovered}
+                          >
+                            <Avatar
+                              name={
+                                channel.subject ||
+                                (isDirectChannel && directChannelUser
+                                  ? directChannelUser.firstName || directChannelUser.id
+                                  : '')
+                              }
+                              image={
+                                channel.avatarUrl ||
+                                (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                              }
+                              size={40}
+                              textSize={12}
+                              setDefaultAvatar={isDirectChannel}
+                            />
+                            <ChannelInfo>
+                              <ChannelTitle color={textPrimary}>
+                                {isDirectChannel
+                                  ? isSelfChannel
+                                    ? 'Me'
+                                    : directChannelUser
+                                      ? makeUsername(
+                                          contactsMap[directChannelUser.id],
+                                          directChannelUser,
+                                          getFromContacts
+                                        )
+                                      : 'Deleted User'
+                                  : channel.subject}
+                              </ChannelTitle>
+                              <ChannelMembersItem
+                                channel={channel}
+                                directChannelUser={directChannelUser}
+                                isDirectChannel={isDirectChannel}
+                              />
+                            </ChannelInfo>
+                            <CustomCheckbox
+                              borderColor={iconInactive}
+                              index={channel.id}
+                              disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
+                              state={isSelected}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                              }}
+                              size='18px'
+                              backgroundColor={'transparent'}
+                              checkedBackgroundColor={accentColor}
+                            />
+                          </ChannelItem>
+                        </ChannelItemWrapper>
                       )
                     })}
                   </React.Fragment>
@@ -341,40 +365,48 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                           ? user
                           : channel.members.find((member: IMember) => member.id !== user.id)
                       return (
-                        <ChannelItem
-                          key={channel.id}
-                          onClick={() => handleChannelSelect(!isSelected, channel)}
-                          disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                          backgroundHover={backgroundHovered}
-                        >
-                          <Avatar
-                            name={channel.subject || ''}
-                            image={channel.avatarUrl}
-                            size={40}
-                            textSize={12}
-                            setDefaultAvatar={false}
-                          />
-                          <ChannelInfo>
-                            <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
-                            <ChannelMembersItem
-                              channel={channel}
-                              directChannelUser={directChannelUser}
-                              isDirectChannel={isDirectChannel}
-                            />
-                          </ChannelInfo>
-                          <CustomCheckbox
-                            borderColor={iconInactive}
-                            index={channel.id}
+                        <ChannelItemWrapper key={channel.id}>
+                          {warningChannelId === channel.id && selectedChannels.length >= maxSelectedCount && (
+                            <WarningTooltip color={textOnPrimary} backgroundColor={tooltipBackground}>
+                              {`You can select up to ${maxSelectedCount} conversation${
+                                maxSelectedCount === 1 ? '' : 's'
+                              }. To add more, remove an existing one.`}
+                            </WarningTooltip>
+                          )}
+                          <ChannelItem
+                            onClick={() => handleChannelSelect(!isSelected, channel)}
                             disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                            state={isSelected}
-                            onClick={(e) => {
-                              e.stopPropagation()
-                            }}
-                            size='18px'
-                            backgroundColor={'transparent'}
-                            checkedBackgroundColor={accentColor}
-                          />
-                        </ChannelItem>
+                            backgroundHover={backgroundHovered}
+                          >
+                            <Avatar
+                              name={channel.subject || ''}
+                              image={channel.avatarUrl}
+                              size={40}
+                              textSize={12}
+                              setDefaultAvatar={false}
+                            />
+                            <ChannelInfo>
+                              <ChannelTitle color={textPrimary}>{channel.subject}</ChannelTitle>
+                              <ChannelMembersItem
+                                channel={channel}
+                                directChannelUser={directChannelUser}
+                                isDirectChannel={isDirectChannel}
+                              />
+                            </ChannelInfo>
+                            <CustomCheckbox
+                              borderColor={iconInactive}
+                              index={channel.id}
+                              disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
+                              state={isSelected}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                              }}
+                              size='18px'
+                              backgroundColor={'transparent'}
+                              checkedBackgroundColor={accentColor}
+                            />
+                          </ChannelItem>
+                        </ChannelItemWrapper>
                       )
                     })}
                   </React.Fragment>
@@ -397,54 +429,62 @@ function ForwardMessagePopup({ title, buttonText, togglePopup, handleForward, lo
                     : channel.members.find((member: IMember) => member.id !== user.id)
                 const isSelected = selectedChannels.findIndex((chan) => chan.id === channel.id) >= 0
                 return (
-                  <ChannelItem
-                    key={channel.id}
-                    onClick={() => handleChannelSelect(!isSelected, channel)}
-                    disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                    backgroundHover={backgroundHovered}
-                  >
-                    <Avatar
-                      name={
-                        channel.subject ||
-                        (isDirectChannel && directChannelUser
-                          ? directChannelUser.firstName || directChannelUser.id
-                          : '')
-                      }
-                      image={
-                        channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
-                      }
-                      size={40}
-                      textSize={12}
-                      setDefaultAvatar={isDirectChannel}
-                    />
-                    <ChannelInfo>
-                      <ChannelTitle color={textPrimary}>
-                        {channel.subject ||
-                          (isDirectChannel && isSelfChannel
-                            ? 'Me'
-                            : directChannelUser
-                              ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
-                              : '')}
-                      </ChannelTitle>
-                      <ChannelMembersItem
-                        channel={channel}
-                        directChannelUser={directChannelUser}
-                        isDirectChannel={isDirectChannel}
-                      />
-                    </ChannelInfo>
-                    <CustomCheckbox
-                      borderColor={iconInactive}
-                      index={channel.id}
+                  <ChannelItemWrapper key={channel.id}>
+                    {warningChannelId === channel.id && selectedChannels.length >= maxSelectedCount && (
+                      <WarningTooltip color={textOnPrimary} backgroundColor={tooltipBackground}>
+                        {`You can select up to ${maxSelectedCount} conversation${
+                          maxSelectedCount === 1 ? '' : 's'
+                        }. To add more, remove an existing one.`}
+                      </WarningTooltip>
+                    )}
+                    <ChannelItem
+                      onClick={() => handleChannelSelect(!isSelected, channel)}
                       disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
-                      state={isSelected}
-                      onClick={(e) => {
-                        e.stopPropagation()
-                      }}
-                      size='18px'
-                      backgroundColor={'transparent'}
-                      checkedBackgroundColor={accentColor}
-                    />
-                  </ChannelItem>
+                      backgroundHover={backgroundHovered}
+                    >
+                      <Avatar
+                        name={
+                          channel.subject ||
+                          (isDirectChannel && directChannelUser
+                            ? directChannelUser.firstName || directChannelUser.id
+                            : '')
+                        }
+                        image={
+                          channel.avatarUrl || (isDirectChannel && directChannelUser ? directChannelUser.avatarUrl : '')
+                        }
+                        size={40}
+                        textSize={12}
+                        setDefaultAvatar={isDirectChannel}
+                      />
+                      <ChannelInfo>
+                        <ChannelTitle color={textPrimary}>
+                          {channel.subject ||
+                            (isDirectChannel && isSelfChannel
+                              ? 'Me'
+                              : directChannelUser
+                                ? makeUsername(contactsMap[directChannelUser.id], directChannelUser, getFromContacts)
+                                : '')}
+                        </ChannelTitle>
+                        <ChannelMembersItem
+                          channel={channel}
+                          directChannelUser={directChannelUser}
+                          isDirectChannel={isDirectChannel}
+                        />
+                      </ChannelInfo>
+                      <CustomCheckbox
+                        borderColor={iconInactive}
+                        index={channel.id}
+                        disabled={selectedChannels.length >= maxSelectedCount && !isSelected}
+                        state={isSelected}
+                        onClick={(e) => {
+                          e.stopPropagation()
+                        }}
+                        size='18px'
+                        backgroundColor={'transparent'}
+                        checkedBackgroundColor={accentColor}
+                      />
+                    </ChannelItem>
+                  </ChannelItemWrapper>
                 )
               })
             )}
@@ -499,6 +539,7 @@ const ChannelItem = styled.div<{ backgroundHover?: string; disabled?: boolean }>
   padding: 8px 12px;
   cursor: pointer;
   border-radius: 8px;
+  position: relative;
 
   ${({ disabled, backgroundHover }) =>
     disabled
@@ -593,4 +634,39 @@ const NoResults = styled.div`
   text-align: center;
   margin-top: 20px;
   color: ${(props) => props.color};
+`
+
+const ChannelItemWrapper = styled.div`
+  position: relative;
+`
+
+const WarningTooltip = styled.div<{ color: string; backgroundColor: string }>`
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  transform: translateX(-50%);
+  background: ${(props) => props.backgroundColor};
+  color: ${(props) => props.color};
+  font-size: 13px;
+  line-height: 18px;
+  font-weight: 400;
+  padding: 10px 14px;
+  border-radius: 8px;
+  text-align: center;
+  margin-top: 8px;
+  pointer-events: none;
+  z-index: 10;
+
+  &::after {
+    content: '';
+    position: absolute;
+    bottom: -7px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid ${(props) => props.backgroundColor};
+  }
 `
