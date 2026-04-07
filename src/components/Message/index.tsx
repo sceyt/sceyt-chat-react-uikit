@@ -448,6 +448,8 @@ const Message = ({
   const handleMouseEnter = useCallback(() => {
     if (message.state !== MESSAGE_STATUS.DELETE && !selectionIsActive) {
       messageActionsTimeout.current = setTimeout(() => {
+        const msgTop = messageItemRef.current?.getBoundingClientRect().top ?? 0
+        if (msgTop < 110) return
         setMessageActionsShow(true)
         dispatch(setMessageMenuOpenedAC(message.id || message.tid!))
       }, MESSAGE_ACTIONS_HOVER_DELAY)

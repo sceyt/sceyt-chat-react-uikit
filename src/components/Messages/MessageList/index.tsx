@@ -1138,6 +1138,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   transform: scaleY(-1);
   background-color: ${(props) => props.backgroundColor};
   overflow-y: overlay;
+  overflow-x: hidden;
   overscroll-behavior-y: contain;
   margin-top: auto;
 
