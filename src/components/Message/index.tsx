@@ -293,6 +293,7 @@ const Message = ({
     (showMessageStatusForEachMessage || !nextMessage)
 
   const renderAvatar =
+    prevMessageUserID &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)

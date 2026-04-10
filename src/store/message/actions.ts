@@ -31,7 +31,8 @@ import {
   RESEND_PENDING_POLL_ACTIONS,
   LOAD_OG_METADATA_FOR_LINK,
   queryDirection,
-  FETCH_OG_METADATA
+  FETCH_OG_METADATA,
+  CANCEL_WINDOW_LOAD
 } from './constants'
 import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import {
@@ -181,6 +182,10 @@ export function loadAroundMessageAC(channel: IChannel, messageId: string, networ
   }
 }
 
+export function cancelWindowLoadAC() {
+  return { type: CANCEL_WINDOW_LOAD }
+}
+
 export function loadNearUnreadAC(channel: IChannel) {
   return {
     type: LOAD_NEAR_UNREAD,
@@ -199,7 +204,8 @@ export function reloadActiveChannelAfterReconnectAC(
   channel: IChannel,
   visibleAnchorId?: string,
   wasViewingLatest?: boolean,
-  applyVisibleWindow: boolean = true
+  applyVisibleWindow: boolean = true,
+  isAtHistoryTop: boolean = false
 ) {
   return {
     type: RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT,
@@ -207,7 +213,8 @@ export function reloadActiveChannelAfterReconnectAC(
       channel,
       visibleAnchorId: visibleAnchorId || '',
       wasViewingLatest: !!wasViewingLatest,
-      applyVisibleWindow
+      applyVisibleWindow,
+      isAtHistoryTop
     }
   }
 }

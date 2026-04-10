@@ -174,7 +174,14 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
         )
       : false
 
-    if (lastMessageIsVisible) {
+    const messagesHasNext = store.getState().MessageReducer.messagesHasNext
+    const lastMessageIsInActiveWindow = storedChannel?.lastMessage?.id
+      ? (store.getState().MessageReducer.activeChannelMessages as IMessage[]).some(
+          (m) => m.id === storedChannel.lastMessage?.id
+        )
+      : false
+
+    if (!messagesHasNext && lastMessageIsInActiveWindow) {
       yield put(addMessagesAC([message], 'next'))
       yield put(loadOGMetadataForLinkAC([message], true))
       if (lastMessageIsVisible) {

@@ -473,7 +473,7 @@ describe('MessageList', () => {
         unreadMessageId: olderMessage.id
       },
       UserReducer: {
-        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+        connectionStatus: CONNECTION_STATUS.CONNECTED
       }
     })
 
@@ -521,7 +521,7 @@ describe('MessageList', () => {
         unreadMessageId: olderMessage.id
       },
       UserReducer: {
-        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+        connectionStatus: CONNECTION_STATUS.CONNECTED
       }
     })
     const dispatchSpy = jest.spyOn(store, 'dispatch')
@@ -603,7 +603,7 @@ describe('MessageList', () => {
         unreadMessageId: ''
       },
       UserReducer: {
-        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+        connectionStatus: CONNECTION_STATUS.CONNECTED
       }
     })
 
@@ -1586,6 +1586,8 @@ describe('MessageList', () => {
     let jumpPromise: Promise<void> | undefined
     await act(async () => {
       jumpPromise = jumpToLatestHandler(true)
+      store.dispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADING))
+      store.dispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADING))
       await Promise.resolve()
     })
 
@@ -1604,6 +1606,8 @@ describe('MessageList', () => {
         ])
       )
       store.dispatch(setMessagesHasNextAC(false))
+      store.dispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADED))
+      store.dispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
       await jumpPromise
     })
 
@@ -1754,7 +1758,7 @@ describe('MessageList', () => {
         loadingNextMessagesState: LOADING_STATE.LOADED
       },
       UserReducer: {
-        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+        connectionStatus: CONNECTION_STATUS.CONNECTED
       }
     })
     const delayedDispatch = attachDelayedServerToMessageListStore(store, {

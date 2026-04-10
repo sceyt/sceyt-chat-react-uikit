@@ -478,6 +478,7 @@ const MessageList: React.FC<MessagesProps> = ({
     handleScrollToRepliedMessage,
     messagesIndexMapRef,
     timelineItems,
+    isJumpingToItem,
     jumpToLatest,
     jumpToItem
   } = useChatController({
@@ -995,7 +996,7 @@ const MessageList: React.FC<MessagesProps> = ({
             thumbColor={surface2}
           >
             {messages.length && messages.length > 0 ? (
-              <MessagesBox className='messageBox' id='messageBox'>
+              <MessagesBox className='messageBox' id='messageBox' $isJumping={isJumpingToItem}>
                 {timelineItems.map((timelineItem, index) => {
                   if (timelineItem.type === 'date-divider') {
                     return (
@@ -1148,7 +1149,7 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
 `
 
-const MessagesBox = styled.div`
+const MessagesBox = styled.div<{ $isJumping?: boolean }>`
   display: flex;
   padding-top: 5px;
   flex-direction: column;
@@ -1156,6 +1157,8 @@ const MessagesBox = styled.div`
   width: 100%;
   transform: scaleY(-1);
   backface-visibility: hidden;
+  filter: ${(props) => (props.$isJumping ? 'blur(4px)' : 'none')};
+  transition: filter 0.2s ease;
 `
 
 const ScrollViewport = styled.div`

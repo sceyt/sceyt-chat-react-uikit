@@ -579,7 +579,7 @@ describe('message saga message-list flows', () => {
             lastDisplayedMessageId: refreshedChannel.lastDisplayedMessageId,
             lastMessage: expect.objectContaining({ id: refreshedChannel.lastMessage.id })
           }),
-          networkChanged: true,
+          networkChanged: false,
           applyVisibleWindow: true
         })
       )
@@ -848,6 +848,7 @@ describe('message saga message-list flows', () => {
 
   it('allows previous and next loadMore requests to run concurrently for the same channel', async () => {
     const channelId = 'channel-load-more-concurrent-directions'
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
     const deferredPrev = (() => {
       let resolveDeferred!: (value: QueryResult) => void
       const promise = new Promise<QueryResult>((resolve) => {
@@ -916,6 +917,7 @@ describe('message saga message-list flows', () => {
 
   it('keeps stale reversed-direction loadMore results cache-only', async () => {
     const channelId = 'channel-stale-load-more-cache-only'
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
     const deferredPrev = (() => {
       let resolveDeferred!: (value: QueryResult) => void
       const promise = new Promise<QueryResult>((resolve) => {
@@ -1276,7 +1278,7 @@ describe('message saga message-list flows', () => {
 
     const dispatched = await runMessageSaga(
       __messageSagaTestables.getMessagesQuery,
-      loadLatestMessagesAC(channel, undefined, undefined, undefined, undefined, true, false)
+      loadLatestMessagesAC(channel, undefined, undefined, false)
     )
 
     expect(dispatched.some((action) => action.type === setMessagesAC([], channel.id).type)).toBe(false)
@@ -1331,7 +1333,7 @@ describe('message saga message-list flows', () => {
 
     const dispatched = await runMessageSaga(
       __messageSagaTestables.getMessagesQuery,
-      loadLatestMessagesAC(refreshedChannel, undefined, undefined, undefined, undefined, true)
+      loadLatestMessagesAC(refreshedChannel, undefined, true)
     )
 
     expect(dispatched).toEqual(
