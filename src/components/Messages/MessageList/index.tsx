@@ -426,7 +426,8 @@ const MessageList: React.FC<MessagesProps> = ({
     [THEME_COLORS.BORDER]: border,
     [THEME_COLORS.INCOMING_MESSAGE_BACKGROUND_X]: incomingMessageBackgroundX,
     [THEME_COLORS.TEXT_ON_PRIMARY]: textOnPrimary,
-    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground
+    [THEME_COLORS.OVERLAY_BACKGROUND]: overlayBackground,
+    [THEME_COLORS.ICON_INACTIVE]: iconInactive
   } = useColor()
 
   const ChatClient = getClient()
@@ -984,6 +985,11 @@ const MessageList: React.FC<MessagesProps> = ({
       <React.Fragment>
         {/* {!hideMessages && ( */}
         <ScrollViewport>
+          {isJumpingToItem && (
+            <JumpOverlay>
+              <JumpSpinner $color={iconInactive} />
+            </JumpOverlay>
+          )}
           <Container
             id='scrollableDiv'
             className={isScrolling ? 'show-scrollbar' : ''}
@@ -1146,6 +1152,33 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
   }
   &.show-scrollbar::-webkit-scrollbar-track {
     background: transparent;
+  }
+`
+
+const JumpOverlay = styled.div`
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+`
+
+const JumpSpinner = styled.div<{ $color?: string }>`
+  width: 26px;
+  height: 26px;
+  border: 2.5px solid transparent;
+  border-top-color: ${(props) => props.$color || '#9EA6B0'};
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  @keyframes spin {
+    to {
+      transform: rotate(360deg);
+    }
   }
 `
 
