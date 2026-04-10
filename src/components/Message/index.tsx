@@ -18,7 +18,6 @@ import {
   scrollToNewMessageAC,
   setMessageForReplyAC,
   setMessageMenuOpenedAC,
-  setMessagesLoadingStateAC,
   setMessageToEditAC,
   retractPollVoteAC,
   setReactionsListAC
@@ -43,7 +42,7 @@ import {
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
 import { getOpenChatOnUserInteraction } from 'helpers/channelHalper'
-import { DEFAULT_CHANNEL_TYPE, LOADING_STATE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
+import { DEFAULT_CHANNEL_TYPE, MESSAGE_DELIVERY_STATUS, MESSAGE_STATUS } from 'helpers/constants'
 import { THEME_COLORS } from 'UIHelper/constants'
 import { IReaction, IUser } from 'types'
 // Components
@@ -83,7 +82,6 @@ const Message = ({
   queueReadMarker,
   queueDeliveredMarker,
   isUnreadMessage,
-  startsUnreadSection = false,
   nextMessageStartsUnreadSection = false,
   unreadMessageId,
   isThreadMessage,
@@ -271,10 +269,13 @@ const Message = ({
   const messageUserID = getComparableUserId(message.user)
   const prevMessageUserID = prevMessage ? getComparableUserId(prevMessage.user) : null
   const current = moment(message.createdAt).startOf('day')
-  const firstMessageInInterval =
-    !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
-    prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-    startsUnreadSection
+  const firstMessageInInterval = useMemo(
+    () =>
+      !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
+      prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
+      unreadMessageId === prevMessage.id,
+    [prevMessage, unreadMessageId]
+  )
 
   const nextMessageUserID = nextMessage ? getComparableUserId(nextMessage.user) : null
   const nextDay = nextMessage ? moment(nextMessage.createdAt).startOf('day') : null
@@ -292,7 +293,6 @@ const Message = ({
     (showMessageStatusForEachMessage || !nextMessage)
 
   const renderAvatar =
-    !!prevMessageUserID &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
@@ -617,7 +617,6 @@ const Message = ({
         compareMessagesForList(message, channel.lastMessage) >= 0
       ) {
         dispatch(scrollToNewMessageAC(false, false, false))
-        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
       if (!channel.isLinkedChannel) {
@@ -801,7 +800,6 @@ const Message = ({
             nextMessage={nextMessage}
             unreadMessageId={unreadMessageId}
             isUnreadMessage={isUnreadMessage}
-            startsUnreadSection={startsUnreadSection}
             messageActionsShow={messageActionsShow}
             selectionIsActive={selectionIsActive}
             emojisPopupOpen={emojisPopupOpen}
@@ -847,7 +845,6 @@ const Message = ({
             prevMessage={prevMessage}
             nextMessage={nextMessage}
             isUnreadMessage={isUnreadMessage}
-            startsUnreadSection={startsUnreadSection}
             unreadMessageId={unreadMessageId}
             isThreadMessage={isThreadMessage}
             fontFamily={fontFamily}
@@ -1081,7 +1078,6 @@ export default React.memo(Message, (prev, next) => {
 
   // List state
   if (prev.isUnreadMessage !== next.isUnreadMessage) return false
-  if (prev.startsUnreadSection !== next.startsUnreadSection) return false
   if (prev.unreadMessageId !== next.unreadMessageId) return false
   if (prev.selectedMessagesMap !== next.selectedMessagesMap) return false
   if (prev.contactsMap !== next.contactsMap) return false

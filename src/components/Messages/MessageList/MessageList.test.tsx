@@ -5,13 +5,19 @@ import { CONNECTION_STATUS } from '../../../store/user/constants'
 import {
   addMessageAC,
   addMessagesAC,
+  loadAroundMessageAC,
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
+  loadMoreMessagesAC,
   loadNearUnreadAC,
+  reloadActiveChannelAfterReconnectAC,
+  refreshCacheAroundMessageAC,
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
   setMessagesAC,
   setMessagesHasNextAC,
+  setMessagesHasPrevAC,
+  setStableUnreadAnchorAC,
   setUnreadMessageIdAC,
   updateMessageAC
 } from '../../../store/message/actions'
@@ -25,6 +31,7 @@ import {
   makePendingMessage,
   renderWithSceytProvider,
   resetMessageListFixtureIds,
+  setElementRect,
   setScrollMetrics
 } from '../../../testUtils/messageListHarness'
 import {
@@ -33,10 +40,12 @@ import {
   unregisterJumpToLatest,
   unregisterMessageListNavigator
 } from '../../../helpers/messageListNavigator'
-import { markMessagesAsReadAC, updateChannelDataAC } from '../../../store/channel/actions'
+import { markMessagesAsReadAC, setActiveChannelAC, updateChannelDataAC } from '../../../store/channel/actions'
 import { setConnectionStatusAC } from '../../../store/user/actions'
 import { resetMockServerDelay, resolveWithMockServerDelay } from '../../../testUtils/mockServerDelay'
 import { DEFAULT_MARKER_BATCH_DEBOUNCE_MS } from '../../../helpers/messageMarkerBatcher'
+import { IMessage } from '../../../types'
+import { LATEST_EDGE_GAP_PX } from './useChatController'
 
 jest.mock('../../Message', () => {
   const React = require('react')
@@ -148,6 +157,13 @@ const renderMessageList = (store: ReturnType<typeof createMessageListStore>) =>
 type DelayedMessageListResponse = {
   messages?: any[]
   hasNext?: boolean
+  hasPrev?: boolean
+  unreadMessageId?: string
+  stableUnreadAnchorId?: string
+}
+
+type DelayedReconnectResponse = {
+  channel?: any
 }
 
 const flushMockServerDelay = async () => {
@@ -156,40 +172,208 @@ const flushMockServerDelay = async () => {
   })
 }
 
+const layoutRenderedMessageList = (
+  container: HTMLElement,
+  options: {
+    scrollTop: number
+    scrollHeight: number
+    clientHeight?: number
+    itemTops: Record<string, number>
+  }
+) => {
+  const clientHeight = options.clientHeight ?? 240
+
+  setElementRect(container, { top: 0, left: 0, width: 320, height: clientHeight })
+  setScrollMetrics(container as HTMLDivElement, {
+    scrollTop: options.scrollTop,
+    scrollHeight: options.scrollHeight,
+    clientHeight,
+    offsetTop: 0,
+    offsetHeight: clientHeight
+  })
+
+  Object.entries(options.itemTops).forEach(([itemId, top]) => {
+    const item = container.querySelector<HTMLElement>(`[data-message-list-item-id="${itemId}"]`)
+    expect(item).not.toBeNull()
+    setElementRect(item!, {
+      top,
+      left: 0,
+      width: 320,
+      height: 32
+    })
+  })
+}
+
+const getRenderedMessageBodies = () => screen.getAllByTestId('message-row').map((node) => node.textContent)
+
+const expectUnreadDividerAt = (messageBody: string) => {
+  expect(screen.getByText('Unread Messages')).toBeInTheDocument()
+  expect(screen.getByText(messageBody)).toHaveAttribute('data-message-is-unread', 'true')
+}
+
 const attachDelayedServerToMessageListStore = (
   store: ReturnType<typeof createMessageListStore>,
   handlers: {
     onLoadDefault?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
     onLoadLatest?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
+    onLoadNearUnread?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
+    onLoadAround?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
+    onLoadMore?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
+    onReconnect?: (action: any) => DelayedReconnectResponse | Promise<DelayedReconnectResponse>
   }
 ) => {
   const originalDispatch = store.dispatch.bind(store)
   const delayedDispatch = jest.fn((action: any) => {
     const result = originalDispatch(action)
 
-    const scheduleResponse = async (
-      resolver?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>
-    ) => {
-      originalDispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADING))
-      originalDispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADING))
-      const response = resolver ? await resolveWithMockServerDelay(null).then(() => resolver(action)) : {}
+    const setLoadingState = (scope: 'previous' | 'next' | 'both', state: number | null) => {
+      if (scope === 'previous' || scope === 'both') {
+        originalDispatch(setLoadingPrevMessagesStateAC(state))
+      }
+      if (scope === 'next' || scope === 'both') {
+        originalDispatch(setLoadingNextMessagesStateAC(state))
+      }
+    }
 
-      if (response?.messages) {
+    const scheduleResponse = async (
+      scope: 'previous' | 'next' | 'both',
+      resolver?: (action: any) => DelayedMessageListResponse | Promise<DelayedMessageListResponse>,
+      applyMessages?: (response: DelayedMessageListResponse) => boolean | void
+    ) => {
+      setLoadingState(scope, LOADING_STATE.LOADING)
+      const response = resolver ? await resolveWithMockServerDelay(null).then(() => resolver(action)) : {}
+      const shouldApplyResponse = applyMessages ? applyMessages(response || {}) !== false : true
+
+      if (typeof response?.stableUnreadAnchorId === 'string') {
+        originalDispatch(setStableUnreadAnchorAC(action.payload.channel.id, response.stableUnreadAnchorId))
+      }
+      if (typeof response?.unreadMessageId === 'string') {
+        originalDispatch(setUnreadMessageIdAC(response.unreadMessageId))
+      }
+      if (!applyMessages && response?.messages) {
         originalDispatch(setMessagesAC(response.messages, action.payload.channel.id))
       }
-      if (typeof response?.hasNext === 'boolean') {
+      if (shouldApplyResponse && typeof response?.hasPrev === 'boolean') {
+        originalDispatch(setMessagesHasPrevAC(response.hasPrev))
+      }
+      if (shouldApplyResponse && typeof response?.hasNext === 'boolean') {
         originalDispatch(setMessagesHasNextAC(response.hasNext))
       }
-      originalDispatch(setLoadingPrevMessagesStateAC(LOADING_STATE.LOADED))
-      originalDispatch(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
+      setLoadingState(scope, LOADING_STATE.LOADED)
+    }
+
+    const scheduleReconnect = async (
+      resolver?: (action: any) => DelayedReconnectResponse | Promise<DelayedReconnectResponse>
+    ) => {
+      const reconnectResponse = resolver ? await resolveWithMockServerDelay(null).then(() => resolver(action)) : {}
+      const reloadedChannel = {
+        ...action.payload.channel,
+        ...(reconnectResponse?.channel || {})
+      }
+
+      if (reconnectResponse?.channel) {
+        originalDispatch(updateChannelDataAC(action.payload.channel.id, reloadedChannel, true))
+      }
+
+      if (action.payload.visibleAnchorId && !action.payload.wasViewingLatest) {
+        delayedDispatch(
+          refreshCacheAroundMessageAC(
+            reloadedChannel.id,
+            action.payload.visibleAnchorId,
+            action.payload.applyVisibleWindow
+          )
+        )
+        return
+      }
+
+      if (action.payload.wasViewingLatest) {
+        delayedDispatch(
+          loadLatestMessagesAC(
+            reloadedChannel,
+            undefined,
+            false,
+            'instant',
+            false,
+            true,
+            action.payload.applyVisibleWindow
+          )
+        )
+        return
+      }
+
+      if (reloadedChannel.newMessageCount && reloadedChannel.lastDisplayedMessageId) {
+        if (!store.getState().MessageReducer.unreadMessageId) {
+          originalDispatch(setUnreadMessageIdAC(reloadedChannel.lastDisplayedMessageId))
+        }
+        delayedDispatch(loadNearUnreadAC(reloadedChannel))
+        return
+      }
+
+      delayedDispatch(loadLatestMessagesAC(reloadedChannel))
     }
 
     if (action.type === loadDefaultMessagesAC(action.payload.channel).type) {
-      scheduleResponse(handlers.onLoadDefault).catch(() => undefined)
+      scheduleResponse('both', handlers.onLoadDefault).catch(() => undefined)
     }
 
     if (action.type === loadLatestMessagesAC(action.payload.channel).type) {
-      scheduleResponse(handlers.onLoadLatest).catch(() => undefined)
+      scheduleResponse('both', handlers.onLoadLatest).catch(() => undefined)
+    }
+
+    if (action.type === loadNearUnreadAC(action.payload.channel).type) {
+      scheduleResponse('both', handlers.onLoadNearUnread).catch(() => undefined)
+    }
+
+    if (action.type === loadAroundMessageAC(action.payload.channel, action.payload.messageId).type) {
+      scheduleResponse('both', handlers.onLoadAround).catch(() => undefined)
+    }
+
+    if (action.type === refreshCacheAroundMessageAC('', '').type) {
+      scheduleResponse('both', handlers.onLoadAround, (response) => {
+        const responseMessages = response?.messages || []
+        const currentConfirmedMessages = store
+          .getState()
+          .MessageReducer.activeChannelMessages.filter((message: IMessage) => !!message.id)
+        const responseConfirmedMessages = responseMessages.filter((message: IMessage) => !!message.id)
+        const sameVisibleWindow =
+          currentConfirmedMessages.length === responseConfirmedMessages.length &&
+          currentConfirmedMessages.every((message: IMessage, index: number) => {
+            return message.id === responseConfirmedMessages[index]?.id
+          })
+
+        if (action.payload.applyVisibleWindow || sameVisibleWindow) {
+          if (responseMessages.length) {
+            originalDispatch(setMessagesAC(responseMessages, action.payload.channelId))
+          }
+        }
+
+        return action.payload.applyVisibleWindow || sameVisibleWindow
+      }).catch(() => undefined)
+    }
+
+    if (action.type === loadMoreMessagesAC('', 0, MESSAGE_LOAD_DIRECTION.NEXT, '', false).type) {
+      scheduleResponse(
+        action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV ? 'previous' : 'next',
+        handlers.onLoadMore,
+        (response) => {
+          const activePaginationIntent = store.getState().MessageReducer.activePaginationIntent
+          const expectedDirection = action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV ? 'prev' : 'next'
+          const shouldApplyVisibleResponse =
+            !action.payload.requestId ||
+            (activePaginationIntent?.channelId === action.payload.channelId &&
+              activePaginationIntent.direction === expectedDirection &&
+              activePaginationIntent.requestId === action.payload.requestId)
+
+          if (shouldApplyVisibleResponse && response?.messages) {
+            originalDispatch(addMessagesAC(response.messages, action.payload.direction))
+          }
+          return shouldApplyVisibleResponse
+        }
+      ).catch(() => undefined)
+    }
+
+    if (action.type === reloadActiveChannelAfterReconnectAC(action.payload.channel).type) {
+      scheduleReconnect(handlers.onReconnect).catch(() => undefined)
     }
 
     return result
@@ -219,8 +403,8 @@ describe('MessageList', () => {
 
     const { unmount } = renderMessageList(store)
 
-    expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
     expect(dispatchSpy).toHaveBeenCalledWith(setUnreadMessageIdAC(''))
+    expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
     expect(registerMessageListNavigator).toHaveBeenCalledTimes(1)
     expect(registerJumpToLatest).toHaveBeenCalledTimes(1)
 
@@ -249,8 +433,8 @@ describe('MessageList', () => {
 
     renderMessageList(store)
 
+    expect(dispatchSpy).toHaveBeenCalledWith(setUnreadMessageIdAC(''))
     expect(dispatchSpy).toHaveBeenCalledWith(loadNearUnreadAC(channel))
-    expect(dispatchSpy).toHaveBeenCalledWith(setUnreadMessageIdAC(unreadAnchor.id))
   })
 
   it('renders date dividers and the unread divider from activeChannelMessages', () => {
@@ -294,6 +478,9 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
     expect(screen.getByText(yesterdayLabel)).toBeInTheDocument()
     expect(screen.getAllByText('Today')).toHaveLength(2)
@@ -323,7 +510,7 @@ describe('MessageList', () => {
       id: channelId,
       lastMessage: latestUnread,
       newMessageCount: 100,
-      lastDisplayedMessageId: unreadAnchor.id
+      lastDisplayedMessageId: olderMessage.id
     })
     const store = createMessageListStore({
       ChannelReducer: {
@@ -331,7 +518,7 @@ describe('MessageList', () => {
       },
       MessageReducer: {
         activeChannelMessages: [olderMessage, unreadAnchor, latestUnread],
-        unreadMessageId: unreadAnchor.id
+        unreadMessageId: olderMessage.id
       },
       UserReducer: {
         connectionStatus: CONNECTION_STATUS.DISCONNECTED
@@ -340,8 +527,11 @@ describe('MessageList', () => {
     const dispatchSpy = jest.spyOn(store, 'dispatch')
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
-    expect(store.getState().MessageReducer.unreadMessageId).toBe(unreadAnchor.id)
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(olderMessage.id)
     dispatchSpy.mockClear()
 
     await act(async () => {
@@ -359,9 +549,94 @@ describe('MessageList', () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
 
-    expect(store.getState().MessageReducer.unreadMessageId).toBe(unreadAnchor.id)
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(olderMessage.id)
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
     expect(dispatchSpy.mock.calls.some(([action]) => action.type === loadNearUnreadAC(channel).type)).toBe(false)
+  })
+
+  it('shows the unread divider after new messages arrive while the same channel stays open in deep history', async () => {
+    const channelId = 'channel-open-history-then-receive-unread'
+    const historyOne = makeMessage({
+      id: '401',
+      channelId,
+      body: 'history-one',
+      incoming: true
+    })
+    const historyTwo = makeMessage({
+      id: '402',
+      channelId,
+      body: 'history-two',
+      incoming: true
+    })
+    const lastDisplayed = makeMessage({
+      id: '500',
+      channelId,
+      body: 'last-displayed',
+      incoming: true
+    })
+    const unreadOne = makeMessage({
+      id: '501',
+      channelId,
+      body: 'arrived-unread-one',
+      incoming: true
+    })
+    const unreadTwo = makeMessage({
+      id: '502',
+      channelId,
+      body: 'arrived-unread-two',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: historyTwo,
+      newMessageCount: 0,
+      lastDisplayedMessageId: lastDisplayed.id
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [historyOne, historyTwo],
+        messagesHasPrev: true,
+        messagesHasNext: true,
+        unreadMessageId: ''
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+
+    renderMessageList(store)
+    expect(screen.queryByText('Unread Messages')).not.toBeInTheDocument()
+
+    await act(async () => {
+      store.dispatch(
+        updateChannelDataAC(
+          channelId,
+          {
+            unread: true,
+            newMessageCount: 2,
+            lastDisplayedMessageId: lastDisplayed.id,
+            lastMessage: unreadTwo
+          },
+          true
+        )
+      )
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+    })
+
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(lastDisplayed.id)
+
+    await act(async () => {
+      store.dispatch(setMessagesHasNextAC(false))
+      store.dispatch(setMessagesAC([lastDisplayed, unreadOne, unreadTwo], channelId))
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+    })
+
+    expectUnreadDividerAt('arrived-unread-one')
+    expect(screen.getByText('arrived-unread-two')).toHaveAttribute('data-message-is-unread', 'true')
+    expect(getRenderedMessageBodies()).toEqual(['last-displayed', 'arrived-unread-one', 'arrived-unread-two'])
   })
 
   it('keeps the unread divider position when unread incoming messages are marked read while scrolling', async () => {
@@ -404,14 +679,17 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
     await act(async () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
 
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
-    expect(screen.getByText('first-unread')).toHaveAttribute('data-message-starts-unread', 'true')
-    expect(screen.getByText('second-unread')).toHaveAttribute('data-message-starts-unread', 'false')
+    expect(screen.getByText('first-unread')).toHaveAttribute('data-message-is-unread', 'true')
+    expect(screen.getByText('second-unread')).toHaveAttribute('data-message-is-unread', 'true')
 
     await act(async () => {
       store.dispatch(
@@ -423,13 +701,11 @@ describe('MessageList', () => {
     })
 
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
-    expect(screen.getByText('first-unread')).toHaveAttribute('data-message-starts-unread', 'true')
     expect(screen.getByText('first-unread')).toHaveAttribute('data-message-is-unread', 'false')
-    expect(screen.getByText('second-unread')).toHaveAttribute('data-message-starts-unread', 'false')
     expect(screen.getByText('second-unread')).toHaveAttribute('data-message-is-unread', 'true')
   })
 
-  it('marks only the first unread message as starting the unread section', () => {
+  it('marks unread incoming messages after the displayed boundary as unread', () => {
     const channelId = 'channel-unread-grouping'
     const sharedUser = {
       id: 'shared-remote-user',
@@ -478,14 +754,16 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
     const firstUnreadRow = screen.getByText('first-unread')
     const secondUnreadRow = screen.getByText('second-unread')
 
-    expect(firstUnreadRow).toHaveAttribute('data-message-starts-unread', 'true')
-    expect(secondUnreadRow).toHaveAttribute('data-message-starts-unread', 'false')
     expect(firstUnreadRow).toHaveAttribute('data-message-is-unread', 'true')
     expect(secondUnreadRow).toHaveAttribute('data-message-is-unread', 'true')
+    expect(screen.getByText('Unread Messages')).toBeInTheDocument()
   })
 
   it('does not mark own outgoing messages as unread when they appear before unread incoming messages', () => {
@@ -534,15 +812,16 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(lastRead.id))
+    })
 
     const ownOutgoingRow = screen.getByText('own-outgoing')
     const firstUnreadRow = screen.getByText('first-unread')
     const secondUnreadRow = screen.getByText('second-unread')
 
     expect(ownOutgoingRow).toHaveAttribute('data-message-is-unread', 'false')
-    expect(ownOutgoingRow).toHaveAttribute('data-message-starts-unread', 'false')
     expect(firstUnreadRow).toHaveAttribute('data-message-is-unread', 'true')
-    expect(firstUnreadRow).toHaveAttribute('data-message-starts-unread', 'true')
     expect(secondUnreadRow).toHaveAttribute('data-message-is-unread', 'true')
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
   })
@@ -570,7 +849,7 @@ describe('MessageList', () => {
       id: channelId,
       lastMessage: latestMessage,
       newMessageCount: 2,
-      lastDisplayedMessageId: unreadAnchor.id
+      lastDisplayedMessageId: olderMessage.id
     })
     const store = createMessageListStore({
       ChannelReducer: {
@@ -578,7 +857,7 @@ describe('MessageList', () => {
       },
       MessageReducer: {
         activeChannelMessages: [olderMessage, unreadAnchor, latestMessage],
-        unreadMessageId: unreadAnchor.id
+        unreadMessageId: olderMessage.id
       },
       UserReducer: {
         connectionStatus: CONNECTION_STATUS.DISCONNECTED
@@ -586,6 +865,9 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
 
@@ -596,11 +878,11 @@ describe('MessageList', () => {
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
 
-    expect(store.getState().MessageReducer.unreadMessageId).toBe(unreadAnchor.id)
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(olderMessage.id)
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
   })
 
-  it('keeps the unread divider after the user sends a latest message into the same open channel', async () => {
+  it('removes the unread divider after the user sends a latest message into the same open channel', async () => {
     const channelId = 'channel-unread-own-send'
     const olderMessage = makeMessage({
       id: '341',
@@ -628,7 +910,7 @@ describe('MessageList', () => {
       id: channelId,
       lastMessage: latestUnread,
       newMessageCount: 2,
-      lastDisplayedMessageId: unreadAnchor.id
+      lastDisplayedMessageId: olderMessage.id
     })
     const store = createMessageListStore({
       ChannelReducer: {
@@ -636,7 +918,7 @@ describe('MessageList', () => {
       },
       MessageReducer: {
         activeChannelMessages: [olderMessage, unreadAnchor, latestUnread],
-        unreadMessageId: unreadAnchor.id
+        unreadMessageId: olderMessage.id
       },
       UserReducer: {
         connectionStatus: CONNECTION_STATUS.DISCONNECTED
@@ -644,17 +926,21 @@ describe('MessageList', () => {
     })
 
     renderMessageList(store)
+    act(() => {
+      store.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
 
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
 
     await act(async () => {
       store.dispatch(updateChannelDataAC(channelId, { lastMessage: ownLatest }, true))
+      store.dispatch(setUnreadMessageIdAC(''))
       store.dispatch(addMessageAC(ownLatest))
       await new Promise((resolve) => window.setTimeout(resolve, 0))
     })
 
-    expect(store.getState().MessageReducer.unreadMessageId).toBe(unreadAnchor.id)
-    expect(screen.getByText('Unread Messages')).toBeInTheDocument()
+    expect(store.getState().MessageReducer.unreadMessageId).toBe('')
+    expect(screen.queryByText('Unread Messages')).not.toBeInTheDocument()
   })
 
   it('removes the unread divider only after re-entering the channel with no unread count', async () => {
@@ -680,7 +966,7 @@ describe('MessageList', () => {
       id: channelId,
       lastMessage: latestUnread,
       newMessageCount: 2,
-      lastDisplayedMessageId: unreadAnchor.id
+      lastDisplayedMessageId: olderMessage.id
     })
     const cleanChannel = makeChannel({
       id: channelId,
@@ -694,7 +980,7 @@ describe('MessageList', () => {
       },
       MessageReducer: {
         activeChannelMessages: [olderMessage, unreadAnchor, latestUnread],
-        unreadMessageId: unreadAnchor.id
+        unreadMessageId: olderMessage.id
       },
       UserReducer: {
         connectionStatus: CONNECTION_STATUS.DISCONNECTED
@@ -702,6 +988,9 @@ describe('MessageList', () => {
     })
 
     const firstRender = renderMessageList(unreadStore)
+    act(() => {
+      unreadStore.dispatch(setUnreadMessageIdAC(olderMessage.id))
+    })
     expect(screen.getByText('Unread Messages')).toBeInTheDocument()
 
     await act(async () => {
@@ -1272,6 +1561,10 @@ describe('MessageList', () => {
     const rendered = renderMessageList(store)
     const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
     const dispatchSpy = jest.spyOn(store, 'dispatch')
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0))
+    })
+    dispatchSpy.mockClear()
 
     act(() => {
       setScrollMetrics(scrollable, {
@@ -1319,7 +1612,7 @@ describe('MessageList', () => {
     })
 
     const latestEdgeTop = scrollable.scrollTop
-    expect(latestEdgeTop).toBe(40)
+    expect(latestEdgeTop).toBe(LATEST_EDGE_GAP_PX)
     expect(screen.queryByText('history-0')).not.toBeInTheDocument()
     expect(screen.getByText('confirmed-latest')).toBeInTheDocument()
     expect(screen.getByText('pending-latest')).toBeInTheDocument()
@@ -1402,10 +1695,9 @@ describe('MessageList', () => {
     delayedDispatch.mockClear()
     const jumpToLatestHandler = (registerJumpToLatest as jest.Mock).mock.calls.at(-1)?.[0]
     expect(typeof jumpToLatestHandler).toBe('function')
-    let jumpPromise: Promise<void> | undefined
 
     await act(async () => {
-      jumpPromise = Promise.resolve(jumpToLatestHandler(true))
+      jumpToLatestHandler(true)
       await Promise.resolve()
     })
 
@@ -1418,19 +1710,149 @@ describe('MessageList', () => {
     act(() => {
       flushAnimationFrames()
     })
-
     await act(async () => {
-      await jumpPromise
+      await Promise.resolve()
     })
 
     expect(store.getState().MessageReducer.loadingPrevMessagesState).toBe(LOADING_STATE.LOADED)
     expect(store.getState().MessageReducer.loadingNextMessagesState).toBe(LOADING_STATE.LOADED)
     expect(store.getState().MessageReducer.messagesHasNext).toBe(false)
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(screen.queryByText('history-delayed-0')).not.toBeInTheDocument()
     expect(screen.getByText('confirmed-before-latest-delayed')).toBeInTheDocument()
     expect(screen.getByText('confirmed-latest-delayed')).toBeInTheDocument()
     expect(screen.getByText('pending-latest-delayed')).toBeInTheDocument()
+  })
+
+  it('starts next pagination in the real MessageList before a slow previous-page load settles', async () => {
+    const channelId = 'channel-message-list-slow-prev-then-next'
+    const initialMessages = [
+      makeMessage({ id: '500', channelId, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId, body: 'msg-501' })
+    ]
+    const previousPageMessages = [
+      makeMessage({ id: '498', channelId, body: 'msg-498' }),
+      makeMessage({ id: '499', channelId, body: 'msg-499' })
+    ]
+    const nextPageMessages = [
+      makeMessage({ id: '502', channelId, body: 'msg-502' }),
+      makeMessage({ id: '503', channelId, body: 'msg-503' })
+    ]
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: initialMessages[initialMessages.length - 1]
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: initialMessages,
+        messagesHasPrev: true,
+        messagesHasNext: true,
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onLoadMore: (action) => {
+        if (action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV) {
+          return {
+            messages: previousPageMessages,
+            hasPrev: true,
+            hasNext: true
+          }
+        }
+
+        return {
+          messages: nextPageMessages,
+          hasPrev: true,
+          hasNext: false
+        }
+      }
+    })
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+
+    await flushMockServerDelay()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    delayedDispatch.mockClear()
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        itemTops: {
+          '500': 0,
+          '501': 40
+        }
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(delayedDispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, 20, MESSAGE_LOAD_DIRECTION.PREV, '500', true)
+    )
+    expect(store.getState().MessageReducer.loadingPrevMessagesState).toBe(LOADING_STATE.LOADING)
+
+    delayedDispatch.mockClear()
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        itemTops: {
+          '500': -40,
+          '501': 0
+        }
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(delayedDispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, 20, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
+    )
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: LATEST_EDGE_GAP_PX,
+        scrollHeight: 800,
+        itemTops: {
+          '500': 80,
+          '501': 120
+        }
+      })
+    })
+
+    await flushMockServerDelay()
+    await screen.findByText('msg-502')
+    await screen.findByText('msg-503')
+
+    act(() => {
+      layoutRenderedMessageList(scrollable, {
+        scrollTop: LATEST_EDGE_GAP_PX,
+        scrollHeight: 960,
+        itemTops: {
+          '500': 0,
+          '501': 40,
+          '502': 80,
+          '503': 120
+        }
+      })
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.queryByText('msg-498')).not.toBeInTheDocument()
+    expect(screen.queryByText('msg-499')).not.toBeInTheDocument()
+    expect(screen.getByText('msg-502')).toBeInTheDocument()
+    expect(screen.getByText('msg-503')).toBeInTheDocument()
   })
 
   it('handles a full flow across pending send, deep history, reconnect, and read/edit updates', async () => {
@@ -1479,7 +1901,6 @@ describe('MessageList', () => {
         scrollHeight: 1200,
         clientHeight: 240
       })
-      store.dispatch(updateChannelDataAC(channelId, { lastMessage: pendingLatest }, true))
       store.dispatch(addMessageAC(pendingLatest))
     })
 
@@ -1536,7 +1957,7 @@ describe('MessageList', () => {
     )?.[0]
 
     expect(loadLatestAction?.payload.channel.id).toBe(channelId)
-    expect(loadLatestAction?.payload.channel.lastMessage?.body).toBe('pending-latest')
+    expect(loadLatestAction?.payload.channel.lastMessage?.body).toBe('confirmed-latest')
 
     await act(async () => {
       store.dispatch(setMessagesAC([confirmedBase, confirmedLatest, pendingLatest]))
@@ -1548,7 +1969,7 @@ describe('MessageList', () => {
       flushAnimationFrames()
     })
 
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(screen.getAllByTestId('message-row').map((node) => node.textContent)).toEqual([
       'confirmed-base',
       'confirmed-latest',
@@ -1573,5 +1994,514 @@ describe('MessageList', () => {
     expect(editedRow).toHaveAttribute('data-message-edited', 'true')
     expect(editedRow).toHaveAttribute('data-message-markers', MESSAGE_DELIVERY_STATUS.READ)
     expect(screen.getAllByTestId('message-row').at(-1)?.textContent).toBe('pending-latest')
+  })
+
+  it('shows newly received messages after reconnecting with a pending local tail', async () => {
+    const channelId = 'channel-reconnect-pending-and-received'
+    const confirmedBase = makeMessage({
+      id: '998',
+      channelId,
+      body: 'confirmed-base'
+    })
+    const confirmedLatest = makeMessage({
+      id: '999',
+      channelId,
+      body: 'confirmed-latest'
+    })
+    const pendingLatest = makePendingMessage({
+      channelId,
+      body: 'pending-latest',
+      createdAt: new Date('2026-04-08T12:10:00.000Z')
+    })
+    const receivedOne = makeMessage({
+      id: '1000',
+      channelId,
+      body: 'received-1000',
+      incoming: true
+    })
+    const receivedTwo = makeMessage({
+      id: '1001',
+      channelId,
+      body: 'received-1001',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: confirmedLatest
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [confirmedBase, confirmedLatest],
+        messagesHasPrev: true,
+        messagesHasNext: false,
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 40,
+        scrollHeight: 1200,
+        clientHeight: 240
+      })
+      store.dispatch(updateChannelDataAC(channelId, { lastMessage: pendingLatest }, true))
+      store.dispatch(addMessageAC(pendingLatest))
+    })
+
+    expect(screen.getAllByTestId('message-row').map((node) => node.textContent)).toEqual([
+      'confirmed-base',
+      'confirmed-latest',
+      'pending-latest'
+    ])
+
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onReconnect: () => ({
+        channel: {
+          ...channel,
+          lastMessage: receivedTwo
+        }
+      }),
+      onLoadDefault: () => ({
+        messages: [confirmedBase, confirmedLatest, receivedOne, receivedTwo, pendingLatest],
+        hasNext: false
+      }),
+      onLoadLatest: () => ({
+        messages: [confirmedBase, confirmedLatest, receivedOne, receivedTwo, pendingLatest],
+        hasNext: false
+      }),
+      onLoadAround: () => ({
+        messages: [confirmedBase, confirmedLatest, receivedOne, receivedTwo, pendingLatest],
+        hasNext: false
+      })
+    })
+
+    delayedDispatch.mockClear()
+
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    await flushMockServerDelay()
+
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    const reconnectActionTypes = delayedDispatch.mock.calls.map(([action]: [any]) => action.type)
+
+    expect(reconnectActionTypes).toContain(reloadActiveChannelAfterReconnectAC(channel).type)
+    expect(reconnectActionTypes).toContain(loadLatestMessagesAC(channel).type)
+    expect(store.getState().ChannelReducer.activeChannel.lastMessage?.id).toBe(receivedTwo.id)
+    expect(screen.getAllByTestId('message-row').map((node) => node.textContent)).toEqual([
+      'confirmed-base',
+      'confirmed-latest',
+      'received-1000',
+      'received-1001',
+      'pending-latest'
+    ])
+  })
+
+  it('shows the unread divider on the first unread message after reconnect fallback when no visible anchor is available', async () => {
+    const channelId = 'channel-reconnect-unread-divider'
+    const lastDisplayed = makeMessage({
+      id: '1498',
+      channelId,
+      body: 'last-displayed'
+    })
+    const unreadOne = makeMessage({
+      id: '1499',
+      channelId,
+      body: 'unread-one',
+      incoming: true
+    })
+    const unreadTwo = makeMessage({
+      id: '1500',
+      channelId,
+      body: 'unread-two',
+      incoming: true
+    })
+    const latest = makeMessage({
+      id: '1501',
+      channelId,
+      body: 'latest',
+      incoming: true
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 0,
+      lastDisplayedMessageId: '',
+      lastMessage: lastDisplayed
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [],
+        messagesHasPrev: true,
+        messagesHasNext: true,
+        unreadMessageId: '',
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+
+    renderMessageList(store)
+
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onReconnect: () => ({
+        channel: {
+          ...channel,
+          newMessageCount: 3,
+          lastDisplayedMessageId: lastDisplayed.id,
+          lastMessage: latest
+        }
+      }),
+      onLoadNearUnread: () => ({
+        messages: [lastDisplayed, unreadOne, unreadTwo, latest],
+        hasNext: false,
+        unreadMessageId: lastDisplayed.id
+      })
+    })
+
+    delayedDispatch.mockClear()
+
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    await flushMockServerDelay()
+    await flushMockServerDelay()
+    await flushMockServerDelay()
+
+    act(() => {
+      flushAnimationFrames()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(delayedDispatch.mock.calls.map(([action]: [any]) => action.type)).toEqual(
+      expect.arrayContaining([reloadActiveChannelAfterReconnectAC(channel).type, loadNearUnreadAC(channel).type])
+    )
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(lastDisplayed.id)
+    expectUnreadDividerAt('unread-one')
+    expect(screen.getByText('unread-two')).toHaveAttribute('data-message-is-unread', 'true')
+    expect(getRenderedMessageBodies()).toEqual(['last-displayed', 'unread-one', 'unread-two', 'latest'])
+  })
+
+  it('shows the unread divider when opening a background chat that received messages while another chat stayed active', async () => {
+    const otherChannel = makeChannel({
+      id: 'channel-other-active',
+      lastMessage: makeMessage({
+        id: '1600',
+        channelId: 'channel-other-active',
+        body: 'other-latest'
+      })
+    })
+    const targetChannelId = 'channel-background-unread-open'
+    const lastDisplayed = makeMessage({
+      id: '1698',
+      channelId: targetChannelId,
+      body: 'target-last-displayed'
+    })
+    const unreadOne = makeMessage({
+      id: '1699',
+      channelId: targetChannelId,
+      body: 'target-unread-one',
+      incoming: true
+    })
+    const unreadTwo = makeMessage({
+      id: '1700',
+      channelId: targetChannelId,
+      body: 'target-unread-two',
+      incoming: true
+    })
+    const targetUnreadChannel = makeChannel({
+      id: targetChannelId,
+      newMessageCount: 2,
+      lastDisplayedMessageId: lastDisplayed.id,
+      lastMessage: unreadTwo
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: otherChannel
+      },
+      MessageReducer: {
+        activeChannelMessages: [
+          makeMessage({
+            id: '1599',
+            channelId: otherChannel.id,
+            body: 'other-visible'
+          }),
+          otherChannel.lastMessage as IMessage
+        ]
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.CONNECTED
+      }
+    })
+
+    renderMessageList(store)
+
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onLoadNearUnread: (action) => {
+        if (action.payload.channel.id !== targetChannelId) {
+          return { messages: [] }
+        }
+
+        return {
+          messages: [lastDisplayed, unreadOne, unreadTwo],
+          hasNext: false,
+          unreadMessageId: lastDisplayed.id
+        }
+      }
+    })
+
+    delayedDispatch.mockClear()
+
+    await act(async () => {
+      store.dispatch(setActiveChannelAC(targetUnreadChannel))
+      await Promise.resolve()
+    })
+
+    await flushMockServerDelay()
+
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(delayedDispatch.mock.calls.map(([action]: [any]) => action.type)).toEqual(
+      expect.arrayContaining([loadNearUnreadAC(targetUnreadChannel).type])
+    )
+    expect(store.getState().MessageReducer.unreadMessageId).toBe(lastDisplayed.id)
+    expectUnreadDividerAt('target-unread-one')
+    expect(screen.getByText('target-unread-two')).toHaveAttribute('data-message-is-unread', 'true')
+    expect(getRenderedMessageBodies()).toEqual(['target-last-displayed', 'target-unread-one', 'target-unread-two'])
+  })
+
+  it('keeps the unread divider before remote unread messages when returning to a chat with an offline pending local tail', async () => {
+    const channelId = 'channel-offline-pending-then-return'
+    const lastDisplayed = makeMessage({
+      id: '1798',
+      channelId,
+      body: 'history-last-displayed'
+    })
+    const pendingLocal = makePendingMessage({
+      channelId,
+      body: 'pending-local-tail',
+      createdAt: new Date('2026-04-09T09:10:00.000Z')
+    })
+    const otherChannel = makeChannel({
+      id: 'channel-away-for-return',
+      lastMessage: makeMessage({
+        id: '1805',
+        channelId: 'channel-away-for-return',
+        body: 'other-chat-latest'
+      })
+    })
+    const unreadOne = makeMessage({
+      id: '1799',
+      channelId,
+      body: 'remote-unread-one',
+      incoming: true
+    })
+    const unreadTwo = makeMessage({
+      id: '1800',
+      channelId,
+      body: 'remote-unread-two',
+      incoming: true
+    })
+    const reopenedChannel = makeChannel({
+      id: channelId,
+      newMessageCount: 2,
+      lastDisplayedMessageId: lastDisplayed.id,
+      lastMessage: unreadTwo
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: makeChannel({
+          id: channelId,
+          lastMessage: lastDisplayed
+        })
+      },
+      MessageReducer: {
+        activeChannelMessages: [lastDisplayed],
+        messagesHasPrev: true,
+        messagesHasNext: false
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+
+    renderMessageList(store)
+
+    await act(async () => {
+      store.dispatch(updateChannelDataAC(channelId, { lastMessage: pendingLocal }, true))
+      store.dispatch(addMessageAC(pendingLocal))
+      await Promise.resolve()
+    })
+
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onLoadNearUnread: (action) => {
+        if (action.payload.channel.id !== channelId) {
+          return { messages: [] }
+        }
+
+        return {
+          messages: [lastDisplayed, unreadOne, unreadTwo, pendingLocal],
+          hasNext: false,
+          unreadMessageId: lastDisplayed.id
+        }
+      }
+    })
+
+    delayedDispatch.mockClear()
+
+    await act(async () => {
+      store.dispatch(setActiveChannelAC(otherChannel))
+      await Promise.resolve()
+    })
+
+    await act(async () => {
+      store.dispatch(setActiveChannelAC(reopenedChannel))
+      await Promise.resolve()
+    })
+
+    await flushMockServerDelay()
+
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(delayedDispatch.mock.calls.map(([action]: [any]) => action.type)).toEqual(
+      expect.arrayContaining([loadNearUnreadAC(reopenedChannel).type])
+    )
+    expectUnreadDividerAt('remote-unread-one')
+    expect(screen.getByText('pending-local-tail')).toHaveAttribute('data-message-is-unread', 'false')
+    expect(getRenderedMessageBodies()).toEqual([
+      'history-last-displayed',
+      'remote-unread-one',
+      'remote-unread-two',
+      'pending-local-tail'
+    ])
+  })
+
+  it('shows the unread divider before remote unread messages after reconnecting with a pending local tail', async () => {
+    const channelId = 'channel-reconnect-unread-with-pending-tail'
+    const lastDisplayed = makeMessage({
+      id: '1898',
+      channelId,
+      body: 'reconnect-last-displayed'
+    })
+    const unreadOne = makeMessage({
+      id: '1899',
+      channelId,
+      body: 'reconnect-unread-one',
+      incoming: true
+    })
+    const unreadTwo = makeMessage({
+      id: '1900',
+      channelId,
+      body: 'reconnect-unread-two',
+      incoming: true
+    })
+    const pendingLocal = makePendingMessage({
+      channelId,
+      body: 'reconnect-pending-local',
+      createdAt: new Date('2026-04-09T09:20:00.000Z')
+    })
+    const channel = makeChannel({
+      id: channelId,
+      newMessageCount: 0,
+      lastDisplayedMessageId: '',
+      lastMessage: lastDisplayed
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [],
+        messagesHasPrev: true,
+        messagesHasNext: true,
+        unreadMessageId: '',
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+
+    renderMessageList(store)
+
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onReconnect: () => ({
+        channel: {
+          ...channel,
+          newMessageCount: 2,
+          lastDisplayedMessageId: lastDisplayed.id,
+          lastMessage: unreadTwo
+        }
+      }),
+      onLoadNearUnread: () => ({
+        messages: [lastDisplayed, unreadOne, unreadTwo, pendingLocal],
+        hasNext: false,
+        unreadMessageId: lastDisplayed.id
+      }),
+      onLoadLatest: () => ({
+        messages: [lastDisplayed, unreadOne, unreadTwo, pendingLocal],
+        hasNext: false,
+        unreadMessageId: lastDisplayed.id
+      })
+    })
+
+    delayedDispatch.mockClear()
+
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    await flushMockServerDelay()
+    await flushMockServerDelay()
+    await flushMockServerDelay()
+
+    act(() => {
+      flushAnimationFrames()
+    })
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    const reconnectActionTypes = delayedDispatch.mock.calls.map(([action]: [any]) => action.type)
+
+    expect(reconnectActionTypes).toContain(reloadActiveChannelAfterReconnectAC(channel).type)
+    expect(
+      reconnectActionTypes.some(
+        (type) => type === loadNearUnreadAC(channel).type || type === loadLatestMessagesAC(channel).type
+      )
+    ).toBe(true)
+    expectUnreadDividerAt('reconnect-unread-one')
+    expect(screen.getByText('reconnect-pending-local')).toHaveAttribute('data-message-is-unread', 'false')
+    expect(getRenderedMessageBodies()).toEqual([
+      'reconnect-last-displayed',
+      'reconnect-unread-one',
+      'reconnect-unread-two',
+      'reconnect-pending-local'
+    ])
   })
 })

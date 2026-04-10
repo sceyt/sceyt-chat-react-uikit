@@ -49,7 +49,6 @@ interface ICustomMessageItem {
   nextMessage?: IMessage
   unreadMessageId: string
   isUnreadMessage: boolean
-  startsUnreadSection?: boolean
   messageActionsShow: boolean
   selectionIsActive?: boolean
   emojisPopupOpen: boolean
@@ -98,7 +97,6 @@ export interface IMessageProps {
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
   isUnreadMessage: boolean
-  startsUnreadSection?: boolean
   nextMessageStartsUnreadSection?: boolean
   isThreadMessage: boolean
   disableAutoReadTracking?: boolean

@@ -1,19 +1,29 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import {
+  addMessagesAC,
+  clearActivePaginationIntentAC,
   clearSelectedMessagesAC,
   loadAroundMessageAC,
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
   loadMoreMessagesAC,
   loadNearUnreadAC,
+  reloadActiveChannelAfterReconnectAC,
+  refreshCacheAroundMessageAC,
   scrollToNewMessageAC,
-  setScrollToMessagesAC,
-  setUnreadMessageIdAC,
+  setActivePaginationIntentAC,
+  setMessagesHasNextAC,
+  setMessagesHasPrevAC,
   setUnreadScrollToAC,
-  showScrollToNewMessageButtonAC
+  showScrollToNewMessageButtonAC,
+  setUnreadMessageIdAC
 } from '../../../store/message/actions'
 import {
+  compareMessageIds,
+  compareMessagesForList,
   clearVisibleMessagesMap,
+  getContiguousNextMessages,
+  getContiguousPrevMessages,
   getClosestConfirmedMessageId,
   getFirstConfirmedMessageId,
   getLastConfirmedMessageId,
@@ -22,6 +32,7 @@ import {
   hasNextContiguousInMap,
   hasPrevContiguousInMap,
   LOAD_MAX_MESSAGE_COUNT,
+  MESSAGES_MAX_PAGE_COUNT,
   MESSAGE_LOAD_DIRECTION
 } from '../../../helpers/messagesHalper'
 import { setAllowEditDeleteIncomingMessage } from '../../../helpers/message'
@@ -30,27 +41,50 @@ import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constan
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import { IChannel, IMessage } from '../../../types'
 
-const PRELOAD_TRIGGER_PX = 2
+export const PRELOAD_TRIGGER_PX = 5
 const PRELOAD_RESET_PX = 50
-const LATEST_EDGE_GAP_PX = 40
+export const LATEST_EDGE_GAP_PX = 5
 const PINNED_TO_LATEST_PX = 96
 const HIGHLIGHT_DURATION_MS = 1600
 const DEFAULT_UNREAD_VISIBILITY_THRESHOLD = 0.5
 const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
+const SCROLL_IDLE_MS = 800
+const MESSAGE_LIST_DEBUG_FLAG = '__SCEYT_DEBUG_MESSAGE_LIST__'
 
 type RestoreState =
   | { mode: 'to-bottom' }
   | { mode: 'to-bottom-smooth' }
   | { mode: 'reveal-unread-separator' }
   | { mode: 'reveal-message'; messageId: string; smooth?: boolean }
-  | { mode: 'preserve-anchor'; itemId: string; offsetFromTop: number; sourceScrollTop: number }
+  | {
+      mode: 'preserve-anchor-window'
+      itemId: string
+      offsetFromTop: number
+      sourceScrollTop: number
+    }
+  | {
+      mode: 'preserve-anchor'
+      itemId: string
+      offsetFromTop: number
+      sourceScrollTop: number
+      loadDirection: 'previous' | 'next'
+      requestId: string
+    }
 
-type ViewportLoadState = null | 'previous' | 'next' | 'around' | 'window'
+type WindowLoadScope = null | 'around' | 'window'
 
 type PendingLoadRequest = {
   previousIds: Set<string>
   resolve: (page: { items: IMessage[] }) => void
+}
+
+type EdgeDirection = 'previous' | 'next'
+
+type EdgePaginationRequest = {
+  requestId: string
+  direction: EdgeDirection
+  anchorId: string
 }
 
 type TimelineItem =
@@ -73,7 +107,6 @@ type TimelineItem =
       nextItem: IMessage | null
       isHighlighted: boolean
       isUnread: boolean
-      startsUnreadSection: boolean
       nextItemStartsUnreadSection: boolean
       startsNewDay: boolean
       registerItemElement: (el: HTMLElement | null) => void
@@ -89,9 +122,6 @@ export interface UseChatControllerParams {
   connectionStatus: string
   scrollToNewMessage: { scrollToBottom: boolean; isIncomingMessage: boolean; updateMessageList: boolean }
   scrollToMentionedMessage: boolean | string | null
-  scrollToRepliedMessageId: string | null
-  scrollToMessageHighlight: boolean
-  scrollToMessageBehavior: ScrollBehavior
   showScrollToNewMessageButton: boolean
   unreadScrollTo: boolean | string
   unreadMessageId: string
@@ -217,17 +247,56 @@ const isUnreadIncomingMessage = (message: IMessage) =>
   message.incoming && !message.userMarkers?.some((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
 
 const getUnreadDividerIndex = (messages: IMessage[], unreadAnchorId: string) => {
-  if (!unreadAnchorId) {
+  if (!unreadAnchorId || !messages.length) {
     return -1
   }
 
   const unreadAnchorIndex = messages.findIndex((message) => message.id === unreadAnchorId)
 
-  return unreadAnchorIndex >= 0 ? unreadAnchorIndex : -1
+  if (unreadAnchorIndex >= 0) {
+    return unreadAnchorIndex + 1
+  }
+
+  const firstConfirmedMessageId = getFirstConfirmedMessageId(messages)
+  const lastConfirmedMessageId = getLastConfirmedMessageId(messages)
+
+  if (!firstConfirmedMessageId || !lastConfirmedMessageId) {
+    return -1
+  }
+
+  if (compareMessageIds(unreadAnchorId, firstConfirmedMessageId) < 0) {
+    return 0
+  }
+
+  if (compareMessageIds(unreadAnchorId, lastConfirmedMessageId) >= 0) {
+    return -1
+  }
+
+  return messages.findIndex((message) => !!message.id && compareMessageIds(message.id, unreadAnchorId) > 0)
 }
 
 const getUnreadTrackingStartIndex = (messages: IMessage[]) => {
   return messages.findIndex(isUnreadIncomingMessage)
+}
+
+const isMessageListDebugEnabled = () =>
+  typeof globalThis !== 'undefined' && Boolean((globalThis as Record<string, unknown>)[MESSAGE_LIST_DEBUG_FLAG])
+
+const getMessageWindowDebugSummary = (messages: IMessage[]) => ({
+  count: messages.length,
+  confirmedCount: messages.filter((message) => !!message.id).length,
+  firstConfirmedId: getFirstConfirmedMessageId(messages) || '',
+  lastConfirmedId: getLastConfirmedMessageId(messages) || '',
+  firstLocalRef: messages[0] ? getMessageLocalRef(messages[0]) : '',
+  lastLocalRef: messages[messages.length - 1] ? getMessageLocalRef(messages[messages.length - 1]) : ''
+})
+
+const debugMessageListController = (scope: string, payload: Record<string, unknown>) => {
+  if (!isMessageListDebugEnabled()) {
+    return
+  }
+
+  console.log(`[MessageListDebug][controller] ${scope}`, JSON.stringify(payload))
 }
 
 export function useChatController({
@@ -240,9 +309,6 @@ export function useChatController({
   connectionStatus,
   scrollToNewMessage,
   scrollToMentionedMessage,
-  scrollToRepliedMessageId,
-  scrollToMessageHighlight,
-  scrollToMessageBehavior,
   showScrollToNewMessageButton,
   unreadScrollTo,
   unreadMessageId,
@@ -257,13 +323,19 @@ export function useChatController({
   const channelRef = useRef(channel)
   const lastVisibleMessageIdRef = useRef<string>('')
   const lastVisibleAnchorIdRef = useRef<string>('')
+  const connectionStatusRef = useRef(connectionStatus)
+  const previousConnectionStatusRef = useRef(connectionStatus)
+  const scrollIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const handleScrollRef = useRef<() => void>(() => undefined)
   const loadingPrevMessagesRef = useRef(loadingPrevMessages)
   const loadingNextMessagesRef = useRef(loadingNextMessages)
-  const pendingLoadRef = useRef<PendingLoadRequest | null>(null)
-  const hasPrevCachedRef = useRef<boolean>(false)
-  const hasNextCachedRef = useRef<boolean>(false)
+  const pendingWindowLoadRef = useRef<PendingLoadRequest | null>(null)
+  const pendingEdgeLoadRefs = useRef<Record<EdgeDirection, PendingLoadRequest | null>>({
+    previous: null,
+    next: null
+  })
   const previousMessagesRef = useRef<IMessage[]>([])
+  const debugPreviousMessagesRef = useRef<IMessage[]>([])
   const suppressedMessageChangesRef = useRef<number>(0)
   const pendingVisibleUnreadFrameRef = useRef<number | null>(null)
   const clearedSelectionChannelIdRef = useRef<string>('')
@@ -283,9 +355,13 @@ export function useChatController({
   const jumpLockModeRef = useRef<null | 'latest' | 'item'>(null)
   const jumpUnlockTimeoutRef = useRef<number | null>(null)
   const isJumping = useRef(false)
-  const loadStateRef = useRef<ViewportLoadState>(null)
-  const deferredEdgeCheckRef = useRef(false)
+  const windowLoadScopeRef = useRef<WindowLoadScope>(null)
+  const activeEdgeIntentRef = useRef<EdgeDirection | null>(null)
+  const activeEdgeRequestRef = useRef<EdgePaginationRequest | null>(null)
+  const cachedEdgeRequestRef = useRef<EdgePaginationRequest | null>(null)
+  const edgeRequestSequenceRef = useRef(0)
   const activeChannelIdRef = useRef<string | null>(null)
+  const lastScrollActivityAtRef = useRef(0)
 
   const [isLoadingPrevious, setIsLoadingPrevious] = useState(false)
   const [isLoadingNext, setIsLoadingNext] = useState(false)
@@ -294,15 +370,12 @@ export function useChatController({
   const [pendingNewestCount, setPendingNewestCount] = useState(0)
   const [remainingUnreadCount, setRemainingUnreadCount] = useState(channel.newMessageCount || 0)
   const [highlightedItemId, setHighlightedItemId] = useState<string | null>(null)
-  const [stableUnreadAnchorId, setStableUnreadAnchorId] = useState(unreadMessageId)
 
   loadingPrevMessagesRef.current = loadingPrevMessages
   loadingNextMessagesRef.current = loadingNextMessages
 
-  const effectiveUnreadAnchorId = stableUnreadAnchorId || unreadMessageId
   const isPreviousLoading = loadingPrevMessages === LOADING_STATE.LOADING
   const isNextLoading = loadingNextMessages === LOADING_STATE.LOADING
-  const isAnyWindowLoading = isPreviousLoading || isNextLoading
 
   const isViewportLoadSettled = useCallback((scope: null | 'previous' | 'next' | 'around' | 'window') => {
     switch (scope) {
@@ -359,24 +432,73 @@ export function useChatController({
     suppressedMessageChangesRef.current += count
   }, [])
 
+  const consumeSuppressedMessageChange = useCallback((count = 1) => {
+    suppressedMessageChangesRef.current = Math.max(0, suppressedMessageChangesRef.current - count)
+  }, [])
+
   useEffect(() => {
     messagesRef.current = messages
     channelRef.current = channel
+    connectionStatusRef.current = connectionStatus
   })
 
-  useEffect(() => {
-    const oldestConfirmedMessageId = getFirstConfirmedMessageId(messages)
-    const newestConfirmedMessageId = getLastConfirmedMessageId(messages)
-    hasPrevCachedRef.current = oldestConfirmedMessageId
-      ? hasPrevContiguousInMap(channel.id, oldestConfirmedMessageId)
-      : false
-    hasNextCachedRef.current = newestConfirmedMessageId
-      ? hasNextContiguousInMap(channel.id, newestConfirmedMessageId)
-      : false
-  }, [channel.id, messages])
+  const oldestConfirmedMessageId = getFirstConfirmedMessageId(messages)
+  const newestConfirmedMessageId = getLastConfirmedMessageId(messages)
+  const hasPrevious =
+    hasPrevMessages || (oldestConfirmedMessageId ? hasPrevContiguousInMap(channel.id, oldestConfirmedMessageId) : false)
+  const hasNext =
+    hasNextMessages || (newestConfirmedMessageId ? hasNextContiguousInMap(channel.id, newestConfirmedMessageId) : false)
 
-  const hasPrevious = hasPrevMessages || hasPrevCachedRef.current
-  const hasNext = hasNextMessages || hasNextCachedRef.current
+  const isScrollInteractionActive = useCallback(() => Date.now() - lastScrollActivityAtRef.current < SCROLL_IDLE_MS, [])
+
+  const captureWindowPreserveAnchor = useCallback(() => {
+    const container = scrollRef.current
+    if (!container) {
+      return
+    }
+
+    const anchor = getTopViewportAnchor(container, itemElementsRef.current)
+    if (!anchor) {
+      return
+    }
+
+    restoreRef.current = {
+      mode: 'preserve-anchor-window',
+      itemId: anchor.itemId,
+      offsetFromTop: anchor.offsetFromTop,
+      sourceScrollTop: container.scrollTop
+    }
+  }, [])
+
+  const getCachedEdgeFlags = useCallback(
+    (direction: EdgeDirection, cachedMessages: IMessage[]) => {
+      const confirmedByRef = new Map<string, IMessage>()
+
+      ;[...messagesRef.current, ...cachedMessages].forEach((message) => {
+        if (!message.id) {
+          return
+        }
+        confirmedByRef.set(getMessageLocalRef(message), message)
+      })
+
+      const nextConfirmedWindow = Array.from(confirmedByRef.values()).sort(compareMessagesForList)
+      const trimmedConfirmedWindow =
+        direction === 'previous'
+          ? nextConfirmedWindow.slice(0, MESSAGES_MAX_PAGE_COUNT)
+          : nextConfirmedWindow.slice(-MESSAGES_MAX_PAGE_COUNT)
+
+      const nextFirstConfirmedId = getFirstConfirmedMessageId(trimmedConfirmedWindow)
+      const nextLastConfirmedId = getLastConfirmedMessageId(trimmedConfirmedWindow)
+
+      return {
+        hasPrev:
+          hasPrevMessages || (nextFirstConfirmedId ? hasPrevContiguousInMap(channel.id, nextFirstConfirmedId) : false),
+        hasNext:
+          hasNextMessages || (nextLastConfirmedId ? hasNextContiguousInMap(channel.id, nextLastConfirmedId) : false)
+      }
+    },
+    [channel.id, hasNextMessages, hasPrevMessages]
+  )
 
   const syncLatestState = useCallback(() => {
     const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
@@ -501,15 +623,13 @@ export function useChatController({
   ])
 
   const timelineItems = useMemo<TimelineItem[]>(() => {
-    const unreadStartIndex = getUnreadDividerIndex(messages, effectiveUnreadAnchorId)
-
+    const unreadStartIndex = getUnreadDividerIndex(messages, unreadMessageId)
     return messages.flatMap((message, index) => {
       const localRef = getMessageLocalRef(message)
       const prevMessage = index > 0 ? messages[index - 1] : null
       const nextMessage = index < messages.length - 1 ? messages[index + 1] : null
       const startsNewDay = !prevMessage || formatMessageDateLabel(prevMessage) !== formatMessageDateLabel(message)
       const isUnread = unreadStartIndex >= 0 && index >= unreadStartIndex && isUnreadIncomingMessage(message)
-      const startsUnreadSection = unreadStartIndex >= 0 && index === unreadStartIndex
       const nextItemStartsUnreadSection = unreadStartIndex >= 0 && index + 1 === unreadStartIndex
       const result: TimelineItem[] = []
 
@@ -538,7 +658,6 @@ export function useChatController({
         nextItem: nextMessage,
         isHighlighted: highlightedItemId === localRef,
         isUnread,
-        startsUnreadSection,
         nextItemStartsUnreadSection,
         startsNewDay,
         registerItemElement: (el: HTMLElement | null) => {
@@ -555,27 +674,97 @@ export function useChatController({
 
       return result
     })
-  }, [highlightedItemId, messages, effectiveUnreadAnchorId])
+  }, [highlightedItemId, messages, unreadMessageId])
 
-  const resolvePendingLoad = useCallback(() => {
-    if (!pendingLoadRef.current || !isViewportLoadSettled(loadStateRef.current)) {
+  const createEdgeRequestId = useCallback(
+    (direction: EdgeDirection) =>
+      `${channelRef.current.id}:${direction}:${Date.now()}:${++edgeRequestSequenceRef.current}`,
+    []
+  )
+
+  const isActiveEdgeRequestCurrent = useCallback((requestId: string, direction?: EdgeDirection) => {
+    const activeRequest =
+      activeEdgeRequestRef.current?.requestId === requestId
+        ? activeEdgeRequestRef.current
+        : cachedEdgeRequestRef.current?.requestId === requestId
+          ? cachedEdgeRequestRef.current
+          : null
+    if (!activeRequest || activeRequest.requestId !== requestId) {
+      return false
+    }
+
+    return !direction || activeRequest.direction === direction
+  }, [])
+
+  const clearPreserveAnchorForRequest = useCallback((requestId?: string) => {
+    if (restoreRef.current?.mode !== 'preserve-anchor') {
       return
     }
 
-    const request = pendingLoadRef.current
-    pendingLoadRef.current = null
+    if (requestId && restoreRef.current.requestId !== requestId) {
+      return
+    }
+
+    restoreRef.current = null
+  }, [])
+
+  const invalidateEdgeDirection = useCallback(
+    (direction: EdgeDirection) => {
+      if (activeEdgeIntentRef.current === direction) {
+        activeEdgeIntentRef.current = null
+      }
+
+      const activeRequest = activeEdgeRequestRef.current
+      if (activeRequest?.direction === direction) {
+        clearPreserveAnchorForRequest(activeRequest.requestId)
+        dispatch(clearActivePaginationIntentAC(activeRequest.requestId))
+        activeEdgeRequestRef.current = null
+      }
+
+      const cachedRequest = cachedEdgeRequestRef.current
+      if (cachedRequest?.direction === direction) {
+        clearPreserveAnchorForRequest(cachedRequest.requestId)
+        cachedEdgeRequestRef.current = null
+      }
+    },
+    [clearPreserveAnchorForRequest, dispatch]
+  )
+
+  const resolvePendingWindowLoad = useCallback(() => {
+    if (!pendingWindowLoadRef.current || !isViewportLoadSettled(windowLoadScopeRef.current)) {
+      return
+    }
+
+    const request = pendingWindowLoadRef.current
+    pendingWindowLoadRef.current = null
     const nextItems = messages.filter((message) => !request.previousIds.has(getMessageLocalRef(message)))
-    request.resolve({ items: nextItems.length > 0 ? nextItems : messages })
-  }, [isViewportLoadSettled, loadingNextMessages, loadingPrevMessages, messages])
+    request.resolve({ items: nextItems })
+  }, [isViewportLoadSettled, messages, loadingPrevMessages, loadingNextMessages])
+
+  const resolvePendingEdgeLoad = useCallback(
+    (direction: EdgeDirection) => {
+      const pendingRequest = pendingEdgeLoadRefs.current[direction]
+      if (!pendingRequest || !isViewportLoadSettled(direction)) {
+        return
+      }
+
+      pendingEdgeLoadRefs.current[direction] = null
+      const nextItems = messages.filter((message) => !pendingRequest.previousIds.has(getMessageLocalRef(message)))
+      pendingRequest.resolve({ items: nextItems })
+    },
+    [isViewportLoadSettled, messages, loadingPrevMessages, loadingNextMessages]
+  )
 
   useEffect(() => {
-    resolvePendingLoad()
-  }, [resolvePendingLoad])
+    resolvePendingWindowLoad()
+    resolvePendingEdgeLoad('previous')
+    resolvePendingEdgeLoad('next')
+  }, [resolvePendingEdgeLoad, resolvePendingWindowLoad])
 
-  const beginPagedRequest = useCallback(
+  const beginWindowPagedRequest = useCallback(
     (dispatchAction: () => void) =>
       new Promise<{ items: IMessage[] }>((resolve) => {
-        pendingLoadRef.current = {
+        pendingWindowLoadRef.current = {
           previousIds: new Set(messagesRef.current.map((message) => getMessageLocalRef(message))),
           resolve
         }
@@ -585,23 +774,25 @@ export function useChatController({
     [suppressNextMessageChange]
   )
 
-  const flushDeferredEdgeCheck = useCallback(() => {
-    if (!deferredEdgeCheckRef.current || loadStateRef.current || !isViewportLoadSettled(null)) {
-      return
-    }
-
-    deferredEdgeCheckRef.current = false
-    window.requestAnimationFrame(() => {
-      if (!loadStateRef.current && isViewportLoadSettled(null)) {
-        handleScrollRef.current()
-      }
-    })
-  }, [isViewportLoadSettled])
+  const beginEdgePagedRequest = useCallback(
+    (direction: EdgeDirection, dispatchAction: () => void) =>
+      new Promise<{ items: IMessage[] }>((resolve) => {
+        pendingEdgeLoadRefs.current[direction] = {
+          previousIds: new Set(messagesRef.current.map((message) => getMessageLocalRef(message))),
+          resolve
+        }
+        suppressNextMessageChange()
+        dispatchAction()
+      }),
+    [suppressNextMessageChange]
+  )
 
   const jumpToLatest = useCallback(
     async (smooth = true) => {
       isJumping.current = true
       lockJumpScrolling(smooth, 'latest')
+      invalidateEdgeDirection('previous')
+      invalidateEdgeDirection('next')
       restoreRef.current = null
       pendingNewestCountRef.current = 0
       setPendingNewestCount(0)
@@ -613,18 +804,11 @@ export function useChatController({
         scrollToLatestEdge(container, smooth ? 'smooth' : 'auto')
       }
 
-      const latestLocalRef = getMessageLocalRef(channelRef.current.lastMessage)
-      const windowHasLatest =
-        !hasNext &&
-        !!latestLocalRef &&
-        messagesRef.current.length > 0 &&
-        messagesRef.current.some((message) => getMessageLocalRef(message) === latestLocalRef)
-
-      if (!windowHasLatest && channelRef.current?.id) {
+      if (channelRef.current?.id) {
         suppressNextMessageChange()
-        loadStateRef.current = 'window'
+        windowLoadScopeRef.current = 'window'
         try {
-          await beginPagedRequest(() => {
+          await beginWindowPagedRequest(() => {
             if (connectionStatus === CONNECTION_STATUS.CONNECTED) {
               dispatch(loadLatestMessagesAC(channelRef.current))
             } else {
@@ -632,9 +816,9 @@ export function useChatController({
             }
           })
         } finally {
-          loadStateRef.current = null
-          flushDeferredEdgeCheck()
+          windowLoadScopeRef.current = null
         }
+        dispatch(showScrollToNewMessageButtonAC(false))
 
         const latestContainer = scrollRef.current
         if (!latestContainer) {
@@ -663,11 +847,11 @@ export function useChatController({
       dispatch(showScrollToNewMessageButtonAC(false))
     },
     [
-      beginPagedRequest,
+      beginWindowPagedRequest,
       connectionStatus,
       dispatch,
-      flushDeferredEdgeCheck,
       hasNext,
+      invalidateEdgeDirection,
       lockJumpScrolling,
       suppressNextMessageChange,
       syncLatestState
@@ -677,6 +861,8 @@ export function useChatController({
   const jumpToItem = useCallback(
     async (itemId: string, smooth = true) => {
       lockJumpScrolling(smooth, 'item')
+      invalidateEdgeDirection('previous')
+      invalidateEdgeDirection('next')
       const length = messagesRef.current?.length
       const isLoaded = messagesRef.current.some(
         (message, index) => index < length - 10 && index > 10 && getMessageLocalRef(message) === itemId
@@ -704,23 +890,31 @@ export function useChatController({
         return
       }
 
-      loadStateRef.current = 'around'
+      windowLoadScopeRef.current = 'around'
       setIsLoadingPrevious(true)
       setIsLoadingNext(true)
 
       try {
-        await beginPagedRequest(() => {
+        await beginWindowPagedRequest(() => {
           dispatch(loadAroundMessageAC(channelRef.current, itemId, scrollToMessageHighlight, 'instant', false))
         })
+        windowLoadScopeRef.current = null
         isJumping.current = true
         setHighlight(itemId)
       } finally {
-        loadStateRef.current = null
+        windowLoadScopeRef.current = null
         setIsLoadingPrevious(false)
         setIsLoadingNext(false)
       }
     },
-    [beginPagedRequest, dispatch, lockJumpScrolling, scrollToMessageHighlight, setHighlight]
+    [
+      beginWindowPagedRequest,
+      dispatch,
+      invalidateEdgeDirection,
+      lockJumpScrolling,
+      scrollToMessageHighlight,
+      setHighlight
+    ]
   )
 
   const notifyIncomingItems = useCallback(
@@ -759,47 +953,140 @@ export function useChatController({
     [hasNext]
   )
 
+  const applyCachedEdgePage = useCallback(
+    (direction: EdgeDirection) => {
+      if (!channel.id || scrollToMentionedMessage) {
+        return false
+      }
+
+      const boundaryMessageId =
+        direction === 'previous'
+          ? getFirstConfirmedMessageId(messagesRef.current)
+          : getLastConfirmedMessageId(messagesRef.current)
+
+      if (!boundaryMessageId) {
+        return false
+      }
+
+      const cachedMessages =
+        direction === 'previous'
+          ? getContiguousPrevMessages(channel.id, boundaryMessageId, LOAD_MAX_MESSAGE_COUNT)
+          : getContiguousNextMessages(channel.id, boundaryMessageId, LOAD_MAX_MESSAGE_COUNT)
+
+      if (!cachedMessages.length) {
+        return false
+      }
+
+      const activeRequest = activeEdgeRequestRef.current?.direction === direction ? activeEdgeRequestRef.current : null
+      const requestId = activeRequest?.requestId || createEdgeRequestId(direction)
+      const container = scrollRef.current
+
+      activeEdgeIntentRef.current = direction
+      if (!activeRequest) {
+        cachedEdgeRequestRef.current = {
+          requestId,
+          direction,
+          anchorId: boundaryMessageId
+        }
+      }
+
+      if (container) {
+        const anchor = getTopViewportAnchor(container, itemElementsRef.current)
+        if (anchor) {
+          restoreRef.current = {
+            mode: 'preserve-anchor',
+            itemId: anchor.itemId,
+            offsetFromTop: anchor.offsetFromTop,
+            sourceScrollTop: container.scrollTop,
+            loadDirection: direction,
+            requestId
+          }
+        }
+      }
+
+      const nextFlags = getCachedEdgeFlags(direction, cachedMessages)
+
+      suppressNextMessageChange()
+      dispatch(
+        addMessagesAC(
+          JSON.parse(JSON.stringify(cachedMessages)),
+          direction === 'previous' ? MESSAGE_LOAD_DIRECTION.PREV : MESSAGE_LOAD_DIRECTION.NEXT
+        )
+      )
+      dispatch(setMessagesHasPrevAC(nextFlags.hasPrev))
+      dispatch(setMessagesHasNextAC(nextFlags.hasNext))
+
+      window.requestAnimationFrame(() => {
+        if (direction === 'previous') {
+          historyLoadArmedRef.current = true
+        } else {
+          latestLoadArmedRef.current = true
+        }
+        handleScrollRef.current()
+      })
+
+      return true
+    },
+    [channel.id, createEdgeRequestId, dispatch, getCachedEdgeFlags, scrollToMentionedMessage, suppressNextMessageChange]
+  )
+
   const loadPrevious = useCallback(
-    async (beforeId: string) => {
+    async (beforeId: string, requestId: string) => {
       if (!channel.id || scrollToMentionedMessage || scrollToNewMessage.scrollToBottom || isPreviousLoading) {
         return { items: [] }
       }
 
-      return beginPagedRequest(() => {
+      dispatch(setActivePaginationIntentAC(channel.id, 'prev', requestId, beforeId))
+      return beginEdgePagedRequest('previous', () => {
         dispatch(
-          loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, beforeId, hasPrevMessages)
+          loadMoreMessagesAC(
+            channel.id,
+            LOAD_MAX_MESSAGE_COUNT,
+            MESSAGE_LOAD_DIRECTION.PREV,
+            beforeId,
+            hasPrevMessages,
+            requestId
+          )
         )
       })
     },
     [
-      beginPagedRequest,
+      beginEdgePagedRequest,
       channel.id,
       dispatch,
       hasPrevMessages,
-      isAnyWindowLoading,
+      isPreviousLoading,
       scrollToMentionedMessage,
       scrollToNewMessage.scrollToBottom
     ]
   )
 
   const loadNext = useCallback(
-    async (afterId: string) => {
+    async (afterId: string, requestId: string) => {
       if (!channel.id || scrollToMentionedMessage || scrollToNewMessage.scrollToBottom || isNextLoading) {
         return { items: [] }
       }
 
-      return beginPagedRequest(() => {
+      dispatch(setActivePaginationIntentAC(channel.id, 'next', requestId, afterId))
+      return beginEdgePagedRequest('next', () => {
         dispatch(
-          loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, afterId, hasNextMessages)
+          loadMoreMessagesAC(
+            channel.id,
+            LOAD_MAX_MESSAGE_COUNT,
+            MESSAGE_LOAD_DIRECTION.NEXT,
+            afterId,
+            hasNextMessages,
+            requestId
+          )
         )
       })
     },
     [
-      beginPagedRequest,
+      beginEdgePagedRequest,
       channel.id,
       dispatch,
       hasNextMessages,
-      isAnyWindowLoading,
+      isNextLoading,
       scrollToMentionedMessage,
       scrollToNewMessage.scrollToBottom
     ]
@@ -810,8 +1097,24 @@ export function useChatController({
       return
     }
     const oldestVisibleId = getFirstConfirmedMessageId(messages)
-    if (!oldestVisibleId || !hasPrevious || isLoadingPrevious || loadStateRef.current) {
+    if (!oldestVisibleId || !hasPrevious || windowLoadScopeRef.current) {
       return
+    }
+
+    if (applyCachedEdgePage('previous')) {
+      return
+    }
+
+    if (isLoadingPrevious) {
+      return
+    }
+
+    const requestId = createEdgeRequestId('previous')
+    activeEdgeIntentRef.current = 'previous'
+    activeEdgeRequestRef.current = {
+      requestId,
+      direction: 'previous',
+      anchorId: oldestVisibleId
     }
 
     const container = scrollRef.current
@@ -822,29 +1125,80 @@ export function useChatController({
           mode: 'preserve-anchor',
           itemId: anchor.itemId,
           offsetFromTop: anchor.offsetFromTop,
-          sourceScrollTop: container.scrollTop
+          sourceScrollTop: container.scrollTop,
+          loadDirection: 'previous',
+          requestId
         }
       }
+      debugMessageListController('paginate-prev:start', {
+        channelId: channel.id,
+        scrollTop: container.scrollTop,
+        oldestVisibleId,
+        hasPrevious,
+        hasNext,
+        anchor,
+        window: getMessageWindowDebugSummary(messages)
+      })
     }
 
-    loadStateRef.current = 'previous'
     setIsLoadingPrevious(true)
     try {
-      await loadPrevious(oldestVisibleId)
+      const result = await loadPrevious(oldestVisibleId, requestId)
+      if (!result.items.length && isActiveEdgeRequestCurrent(requestId, 'previous')) {
+        clearPreserveAnchorForRequest(requestId)
+      }
     } finally {
-      loadStateRef.current = null
+      const isCurrentRequest = isActiveEdgeRequestCurrent(requestId, 'previous')
+      if (isCurrentRequest) {
+        dispatch(clearActivePaginationIntentAC(requestId))
+        activeEdgeRequestRef.current = null
+      } else {
+        consumeSuppressedMessageChange()
+      }
+      historyLoadArmedRef.current = true
+      window.requestAnimationFrame(() => {
+        handleScrollRef.current()
+      })
       setIsLoadingPrevious(false)
-      flushDeferredEdgeCheck()
     }
-  }, [flushDeferredEdgeCheck, hasPrevious, isLoadingPrevious, loadPrevious, messages])
+  }, [
+    applyCachedEdgePage,
+    channel.id,
+    clearPreserveAnchorForRequest,
+    consumeSuppressedMessageChange,
+    createEdgeRequestId,
+    dispatch,
+    hasNext,
+    hasPrevious,
+    isActiveEdgeRequestCurrent,
+    isLoadingPrevious,
+    loadPrevious,
+    messages
+  ])
 
   const loadNextItems = useCallback(async () => {
     if (isJumping.current) {
       return
     }
     const newestVisibleId = getLastConfirmedMessageId(messages)
-    if (!newestVisibleId || !hasNext || isLoadingNext || loadStateRef.current) {
+    if (!newestVisibleId || !hasNext || windowLoadScopeRef.current) {
       return
+    }
+
+    if (applyCachedEdgePage('next')) {
+      return
+    }
+
+    if (isLoadingNext) {
+      return
+    }
+
+    const requestId = createEdgeRequestId('next')
+    activeEdgeIntentRef.current = 'next'
+    activeEdgeRequestRef.current = {
+      requestId,
+      direction: 'next',
+      anchorId: newestVisibleId
     }
 
     const container = scrollRef.current
@@ -855,27 +1209,64 @@ export function useChatController({
           mode: 'preserve-anchor',
           itemId: anchor.itemId,
           offsetFromTop: anchor.offsetFromTop,
-          sourceScrollTop: container.scrollTop
+          sourceScrollTop: container.scrollTop,
+          loadDirection: 'next',
+          requestId
         }
       }
+      debugMessageListController('paginate-next:start', {
+        channelId: channel.id,
+        scrollTop: container.scrollTop,
+        newestVisibleId,
+        hasPrevious,
+        hasNext,
+        anchor,
+        window: getMessageWindowDebugSummary(messages)
+      })
     }
 
-    loadStateRef.current = 'next'
     setIsLoadingNext(true)
     try {
-      await loadNext(newestVisibleId)
+      const result = await loadNext(newestVisibleId, requestId)
+      if (!result.items.length && isActiveEdgeRequestCurrent(requestId, 'next')) {
+        clearPreserveAnchorForRequest(requestId)
+      }
     } finally {
-      loadStateRef.current = null
+      const isCurrentRequest = isActiveEdgeRequestCurrent(requestId, 'next')
+      if (isCurrentRequest) {
+        dispatch(clearActivePaginationIntentAC(requestId))
+        activeEdgeRequestRef.current = null
+      } else {
+        consumeSuppressedMessageChange()
+      }
+      latestLoadArmedRef.current = true
+      window.requestAnimationFrame(() => {
+        handleScrollRef.current()
+      })
       setIsLoadingNext(false)
-      flushDeferredEdgeCheck()
     }
-  }, [flushDeferredEdgeCheck, hasNext, isLoadingNext, loadNext, messages])
+  }, [
+    applyCachedEdgePage,
+    channel.id,
+    clearPreserveAnchorForRequest,
+    consumeSuppressedMessageChange,
+    createEdgeRequestId,
+    dispatch,
+    hasNext,
+    hasPrevious,
+    isActiveEdgeRequestCurrent,
+    isLoadingNext,
+    loadNext,
+    messages
+  ])
 
   const handleTimelineScroll = useCallback(() => {
     const container = scrollRef.current
     if (!container) {
       return
     }
+
+    lastScrollActivityAtRef.current = Date.now()
 
     if (isJumping.current) {
       return
@@ -893,20 +1284,33 @@ export function useChatController({
       setScrollTop(container, LATEST_EDGE_GAP_PX)
     }
 
-    const pendingRestore = restoreRef.current
+    const pendingRestore =
+      restoreRef.current?.mode === 'preserve-anchor' || restoreRef.current?.mode === 'preserve-anchor-window'
+        ? restoreRef.current
+        : null
     if (
-      pendingRestore?.mode === 'preserve-anchor' &&
-      loadStateRef.current &&
-      Math.abs(container.scrollTop - pendingRestore.sourceScrollTop) > PRESERVE_ANCHOR_SCROLL_EPSILON_PX
+      pendingRestore &&
+      Math.abs(container.scrollTop - pendingRestore.sourceScrollTop) > PRESERVE_ANCHOR_SCROLL_EPSILON_PX &&
+      (pendingRestore.mode === 'preserve-anchor-window' ||
+        (pendingRestore.mode === 'preserve-anchor' && isActiveEdgeRequestCurrent(pendingRestore.requestId)))
     ) {
       const currentAnchor = getTopViewportAnchor(container, itemElementsRef.current)
       restoreRef.current = currentAnchor
-        ? {
-            mode: 'preserve-anchor',
-            itemId: currentAnchor.itemId,
-            offsetFromTop: currentAnchor.offsetFromTop,
-            sourceScrollTop: container.scrollTop
-          }
+        ? pendingRestore.mode === 'preserve-anchor-window'
+          ? {
+              mode: 'preserve-anchor-window',
+              itemId: currentAnchor.itemId,
+              offsetFromTop: currentAnchor.offsetFromTop,
+              sourceScrollTop: container.scrollTop
+            }
+          : {
+              mode: 'preserve-anchor',
+              itemId: currentAnchor.itemId,
+              offsetFromTop: currentAnchor.offsetFromTop,
+              sourceScrollTop: container.scrollTop,
+              loadDirection: pendingRestore.loadDirection,
+              requestId: pendingRestore.requestId
+            }
         : null
     }
 
@@ -914,38 +1318,89 @@ export function useChatController({
     queueVisibleUnreadCheck()
 
     const maxScrollTop = getMaxScrollTop(container)
-    if (container.scrollTop > maxScrollTop) {
-      setScrollTop(container, maxScrollTop)
+    if (container.scrollTop > maxScrollTop - LATEST_EDGE_GAP_PX) {
+      setScrollTop(container, maxScrollTop - LATEST_EDGE_GAP_PX)
     }
     const distanceFromHistory = maxScrollTop - container.scrollTop
     const historyTriggered = distanceFromHistory <= PRELOAD_TRIGGER_PX && hasPrevious
     const latestTriggered = container.scrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX && hasNext
 
-    if (loadStateRef.current && (historyTriggered || latestTriggered)) {
-      deferredEdgeCheckRef.current = true
-    }
-
     if (distanceFromHistory > PRELOAD_RESET_PX) {
       historyLoadArmedRef.current = true
+      invalidateEdgeDirection('previous')
     }
     if (container.scrollTop > PRELOAD_RESET_PX) {
       latestLoadArmedRef.current = true
+      invalidateEdgeDirection('next')
     }
 
-    if (loadStateRef.current) {
+    if (windowLoadScopeRef.current) {
       return
     }
 
-    if (historyTriggered && historyLoadArmedRef.current) {
-      historyLoadArmedRef.current = false
-      loadPreviousItems()
+    if (historyTriggered) {
+      if (activeEdgeRequestRef.current?.direction === 'next' || cachedEdgeRequestRef.current?.direction === 'next') {
+        invalidateEdgeDirection('next')
+      }
+      activeEdgeIntentRef.current = 'previous'
+      if (historyLoadArmedRef.current) {
+        historyLoadArmedRef.current = false
+        loadPreviousItems()
+        return
+      }
+    } else if (latestTriggered) {
+      if (
+        activeEdgeRequestRef.current?.direction === 'previous' ||
+        cachedEdgeRequestRef.current?.direction === 'previous'
+      ) {
+        invalidateEdgeDirection('previous')
+      }
+      activeEdgeIntentRef.current = 'next'
+      if (latestLoadArmedRef.current) {
+        latestLoadArmedRef.current = false
+        loadNextItems()
+        return
+      }
     }
 
-    if (latestTriggered && latestLoadArmedRef.current) {
-      latestLoadArmedRef.current = false
-      loadNextItems()
+    // Scroll-idle: refresh cached messages around the visible anchor when not at the latest window
+    if (scrollIdleTimerRef.current !== null) {
+      clearTimeout(scrollIdleTimerRef.current)
+      scrollIdleTimerRef.current = null
     }
-  }, [hasNext, hasPrevious, loadNextItems, loadPreviousItems, queueVisibleUnreadCheck, syncLatestState])
+    if (!viewIsAtLatestRef.current) {
+      scrollIdleTimerRef.current = setTimeout(() => {
+        scrollIdleTimerRef.current = null
+        if (windowLoadScopeRef.current) return
+        if (connectionStatusRef.current !== CONNECTION_STATUS.CONNECTED) return
+        const confirmedMessages = messagesRef.current.filter((message) => !!message.id)
+        const centerAnchorId =
+          getClosestConfirmedMessageId(confirmedMessages, Math.floor(confirmedMessages.length / 2), 'nearest') ||
+          lastVisibleAnchorIdRef.current
+        const anchorId = centerAnchorId
+        if (!anchorId) return
+        debugMessageListController('refresh-idle', {
+          channelId: channelRef.current.id,
+          anchorId,
+          window: getMessageWindowDebugSummary(messagesRef.current)
+        })
+        captureWindowPreserveAnchor()
+        dispatch(refreshCacheAroundMessageAC(channelRef.current.id, anchorId, true))
+      }, SCROLL_IDLE_MS)
+    }
+  }, [
+    captureWindowPreserveAnchor,
+    clearJumpScrollingLock,
+    dispatch,
+    hasNext,
+    hasPrevious,
+    invalidateEdgeDirection,
+    isActiveEdgeRequestCurrent,
+    loadNextItems,
+    loadPreviousItems,
+    queueVisibleUnreadCheck,
+    syncLatestState
+  ])
 
   // Keep a stable latest-closure ref so the scroll/wheel listeners never need re-registering.
   handleScrollRef.current = handleTimelineScroll
@@ -991,8 +1446,15 @@ export function useChatController({
     activeChannelIdRef.current = channel.id
     lastBootKeyRef.current = null
     restoreRef.current = null
-    loadStateRef.current = null
+    windowLoadScopeRef.current = null
+    activeEdgeIntentRef.current = null
+    activeEdgeRequestRef.current = null
+    cachedEdgeRequestRef.current = null
     lastVisibleAnchorIdRef.current = ''
+    if (scrollIdleTimerRef.current !== null) {
+      clearTimeout(scrollIdleTimerRef.current)
+      scrollIdleTimerRef.current = null
+    }
     jumpLockUntilRef.current = 0
     historyLoadArmedRef.current = true
     latestLoadArmedRef.current = true
@@ -1001,7 +1463,12 @@ export function useChatController({
     itemElementsRef.current.clear()
     previousMessagesRef.current = []
     suppressedMessageChangesRef.current = 0
-    deferredEdgeCheckRef.current = false
+    pendingWindowLoadRef.current?.resolve({ items: [] })
+    pendingWindowLoadRef.current = null
+    pendingEdgeLoadRefs.current.previous?.resolve({ items: [] })
+    pendingEdgeLoadRefs.current.next?.resolve({ items: [] })
+    pendingEdgeLoadRefs.current.previous = null
+    pendingEdgeLoadRefs.current.next = null
     pendingNewestCountRef.current = 0
     viewIsAtLatestRef.current = true
     jumpLockModeRef.current = null
@@ -1010,7 +1477,8 @@ export function useChatController({
     setIsViewingLatest(true)
     setHighlightedItemId(null)
     highlightedItemIdRef.current = null
-  }, [channel.id])
+    dispatch(clearActivePaginationIntentAC())
+  }, [channel.id, dispatch])
 
   useLayoutEffect(() => {
     const container = scrollRef.current
@@ -1021,7 +1489,7 @@ export function useChatController({
     if (!lastBootKeyRef.current) {
       lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
       restoreRef.current =
-        unreadScrollTo && effectiveUnreadAnchorId ? { mode: 'reveal-unread-separator' } : { mode: 'to-bottom' }
+        unreadScrollTo && unreadMessageId ? { mode: 'reveal-unread-separator' } : { mode: 'to-bottom' }
     }
 
     const restoreState = restoreRef.current
@@ -1076,10 +1544,44 @@ export function useChatController({
       return
     }
 
+    if (restoreState.mode === 'preserve-anchor-window') {
+      const anchorElement = getItemElement(container, restoreState.itemId)
+      if (!anchorElement) {
+        return
+      }
+
+      const containerRect = container.getBoundingClientRect()
+      const anchorRect = anchorElement.getBoundingClientRect()
+      const offsetDelta = anchorRect.top - containerRect.top - restoreState.offsetFromTop
+
+      restoreRef.current = null
+      if (offsetDelta !== 0) {
+        setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, container.scrollTop + offsetDelta), 'auto')
+      }
+      return
+    }
+
     if (restoreState.mode === 'preserve-anchor') {
+      if (!isActiveEdgeRequestCurrent(restoreState.requestId, restoreState.loadDirection)) {
+        debugMessageListController('restore:skip-preserve-anchor', {
+          channelId: channel.id,
+          itemId: restoreState.itemId,
+          requestId: restoreState.requestId,
+          loadDirection: restoreState.loadDirection,
+          activeEdgeRequest: activeEdgeRequestRef.current,
+          window: getMessageWindowDebugSummary(messages)
+        })
+        restoreRef.current = null
+        if (cachedEdgeRequestRef.current?.requestId === restoreState.requestId) {
+          cachedEdgeRequestRef.current = null
+        }
+        return
+      }
+
+      const pendingEdgeLoad = pendingEdgeLoadRefs.current[restoreState.loadDirection]
       if (
-        pendingLoadRef.current &&
-        !messages.some((message) => !pendingLoadRef.current?.previousIds.has(getMessageLocalRef(message)))
+        pendingEdgeLoad &&
+        !messages.some((message) => !pendingEdgeLoad.previousIds.has(getMessageLocalRef(message)))
       ) {
         return
       }
@@ -1094,14 +1596,28 @@ export function useChatController({
       const offsetDelta = anchorRect.top - containerRect.top - restoreState.offsetFromTop
 
       restoreRef.current = null
+      if (cachedEdgeRequestRef.current?.requestId === restoreState.requestId) {
+        cachedEdgeRequestRef.current = null
+      }
       if (offsetDelta !== 0) {
-        setScrollTop(container, container.scrollTop + offsetDelta, 'auto')
+        const nextScrollTop = Math.max(LATEST_EDGE_GAP_PX, container.scrollTop + offsetDelta)
+        debugMessageListController('restore:preserve-anchor', {
+          channelId: channel.id,
+          itemId: restoreState.itemId,
+          sourceScrollTop: restoreState.sourceScrollTop,
+          currentScrollTop: container.scrollTop,
+          offsetFromTop: restoreState.offsetFromTop,
+          offsetDelta,
+          nextScrollTop,
+          window: getMessageWindowDebugSummary(messages)
+        })
+        setScrollTop(container, nextScrollTop, 'auto')
       }
     }
-  }, [channel.id, messages, effectiveUnreadAnchorId, unreadScrollTo])
+  }, [channel.id, unreadMessageId, isActiveEdgeRequestCurrent, messages, unreadScrollTo])
 
   useEffect(() => {
-    if (!unreadScrollTo || !effectiveUnreadAnchorId || !messages.length || unreadRestoreCompletedRef.current) {
+    if (!unreadScrollTo || !unreadMessageId || !messages.length || unreadRestoreCompletedRef.current) {
       return
     }
 
@@ -1124,7 +1640,7 @@ export function useChatController({
       block: 'center',
       inline: 'nearest'
     })
-  }, [messages, effectiveUnreadAnchorId, unreadScrollTo])
+  }, [messages, unreadMessageId, unreadScrollTo])
 
   useEffect(() => {
     const previousMessages = previousMessagesRef.current
@@ -1138,7 +1654,13 @@ export function useChatController({
     }
 
     if (!previousMessages.length || !messages.length) {
-      if (!previousMessages.length && messages.length > 0 && !pendingLoadRef.current) {
+      if (
+        !previousMessages.length &&
+        messages.length > 0 &&
+        !pendingWindowLoadRef.current &&
+        !pendingEdgeLoadRefs.current.previous &&
+        !pendingEdgeLoadRefs.current.next
+      ) {
         suppressedMessageChangesRef.current = 0
       }
       previousMessagesRef.current = messages
@@ -1169,27 +1691,61 @@ export function useChatController({
   }, [messages, notifyIncomingItems, notifyOutgoingItem, queueVisibleUnreadCheck, syncLatestState])
 
   useEffect(() => {
-    if (isViewportLoadSettled(null)) {
-      flushDeferredEdgeCheck()
+    const previousMessages = debugPreviousMessagesRef.current
+    if (!isMessageListDebugEnabled()) {
+      debugPreviousMessagesRef.current = messages
+      return
     }
-  }, [flushDeferredEdgeCheck, isViewportLoadSettled, loadingNextMessages, loadingPrevMessages])
+
+    const previousSummary = getMessageWindowDebugSummary(previousMessages)
+    const nextSummary = getMessageWindowDebugSummary(messages)
+    if (
+      previousSummary.count !== nextSummary.count ||
+      previousSummary.firstConfirmedId !== nextSummary.firstConfirmedId ||
+      previousSummary.lastConfirmedId !== nextSummary.lastConfirmedId ||
+      previousSummary.firstLocalRef !== nextSummary.firstLocalRef ||
+      previousSummary.lastLocalRef !== nextSummary.lastLocalRef
+    ) {
+      debugMessageListController('window:changed', {
+        channelId: channel.id,
+        previousWindow: previousSummary,
+        nextWindow: nextSummary,
+        loadState: windowLoadScopeRef.current || activeEdgeRequestRef.current?.direction || null,
+        scrollTop: scrollRef.current?.scrollTop ?? null,
+        hasPrevious,
+        hasNext
+      })
+    }
+    debugPreviousMessagesRef.current = messages
+  }, [channel.id, hasNext, hasPrevious, messages])
 
   useEffect(() => {
     serverUnreadCountRef.current = channel.newMessageCount || 0
     optimisticReadUnreadCountRef.current = 0
     setRemainingUnreadCount(channel.newMessageCount || 0)
+    dispatch(setUnreadMessageIdAC(''))
   }, [channel.id])
 
   useEffect(() => {
     const nextServerUnreadCount = channel.newMessageCount || 0
-    const acknowledgedReadCount = Math.max(0, serverUnreadCountRef.current - nextServerUnreadCount)
+    const previousServerUnreadCount = serverUnreadCountRef.current
+    const acknowledgedReadCount = Math.max(0, previousServerUnreadCount - nextServerUnreadCount)
     if (acknowledgedReadCount > 0) {
       optimisticReadUnreadCountRef.current = Math.max(0, optimisticReadUnreadCountRef.current - acknowledgedReadCount)
     }
 
+    if (
+      nextServerUnreadCount > previousServerUnreadCount &&
+      !unreadMessageId &&
+      channel.lastDisplayedMessageId &&
+      !viewIsAtLatestRef.current
+    ) {
+      dispatch(setUnreadMessageIdAC(channel.lastDisplayedMessageId))
+    }
+
     serverUnreadCountRef.current = nextServerUnreadCount
     syncRemainingUnreadCount(nextServerUnreadCount)
-  }, [channel.newMessageCount, syncRemainingUnreadCount])
+  }, [channel.lastDisplayedMessageId, channel.newMessageCount, dispatch, syncRemainingUnreadCount, unreadMessageId])
 
   useEffect(() => {
     const validKeys = new Set(messages.map((message) => message.id).filter(Boolean))
@@ -1201,32 +1757,17 @@ export function useChatController({
   }, [messages])
 
   useEffect(() => {
-    setStableUnreadAnchorId(unreadMessageId)
-  }, [channel.id, unreadMessageId])
-
-  useEffect(() => {
-    if (
-      !channel.lastDisplayedMessageId ||
-      stableUnreadAnchorId !== channel.lastDisplayedMessageId ||
-      !messages.length
-    ) {
-      return
-    }
-
-    const displayedAnchorIndex = messages.findIndex((message) => message.id === channel.lastDisplayedMessageId)
-    const normalizedUnreadAnchor = messages.find(
-      (message, index) => index > displayedAnchorIndex && isUnreadIncomingMessage(message)
-    )
-
-    if (normalizedUnreadAnchor?.id && normalizedUnreadAnchor.id !== stableUnreadAnchorId) {
-      setStableUnreadAnchorId(normalizedUnreadAnchor.id)
-    }
-  }, [channel.lastDisplayedMessageId, messages, stableUnreadAnchorId])
-
-  useEffect(() => {
     messagesIndexMapRef.current = {}
-    pendingLoadRef.current?.resolve({ items: [] })
-    pendingLoadRef.current = null
+    pendingWindowLoadRef.current?.resolve({ items: [] })
+    pendingWindowLoadRef.current = null
+    pendingEdgeLoadRefs.current.previous?.resolve({ items: [] })
+    pendingEdgeLoadRefs.current.next?.resolve({ items: [] })
+    pendingEdgeLoadRefs.current.previous = null
+    pendingEdgeLoadRefs.current.next = null
+    activeEdgeIntentRef.current = null
+    activeEdgeRequestRef.current = null
+    cachedEdgeRequestRef.current = null
+    dispatch(clearActivePaginationIntentAC())
     previousMessagesRef.current = []
 
     if (channel.backToLinkedChannel && channel?.id) {
@@ -1238,14 +1779,12 @@ export function useChatController({
       const messageId = visibleMessagesIds[visibleMessagesIds.length - 1]
       if (messageId) {
         suppressNextMessageChange()
-        dispatch(loadAroundMessageAC(channel, messageId, undefined, 'instant'))
-        dispatch(setUnreadMessageIdAC(messageId))
+        dispatch(loadAroundMessageAC(channel, messageId))
       }
     } else {
       if (!channel.isLinkedChannel) {
         clearVisibleMessagesMap()
       }
-
       if (channel?.id) {
         if (channel.newMessageCount && channel.lastDisplayedMessageId) {
           suppressNextMessageChange()
@@ -1255,12 +1794,6 @@ export function useChatController({
           dispatch(loadDefaultMessagesAC(channel))
         }
       }
-
-      dispatch(
-        setUnreadMessageIdAC(
-          channel.newMessageCount && channel.lastDisplayedMessageId ? channel.lastDisplayedMessageId : ''
-        )
-      )
     }
   }, [dispatch, channel?.id, channel.backToLinkedChannel, channel.isLinkedChannel, suppressNextMessageChange])
 
@@ -1280,39 +1813,40 @@ export function useChatController({
   }, [allowEditDeleteIncomingMessage])
 
   useEffect(() => {
-    if (connectionStatus !== CONNECTION_STATUS.CONNECTED || !channel?.id) {
+    const previousConnectionStatus = previousConnectionStatusRef.current
+    previousConnectionStatusRef.current = connectionStatus
+
+    if (
+      connectionStatus !== CONNECTION_STATUS.CONNECTED ||
+      previousConnectionStatus === CONNECTION_STATUS.CONNECTED ||
+      !channel?.id
+    ) {
       return
     }
 
-    const latestLocalRef = getMessageLocalRef(channel.lastMessage)
-    const visibleAnchorId =
-      lastVisibleAnchorIdRef.current && lastVisibleMessageIdRef.current !== latestLocalRef
-        ? lastVisibleAnchorIdRef.current
-        : ''
-
-    if (visibleAnchorId) {
-      suppressNextMessageChange()
-      dispatch(loadAroundMessageAC(channel, visibleAnchorId, false, 'instant', false, true))
-      return
+    const applyVisibleWindow = !isScrollInteractionActive()
+    if (applyVisibleWindow && !isViewingLatest && lastVisibleAnchorIdRef.current) {
+      captureWindowPreserveAnchor()
     }
 
-    if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-      suppressNextMessageChange()
-      dispatch(loadNearUnreadAC(channel))
-    } else {
-      suppressNextMessageChange()
-      dispatch(loadDefaultMessagesAC(channel))
-    }
-  }, [channel?.id, connectionStatus, suppressNextMessageChange])
-
-  useEffect(() => {
-    if (!scrollToRepliedMessageId) {
-      return
-    }
-
-    jumpToItem(scrollToRepliedMessageId, scrollToMessageBehavior === 'smooth')
-    dispatch(setScrollToMessagesAC(null, scrollToMessageHighlight, scrollToMessageBehavior))
-  }, [dispatch, jumpToItem, scrollToMessageBehavior, scrollToMessageHighlight, scrollToRepliedMessageId])
+    suppressNextMessageChange()
+    dispatch(
+      reloadActiveChannelAfterReconnectAC(
+        channel,
+        lastVisibleAnchorIdRef.current || '',
+        isViewingLatest,
+        applyVisibleWindow
+      )
+    )
+  }, [
+    captureWindowPreserveAnchor,
+    channel?.id,
+    connectionStatus,
+    dispatch,
+    isScrollInteractionActive,
+    isViewingLatest,
+    suppressNextMessageChange
+  ])
 
   useEffect(() => {
     if (!scrollToNewMessage.scrollToBottom) {
@@ -1378,9 +1912,18 @@ export function useChatController({
       if (jumpUnlockTimeoutRef.current !== null) {
         window.clearTimeout(jumpUnlockTimeoutRef.current)
       }
-      deferredEdgeCheckRef.current = false
-      pendingLoadRef.current?.resolve({ items: [] })
-      pendingLoadRef.current = null
+      if (scrollIdleTimerRef.current !== null) {
+        window.clearTimeout(scrollIdleTimerRef.current)
+      }
+      activeEdgeIntentRef.current = null
+      activeEdgeRequestRef.current = null
+      cachedEdgeRequestRef.current = null
+      pendingWindowLoadRef.current?.resolve({ items: [] })
+      pendingWindowLoadRef.current = null
+      pendingEdgeLoadRefs.current.previous?.resolve({ items: [] })
+      pendingEdgeLoadRefs.current.next?.resolve({ items: [] })
+      pendingEdgeLoadRefs.current.previous = null
+      pendingEdgeLoadRefs.current.next = null
     },
     []
   )

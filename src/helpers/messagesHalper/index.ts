@@ -210,7 +210,11 @@ export const extendActiveSegment = (channelId: string, startId: string, endId: s
   activeSegmentChannelId = channelId
 }
 
-export const appendMessageToLatestSegment = (channelId: string, messageId?: string | null) => {
+export const appendMessageToLatestSegment = (
+  channelId: string,
+  messageId?: string | null,
+  expectedPreviousLatestMessageId?: string | null
+) => {
   if (!messageId) {
     return false
   }
@@ -222,6 +226,12 @@ export const appendMessageToLatestSegment = (channelId: string, messageId?: stri
 
   const latestIndex = segments.length - 1
   const latestSegment = segments[latestIndex]
+  if (
+    expectedPreviousLatestMessageId &&
+    compareMessageIds(latestSegment.endId, expectedPreviousLatestMessageId) !== 0
+  ) {
+    return false
+  }
   if (compareMessageIds(messageId, latestSegment.endId) <= 0) {
     return false
   }
@@ -318,11 +328,134 @@ export function hasNextContiguousInMap(channelId: string, fromMessageId: string)
   return segments.some((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) > bigFrom)
 }
 
+export function getCachedNearMessages(
+  channelId: string,
+  boundaryMessageId: string,
+  limit: number
+): {
+  messages: IMessage[]
+  hasEnoughCache: boolean
+  hasNextMessages: boolean
+  hasPrevMessages: boolean
+} {
+  const segments = loadedSegmentsMap[channelId] || []
+  const channelMessages = messagesMap[channelId] || {}
+  if (!segments.length || !Object.keys(channelMessages).length) {
+    return {
+      messages: [],
+      hasEnoughCache: false,
+      hasNextMessages: false,
+      hasPrevMessages: false
+    }
+  }
+
+  const hasOlderSegmentBefore = (startId: string) =>
+    segments.some((segment) => compareMessageIds(segment.endId, startId) < 0)
+  const hasNewerSegmentAfter = (endId: string) =>
+    segments.some((segment) => compareMessageIds(segment.startId, endId) > 0)
+
+  if (!boundaryMessageId) {
+    const latestSegment = segments[segments.length - 1]
+    const latestMessages = Object.values(channelMessages)
+      .filter(
+        (message): message is IMessage =>
+          !!message.id &&
+          compareMessageIds(message.id, latestSegment.startId) >= 0 &&
+          compareMessageIds(message.id, latestSegment.endId) <= 0
+      )
+      .sort(compareMessagesForList)
+      .slice(-limit)
+
+    if (!latestMessages.length) {
+      return {
+        messages: [],
+        hasEnoughCache: false,
+        hasNextMessages: false,
+        hasPrevMessages: false
+      }
+    }
+
+    const firstMessageId = latestMessages[0]?.id || ''
+    return {
+      messages: latestMessages,
+      hasEnoughCache: true,
+      hasNextMessages: false,
+      hasPrevMessages:
+        (firstMessageId ? compareMessageIds(firstMessageId, latestSegment.startId) > 0 : false) ||
+        hasOlderSegmentBefore(latestSegment.startId)
+    }
+  }
+
+  const containingSegment = segments.find(
+    (segment) =>
+      compareMessageIds(segment.startId, boundaryMessageId) <= 0 &&
+      compareMessageIds(segment.endId, boundaryMessageId) >= 0
+  )
+  if (!containingSegment) {
+    return {
+      messages: [],
+      hasEnoughCache: false,
+      hasNextMessages: false,
+      hasPrevMessages: false
+    }
+  }
+
+  const segmentMessages = Object.values(channelMessages)
+    .filter(
+      (message): message is IMessage =>
+        !!message.id &&
+        compareMessageIds(message.id, containingSegment.startId) >= 0 &&
+        compareMessageIds(message.id, containingSegment.endId) <= 0
+    )
+    .sort(compareMessagesForList)
+  const boundaryIndex = segmentMessages.findIndex((message) => message.id === boundaryMessageId)
+
+  if (boundaryIndex < 0) {
+    return {
+      messages: [],
+      hasEnoughCache: false,
+      hasNextMessages: false,
+      hasPrevMessages: false
+    }
+  }
+
+  const nextMessages = segmentMessages.slice(boundaryIndex + 1, boundaryIndex + 1 + Math.max(limit - 1, 0))
+  const remainingSlots = Math.max(limit - 1 - nextMessages.length, 0)
+  const previousMessages =
+    remainingSlots > 0 ? segmentMessages.slice(Math.max(0, boundaryIndex - remainingSlots), boundaryIndex) : []
+  const messages = [...previousMessages, segmentMessages[boundaryIndex], ...nextMessages]
+
+  const firstMessageId = messages[0]?.id || ''
+  const lastMessageId = messages[messages.length - 1]?.id || ''
+
+  return {
+    messages,
+    hasEnoughCache: messages.length > 0,
+    hasNextMessages:
+      (lastMessageId ? compareMessageIds(lastMessageId, containingSegment.endId) < 0 : false) ||
+      hasNewerSegmentAfter(containingSegment.endId),
+    hasPrevMessages:
+      (firstMessageId ? compareMessageIds(firstMessageId, containingSegment.startId) > 0 : false) ||
+      hasOlderSegmentBefore(containingSegment.startId)
+  }
+}
+
 export const getMessageSortKey = (message: IMessage): bigint => {
   if (message.id) {
     return BigInt(message.id)
   }
   return getCreatedAtSortKey(message.createdAt)
+}
+
+export const comparePendingMessages = (a: IMessage, b: IMessage) => {
+  const aCreatedAt = getCreatedAtSortKey(a.createdAt)
+  const bCreatedAt = getCreatedAtSortKey(b.createdAt)
+
+  if (aCreatedAt === bCreatedAt) {
+    return (a.tid || a.id || '').localeCompare(b.tid || b.id || '')
+  }
+
+  return aCreatedAt < bCreatedAt ? -1 : 1
 }
 
 export const getMessageLocalRef = (message?: Partial<Pick<IMessage, 'id' | 'tid' | 'createdAt'>> | null) => {
@@ -366,7 +499,15 @@ export const shouldReplaceLastMessage = (
   nextLastMessage: IMessage,
   sourceMessage?: IMessage | null
 ) => {
+  if (!nextLastMessage?.id) {
+    return false
+  }
+
   if (!currentLastMessage) {
+    return true
+  }
+
+  if (!currentLastMessage.id) {
     return true
   }
 
@@ -691,7 +832,7 @@ export const deletePendingMessage = (channelId: string, message: IMessage) => {
 export function getPendingMessagesFromMap(channelId: string): IMessage[] {
   return Object.values(messagesMap[channelId] || {})
     .filter((message) => !message.id && !!message.tid)
-    .sort(compareMessagesForList)
+    .sort(comparePendingMessages)
 }
 
 export function getAllPendingFromMap(): { [channelId: string]: IMessage[] } {

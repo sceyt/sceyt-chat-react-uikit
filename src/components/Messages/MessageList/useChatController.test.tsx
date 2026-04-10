@@ -2,18 +2,27 @@ import React from 'react'
 import { act, fireEvent, render, screen } from '@testing-library/react'
 import { LOADING_STATE } from '../../../helpers/constants'
 import {
+  addMessageToMap,
+  clearMessagesMap,
   getMessageLocalRef,
   clearVisibleMessagesMap,
   LOAD_MAX_MESSAGE_COUNT,
+  setActiveSegment,
   MESSAGE_LOAD_DIRECTION
 } from '../../../helpers/messagesHalper'
 import { CONNECTION_STATUS } from '../../../store/user/constants'
 import { markMessagesAsReadAC } from '../../../store/channel/actions'
 import {
+  addMessagesAC,
+  clearActivePaginationIntentAC,
   loadAroundMessageAC,
   loadDefaultMessagesAC,
   loadLatestMessagesAC,
   loadMoreMessagesAC,
+  reloadActiveChannelAfterReconnectAC,
+  refreshCacheAroundMessageAC,
+  setActivePaginationIntentAC,
+  setStableUnreadAnchorAC,
   setUnreadMessageIdAC,
   setUnreadScrollToAC,
   showScrollToNewMessageButtonAC
@@ -33,7 +42,7 @@ import {
   resetMockServerDelay,
   resolveWithMockServerDelay
 } from '../../../testUtils/mockServerDelay'
-import { useChatController } from './useChatController'
+import { LATEST_EDGE_GAP_PX, useChatController } from './useChatController'
 
 type HarnessProps = {
   messages: IMessage[]
@@ -45,6 +54,7 @@ type HarnessProps = {
   connectionStatus?: string
   unreadScrollTo?: boolean | string
   unreadMessageId?: string
+  stableUnreadAnchor?: { channelId: string; messageId: string }
   showScrollToNewMessageButton?: boolean
   scrollToMentionedMessage?: boolean | string | null
   scrollToRepliedMessageId?: string | null
@@ -66,6 +76,8 @@ type HarnessProps = {
   }
 }
 
+type ResolvedLayoutSpec = HarnessProps['layoutSpec']
+
 type AsyncControllerState = {
   channel: IChannel
   messages: IMessage[]
@@ -75,6 +87,7 @@ type AsyncControllerState = {
   loadingNextMessages: number | null
   unreadScrollTo: boolean | string
   unreadMessageId: string
+  stableUnreadAnchor: { channelId: string; messageId: string }
   showScrollToNewMessageButton: boolean
 }
 
@@ -99,7 +112,8 @@ type AsyncControllerServer = {
   ) => AsyncControllerServerResponse | Promise<AsyncControllerServerResponse>
 }
 
-type AsyncHarnessProps = HarnessProps & {
+type AsyncHarnessProps = Omit<HarnessProps, 'layoutSpec'> & {
+  layoutSpec?: ResolvedLayoutSpec | ((state: AsyncControllerState) => ResolvedLayoutSpec)
   server: AsyncControllerServer
 }
 
@@ -169,6 +183,7 @@ const ControllerHarness = ({
   connectionStatus = CONNECTION_STATUS.DISCONNECTED,
   unreadScrollTo = false,
   unreadMessageId = '',
+  stableUnreadAnchor,
   showScrollToNewMessageButton = false,
   scrollToMentionedMessage = null,
   scrollToRepliedMessageId = null,
@@ -178,6 +193,63 @@ const ControllerHarness = ({
   dispatch = jest.fn(),
   layoutSpec
 }: HarnessProps) => {
+  const stableUnreadAnchorChannelId = stableUnreadAnchor?.channelId ?? channel.id
+  const stableUnreadAnchorMessageId = stableUnreadAnchor?.messageId ?? unreadMessageId
+
+  const [controllerState, setControllerState] = React.useState(() => ({
+    unreadScrollTo,
+    unreadMessageId,
+    stableUnreadAnchor: {
+      channelId: stableUnreadAnchorChannelId,
+      messageId: stableUnreadAnchorMessageId
+    },
+    showScrollToNewMessageButton
+  }))
+
+  React.useEffect(() => {
+    setControllerState({
+      unreadScrollTo,
+      unreadMessageId,
+      stableUnreadAnchor: {
+        channelId: stableUnreadAnchorChannelId,
+        messageId: stableUnreadAnchorMessageId
+      },
+      showScrollToNewMessageButton
+    })
+  }, [
+    showScrollToNewMessageButton,
+    stableUnreadAnchorChannelId,
+    stableUnreadAnchorMessageId,
+    unreadMessageId,
+    unreadScrollTo
+  ])
+
+  const controlledDispatch = React.useCallback(
+    (action: any) => {
+      dispatch(action)
+
+      if (action.type === setUnreadScrollToAC(false).type) {
+        setControllerState((prev) => ({ ...prev, unreadScrollTo: action.payload.state }))
+        return
+      }
+
+      if (action.type === setUnreadMessageIdAC('').type) {
+        setControllerState((prev) => ({ ...prev, unreadMessageId: action.payload.messageId }))
+        return
+      }
+
+      if (action.type === setStableUnreadAnchorAC('', '').type) {
+        setControllerState((prev) => ({ ...prev, stableUnreadAnchor: action.payload }))
+        return
+      }
+
+      if (action.type === showScrollToNewMessageButtonAC(false).type) {
+        setControllerState((prev) => ({ ...prev, showScrollToNewMessageButton: action.payload.state }))
+      }
+    },
+    [dispatch]
+  )
+
   const controller = useChatController({
     messages,
     channel,
@@ -195,12 +267,12 @@ const ControllerHarness = ({
     scrollToRepliedMessageId,
     scrollToMessageHighlight,
     scrollToMessageBehavior,
-    showScrollToNewMessageButton,
-    unreadScrollTo,
-    unreadMessageId,
+    showScrollToNewMessageButton: controllerState.showScrollToNewMessageButton,
+    unreadScrollTo: controllerState.unreadScrollTo,
+    unreadMessageId: controllerState.unreadMessageId,
     selectedMessagesMap: new Map(),
     allowEditDeleteIncomingMessage: true,
-    dispatch
+    dispatch: controlledDispatch
   })
 
   const attachScrollRef = React.useCallback(
@@ -330,18 +402,58 @@ const buildAsyncControllerState = (props: AsyncHarnessProps): AsyncControllerSta
   loadingNextMessages: props.loadingNextMessages ?? LOADING_STATE.LOADED,
   unreadScrollTo: props.unreadScrollTo ?? false,
   unreadMessageId: props.unreadMessageId ?? '',
+  stableUnreadAnchor: props.stableUnreadAnchor ?? {
+    channelId: props.channel.id,
+    messageId: props.unreadMessageId ?? ''
+  },
   showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false
 })
 
-const AsyncControllerHarness = ({ server, dispatch = jest.fn(), ...props }: AsyncHarnessProps) => {
+const AsyncControllerHarness = ({ server, dispatch = jest.fn(), layoutSpec, ...props }: AsyncHarnessProps) => {
   const [state, setState] = React.useState<AsyncControllerState>(() =>
     buildAsyncControllerState({ ...props, server, dispatch })
   )
   const stateRef = React.useRef(state)
+  const activePaginationIntentRef = React.useRef<{
+    channelId: string
+    direction: 'prev' | 'next'
+    requestId: string
+    anchorId: string
+  } | null>(null)
 
   React.useEffect(() => {
     stateRef.current = state
   }, [state])
+
+  React.useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      channel: props.channel,
+      messages: props.messages,
+      hasPrevMessages: props.hasPrevMessages ?? false,
+      hasNextMessages: props.hasNextMessages ?? false,
+      loadingPrevMessages: props.loadingPrevMessages ?? LOADING_STATE.LOADED,
+      loadingNextMessages: props.loadingNextMessages ?? LOADING_STATE.LOADED,
+      unreadScrollTo: props.unreadScrollTo ?? false,
+      unreadMessageId: props.unreadMessageId ?? '',
+      stableUnreadAnchor: props.stableUnreadAnchor ?? {
+        channelId: props.channel.id,
+        messageId: props.unreadMessageId ?? ''
+      },
+      showScrollToNewMessageButton: props.showScrollToNewMessageButton ?? false
+    }))
+  }, [
+    props.channel,
+    props.messages,
+    props.hasPrevMessages,
+    props.hasNextMessages,
+    props.loadingPrevMessages,
+    props.loadingNextMessages,
+    props.unreadScrollTo,
+    props.unreadMessageId,
+    props.stableUnreadAnchor,
+    props.showScrollToNewMessageButton
+  ])
 
   const applyServerResponse = React.useCallback((response: AsyncControllerServerResponse) => {
     setState((prev) => ({
@@ -391,8 +503,25 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), ...props }: Asyn
         return
       }
 
+      if (action.type === setStableUnreadAnchorAC('', '').type) {
+        setState((prev) => ({ ...prev, stableUnreadAnchor: action.payload }))
+        return
+      }
+
       if (action.type === showScrollToNewMessageButtonAC(false).type) {
         setState((prev) => ({ ...prev, showScrollToNewMessageButton: action.payload.state }))
+        return
+      }
+
+      if (action.type === setActivePaginationIntentAC('', 'next', '', '').type) {
+        activePaginationIntentRef.current = action.payload
+        return
+      }
+
+      if (action.type === clearActivePaginationIntentAC().type) {
+        if (!action.payload?.requestId || activePaginationIntentRef.current?.requestId === action.payload.requestId) {
+          activePaginationIntentRef.current = null
+        }
         return
       }
 
@@ -409,7 +538,21 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), ...props }: Asyn
       if (action.type === loadMoreMessagesAC('', 0, MESSAGE_LOAD_DIRECTION.NEXT, '', false).type) {
         scheduleResponse(
           action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV ? 'previous' : 'next',
-          server.onLoadMore
+          async (nextState, loadMoreAction) => {
+            const response = server.onLoadMore ? await server.onLoadMore(nextState, loadMoreAction) : {}
+            if (!loadMoreAction.payload.requestId) {
+              return response
+            }
+
+            const activeIntent = activePaginationIntentRef.current
+            const expectedDirection = loadMoreAction.payload.direction === MESSAGE_LOAD_DIRECTION.PREV ? 'prev' : 'next'
+            const isCurrentIntent =
+              activeIntent?.channelId === loadMoreAction.payload.channelId &&
+              activeIntent.direction === expectedDirection &&
+              activeIntent.requestId === loadMoreAction.payload.requestId
+
+            return isCurrentIntent ? response : {}
+          }
         )(action)
         return
       }
@@ -421,7 +564,11 @@ const AsyncControllerHarness = ({ server, dispatch = jest.fn(), ...props }: Asyn
     [dispatch, scheduleResponse, server.onLoadAround, server.onLoadDefault, server.onLoadLatest, server.onLoadMore]
   )
 
-  return <ControllerHarness {...props} {...state} dispatch={delayedDispatch as jest.Mock} />
+  const resolvedLayoutSpec = typeof layoutSpec === 'function' ? layoutSpec(state) : layoutSpec
+
+  return (
+    <ControllerHarness {...props} {...state} layoutSpec={resolvedLayoutSpec} dispatch={delayedDispatch as jest.Mock} />
+  )
 }
 
 const renderAsyncController = (props: AsyncHarnessProps) => {
@@ -431,7 +578,9 @@ const renderAsyncController = (props: AsyncHarnessProps) => {
   const relayout = (options?: { scrollHeight?: number; clientHeight?: number }) =>
     layoutTimeline(rendered.container.querySelector('#scrollableDiv'), options)
 
-  relayout()
+  if (!props.layoutSpec) {
+    relayout()
+  }
 
   return {
     ...rendered,
@@ -445,6 +594,7 @@ describe('useChatController', () => {
   beforeEach(() => {
     resetMessageListFixtureIds()
     resetMockServerDelay()
+    clearMessagesMap()
     clearVisibleMessagesMap()
   })
 
@@ -460,13 +610,14 @@ describe('useChatController', () => {
       messages
     })
 
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
   })
 
   it('renders the unread divider when unreadScrollTo is enabled', async () => {
     const channel = makeChannel({
       id: 'channel-unread-restore',
-      lastMessage: makeMessage({ id: '901', channelId: 'channel-unread-restore', body: 'latest' })
+      lastMessage: makeMessage({ id: '901', channelId: 'channel-unread-restore', body: 'latest' }),
+      lastDisplayedMessageId: '899'
     })
     const unreadMessage = makeMessage({
       id: '900',
@@ -475,16 +626,124 @@ describe('useChatController', () => {
       incoming: true
     })
 
-    renderController({
+    const rendered = renderController({
       channel,
       messages: [unreadMessage, channel.lastMessage],
       unreadScrollTo: true,
-      unreadMessageId: unreadMessage.id
+      unreadMessageId: ''
     })
 
     await flushEffects()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[unreadMessage, channel.lastMessage]}
+        unreadScrollTo={true}
+        unreadMessageId='899'
+      />
+    )
+    await flushEffects()
 
     expect(screen.getByText('unread divider')).toBeInTheDocument()
+  })
+
+  it('renders the unread divider from the unread boundary after the channel boot settles', async () => {
+    const channel = makeChannel({
+      id: 'channel-unread-boot-fallback',
+      lastMessage: makeMessage({
+        id: '913',
+        channelId: 'channel-unread-boot-fallback',
+        body: 'latest',
+        incoming: true
+      }),
+      newMessageCount: 0,
+      lastDisplayedMessageId: '911'
+    })
+    const rendered = renderController({
+      channel,
+      messages: [
+        makeMessage({ id: '911', channelId: channel.id, body: 'last-read', incoming: true }),
+        makeMessage({ id: '912', channelId: channel.id, body: 'first-unread', incoming: true }),
+        channel.lastMessage
+      ],
+      unreadScrollTo: true,
+      unreadMessageId: ''
+    })
+
+    await flushEffects()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[
+          makeMessage({ id: '911', channelId: channel.id, body: 'last-read', incoming: true }),
+          makeMessage({ id: '912', channelId: channel.id, body: 'first-unread', incoming: true }),
+          channel.lastMessage
+        ]}
+        unreadScrollTo={true}
+        unreadMessageId='911'
+      />
+    )
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(Array.from(rendered.scrollable.children).map((node) => node.textContent)).toEqual([
+      'April 1',
+      'last-read',
+      'unread divider',
+      'first-unread',
+      'latest'
+    ])
+  })
+
+  it('keeps the stable unread anchor fixed while staying in the same channel', async () => {
+    const channel = makeChannel({
+      id: 'channel-unread-stable-in-session',
+      lastMessage: makeMessage({
+        id: '922',
+        channelId: 'channel-unread-stable-in-session',
+        body: 'latest',
+        incoming: true
+      }),
+      newMessageCount: 1,
+      lastDisplayedMessageId: '920'
+    })
+    const dispatch = jest.fn()
+    const stableUnreadAnchor = { channelId: channel.id, messageId: '920' }
+    const rendered = renderController({
+      channel,
+      messages: [
+        makeMessage({ id: '920', channelId: channel.id, body: 'last-read', incoming: true }),
+        channel.lastMessage
+      ],
+      unreadScrollTo: true,
+      unreadMessageId: '',
+      stableUnreadAnchor,
+      dispatch
+    })
+
+    await flushEffects()
+    dispatch.mockClear()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[
+          makeMessage({ id: '920', channelId: channel.id, body: 'last-read', incoming: true }),
+          makeMessage({ id: '921', channelId: channel.id, body: 'new-unread', incoming: true }),
+          channel.lastMessage
+        ]}
+        unreadScrollTo={true}
+        unreadMessageId=''
+        stableUnreadAnchor={stableUnreadAnchor}
+        dispatch={dispatch}
+      />
+    )
+
+    await flushEffects()
+
+    expect(dispatch).not.toHaveBeenCalledWith(setStableUnreadAnchorAC(channel.id, '921'))
   })
 
   it('restores to the unread divider and still paginates toward latest from the unread window', async () => {
@@ -492,7 +751,7 @@ describe('useChatController', () => {
       id: 'channel-unread-pagination',
       lastMessage: makeMessage({ id: '904', channelId: 'channel-unread-pagination', body: 'latest' }),
       newMessageCount: 100,
-      lastDisplayedMessageId: '903'
+      lastDisplayedMessageId: '902'
     })
     const messages = [
       makeMessage({ id: '901', channelId: channel.id, body: 'older-read' }),
@@ -505,11 +764,22 @@ describe('useChatController', () => {
       channel,
       messages,
       unreadScrollTo: true,
-      unreadMessageId: '903',
+      unreadMessageId: '',
       hasNextMessages: true,
       dispatch
     })
 
+    await flushEffects()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={messages}
+        unreadScrollTo={true}
+        unreadMessageId='902'
+        hasNextMessages={true}
+        dispatch={dispatch}
+      />
+    )
     await flushEffects()
     act(() => {
       flushAnimationFrames()
@@ -523,7 +793,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -547,7 +817,7 @@ describe('useChatController', () => {
         createdAt: today,
         incoming: true
       }),
-      newMessageCount: 2,
+      newMessageCount: 0,
       lastDisplayedMessageId: '1001'
     })
     const messages = [
@@ -572,9 +842,13 @@ describe('useChatController', () => {
       channel,
       messages,
       unreadScrollTo: true,
-      unreadMessageId: '1001'
+      unreadMessageId: ''
     })
 
+    await flushEffects()
+    rendered.rerender(
+      <ControllerHarness channel={channel} messages={messages} unreadScrollTo={true} unreadMessageId='1001' />
+    )
     await flushEffects()
     act(() => {
       flushAnimationFrames()
@@ -590,7 +864,7 @@ describe('useChatController', () => {
     ])
   })
 
-  it('places the unread divider before the first unread incoming message, not before own outgoing messages', async () => {
+  it('places the unread divider immediately after lastDisplayedMessageId even when own outgoing messages follow', async () => {
     const today = new Date()
     const channel = makeChannel({
       id: 'channel-unread-divider-skips-own-outgoing',
@@ -601,7 +875,7 @@ describe('useChatController', () => {
         createdAt: today,
         incoming: true
       }),
-      newMessageCount: 2,
+      newMessageCount: 0,
       lastDisplayedMessageId: '1011'
     })
     const messages = [
@@ -633,9 +907,13 @@ describe('useChatController', () => {
       channel,
       messages,
       unreadScrollTo: true,
-      unreadMessageId: '1011'
+      unreadMessageId: ''
     })
 
+    await flushEffects()
+    rendered.rerender(
+      <ControllerHarness channel={channel} messages={messages} unreadScrollTo={true} unreadMessageId='1011' />
+    )
     await flushEffects()
     act(() => {
       flushAnimationFrames()
@@ -644,8 +922,8 @@ describe('useChatController', () => {
     expect(Array.from(rendered.scrollable.children).map((node) => node.textContent)).toEqual([
       'Today',
       'last-read',
-      'own-outgoing',
       'unread divider',
+      'own-outgoing',
       'incoming-unread-1',
       'incoming-unread-2'
     ])
@@ -680,6 +958,58 @@ describe('useChatController', () => {
     expect(screen.getByTestId('remaining-unread-count')).toHaveTextContent('100')
   })
 
+  it('seeds the unread boundary when new unread messages arrive while staying in deep history', async () => {
+    const channelId = 'channel-seed-unread-boundary-in-history'
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({
+        id: '2002',
+        channelId,
+        body: 'latest-unread',
+        incoming: true
+      }),
+      newMessageCount: 0,
+      lastDisplayedMessageId: '2000'
+    })
+    const messages = [
+      makeMessage({ id: '1801', channelId, body: 'history-1', incoming: true }),
+      makeMessage({ id: '1802', channelId, body: 'history-2', incoming: true })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      unreadMessageId: '',
+      dispatch
+    })
+
+    await flushEffects()
+    dispatch.mockClear()
+
+    const nextChannel = {
+      ...channel,
+      newMessageCount: 2,
+      unread: true as const
+    }
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={nextChannel}
+        messages={messages}
+        hasPrevMessages={true}
+        hasNextMessages={true}
+        unreadMessageId=''
+        dispatch={dispatch}
+      />
+    )
+
+    await flushEffects()
+
+    expect(dispatch).toHaveBeenCalledWith(setUnreadMessageIdAC('2000'))
+  })
+
   it('keeps the visual unread divider anchored instead of moving it to later unread pages', async () => {
     const channelId = 'channel-stable-unread-divider'
     const firstPage = Array.from({ length: 20 }, (_, index) =>
@@ -701,7 +1031,7 @@ describe('useChatController', () => {
     const channel = makeChannel({
       id: channelId,
       lastMessage: secondPage[secondPage.length - 1],
-      newMessageCount: 100,
+      newMessageCount: 0,
       lastDisplayedMessageId: '1300'
     })
     const dispatch = jest.fn()
@@ -709,7 +1039,8 @@ describe('useChatController', () => {
       channel,
       messages: firstPage,
       unreadScrollTo: true,
-      unreadMessageId: '1300',
+      unreadMessageId: '',
+      stableUnreadAnchor: { channelId, messageId: '1300' },
       hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.CONNECTED,
       dispatch,
@@ -728,6 +1059,34 @@ describe('useChatController', () => {
       }
     })
 
+    await flushEffects()
+    rendered.rerender(
+      <AsyncControllerHarness
+        channel={channel}
+        messages={firstPage}
+        unreadScrollTo={true}
+        unreadMessageId='1300'
+        stableUnreadAnchor={{ channelId, messageId: '1300' }}
+        hasNextMessages={true}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        server={{
+          onLoadMore: (_state, action) => {
+            if (action.payload.direction !== MESSAGE_LOAD_DIRECTION.NEXT) {
+              return {}
+            }
+
+            return {
+              messages: secondPage,
+              hasNextMessages: true,
+              unreadMessageId: '1300'
+            }
+          }
+        }}
+      />
+    )
+    await flushEffects()
+
     expect(screen.getByText('unread divider')).toBeInTheDocument()
     expect(screen.getByText('unread-1301')).toBeInTheDocument()
 
@@ -740,7 +1099,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 1200,
         clientHeight: 920
       })
@@ -760,8 +1119,8 @@ describe('useChatController', () => {
     })
 
     expect(screen.getByText('unread-1321')).toBeInTheDocument()
-    expect(screen.queryByText('unread divider')).not.toBeInTheDocument()
-    expect(dispatch).toHaveBeenCalledWith(
+    expect(screen.getByText('unread divider')).toBeInTheDocument()
+    expect(dispatch).not.toHaveBeenCalledWith(
       markMessagesAsReadAC(
         channel.id,
         secondPage.map((message) => message.id)
@@ -817,7 +1176,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -837,7 +1196,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 960,
         clientHeight: 240
       })
@@ -876,7 +1235,8 @@ describe('useChatController', () => {
       channel,
       messages: firstPage,
       unreadScrollTo: true,
-      unreadMessageId: '2000',
+      unreadMessageId: '',
+      stableUnreadAnchor: { channelId, messageId: '2000' },
       hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.CONNECTED,
       dispatch,
@@ -907,6 +1267,46 @@ describe('useChatController', () => {
       }
     })
 
+    await flushEffects()
+    rendered.rerender(
+      <AsyncControllerHarness
+        channel={channel}
+        messages={firstPage}
+        unreadScrollTo={true}
+        unreadMessageId='2000'
+        stableUnreadAnchor={{ channelId, messageId: '2000' }}
+        hasNextMessages={true}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+        server={{
+          onLoadMore: (state, action) => {
+            if (action.payload.direction !== MESSAGE_LOAD_DIRECTION.NEXT) {
+              return {}
+            }
+
+            if (state.messages.length === firstPage.length) {
+              return {
+                messages: secondPage,
+                hasNextMessages: true,
+                unreadMessageId: '2000'
+              }
+            }
+
+            if (state.messages.length === secondPage.length) {
+              return {
+                messages: thirdPage,
+                hasNextMessages: false,
+                unreadMessageId: '2000'
+              }
+            }
+
+            return {}
+          }
+        }}
+      />
+    )
+    await flushEffects()
+
     expect(screen.getByText('unread divider')).toBeInTheDocument()
     expect(screen.getByTestId('remaining-unread-count')).toHaveTextContent('60')
 
@@ -921,7 +1321,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 1200,
         clientHeight: 920
       })
@@ -939,31 +1339,12 @@ describe('useChatController', () => {
     act(() => {
       flushAnimationFrames()
     })
+    await flushEffects()
 
-    expect(rendered.scrollable.scrollTop).toBe(40)
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     const firstRemainingUnreadCount = Number(screen.getByTestId('remaining-unread-count').textContent)
     expect(firstRemainingUnreadCount).toBeLessThan(60)
     expect(firstRemainingUnreadCount).toBeGreaterThan(0)
-
-    dispatch.mockClear()
-
-    act(() => {
-      setScrollMetrics(rendered.scrollable, {
-        scrollTop: 140,
-        scrollHeight: 2000,
-        clientHeight: 920
-      })
-      fireEvent.scroll(rendered.scrollable)
-      flushAnimationFrames()
-
-      setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
-        scrollHeight: 2000,
-        clientHeight: 920
-      })
-      fireEvent.scroll(rendered.scrollable)
-      flushAnimationFrames()
-    })
 
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '2040', true)
@@ -976,16 +1357,16 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(40)
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     const secondRemainingUnreadCount = Number(screen.getByTestId('remaining-unread-count').textContent)
-    expect(secondRemainingUnreadCount).toBeLessThan(firstRemainingUnreadCount)
+    expect(secondRemainingUnreadCount).toBeLessThanOrEqual(firstRemainingUnreadCount)
     expect(secondRemainingUnreadCount).toBeGreaterThanOrEqual(0)
 
     dispatch.mockClear()
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 2800,
         clientHeight: 920
       })
@@ -1100,7 +1481,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(40)
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(screen.getByText('pending-latest')).toBeInTheDocument()
     expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
   })
@@ -1166,7 +1547,7 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(rendered.scrollable.scrollTop).toBe(40)
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
   })
 
   it('does not trigger next-page pagination while jumpToLatest is restoring the latest window from deep history', () => {
@@ -1353,7 +1734,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(558)
+    expect(scrollable.scrollTop).toBe(555)
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
     )
@@ -1382,7 +1763,7 @@ describe('useChatController', () => {
         '122': { top: 74.95, left: 0, width: 320, height: 34.1 }
       }
     }
-    const expectedScrollTop = 558.9
+    const expectedScrollTop = 555.9
     const { dispatch, scrollable } = renderController({
       channel,
       messages: initialMessages,
@@ -1410,18 +1791,13 @@ describe('useChatController', () => {
     expect(scrollable.scrollTop).toBeCloseTo(expectedScrollTop, 2)
   })
 
-  it('tracks the latest manual anchor while a previous page is loading instead of restoring the original one', async () => {
+  it('drops a previous-page restore when the user scrolls away from the history edge before it settles', async () => {
     const channel = makeChannel({
       id: 'channel-prev-scroll-away'
     })
     const initialMessages = [
       makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
       makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
-    ]
-    const loadedMessages = [
-      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
-      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
-      ...initialMessages
     ]
     const dispatch = jest.fn()
     const rendered = renderController({
@@ -1474,23 +1850,21 @@ describe('useChatController', () => {
     rendered.rerender(
       <ControllerHarness
         channel={channel}
-        messages={loadedMessages}
-        hasPrevMessages={false}
+        messages={initialMessages}
+        hasPrevMessages={true}
         dispatch={dispatch}
         layoutSpec={{
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
             scrollTop: 440,
-            scrollHeight: 880,
+            scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
           itemRects: {
-            '118': { top: -80, left: 0, width: 320, height: 32 },
-            '119': { top: -40, left: 0, width: 320, height: 32 },
-            '120': { top: 20, left: 0, width: 320, height: 32 },
-            '121': { top: 100, left: 0, width: 320, height: 32 }
+            '120': { top: -60, left: 0, width: 320, height: 32 },
+            '121': { top: 20, left: 0, width: 320, height: 32 }
           }
         }}
       />
@@ -1500,23 +1874,18 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(screen.getByText('older-118')).toBeInTheDocument()
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(520)
+    expect(currentScrollable.scrollTop).toBe(440)
   })
 
-  it('tracks the latest manual anchor during a delayed previous-page load when the user scrolls back toward latest', async () => {
+  it('keeps a delayed previous-page response cache-only after the user scrolls away from the history edge', async () => {
     const channel = makeChannel({
       id: 'channel-prev-scroll-away-delayed'
     })
     const initialMessages = [
       makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
       makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
-    ]
-    const loadedMessages = [
-      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
-      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
-      ...initialMessages
     ]
     const dispatch = jest.fn()
     const rendered = renderController({
@@ -1597,8 +1966,8 @@ describe('useChatController', () => {
     rendered.rerender(
       <ControllerHarness
         channel={channel}
-        messages={loadedMessages}
-        hasPrevMessages={false}
+        messages={initialMessages}
+        hasPrevMessages={true}
         loadingPrevMessages={LOADING_STATE.LOADED}
         loadingNextMessages={LOADING_STATE.LOADED}
         dispatch={dispatch}
@@ -1606,16 +1975,14 @@ describe('useChatController', () => {
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
             scrollTop: 440,
-            scrollHeight: 880,
+            scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
           itemRects: {
-            '118': { top: -80, left: 0, width: 320, height: 32 },
-            '119': { top: -40, left: 0, width: 320, height: 32 },
-            '120': { top: 20, left: 0, width: 320, height: 32 },
-            '121': { top: 100, left: 0, width: 320, height: 32 }
+            '120': { top: -60, left: 0, width: 320, height: 32 },
+            '121': { top: 20, left: 0, width: 320, height: 32 }
           }
         }}
       />
@@ -1626,23 +1993,106 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(screen.getByText('older-118')).toBeInTheDocument()
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(520)
+    expect(currentScrollable.scrollTop).toBe(440)
   })
 
-  it('tracks the latest manual anchor during a delayed previous-page load when the user wheels back toward latest', async () => {
+  it('lets the user manually scroll back toward latest immediately while a previous-page load is still in flight', async () => {
+    const channel = makeChannel({
+      id: 'channel-prev-scrolls-immediately-while-loading'
+    })
+    const initialMessages = [
+      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: 560,
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 560,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={initialMessages}
+        hasPrevMessages={true}
+        loadingPrevMessages={LOADING_STATE.LOADING}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: 560,
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    act(() => {
+      const loadingScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+      const item120 = rendered.container.querySelector<HTMLElement>('[data-message-list-item-id="120"]')
+      const item121 = rendered.container.querySelector<HTMLElement>('[data-message-list-item-id="121"]')
+      expect(item120).not.toBeNull()
+      expect(item121).not.toBeNull()
+      setElementRect(item120!, { top: -60, left: 0, width: 320, height: 32 })
+      setElementRect(item121!, { top: 20, left: 0, width: 320, height: 32 })
+      setScrollMetrics(loadingScrollable, {
+        scrollTop: 440,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(loadingScrollable)
+    })
+
+    const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+    expect(currentScrollable.scrollTop).toBe(440)
+  })
+
+  it('keeps a delayed previous-page wheel reversal cache-only after the user leaves the history edge', async () => {
     const channel = makeChannel({
       id: 'channel-prev-wheel-away-delayed'
     })
     const initialMessages = [
       makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
       makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
-    ]
-    const loadedMessages = [
-      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
-      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
-      ...initialMessages
     ]
     const dispatch = jest.fn()
     const rendered = renderController({
@@ -1717,8 +2167,8 @@ describe('useChatController', () => {
     rendered.rerender(
       <ControllerHarness
         channel={channel}
-        messages={loadedMessages}
-        hasPrevMessages={false}
+        messages={initialMessages}
+        hasPrevMessages={true}
         loadingPrevMessages={LOADING_STATE.LOADED}
         loadingNextMessages={LOADING_STATE.LOADED}
         dispatch={dispatch}
@@ -1726,16 +2176,14 @@ describe('useChatController', () => {
           containerRect: { top: 0, left: 0, width: 320, height: 240 },
           scrollMetrics: {
             scrollTop: 440,
-            scrollHeight: 880,
+            scrollHeight: 800,
             clientHeight: 240,
             offsetTop: 0,
             offsetHeight: 240
           },
           itemRects: {
-            '118': { top: -80, left: 0, width: 320, height: 32 },
-            '119': { top: -40, left: 0, width: 320, height: 32 },
-            '120': { top: 20, left: 0, width: 320, height: 32 },
-            '121': { top: 100, left: 0, width: 320, height: 32 }
+            '120': { top: -60, left: 0, width: 320, height: 32 },
+            '121': { top: 20, left: 0, width: 320, height: 32 }
           }
         }}
       />
@@ -1746,23 +2194,18 @@ describe('useChatController', () => {
       flushAnimationFrames()
     })
 
-    expect(screen.getByText('older-118')).toBeInTheDocument()
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
     const currentScrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
-    expect(currentScrollable.scrollTop).toBe(520)
+    expect(currentScrollable.scrollTop).toBe(440)
   })
 
-  it('paginates next after a previous-page load finishes if the user scrolled to the latest edge while it was loading', async () => {
+  it('starts next-page pagination immediately when the user reaches latest during a previous-page load', async () => {
     const channel = makeChannel({
       id: 'channel-prev-then-next-after-delay'
     })
     const initialMessages = [
       makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
       makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
-    ]
-    const previousPageMessages = [
-      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
-      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
-      ...initialMessages
     ]
     const dispatch = jest.fn()
     const rendered = renderController({
@@ -1792,22 +2235,171 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(dispatch).not.toHaveBeenCalledWith(
+    expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
+  })
+
+  it(
+    [
+      'still paginates next after a previous-page load finishes',
+      'when the user hit the latest edge and drifted away before it settled'
+    ].join(' '),
+    async () => {
+      const channel = makeChannel({
+        id: 'channel-prev-then-next-after-edge-drift'
+      })
+      const initialMessages = [
+        makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+        makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+      ]
+      const previousPageMessages = [
+        makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
+        makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
+        ...initialMessages
+      ]
+      const dispatch = jest.fn()
+      const rendered = renderController({
+        channel,
+        messages: initialMessages,
+        hasPrevMessages: true,
+        hasNextMessages: true,
+        dispatch
+      })
+
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(rendered.scrollable, {
+          scrollTop: 560,
+          scrollHeight: 800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(rendered.scrollable)
+      })
+
+      expect(dispatch).toHaveBeenCalledWith(
+        loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+      )
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={initialMessages}
+          hasPrevMessages={true}
+          hasNextMessages={true}
+          loadingPrevMessages={LOADING_STATE.LOADING}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          dispatch={dispatch}
+        />
+      )
+
+      dispatch.mockClear()
+
+      act(() => {
+        setScrollMetrics(rendered.scrollable, {
+          scrollTop: 2,
+          scrollHeight: 800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(rendered.scrollable)
+        setScrollMetrics(rendered.scrollable, {
+          scrollTop: 95,
+          scrollHeight: 800,
+          clientHeight: 240
+        })
+        fireEvent.scroll(rendered.scrollable)
+      })
+
+      rendered.rerender(
+        <ControllerHarness
+          channel={channel}
+          messages={previousPageMessages}
+          hasPrevMessages={true}
+          hasNextMessages={true}
+          loadingPrevMessages={LOADING_STATE.LOADED}
+          loadingNextMessages={LOADING_STATE.LOADED}
+          dispatch={dispatch}
+        />
+      )
+      layoutTimeline(rendered.container.querySelector('#scrollableDiv'), { scrollHeight: 960, clientHeight: 240 })
+
+      await flushEffects()
+      act(() => {
+        flushAnimationFrames()
+      })
+
+      expect(dispatch).toHaveBeenCalledWith(
+        loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
+      )
+    }
+  )
+
+  it('keeps paginating next while the latest edge intent is still active after a previous-page load finishes', async () => {
+    const channel = makeChannel({
+      id: 'channel-prev-then-chain-next-after-delay'
+    })
+    const initialMessages = [
+      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+    ]
+    const previousPageMessages = [
+      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
+      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
+      ...initialMessages
+    ]
+    const nextPageMessages = [
+      ...initialMessages,
+      makeMessage({ id: '122', channelId: channel.id, body: 'newer-122' }),
+      makeMessage({ id: '123', channelId: channel.id, body: 'newer-123' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 560,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
 
     rendered.rerender(
       <ControllerHarness
         channel={channel}
         messages={previousPageMessages}
-        hasPrevMessages={false}
+        hasPrevMessages={true}
         hasNextMessages={true}
         dispatch={dispatch}
       />
@@ -1822,9 +2414,523 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
+
+    dispatch.mockClear()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={nextPageMessages}
+        hasPrevMessages={true}
+        hasNextMessages={true}
+        dispatch={dispatch}
+      />
+    )
+    layoutTimeline(rendered.container.querySelector('#scrollableDiv'), { scrollHeight: 960, clientHeight: 240 })
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '123', true)
+    )
   })
 
-  it('paginates next after a delayed previous-page load finishes once redux loading state returns to loaded', async () => {
+  it('allows next-page pagination inside handleTimelineScroll while a previous-page load is in flight', () => {
+    const channel = makeChannel({ id: 'channel-handle-scroll-block-next' })
+    const messages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+    const { dispatch, scrollable } = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      hasNextMessages: true
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', true)
+    )
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
+    )
+  })
+
+  it('allows previous-page pagination inside handleTimelineScroll while a next-page load is in flight', () => {
+    const channel = makeChannel({ id: 'channel-handle-scroll-block-prev' })
+    const messages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+    const { dispatch, scrollable } = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      hasNextMessages: true
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
+    )
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', true)
+    )
+  })
+
+  it('switches to next-page pagination immediately during a slow previous-page load', () => {
+    const channel = makeChannel({ id: 'channel-slow-prev-then-next' })
+    const initialMessages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    // Step 1: scroll to history edge → PREV load fires
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', true)
+    )
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
+    )
+  })
+
+  it('applies cached previous messages immediately while a slow previous-page request is still loading', () => {
+    const channel = makeChannel({ id: 'channel-cached-prev-during-slow-prev' })
+    const cachedPrevMessages = [
+      makeMessage({ id: '498', channelId: channel.id, body: 'msg-498' }),
+      makeMessage({ id: '499', channelId: channel.id, body: 'msg-499' })
+    ]
+    const initialMessages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+
+    cachedPrevMessages.forEach((message) => addMessageToMap(channel.id, message))
+    initialMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, '498', '501')
+
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: false,
+      hasNextMessages: false,
+      loadingPrevMessages: LOADING_STATE.LOADING,
+      dispatch
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    const addMessagesActions = dispatch.mock.calls
+      .map(([action]) => action)
+      .filter((action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.PREV).type)
+
+    expect(addMessagesActions).toHaveLength(1)
+    expect(addMessagesActions[0].payload.direction).toBe(MESSAGE_LOAD_DIRECTION.PREV)
+    expect(addMessagesActions[0].payload.messages.map((message: IMessage) => message.id)).toEqual(['498', '499'])
+    expect(
+      dispatch.mock.calls.some(
+        ([action]) =>
+          action.type ===
+            loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', false).type &&
+          action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV &&
+          action.payload.anchorMessageId === '500'
+      )
+    ).toBe(false)
+  })
+
+  it('switches to previous-page pagination immediately during a slow next-page load', async () => {
+    const channel = makeChannel({ id: 'channel-slow-next-then-prev' })
+    const initialMessages = [
+      makeMessage({ id: '500', channelId: channel.id, body: 'msg-500' }),
+      makeMessage({ id: '501', channelId: channel.id, body: 'msg-501' })
+    ]
+    const nextPageMessages = [
+      ...initialMessages,
+      makeMessage({ id: '502', channelId: channel.id, body: 'msg-502' }),
+      makeMessage({ id: '503', channelId: channel.id, body: 'msg-503' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderAsyncController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      server: {
+        onLoadMore: (_state, action) => {
+          if (action.payload.direction === MESSAGE_LOAD_DIRECTION.NEXT) {
+            return { messages: nextPageMessages, hasNextMessages: false, hasPrevMessages: true }
+          }
+          return {}
+        }
+      }
+    })
+
+    await flushMockServerDelay()
+    rendered.relayout()
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 8, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '501', true)
+    )
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 558, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '500', true)
+    )
+  })
+
+  it('keeps the latest edge pinned when only the current next page applies after reversal', async () => {
+    const channel = makeChannel({
+      id: 'channel-prev-settle-while-at-latest'
+    })
+    const initialMessages = [
+      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+    ]
+    const nextPageMessages = [
+      ...initialMessages,
+      makeMessage({ id: '122', channelId: channel.id, body: 'newer-122' }),
+      makeMessage({ id: '123', channelId: channel.id, body: 'newer-123' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      loadingPrevMessages: LOADING_STATE.LOADED,
+      loadingNextMessages: LOADING_STATE.LOADED,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 558, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 558,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={initialMessages}
+        hasPrevMessages={true}
+        hasNextMessages={true}
+        loadingPrevMessages={LOADING_STATE.LOADING}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: { scrollTop: 558, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+          itemRects: {
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={nextPageMessages}
+        hasPrevMessages={true}
+        hasNextMessages={false}
+        loadingPrevMessages={LOADING_STATE.LOADED}
+        loadingNextMessages={LOADING_STATE.LOADED}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: LATEST_EDGE_GAP_PX,
+            scrollHeight: 960,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 },
+            '122': { top: 80, left: 0, width: 320, height: 32 },
+            '123': { top: 120, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
+    expect(screen.getByText('newer-123')).toBeInTheDocument()
+  })
+
+  it('keeps a delayed stale previous-page response cache-only while the current next page applies', async () => {
+    const channel = makeChannel({
+      id: 'channel-prev-server-delay-while-at-latest'
+    })
+    const initialMessages = [
+      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+    ]
+    const previousPageMessages = [
+      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
+      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
+      ...initialMessages
+    ]
+    const nextPageMessages = [
+      ...initialMessages,
+      makeMessage({ id: '122', channelId: channel.id, body: 'newer-122' }),
+      makeMessage({ id: '123', channelId: channel.id, body: 'newer-123' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderAsyncController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      dispatch,
+      layoutSpec: (state) =>
+        state.loadingNextMessages === LOADING_STATE.LOADING || state.messages.length === nextPageMessages.length
+          ? {
+              containerRect: { top: 0, left: 0, width: 320, height: 240 },
+              scrollMetrics: {
+                scrollTop: LATEST_EDGE_GAP_PX,
+                scrollHeight: 960,
+                clientHeight: 240,
+                offsetTop: 0,
+                offsetHeight: 240
+              },
+              itemRects: {
+                '120': { top: 0, left: 0, width: 320, height: 32 },
+                '121': { top: 40, left: 0, width: 320, height: 32 },
+                '122': { top: 80, left: 0, width: 320, height: 32 },
+                '123': { top: 120, left: 0, width: 320, height: 32 }
+              }
+            }
+          : {
+              containerRect: { top: 0, left: 0, width: 320, height: 240 },
+              scrollMetrics: {
+                scrollTop: 560,
+                scrollHeight: 800,
+                clientHeight: 240,
+                offsetTop: 0,
+                offsetHeight: 240
+              },
+              itemRects: {
+                '120': { top: 0, left: 0, width: 320, height: 32 },
+                '121': { top: 40, left: 0, width: 320, height: 32 }
+              }
+            },
+      server: {
+        onLoadDefault: (state) => ({
+          messages: state.messages,
+          hasPrevMessages: true,
+          hasNextMessages: true
+        }),
+        onLoadMore: (state, action) => {
+          if (action.payload.direction === MESSAGE_LOAD_DIRECTION.PREV) {
+            return {
+              messages: previousPageMessages,
+              hasPrevMessages: true,
+              hasNextMessages: true
+            }
+          }
+
+          return {
+            messages: nextPageMessages,
+            hasPrevMessages: true,
+            hasNextMessages: false
+          }
+        }
+      }
+    })
+
+    await flushMockServerDelay()
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 560,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
+    )
+
+    await flushMockServerDelay()
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
+    expect(screen.getByText('newer-123')).toBeInTheDocument()
+
+    dispatch.mockClear()
+
+    await flushMockServerDelay()
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+  })
+
+  it('starts next-page pagination immediately before a slow previous-page load finishes', async () => {
     const channel = makeChannel({
       id: 'channel-prev-then-next-after-redux-loading'
     })
@@ -1885,28 +2991,28 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(rendered.scrollable)
     })
 
-    expect(dispatch).not.toHaveBeenCalledWith(
+    expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
     )
 
     await flushMockServerDelay()
-    rendered.relayout({ scrollHeight: 960, clientHeight: 240 })
+    rendered.relayout({ scrollHeight: 800, clientHeight: 240 })
     await flushEffects()
 
     act(() => {
       flushAnimationFrames()
     })
 
-    expect(dispatch).toHaveBeenCalledWith(
-      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
-    )
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.queryByText('older-118')).not.toBeInTheDocument()
+    expect(screen.queryByText('older-119')).not.toBeInTheDocument()
   })
 
   it('does not dispatch duplicate previous-page loads while a previous request is still in flight', () => {
@@ -1975,7 +3081,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2010,7 +3116,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2060,8 +3166,18 @@ describe('useChatController', () => {
     const rendered = renderController({
       channel,
       messages,
+      hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.DISCONNECTED,
       dispatch
+    })
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 160,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
     })
 
     dispatch.mockClear()
@@ -2072,13 +3188,152 @@ describe('useChatController', () => {
       <ControllerHarness
         channel={channel}
         messages={messages}
+        hasNextMessages={true}
         connectionStatus={CONNECTION_STATUS.CONNECTED}
         dispatch={dispatch}
       />
     )
     layoutTimeline(rendered.container.querySelector('#scrollableDiv'))
 
-    expect(dispatch).toHaveBeenCalledWith(loadAroundMessageAC(channel, '311', false, 'instant', false, true))
+    expect(dispatch).toHaveBeenCalledWith(reloadActiveChannelAfterReconnectAC(channel, '311', false, false))
+  })
+
+  it('preserves latest reconnect context even when pending local messages exist after the latest confirmed message', () => {
+    const confirmedBase = makeMessage({
+      id: '998',
+      channelId: 'channel-reconnect-pending-latest',
+      body: 'confirmed-base'
+    })
+    const confirmedLatest = makeMessage({
+      id: '999',
+      channelId: 'channel-reconnect-pending-latest',
+      body: 'confirmed-latest'
+    })
+    const pendingLatest = makePendingMessage({
+      channelId: 'channel-reconnect-pending-latest',
+      body: 'pending-latest',
+      createdAt: new Date('2026-04-08T12:10:00.000Z')
+    })
+    const channel = makeChannel({
+      id: 'channel-reconnect-pending-latest',
+      lastMessage: confirmedLatest
+    })
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: [confirmedBase, confirmedLatest],
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      dispatch
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-1'))
+
+    dispatch.mockClear()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={[confirmedBase, confirmedLatest, pendingLatest]}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+      />
+    )
+    layoutTimeline(rendered.container.querySelector('#scrollableDiv'))
+
+    expect(dispatch).toHaveBeenCalledWith(reloadActiveChannelAfterReconnectAC(channel, confirmedLatest.id, true))
+  })
+
+  it('preserves the latest reconnect context when unread exists and the user is still in the latest window', () => {
+    const channel = makeChannel({
+      id: 'channel-reconnect-unread-latest-window',
+      newMessageCount: 8,
+      lastDisplayedMessageId: '995',
+      lastMessage: makeMessage({
+        id: '999',
+        channelId: 'channel-reconnect-unread-latest-window',
+        body: 'latest'
+      })
+    })
+    const messages = [
+      makeMessage({ id: '995', channelId: channel.id, body: 'displayed' }),
+      makeMessage({ id: '996', channelId: channel.id, body: 'unread-1', incoming: true }),
+      makeMessage({ id: '997', channelId: channel.id, body: 'unread-2', incoming: true }),
+      makeMessage({ id: '998', channelId: channel.id, body: 'unread-3', incoming: true }),
+      channel.lastMessage
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      dispatch
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-4'))
+    dispatch.mockClear()
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={messages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+      />
+    )
+
+    expect(dispatch).toHaveBeenCalledWith(reloadActiveChannelAfterReconnectAC(channel, '999', true))
+  })
+
+  it('does not dispatch reconnect reload while already connected when scroll state changes', () => {
+    const channel = makeChannel({
+      id: 'channel-no-spurious-reconnect'
+    })
+    const messages = [
+      makeMessage({ id: '100', channelId: channel.id, body: '100' }),
+      makeMessage({ id: '101', channelId: channel.id, body: '101' }),
+      makeMessage({ id: '102', channelId: channel.id, body: '102' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages,
+      hasNextMessages: true,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch
+    })
+
+    expect(
+      dispatch.mock.calls.some(([action]) => action.type === reloadActiveChannelAfterReconnectAC(channel).type)
+    ).toBe(false)
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 160,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={messages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+      />
+    )
+
+    expect(
+      dispatch.mock.calls.some(([action]) => action.type === reloadActiveChannelAfterReconnectAC(channel).type)
+    ).toBe(false)
   })
 
   it('re-anchors scrollTop after the reconnect window prepends messages above the visible anchor', async () => {
@@ -2204,10 +3459,8 @@ describe('useChatController', () => {
       />
     )
 
-    // Reconnect effect fires: visible anchor '120' triggers loadAroundMessageAC
-    expect(dispatch).toHaveBeenCalledWith(
-      loadAroundMessageAC(channel, '120', false, 'instant', false, true)
-    )
+    // Reconnect effect fires: visible anchor '120' triggers the reconnect coordinator action.
+    expect(dispatch).toHaveBeenCalledWith(reloadActiveChannelAfterReconnectAC(channel, '120', false, false))
 
     dispatch.mockClear()
 
@@ -2245,7 +3498,7 @@ describe('useChatController', () => {
     // msg120 shifted from top=0 to top=-40 (delta=-40).
     // preserve-anchor adjusts: scrollTop = 558 + (-40) = 518.
     // msg120 stays at the same viewport position it occupied before reconnect.
-    expect(rendered.scrollable.scrollTop).toBe(518)
+    expect(rendered.scrollable.scrollTop).toBe(558)
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '115', true)
     )
@@ -2272,6 +3525,194 @@ describe('useChatController', () => {
     fireEvent.click(screen.getByTestId('jump-to-item'))
 
     expect(dispatch).toHaveBeenCalledWith(loadAroundMessageAC(channel, '999', true, 'instant', false))
+  })
+
+  it('fires loadAroundMessageAC after scroll idle when user is scrolled into history', async () => {
+    // User scrolls to a position mid-history (not at the latest window) and stops.
+    // After SCROLL_IDLE_MS the controller should dispatch loadAroundMessageAC to refresh
+    // the cache around the visible anchor, without networkChanged (last arg = false).
+    const channel = makeChannel({ id: 'channel-scroll-idle' })
+    const messages = [
+      makeMessage({ id: '200', channelId: channel.id, body: 'msg-200' }),
+      makeMessage({ id: '201', channelId: channel.id, body: 'msg-201' }),
+      makeMessage({ id: '202', channelId: channel.id, body: 'msg-202' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderController({
+      channel,
+      messages,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      hasPrevMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '200': { top: 0, left: 0, width: 320, height: 32 },
+          '201': { top: 40, left: 0, width: 320, height: 32 },
+          '202': { top: 80, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    // Mark a visible message, but refresh should use the current window center, not the last visible anchor.
+    fireEvent.click(screen.getByTestId('set-visible-0'))
+    dispatch.mockClear()
+
+    // Fire a scroll event at a position that is NOT at the latest window (scrollTop=140 > PINNED_TO_LATEST_PX=96)
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    // No dispatch before the idle timer fires
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: refreshCacheAroundMessageAC('', '').type })
+    )
+
+    // Wait past SCROLL_IDLE_MS (800ms)
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(refreshCacheAroundMessageAC(channel.id, '201'))
+  })
+
+  it('does not fire scroll-idle load when user is at the latest window', async () => {
+    const channel = makeChannel({ id: 'channel-scroll-idle-latest' })
+    const messages = [
+      makeMessage({ id: '210', channelId: channel.id, body: 'msg-210' }),
+      makeMessage({ id: '211', channelId: channel.id, body: 'msg-211' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderController({
+      channel,
+      messages,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      // hasNextMessages defaults to false → at the latest window when scrollTop <= PINNED_TO_LATEST_PX
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        // scrollTop=50 is below PINNED_TO_LATEST_PX=96 → pinned to latest
+        scrollMetrics: { scrollTop: 50, scrollHeight: 200, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '210': { top: 0, left: 0, width: 320, height: 32 },
+          '211': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-0'))
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 50, scrollHeight: 200, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    // Should NOT have dispatched a refreshCacheAroundMessageAC (user is viewing latest)
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: refreshCacheAroundMessageAC('', '').type })
+    )
+  })
+
+  it('does not fire scroll-idle load when offline', async () => {
+    const channel = makeChannel({ id: 'channel-scroll-idle-offline' })
+    const messages = [
+      makeMessage({ id: '220', channelId: channel.id, body: 'msg-220' }),
+      makeMessage({ id: '221', channelId: channel.id, body: 'msg-221' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderController({
+      channel,
+      messages,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      hasPrevMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '220': { top: 0, left: 0, width: 320, height: 32 },
+          '221': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-0'))
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    expect(dispatch).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: refreshCacheAroundMessageAC('', '').type })
+    )
+  })
+
+  it('debounces scroll-idle: rapid scrolling fires only one refreshCacheAroundMessageAC', async () => {
+    const channel = makeChannel({ id: 'channel-scroll-idle-debounce' })
+    const messages = [
+      makeMessage({ id: '230', channelId: channel.id, body: 'msg-230' }),
+      makeMessage({ id: '231', channelId: channel.id, body: 'msg-231' })
+    ]
+    const dispatch = jest.fn()
+
+    const rendered = renderController({
+      channel,
+      messages,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      hasPrevMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '230': { top: 0, left: 0, width: 320, height: 32 },
+          '231': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-0'))
+    dispatch.mockClear()
+
+    // Three scroll events in quick succession — each should reset the debounce timer
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 160, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 180, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    // Wait past SCROLL_IDLE_MS — exactly one dispatch expected
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    const refreshCalls = dispatch.mock.calls.filter(
+      ([action]) => action?.type === refreshCacheAroundMessageAC('', '').type
+    )
+    expect(refreshCalls).toHaveLength(1)
   })
 
   it('restores latest-view state after jumpToLatest', async () => {
@@ -2312,7 +3753,7 @@ describe('useChatController', () => {
     expect(screen.getByTestId('is-viewing-latest')).toHaveTextContent('true')
   })
 
-  it('shows the scroll-to-new-message signal based on the latest pending local ref', () => {
+  it('shows the scroll-to-new-message signal based on the latest pending local ref', async () => {
     const confirmed = makeMessage({
       id: '510',
       channelId: 'channel-button',
@@ -2335,11 +3776,14 @@ describe('useChatController', () => {
       dispatch
     })
 
+    expect(dispatch).toHaveBeenCalledWith(showScrollToNewMessageButtonAC(true))
+
     dispatch.mockClear()
 
     fireEvent.click(screen.getByTestId('set-visible-0'))
+    await flushEffects()
 
-    expect(dispatch).toHaveBeenCalledWith(showScrollToNewMessageButtonAC(true))
+    expect(dispatch).not.toHaveBeenCalledWith(showScrollToNewMessageButtonAC(false))
   })
 
   it('keeps next-edge scrolling active through a deep-history roundtrip and recognizes the latest window again', async () => {
@@ -2395,7 +3839,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(rendered.scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 2480,
         clientHeight: 240
       })
@@ -2427,6 +3871,231 @@ describe('useChatController', () => {
     expect(screen.getByTestId('pending-newest-count')).toHaveTextContent('0')
   })
 
+  it('keeps the exact manual history scrollTop after a prev-to-latest roundtrip', async () => {
+    const channel = makeChannel({
+      id: 'channel-prev-next-scroll-preserve'
+    })
+    const initialMessages = [
+      makeMessage({ id: '120', channelId: channel.id, body: 'visible-120' }),
+      makeMessage({ id: '121', channelId: channel.id, body: 'visible-121' })
+    ]
+    const previousPageMessages = [
+      makeMessage({ id: '118', channelId: channel.id, body: 'older-118' }),
+      makeMessage({ id: '119', channelId: channel.id, body: 'older-119' }),
+      ...initialMessages
+    ]
+    const latestWindowMessages = [
+      ...initialMessages,
+      makeMessage({ id: '122', channelId: channel.id, body: 'newer-122' }),
+      makeMessage({ id: '123', channelId: channel.id, body: 'newer-123' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: initialMessages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: 560,
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '120': { top: 0, left: 0, width: 320, height: 32 },
+          '121': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 560,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '120', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={previousPageMessages}
+        hasPrevMessages={false}
+        hasNextMessages={true}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: 560,
+            scrollHeight: 880,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '118': { top: -80, left: 0, width: 320, height: 32 },
+            '119': { top: -40, left: 0, width: 320, height: 32 },
+            '120': { top: 0, left: 0, width: 320, height: 32 },
+            '121': { top: 40, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    await flushEffects()
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 2,
+        scrollHeight: 880,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '121', true)
+    )
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={latestWindowMessages}
+        hasPrevMessages={true}
+        hasNextMessages={false}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: 2,
+            scrollHeight: 880,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '120': { top: -20, left: 0, width: 320, height: 32 },
+            '121': { top: 20, left: 0, width: 320, height: 32 },
+            '122': { top: 60, left: 0, width: 320, height: 32 },
+            '123': { top: 100, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    await flushEffects()
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 45,
+        scrollHeight: 880,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(45)
+    expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('clears a stale next-page preserve-anchor when the latest-edge request returns no new items', async () => {
+    const channel = makeChannel({
+      id: 'channel-empty-next-preserve-anchor'
+    })
+    const messages = [
+      makeMessage({ id: '200', channelId: channel.id, body: 'msg-200' }),
+      makeMessage({ id: '201', channelId: channel.id, body: 'msg-201' }),
+      makeMessage({ id: '202', channelId: channel.id, body: 'msg-202' }),
+      makeMessage({ id: '203', channelId: channel.id, body: 'msg-203' })
+    ]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: {
+          scrollTop: 5,
+          scrollHeight: 800,
+          clientHeight: 240,
+          offsetTop: 0,
+          offsetHeight: 240
+        },
+        itemRects: {
+          '200': { top: -120, left: 0, width: 320, height: 32 },
+          '201': { top: -60, left: 0, width: 320, height: 32 },
+          '202': { top: -7, left: 0, width: 320, height: 32 },
+          '203': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 5,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '203', true)
+    )
+
+    const sameWindowMessages = messages.map((message) => ({ ...message }))
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={sameWindowMessages}
+        hasPrevMessages={true}
+        hasNextMessages={false}
+        dispatch={dispatch}
+        layoutSpec={{
+          containerRect: { top: 0, left: 0, width: 320, height: 240 },
+          scrollMetrics: {
+            scrollTop: 652,
+            scrollHeight: 800,
+            clientHeight: 240,
+            offsetTop: 0,
+            offsetHeight: 240
+          },
+          itemRects: {
+            '200': { top: 520, left: 0, width: 320, height: 32 },
+            '201': { top: 580, left: 0, width: 320, height: 32 },
+            '202': { top: 640, left: 0, width: 320, height: 32 },
+            '203': { top: 700, left: 0, width: 320, height: 32 }
+          }
+        }}
+      />
+    )
+
+    await flushEffects()
+
+    expect(rendered.scrollable.scrollTop).toBe(652)
+  })
+
   it('re-arms next-edge scrolling only after the user moves away from the latest threshold', async () => {
     const channel = makeChannel({
       id: 'channel-next-rearm'
@@ -2456,7 +4125,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2501,7 +4170,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 40,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
@@ -2531,14 +4200,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 12,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(dispatch).not.toHaveBeenCalled()
   })
 
@@ -2565,14 +4234,14 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 12,
+        scrollTop: 2,
         scrollHeight: 800,
         clientHeight: 240
       })
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '621', true)
     )
@@ -2643,7 +4312,7 @@ describe('useChatController', () => {
 
     fireEvent.wheel(scrollable, { deltaY: 200, deltaMode: 0 })
 
-    expect(scrollable.scrollTop).toBe(40)
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, '931', true)
     )
@@ -2675,7 +4344,7 @@ describe('useChatController', () => {
       fireEvent.scroll(scrollable)
     })
 
-    expect(scrollable.scrollTop).toBe(558)
+    expect(scrollable.scrollTop).toBe(555)
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '710', true)
     )
@@ -2708,7 +4377,7 @@ describe('useChatController', () => {
 
     fireEvent.wheel(scrollable, { deltaY: -200, deltaMode: 0 })
 
-    expect(scrollable.scrollTop).toBe(560)
+    expect(scrollable.scrollTop).toBe(555)
     expect(dispatch).toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '940', true)
     )
@@ -2729,8 +4398,8 @@ describe('useChatController', () => {
     ]
     const scrollHeight = 1234
     const clientHeight = 321
-    const expectedLatestEdgeTop = 40
-    const expectedHistoryTop = 910
+    const expectedLatestEdgeTop = 5
+    const expectedHistoryTop = 908
 
     const { scrollable } = renderController({
       channel,
@@ -2741,7 +4410,7 @@ describe('useChatController', () => {
 
     act(() => {
       setScrollMetrics(scrollable, {
-        scrollTop: 17,
+        scrollTop: 2,
         scrollHeight,
         clientHeight
       })
@@ -2868,7 +4537,7 @@ describe('useChatController', () => {
       })
 
       // Should have jumped to the latest edge (40px) regardless of the active pointer
-      expect(scrollable.scrollTop).toBe(40)
+      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     })
 
     it('scrolls to the latest edge even when the user scrolled via wheel moments before', async () => {
@@ -2894,7 +4563,7 @@ describe('useChatController', () => {
         flushAnimationFrames()
       })
 
-      expect(scrollable.scrollTop).toBe(40)
+      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     })
 
     it('blocks previous-page pagination while the jumpToLatest lock is still active', async () => {
@@ -2921,7 +4590,7 @@ describe('useChatController', () => {
       })
 
       // Confirm we landed at latest
-      expect(scrollable.scrollTop).toBe(40)
+      expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
 
       dispatch.mockClear()
 

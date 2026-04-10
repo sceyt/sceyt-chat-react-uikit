@@ -44,7 +44,6 @@ interface IMessageBodyProps {
   handleScrollToRepliedMessage: (msgId: string) => void
   handleMediaItemClick?: (attachment: IAttachment) => void
   unreadMessageId: string
-  startsUnreadSection: boolean
   isUnreadMessage: boolean
   isThreadMessage: boolean
   fontFamily?: string
@@ -182,7 +181,7 @@ const MessageBody = ({
   isPendingMessage,
   prevMessage,
   nextMessage,
-  startsUnreadSection = false,
+  unreadMessageId,
   isThreadMessage,
   fontFamily,
   ownMessageOnRightSide,
@@ -395,8 +394,8 @@ const MessageBody = ({
     () =>
       !(prevMessage && current.diff(moment(prevMessage.createdAt).startOf('day'), 'days') === 0) ||
       prevMessage?.type === MESSAGE_TYPE.SYSTEM ||
-      startsUnreadSection,
-    [prevMessage, current, startsUnreadSection]
+      unreadMessageId === prevMessage.id,
+    [prevMessage, current, unreadMessageId]
   )
   const lastMessageInInterval = useMemo(
     () =>
@@ -1064,7 +1063,6 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.showSenderNameOnGroupChannel === nextProps.showSenderNameOnGroupChannel &&
     prevProps.showSenderNameOnOwnMessages === nextProps.showSenderNameOnOwnMessages &&
     prevProps.isUnreadMessage === nextProps.isUnreadMessage &&
-    prevProps.startsUnreadSection === nextProps.startsUnreadSection &&
     prevProps.unreadMessageId === nextProps.unreadMessageId &&
     prevProps.messageStatusAndTimePosition === nextProps.messageStatusAndTimePosition &&
     prevProps.messageStatusDisplayingType === nextProps.messageStatusDisplayingType &&

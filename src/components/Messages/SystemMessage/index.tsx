@@ -11,7 +11,7 @@ import { isJSON, makeUsername } from '../../../helpers/message'
 import { systemMessageUserName, formatDisappearingMessageTime } from '../../../helpers'
 import { IChannel, IMessage } from '../../../types'
 import { getShowOnlyContactUsers } from '../../../helpers/contacts'
-import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
+import { MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import { THEME_COLORS } from '../../../UIHelper/constants'
 import { getClient } from '../../../common/client'
 import {
@@ -19,7 +19,7 @@ import {
   removeMessageFromVisibleMessagesMap,
   setMessageToVisibleMessagesMap
 } from 'helpers/messagesHalper'
-import { scrollToNewMessageAC, setMessagesLoadingStateAC } from 'store/message/actions'
+import { scrollToNewMessageAC } from 'store/message/actions'
 import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 
@@ -113,7 +113,6 @@ const Message = ({
         compareMessagesForList(message, channel.lastMessage) >= 0
       ) {
         dispatch(scrollToNewMessageAC(false, false, false))
-        dispatch(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
       }
     } else {
       if (!channel.isLinkedChannel) {

@@ -42,14 +42,13 @@ import {
   updateSearchedChannelDataAC
 } from '../channel/actions'
 import {
-  addMessageAC,
+  addMessagesAC,
   addPollVotesToListAC,
   addReactionToMessageAC,
   clearMessagesAC,
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
   loadOGMetadataForLinkAC,
-  scrollToNewMessageAC,
   updateMessageAC,
   updateMessagesMarkersAC,
   updateMessagesStatusAC
@@ -61,7 +60,7 @@ import {
   appendMessageToLatestSegment,
   addReactionToMessageOnMap,
   checkChannelExistsOnMessagesMap,
-  getLatestPendingMessageFromMap,
+  getVisibleMessagesMap,
   messagesShareReference,
   removeAllMessages,
   removeMessagesFromMap,
@@ -88,6 +87,7 @@ import log from 'loglevel'
 import store from 'store'
 import { updateActiveChannelMembersAdd, updateActiveChannelMembersRemove } from '../member/helpers'
 import { MESSAGE_TYPE } from '../../types/enum'
+import { navigateToLatest } from 'helpers/messageListNavigator'
 
 const getStoredChannel = (channelId: string) =>
   getChannelFromMap(channelId) ||
@@ -122,10 +122,8 @@ const getResolvedChannelLastMessage = (
   sourceMessage?: IMessage | null
 ) => {
   const storedChannel = getStoredChannel(channelId)
-  const latestRemainingPendingMessage = getLatestPendingMessageFromMap(channelId, sourceMessage || nextLastMessage)
-
-  if (latestRemainingPendingMessage) {
-    return latestRemainingPendingMessage
+  if (!nextLastMessage?.id) {
+    return storedChannel?.lastMessage?.id ? storedChannel.lastMessage : null
   }
 
   if (
@@ -135,7 +133,7 @@ const getResolvedChannelLastMessage = (
     return nextLastMessage
   }
 
-  return storedChannel?.lastMessage || null
+  return storedChannel?.lastMessage?.id ? storedChannel.lastMessage : null
 }
 
 export function* handleChannelMessageEvent(args: { channel: IChannel; message: IMessage }, SceytChatClient: any): any {
@@ -161,7 +159,35 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     ? storedChannel?.lastMessage || null
     : getResolvedChannelLastMessage(channel.id, candidateLastMessage, message)
   const shouldUpdateLastMessage = lastMessageNeedsUpdate(storedChannel?.lastMessage, resolvedLastMessage)
-  const channelDataUpdate = {
+
+  yield put(addChannelAC(channelForAdd))
+  if (!channelExists) {
+    setChannelInMap(channel)
+  } else if (shouldUpdateLastMessage) {
+    yield put(updateChannelLastMessageAC(resolvedLastMessage!, channelForAdd))
+  }
+
+  if (channel.id === activeChannelId) {
+    const lastMessageIsVisible = storedChannel?.lastMessage?.id
+      ? Object.values(getVisibleMessagesMap()).some(
+          (visibleMessage) => visibleMessage.id === storedChannel.lastMessage?.id
+        )
+      : false
+
+    if (lastMessageIsVisible) {
+      yield put(addMessagesAC([message], 'next'))
+      yield put(loadOGMetadataForLinkAC([message], true))
+      if (lastMessageIsVisible) {
+        navigateToLatest(true)
+      }
+    }
+  }
+
+  addMessageToMap(channel.id, message)
+  const channelDataUpdate: Omit<Partial<IChannel>, 'lastReactedMessage'> & {
+    userMessageReactions: any[]
+    lastReactedMessage: null
+  } = {
     messageCount: channelForAdd.messageCount,
     unread: channelForAdd.unread,
     newMessageCount: channelForAdd.newMessageCount,
@@ -174,28 +200,14 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     newReactions: channelForAdd.newReactions,
     userMessageReactions: [],
     lastReactedMessage: null,
-    ...(shouldUpdateLastMessage ? { lastMessage: resolvedLastMessage } : {})
+    ...(shouldUpdateLastMessage && resolvedLastMessage ? { lastMessage: resolvedLastMessage } : {})
   }
-
-  yield put(addChannelAC(channelForAdd))
-  if (!channelExists) {
-    setChannelInMap(channel)
-  } else if (shouldUpdateLastMessage) {
-    yield put(updateChannelLastMessageAC(resolvedLastMessage!, channelForAdd))
-  }
-
   if (channel.id === activeChannelId) {
-    const hasNextMessage = store.getState().MessageReducer.messagesHasNext
-    if (!hasNextMessage) {
-      yield put(addMessageAC(message))
-      yield put(loadOGMetadataForLinkAC([message], true))
-      yield put(scrollToNewMessageAC(true, false, true))
+    if (!store.getState().MessageReducer.messagesHasNext) {
+      appendMessageToLatestSegment(channel.id, message.id)
     }
-  }
-
-  addMessageToMap(channel.id, message)
-  if (channel.id === activeChannelId && !store.getState().MessageReducer.messagesHasNext) {
-    appendMessageToLatestSegment(channel.id, message.id)
+  } else if (storedChannel?.lastMessage?.id) {
+    appendMessageToLatestSegment(channel.id, message.id, storedChannel.lastMessage.id)
   }
   yield put(updateChannelDataAC(channel.id, channelDataUpdate))
   const groupName = getChannelGroupName(channel)
@@ -256,7 +268,7 @@ export function* handleUnreadMessagesInfoEvent(args: { channel: IChannel }): any
   const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, channel.lastMessage)
   const shouldUpdateLastMessage = lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)
   const channelUpdateParams = {
-    ...(shouldUpdateLastMessage ? { lastMessage: resolvedLastMessage } : {}),
+    ...(shouldUpdateLastMessage && resolvedLastMessage ? { lastMessage: resolvedLastMessage } : {}),
     newMessageCount: channel.newMessageCount,
     newMentionCount: channel.newMentionCount,
     unread: channel.unread,

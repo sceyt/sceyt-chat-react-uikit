@@ -7,8 +7,10 @@ import {
   GET_MESSAGE,
   LOAD_LATEST_MESSAGES,
   LOAD_AROUND_MESSAGE,
+  REFRESH_CACHE_AROUND_MESSAGE,
   LOAD_NEAR_UNREAD,
   LOAD_DEFAULT_MESSAGES,
+  RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT,
   GET_MESSAGES_ATTACHMENTS,
   GET_REACTIONS,
   LOAD_MORE_MESSAGES,
@@ -35,7 +37,6 @@ import { IAttachment, IChannel, IMarker, IMessage, IOGMetadata, IPollVote, IReac
 import {
   addMessage,
   deleteMessageFromList,
-  setScrollToMessage,
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
@@ -44,6 +45,7 @@ import {
   addMessages,
   updateMessagesStatus,
   updateMessage,
+  patchMessages,
   addReactionToMessage,
   deleteReactionFromMessage,
   setHasPrevMessages,
@@ -60,9 +62,10 @@ import {
   updateUploadProgress,
   removeUploadProgress,
   setMessageToEdit,
-  setMessagesLoadingState,
   setLoadingPrevMessagesState,
   setLoadingNextMessagesState,
+  setActivePaginationIntent,
+  clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
@@ -91,7 +94,8 @@ import {
   removePendingPollAction,
   setPendingPollActionsMap,
   updatePendingPollAction,
-  setUnreadMessageId
+  setUnreadMessageId,
+  setStableUnreadAnchor
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
@@ -161,28 +165,19 @@ export function setMessageToEditAC(message: IMessage | null) {
 export function loadLatestMessagesAC(
   channel: IChannel,
   messageId?: string,
-  highlight?: boolean,
-  behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage?: boolean,
-  networkChanged?: boolean
+  networkChanged?: boolean,
+  applyVisibleWindow: boolean = true
 ) {
   return {
     type: LOAD_LATEST_MESSAGES,
-    payload: { channel, messageId, highlight, behavior, scrollToMessage, networkChanged }
+    payload: { channel, messageId, networkChanged, applyVisibleWindow }
   }
 }
 
-export function loadAroundMessageAC(
-  channel: IChannel,
-  messageId: string,
-  highlight?: boolean,
-  behavior?: 'smooth' | 'instant' | 'auto',
-  scrollToMessage?: boolean,
-  networkChanged?: boolean
-) {
+export function loadAroundMessageAC(channel: IChannel, messageId: string, networkChanged?: boolean) {
   return {
     type: LOAD_AROUND_MESSAGE,
-    payload: { channel, messageId, highlight, behavior, scrollToMessage, networkChanged }
+    payload: { channel, messageId, networkChanged }
   }
 }
 
@@ -200,6 +195,23 @@ export function loadDefaultMessagesAC(channel: IChannel) {
   }
 }
 
+export function reloadActiveChannelAfterReconnectAC(
+  channel: IChannel,
+  visibleAnchorId?: string,
+  wasViewingLatest?: boolean,
+  applyVisibleWindow: boolean = true
+) {
+  return {
+    type: RELOAD_ACTIVE_CHANNEL_AFTER_RECONNECT,
+    payload: {
+      channel,
+      visibleAnchorId: visibleAnchorId || '',
+      wasViewingLatest: !!wasViewingLatest,
+      applyVisibleWindow
+    }
+  }
+}
+
 export function getMessageAC(channelId: string, messageId?: string, limit?: number) {
   return {
     type: GET_MESSAGE,
@@ -207,21 +219,10 @@ export function getMessageAC(channelId: string, messageId?: string, limit?: numb
   }
 }
 
-export function setScrollToMessagesAC(
-  messageId: string | null,
-  highlight = true,
-  behavior?: 'smooth' | 'instant' | 'auto'
-) {
-  return setScrollToMessage({ messageId: messageId || '', highlight, behavior })
-}
-
 export function setScrollToMentionedMessageAC(isScrollToMentionedMessage: boolean | null) {
   return setScrollToMentionedMessage({ isScrollToMentionedMessage: !!isScrollToMentionedMessage })
 }
 
-export function setMessagesLoadingStateAC(state: number) {
-  return setMessagesLoadingState({ state })
-}
 export function setLoadingPrevMessagesStateAC(state: number | null) {
   return setLoadingPrevMessagesState({ state })
 }
@@ -358,11 +359,46 @@ export function loadMoreMessagesAC(
   limit: number,
   direction: string,
   messageId: string,
-  hasNext: boolean
+  hasNext: boolean,
+  requestId?: string
 ) {
-  return {
+  const payload: {
+    limit: number
+    direction: string
+    channelId: string
+    messageId: string
+    hasNext: boolean
+    requestId?: string
+  } = { limit, direction, channelId, messageId, hasNext }
+
+  if (requestId) {
+    Object.defineProperty(payload, 'requestId', {
+      value: requestId,
+      enumerable: false,
+      configurable: true
+    })
+  }
+
+  const action = {
     type: LOAD_MORE_MESSAGES,
-    payload: { limit, direction, channelId, messageId, hasNext }
+    payload
+  }
+
+  return action
+}
+
+export function setActivePaginationIntentAC(
+  channelId: string,
+  direction: 'prev' | 'next',
+  requestId: string,
+  anchorId: string
+) {
+  return setActivePaginationIntent({ channelId, direction, requestId, anchorId })
+}
+
+export function clearActivePaginationIntentAC(requestId?: string) {
+  return {
+    ...clearActivePaginationIntent({ requestId })
   }
 }
 
@@ -629,10 +665,25 @@ export function setUnreadMessageIdAC(messageId: string) {
   return setUnreadMessageId({ messageId })
 }
 
+export function setStableUnreadAnchorAC(channelId: string, messageId: string) {
+  return setStableUnreadAnchor({ channelId, messageId })
+}
+
 export function loadOGMetadataForLinkAC(messages: IMessage[], setStore = false) {
   return {
     type: LOAD_OG_METADATA_FOR_LINK,
     payload: { messages, setStore }
+  }
+}
+
+export function patchMessagesAC(messages: IMessage[]) {
+  return patchMessages({ messages })
+}
+
+export function refreshCacheAroundMessageAC(channelId: string, messageId: string, applyVisibleWindow = true) {
+  return {
+    type: REFRESH_CACHE_AROUND_MESSAGE,
+    payload: { channelId, messageId, applyVisibleWindow }
   }
 }
 

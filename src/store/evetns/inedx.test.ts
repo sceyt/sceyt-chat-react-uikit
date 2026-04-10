@@ -11,8 +11,10 @@ import {
 import {
   addMessageToMap,
   clearMessagesMap,
+  clearVisibleMessagesMap,
   getActiveSegment,
   getContiguousNextMessages,
+  setMessageToVisibleMessagesMap,
   setActiveSegment
 } from '../../helpers/messagesHalper'
 import {
@@ -23,7 +25,13 @@ import {
   resetMessageListFixtureIds
 } from '../../testUtils/messageFixtures'
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
+import { addMessagesAC } from '../message/actions'
+import { navigateToLatest } from '../../helpers/messageListNavigator'
 import { __eventsTestables } from './inedx'
+
+jest.mock('../../helpers/messageListNavigator', () => ({
+  navigateToLatest: jest.fn()
+}))
 
 describe('event message last-message handling', () => {
   const mockStore = require('store') as {
@@ -38,13 +46,14 @@ describe('event message last-message handling', () => {
   }
 
   const keepsNewestPendingTitle =
-    'does not replace a newer pending channel last message when an older resend confirmation arrives as a channel message event'
+    'restores confirmed channel last message when an older resend confirmation arrives as a channel message event'
   const keepsNewestPendingUnreadInfoTitle =
-    'does not replace a newer pending channel last message when unread info arrives with an older confirmed last message'
+    'restores confirmed channel last message when unread info arrives with an older confirmed last message'
 
   beforeEach(() => {
     resetMessageListFixtureIds()
     clearMessagesMap()
+    clearVisibleMessagesMap()
     destroyChannelsMap()
     setActiveChannelId('')
     setClient({
@@ -53,10 +62,12 @@ describe('event message last-message handling', () => {
     })
     mockStore.getState = jest.fn(() => defaultStoreState)
     mockStore.dispatch.mockClear()
+    ;(navigateToLatest as jest.Mock).mockClear()
   })
 
   afterEach(() => {
     clearMessagesMap()
+    clearVisibleMessagesMap()
     destroyChannelsMap()
     setActiveChannelId('')
   })
@@ -105,9 +116,9 @@ describe('event message last-message handling', () => {
       { user: { id: 'current-user' } }
     ).toPromise()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ tid: newestPending.tid }))
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: olderConfirmed.id }))
     expect(getChannelFromAllChannels(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ tid: newestPending.tid })
+      expect.objectContaining({ id: olderConfirmed.id })
     )
     expect(
       dispatched.some(
@@ -115,7 +126,7 @@ describe('event message last-message handling', () => {
           action.type === updateChannelLastMessageAC(olderConfirmed, incomingChannel as any).type &&
           action.payload.channel.id === channelId
       )
-    ).toBe(false)
+    ).toBe(true)
     expect(
       dispatched.some(
         (action) =>
@@ -123,7 +134,7 @@ describe('event message last-message handling', () => {
           action.payload.channelId === channelId &&
           action.payload.config?.lastMessage?.id === olderConfirmed.id
       )
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it(keepsNewestPendingUnreadInfoTitle, async () => {
@@ -171,15 +182,15 @@ describe('event message last-message handling', () => {
       { channel: unreadInfoChannel as any }
     ).toPromise()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ tid: newestPending.tid }))
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: olderConfirmed.id }))
     expect(getChannelFromAllChannels(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ tid: newestPending.tid })
+      expect.objectContaining({ id: olderConfirmed.id })
     )
     const updateChannelDataAction = dispatched.find(
       (action) =>
         action.type === updateChannelDataAC(channelId, { unread: true }).type && action.payload.channelId === channelId
     )
-    expect(updateChannelDataAction?.payload.config?.lastMessage).toBeUndefined()
+    expect(updateChannelDataAction?.payload.config?.lastMessage?.id).toBe(olderConfirmed.id)
     expect(
       dispatched.some(
         (action) =>
@@ -187,7 +198,7 @@ describe('event message last-message handling', () => {
           action.payload.channelId === channelId &&
           action.payload.config?.lastMessage?.id === olderConfirmed.id
       )
-    ).toBe(false)
+    ).toBe(true)
   })
 
   it('extends the cached latest segment when an incoming message arrives in the active latest window', async () => {
@@ -214,25 +225,91 @@ describe('event message last-message handling', () => {
     addMessageToMap(channelId, makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }))
     addMessageToMap(channelId, makeMessage({ id: '901', channelId, body: 'cached-901', incoming: true }))
     addMessageToMap(channelId, storedChannel.lastMessage!)
+    setMessageToVisibleMessagesMap(storedChannel.lastMessage!)
     setActiveSegment(channelId, '900', '902')
     mockStore.getState = jest.fn(() => ({
       MessageReducer: {
         pendingPollActions: {},
-        messagesHasNext: false
+        messagesHasNext: false,
+        activeChannelMessages: [
+          makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }),
+          makeMessage({ id: '901', channelId, body: 'cached-901', incoming: true }),
+          storedChannel.lastMessage
+        ]
       }
     }))
 
+    const dispatched: any[] = []
+
     await runSaga(
       {
-        dispatch: () => undefined
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
       },
       __eventsTestables.handleChannelMessageEvent,
       { channel: { ...storedChannel, lastMessage: incomingMessage }, message: incomingMessage },
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
+    expect(dispatched).toEqual(expect.arrayContaining([addMessagesAC([incomingMessage], 'next')]))
+    expect(navigateToLatest).toHaveBeenCalledWith(true)
     expect(getContiguousNextMessages(channelId, '902', 10).map((message) => message.id)).toEqual(['903'])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
+  })
+
+  it('appends an incoming message without auto-jumping when the previous latest message is loaded but not visible', async () => {
+    const channelId = 'channel-event-segment-latest-not-visible'
+    const incomingMessage = makeMessage({
+      id: '913',
+      channelId,
+      body: 'incoming-latest',
+      incoming: true
+    })
+    const storedChannel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({
+        id: '912',
+        channelId,
+        body: 'last-before-incoming',
+        incoming: true
+      })
+    })
+
+    setActiveChannelId(channelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, makeMessage({ id: '910', channelId, body: 'cached-910', incoming: true }))
+    addMessageToMap(channelId, makeMessage({ id: '911', channelId, body: 'cached-911', incoming: true }))
+    addMessageToMap(channelId, storedChannel.lastMessage!)
+    setActiveSegment(channelId, '910', '912')
+    mockStore.getState = jest.fn(() => ({
+      MessageReducer: {
+        pendingPollActions: {},
+        messagesHasNext: false,
+        activeChannelMessages: [
+          makeMessage({ id: '910', channelId, body: 'cached-910', incoming: true }),
+          makeMessage({ id: '911', channelId, body: 'cached-911', incoming: true }),
+          storedChannel.lastMessage
+        ]
+      }
+    }))
+
+    const dispatched: any[] = []
+
+    await runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: incomingMessage }, message: incomingMessage },
+      { user: { id: incomingMessage.user.id } }
+    ).toPromise()
+
+    expect(dispatched).toEqual(expect.arrayContaining([addMessagesAC([incomingMessage], 'next')]))
+    expect(navigateToLatest).not.toHaveBeenCalled()
   })
 
   it('does not extend the cached latest segment when the active window still has newer confirmed pages', async () => {
@@ -263,7 +340,63 @@ describe('event message last-message handling', () => {
     mockStore.getState = jest.fn(() => ({
       MessageReducer: {
         pendingPollActions: {},
-        messagesHasNext: true
+        messagesHasNext: true,
+        activeChannelMessages: [
+          makeMessage({ id: '900', channelId, body: 'cached-900', incoming: true }),
+          makeMessage({ id: '901', channelId, body: 'cached-901', incoming: true }),
+          storedChannel.lastMessage
+        ]
+      }
+    }))
+
+    const dispatched: any[] = []
+
+    await runSaga(
+      {
+        dispatch: (action) => {
+          dispatched.push(action)
+        }
+      },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: incomingMessage }, message: incomingMessage },
+      { user: { id: incomingMessage.user.id } }
+    ).toPromise()
+
+    expect(getContiguousNextMessages(channelId, '902', 10)).toEqual([])
+    expect(getActiveSegment()).toEqual({ startId: '900', endId: '902' })
+  })
+
+  it('extends an inactive channel cached latest segment when a background message arrives after the cached latest edge', async () => {
+    const activeChannelId = 'channel-active-other'
+    const channelId = 'channel-event-segment-inactive-latest'
+    const previousLatest = makeMessage({
+      id: '952',
+      channelId,
+      body: 'last-before-background',
+      incoming: true
+    })
+    const incomingMessage = makeMessage({
+      id: '953',
+      channelId,
+      body: 'incoming-background',
+      incoming: true
+    })
+    const storedChannel = makeChannel({
+      id: channelId,
+      lastMessage: previousLatest
+    })
+
+    setActiveChannelId(activeChannelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, makeMessage({ id: '950', channelId, body: 'cached-950', incoming: true }))
+    addMessageToMap(channelId, makeMessage({ id: '951', channelId, body: 'cached-951', incoming: true }))
+    addMessageToMap(channelId, previousLatest)
+    setActiveSegment(channelId, '950', '952')
+    mockStore.getState = jest.fn(() => ({
+      MessageReducer: {
+        pendingPollActions: {},
+        messagesHasNext: false
       }
     }))
 
@@ -276,7 +409,51 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, '902', 10)).toEqual([])
-    expect(getActiveSegment()).toEqual({ startId: '900', endId: '902' })
+    expect(getContiguousNextMessages(channelId, '952', 10).map((message) => message.id)).toEqual(['953'])
+  })
+
+  it('does not extend an inactive channel cached segment when the cached range is not the channel latest edge', async () => {
+    const activeChannelId = 'channel-active-other-safety'
+    const channelId = 'channel-event-segment-inactive-history'
+    const storedChannel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({
+        id: '965',
+        channelId,
+        body: 'latest-known-outside-cache',
+        incoming: true
+      })
+    })
+    const incomingMessage = makeMessage({
+      id: '966',
+      channelId,
+      body: 'incoming-background',
+      incoming: true
+    })
+
+    setActiveChannelId(activeChannelId)
+    setChannelInMap(storedChannel)
+    addChannelToAllChannels(storedChannel)
+    addMessageToMap(channelId, makeMessage({ id: '950', channelId, body: 'cached-950', incoming: true }))
+    addMessageToMap(channelId, makeMessage({ id: '951', channelId, body: 'cached-951', incoming: true }))
+    addMessageToMap(channelId, makeMessage({ id: '952', channelId, body: 'cached-952', incoming: true }))
+    setActiveSegment(channelId, '950', '952')
+    mockStore.getState = jest.fn(() => ({
+      MessageReducer: {
+        pendingPollActions: {},
+        messagesHasNext: false
+      }
+    }))
+
+    await runSaga(
+      {
+        dispatch: () => undefined
+      },
+      __eventsTestables.handleChannelMessageEvent,
+      { channel: { ...storedChannel, lastMessage: incomingMessage }, message: incomingMessage },
+      { user: { id: incomingMessage.user.id } }
+    ).toPromise()
+
+    expect(getContiguousNextMessages(channelId, '952', 10)).toEqual([])
   })
 })

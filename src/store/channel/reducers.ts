@@ -115,6 +115,14 @@ const channelSlice = createSlice({
 
     setChannels: (state, action: PayloadAction<{ channels: IChannel[] }>) => {
       state.channels = sortChannelByLastMessage([...action.payload.channels])
+      if (state.activeChannel) {
+        const channel = state.channels.find(
+          (channel: IChannel) => channel.id === (state?.activeChannel as IChannel)?.id
+        ) as IChannel
+        if (channel) {
+          state.activeChannel = channel
+        }
+      }
     },
 
     setSearchedChannels: (

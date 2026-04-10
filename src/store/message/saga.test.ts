@@ -29,7 +29,11 @@ import {
   resetMessageListFixtureIds,
   makeUser
 } from '../../testUtils/messageFixtures'
-import { resetMockServerDelay, resolveWithMockServerDelay } from '../../testUtils/mockServerDelay'
+import {
+  MOCK_SERVER_DELAY_MAX_MS,
+  resetMockServerDelay,
+  resolveWithMockServerDelay
+} from '../../testUtils/mockServerDelay'
 import {
   addMessageAC,
   addMessagesAC,
@@ -39,13 +43,18 @@ import {
   loadLatestMessagesAC,
   loadMoreMessagesAC,
   loadNearUnreadAC,
+  patchMessagesAC,
+  refreshCacheAroundMessageAC,
+  reloadActiveChannelAfterReconnectAC,
   resendMessageAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessagesAC,
   setMessagesHasNextAC,
   setMessagesHasPrevAC,
-  setMessagesLoadingStateAC,
+  setLoadingNextMessagesStateAC,
+  setLoadingPrevMessagesStateAC,
+  setUnreadMessageIdAC,
   setUnreadScrollToAC,
   updateAttachmentUploadingStateAC,
   updateMessageAC
@@ -55,12 +64,17 @@ import { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
 
 const mockStoreState = {
+  ChannelReducer: {
+    channelsLoadingState: LOADING_STATE.LOADED,
+    activeChannel: {}
+  },
   UserReducer: {
     connectionStatus: CONNECTION_STATUS.DISCONNECTED,
     waitToSendPendingMessages: false
   },
   MessageReducer: {
     activeChannelMessages: [],
+    activePaginationIntent: null,
     pendingPollActions: {},
     oGMetadata: {}
   }
@@ -143,6 +157,11 @@ const runMessageSaga = async (saga: any, ...args: any[]) => {
 
 const getActionByType = (actions: any[], type: string) => actions.find((action) => action.type === type)
 const flushAsyncWork = () => new Promise((resolve) => setTimeout(resolve, 0))
+const flushMockServerDelay = () => new Promise((resolve) => setTimeout(resolve, MOCK_SERVER_DELAY_MAX_MS + 25))
+const bothDirectionLoadingActions = (state: number | null) => [
+  setLoadingPrevMessagesStateAC(state),
+  setLoadingNextMessagesStateAC(state)
+]
 
 describe('message saga message-list flows', () => {
   beforeEach(() => {
@@ -160,8 +179,17 @@ describe('message saga message-list flows', () => {
       connectionStatus: CONNECTION_STATUS.DISCONNECTED,
       waitToSendPendingMessages: false
     }
+    mockStoreState.ChannelReducer = {
+      channelsLoadingState: LOADING_STATE.LOADED,
+      activeChannel: {}
+    }
     mockStoreState.MessageReducer = {
       activeChannelMessages: [],
+      activePaginationIntent: null,
+      stableUnreadAnchor: {
+        channelId: '',
+        messageId: ''
+      },
       pendingPollActions: {},
       oGMetadata: {}
     }
@@ -185,7 +213,7 @@ describe('message saga message-list flows', () => {
     __resetMessageSagaTestState()
   })
 
-  it('loads near-unread messages, updates list flags, and appends pending messages from the map', async () => {
+  it('loads near-unread messages, updates list flags, and keeps pending messages out of non-latest windows', async () => {
     const channel = makeChannel({
       id: 'channel-near-unread',
       lastDisplayedMessageId: '303',
@@ -218,18 +246,18 @@ describe('message saga message-list flows', () => {
 
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADING),
         setMessagesHasPrevAC(true),
         setMessagesHasNextAC(true),
         setMessagesAC(loadedMessages, channel.id),
         setUnreadScrollToAC(true),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADED)
       ])
     )
 
     const appendPendingAction = getActionByType(dispatched, addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
     expect(appendPendingAction.payload.direction).toBe(MESSAGE_LOAD_DIRECTION.NEXT)
-    expect(appendPendingAction.payload.messages.map((message: any) => message.body)).toEqual(['pending-near-unread'])
+    expect(appendPendingAction.payload.messages.map((message: any) => message.body)).toEqual([])
 
     expect(getMessageFromMap(channel.id, '303')?.body).toBe('server-303')
     expect(dispatched).toEqual(
@@ -237,6 +265,134 @@ describe('message saga message-list flows', () => {
         updateChannelLastMessageAC(channel.lastMessage, { ...channel, lastMessage: channel.lastMessage })
       ])
     )
+  })
+
+  it('shows a cached unread window immediately and patches it after the server refresh returns the same confirmed ids', async () => {
+    const channel = makeChannel({
+      id: 'channel-near-unread-cache-first',
+      lastDisplayedMessageId: '503',
+      lastMessage: makeMessage({
+        id: '505',
+        channelId: 'channel-near-unread-cache-first',
+        body: 'latest-server'
+      })
+    })
+    const cachedBoundary = makeMessage({ id: '503', channelId: channel.id, body: 'cached-503', incoming: true })
+    const cachedUnread = makeMessage({ id: '504', channelId: channel.id, body: 'cached-504', incoming: true })
+    const refreshedBoundary = { ...cachedBoundary }
+    const refreshedUnread = { ...cachedUnread, body: 'refreshed-504' }
+    const query = createMessageQuery({
+      loadNearMessageId: jest.fn(() =>
+        resolveWithMockServerDelay({ messages: [refreshedBoundary, refreshedUnread], hasNext: false })
+      )
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = [cachedBoundary, cachedUnread]
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, cachedBoundary)
+    addMessageToMap(channel.id, cachedUnread)
+    setActiveSegment(channel.id, '503', '504')
+    setClient(createClient(query, { ...channel, lastMessage: channel.lastMessage }))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+    expect(dispatched).not.toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadNearMessageId).toHaveBeenCalledWith('503')
+
+    const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type)
+    expect(setMessagesActions).toHaveLength(1)
+    expect(setMessagesActions[0].payload.messages.map((message: IMessage) => message.body)).toEqual([
+      'cached-503',
+      'cached-504'
+    ])
+
+    const patchAction = getActionByType(dispatched, patchMessagesAC([]).type)
+    expect(patchAction).toEqual(
+      patchMessagesAC([
+        expect.objectContaining({
+          id: '504',
+          body: 'refreshed-504'
+        })
+      ])
+    )
+  })
+
+  it('falls back to the server when the unread boundary is missing from a fragmented cached segment', async () => {
+    const channel = makeChannel({
+      id: 'channel-near-unread-fragmented-cache',
+      lastDisplayedMessageId: '703',
+      lastMessage: makeMessage({
+        id: '705',
+        channelId: 'channel-near-unread-fragmented-cache',
+        body: 'latest-server'
+      })
+    })
+    const cachedOlder = makeMessage({ id: '701', channelId: channel.id, body: 'cached-701', incoming: true })
+    const cachedNewer = makeMessage({ id: '704', channelId: channel.id, body: 'cached-704', incoming: true })
+    const loadedMessages = [
+      makeMessage({ id: '703', channelId: channel.id, body: 'server-703', incoming: true }),
+      makeMessage({ id: '704', channelId: channel.id, body: 'server-704', incoming: true })
+    ]
+    const query = createMessageQuery({
+      loadNearMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: loadedMessages, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, cachedOlder)
+    addMessageToMap(channel.id, cachedNewer)
+    setActiveSegment(channel.id, '701', '704')
+    setClient(createClient(query, { ...channel, lastMessage: channel.lastMessage }))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(query.loadNearMessageId).toHaveBeenCalledWith('703')
+
+    const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type)
+    expect(setMessagesActions).toHaveLength(1)
+    expect(setMessagesActions[0].payload.messages.map((message: IMessage) => message.id)).toEqual(['701', '703', '704'])
+  })
+
+  it('shows a cached unread window while offline without attempting a network fetch', async () => {
+    const channel = makeChannel({
+      id: 'channel-near-unread-offline-cache',
+      lastDisplayedMessageId: '803',
+      lastMessage: makeMessage({
+        id: '805',
+        channelId: 'channel-near-unread-offline-cache',
+        body: 'latest-server'
+      })
+    })
+    const cachedBoundary = makeMessage({ id: '803', channelId: channel.id, body: 'cached-803', incoming: true })
+    const cachedUnread = makeMessage({ id: '804', channelId: channel.id, body: 'cached-804', incoming: true })
+    const query = createMessageQuery()
+
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, cachedBoundary)
+    addMessageToMap(channel.id, cachedUnread)
+    setActiveSegment(channel.id, '803', '804')
+    setClient(createClient(query, { ...channel, lastMessage: channel.lastMessage }))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadNearUnread, loadNearUnreadAC(channel))
+
+    expect(dispatched).not.toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        setMessagesHasPrevAC(true),
+        setMessagesHasNextAC(true),
+        setUnreadMessageIdAC('803'),
+        setMessagesAC([cachedBoundary, cachedUnread], channel.id),
+        setUnreadScrollToAC(true),
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADED)
+      ])
+    )
+    expect(query.loadNearMessageId).not.toHaveBeenCalled()
+    expect(query.loadPrevious).not.toHaveBeenCalled()
   })
 
   it('loads default messages from the local cache while offline and still queues pending messages for the list tail', async () => {
@@ -265,8 +421,8 @@ describe('message saga message-list flows', () => {
 
     const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
 
-    expect(dispatched).toEqual(expect.arrayContaining([setMessagesLoadingStateAC(LOADING_STATE.LOADED)]))
-    expect(dispatched).not.toEqual(expect.arrayContaining([setMessagesLoadingStateAC(LOADING_STATE.LOADING)]))
+    expect(dispatched).toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADED)))
+    expect(dispatched).not.toEqual(expect.arrayContaining(bothDirectionLoadingActions(LOADING_STATE.LOADING)))
 
     const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channel.id).type)
     expect(setMessagesAction.payload.messages.map((message: any) => message.body)).toEqual([
@@ -277,6 +433,386 @@ describe('message saga message-list flows', () => {
 
     const appendPendingAction = getActionByType(dispatched, addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)
     expect(appendPendingAction.payload.messages).toEqual([])
+  })
+
+  it('reloads around the visible anchor on reconnect when refreshed channel data is available', () => {
+    const channelId = 'channel-reconnect-coordinator-around'
+    const refreshedChannel = makeChannel({
+      id: channelId,
+      newMessageCount: 6,
+      lastDisplayedMessageId: '514',
+      lastMessage: makeMessage({
+        id: '525',
+        channelId,
+        body: 'refreshed-last-message'
+      })
+    })
+    const reloadAction = __messageSagaTestables.getReconnectReloadAction(refreshedChannel, '511', false, true)
+
+    expect(reloadAction.type).toBe(refreshCacheAroundMessageAC(channelId, '511').type)
+    expect(reloadAction.payload).toEqual(
+      expect.objectContaining({
+        channelId,
+        messageId: '511',
+        applyVisibleWindow: true
+      })
+    )
+  })
+
+  it('loads the unread window after reconnect when there is no visible anchor and the refreshed channel has unread state', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-reconnect-coordinator-unread'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        lastDisplayedMessageId: ''
+      })
+      const refreshedChannel = {
+        ...channel,
+        newMessageCount: 12,
+        lastDisplayedMessageId: '610'
+      }
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      mockStoreState.ChannelReducer = {
+        channelsLoadingState: LOADING_STATE.LOADING,
+        activeChannel: channel
+      }
+
+      setTimeout(() => {
+        setChannelInMap(refreshedChannel)
+        mockStoreState.ChannelReducer = {
+          channelsLoadingState: LOADING_STATE.LOADED,
+          activeChannel: refreshedChannel
+        }
+      }, 100)
+
+      const dispatchedPromise = runMessageSaga(
+        __messageSagaTestables.reloadActiveChannelAfterReconnect,
+        reloadActiveChannelAfterReconnectAC(channel)
+      )
+
+      await Promise.resolve()
+      jest.advanceTimersByTime(100)
+      await Promise.resolve()
+
+      const dispatched = await dispatchedPromise
+
+      expect(dispatched).toHaveLength(2)
+      expect(dispatched[0]).toEqual(setUnreadMessageIdAC(refreshedChannel.lastDisplayedMessageId))
+      expect(dispatched[1].type).toBe(loadNearUnreadAC(channel).type)
+      expect(dispatched[1].payload.channel).toEqual(
+        expect.objectContaining({
+          id: channelId,
+          newMessageCount: refreshedChannel.newMessageCount,
+          lastDisplayedMessageId: refreshedChannel.lastDisplayedMessageId
+        })
+      )
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('loads the latest window after reconnect when unread exists and the reconnect started from the latest window', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-reconnect-coordinator-unread-preferred'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        lastDisplayedMessageId: '',
+        lastMessage: makeMessage({
+          id: '650',
+          channelId,
+          body: 'stale-latest'
+        })
+      })
+      const refreshedChannel = {
+        ...channel,
+        newMessageCount: 18,
+        lastDisplayedMessageId: '640',
+        lastMessage: makeMessage({
+          id: '668',
+          channelId,
+          body: 'refreshed-latest'
+        })
+      }
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      mockStoreState.ChannelReducer = {
+        channelsLoadingState: LOADING_STATE.LOADING,
+        activeChannel: channel
+      }
+
+      setTimeout(() => {
+        setChannelInMap(refreshedChannel)
+        mockStoreState.ChannelReducer = {
+          channelsLoadingState: LOADING_STATE.LOADED,
+          activeChannel: refreshedChannel
+        }
+      }, 100)
+
+      const dispatchedPromise = runMessageSaga(
+        __messageSagaTestables.reloadActiveChannelAfterReconnect,
+        reloadActiveChannelAfterReconnectAC(channel, '649', true)
+      )
+
+      await Promise.resolve()
+      jest.advanceTimersByTime(100)
+      await Promise.resolve()
+
+      const dispatched = await dispatchedPromise
+
+      expect(dispatched).toHaveLength(2)
+      expect(dispatched[0]).toEqual(setUnreadMessageIdAC(refreshedChannel.lastDisplayedMessageId))
+      expect(dispatched[1].type).toBe(loadLatestMessagesAC(channel).type)
+      expect(dispatched[1].payload).toEqual(
+        expect.objectContaining({
+          channel: expect.objectContaining({
+            id: channelId,
+            newMessageCount: refreshedChannel.newMessageCount,
+            lastDisplayedMessageId: refreshedChannel.lastDisplayedMessageId,
+            lastMessage: expect.objectContaining({ id: refreshedChannel.lastMessage.id })
+          }),
+          networkChanged: true,
+          applyVisibleWindow: true
+        })
+      )
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('falls back to the latest window after reconnect if the active channel does not refresh before timeout', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-reconnect-coordinator-timeout'
+      const channel = makeChannel({
+        id: channelId,
+        newMessageCount: 0,
+        lastDisplayedMessageId: '',
+        lastMessage: makeMessage({
+          id: '710',
+          channelId,
+          body: 'latest'
+        })
+      })
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      mockStoreState.ChannelReducer = {
+        channelsLoadingState: LOADING_STATE.LOADED,
+        activeChannel: channel
+      }
+
+      const dispatchedPromise = runMessageSaga(
+        __messageSagaTestables.reloadActiveChannelAfterReconnect,
+        reloadActiveChannelAfterReconnectAC(channel)
+      )
+
+      for (let i = 0; i < 32; i += 1) {
+        jest.advanceTimersByTime(50)
+        await Promise.resolve()
+      }
+
+      const dispatched = await dispatchedPromise
+
+      expect(dispatched).toEqual([loadLatestMessagesAC(channel)])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('drops reconnect reload work if the active channel changes while waiting for refreshed channel data', async () => {
+    jest.useFakeTimers()
+
+    try {
+      const channelId = 'channel-reconnect-stale-drop'
+      const otherChannelId = 'channel-reconnect-stale-drop-other'
+      const channel = makeChannel({ id: channelId })
+      const refreshedChannel = {
+        ...channel,
+        newMessageCount: 4,
+        lastDisplayedMessageId: '801'
+      }
+
+      setActiveChannelId(channelId)
+      setChannelInMap(channel)
+      mockStoreState.ChannelReducer = {
+        channelsLoadingState: LOADING_STATE.LOADING,
+        activeChannel: channel
+      }
+
+      setTimeout(() => {
+        setActiveChannelId(otherChannelId)
+        setChannelInMap(refreshedChannel)
+        mockStoreState.ChannelReducer = {
+          channelsLoadingState: LOADING_STATE.LOADED,
+          activeChannel: makeChannel({ id: otherChannelId })
+        }
+      }, 100)
+
+      const dispatchedPromise = runMessageSaga(
+        __messageSagaTestables.reloadActiveChannelAfterReconnect,
+        reloadActiveChannelAfterReconnectAC(channel, '800', false)
+      )
+
+      await Promise.resolve()
+      jest.advanceTimersByTime(100)
+      await Promise.resolve()
+
+      const dispatched = await dispatchedPromise
+
+      expect(dispatched).toEqual([])
+    } finally {
+      jest.useRealTimers()
+    }
+  })
+
+  it('refreshes the current 50-message view around the center using 25 previous and 25 next messages', async () => {
+    const channelId = 'channel-refresh-center-50'
+    const activeMessages = Array.from({ length: 50 }, (_, index) =>
+      makeMessage({
+        id: String(1000 + index),
+        channelId,
+        body: `message-${index}`
+      })
+    )
+    const refreshedMessages = activeMessages.map((message) =>
+      message.id === '1027' ? { ...message, body: 'message-27-edited' } : message
+    )
+    const previousSlice = refreshedMessages.slice(0, 25)
+    const nextSlice = refreshedMessages.slice(25)
+    const query = createMessageQuery()
+    const previousCalls: Array<{ messageId: string; limit: number }> = []
+    const nextCalls: Array<{ messageId: string; limit: number }> = []
+
+    query.loadPreviousMessageId = jest.fn((messageId: string) => {
+      previousCalls.push({ messageId, limit: query.limit })
+      return resolveWithMockServerDelay({ messages: previousSlice, hasNext: false })
+    })
+    query.loadNextMessageId = jest.fn((messageId: string) => {
+      nextCalls.push({ messageId, limit: query.limit })
+      return resolveWithMockServerDelay({ messages: nextSlice, hasNext: false })
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = activeMessages
+    setActiveChannelId(channelId)
+    setClient(createClient(query))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.refreshCacheAroundMessage,
+      refreshCacheAroundMessageAC(channelId, 'ignored-anchor')
+    )
+
+    expect(previousCalls).toEqual([{ messageId: '1025', limit: 25 }])
+    expect(nextCalls).toEqual([{ messageId: '1024', limit: 25 }])
+    expect(dispatched).toEqual([
+      patchMessagesAC([
+        expect.objectContaining({
+          id: '1027',
+          body: 'message-27-edited'
+        })
+      ])
+    ])
+    expect(getMessageFromMap(channelId, '1027')?.body).toBe('message-27-edited')
+  })
+
+  it('replaces the active confirmed window when refreshed center slices return a different id window', async () => {
+    const channelId = 'channel-refresh-center-replace'
+    const activeMessages = Array.from({ length: 60 }, (_, index) =>
+      makeMessage({
+        id: String(2000 + index),
+        channelId,
+        body: `active-${index}`
+      })
+    )
+    const previousSlice = activeMessages.slice(0, 30)
+    const nextSlice = [
+      ...activeMessages.slice(31),
+      makeMessage({
+        id: '2060',
+        channelId,
+        body: 'inserted-server-message'
+      })
+    ]
+    const query = createMessageQuery()
+    const previousCalls: Array<{ messageId: string; limit: number }> = []
+    const nextCalls: Array<{ messageId: string; limit: number }> = []
+
+    query.loadPreviousMessageId = jest.fn((messageId: string) => {
+      previousCalls.push({ messageId, limit: query.limit })
+      return resolveWithMockServerDelay({ messages: previousSlice, hasNext: false })
+    })
+    query.loadNextMessageId = jest.fn((messageId: string) => {
+      nextCalls.push({ messageId, limit: query.limit })
+      return resolveWithMockServerDelay({ messages: nextSlice, hasNext: false })
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = activeMessages
+    setActiveChannelId(channelId)
+    setClient(createClient(query))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.refreshCacheAroundMessage,
+      refreshCacheAroundMessageAC(channelId, 'ignored-anchor')
+    )
+
+    expect(previousCalls).toEqual([{ messageId: '2030', limit: 30 }])
+    expect(nextCalls).toEqual([{ messageId: '2029', limit: 30 }])
+
+    const setMessagesAction = getActionByType(dispatched, setMessagesAC([], channelId).type)
+    expect(setMessagesAction.payload.messages.map((message: IMessage) => message.id)).toEqual([
+      ...previousSlice.map((message) => message.id),
+      ...nextSlice.map((message) => message.id)
+    ])
+    expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
+  })
+
+  it('keeps a changed refreshed window cache-only when applyVisibleWindow is false', async () => {
+    const channelId = 'channel-refresh-center-cache-only'
+    const activeMessages = Array.from({ length: 60 }, (_, index) =>
+      makeMessage({
+        id: String(2100 + index),
+        channelId,
+        body: `active-${index}`
+      })
+    )
+    const previousSlice = activeMessages.slice(0, 30)
+    const nextSlice = [
+      ...activeMessages.slice(31),
+      makeMessage({
+        id: '2160',
+        channelId,
+        body: 'inserted-server-message'
+      })
+    ]
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: previousSlice, hasNext: false })),
+      loadNextMessageId: jest.fn(() => resolveWithMockServerDelay({ messages: nextSlice, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = activeMessages
+    setActiveChannelId(channelId)
+    setClient(createClient(query))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.refreshCacheAroundMessage,
+      refreshCacheAroundMessageAC(channelId, 'ignored-anchor', false)
+    )
+
+    expect(dispatched.some((action) => action.type === setMessagesAC([], channelId).type)).toBe(false)
+    expect(dispatched.some((action) => action.type === patchMessagesAC([]).type)).toBe(false)
+    expect(getMessageFromMap(channelId, '2160')?.body).toBe('inserted-server-message')
   })
 
   it('loads the next page from the contiguous message map without hitting the network path', async () => {
@@ -298,7 +834,7 @@ describe('message saga message-list flows', () => {
 
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
+        setLoadingNextMessagesStateAC(LOADING_STATE.LOADING),
         setMessagesHasNextAC(false),
         setMessagesHasPrevAC(true)
       ])
@@ -307,7 +843,140 @@ describe('message saga message-list flows', () => {
     expect(addMessagesAction.payload.direction).toBe(MESSAGE_LOAD_DIRECTION.NEXT)
     expect(addMessagesAction.payload.messages.map((message: any) => message.id)).toEqual(['511', '512'])
     expect(addMessagesAction.payload.messages.map((message: any) => message.body)).toEqual(['next-one', 'next-two'])
-    expect(mockStore.dispatch).toHaveBeenCalledWith(setMessagesLoadingStateAC(LOADING_STATE.LOADED))
+    expect(mockStore.dispatch).toHaveBeenCalledWith(setLoadingNextMessagesStateAC(LOADING_STATE.LOADED))
+  })
+
+  it('allows previous and next loadMore requests to run concurrently for the same channel', async () => {
+    const channelId = 'channel-load-more-concurrent-directions'
+    const deferredPrev = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const deferredNext = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn().mockImplementation(() => deferredPrev.promise),
+      loadNextMessageId: jest.fn().mockImplementation(() => deferredNext.promise)
+    })
+
+    addMessageToMap(channelId, makeMessage({ id: '900', channelId, body: 'anchor-prev' }))
+    addMessageToMap(channelId, makeMessage({ id: '901', channelId, body: 'anchor-next' }))
+    setActiveSegment(channelId, '900', '901')
+    setClient(createClient(query))
+
+    const prevTask = runSaga(
+      {
+        dispatch: () => undefined,
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.loadMoreMessages,
+      loadMoreMessagesAC(channelId, 20, MESSAGE_LOAD_DIRECTION.PREV, '900', true)
+    )
+
+    const nextTask = runSaga(
+      {
+        dispatch: () => undefined,
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.loadMoreMessages,
+      loadMoreMessagesAC(channelId, 20, MESSAGE_LOAD_DIRECTION.NEXT, '901', true)
+    )
+
+    await flushMockServerDelay()
+    await flushAsyncWork()
+
+    expect(query.loadPreviousMessageId).toHaveBeenCalledTimes(1)
+    expect(query.loadNextMessageId).toHaveBeenCalledTimes(1)
+
+    deferredPrev.resolve({
+      messages: [
+        makeMessage({ id: '898', channelId, body: 'prev-898' }),
+        makeMessage({ id: '899', channelId, body: 'prev-899' })
+      ],
+      hasNext: true
+    })
+    deferredNext.resolve({
+      messages: [
+        makeMessage({ id: '902', channelId, body: 'next-902' }),
+        makeMessage({ id: '903', channelId, body: 'next-903' })
+      ],
+      hasNext: true
+    })
+
+    await Promise.all([prevTask.toPromise(), nextTask.toPromise()])
+  })
+
+  it('keeps stale reversed-direction loadMore results cache-only', async () => {
+    const channelId = 'channel-stale-load-more-cache-only'
+    const deferredPrev = (() => {
+      let resolveDeferred!: (value: QueryResult) => void
+      const promise = new Promise<QueryResult>((resolve) => {
+        resolveDeferred = resolve
+      })
+      return { promise, resolve: resolveDeferred }
+    })()
+    const query = createMessageQuery({
+      loadPreviousMessageId: jest.fn().mockImplementation(() => deferredPrev.promise)
+    })
+    const visibleMessages = [
+      makeMessage({ id: '900', channelId, body: 'visible-900' }),
+      makeMessage({ id: '901', channelId, body: 'visible-901' })
+    ]
+
+    visibleMessages.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, '900', '901')
+    mockStoreState.MessageReducer.activeChannelMessages = visibleMessages
+    mockStoreState.MessageReducer.activePaginationIntent = {
+      channelId,
+      direction: 'prev',
+      requestId: 'prev-request',
+      anchorId: '900'
+    }
+    setClient(createClient(query))
+
+    const dispatched: any[] = []
+    const prevTask = runSaga(
+      {
+        dispatch: (effect) => {
+          dispatched.push(effect)
+        },
+        getState: () => mockStoreState
+      },
+      __messageSagaTestables.loadMoreMessages,
+      loadMoreMessagesAC(channelId, 20, MESSAGE_LOAD_DIRECTION.PREV, '900', true, 'prev-request')
+    )
+
+    await flushAsyncWork()
+
+    mockStoreState.MessageReducer.activePaginationIntent = {
+      channelId,
+      direction: 'next',
+      requestId: 'next-request',
+      anchorId: '901'
+    }
+
+    deferredPrev.resolve({
+      messages: [
+        makeMessage({ id: '898', channelId, body: 'stale-898' }),
+        makeMessage({ id: '899', channelId, body: 'stale-899' })
+      ],
+      hasNext: true
+    })
+
+    await prevTask.toPromise()
+
+    expect(getContiguousPrevMessages(channelId, '900', 20).map((message) => message.id)).toEqual(['898', '899'])
+    expect(dispatched.some((action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.PREV).type)).toBe(false)
+    expect(dispatched.some((action) => action.type === setMessagesHasPrevAC(true).type)).toBe(false)
+    expect(dispatched.some((action) => action.type === setMessagesHasNextAC(true).type)).toBe(false)
   })
 
   it('re-appends pending messages when next-page pagination reaches the latest confirmed edge', async () => {
@@ -504,10 +1173,10 @@ describe('message saga message-list flows', () => {
     expect(query.loadPrevious).toHaveBeenCalledTimes(1)
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADING),
         setMessagesHasPrevAC(true),
         setMessagesHasNextAC(false),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        ...bothDirectionLoadingActions(LOADING_STATE.LOADED)
       ])
     )
 
@@ -519,76 +1188,159 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, '703')?.body).toBe('server-703')
   })
 
-  it('does not overwrite a newer pending channel last message during network-changed refresh before resend completes', async () => {
+  it('replaces the cached latest window on reconnect when the server returns newer received ids beyond the offline cache', async () => {
     const currentUser = makeUser({ id: 'current-user' })
+    const remoteUser = makeUser({ id: 'remote-user' })
     const channel = makeChannel({
-      id: 'channel-network-changed-last-message',
+      id: 'channel-reconnect-received-after-offline',
       lastMessage: makePendingMessage({
-        channelId: 'channel-network-changed-last-message',
+        channelId: 'channel-reconnect-received-after-offline',
         tid: 'pending-latest-tid',
         body: 'pending-latest',
         metadata: '{}',
-        createdAt: new Date('2026-04-02T12:30:00.000Z'),
+        createdAt: new Date('2026-04-08T10:59:00.000Z'),
         user: currentUser
       })
     })
-    const cachedConfirmed = makeMessage({
-      id: '801',
-      channelId: channel.id,
-      body: 'cached-confirmed'
-    })
-    const olderConfirmed = makeMessage({
-      id: '802',
-      tid: 'pending-older-tid',
-      channelId: channel.id,
-      body: 'confirmed-older',
-      metadata: {} as any,
-      user: currentUser
-    })
+    const cachedConfirmed = [
+      makeMessage({ id: '998', channelId: channel.id, body: 'cached-998', user: remoteUser, incoming: true }),
+      makeMessage({ id: '999', channelId: channel.id, body: 'cached-999', user: remoteUser, incoming: true })
+    ]
+    const receivedWhileOffline = [
+      makeMessage({ id: '1000', channelId: channel.id, body: 'received-1000', user: remoteUser, incoming: true }),
+      makeMessage({ id: '1001', channelId: channel.id, body: 'received-1001', user: remoteUser, incoming: true })
+    ]
+    const loadedMessages = [...cachedConfirmed, ...receivedWhileOffline]
     const query = createMessageQuery({
-      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: [cachedConfirmed], hasNext: false }))
+      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: loadedMessages, hasNext: false }))
     })
 
     mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
-    addMessageToMap(channel.id, cachedConfirmed)
-    addMessageToMap(
-      channel.id,
-      makePendingMessage({
-        channelId: channel.id,
-        tid: 'pending-older-tid',
-        body: 'pending-older',
-        metadata: '{}',
-        createdAt: new Date('2026-04-02T12:29:00.000Z'),
-        user: currentUser
-      })
-    )
+    cachedConfirmed.forEach((message) => addMessageToMap(channel.id, message))
     addMessageToMap(channel.id, channel.lastMessage as any)
-    setClient(createClient(query, { ...channel, lastMessage: olderConfirmed, newMessageCount: 2, unread: true }))
+    setClient(createClient(query, { ...channel, lastMessage: receivedWhileOffline[1] }))
+
+    const dispatched = await runMessageSaga(__messageSagaTestables.loadDefaultMessages, loadDefaultMessagesAC(channel))
+
+    const setMessagesActions = dispatched.filter((action) => action.type === setMessagesAC([], channel.id).type)
+
+    expect(setMessagesActions).toHaveLength(2)
+    expect(setMessagesActions[0].payload.messages.map((message: any) => message.body)).toEqual([
+      'cached-998',
+      'cached-999',
+      'pending-latest'
+    ])
+    expect(setMessagesActions[1].payload.messages.map((message: any) => message.body)).toEqual([
+      'cached-998',
+      'cached-999',
+      'received-1000',
+      'received-1001'
+    ])
+
+    const appendPendingActions = dispatched.filter(
+      (action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type
+    )
+    expect(appendPendingActions.at(-1)?.payload.messages.map((message: any) => message.body)).toEqual([
+      'pending-latest'
+    ])
+  })
+
+  it('refreshes latest cache without replacing a changed visible window when applyVisibleWindow is false', async () => {
+    const channel = makeChannel({
+      id: 'channel-latest-cache-only-refresh',
+      lastMessage: makeMessage({
+        id: '903',
+        channelId: 'channel-latest-cache-only-refresh',
+        body: 'server-903'
+      })
+    })
+    const activeMessages = [
+      makeMessage({ id: '900', channelId: channel.id, body: 'active-900', incoming: true }),
+      makeMessage({ id: '901', channelId: channel.id, body: 'active-901', incoming: true })
+    ]
+    const loadedMessages = [
+      makeMessage({ id: '902', channelId: channel.id, body: 'server-902', incoming: true }),
+      makeMessage({ id: '903', channelId: channel.id, body: 'server-903', incoming: true })
+    ]
+    const query = createMessageQuery({
+      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: loadedMessages, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.activeChannelMessages = activeMessages
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    setClient(createClient(query, channel))
 
     const dispatched = await runMessageSaga(
       __messageSagaTestables.getMessagesQuery,
-      loadLatestMessagesAC(channel, undefined, undefined, undefined, undefined, true)
+      loadLatestMessagesAC(channel, undefined, undefined, undefined, undefined, true, false)
     )
 
-    expect(
-      dispatched.some(
-        (action) =>
-          action.type === updateChannelDataAC(channel.id, { ...channel, lastMessage: olderConfirmed }).type &&
-          action.payload.channelId === channel.id &&
-          action.payload.config?.lastMessage?.id === olderConfirmed.id
-      )
-    ).toBe(false)
+    expect(dispatched.some((action) => action.type === setMessagesAC([], channel.id).type)).toBe(false)
+    expect(dispatched.some((action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.NEXT).type)).toBe(false)
+    expect(getMessageFromMap(channel.id, '903')?.body).toBe('server-903')
+  })
 
-    const initialChannelUpdate = dispatched.find(
-      (action) =>
-        action.type === updateChannelDataAC(channel.id, { unread: true }).type &&
-        action.payload.channelId === channel.id
+  it('keeps the unread boundary on lastDisplayedMessageId when reconnect refresh loads the latest window', async () => {
+    const staleChannel = makeChannel({
+      id: 'channel-reconnect-latest-unread-anchor',
+      newMessageCount: 0,
+      lastDisplayedMessageId: '',
+      lastMessage: makeMessage({
+        id: '1098',
+        channelId: 'channel-reconnect-latest-unread-anchor',
+        body: 'stale-latest'
+      })
+    })
+    const refreshedChannel = {
+      ...staleChannel,
+      newMessageCount: 2,
+      lastDisplayedMessageId: '1098',
+      lastMessage: makeMessage({
+        id: '1101',
+        channelId: staleChannel.id,
+        body: 'server-1101',
+        incoming: true
+      })
+    }
+    const loadedMessages = [
+      makeMessage({
+        id: '1100',
+        channelId: staleChannel.id,
+        body: 'server-1100',
+        incoming: true
+      }),
+      makeMessage({
+        id: '1101',
+        channelId: staleChannel.id,
+        body: 'server-1101',
+        incoming: true
+      })
+    ]
+    const query = createMessageQuery({
+      loadPrevious: jest.fn(() => resolveWithMockServerDelay({ messages: loadedMessages, hasNext: false }))
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    setActiveChannelId(staleChannel.id)
+    setChannelInMap(staleChannel)
+    setClient(createClient(query, refreshedChannel))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.getMessagesQuery,
+      loadLatestMessagesAC(refreshedChannel, undefined, undefined, undefined, undefined, true)
     )
 
-    expect(initialChannelUpdate).toBeDefined()
-    expect(initialChannelUpdate.payload.config?.lastMessage).toBeUndefined()
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        setUnreadMessageIdAC(refreshedChannel.lastDisplayedMessageId),
+        setMessagesAC(loadedMessages, staleChannel.id)
+      ])
+    )
+    expect(dispatched).not.toContainEqual(setUnreadMessageIdAC('1100'))
   })
 
   it('prefetches previous and next pages into the message map while extending the active segment', async () => {
@@ -623,6 +1375,50 @@ describe('message saga message-list flows', () => {
     expect(query.loadNextMessageId).toHaveBeenCalledWith('902')
     expect(getContiguousNextMessages(channelId, '902', 10).map((message) => message.id)).toEqual(['903', '904'])
     expect(getActiveSegment()).toEqual({ startId: '898', endId: '904' })
+  })
+
+  it('patches the active message list when a background prefetch updates an overlapping cached page', async () => {
+    const channelId = 'channel-prefetch-patch-active'
+    const anchor = makeMessage({ id: '900', channelId, body: 'anchor' })
+    const staleVisible = makeMessage({ id: '901', channelId, body: 'stale-visible' })
+    const refreshedVisible = makeMessage({ id: '901', channelId, body: 'refreshed-visible' })
+    const prefetchedNext = makeMessage({ id: '902', channelId, body: 'prefetched-next' })
+    const query = createMessageQuery({
+      loadNextMessageId: jest.fn(() =>
+        resolveWithMockServerDelay({ messages: [refreshedVisible, prefetchedNext], hasNext: false })
+      )
+    })
+
+    mockStoreState.MessageReducer.activeChannelMessages = [anchor, staleVisible]
+    setActiveChannelId(channelId)
+    addMessageToMap(channelId, anchor)
+    addMessageToMap(channelId, staleVisible)
+    setActiveSegment(channelId, '900', '900')
+    setClient(createClient(query))
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.prefetchMessages,
+      channelId,
+      '900',
+      MESSAGE_LOAD_DIRECTION.NEXT,
+      1
+    )
+
+    expect(query.loadNextMessageId).toHaveBeenCalledWith('900')
+    expect(getContiguousNextMessages(channelId, '900', 10).map((message) => message.body)).toEqual([
+      'refreshed-visible',
+      'prefetched-next'
+    ])
+
+    const patchAction = getActionByType(dispatched, patchMessagesAC([]).type)
+    expect(patchAction).toEqual(
+      patchMessagesAC([
+        expect.objectContaining({
+          id: '901',
+          body: 'refreshed-visible'
+        })
+      ])
+    )
   })
 
   it('queues overlapping prefetch requests for the same direction instead of dropping the later request', async () => {
@@ -933,7 +1729,7 @@ describe('message saga message-list flows', () => {
     expect(navigateToLatest).toHaveBeenCalledWith(true)
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
+        setUnreadMessageIdAC(''),
         updateMessageAC('local-tid', expect.objectContaining({ id: '601', tid: 'local-tid' }), true),
         updateChannelDataAC(
           channel.id,
@@ -942,8 +1738,7 @@ describe('message saga message-list flows', () => {
             lastReactedMessage: null
           }),
           true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        )
       ])
     )
 
@@ -1026,17 +1821,8 @@ describe('message saga message-list flows', () => {
     expect(channel.sendMessage).not.toHaveBeenCalled()
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
-        updateMessageAC('offline-tid', { state: MESSAGE_STATUS.FAILED }),
-        updateChannelDataAC(
-          channel.id,
-          expect.objectContaining({
-            lastMessage: expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED }),
-            lastReactedMessage: null
-          }),
-          true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        setUnreadMessageIdAC(''),
+        updateMessageAC('offline-tid', { state: MESSAGE_STATUS.FAILED })
       ])
     )
 
@@ -1050,12 +1836,10 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, 'offline-tid')).toEqual(
       expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED })
     )
-    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
-      expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED })
-    )
+    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '700' }))
   })
 
-  it('keeps the newest failed pending text message as channel last message across multiple offline sends', async () => {
+  it('keeps pending messages separate while the confirmed channel last message stays unchanged across multiple offline sends', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeChannel({
       id: 'channel-send-offline-sequence',
@@ -1126,12 +1910,8 @@ describe('message saga message-list flows', () => {
         )
       )
 
-      expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
-        expect.objectContaining({ tid: createdMessages[index].tid, state: MESSAGE_STATUS.FAILED })
-      )
-      expect(getChannelFromAllChannels(channel.id)?.lastMessage).toEqual(
-        expect.objectContaining({ tid: createdMessages[index].tid, state: MESSAGE_STATUS.FAILED })
-      )
+      expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '706' }))
+      expect(getChannelFromAllChannels(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '706' }))
     }
 
     logErrorSpy.mockRestore()
@@ -1239,18 +2019,8 @@ describe('message saga message-list flows', () => {
     expect(channel.sendMessage).not.toHaveBeenCalled()
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
         updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'offline-attachment-file-tid'),
-        updateMessageAC('offline-attachment-tid', { state: MESSAGE_STATUS.FAILED }),
-        updateChannelDataAC(
-          channel.id,
-          expect.objectContaining({
-            lastMessage: expect.objectContaining({ tid: 'offline-attachment-tid', state: MESSAGE_STATUS.FAILED }),
-            lastReactedMessage: null
-          }),
-          true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        updateMessageAC('offline-attachment-tid', { state: MESSAGE_STATUS.FAILED })
       ])
     )
 
@@ -1385,7 +2155,7 @@ describe('message saga message-list flows', () => {
     expect(navigateToLatest).toHaveBeenCalledWith(true)
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
+        setUnreadMessageIdAC(''),
         updateMessageAC(
           'connected-attachment-tid',
           expect.objectContaining({ id: '712', tid: 'connected-attachment-tid', body: 'photo connected' }),
@@ -1398,8 +2168,7 @@ describe('message saga message-list flows', () => {
             lastReactedMessage: null
           }),
           true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        )
       ])
     )
 
@@ -1478,19 +2247,7 @@ describe('message saga message-list flows', () => {
 
     expect(channel.sendMessage).not.toHaveBeenCalled()
     expect(dispatched).toEqual(
-      expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
-        updateMessageAC('offline-forward-tid', { state: MESSAGE_STATUS.FAILED }),
-        updateChannelDataAC(
-          channel.id,
-          expect.objectContaining({
-            lastMessage: expect.objectContaining({ tid: 'offline-forward-tid', state: MESSAGE_STATUS.FAILED }),
-            lastReactedMessage: null
-          }),
-          true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
-      ])
+      expect.arrayContaining([updateMessageAC('offline-forward-tid', { state: MESSAGE_STATUS.FAILED })])
     )
 
     expect(getPendingMessagesFromMap(channel.id)).toEqual([
@@ -1579,7 +2336,6 @@ describe('message saga message-list flows', () => {
 
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
         updateMessageAC(
           'connected-forward-tid',
           expect.objectContaining({ id: '722', tid: 'connected-forward-tid', body: 'forward body' }),
@@ -1592,8 +2348,7 @@ describe('message saga message-list flows', () => {
             lastReactedMessage: null
           }),
           true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        )
       ])
     )
 
@@ -1718,19 +2473,7 @@ describe('message saga message-list flows', () => {
     expect(navigateToLatest).not.toHaveBeenCalled()
     expect(dispatched.some((action) => action.type === addMessageAC(failedMessage).type)).toBe(false)
     expect(dispatched).toEqual(
-      expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
-        updateMessageAC('resend-text-tid', { state: MESSAGE_STATUS.FAILED }),
-        updateChannelDataAC(
-          channel.id,
-          expect.objectContaining({
-            lastMessage: expect.objectContaining({ tid: 'resend-text-tid', state: MESSAGE_STATUS.FAILED }),
-            lastReactedMessage: null
-          }),
-          true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
-      ])
+      expect.arrayContaining([updateMessageAC('resend-text-tid', { state: MESSAGE_STATUS.FAILED })])
     )
     expect(getMessageFromMap(channel.id, 'resend-text-tid')).toEqual(
       expect.objectContaining({ tid: 'resend-text-tid', state: MESSAGE_STATUS.FAILED })
@@ -1819,19 +2562,9 @@ describe('message saga message-list flows', () => {
     expect(dispatched.some((action) => action.type === addMessageAC(failedMessage).type)).toBe(false)
     expect(dispatched).toEqual(
       expect.arrayContaining([
-        setMessagesLoadingStateAC(LOADING_STATE.LOADING),
         updateMessageAC('resend-attachment-tid', { state: MESSAGE_STATUS.UNMODIFIED }),
         updateAttachmentUploadingStateAC(UPLOAD_STATE.FAIL, 'resend-attachment-file-tid'),
-        updateMessageAC('resend-attachment-tid', { state: MESSAGE_STATUS.FAILED }),
-        updateChannelDataAC(
-          channel.id,
-          expect.objectContaining({
-            lastMessage: expect.objectContaining({ tid: 'resend-attachment-tid', state: MESSAGE_STATUS.FAILED }),
-            lastReactedMessage: null
-          }),
-          true
-        ),
-        setMessagesLoadingStateAC(LOADING_STATE.LOADED)
+        updateMessageAC('resend-attachment-tid', { state: MESSAGE_STATUS.FAILED })
       ])
     )
     expect(getMessageFromMap(channel.id, 'resend-attachment-tid')).toEqual(
@@ -1839,7 +2572,7 @@ describe('message saga message-list flows', () => {
     )
   })
 
-  it('keeps the newest pending channel last message while reconnect resend confirms older pending messages', async () => {
+  it('keeps channel last message on confirmed server truth while reconnect resend confirms older pending messages', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-message-order'
     const textPending = makePendingMessage({
@@ -1910,7 +2643,13 @@ describe('message saga message-list flows', () => {
     })
     const channel = makeChannel({
       id: channelId,
-      lastMessage: latestForwardPending
+      lastMessage: makeMessage({
+        id: '900',
+        channelId,
+        body: 'confirmed-start',
+        metadata: {} as any,
+        user: currentUser
+      })
     })
     const messageBuilder = {
       setBody: jest.fn().mockReturnThis(),
@@ -2000,9 +2739,7 @@ describe('message saga message-list flows', () => {
     resolveText(confirmedText)
     await flushAsyncWork()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ tid: latestForwardPending.tid })
-    )
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: confirmedText.id }))
     expect(
       dispatched.some(
         (action) =>
@@ -2011,16 +2748,14 @@ describe('message saga message-list flows', () => {
           action.payload.channelId === channelId &&
           action.payload.config?.lastMessage?.id === confirmedText.id
       )
-    ).toBe(false)
+    ).toBe(true)
 
     expect(channel.sendMessage).toHaveBeenNthCalledWith(2, expect.objectContaining({ tid: attachmentPending.tid }))
 
     resolveAttachment(confirmedAttachment)
     await flushAsyncWork()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ tid: latestForwardPending.tid })
-    )
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: confirmedAttachment.id }))
     expect(
       dispatched.some(
         (action) =>
@@ -2029,7 +2764,7 @@ describe('message saga message-list flows', () => {
           action.payload.channelId === channelId &&
           action.payload.config?.lastMessage?.id === confirmedAttachment.id
       )
-    ).toBe(false)
+    ).toBe(true)
 
     expect(channel.sendMessage).toHaveBeenNthCalledWith(3, expect.objectContaining({ tid: latestForwardPending.tid }))
 
@@ -2048,7 +2783,7 @@ describe('message saga message-list flows', () => {
     ).toBe(true)
   })
 
-  it('keeps the last pending text message as channel last message until that same text message confirms on reconnect', async () => {
+  it('promotes confirmed resend results into channel last message order even while newer pending items still exist', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-text-order'
     const pendingMessages = [1, 2, 3, 4].map((index) =>
@@ -2073,7 +2808,13 @@ describe('message saga message-list flows', () => {
     )
     const channel = makeChannel({
       id: channelId,
-      lastMessage: pendingMessages[3]
+      lastMessage: makeMessage({
+        id: '900000000000000000',
+        channelId,
+        body: 'confirmed-start',
+        metadata: {} as any,
+        user: currentUser
+      })
     })
     const builder = {
       setBody: jest.fn().mockReturnThis(),
@@ -2130,7 +2871,7 @@ describe('message saga message-list flows', () => {
       await flushAsyncWork()
 
       expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-        expect.objectContaining({ tid: pendingMessages[3].tid })
+        expect.objectContaining({ id: confirmedMessages[index].id })
       )
       expect(
         dispatched.some(
@@ -2141,7 +2882,7 @@ describe('message saga message-list flows', () => {
             action.payload.channelId === channelId &&
             action.payload.config?.lastMessage?.id === confirmedMessages[index].id
         )
-      ).toBe(false)
+      ).toBe(true)
     }
 
     resolvers[3](confirmedMessages[3])

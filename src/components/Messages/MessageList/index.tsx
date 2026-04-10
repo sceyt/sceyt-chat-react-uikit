@@ -19,9 +19,6 @@ import {
   openedMessageMenuSelector,
   sendMessageInputHeightSelector,
   scrollToMentionedMessageSelector,
-  scrollToMessageHighlightSelector,
-  scrollToMessageBehaviorSelector,
-  scrollToMessageSelector,
   scrollToNewMessageSelector,
   selectedMessagesMapSelector,
   showScrollToNewMessageButtonSelector,
@@ -445,9 +442,6 @@ const MessageList: React.FC<MessagesProps> = ({
   const selectedMessagesMap = useSelector(selectedMessagesMapSelector)
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
   const scrollToMentionedMessage = useSelector(scrollToMentionedMessageSelector, shallowEqual)
-  const scrollToRepliedMessage = useSelector(scrollToMessageSelector, shallowEqual)
-  const scrollToMessageHighlight = useSelector(scrollToMessageHighlightSelector, shallowEqual)
-  const scrollToMessageBehavior = useSelector(scrollToMessageBehaviorSelector, shallowEqual)
   const browserTabIsActive = useSelector(browserTabIsActiveSelector, shallowEqual)
   const hasNextMessages = useSelector(messagesHasNextSelector, shallowEqual)
   const hasPrevMessages = useSelector(messagesHasPrevSelector, shallowEqual)
@@ -496,9 +490,6 @@ const MessageList: React.FC<MessagesProps> = ({
     connectionStatus,
     scrollToNewMessage,
     scrollToMentionedMessage,
-    scrollToRepliedMessageId: scrollToRepliedMessage,
-    scrollToMessageHighlight,
-    scrollToMessageBehavior,
     showScrollToNewMessageButton,
     unreadScrollTo,
     unreadMessageId,
@@ -752,7 +743,6 @@ const MessageList: React.FC<MessagesProps> = ({
     nextMessage,
     index,
     isUnreadMessage,
-    startsUnreadSection,
     nextMessageStartsUnreadSection,
     isHighlighted
   }: {
@@ -761,7 +751,6 @@ const MessageList: React.FC<MessagesProps> = ({
     nextMessage: IMessage | null
     index: number
     isUnreadMessage: boolean
-    startsUnreadSection: boolean
     nextMessageStartsUnreadSection: boolean
     isHighlighted: boolean
   }) => {
@@ -809,7 +798,6 @@ const MessageList: React.FC<MessagesProps> = ({
           prevMessage={prevMessage as IMessage}
           nextMessage={nextMessage as IMessage}
           isUnreadMessage={isUnreadMessage}
-          startsUnreadSection={startsUnreadSection}
           nextMessageStartsUnreadSection={nextMessageStartsUnreadSection}
           unreadMessageId={unreadMessageId}
           setLastVisibleMessageId={setLastVisibleMessageId}
@@ -1059,7 +1047,6 @@ const MessageList: React.FC<MessagesProps> = ({
                         nextMessage: timelineItem.nextItem,
                         index: timelineItem.index,
                         isUnreadMessage: timelineItem.isUnread && !channel.backToLinkedChannel,
-                        startsUnreadSection: timelineItem.startsUnreadSection && !channel.backToLinkedChannel,
                         nextMessageStartsUnreadSection:
                           timelineItem.nextItemStartsUnreadSection && !channel.backToLinkedChannel,
                         isHighlighted: timelineItem.isHighlighted
@@ -1096,7 +1083,9 @@ const MessageList: React.FC<MessagesProps> = ({
             <StickyDateLabel
               dateDividerFontSize={dateDividerFontSize}
               dateDividerTextColor={dateDividerTextColor || textOnPrimary}
-              dateDividerBackgroundColor={dateDividerBackgroundColor || overlayBackground}
+              dateDividerBackgroundColor={
+                dateDividerBackgroundColor || newMessagesSeparatorBackground || overlayBackground
+              }
               dateDividerBorderRadius={dateDividerBorderRadius}
             >
               <span>{stickyDate}</span>
@@ -1161,8 +1150,9 @@ export const Container = styled.div<{ stopScrolling?: boolean; backgroundColor?:
 
 const MessagesBox = styled.div`
   display: flex;
+  padding-top: 5px;
   flex-direction: column;
-  padding-bottom: 40px;
+  padding-bottom: 6px;
   width: 100%;
   transform: scaleY(-1);
   backface-visibility: hidden;
@@ -1183,22 +1173,22 @@ const StickyDateLabel = styled.div<{
   dateDividerBorderRadius?: string
 }>`
   position: absolute;
-  top: 18px;
+  top: 8px;
   left: 0;
   right: 0;
-  height: 0;
   z-index: 10;
   display: flex;
   justify-content: center;
   align-items: center;
   pointer-events: none;
+  padding-right: 8px;
 
   span {
     display: inline-block;
     font-size: ${(props) => props.dateDividerFontSize || '14px'};
     color: ${(props) => props.dateDividerTextColor};
     background-color: ${(props) =>
-      props.dateDividerBackgroundColor ? `${props.dateDividerBackgroundColor}99` : 'rgba(0,0,0,0.3)'};
+      props.dateDividerBackgroundColor ? `${props.dateDividerBackgroundColor}66` : 'rgba(0,0,0,0.3)'};
     box-sizing: border-box;
     border-radius: ${(props) => props.dateDividerBorderRadius || '14px'};
     padding: 5px 16px;

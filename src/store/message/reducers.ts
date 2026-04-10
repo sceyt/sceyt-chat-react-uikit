@@ -2,6 +2,7 @@ import { createSlice, PayloadAction } from '@reduxjs/toolkit'
 import { IMarker, IMessage, IOGMetadata, IPollVote, IReaction } from '../../types'
 import { DESTROY_SESSION } from '../channel/constants'
 import {
+  comparePendingMessages,
   compareMessagesForList,
   MESSAGE_LOAD_DIRECTION,
   MESSAGES_MAX_PAGE_COUNT,
@@ -15,9 +16,14 @@ import store from 'store'
 import { getPollVotesAC } from './actions'
 
 export interface IMessageStore {
-  messagesLoadingState: number | null
   loadingPrevMessagesState: number | null
   loadingNextMessagesState: number | null
+  activePaginationIntent: {
+    channelId: string
+    direction: 'prev' | 'next'
+    requestId: string
+    anchorId: string
+  } | null
   messagesHasNext: boolean
   messagesHasPrev: boolean
   threadMessagesHasNext: boolean
@@ -42,9 +48,6 @@ export interface IMessageStore {
   showScrollToNewMessageButton: boolean
   sendMessageInputHeight: number
   attachmentsUploadingState: { [key: string]: any }
-  scrollToMessage: string | null
-  scrollToMessageHighlight: boolean
-  scrollToMessageBehavior: 'smooth' | 'instant' | 'auto'
   scrollToMentionedMessage: boolean | null
   reactionsList: IReaction[]
   reactionsHasNext: boolean
@@ -70,12 +73,16 @@ export interface IMessageStore {
   pendingPollActions: { [key: string]: PendingPollAction[] }
   unreadScrollTo: boolean
   unreadMessageId: string
+  stableUnreadAnchor: {
+    channelId: string
+    messageId: string
+  }
 }
 
 const initialState: IMessageStore = {
-  messagesLoadingState: null,
   loadingPrevMessagesState: null,
   loadingNextMessagesState: null,
+  activePaginationIntent: null,
   messagesHasNext: false,
   messagesHasPrev: true,
   threadMessagesHasNext: false,
@@ -100,9 +107,6 @@ const initialState: IMessageStore = {
   sendMessageInputHeight: 0,
   messageForReply: null,
   attachmentsUploadingState: {},
-  scrollToMessage: null,
-  scrollToMessageHighlight: true,
-  scrollToMessageBehavior: 'smooth',
   scrollToMentionedMessage: false,
   reactionsList: [],
   reactionsHasNext: true,
@@ -121,7 +125,11 @@ const initialState: IMessageStore = {
   pollVotesInitialCount: null,
   pendingPollActions: {},
   unreadScrollTo: true,
-  unreadMessageId: ''
+  unreadMessageId: '',
+  stableUnreadAnchor: {
+    channelId: '',
+    messageId: ''
+  }
 }
 
 const isPendingMessage = (message: IMessage) => !message.id && !!message.tid
@@ -182,7 +190,7 @@ const normalizeActiveChannelMessages = (messages: IMessage[], direction?: string
   const confirmedMessages = deduplicatedMessages.filter((message) => !!message.id).sort(compareMessagesForList)
   const pendingMessages = deduplicatedMessages
     .filter((message) => isPendingMessage(message))
-    .sort(compareMessagesForList)
+    .sort(comparePendingMessages)
   const trimmedConfirmedMessages = getTrimmedConfirmedMessages(confirmedMessages, direction)
 
   return [
@@ -205,15 +213,6 @@ const messageSlice = createSlice({
       state.activeChannelMessages = state.activeChannelMessages.filter(
         (msg) => !(msg.id === messageId || msg.tid === messageId)
       )
-    },
-
-    setScrollToMessage: (
-      state,
-      action: PayloadAction<{ messageId: string; highlight: boolean; behavior?: 'smooth' | 'instant' | 'auto' }>
-    ) => {
-      state.scrollToMessage = action.payload.messageId
-      state.scrollToMessageHighlight = action.payload.highlight
-      state.scrollToMessageBehavior = action.payload.behavior || 'smooth'
     },
 
     setScrollToMentionedMessage: (state, action: PayloadAction<{ isScrollToMentionedMessage: boolean }>) => {
@@ -334,6 +333,15 @@ const messageSlice = createSlice({
         state.activeChannelMessages.push(params)
       }
       state.activeChannelMessages = normalizeActiveChannelMessages(state.activeChannelMessages)
+    },
+
+    // Replace messages by ID without merging — used for lightweight cache-refresh patches.
+    // Only messages whose IDs appear in both the patch list and the active list are replaced.
+    patchMessages: (state, action: PayloadAction<{ messages: IMessage[] }>) => {
+      const patchMap = new Map(action.payload.messages.filter((m) => !!m.id).map((m) => [m.id, m]))
+      state.activeChannelMessages = state.activeChannelMessages.map((msg) =>
+        msg.id && patchMap.has(msg.id) ? patchMap.get(msg.id)! : msg
+      )
     },
 
     updateMessageAttachment: (state, action: PayloadAction<{ url: string; attachmentUrl: string }>) => {
@@ -482,16 +490,32 @@ const messageSlice = createSlice({
       state.messageToEdit = action.payload.message
     },
 
-    setMessagesLoadingState: (state, action: PayloadAction<{ state: number | null }>) => {
-      state.messagesLoadingState = action.payload.state
-    },
-
     setLoadingPrevMessagesState: (state, action: PayloadAction<{ state: number | null }>) => {
       state.loadingPrevMessagesState = action.payload.state
     },
 
     setLoadingNextMessagesState: (state, action: PayloadAction<{ state: number | null }>) => {
       state.loadingNextMessagesState = action.payload.state
+    },
+
+    setActivePaginationIntent: (
+      state,
+      action: PayloadAction<{
+        channelId: string
+        direction: 'prev' | 'next'
+        requestId: string
+        anchorId: string
+      }>
+    ) => {
+      state.activePaginationIntent = action.payload
+    },
+
+    clearActivePaginationIntent: (state, action: PayloadAction<{ requestId?: string } | undefined>) => {
+      if (action.payload?.requestId && state.activePaginationIntent?.requestId !== action.payload.requestId) {
+        return
+      }
+
+      state.activePaginationIntent = null
     },
 
     setAttachmentsLoadingState: (state, action: PayloadAction<{ state: number | null; forPopup?: boolean }>) => {
@@ -799,6 +823,9 @@ const messageSlice = createSlice({
     },
     setUnreadMessageId: (state, action: PayloadAction<{ messageId: string }>) => {
       state.unreadMessageId = action.payload.messageId
+    },
+    setStableUnreadAnchor: (state, action: PayloadAction<{ channelId: string; messageId: string }>) => {
+      state.stableUnreadAnchor = action.payload
     }
   },
   extraReducers: (builder) => {
@@ -812,7 +839,6 @@ const messageSlice = createSlice({
 export const {
   addMessage,
   deleteMessageFromList,
-  setScrollToMessage,
   setScrollToMentionedMessage,
   setScrollToNewMessage,
   setShowScrollToNewMessageButton,
@@ -821,6 +847,7 @@ export const {
   addMessages,
   updateMessagesStatus,
   updateMessage,
+  patchMessages,
   updateMessageAttachment,
   addReactionToMessage,
   deleteReactionFromMessage,
@@ -838,9 +865,10 @@ export const {
   updateUploadProgress,
   removeUploadProgress,
   setMessageToEdit,
-  setMessagesLoadingState,
   setLoadingPrevMessagesState,
   setLoadingNextMessagesState,
+  setActivePaginationIntent,
+  clearActivePaginationIntent,
   setAttachmentsLoadingState,
   setSendMessageInputHeight,
   setMessageForReply,
@@ -868,7 +896,8 @@ export const {
   removePendingPollAction,
   setPendingPollActionsMap,
   updatePendingPollAction,
-  setUnreadMessageId
+  setUnreadMessageId,
+  setStableUnreadAnchor
 } = messageSlice.actions
 
 // Export reducer
