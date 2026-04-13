@@ -925,72 +925,75 @@ export function useChatController({
         pendingWindowLoadRef.current = null
         clearJumpBlur()
       }
-      setTimeout(async () => {
-        clearPendingLatestJump()
-        const jumpId = ++currentJumpIdRef.current
-        isJumping.current = true
-        invalidateEdgeDirection('previous')
-        invalidateEdgeDirection('next')
-        const length = messagesRef.current?.length
-        const isLoaded = messagesRef.current.some(
-          (message, index) => index < length - 10 && index > 10 && getMessageLocalRef(message) === itemId
-        )
-        restoreRef.current = {
-          mode: 'reveal-message',
-          messageId: itemId,
-          smooth
-        }
-
-        if (isLoaded) {
-          const container = scrollRef.current
-          const target = container ? getItemElement(container, itemId) : null
-          if (container && target) {
-            lockJumpScrolling(smooth, 'item')
-            restoreRef.current = null
-            viewIsAtLatestRef.current = false
-            setIsViewingLatest(false)
-            scrollItemIntoView(container, target, smooth, true)
-            clearJumpBlur()
+      const length = messagesRef.current?.length
+      const isLoaded = messagesRef.current.some(
+        (message, index) => index < length - 10 && index > 10 && getMessageLocalRef(message) === itemId
+      )
+      setTimeout(
+        async () => {
+          clearPendingLatestJump()
+          const jumpId = ++currentJumpIdRef.current
+          isJumping.current = true
+          invalidateEdgeDirection('previous')
+          invalidateEdgeDirection('next')
+          restoreRef.current = {
+            mode: 'reveal-message',
+            messageId: itemId,
+            smooth
           }
-          setHighlight(itemId)
-          return
-        }
 
-        if (!channelRef.current.id) {
-          return
-        }
-
-        windowLoadScopeRef.current = 'around'
-        setIsLoadingPrevious(true)
-        setIsLoadingNext(true)
-        jumpTargetIdRef.current = itemId
-        setIsJumpingToItem(true)
-
-        try {
-          await beginWindowPagedRequest(() => {
-            dispatch(loadAroundMessageAC(channelRef.current, itemId))
-          })
-
-          // A newer jump has already taken over — don't continue
-          if (jumpId !== currentJumpIdRef.current) {
-            clearJumpBlur()
+          if (isLoaded) {
+            const container = scrollRef.current
+            const target = container ? getItemElement(container, itemId) : null
+            if (container && target) {
+              lockJumpScrolling(smooth, 'item')
+              restoreRef.current = null
+              viewIsAtLatestRef.current = false
+              setIsViewingLatest(false)
+              scrollItemIntoView(container, target, smooth, true)
+              clearJumpBlur()
+            }
+            setHighlight(itemId)
             return
           }
 
-          windowLoadScopeRef.current = null
-          setHighlight(itemId)
-        } finally {
-          // Only reset loading indicators if no newer jump has claimed them.
-          // isJumpingToItem and isJumping.current are cleared by the
-          // IntersectionObserver once the target element becomes visible.
-          if (jumpId === currentJumpIdRef.current) {
-            lockJumpScrolling(smooth, 'item')
-            windowLoadScopeRef.current = null
-            setIsLoadingPrevious(false)
-            setIsLoadingNext(false)
+          if (!channelRef.current.id) {
+            return
           }
-        }
-      }, 50)
+
+          windowLoadScopeRef.current = 'around'
+          setIsLoadingPrevious(true)
+          setIsLoadingNext(true)
+          jumpTargetIdRef.current = itemId
+          setIsJumpingToItem(true)
+
+          try {
+            await beginWindowPagedRequest(() => {
+              dispatch(loadAroundMessageAC(channelRef.current, itemId))
+            })
+
+            // A newer jump has already taken over — don't continue
+            if (jumpId !== currentJumpIdRef.current) {
+              clearJumpBlur()
+              return
+            }
+
+            windowLoadScopeRef.current = null
+            setHighlight(itemId)
+          } finally {
+            // Only reset loading indicators if no newer jump has claimed them.
+            // isJumpingToItem and isJumping.current are cleared by the
+            // IntersectionObserver once the target element becomes visible.
+            if (jumpId === currentJumpIdRef.current) {
+              lockJumpScrolling(smooth, 'item')
+              windowLoadScopeRef.current = null
+              setIsLoadingPrevious(false)
+              setIsLoadingNext(false)
+            }
+          }
+        },
+        isLoaded ? 0 : 50
+      )
     },
     [
       beginWindowPagedRequest,
@@ -1698,7 +1701,7 @@ export function useChatController({
         cachedEdgeRequestRef.current = null
       }
       if (offsetDelta !== 0) {
-        const nextScrollTop = Math.max(LATEST_EDGE_GAP_PX, container.scrollTop + offsetDelta)
+        const nextScrollTop = Math.max(LATEST_EDGE_GAP_PX, container.scrollTop - offsetDelta)
         setScrollTop(container, nextScrollTop, 'auto')
       }
     }
