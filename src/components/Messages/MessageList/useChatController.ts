@@ -1665,7 +1665,7 @@ export function useChatController({
 
       restoreRef.current = null
       if (offsetDelta !== 0) {
-        setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, container.scrollTop + offsetDelta), 'auto')
+        setScrollTop(container, Math.max(LATEST_EDGE_GAP_PX, container.scrollTop - offsetDelta), 'auto')
       }
       return
     }
