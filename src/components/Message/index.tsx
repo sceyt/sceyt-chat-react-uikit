@@ -53,7 +53,7 @@ import MessageStatusAndTime from './MessageStatusAndTime'
 import MessageReactions from './MessageReactions'
 import MessagePopups from './MessagePopups'
 import MessageSelection from './MessageSelection'
-import { scrollToNewMessageSelector, unreadScrollToSelector } from 'store/message/selector'
+import { scrollToNewMessageSelector } from 'store/message/selector'
 import { MESSAGE_TYPE } from 'types/enum'
 import { bodyAttributesToHTML, extractTextFromReactElement, isMessageUnsupported } from 'helpers/message'
 import { copyRichTextToClipboard } from 'helpers/clipboard'
@@ -255,7 +255,6 @@ const Message = ({
     setReportPopupOpen
   } = stateSetters
   const scrollToNewMessage = useSelector(scrollToNewMessageSelector, shallowEqual)
-  const unreadScrollTo = useSelector(unreadScrollToSelector, shallowEqual)
   const messageItemRef = useRef<HTMLDivElement>(null)
   const isVisible = useOnScreen(messageItemRef)
   const reactionsCount = useMemo(() => {
@@ -293,7 +292,7 @@ const Message = ({
     (showMessageStatusForEachMessage || !nextMessage)
 
   const renderAvatar =
-    prevMessageUserID &&
+    !!prevMessageUserID &&
     (prevMessageUserID !== messageUserID || firstMessageInInterval) &&
     !(channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !showSenderNameOnDirectChannel) &&
     !(!message.incoming && !showOwnAvatar)
@@ -502,8 +501,7 @@ const Message = ({
       if (
         message.userMarkers &&
         message.userMarkers.length &&
-        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ) &&
-        !unreadScrollTo
+        message.userMarkers.find((marker) => marker.name === MESSAGE_DELIVERY_STATUS.READ)
       ) {
         if (queueDeliveredMarker) {
           queueDeliveredMarker(channel.id, message.id)
@@ -523,8 +521,7 @@ const Message = ({
       ) &&
       channel.newMessageCount &&
       channel.newMessageCount > 0 &&
-      connectionStatus === CONNECTION_STATUS.CONNECTED &&
-      !unreadScrollTo
+      connectionStatus === CONNECTION_STATUS.CONNECTED
     ) {
       if (queueReadMarker) {
         queueReadMarker(channel.id, message.id)
@@ -541,7 +538,6 @@ const Message = ({
     channel.id,
     channel.newMessageCount,
     connectionStatus,
-    unreadScrollTo,
     queueReadMarker,
     queueDeliveredMarker
   ])
@@ -601,7 +597,7 @@ const Message = ({
   )
 
   useEffect(() => {
-    if (isVisible && !unreadScrollTo) {
+    if (isVisible) {
       if (setLastVisibleMessageId) {
         setLastVisibleMessageId(message)
       }
@@ -626,7 +622,6 @@ const Message = ({
     }
   }, [
     isVisible,
-    unreadScrollTo,
     setLastVisibleMessageId,
     message.id,
     handleSendReadMarker,

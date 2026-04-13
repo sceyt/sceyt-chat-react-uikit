@@ -1273,6 +1273,7 @@ describe('useChatController', () => {
     renderController({
       channel,
       messages: [makeMessage({ id: '990', channelId: channel.id, body: 'window-old' })],
+      hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.CONNECTED,
       dispatch
     })
@@ -1294,6 +1295,7 @@ describe('useChatController', () => {
     renderController({
       channel,
       messages: [makeMessage({ id: '1090', channelId: channel.id, body: 'window-old' })],
+      hasNextMessages: true,
       connectionStatus: CONNECTION_STATUS.DISCONNECTED,
       dispatch
     })
@@ -1303,6 +1305,162 @@ describe('useChatController', () => {
     fireEvent.click(screen.getByTestId('jump-to-latest'))
 
     expect(dispatch).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
+  it('does not pre-scroll stale history before an offline cache-backed jumpToLatest window is applied', async () => {
+    const channelId = 'channel-offline-cached-latest-jump'
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({ id: '999', channelId, body: 'server-latest' })
+    })
+    const deepHistoryMessages = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({
+        id: String(900 + index),
+        channelId,
+        body: `history-${index}`
+      })
+    )
+    const cachedLatestMessages = [
+      makeMessage({ id: '950', channelId, body: 'cached-latest-0' }),
+      makeMessage({ id: '951', channelId, body: 'cached-latest-1' }),
+      makeMessage({ id: '952', channelId, body: 'cached-latest-2' })
+    ]
+    cachedLatestMessages.forEach((message) => addMessageToMap(channelId, message))
+
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: deepHistoryMessages,
+      hasNextMessages: true,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      dispatch
+    })
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 180,
+        scrollHeight: 1800,
+        clientHeight: 240
+      })
+    })
+
+    dispatch.mockClear()
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    expect(dispatch).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+    expect(rendered.scrollable.scrollTop).toBe(180)
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={cachedLatestMessages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.DISCONNECTED}
+        dispatch={dispatch}
+      />
+    )
+    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.getByText('cached-latest-2')).toBeInTheDocument()
+  })
+
+  it('loads true latest after reconnect when an offline jumpToLatest only reached cached latest', async () => {
+    const channelId = 'channel-offline-cached-then-reconnect'
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({ id: '999', channelId, body: 'server-latest' })
+    })
+    const deepHistoryMessages = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({
+        id: String(900 + index),
+        channelId,
+        body: `history-${index}`
+      })
+    )
+    const cachedLatestMessages = [
+      makeMessage({ id: '950', channelId, body: 'cached-latest-0' }),
+      makeMessage({ id: '951', channelId, body: 'cached-latest-1' }),
+      makeMessage({ id: '952', channelId, body: 'cached-latest-2' })
+    ]
+    const serverLatestMessages = [
+      makeMessage({ id: '998', channelId, body: 'server-latest-0' }),
+      makeMessage({ id: '999', channelId, body: 'server-latest-1' })
+    ]
+    cachedLatestMessages.forEach((message) => addMessageToMap(channelId, message))
+
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: deepHistoryMessages,
+      hasNextMessages: true,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      dispatch
+    })
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, {
+        scrollTop: 180,
+        scrollHeight: 1800,
+        clientHeight: 240
+      })
+    })
+
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={cachedLatestMessages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.DISCONNECTED}
+        dispatch={dispatch}
+      />
+    )
+    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    dispatch.mockClear()
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={cachedLatestMessages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+      />
+    )
+
+    await flushEffects()
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel))
+
+    rendered.rerender(
+      <ControllerHarness
+        channel={channel}
+        messages={serverLatestMessages}
+        hasNextMessages={false}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
+        dispatch={dispatch}
+      />
+    )
+    layoutTimeline(rendered.scrollable, { scrollHeight: 800 })
+
+    await flushEffects()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.getByText('server-latest-1')).toBeInTheDocument()
   })
 
   it('jumps to the latest edge after reloading an offline window whose latest message is pending', async () => {
@@ -3654,7 +3812,7 @@ describe('useChatController', () => {
     )
   })
 
-  it('loads around a replied message when it is outside the current window', () => {
+  it('loads around a replied message when it is outside the current window', async () => {
     const channel = makeChannel({
       id: 'channel-replied-scroll'
     })
@@ -3672,7 +3830,17 @@ describe('useChatController', () => {
     })
 
     dispatch.mockClear()
-    fireEvent.click(screen.getByTestId('jump-to-item'))
+    jest.useFakeTimers()
+    try {
+      fireEvent.click(screen.getByTestId('jump-to-item'))
+
+      await act(async () => {
+        jest.advanceTimersByTime(60)
+        await Promise.resolve()
+      })
+    } finally {
+      jest.useRealTimers()
+    }
 
     expect(dispatch).toHaveBeenCalledWith(loadAroundMessageAC(channel, '999'))
   })
@@ -3969,7 +4137,7 @@ describe('useChatController', () => {
       messages: deepHistoryMessages,
       hasPrevMessages: true,
       hasNextMessages: true,
-      connectionStatus: CONNECTION_STATUS.DISCONNECTED,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
       dispatch
     })
 
@@ -4008,7 +4176,7 @@ describe('useChatController', () => {
         messages={latestMessages}
         hasPrevMessages={true}
         hasNextMessages={false}
-        connectionStatus={CONNECTION_STATUS.DISCONNECTED}
+        connectionStatus={CONNECTION_STATUS.CONNECTED}
         dispatch={dispatch}
       />
     )
@@ -4351,13 +4519,13 @@ describe('useChatController', () => {
   })
 
   it('clamps the latest edge gap when the scroll position drifts too close to the latest boundary', () => {
+    const confirmedOlder = makeMessage({ id: '610', channelId: 'channel-latest-gap-clamp', body: 'confirmed-610' })
+    const confirmedLatest = makeMessage({ id: '611', channelId: 'channel-latest-gap-clamp', body: 'confirmed-611' })
     const channel = makeChannel({
-      id: 'channel-latest-gap-clamp'
+      id: 'channel-latest-gap-clamp',
+      lastMessage: confirmedLatest
     })
-    const messages = [
-      makeMessage({ id: '610', channelId: channel.id, body: 'confirmed-610' }),
-      makeMessage({ id: '611', channelId: channel.id, body: 'confirmed-611' })
-    ]
+    const messages = [confirmedOlder, confirmedLatest]
     const { scrollable, dispatch } = renderController({
       channel,
       messages,
@@ -4377,6 +4545,94 @@ describe('useChatController', () => {
 
     expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
     expect(dispatch).not.toHaveBeenCalled()
+  })
+
+  it('treats a hidden offline pending tail as next content when returning to the latest confirmed edge', () => {
+    const channel = makeChannel({
+      id: 'channel-hidden-pending-tail'
+    })
+    const confirmedOlder = makeMessage({ id: '615', channelId: channel.id, body: 'confirmed-615' })
+    const confirmedLatest = makeMessage({ id: '616', channelId: channel.id, body: 'confirmed-616' })
+    const pendingTail = makePendingMessage({
+      channelId: channel.id,
+      body: 'pending-tail',
+      createdAt: new Date('2026-04-03T12:05:00.000Z')
+    })
+
+    addMessageToMap(channel.id, confirmedOlder)
+    addMessageToMap(channel.id, confirmedLatest)
+    addMessageToMap(channel.id, pendingTail)
+    setActiveSegment(channel.id, confirmedOlder.id, confirmedLatest.id)
+
+    const { scrollable, dispatch } = renderController({
+      channel,
+      messages: [confirmedOlder, confirmedLatest],
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 800,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(dispatch).toHaveBeenCalledWith(addMessagesAC([pendingTail], MESSAGE_LOAD_DIRECTION.NEXT))
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
+    )
+  })
+
+  it('paginates through a pending tail that spans more than one page', () => {
+    const channel = makeChannel({
+      id: 'channel-multi-page-pending-tail'
+    })
+    const confirmedOlder = makeMessage({ id: '700', channelId: channel.id, body: 'confirmed-700' })
+    const confirmedLatest = makeMessage({ id: '701', channelId: channel.id, body: 'confirmed-701' })
+    const pendingMessages = Array.from({ length: LOAD_MAX_MESSAGE_COUNT + 5 }, (_, index) =>
+      makePendingMessage({
+        channelId: channel.id,
+        body: `pending-${index}`,
+        createdAt: new Date(`2026-04-03T12:${String(index).padStart(2, '0')}:00.000Z`)
+      })
+    )
+    const firstPendingPage = pendingMessages.slice(0, LOAD_MAX_MESSAGE_COUNT)
+    const secondPendingPage = pendingMessages.slice(LOAD_MAX_MESSAGE_COUNT)
+
+    addMessageToMap(channel.id, confirmedOlder)
+    addMessageToMap(channel.id, confirmedLatest)
+    pendingMessages.forEach((message) => addMessageToMap(channel.id, message))
+    setActiveSegment(channel.id, confirmedOlder.id, confirmedLatest.id)
+
+    const { scrollable, dispatch } = renderController({
+      channel,
+      messages: [confirmedOlder, confirmedLatest, ...firstPendingPage],
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 1400,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(dispatch).toHaveBeenCalledWith(addMessagesAC(secondPendingPage, MESSAGE_LOAD_DIRECTION.NEXT))
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
+    )
   })
 
   it('still loads the next page when a fast scroll crosses below the latest edge gap', () => {

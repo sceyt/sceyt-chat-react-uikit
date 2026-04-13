@@ -17,6 +17,7 @@ import {
   setMessageToVisibleMessagesMap,
   setActiveSegment
 } from '../../helpers/messagesHalper'
+import { IMessage } from '../../types'
 import {
   makeChannel,
   makeMessage,
@@ -254,7 +255,7 @@ describe('event message last-message handling', () => {
 
     expect(dispatched).toEqual(expect.arrayContaining([addMessagesAC([incomingMessage], 'next')]))
     expect(navigateToLatest).toHaveBeenCalledWith(true)
-    expect(getContiguousNextMessages(channelId, '902', 10).map((message) => message.id)).toEqual(['903'])
+    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual(['903'])
     expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
   })
 
@@ -312,7 +313,7 @@ describe('event message last-message handling', () => {
     expect(navigateToLatest).not.toHaveBeenCalled()
   })
 
-  it('does not extend the cached latest segment when the active window still has newer confirmed pages', async () => {
+  it('extends the cached latest segment for a real incoming message even when the user is reading history', async () => {
     const channelId = 'channel-event-segment-has-next'
     const incomingMessage = makeMessage({
       id: '903',
@@ -362,8 +363,8 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, '902', 10)).toEqual([])
-    expect(getActiveSegment()).toEqual({ startId: '900', endId: '902' })
+    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual(['903'])
+    expect(getActiveSegment()).toEqual({ startId: '900', endId: '903' })
   })
 
   it('extends an inactive channel cached latest segment when a background message arrives after the cached latest edge', async () => {
@@ -409,7 +410,7 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, '952', 10).map((message) => message.id)).toEqual(['953'])
+    expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10).map((message) => message.id)).toEqual(['953'])
   })
 
   it('does not extend an inactive channel cached segment when the cached range is not the channel latest edge', async () => {
@@ -454,6 +455,6 @@ describe('event message last-message handling', () => {
       { user: { id: incomingMessage.user.id } }
     ).toPromise()
 
-    expect(getContiguousNextMessages(channelId, '952', 10)).toEqual([])
+    expect(getContiguousNextMessages(channelId, { id: '952' } as IMessage, 10)).toEqual([])
   })
 })

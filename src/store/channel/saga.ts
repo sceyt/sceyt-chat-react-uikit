@@ -967,6 +967,7 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
+  console.log(messageIds, 'messageIds')
   const connectionStatus = store.getState().UserReducer.connectionStatus
   if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
     return

@@ -480,6 +480,12 @@ const addPendingMessage = (message: any, messageCopy: IMessage, channelId: strin
     parentMessage: message.parentMessage
   }
   addMessageToMap(channelId, messageToAdd)
+  if (getActiveChannelId() === channelId) {
+    store.dispatch(updateChannelLastMessageAC(messageToAdd, { id: channelId } as IChannel))
+  }
+  store.dispatch(updateChannelLastMessageAC(messageToAdd, { id: channelId } as IChannel))
+  updateChannelLastMessageOnAllChannels(channelId, messageToAdd)
+  store.dispatch(addMessagesAC([messageToAdd], 'next'))
 }
 
 const addConfirmedMessageToCache = (channelId: string, message: IMessage) => {
@@ -2331,8 +2337,12 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
       let currentFromId = request.fromMessageId
       for (let i = 0; i < request.pages; i++) {
         if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
-          if (hasPrevContiguousInMap(channelId, currentFromId)) {
-            const cached = getContiguousPrevMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+          if (hasPrevContiguousInMap(channelId, { id: currentFromId } as IMessage)) {
+            const cached = getContiguousPrevMessages(
+              channelId,
+              { id: currentFromId } as IMessage,
+              LOAD_MAX_MESSAGE_COUNT_PREFETCH
+            )
             if (cached.length > 0) {
               currentFromId = cached[0].id
               continue
@@ -2365,8 +2375,12 @@ function* prefetchMessages(channelId: string, fromMessageId: string, direction: 
           currentFromId = result.messages[0].id
           if (!result.hasNext) break
         } else {
-          if (hasNextContiguousInMap(channelId, currentFromId)) {
-            const cached = getContiguousNextMessages(channelId, currentFromId, LOAD_MAX_MESSAGE_COUNT_PREFETCH)
+          if (hasNextContiguousInMap(channelId, { id: currentFromId } as IMessage)) {
+            const cached = getContiguousNextMessages(
+              channelId,
+              { id: currentFromId } as IMessage,
+              LOAD_MAX_MESSAGE_COUNT_PREFETCH
+            )
             if (cached.length > 0) {
               currentFromId = cached[cached.length - 1].id
               continue
@@ -2447,14 +2461,14 @@ function* loadMoreMessages(action: IAction): any {
 
     if (direction === MESSAGE_LOAD_DIRECTION.PREV) {
       // Segment-map cache: check if the map has contiguous messages before messageId
-      let mapCached = getContiguousPrevMessages(channelId, messageId, limit || 30)
+      let mapCached = getContiguousPrevMessages(channelId, { id: messageId } as IMessage, limit || 30)
       if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
         yield call(waitForPrefetchCompletion, prefetchKey)
-        mapCached = getContiguousPrevMessages(channelId, messageId, limit || 30)
+        mapCached = getContiguousPrevMessages(channelId, { id: messageId } as IMessage, limit || 30)
       }
       if (mapCached.length > 0) {
         result.messages = mapCached
-        const aheadCached = getContiguousPrevMessages(channelId, mapCached[0].id, LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
+        const aheadCached = getContiguousPrevMessages(channelId, mapCached[0], LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
         nextHasPrevState = aheadCached.length > 0 || hasNext
         const pagesToFetch = 2 - Math.floor(aheadCached.length / LOAD_MAX_MESSAGE_COUNT_PREFETCH)
         if (pagesToFetch > 0 && hasNext) {
@@ -2482,7 +2496,7 @@ function* loadMoreMessages(action: IAction): any {
             MESSAGE_LOAD_DIRECTION.PREV
           )
           yield spawn(prefetchMessages, channelId, result.messages[0].id, MESSAGE_LOAD_DIRECTION.PREV, 2)
-          result.messages = getContiguousPrevMessages(channelId, messageId, limit || 30)
+          result.messages = getContiguousPrevMessages(channelId, { id: messageId } as IMessage, limit || 30)
         }
         nextHasPrevState = result.hasNext
       }
@@ -2494,16 +2508,17 @@ function* loadMoreMessages(action: IAction): any {
       }
     } else {
       // Segment-map cache: check if the map has contiguous messages after messageId
-      let mapCached = getContiguousNextMessages(channelId, messageId, limit || 30)
+      let mapCached = getContiguousNextMessages(channelId, { id: messageId } as IMessage, limit || 30)
       if (!mapCached.length && hasNext && prefetchInFlight.has(prefetchKey)) {
         yield call(waitForPrefetchCompletion, prefetchKey)
-        mapCached = getContiguousNextMessages(channelId, messageId, limit || 30)
+        mapCached = getContiguousNextMessages(channelId, { id: messageId } as IMessage, limit || 30)
       }
       if (mapCached.length > 0) {
         result.messages = mapCached
-        const lastConfirmedId = [...mapCached].reverse().find((m) => !!m.id)?.id
-        const aheadCached = lastConfirmedId
-          ? getContiguousNextMessages(channelId, lastConfirmedId, LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
+        const lastConfirmedMsg = [...mapCached].reverse().find((m) => !!m.id)
+        const lastConfirmedId = lastConfirmedMsg?.id
+        const aheadCached = lastConfirmedMsg
+          ? getContiguousNextMessages(channelId, lastConfirmedMsg, LOAD_MAX_MESSAGE_COUNT_PREFETCH * 2)
           : []
         const confirmedAheadCount = aheadCached.filter((m) => !!m.id).length
         const hasCachedNext = confirmedAheadCount > 0
@@ -2546,7 +2561,7 @@ function* loadMoreMessages(action: IAction): any {
             MESSAGE_LOAD_DIRECTION.NEXT,
             2
           )
-          result.messages = getContiguousNextMessages(channelId, messageId, limit || 30)
+          result.messages = getContiguousNextMessages(channelId, { id: messageId } as IMessage, limit || 30)
         }
         reachedLatestConfirmedEdge = !result.hasNext
         nextHasNextState = result.hasNext

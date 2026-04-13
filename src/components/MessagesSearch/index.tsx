@@ -586,7 +586,7 @@ const GroupLabel = styled.div<{ color: string; backgroundColor: string }>`
   font-weight: 500;
   font-size: 13px;
   line-height: 16px;
-  letter-spacing: 0px;
+  user-select: none;
 `
 
 const ResultItem = styled.div<{ hoverBackground: string; isActive: boolean }>`

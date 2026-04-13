@@ -285,47 +285,72 @@ export const compareMessageIds = (leftId?: string | null, rightId?: string | nul
 }
 
 /**
- * Returns up to `limit` cached messages contiguous with and immediately before `fromMessageId`
- * within the loaded segment that contains `fromMessageId`. Returns [] if there is a gap.
+ * Returns up to `limit` cached messages contiguous with and immediately before `fromMessage`
+ * within the loaded segment that contains `fromMessage`. Returns [] if there is a gap.
  */
-export function getContiguousPrevMessages(channelId: string, fromMessageId: string, limit: number): IMessage[] {
+export function getContiguousPrevMessages(channelId: string, fromMessage: IMessage, limit: number): IMessage[] {
   const segments = loadedSegmentsMap[channelId] || []
-  const bigFrom = BigInt(fromMessageId)
-  const seg = segments.find((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) >= bigFrom)
-  if (!seg || BigInt(seg.startId) >= bigFrom) return []
+  const fromKey = getMessageSortKey(fromMessage)
+  const seg = segments.find((s) => BigInt(s.startId) <= fromKey && BigInt(s.endId) >= fromKey)
+  if (!seg || BigInt(seg.startId) >= fromKey) return []
   return Object.values(messagesMap[channelId] || {})
-    .filter((msg) => msg.id && BigInt(msg.id) >= BigInt(seg.startId) && BigInt(msg.id) < bigFrom)
+    .filter((msg) => msg.id && BigInt(msg.id) >= BigInt(seg.startId) && BigInt(msg.id) < fromKey)
     .sort(compareMessagesForList)
     .slice(-limit)
 }
 
 /**
- * Returns up to `limit` cached messages contiguous with and immediately after `fromMessageId`
- * within the loaded segment that contains `fromMessageId`. Returns [] if there is a gap.
+ * Returns up to `limit` cached messages contiguous with and immediately after `fromMessage`
+ * within the loaded segment that contains `fromMessage`. Returns [] if there is a gap.
+ * When `includePending` is true, also includes pending messages that sit beyond the latest
+ * confirmed segment edge (they have no numeric id yet but are in the messages map by tid).
  */
-export function getContiguousNextMessages(channelId: string, fromMessageId: string, limit: number): IMessage[] {
+export function getContiguousNextMessages(
+  channelId: string,
+  fromMessage: IMessage,
+  limit: number,
+  includePending = false
+): IMessage[] {
   const segments = loadedSegmentsMap[channelId] || []
-  const bigFrom = BigInt(fromMessageId)
-  const seg = segments.find((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) >= bigFrom)
-  if (!seg || BigInt(seg.endId) <= bigFrom) return []
-  return Object.values(messagesMap[channelId] || {})
-    .filter((msg) => msg.id && BigInt(msg.id) > bigFrom && BigInt(msg.id) <= BigInt(seg.endId))
+  const fromKey = getMessageSortKey(fromMessage)
+  const seg = segments.find((s) => BigInt(s.startId) <= fromKey && BigInt(s.endId) >= fromKey)
+  const pendingMessages = Object.values(messagesMap[channelId] || {})
+    .filter((msg) => !msg.id && !!msg.tid)
     .sort(compareMessagesForList)
-    .slice(0, limit)
+
+  if (!seg) {
+    if (!includePending || fromMessage.id) {
+      return []
+    }
+
+    return pendingMessages.filter((msg) => getMessageSortKey(msg) > fromKey).slice(0, limit)
+  }
+  const segEnd = BigInt(seg.endId)
+  const confirmedMessages = Object.values(messagesMap[channelId] || {}).filter(
+    (msg) => msg.id && BigInt(msg.id) > fromKey && BigInt(msg.id) <= segEnd
+  )
+  if (!includePending) {
+    if (segEnd <= fromKey) return []
+    return confirmedMessages.sort(compareMessagesForList).slice(0, limit)
+  }
+  const latestSeg = segments[segments.length - 1]
+  const pendingTailMessages = seg.endId === latestSeg?.endId ? pendingMessages : []
+  if (!confirmedMessages.length && !pendingTailMessages.length) return []
+  return [...confirmedMessages, ...pendingTailMessages].sort(compareMessagesForList).slice(0, limit)
 }
 
-/** True if the map has contiguous messages before `fromMessageId` in the same segment. */
-export function hasPrevContiguousInMap(channelId: string, fromMessageId: string): boolean {
+/** True if the map has contiguous messages before `fromMessage` in the same segment. */
+export function hasPrevContiguousInMap(channelId: string, fromMessage: IMessage): boolean {
   const segments = loadedSegmentsMap[channelId] || []
-  const bigFrom = BigInt(fromMessageId)
-  return segments.some((s) => BigInt(s.startId) < bigFrom && BigInt(s.endId) >= bigFrom)
+  const fromKey = getMessageSortKey(fromMessage)
+  return segments.some((s) => BigInt(s.startId) < fromKey && BigInt(s.endId) >= fromKey)
 }
 
-/** True if the map has contiguous messages after `fromMessageId` in the same segment. */
-export function hasNextContiguousInMap(channelId: string, fromMessageId: string): boolean {
+/** True if the map has contiguous messages after `fromMessage` in the same segment. */
+export function hasNextContiguousInMap(channelId: string, fromMessage: IMessage): boolean {
   const segments = loadedSegmentsMap[channelId] || []
-  const bigFrom = BigInt(fromMessageId)
-  return segments.some((s) => BigInt(s.startId) <= bigFrom && BigInt(s.endId) > bigFrom)
+  const fromKey = getMessageSortKey(fromMessage)
+  return segments.some((s) => BigInt(s.startId) <= fromKey && BigInt(s.endId) > fromKey)
 }
 
 export function getCachedNearMessages(
@@ -518,7 +543,8 @@ export const shouldReplaceLastMessage = (
   return compareMessagesForList(nextLastMessage, currentLastMessage) >= 0
 }
 
-export const getFirstConfirmedMessageId = (messages: IMessage[]) => messages.find((message) => !!message.id)?.id || ''
+export const getFirstConfirmedMessageId = (messages: IMessage[]) =>
+  messages.find((message) => !!message.id)?.id || undefined
 
 export const getLastConfirmedMessageId = (messages: IMessage[]) => {
   for (let index = messages.length - 1; index >= 0; index--) {
@@ -527,6 +553,15 @@ export const getLastConfirmedMessageId = (messages: IMessage[]) => {
     }
   }
   return ''
+}
+
+export const getFirstConfirmedMessage = (messages: IMessage[]): IMessage | undefined => messages.find((m) => !!m.id)
+
+export const getLastConfirmedMessage = (messages: IMessage[]): IMessage | undefined => {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i]?.id || messages[i]?.tid) return messages[i]
+  }
+  return undefined
 }
 
 export const getClosestConfirmedMessageId = (
@@ -566,6 +601,20 @@ export function getLatestMessagesFromMap(channelId: string, limit: number): IMes
     .filter((m) => !!m.id || m.tid)
     .sort(compareMessagesForList)
     .slice(-limit)
+}
+
+export function getLatestCachedConfirmedMessageId(channelId: string): string {
+  const latestSegment = loadedSegmentsMap[channelId]?.at(-1)
+  if (latestSegment?.endId) {
+    return latestSegment.endId
+  }
+
+  const latestConfirmedMessage = Object.values(messagesMap[channelId] || {})
+    .filter((message): message is IMessage => !!message.id)
+    .sort(compareMessagesForList)
+    .at(-1)
+
+  return latestConfirmedMessage?.id || ''
 }
 
 export function setMessagesToMap(

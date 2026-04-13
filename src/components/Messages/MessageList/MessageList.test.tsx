@@ -21,7 +21,7 @@ import {
   setUnreadMessageIdAC,
   updateMessageAC
 } from '../../../store/message/actions'
-import { MESSAGE_LOAD_DIRECTION } from '../../../helpers/messagesHalper'
+import { addMessageToMap, MESSAGE_LOAD_DIRECTION, setActiveSegment } from '../../../helpers/messagesHalper'
 import { LOADING_STATE, MESSAGE_DELIVERY_STATUS } from '../../../helpers/constants'
 import {
   createMessageListStore,
@@ -1302,6 +1302,79 @@ describe('MessageList', () => {
     expect(screen.getAllByTestId('message-row').at(-1)?.textContent).toBe('pending-tail')
   })
 
+  it('paginates through multiple offline pending pages while manually scrolling toward latest', async () => {
+    const channelId = 'channel-roundtrip-history-multi-pending'
+    const confirmedBeforeLatest = makeMessage({
+      id: '1099',
+      channelId,
+      body: 'confirmed-before-latest'
+    })
+    const confirmedLatest = makeMessage({
+      id: '1100',
+      channelId,
+      body: 'confirmed-latest'
+    })
+    const pendingMessages = Array.from({ length: 25 }, (_, index) =>
+      makePendingMessage({
+        channelId,
+        body: `pending-tail-${index}`,
+        createdAt: new Date(`2026-04-01T13:${String(index).padStart(2, '0')}:00.000Z`)
+      })
+    )
+    const firstPendingPage = pendingMessages.slice(0, 20)
+    const secondPendingPage = pendingMessages.slice(20)
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: confirmedLatest
+    })
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: [confirmedBeforeLatest, confirmedLatest, ...firstPendingPage],
+        messagesHasPrev: true,
+        messagesHasNext: false,
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+
+    addMessageToMap(channelId, confirmedBeforeLatest)
+    addMessageToMap(channelId, confirmedLatest)
+    pendingMessages.forEach((message) => addMessageToMap(channelId, message))
+    setActiveSegment(channelId, confirmedBeforeLatest.id, confirmedLatest.id)
+
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+
+    expect(screen.queryByText('pending-tail-24')).not.toBeInTheDocument()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 2,
+        scrollHeight: 1600,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    secondPendingPage.forEach((message) => {
+      expect(screen.getByText(message.body)).toBeInTheDocument()
+    })
+    expect(screen.getAllByTestId('message-row').at(-1)?.textContent).toBe('pending-tail-24')
+  })
+
   it('removes the duplicate pending message when the confirmed echo arrives', () => {
     const channelId = 'channel-confirm'
     const confirmedBase = makeMessage({
@@ -1419,6 +1492,106 @@ describe('MessageList', () => {
     fireEvent.click(screen.getByTestId('scroll-to-bottom'))
 
     expect(dispatchSpy).toHaveBeenCalledWith(loadDefaultMessagesAC(channel))
+  })
+
+  it('shows cached latest offline first, then loads true latest after reconnect when newer messages were not cached', async () => {
+    const channelId = 'channel-scroll-button-offline-cache-then-server'
+    const channel = makeChannel({
+      id: channelId,
+      lastMessage: makeMessage({ id: '999', channelId, body: 'server-latest' })
+    })
+    const deepHistoryMessages = Array.from({ length: 40 }, (_, index) =>
+      makeMessage({
+        id: String(900 + index),
+        channelId,
+        body: `history-${index}`
+      })
+    )
+    const cachedLatestMessages = [
+      makeMessage({ id: '950', channelId, body: 'cached-latest-0' }),
+      makeMessage({ id: '951', channelId, body: 'cached-latest-1' }),
+      makeMessage({ id: '952', channelId, body: 'cached-latest-2' })
+    ]
+    const serverLatestMessages = [
+      makeMessage({ id: '998', channelId, body: 'server-latest-0' }),
+      makeMessage({ id: '999', channelId, body: 'server-latest-1' })
+    ]
+
+    cachedLatestMessages.forEach((message) => addMessageToMap(channelId, message))
+
+    const store = createMessageListStore({
+      ChannelReducer: {
+        activeChannel: channel
+      },
+      MessageReducer: {
+        activeChannelMessages: deepHistoryMessages,
+        showScrollToNewMessageButton: true,
+        messagesHasNext: true,
+        loadingPrevMessagesState: LOADING_STATE.LOADED,
+        loadingNextMessagesState: LOADING_STATE.LOADED
+      },
+      UserReducer: {
+        connectionStatus: CONNECTION_STATUS.DISCONNECTED
+      }
+    })
+    const delayedDispatch = attachDelayedServerToMessageListStore(store, {
+      onLoadDefault: () => ({
+        messages: cachedLatestMessages,
+        hasNext: false
+      }),
+      onLoadLatest: () => ({
+        messages: serverLatestMessages,
+        hasNext: false
+      })
+    })
+
+    const rendered = renderMessageList(store)
+    const scrollable = rendered.container.querySelector('#scrollableDiv') as HTMLDivElement
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 180,
+        scrollHeight: 2600,
+        clientHeight: 240
+      })
+    })
+
+    delayedDispatch.mockClear()
+    fireEvent.click(screen.getByTestId('scroll-to-bottom'))
+
+    expect(
+      delayedDispatch.mock.calls.some(([action]: [any]) => action.type === loadDefaultMessagesAC(channel).type)
+    ).toBe(true)
+    expect(scrollable.scrollTop).toBe(180)
+
+    await flushMockServerDelay()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.getByText('cached-latest-2')).toBeInTheDocument()
+
+    delayedDispatch.mockClear()
+    act(() => {
+      store.dispatch(setConnectionStatusAC(CONNECTION_STATUS.CONNECTED))
+    })
+
+    await act(async () => {
+      await Promise.resolve()
+    })
+
+    expect(
+      delayedDispatch.mock.calls.some(([action]: [any]) => action.type === loadLatestMessagesAC(channel).type)
+    ).toBe(true)
+
+    await flushMockServerDelay()
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+    expect(screen.getByText('server-latest-1')).toBeInTheDocument()
   })
 
   it('shows the total unread count even when only part of the unread range is loaded', () => {

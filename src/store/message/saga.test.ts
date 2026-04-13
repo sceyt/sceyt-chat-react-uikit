@@ -62,6 +62,7 @@ import {
 import { updateChannelDataAC, updateChannelLastMessageAC } from '../channel/actions'
 import { __messageSagaTestables, __resetMessageSagaTestState } from './saga'
 import { navigateToLatest } from '../../helpers/messageListNavigator'
+import { IMessage } from '../../types'
 
 const mockStoreState = {
   ChannelReducer: {
@@ -975,7 +976,7 @@ describe('message saga message-list flows', () => {
 
     await prevTask.toPromise()
 
-    expect(getContiguousPrevMessages(channelId, '900', 20).map((message) => message.id)).toEqual(['898', '899'])
+    expect(getContiguousPrevMessages(channelId, { id: '900' } as IMessage, 20).map((message) => message.id)).toEqual(['898', '899'])
     expect(dispatched.some((action) => action.type === addMessagesAC([], MESSAGE_LOAD_DIRECTION.PREV).type)).toBe(false)
     expect(dispatched.some((action) => action.type === setMessagesHasPrevAC(true).type)).toBe(false)
     expect(dispatched.some((action) => action.type === setMessagesHasNextAC(true).type)).toBe(false)
@@ -1369,13 +1370,13 @@ describe('message saga message-list flows', () => {
     await runMessageSaga(__messageSagaTestables.prefetchMessages, channelId, '900', MESSAGE_LOAD_DIRECTION.PREV, 1)
 
     expect(query.loadPreviousMessageId).toHaveBeenCalledWith('900')
-    expect(getContiguousPrevMessages(channelId, '900', 10).map((message) => message.id)).toEqual(['898', '899'])
+    expect(getContiguousPrevMessages(channelId, { id: '900' } as IMessage, 10).map((message) => message.id)).toEqual(['898', '899'])
     expect(getActiveSegment()).toEqual({ startId: '898', endId: '902' })
 
     await runMessageSaga(__messageSagaTestables.prefetchMessages, channelId, '902', MESSAGE_LOAD_DIRECTION.NEXT, 1)
 
     expect(query.loadNextMessageId).toHaveBeenCalledWith('902')
-    expect(getContiguousNextMessages(channelId, '902', 10).map((message) => message.id)).toEqual(['903', '904'])
+    expect(getContiguousNextMessages(channelId, { id: '902' } as IMessage, 10).map((message) => message.id)).toEqual(['903', '904'])
     expect(getActiveSegment()).toEqual({ startId: '898', endId: '904' })
   })
 
@@ -1407,7 +1408,7 @@ describe('message saga message-list flows', () => {
     )
 
     expect(query.loadNextMessageId).toHaveBeenCalledWith('900')
-    expect(getContiguousNextMessages(channelId, '900', 10).map((message) => message.body)).toEqual([
+    expect(getContiguousNextMessages(channelId, { id: '900' } as IMessage, 10).map((message) => message.body)).toEqual([
       'refreshed-visible',
       'prefetched-next'
     ])
@@ -1491,7 +1492,7 @@ describe('message saga message-list flows', () => {
 
     expect(query.loadPreviousMessageId).toHaveBeenNthCalledWith(1, '900')
     expect(query.loadPreviousMessageId).toHaveBeenNthCalledWith(2, '898')
-    expect(getContiguousPrevMessages(channelId, '900', 10).map((message) => message.id)).toEqual([
+    expect(getContiguousPrevMessages(channelId, { id: '900' } as IMessage, 10).map((message) => message.id)).toEqual([
       '896',
       '897',
       '898',
@@ -1747,7 +1748,7 @@ describe('message saga message-list flows', () => {
     expect(getPendingMessagesFromMap(channel.id)).toEqual([])
     expect(getMessageFromMap(channel.id, '601')).toEqual(expect.objectContaining({ id: '601', tid: 'local-tid' }))
     expect(getMessageFromMap(channel.id, 'local-tid')).toEqual(expect.objectContaining({ id: '601' }))
-    expect(getContiguousNextMessages(channel.id, '600', 10).map((message) => message.id)).toEqual(['601'])
+    expect(getContiguousNextMessages(channel.id, { id: '600' } as IMessage, 10).map((message) => message.id)).toEqual(['601'])
     expect(getActiveSegment()).toEqual({ startId: '598', endId: '601' })
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: '601', body: 'hello world' })
@@ -2178,7 +2179,7 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, '712')).toEqual(
       expect.objectContaining({ id: '712', tid: createdMessage.tid })
     )
-    expect(getContiguousNextMessages(channel.id, '711', 10).map((message) => message.id)).toEqual(['712'])
+    expect(getContiguousNextMessages(channel.id, { id: '711' } as IMessage, 10).map((message) => message.id)).toEqual(['712'])
     expect(getActiveSegment()).toEqual({ startId: '709', endId: '712' })
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: '712', body: 'photo connected' })
@@ -2358,7 +2359,7 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, '722')).toEqual(
       expect.objectContaining({ id: '722', tid: createdForward.tid })
     )
-    expect(getContiguousNextMessages(channel.id, '721', 10).map((message) => message.id)).toEqual(['722'])
+    expect(getContiguousNextMessages(channel.id, { id: '721' } as IMessage, 10).map((message) => message.id)).toEqual(['722'])
     expect(getActiveSegment()).toEqual({ startId: '719', endId: '722' })
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: '722', body: 'forward body' })

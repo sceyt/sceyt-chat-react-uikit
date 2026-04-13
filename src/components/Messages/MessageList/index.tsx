@@ -565,7 +565,7 @@ const MessageList: React.FC<MessagesProps> = ({
     }
 
     if (channel.lastMessage.id && String(channel.lastMessage.user.id) !== currentUserId) {
-      dispatch(markMessagesAsReadAC(channel.id, [channel.lastMessage.id]))
+      markerBatcherRef.current?.enqueueRead(channel.id, channel.lastMessage.id)
     }
 
     jumpToLatest(true)

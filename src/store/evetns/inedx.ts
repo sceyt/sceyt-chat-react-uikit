@@ -209,11 +209,7 @@ export function* handleChannelMessageEvent(args: { channel: IChannel; message: I
     lastReactedMessage: null,
     ...(shouldUpdateLastMessage && resolvedLastMessage ? { lastMessage: resolvedLastMessage } : {})
   }
-  if (channel.id === activeChannelId) {
-    if (!store.getState().MessageReducer.messagesHasNext) {
-      appendMessageToLatestSegment(channel.id, message.id)
-    }
-  } else if (storedChannel?.lastMessage?.id) {
+  if (storedChannel?.lastMessage?.id) {
     appendMessageToLatestSegment(channel.id, message.id, storedChannel.lastMessage.id)
   }
   yield put(updateChannelDataAC(channel.id, channelDataUpdate))
