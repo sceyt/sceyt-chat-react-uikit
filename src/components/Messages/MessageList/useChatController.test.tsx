@@ -4033,6 +4033,100 @@ describe('useChatController', () => {
     expect(refreshCalls).toHaveLength(1)
   })
 
+  it('cancels a pending scroll-idle refresh when jumpToLatest starts', async () => {
+    const channel = makeChannel({
+      id: 'channel-scroll-idle-cancel-on-jump',
+      lastMessage: makeMessage({ id: '241', channelId: 'channel-scroll-idle-cancel-on-jump', body: 'latest' })
+    })
+    const messages = [makeMessage({ id: '240', channelId: channel.id, body: 'older' }), channel.lastMessage]
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages,
+      hasPrevMessages: true,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '240': { top: 0, left: 0, width: 320, height: 32 },
+          '241': { top: 40, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('set-visible-0'))
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: 140, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    expect(
+      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
+    ).toBe(false)
+
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+    act(() => {
+      flushAnimationFrames()
+    })
+
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    expect(
+      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
+    ).toBe(false)
+    expect(rendered.scrollable.scrollTop).toBe(LATEST_EDGE_GAP_PX)
+  })
+
+  it('does not schedule scroll-idle refresh while the jumpToLatest latest lock is active', async () => {
+    const channel = makeChannel({
+      id: 'channel-scroll-idle-latest-lock',
+      lastMessage: makeMessage({ id: '1099', channelId: 'channel-scroll-idle-latest-lock', body: 'server-latest' })
+    })
+    const dispatch = jest.fn()
+    const rendered = renderController({
+      channel,
+      messages: [makeMessage({ id: '1090', channelId: channel.id, body: 'window-old' })],
+      hasPrevMessages: true,
+      hasNextMessages: true,
+      connectionStatus: CONNECTION_STATUS.CONNECTED,
+      dispatch,
+      layoutSpec: {
+        containerRect: { top: 0, left: 0, width: 320, height: 240 },
+        scrollMetrics: { scrollTop: 140, scrollHeight: 800, clientHeight: 240, offsetTop: 0, offsetHeight: 240 },
+        itemRects: {
+          '1090': { top: 0, left: 0, width: 320, height: 32 }
+        }
+      }
+    })
+
+    fireEvent.click(screen.getByTestId('jump-to-latest'))
+
+    expect(dispatch).toHaveBeenCalledWith(loadLatestMessagesAC(channel))
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(rendered.scrollable, { scrollTop: LATEST_EDGE_GAP_PX, scrollHeight: 800, clientHeight: 240 })
+      fireEvent.scroll(rendered.scrollable)
+    })
+
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 825))
+    })
+
+    expect(
+      dispatch.mock.calls.some(([action]) => action?.type === refreshCacheAroundMessageAC('', '').type)
+    ).toBe(false)
+  })
+
   it('restores latest-view state after jumpToLatest', async () => {
     const channel = makeChannel({
       id: 'channel-pending-count',
@@ -4632,6 +4726,47 @@ describe('useChatController', () => {
     expect(dispatch).toHaveBeenCalledWith(addMessagesAC(secondPendingPage, MESSAGE_LOAD_DIRECTION.NEXT))
     expect(dispatch).not.toHaveBeenCalledWith(
       loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.NEXT, confirmedLatest.id, false)
+    )
+  })
+
+  it('paginates backward through pending-only pages when older pending items are hidden', () => {
+    const channel = makeChannel({
+      id: 'channel-pending-only-previous-page'
+    })
+    const pendingMessages = Array.from({ length: LOAD_MAX_MESSAGE_COUNT + 5 }, (_, index) =>
+      makePendingMessage({
+        channelId: channel.id,
+        body: `pending-only-${index}`,
+        createdAt: new Date(`2026-04-04T12:${String(index).padStart(2, '0')}:00.000Z`)
+      })
+    )
+    const firstPendingPage = pendingMessages.slice(0, LOAD_MAX_MESSAGE_COUNT)
+    const secondPendingPage = pendingMessages.slice(LOAD_MAX_MESSAGE_COUNT)
+
+    pendingMessages.forEach((message) => addMessageToMap(channel.id, message))
+
+    const { scrollable, dispatch } = renderController({
+      channel,
+      messages: secondPendingPage,
+      hasPrevMessages: false,
+      hasNextMessages: false,
+      connectionStatus: CONNECTION_STATUS.DISCONNECTED
+    })
+
+    dispatch.mockClear()
+
+    act(() => {
+      setScrollMetrics(scrollable, {
+        scrollTop: 1158,
+        scrollHeight: 1400,
+        clientHeight: 240
+      })
+      fireEvent.scroll(scrollable)
+    })
+
+    expect(dispatch).toHaveBeenCalledWith(addMessagesAC(firstPendingPage, MESSAGE_LOAD_DIRECTION.PREV))
+    expect(dispatch).not.toHaveBeenCalledWith(
+      loadMoreMessagesAC(channel.id, LOAD_MAX_MESSAGE_COUNT, MESSAGE_LOAD_DIRECTION.PREV, '', false)
     )
   })
 

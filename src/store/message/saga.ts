@@ -576,7 +576,9 @@ const updateMessage = function* (
     if (getActiveChannelId() === channelId) {
       yield put(setUnreadMessageIdAC(''))
       if (scrollToNewMessage) {
-        navigateToLatest(true)
+        setTimeout(() => {
+          navigateToLatest(true)
+        }, 50)
       }
     }
   }
@@ -1013,7 +1015,6 @@ function* sendMessage(action: IAction): any {
 
 // const msgCount = 1
 function* sendTextMessage(action: IAction): any {
-  // let messageForCatch = {}
   const { payload } = action
   const { message, connectionState, channelId } = payload
   let channel: IChannel = yield call(getChannelFromMap, channelId)

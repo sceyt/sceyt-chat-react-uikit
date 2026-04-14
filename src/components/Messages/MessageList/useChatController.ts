@@ -18,6 +18,7 @@ import {
   setUnreadMessageIdAC
 } from '../../../store/message/actions'
 import {
+  compareMessagesForList,
   compareMessageIds,
   clearVisibleMessagesMap,
   getContiguousNextMessages,
@@ -29,6 +30,7 @@ import {
   getLatestCachedConfirmedMessageId,
   getLastConfirmedMessageId,
   getMessageLocalRef,
+  getMessagesFromMap,
   getPendingMessagesFromMap,
   getVisibleMessagesMap,
   hasNextContiguousInMap,
@@ -440,8 +442,28 @@ export function useChatController({
   const oldestConfirmedMessage = getFirstConfirmedMessage(messages)
   const newestConfirmedMessage = getLastConfirmedMessage(messages)
   const newestConfirmedMessageId = getLastConfirmedMessageId(messages)
+  const hiddenOlderPendingHeadExists = useMemo(() => {
+    const oldestVisibleMessage = messages[0]
+    if (!oldestVisibleMessage || oldestVisibleMessage.id) {
+      return false
+    }
+
+    const oldestVisibleRef = getMessageLocalRef(oldestVisibleMessage)
+    if (!oldestVisibleRef) {
+      return false
+    }
+
+    const sortedLocalMessages = Object.values(getMessagesFromMap(channel.id) || {}).sort(compareMessagesForList)
+    const oldestVisibleIndex = sortedLocalMessages.findIndex(
+      (message) => getMessageLocalRef(message) === oldestVisibleRef
+    )
+
+    return oldestVisibleIndex > 0
+  }, [channel.id, messages])
   const hasPrevious =
-    hasPrevMessages || (oldestConfirmedMessage ? hasPrevContiguousInMap(channel.id, oldestConfirmedMessage) : false)
+    hasPrevMessages ||
+    (oldestConfirmedMessage ? hasPrevContiguousInMap(channel.id, oldestConfirmedMessage) : false) ||
+    hiddenOlderPendingHeadExists
   const hiddenPendingTailExists = useMemo(() => {
     const pendingMessages = getPendingMessagesFromMap(channel.id)
     if (!pendingMessages.length) {
@@ -458,9 +480,29 @@ export function useChatController({
       ? compareMessageIds(channel.lastMessage.id, newestConfirmedMessageId) > 0
       : false) ||
     hiddenPendingTailExists
-
   const isScrollInteractionActive = useCallback(() => Date.now() - lastScrollActivityAtRef.current < SCROLL_IDLE_MS, [])
+  const clearScrollIdleTimer = useCallback(() => {
+    if (scrollIdleTimerRef.current !== null) {
+      clearTimeout(scrollIdleTimerRef.current)
+      scrollIdleTimerRef.current = null
+    }
+  }, [])
+
+  const isLatestJumpLocked = useCallback(
+    () =>
+      jumpLockModeRef.current === 'latest' && (isJumping.current || Date.now() < jumpLockUntilRef.current),
+    []
+  )
+
   const captureWindowPreserveAnchor = useCallback(() => {
+    if (isLatestJumpLocked()) {
+      return
+    }
+
+    if (restoreRef.current?.mode === 'to-bottom' || restoreRef.current?.mode === 'to-bottom-smooth') {
+      return
+    }
+
     const container = scrollRef.current
     if (!container) {
       return
@@ -477,7 +519,7 @@ export function useChatController({
       offsetFromTop: anchor.offsetFromTop,
       sourceScrollTop: container.scrollTop
     }
-  }, [])
+  }, [isLatestJumpLocked])
 
   const syncLatestState = useCallback(() => {
     const nextIsViewingLatest = !hasNext && isPinnedToLatest(scrollRef.current)
@@ -817,8 +859,31 @@ export function useChatController({
     [suppressNextMessageChange]
   )
 
+  const getCachedPreviousMessages = useCallback(
+    (fromMessage: IMessage) => {
+      if (fromMessage.id) {
+        return getContiguousPrevMessages(channel.id, fromMessage, LOAD_MAX_MESSAGE_COUNT)
+      }
+
+      const fromLocalRef = getMessageLocalRef(fromMessage)
+      if (!fromLocalRef) {
+        return []
+      }
+
+      const sortedLocalMessages = Object.values(getMessagesFromMap(channel.id) || {}).sort(compareMessagesForList)
+      const fromIndex = sortedLocalMessages.findIndex((message) => getMessageLocalRef(message) === fromLocalRef)
+      if (fromIndex <= 0) {
+        return []
+      }
+
+      return sortedLocalMessages.slice(Math.max(0, fromIndex - LOAD_MAX_MESSAGE_COUNT), fromIndex)
+    },
+    [channel.id]
+  )
+
   const jumpToLatest = useCallback(
     async (smooth = true) => {
+      clearScrollIdleTimer()
       isJumping.current = true
       lockJumpScrolling(smooth, 'latest')
       invalidateEdgeDirection('previous')
@@ -907,6 +972,7 @@ export function useChatController({
     [
       beginWindowPagedRequest,
       clearPendingLatestJump,
+      clearScrollIdleTimer,
       connectionStatus,
       dispatch,
       hasNext,
@@ -1126,18 +1192,16 @@ export function useChatController({
       return
     }
     clearPendingLatestJump()
+    const oldestVisibleMessage = messages[0]
+    const oldestVisibleLocalRef = getMessageLocalRef(oldestVisibleMessage)
     const oldestVisibleId = getFirstConfirmedMessageId(messages)
-    if (!oldestVisibleId || !hasPrevious || windowLoadScopeRef.current) {
+    if (!oldestVisibleMessage || !hasPrevious || windowLoadScopeRef.current) {
       return
     }
 
     const requestId = createEdgeRequestId('previous')
     activeEdgeIntentRef.current = 'previous'
-    const cachedPreviousMessages = getContiguousPrevMessages(
-      channel.id,
-      { id: oldestVisibleId } as IMessage,
-      LOAD_MAX_MESSAGE_COUNT
-    )
+    const cachedPreviousMessages = getCachedPreviousMessages(oldestVisibleMessage)
     if (cachedPreviousMessages.length > 0) {
       const container = scrollRef.current
       const anchor = container ? getTopViewportAnchor(container, itemElementsRef.current) : null
@@ -1145,7 +1209,7 @@ export function useChatController({
         cachedEdgeRequestRef.current = {
           requestId,
           direction: 'previous',
-          anchorId: oldestVisibleId
+          anchorId: oldestVisibleLocalRef || oldestVisibleId || ''
         }
         restoreRef.current = {
           mode: 'preserve-anchor',
@@ -1169,6 +1233,12 @@ export function useChatController({
         loadPrevFrameRef.current = null
         handleScrollRef.current()
       })
+      return
+    }
+
+    if (!oldestVisibleId) {
+      activeEdgeIntentRef.current = null
+      historyLoadArmedRef.current = true
       return
     }
 
@@ -1224,6 +1294,7 @@ export function useChatController({
     createEdgeRequestId,
     clearPendingLatestJump,
     dispatch,
+    getCachedPreviousMessages,
     suppressNextMessageChange,
     hasNext,
     hasPrevious,
@@ -1453,15 +1524,18 @@ export function useChatController({
     }
 
     // Scroll-idle: refresh cached messages around the visible anchor when not at the latest window
-    if (scrollIdleTimerRef.current !== null) {
-      clearTimeout(scrollIdleTimerRef.current)
-      scrollIdleTimerRef.current = null
-    }
-    if (!viewIsAtLatestRef.current) {
+    clearScrollIdleTimer()
+    if (!viewIsAtLatestRef.current && !isLatestJumpLocked()) {
+      const scheduledChannelId = channelRef.current.id
+      const scheduledContainer = container
       scrollIdleTimerRef.current = setTimeout(() => {
         scrollIdleTimerRef.current = null
         if (windowLoadScopeRef.current) return
         if (connectionStatusRef.current !== CONNECTION_STATUS.CONNECTED) return
+        if (scheduledChannelId !== channelRef.current.id) return
+        if (scheduledContainer !== scrollRef.current) return
+        if (viewIsAtLatestRef.current) return
+        if (isLatestJumpLocked()) return
         const confirmedMessages = messagesRef.current.filter((message) => !!message.id)
         const centerAnchorId =
           getClosestConfirmedMessageId(confirmedMessages, Math.floor(confirmedMessages.length / 2), 'nearest') ||
@@ -1469,16 +1543,19 @@ export function useChatController({
         const anchorId = centerAnchorId
         if (!anchorId) return
         captureWindowPreserveAnchor()
+        if (isLatestJumpLocked()) return
         dispatch(refreshCacheAroundMessageAC(channelRef.current.id, anchorId, true))
       }, SCROLL_IDLE_MS)
     }
   }, [
     captureWindowPreserveAnchor,
+    clearScrollIdleTimer,
     clearJumpScrollingLock,
     dispatch,
     hasNext,
     hasPrevious,
     invalidateEdgeDirection,
+    isLatestJumpLocked,
     isActiveEdgeRequestCurrent,
     loadNextItems,
     loadPreviousItems,
@@ -1537,10 +1614,7 @@ export function useChatController({
     activeEdgeRequestRef.current = null
     cachedEdgeRequestRef.current = null
     lastVisibleAnchorIdRef.current = ''
-    if (scrollIdleTimerRef.current !== null) {
-      clearTimeout(scrollIdleTimerRef.current)
-      scrollIdleTimerRef.current = null
-    }
+    clearScrollIdleTimer()
     jumpLockUntilRef.current = 0
     historyLoadArmedRef.current = true
     latestLoadArmedRef.current = true
@@ -1571,7 +1645,7 @@ export function useChatController({
     setHighlightedItemId(null)
     highlightedItemIdRef.current = null
     dispatch(clearActivePaginationIntentAC())
-  }, [channel.id, dispatch])
+  }, [channel.id, clearScrollIdleTimer, dispatch])
 
   useLayoutEffect(() => {
     const container = scrollRef.current
@@ -1687,6 +1761,17 @@ export function useChatController({
         return
       }
 
+      const shouldClampLatestEdge =
+        !hasNextMessages && restoreState.sourceScrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX
+      if (shouldClampLatestEdge) {
+        restoreRef.current = null
+        if (cachedEdgeRequestRef.current?.requestId === restoreState.requestId) {
+          cachedEdgeRequestRef.current = null
+        }
+        scrollToLatestEdge(container, 'auto')
+        return
+      }
+
       const anchorElement = getItemElement(container, restoreState.itemId)
       if (!anchorElement) {
         return
@@ -1705,7 +1790,15 @@ export function useChatController({
         setScrollTop(container, nextScrollTop, 'auto')
       }
     }
-  }, [channel.id, unreadMessageId, isActiveEdgeRequestCurrent, messages, unreadScrollTo, clearJumpBlur])
+  }, [
+    channel.id,
+    unreadMessageId,
+    isActiveEdgeRequestCurrent,
+    messages,
+    unreadScrollTo,
+    clearJumpBlur,
+    hasNextMessages
+  ])
 
   useEffect(() => {
     if (!unreadScrollTo || !unreadMessageId || !messages.length || unreadRestoreCompletedRef.current) {
@@ -2002,9 +2095,7 @@ export function useChatController({
       if (jumpUnlockTimeoutRef.current !== null) {
         clearTimeout(jumpUnlockTimeoutRef.current)
       }
-      if (scrollIdleTimerRef.current !== null) {
-        clearTimeout(scrollIdleTimerRef.current)
-      }
+      clearScrollIdleTimer()
       activeEdgeIntentRef.current = null
       activeEdgeRequestRef.current = null
       cachedEdgeRequestRef.current = null
@@ -2015,7 +2106,7 @@ export function useChatController({
       pendingEdgeLoadRefs.current.previous = null
       pendingEdgeLoadRefs.current.next = null
     },
-    []
+    [clearScrollIdleTimer]
   )
 
   return {
