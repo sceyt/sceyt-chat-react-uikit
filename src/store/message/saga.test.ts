@@ -37,6 +37,7 @@ import {
 import {
   addMessageAC,
   addMessagesAC,
+  deleteMessageAC,
   editMessageAC,
   forwardMessageAC,
   loadDefaultMessagesAC,
@@ -47,6 +48,8 @@ import {
   refreshCacheAroundMessageAC,
   reloadActiveChannelAfterReconnectAC,
   resendMessageAC,
+  removePendingMessageMutationAC,
+  resendPendingMessageMutationsAC,
   sendMessageAC,
   sendTextMessageAC,
   setMessagesAC,
@@ -54,6 +57,7 @@ import {
   setMessagesHasPrevAC,
   setLoadingNextMessagesStateAC,
   setLoadingPrevMessagesStateAC,
+  setPendingMessageMutationAC,
   setUnreadMessageIdAC,
   setUnreadScrollToAC,
   updateAttachmentUploadingStateAC,
@@ -77,6 +81,7 @@ const mockStoreState = {
     activeChannelMessages: [],
     activePaginationIntent: null,
     pendingPollActions: {},
+    pendingMessageMutations: {},
     oGMetadata: {}
   }
 }
@@ -159,6 +164,7 @@ const runMessageSaga = async (saga: any, ...args: any[]) => {
 const getActionByType = (actions: any[], type: string) => actions.find((action) => action.type === type)
 const flushAsyncWork = () => new Promise((resolve) => setTimeout(resolve, 0))
 const flushMockServerDelay = () => new Promise((resolve) => setTimeout(resolve, MOCK_SERVER_DELAY_MAX_MS + 25))
+const flushNavigateToLatestDelay = () => new Promise((resolve) => setTimeout(resolve, 75))
 const bothDirectionLoadingActions = (state: number | null) => [
   setLoadingPrevMessagesStateAC(state),
   setLoadingNextMessagesStateAC(state)
@@ -192,6 +198,7 @@ describe('message saga message-list flows', () => {
         messageId: ''
       },
       pendingPollActions: {},
+      pendingMessageMutations: {},
       oGMetadata: {}
     }
     setClient({
@@ -261,11 +268,6 @@ describe('message saga message-list flows', () => {
     expect(appendPendingAction.payload.messages.map((message: any) => message.body)).toEqual([])
 
     expect(getMessageFromMap(channel.id, '303')?.body).toBe('server-303')
-    expect(dispatched).toEqual(
-      expect.arrayContaining([
-        updateChannelLastMessageAC(channel.lastMessage, { ...channel, lastMessage: channel.lastMessage })
-      ])
-    )
   })
 
   it('shows a cached unread window immediately and patches it after the server refresh returns the same confirmed ids', async () => {
@@ -1817,6 +1819,7 @@ describe('message saga message-list flows', () => {
       __messageSagaTestables.sendTextMessage,
       sendTextMessageAC(inputMessage, channel.id, CONNECTION_STATUS.DISCONNECTED)
     )
+    await flushNavigateToLatestDelay()
 
     logErrorSpy.mockRestore()
 
@@ -2015,6 +2018,7 @@ describe('message saga message-list flows', () => {
       __messageSagaTestables.sendMessage,
       sendMessageAC(inputMessage, channel.id, CONNECTION_STATUS.DISCONNECTED, false)
     )
+    await flushNavigateToLatestDelay()
 
     logErrorSpy.mockRestore()
 
@@ -2386,6 +2390,7 @@ describe('message saga message-list flows', () => {
 
     channel.editMessage = jest.fn(() => resolveWithMockServerDelay(editedResponse))
 
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
     setActiveChannelId(channel.id)
     setChannelInMap(channel)
     addMessageToMap(channel.id, channel.lastMessage)
@@ -2418,6 +2423,439 @@ describe('message saga message-list flows', () => {
     expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
       expect.objectContaining({ id: '7401', body: 'after-edit' })
     )
+  })
+
+  it('queues a delete while reconnecting, applies an optimistic tombstone, and does not call the SDK immediately', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const message = makeMessage({
+      id: '7501',
+      channelId: 'channel-delete-reconnecting',
+      body: 'delete me',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-delete-reconnecting',
+      lastMessage: message
+    })
+
+    channel.deleteMessageById = jest.fn()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTING
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, message)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.deleteMessage,
+      deleteMessageAC(channel.id, message.id, 'forEveryone')
+    )
+
+    const queuedMutationAction = getActionByType(dispatched, setPendingMessageMutationAC({} as any).type)
+
+    expect(channel.deleteMessageById).not.toHaveBeenCalled()
+    expect(queuedMutationAction.payload.mutation).toEqual(
+      expect.objectContaining({
+        type: 'DELETE_MESSAGE',
+        channelId: channel.id,
+        messageId: message.id,
+        deleteOption: 'forEveryone',
+        originalMessage: expect.objectContaining({ id: message.id, body: 'delete me' })
+      })
+    )
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateMessageAC(
+          message.id,
+          expect.objectContaining({
+            id: message.id,
+            state: MESSAGE_STATUS.DELETE,
+            body: '',
+            attachments: []
+          })
+        ),
+        updateChannelLastMessageAC(
+          expect.objectContaining({
+            id: message.id,
+            state: MESSAGE_STATUS.DELETE,
+            body: ''
+          }),
+          channel
+        )
+      ])
+    )
+    expect(getMessageFromMap(channel.id, message.id)).toEqual(
+      expect.objectContaining({ id: message.id, state: MESSAGE_STATUS.DELETE, body: '' })
+    )
+    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
+      expect.objectContaining({ id: message.id, state: MESSAGE_STATUS.DELETE, body: '' })
+    )
+  })
+
+  it('queues an edit while reconnecting, applies the optimistic change, and does not call the SDK immediately', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const originalMessage = makeMessage({
+      id: '7601',
+      channelId: 'channel-edit-reconnecting',
+      body: 'before-edit',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-edit-reconnecting',
+      lastMessage: originalMessage
+    })
+
+    channel.editMessage = jest.fn()
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTING
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, originalMessage)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.editMessage,
+      editMessageAC(channel.id, {
+        ...originalMessage,
+        body: 'after-edit-offline'
+      } as any)
+    )
+
+    const queuedMutationAction = getActionByType(dispatched, setPendingMessageMutationAC({} as any).type)
+
+    expect(channel.editMessage).not.toHaveBeenCalled()
+    expect(queuedMutationAction.payload.mutation).toEqual(
+      expect.objectContaining({
+        type: 'EDIT_MESSAGE',
+        channelId: channel.id,
+        messageId: originalMessage.id,
+        message: expect.objectContaining({ id: originalMessage.id, body: 'after-edit-offline' }),
+        originalMessage: expect.objectContaining({ id: originalMessage.id, body: 'before-edit' })
+      })
+    )
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateMessageAC(
+          originalMessage.id,
+          expect.objectContaining({ id: originalMessage.id, body: 'after-edit-offline' })
+        ),
+        updateChannelLastMessageAC(
+          expect.objectContaining({ id: originalMessage.id, body: 'after-edit-offline' }),
+          channel
+        )
+      ])
+    )
+    expect(getMessageFromMap(channel.id, originalMessage.id)).toEqual(
+      expect.objectContaining({ id: originalMessage.id, body: 'after-edit-offline' })
+    )
+    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
+      expect.objectContaining({ id: originalMessage.id, body: 'after-edit-offline' })
+    )
+  })
+
+  it('replays queued delete and edit mutations after reconnect and clears their queue entries', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const deleteMessage = makeMessage({
+      id: '7701',
+      channelId: 'channel-replay-mutations',
+      body: 'delete-on-reconnect',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const editMessage = makeMessage({
+      id: '7702',
+      channelId: 'channel-replay-mutations',
+      body: 'edit-before-reconnect',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-replay-mutations',
+      lastMessage: editMessage
+    })
+    const deletedResponse = {
+      ...deleteMessage,
+      state: MESSAGE_STATUS.DELETE,
+      body: '',
+      attachments: [],
+      bodyAttributes: [],
+      updatedAt: new Date('2026-04-11T10:00:00.000Z')
+    }
+    const editedResponse = {
+      ...editMessage,
+      body: 'edit-after-reconnect',
+      updatedAt: new Date('2026-04-11T10:01:00.000Z')
+    }
+
+    channel.deleteMessageById = jest.fn(() => resolveWithMockServerDelay(deletedResponse))
+    channel.editMessage = jest.fn(() => resolveWithMockServerDelay(editedResponse))
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.pendingMessageMutations = {
+      [deleteMessage.id]: {
+        type: 'DELETE_MESSAGE',
+        channelId: channel.id,
+        messageId: deleteMessage.id,
+        deleteOption: 'forEveryone',
+        originalMessage: deleteMessage,
+        queuedAt: 1
+      },
+      [editMessage.id]: {
+        type: 'EDIT_MESSAGE',
+        channelId: channel.id,
+        messageId: editMessage.id,
+        message: {
+          ...editMessage,
+          body: 'edit-after-reconnect'
+        },
+        originalMessage: editMessage,
+        queuedAt: 2
+      }
+    }
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, deleteMessage)
+    addMessageToMap(channel.id, editMessage)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.resendPendingMessageMutations,
+      resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect(channel.deleteMessageById).toHaveBeenCalledWith(deleteMessage.id, false)
+    expect(channel.editMessage).toHaveBeenCalledWith(
+      expect.objectContaining({
+        id: editMessage.id,
+        body: 'edit-after-reconnect'
+      })
+    )
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateMessageAC(deleteMessage.id, expect.objectContaining({ id: deleteMessage.id, state: MESSAGE_STATUS.DELETE })),
+        updateMessageAC(editMessage.id, expect.objectContaining({ id: editMessage.id, body: 'edit-after-reconnect' })),
+        removePendingMessageMutationAC(deleteMessage.id),
+        removePendingMessageMutationAC(editMessage.id)
+      ])
+    )
+    expect(getMessageFromMap(channel.id, deleteMessage.id)).toEqual(
+      expect.objectContaining({ id: deleteMessage.id, state: MESSAGE_STATUS.DELETE, body: '' })
+    )
+    expect(getMessageFromMap(channel.id, editMessage.id)).toEqual(
+      expect.objectContaining({ id: editMessage.id, body: 'edit-after-reconnect' })
+    )
+  })
+
+  it('replaces a queued reconnecting edit with the latest edit payload while preserving the original rollback snapshot', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const originalMessage = makeMessage({
+      id: '7801',
+      channelId: 'channel-edit-conflict',
+      body: 'before-edit',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-edit-conflict',
+      lastMessage: originalMessage
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTING
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, originalMessage)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const firstDispatched = await runMessageSaga(
+      __messageSagaTestables.editMessage,
+      editMessageAC(channel.id, {
+        ...originalMessage,
+        body: 'draft-1'
+      } as any)
+    )
+    const firstQueuedMutation = getActionByType(firstDispatched, setPendingMessageMutationAC({} as any).type).payload
+      .mutation
+
+    mockStoreState.MessageReducer.pendingMessageMutations = {
+      [originalMessage.id]: firstQueuedMutation
+    }
+
+    const secondDispatched = await runMessageSaga(
+      __messageSagaTestables.editMessage,
+      editMessageAC(channel.id, {
+        ...originalMessage,
+        body: 'draft-2'
+      } as any)
+    )
+    const secondQueuedMutation = getActionByType(secondDispatched, setPendingMessageMutationAC({} as any).type).payload
+      .mutation
+
+    expect(secondQueuedMutation).toEqual(
+      expect.objectContaining({
+        type: 'EDIT_MESSAGE',
+        messageId: originalMessage.id,
+        message: expect.objectContaining({ body: 'draft-2' }),
+        originalMessage: expect.objectContaining({ body: 'before-edit' }),
+        queuedAt: firstQueuedMutation.queuedAt
+      })
+    )
+    expect(getMessageFromMap(channel.id, originalMessage.id)).toEqual(
+      expect.objectContaining({ id: originalMessage.id, body: 'draft-2' })
+    )
+  })
+
+  it('collapses reconnecting edit then delete into a queued delete and ignores later edits after delete wins', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const originalMessage = makeMessage({
+      id: '7901',
+      channelId: 'channel-delete-conflict',
+      body: 'before-delete',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-delete-conflict',
+      lastMessage: originalMessage
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTING
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, originalMessage)
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const editDispatched = await runMessageSaga(
+      __messageSagaTestables.editMessage,
+      editMessageAC(channel.id, {
+        ...originalMessage,
+        body: 'edited-before-delete'
+      } as any)
+    )
+    const queuedEditMutation = getActionByType(editDispatched, setPendingMessageMutationAC({} as any).type).payload
+      .mutation
+
+    mockStoreState.MessageReducer.pendingMessageMutations = {
+      [originalMessage.id]: queuedEditMutation
+    }
+
+    const deleteDispatched = await runMessageSaga(
+      __messageSagaTestables.deleteMessage,
+      deleteMessageAC(channel.id, originalMessage.id, 'forEveryone')
+    )
+    const queuedDeleteMutation = getActionByType(deleteDispatched, setPendingMessageMutationAC({} as any).type).payload
+      .mutation
+
+    expect(queuedDeleteMutation).toEqual(
+      expect.objectContaining({
+        type: 'DELETE_MESSAGE',
+        messageId: originalMessage.id,
+        deleteOption: 'forEveryone',
+        originalMessage: expect.objectContaining({ body: 'before-delete' }),
+        queuedAt: queuedEditMutation.queuedAt
+      })
+    )
+
+    mockStoreState.MessageReducer.pendingMessageMutations = {
+      [originalMessage.id]: queuedDeleteMutation
+    }
+
+    const ignoredEditDispatched = await runMessageSaga(
+      __messageSagaTestables.editMessage,
+      editMessageAC(channel.id, {
+        ...originalMessage,
+        body: 'should-be-ignored'
+      } as any)
+    )
+
+    expect(
+      ignoredEditDispatched.some((action) => action.type === setPendingMessageMutationAC({} as any).type)
+    ).toBe(false)
+    expect(getMessageFromMap(channel.id, originalMessage.id)).toEqual(
+      expect.objectContaining({ id: originalMessage.id, state: MESSAGE_STATUS.DELETE, body: '' })
+    )
+  })
+
+  it('rolls back an optimistic queued edit if replay fails with a non-connection error', async () => {
+    const currentUser = makeUser({ id: 'current-user' })
+    const originalMessage = makeMessage({
+      id: '7951',
+      channelId: 'channel-replay-rollback',
+      body: 'rollback-before',
+      metadata: {} as any,
+      user: currentUser
+    })
+    const channel = makeChannel({
+      id: 'channel-replay-rollback',
+      lastMessage: originalMessage
+    })
+
+    channel.editMessage = jest.fn(() => {
+      throw new Error('forbidden')
+    })
+
+    mockStoreState.UserReducer.connectionStatus = CONNECTION_STATUS.CONNECTED
+    mockStoreState.MessageReducer.pendingMessageMutations = {
+      [originalMessage.id]: {
+        type: 'EDIT_MESSAGE',
+        channelId: channel.id,
+        messageId: originalMessage.id,
+        message: {
+          ...originalMessage,
+          body: 'rollback-after'
+        },
+        originalMessage,
+        queuedAt: 1
+      }
+    }
+    setActiveChannelId(channel.id)
+    setChannelInMap(channel)
+    addMessageToMap(channel.id, {
+      ...originalMessage,
+      body: 'rollback-after',
+      updatedAt: new Date('2026-04-11T12:00:00.000Z')
+    })
+    setClient({
+      user: { id: 'current-user' },
+      Channel: { create: jest.fn() }
+    })
+
+    const dispatched = await runMessageSaga(
+      __messageSagaTestables.resendPendingMessageMutations,
+      resendPendingMessageMutationsAC(CONNECTION_STATUS.CONNECTED)
+    )
+
+    expect(channel.editMessage).toHaveBeenCalled()
+    expect(dispatched).toEqual(
+      expect.arrayContaining([
+        updateMessageAC(originalMessage.id, expect.objectContaining({ id: originalMessage.id, body: 'rollback-before' })),
+        updateChannelLastMessageAC(
+          expect.objectContaining({ id: originalMessage.id, body: 'rollback-before' }),
+          channel
+        ),
+        removePendingMessageMutationAC(originalMessage.id)
+      ])
+    )
+    expect(getMessageFromMap(channel.id, originalMessage.id)).toEqual(
+      expect.objectContaining({ id: originalMessage.id, body: 'rollback-before' })
+    )
+    expect(logErrorSpy).toHaveBeenCalled()
   })
 
   it('resends an offline text message without creating a duplicate optimistic item', async () => {

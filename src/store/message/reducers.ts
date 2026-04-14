@@ -71,6 +71,7 @@ export interface IMessageStore {
   pollVotesLoadingState: { [key: string]: number | null }
   pollVotesInitialCount: number | null
   pendingPollActions: { [key: string]: PendingPollAction[] }
+  pendingMessageMutations: { [key: string]: PendingMessageMutation }
   unreadScrollTo: boolean
   unreadMessageId: string
   stableUnreadAnchor: {
@@ -78,6 +79,24 @@ export interface IMessageStore {
     messageId: string
   }
 }
+
+export type PendingMessageMutation =
+  | {
+      type: 'EDIT_MESSAGE'
+      channelId: string
+      messageId: string
+      message: IMessage
+      originalMessage: IMessage
+      queuedAt: number
+    }
+  | {
+      type: 'DELETE_MESSAGE'
+      channelId: string
+      messageId: string
+      deleteOption: 'forMe' | 'forEveryone'
+      originalMessage: IMessage
+      queuedAt: number
+    }
 
 const initialState: IMessageStore = {
   loadingPrevMessagesState: null,
@@ -124,6 +143,7 @@ const initialState: IMessageStore = {
   pollVotesLoadingState: {},
   pollVotesInitialCount: null,
   pendingPollActions: {},
+  pendingMessageMutations: {},
   unreadScrollTo: true,
   unreadMessageId: '',
   stableUnreadAnchor: {
@@ -821,6 +841,13 @@ const messageSlice = createSlice({
         return action.message?.id === messageId || action.message?.tid === messageId ? { ...action, message } : action
       })
     },
+    setPendingMessageMutation: (state, action: PayloadAction<{ mutation: PendingMessageMutation }>) => {
+      const { mutation } = action.payload
+      state.pendingMessageMutations[mutation.messageId] = mutation
+    },
+    removePendingMessageMutation: (state, action: PayloadAction<{ messageId: string }>) => {
+      delete state.pendingMessageMutations[action.payload.messageId]
+    },
     setUnreadMessageId: (state, action: PayloadAction<{ messageId: string }>) => {
       state.unreadMessageId = action.payload.messageId
     },
@@ -896,6 +923,8 @@ export const {
   removePendingPollAction,
   setPendingPollActionsMap,
   updatePendingPollAction,
+  setPendingMessageMutation,
+  removePendingMessageMutation,
   setUnreadMessageId,
   setStableUnreadAnchor
 } = messageSlice.actions

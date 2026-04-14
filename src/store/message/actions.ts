@@ -29,6 +29,7 @@ import {
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
   RESEND_PENDING_POLL_ACTIONS,
+  RESEND_PENDING_MESSAGE_MUTATIONS,
   LOAD_OG_METADATA_FOR_LINK,
   queryDirection,
   FETCH_OG_METADATA,
@@ -95,10 +96,13 @@ import {
   removePendingPollAction,
   setPendingPollActionsMap,
   updatePendingPollAction,
+  setPendingMessageMutation,
+  removePendingMessageMutation,
   setUnreadMessageId,
   setStableUnreadAnchor
 } from './reducers'
 import { PendingPollAction } from 'helpers/messagesHalper'
+import { PendingMessageMutation } from './reducers'
 import { ATTACHMENT_VERSION } from 'helpers/attachmentsCache'
 
 export function sendMessageAC(
@@ -666,6 +670,21 @@ export function setPendingPollActionsMapAC(messageId: string, event: PendingPoll
 
 export function updatePendingPollActionAC(messageId: string, message: IMessage) {
   return updatePendingPollAction({ messageId, message })
+}
+
+export function setPendingMessageMutationAC(mutation: PendingMessageMutation) {
+  return setPendingMessageMutation({ mutation })
+}
+
+export function removePendingMessageMutationAC(messageId: string) {
+  return removePendingMessageMutation({ messageId })
+}
+
+export function resendPendingMessageMutationsAC(connectionState: string) {
+  return {
+    type: RESEND_PENDING_MESSAGE_MUTATIONS,
+    payload: { connectionState }
+  }
 }
 
 export function setUnreadMessageIdAC(messageId: string) {

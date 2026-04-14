@@ -489,8 +489,7 @@ export function useChatController({
   }, [])
 
   const isLatestJumpLocked = useCallback(
-    () =>
-      jumpLockModeRef.current === 'latest' && (isJumping.current || Date.now() < jumpLockUntilRef.current),
+    () => jumpLockModeRef.current === 'latest' && (isJumping.current || Date.now() < jumpLockUntilRef.current),
     []
   )
 
@@ -1758,17 +1757,6 @@ export function useChatController({
         pendingEdgeLoad &&
         !messages.some((message) => !pendingEdgeLoad.previousIds.has(getMessageLocalRef(message)))
       ) {
-        return
-      }
-
-      const shouldClampLatestEdge =
-        !hasNextMessages && restoreState.sourceScrollTop <= PRELOAD_TRIGGER_PX + LATEST_EDGE_GAP_PX
-      if (shouldClampLatestEdge) {
-        restoreRef.current = null
-        if (cachedEdgeRequestRef.current?.requestId === restoreState.requestId) {
-          cachedEdgeRequestRef.current = null
-        }
-        scrollToLatestEdge(container, 'auto')
         return
       }
 

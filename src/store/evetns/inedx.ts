@@ -49,6 +49,8 @@ import {
   deletePollVotesFromListAC,
   deleteReactionFromMessageAC,
   loadOGMetadataForLinkAC,
+  removePendingMessageMutationAC,
+  resendPendingMessageMutationsAC,
   updateMessageAC,
   updateMessagesMarkersAC,
   updateMessagesStatusAC
@@ -1095,6 +1097,7 @@ export default function* watchForEvents(): any {
             },
             deletedMessage
           )
+          yield put(removePendingMessageMutationAC(deletedMessage.id))
           break
         }
         case CHANNEL_EVENT_TYPES.EDIT_MESSAGE: {
@@ -1125,6 +1128,7 @@ export default function* watchForEvents(): any {
             })
           }
           updateChannelOnAllChannels(channel.id, {}, message)
+          yield put(removePendingMessageMutationAC(message.id))
           break
         }
         case CHANNEL_EVENT_TYPES.REACTION_ADDED: {
@@ -1663,6 +1667,7 @@ export default function* watchForEvents(): any {
           yield put(setConnectionStatusAC(status))
           if (status === CONNECTION_STATUS.CONNECTED) {
             yield put(getRolesAC())
+            yield put(resendPendingMessageMutationsAC(status))
           }
           break
         }

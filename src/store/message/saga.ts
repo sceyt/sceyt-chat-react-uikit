@@ -32,6 +32,7 @@ import {
   GET_POLL_VOTES,
   LOAD_MORE_POLL_VOTES,
   RESEND_PENDING_POLL_ACTIONS,
+  RESEND_PENDING_MESSAGE_MUTATIONS,
   LOAD_OG_METADATA_FOR_LINK,
   FETCH_OG_METADATA,
   CANCEL_WINDOW_LOAD
@@ -92,8 +93,10 @@ import {
   loadAroundMessageAC,
   loadLatestMessagesAC,
   loadNearUnreadAC,
+  removePendingMessageMutationAC,
   removePendingPollActionAC,
   resendPendingPollActionsAC,
+  setPendingMessageMutationAC,
   updatePendingPollActionAC,
   setUnreadScrollToAC,
   setAttachmentsLoadingStateAC,
@@ -175,6 +178,7 @@ import { MESSAGE_TYPE } from 'types/enum'
 import { setWaitToSendPendingMessagesAC } from 'store/user/actions'
 import { isResendableError } from 'helpers/error'
 import { calculateRenderedImageWidth } from 'helpers'
+import { PendingMessageMutation } from './reducers'
 
 const loadMoreMessagesInFlight = new Set<string>()
 const prefetchInFlight = new Set<string>()
@@ -480,11 +484,16 @@ const addPendingMessage = (message: any, messageCopy: IMessage, channelId: strin
     parentMessage: message.parentMessage
   }
   addMessageToMap(channelId, messageToAdd)
-  if (getActiveChannelId() === channelId) {
-    store.dispatch(updateChannelLastMessageAC(messageToAdd, { id: channelId } as IChannel))
+  const currentLastMessage = getStoredChannel(channelId)?.lastMessage || null
+  const nextLastMessage = messageToAdd.id ? messageToAdd : currentLastMessage?.id ? currentLastMessage : messageToAdd
+
+  if (nextLastMessage && lastMessageNeedsUpdate(currentLastMessage, nextLastMessage)) {
+    if (getActiveChannelId() === channelId) {
+      store.dispatch(updateChannelLastMessageAC(nextLastMessage, { id: channelId } as IChannel))
+    }
+    store.dispatch(updateChannelLastMessageAC(nextLastMessage, { id: channelId } as IChannel))
+    updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
   }
-  store.dispatch(updateChannelLastMessageAC(messageToAdd, { id: channelId } as IChannel))
-  updateChannelLastMessageOnAllChannels(channelId, messageToAdd)
   store.dispatch(addMessagesAC([messageToAdd], 'next'))
 }
 
@@ -561,6 +570,157 @@ const lastMessageNeedsUpdate = (
     currentLastMessage.state === nextLastMessage.state &&
     currentLastMessage.deliveryStatus === nextLastMessage.deliveryStatus
   )
+}
+
+const cloneSerializable = <T>(value: T): T => JSON.parse(JSON.stringify(value))
+
+const getMessageMutationConnectionState = () => {
+  const storeConnectionState = store.getState().UserReducer.connectionStatus
+  const clientConnectionState = getClient()?.connectionState
+
+  if (storeConnectionState !== CONNECTION_STATUS.CONNECTED) {
+    return storeConnectionState
+  }
+
+  return clientConnectionState || storeConnectionState
+}
+
+const isMessageMutationConnected = () => getMessageMutationConnectionState() === CONNECTION_STATUS.CONNECTED
+
+const getPendingMessageMutations = (): { [key: string]: PendingMessageMutation } =>
+  store.getState().MessageReducer.pendingMessageMutations || {}
+
+const buildQueuedPendingMessageMutation = (
+  existingMutation: PendingMessageMutation | undefined,
+  nextMutation: PendingMessageMutation
+): PendingMessageMutation | null => {
+  if (!existingMutation) {
+    return nextMutation
+  }
+
+  if (existingMutation.type === 'DELETE_MESSAGE' && nextMutation.type === 'EDIT_MESSAGE') {
+    return null
+  }
+
+  return {
+    ...nextMutation,
+    originalMessage: existingMutation.originalMessage,
+    queuedAt: existingMutation.queuedAt
+  }
+}
+
+function* getChannelForMessageMutation(channelId: string): any {
+  let channel = yield call(getChannelFromMap, channelId)
+  if (!channel) {
+    channel = getChannelFromAllChannels(channelId)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+  if (!channel) {
+    channel = getChannelFromAllChannelsMap(channelId)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+
+  return channel
+}
+
+function* applyLocalMessageUpdate(channelId: string, messageId: string, params: IMessage): any {
+  yield put(updateMessageAC(messageId, params))
+  updateMessageOnMap(channelId, {
+    messageId,
+    params
+  })
+
+  const storedChannel = getStoredChannel(channelId)
+  if (storedChannel?.lastMessage?.id === messageId) {
+    const nextLastMessage = cloneSerializable(params)
+    updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
+    yield put(updateChannelLastMessageAC(nextLastMessage, storedChannel))
+  }
+}
+
+function* applyOptimisticDeleteMessage(channelId: string, messageId: string, originalMessage: IMessage): any {
+  const optimisticDeletedMessage: IMessage = {
+    ...cloneSerializable(originalMessage),
+    id: originalMessage.id || messageId,
+    state: MESSAGE_STATUS.DELETE,
+    type: MESSAGE_TYPE.DELETED,
+    body: '',
+    bodyAttributes: [],
+    attachments: [],
+    updatedAt: new Date(Date.now())
+  }
+
+  yield call(applyLocalMessageUpdate, channelId, messageId, optimisticDeletedMessage)
+}
+
+function* applyOptimisticEditMessage(channelId: string, message: IMessage, originalMessage: IMessage): any {
+  const optimisticEditedMessage: IMessage = {
+    ...cloneSerializable(originalMessage),
+    ...cloneSerializable(message),
+    updatedAt: new Date(Date.now())
+  }
+
+  yield call(applyLocalMessageUpdate, channelId, message.id, optimisticEditedMessage)
+}
+
+const getEditMessageRequestPayload = (channel: IChannel, message: IMessage) => {
+  const attachments = message.attachments || []
+  if (!attachments.length) {
+    return {
+      ...message,
+      metadata: isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata),
+      attachments: []
+    }
+  }
+
+  const linkAttachments = attachments.filter((att: IAttachment) => att.type === attachmentTypes.link)
+  const anotherAttachments = attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
+  const linkAttachmentsToSend: IAttachment[] = []
+
+  linkAttachments.forEach((linkAttachment: IAttachment) => {
+    const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
+    const linkAttachmentToSend = linkAttachmentBuilder
+      .setName(linkAttachment.name)
+      .setUpload(linkAttachment.upload)
+      .create()
+    linkAttachmentsToSend.push(linkAttachmentToSend)
+  })
+
+  return {
+    ...message,
+    metadata: isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata),
+    attachments: [...anotherAttachments, ...linkAttachmentsToSend].map((att: IAttachment) => ({
+      ...att,
+      metadata: isJSON(att.metadata) ? att.metadata : JSON.stringify(att.metadata)
+    }))
+  }
+}
+
+function* executeDeleteMessageMutation(
+  channel: IChannel,
+  messageId: string,
+  deleteOption: 'forMe' | 'forEveryone'
+): any {
+  let sdkChannel = yield call(getChannelFromMap, channel.id)
+  if (!sdkChannel) {
+    sdkChannel = getChannelFromAllChannels(channel.id)
+    if (channel) {
+      setChannelInMap(channel)
+    }
+  }
+  const deletedMessage = yield call(sdkChannel.deleteMessageById, messageId, deleteOption === 'forMe')
+  yield call(applyLocalMessageUpdate, channel.id, deletedMessage.id, deletedMessage)
+  yield put(removePendingMessageMutationAC(messageId))
+}
+
+function* executeEditMessageMutation(channel: IChannel, message: IMessage): any {
+  const editedMessage = yield call(channel.editMessage, getEditMessageRequestPayload(channel, message))
+  yield call(applyLocalMessageUpdate, channel.id, editedMessage.id, editedMessage)
+  yield put(removePendingMessageMutationAC(message.id))
 }
 
 const updateMessage = function* (
@@ -1348,26 +1508,38 @@ function* deleteMessage(action: IAction): any {
   try {
     const { payload } = action
     const { messageId, channelId, deleteOption } = payload
-    let channel = yield call(getChannelFromMap, channelId)
+    const channel = yield call(getChannelForMessageMutation, channelId)
     if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
-      if (channel) {
-        setChannelInMap(channel)
+      return
+    }
+
+    const currentMessage = getMessageFromMap(channelId, messageId)
+    if (!currentMessage) {
+      yield put(removePendingMessageMutationAC(messageId))
+      return
+    }
+
+    if (!isMessageMutationConnected()) {
+      const existingMutation = getPendingMessageMutations()[messageId]
+      const queuedMutation = buildQueuedPendingMessageMutation(existingMutation, {
+        type: 'DELETE_MESSAGE',
+        channelId,
+        messageId,
+        deleteOption,
+        originalMessage: cloneSerializable(currentMessage),
+        queuedAt: Date.now()
+      })
+
+      if (!queuedMutation) {
+        return
       }
+
+      yield put(setPendingMessageMutationAC(queuedMutation))
+      yield call(applyOptimisticDeleteMessage, channelId, messageId, currentMessage)
+      return
     }
 
-    const deletedMessage = yield call(channel.deleteMessageById, messageId, deleteOption === 'forMe')
-    yield put(updateMessageAC(deletedMessage.id, deletedMessage))
-    updateMessageOnMap(channel.id, {
-      messageId: deletedMessage.id,
-      params: deletedMessage
-    })
-
-    const messageToUpdate = JSON.parse(JSON.stringify(deletedMessage))
-    if (channel.lastMessage.id === messageId) {
-      updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-      yield put(updateChannelLastMessageAC(messageToUpdate, channel))
-    }
+    yield call(executeDeleteMessageMutation, channel, messageId, deleteOption)
   } catch (e) {
     log.error('ERROR in delete message', e.message)
     // yield put(setErrorNotification(e.message))
@@ -1378,46 +1550,34 @@ function* editMessage(action: IAction): any {
   try {
     const { payload } = action
     const { message, channelId } = payload
-    let channel = yield call(getChannelFromMap, channelId)
-    if (!channel) {
-      channel = getChannelFromAllChannels(channelId)
-      if (channel) {
-        setChannelInMap(channel)
-      }
-    }
-    if (message.attachments.length > 0) {
-      const linkAttachments = message.attachments.filter((att: IAttachment) => att.type === attachmentTypes.link)
-      const anotherAttachments = message.attachments.filter((att: IAttachment) => att.type !== attachmentTypes.link)
-      const linkAttachmentsToSend: IAttachment[] = []
-      linkAttachments.forEach((linkAttachment: IAttachment) => {
-        const linkAttachmentBuilder = channel.createAttachmentBuilder(linkAttachment.data, linkAttachment.type)
-        const linkAttachmentToSend = linkAttachmentBuilder
-          .setName(linkAttachment.name)
-          .setUpload(linkAttachment.upload)
-          .create()
-        linkAttachmentsToSend.push(linkAttachmentToSend)
-      })
-      message.attachments = [...anotherAttachments, ...linkAttachmentsToSend]
+    const channel = yield call(getChannelForMessageMutation, channelId)
+    if (!channel || !message?.id) {
+      return
     }
 
-    const editedMessage = yield call(channel.editMessage, {
-      ...message,
-      metadata: isJSON(message.metadata) ? message.metadata : JSON.stringify(message.metadata),
-      attachments: message.attachments.map((att: IAttachment) => ({
-        ...att,
-        metadata: isJSON(att.metadata) ? att.metadata : JSON.stringify(att.metadata)
-      }))
-    })
-    yield put(updateMessageAC(editedMessage.id, editedMessage))
-    updateMessageOnMap(channel.id, {
-      messageId: editedMessage.id,
-      params: editedMessage
-    })
-    if (channel.lastMessage.id === message.id) {
-      const messageToUpdate = JSON.parse(JSON.stringify(editedMessage))
-      updateChannelLastMessageOnAllChannels(channel.id, messageToUpdate)
-      yield put(updateChannelLastMessageAC(messageToUpdate, channel))
+    const currentMessage = getMessageFromMap(channelId, message.id) || message
+
+    if (!isMessageMutationConnected()) {
+      const existingMutation = getPendingMessageMutations()[message.id]
+      const queuedMutation = buildQueuedPendingMessageMutation(existingMutation, {
+        type: 'EDIT_MESSAGE',
+        channelId,
+        messageId: message.id,
+        message: cloneSerializable(message),
+        originalMessage: cloneSerializable(currentMessage),
+        queuedAt: Date.now()
+      })
+
+      if (!queuedMutation) {
+        return
+      }
+
+      yield put(setPendingMessageMutationAC(queuedMutation))
+      yield call(applyOptimisticEditMessage, channelId, message, currentMessage)
+      return
     }
+
+    yield call(executeEditMessageMutation, channel, message)
   } catch (e) {
     log.error('ERROR in edit message', e.message)
     // yield put(setErrorNotification(e.message))
@@ -3290,6 +3450,65 @@ function* resendPendingPollActions(action: IAction): any {
   }
 }
 
+function* resendPendingMessageMutations(action: IAction): any {
+  try {
+    const { payload } = action
+    const { connectionState } = payload
+
+    if (connectionState !== CONNECTION_STATUS.CONNECTED || !isMessageMutationConnected()) {
+      return
+    }
+
+    const pendingMutations = Object.values(getPendingMessageMutations()).sort(
+      (left, right) => left.queuedAt - right.queuedAt
+    )
+
+    for (const mutation of pendingMutations) {
+      const currentMutation = getPendingMessageMutations()[mutation.messageId]
+      if (
+        !currentMutation ||
+        currentMutation.queuedAt !== mutation.queuedAt ||
+        currentMutation.type !== mutation.type
+      ) {
+        continue
+      }
+
+      if (!isMessageMutationConnected()) {
+        return
+      }
+
+      const channel = yield call(getChannelForMessageMutation, mutation.channelId)
+      if (!channel) {
+        yield put(removePendingMessageMutationAC(mutation.messageId))
+        continue
+      }
+
+      try {
+        if (mutation.type === 'DELETE_MESSAGE') {
+          yield call(executeDeleteMessageMutation, channel, mutation.messageId, mutation.deleteOption)
+        } else {
+          yield call(executeEditMessageMutation, channel, mutation.message)
+        }
+      } catch (error) {
+        if (!isMessageMutationConnected()) {
+          return
+        }
+
+        yield call(
+          applyLocalMessageUpdate,
+          mutation.channelId,
+          mutation.messageId,
+          cloneSerializable(mutation.originalMessage)
+        )
+        yield put(removePendingMessageMutationAC(mutation.messageId))
+        log.error('error in resend pending message mutations', error)
+      }
+    }
+  } catch (e) {
+    log.error('error in resend pending message mutations', e)
+  }
+}
+
 function* getPollVotes(action: IAction): any {
   try {
     const { payload } = action
@@ -3402,6 +3621,8 @@ export const __messageSagaTestables = {
   forwardMessage,
   resendMessage,
   editMessage,
+  deleteMessage,
+  resendPendingMessageMutations,
   sendPendingMessages,
   reloadActiveChannelAfterReconnect,
   loadNearUnread,
@@ -3536,6 +3757,7 @@ export default function* MessageSaga() {
   yield takeEvery(GET_POLL_VOTES, getPollVotes)
   yield takeEvery(LOAD_MORE_POLL_VOTES, loadMorePollVotes)
   yield takeEvery(RESEND_PENDING_POLL_ACTIONS, resendPendingPollActions)
+  yield takeLatest(RESEND_PENDING_MESSAGE_MUTATIONS, resendPendingMessageMutations)
   yield takeEvery(LOAD_OG_METADATA_FOR_LINK, loadOGMetadataForLinkSaga)
   yield takeEvery(FETCH_OG_METADATA, fetchOGMetadata)
 }
