@@ -1589,7 +1589,7 @@ export function useChatController({
     const onScroll = () => handleScrollRef.current()
     el.addEventListener('scroll', onScroll, { passive: true })
     return () => el.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [channel?.id])
 
   useEffect(() => {
     const el = scrollRef.current
@@ -1608,7 +1608,7 @@ export function useChatController({
 
     el.addEventListener('wheel', onWheel, { passive: false })
     return () => el.removeEventListener('wheel', onWheel)
-  }, [])
+  }, [channel?.id])
 
   useEffect(() => {
     if (activeChannelIdRef.current === null) {
@@ -1619,6 +1619,7 @@ export function useChatController({
     if (activeChannelIdRef.current === channel.id) {
       return
     }
+
     // Stop all active processes before switching to the new channel
     if (pendingVisibleUnreadFrameRef.current !== null) {
       cancelAnimationFrame(pendingVisibleUnreadFrameRef.current)
@@ -1644,6 +1645,8 @@ export function useChatController({
       clearTimeout(jumpUnlockTimeoutRef.current)
       jumpUnlockTimeoutRef.current = null
     }
+    isJumping.current = false
+    currentJumpIdRef.current += 1
 
     activeChannelIdRef.current = channel.id
     lastBootKeyRef.current = null
@@ -1712,7 +1715,6 @@ export function useChatController({
       })
     }
   }
-
   useLayoutEffect(() => {
     const container = scrollRef.current
     if (!container || !messages.length) {
