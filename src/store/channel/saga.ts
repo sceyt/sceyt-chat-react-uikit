@@ -83,6 +83,7 @@ import {
   setChannelInMap,
   addChannelsToAllChannels,
   getAllChannels,
+  getPendingLastMessages,
   getChannelFromAllChannels,
   updateChannelOnAllChannels,
   deleteChannelFromAllChannels,
@@ -316,10 +317,22 @@ function* getChannels(action: IAction): any {
     log.info(
       `${new Date().toISOString()} [getChannels] activeChannel from map: ${activeChannel ? activeChannel?.id : 'null'}`
     )
+    const pendingLastMessages = getPendingLastMessages()
     yield call(destroyChannelsMap)
     log.info(`${new Date().toISOString()} [getChannels] channels map destroyed`)
 
     let { channels: mappedChannels, channelsForUpdateLastReactionMessage } = yield call(setChannelsInMap, channelList)
+    for (const channelId of Object.keys(pendingLastMessages)) {
+      const pendingLastMessage = pendingLastMessages[channelId]
+      const mappedChannel = mappedChannels.find((ch: IChannel) => ch.id === channelId)
+      if (mappedChannel) {
+        mappedChannel.lastMessage = pendingLastMessage
+      }
+      const mapEntry = getChannelFromMap(channelId)
+      if (mapEntry) {
+        setChannelInMap({ ...mapEntry, lastMessage: pendingLastMessage })
+      }
+    }
     log.info(
       `${new Date().toISOString()} [getChannels] setChannelsInMap result: ${JSON.stringify({
         mappedChannelsCount: mappedChannels?.length || 0,

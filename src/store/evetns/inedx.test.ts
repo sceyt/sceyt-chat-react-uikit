@@ -117,17 +117,15 @@ describe('event message last-message handling', () => {
       { user: { id: 'current-user' } }
     ).toPromise()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: olderConfirmed.id }))
-    expect(getChannelFromAllChannels(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ id: olderConfirmed.id })
-    )
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ tid: newestPending.tid }))
+    expect(getChannelFromMap(channelId)?.lastMessage?.id).toBeFalsy()
     expect(
       dispatched.some(
         (action) =>
           action.type === updateChannelLastMessageAC(olderConfirmed, incomingChannel as any).type &&
           action.payload.channel.id === channelId
       )
-    ).toBe(true)
+    ).toBe(false)
     expect(
       dispatched.some(
         (action) =>
@@ -135,7 +133,7 @@ describe('event message last-message handling', () => {
           action.payload.channelId === channelId &&
           action.payload.config?.lastMessage?.id === olderConfirmed.id
       )
-    ).toBe(true)
+    ).toBe(false)
   })
 
   it(keepsNewestPendingUnreadInfoTitle, async () => {
@@ -183,23 +181,13 @@ describe('event message last-message handling', () => {
       { channel: unreadInfoChannel as any }
     ).toPromise()
 
-    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ id: olderConfirmed.id }))
-    expect(getChannelFromAllChannels(channelId)?.lastMessage).toEqual(
-      expect.objectContaining({ id: olderConfirmed.id })
-    )
+    expect(getChannelFromMap(channelId)?.lastMessage).toEqual(expect.objectContaining({ tid: newestPending.tid }))
+    expect(getChannelFromMap(channelId)?.lastMessage?.id).toBeFalsy()
     const updateChannelDataAction = dispatched.find(
       (action) =>
         action.type === updateChannelDataAC(channelId, { unread: true }).type && action.payload.channelId === channelId
     )
-    expect(updateChannelDataAction?.payload.config?.lastMessage?.id).toBe(olderConfirmed.id)
-    expect(
-      dispatched.some(
-        (action) =>
-          action.type === updateChannelDataAC(channelId, { lastMessage: olderConfirmed, unread: true }).type &&
-          action.payload.channelId === channelId &&
-          action.payload.config?.lastMessage?.id === olderConfirmed.id
-      )
-    ).toBe(true)
+    expect(updateChannelDataAction?.payload.config?.lastMessage).toBeUndefined()
   })
 
   it('extends the cached latest segment when an incoming message arrives in the active latest window', async () => {

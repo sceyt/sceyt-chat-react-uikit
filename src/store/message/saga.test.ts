@@ -1854,10 +1854,10 @@ describe('message saga message-list flows', () => {
     expect(getMessageFromMap(channel.id, 'offline-tid')).toEqual(
       expect.objectContaining({ tid: 'offline-tid', state: MESSAGE_STATUS.FAILED })
     )
-    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '700' }))
+    expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ tid: 'offline-tid' }))
   })
 
-  it('keeps pending messages separate while the confirmed channel last message stays unchanged across multiple offline sends', async () => {
+  it('updates channel last message to the latest pending after each offline send', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channel = makeChannel({
       id: 'channel-send-offline-sequence',
@@ -1928,8 +1928,12 @@ describe('message saga message-list flows', () => {
         )
       )
 
-      expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '706' }))
-      expect(getChannelFromAllChannels(channel.id)?.lastMessage).toEqual(expect.objectContaining({ id: '706' }))
+      expect(getChannelFromMap(channel.id)?.lastMessage).toEqual(
+        expect.objectContaining({ tid: createdMessages[index].tid })
+      )
+      expect(getChannelFromAllChannels(channel.id)?.lastMessage).toEqual(
+        expect.objectContaining({ tid: createdMessages[index].tid })
+      )
     }
 
     logErrorSpy.mockRestore()
@@ -3246,7 +3250,7 @@ describe('message saga message-list flows', () => {
     ).toBe(true)
   })
 
-  it('promotes confirmed resend results into channel last message order even while newer pending items still exist', async () => {
+  it('keeps newest pending last message while older resend confirmations arrive and promotes only when the pending itself confirms', async () => {
     const currentUser = makeUser({ id: 'current-user' })
     const channelId = 'channel-resend-last-text-order'
     const pendingMessages = [1, 2, 3, 4].map((index) =>
@@ -3269,15 +3273,10 @@ describe('message saga message-list flows', () => {
         user: currentUser
       })
     )
+    const newestPending = pendingMessages[3]
     const channel = makeChannel({
       id: channelId,
-      lastMessage: makeMessage({
-        id: '900000000000000000',
-        channelId,
-        body: 'confirmed-start',
-        metadata: {} as any,
-        user: currentUser
-      })
+      lastMessage: newestPending as any
     })
     const builder = {
       setBody: jest.fn().mockReturnThis(),
@@ -3334,18 +3333,9 @@ describe('message saga message-list flows', () => {
       await flushAsyncWork()
 
       expect(getChannelFromMap(channelId)?.lastMessage).toEqual(
-        expect.objectContaining({ id: confirmedMessages[index].id })
+        expect.objectContaining({ tid: newestPending.tid })
       )
-      expect(
-        dispatched.some(
-          (action) =>
-            action.type ===
-              updateChannelDataAC(channelId, { lastMessage: confirmedMessages[index], lastReactedMessage: null }, true)
-                .type &&
-            action.payload.channelId === channelId &&
-            action.payload.config?.lastMessage?.id === confirmedMessages[index].id
-        )
-      ).toBe(true)
+      expect(getChannelFromMap(channelId)?.lastMessage?.id).toBeFalsy()
     }
 
     resolvers[3](confirmedMessages[3])

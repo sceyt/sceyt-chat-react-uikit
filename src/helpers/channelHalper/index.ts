@@ -291,6 +291,17 @@ export function checkChannelExists(channelId: string) {
   return !!channelsMap[channelId]
 }
 
+export function getPendingLastMessages(): Record<string, IMessage> {
+  const result: Record<string, IMessage> = {}
+  for (const channelId of Object.keys(channelsMap)) {
+    const lastMessage = channelsMap[channelId]?.lastMessage
+    if (lastMessage && !lastMessage.id) {
+      result[channelId] = lastMessage
+    }
+  }
+  return result
+}
+
 export function destroyChannelsMap() {
   channelsMap = {}
   allChannels = []

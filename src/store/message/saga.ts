@@ -489,9 +489,6 @@ const addPendingMessage = (message: any, messageCopy: IMessage, channelId: strin
   const nextLastMessage = messageToAdd
 
   if (nextLastMessage && lastMessageNeedsUpdate(currentLastMessage, nextLastMessage)) {
-    if (getActiveChannelId() === channelId) {
-      store.dispatch(updateChannelLastMessageAC(nextLastMessage, { id: channelId } as IChannel))
-    }
     store.dispatch(updateChannelLastMessageAC(nextLastMessage, { id: channelId } as IChannel))
     updateChannelLastMessageOnAllChannels(channelId, nextLastMessage)
   }
@@ -1280,7 +1277,6 @@ function* sendTextMessage(action: IAction): any {
       const resolvedLastMessage = getResolvedChannelLastMessage(channel.id, messageToUpdate, messageToSend)
       if (lastMessageNeedsUpdate(getStoredChannel(channel.id)?.lastMessage, resolvedLastMessage)) {
         updateChannelLastMessageOnAllChannels(channel.id, resolvedLastMessage!)
-        // yield put(updateChannelLastMessageAC(messageToUpdate, { id: channel.id } as IChannel))
         const channelUpdateParam = {
           lastMessage: resolvedLastMessage,
           lastReactedMessage: null

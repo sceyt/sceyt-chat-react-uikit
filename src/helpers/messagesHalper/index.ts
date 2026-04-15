@@ -586,7 +586,10 @@ export const shouldReplaceLastMessage = (
   }
 
   if (!currentLastMessage.id) {
-    return true
+    if (messagesShareReference(currentLastMessage, nextLastMessage)) {
+      return true
+    }
+    return false
   }
 
   if (sourceMessage && getMessageLocalRef(currentLastMessage) === getMessageLocalRef(sourceMessage)) {
