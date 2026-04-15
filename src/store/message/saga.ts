@@ -486,7 +486,7 @@ const addPendingMessage = (message: any, messageCopy: IMessage, channelId: strin
   }
   addMessageToMap(channelId, messageToAdd)
   const currentLastMessage = getStoredChannel(channelId)?.lastMessage || null
-  const nextLastMessage = messageToAdd.id ? messageToAdd : currentLastMessage?.id ? currentLastMessage : messageToAdd
+  const nextLastMessage = messageToAdd
 
   if (nextLastMessage && lastMessageNeedsUpdate(currentLastMessage, nextLastMessage)) {
     if (getActiveChannelId() === channelId) {
