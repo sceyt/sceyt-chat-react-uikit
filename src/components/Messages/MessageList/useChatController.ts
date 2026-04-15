@@ -15,7 +15,9 @@ import {
   setActivePaginationIntentAC,
   setUnreadScrollToAC,
   showScrollToNewMessageButtonAC,
-  setUnreadMessageIdAC
+  setUnreadMessageIdAC,
+  RestoreWindowPayload,
+  setMessagesAC
 } from '../../../store/message/actions'
 import {
   compareMessagesForList,
@@ -54,11 +56,24 @@ const JUMP_SCROLL_LOCK_MS = 1800
 const PRESERVE_ANCHOR_SCROLL_EPSILON_PX = 1
 const SCROLL_IDLE_MS = 800
 
+type ChannelRestoreWindow = {
+  startId: string
+  endId: string
+  scrollTop: number
+  anchorId: string
+  prevCount: number
+  nextCount: number
+}
+
+// Session-only per-channel restore state. Consumed on next successful re-entry.
+const channelRestoreWindowMap = new Map<string, ChannelRestoreWindow>()
+
 type RestoreState =
   | { mode: 'to-bottom' }
   | { mode: 'to-bottom-smooth' }
   | { mode: 'reveal-unread-separator' }
   | { mode: 'reveal-message'; messageId: string; smooth?: boolean }
+  | { mode: 'restore-scroll-top'; scrollTop: number }
   | {
       mode: 'preserve-anchor-window'
       itemId: string
@@ -1604,6 +1619,31 @@ export function useChatController({
     if (activeChannelIdRef.current === channel.id) {
       return
     }
+    // Stop all active processes before switching to the new channel
+    if (pendingVisibleUnreadFrameRef.current !== null) {
+      cancelAnimationFrame(pendingVisibleUnreadFrameRef.current)
+      pendingVisibleUnreadFrameRef.current = null
+    }
+    if (jumpToLatestFrameRef.current !== null) {
+      cancelAnimationFrame(jumpToLatestFrameRef.current)
+      jumpToLatestFrameRef.current = null
+    }
+    if (loadPrevFrameRef.current !== null) {
+      cancelAnimationFrame(loadPrevFrameRef.current)
+      loadPrevFrameRef.current = null
+    }
+    if (loadNextFrameRef.current !== null) {
+      cancelAnimationFrame(loadNextFrameRef.current)
+      loadNextFrameRef.current = null
+    }
+    if (highlightTimeoutRef.current !== null) {
+      clearTimeout(highlightTimeoutRef.current)
+      highlightTimeoutRef.current = null
+    }
+    if (jumpUnlockTimeoutRef.current !== null) {
+      clearTimeout(jumpUnlockTimeoutRef.current)
+      jumpUnlockTimeoutRef.current = null
+    }
 
     activeChannelIdRef.current = channel.id
     lastBootKeyRef.current = null
@@ -1644,11 +1684,52 @@ export function useChatController({
     setHighlightedItemId(null)
     highlightedItemIdRef.current = null
     dispatch(clearActivePaginationIntentAC())
+    if (channel?.hidden) {
+      dispatch(setMessagesAC([]))
+    }
   }, [channel.id, clearScrollIdleTimer, dispatch])
+
+  const departingChannelId = activeChannelIdRef.current
+  if (departingChannelId) {
+    const currentMessages = messagesRef.current
+    const startId = getFirstConfirmedMessageId(currentMessages)
+    const endId = getLastConfirmedMessageId(currentMessages)
+    const anchorId = lastVisibleAnchorIdRef.current
+    const scrollTop = scrollRef.current?.scrollTop ?? 0
+
+    if (startId && endId && anchorId) {
+      const confirmedMessages = currentMessages.filter((m) => !!m.id)
+      const anchorIndex = confirmedMessages.findIndex((m) => m.id === anchorId)
+      const prevCount = anchorIndex >= 0 ? anchorIndex : 0
+      const nextCount = anchorIndex >= 0 ? confirmedMessages.length - anchorIndex - 1 : 0
+      channelRestoreWindowMap.set(departingChannelId, {
+        startId,
+        endId,
+        scrollTop,
+        anchorId,
+        prevCount,
+        nextCount
+      })
+    }
+  }
 
   useLayoutEffect(() => {
     const container = scrollRef.current
     if (!container || !messages.length) {
+      return
+    }
+
+    // Saved-interval restore: apply raw scrollTop before the default boot logic can override it.
+    if (restoreRef.current?.mode === 'restore-scroll-top') {
+      const savedScrollTop = restoreRef.current.scrollTop
+      if (!lastBootKeyRef.current) {
+        lastBootKeyRef.current = `${channel.id}:${getMessageLocalRef(messages[0])}`
+      }
+      restoreRef.current = null
+      viewIsAtLatestRef.current = false
+      setIsViewingLatest(false)
+      const maxScrollTop = getMaxScrollTop(container)
+      setScrollTop(container, Math.min(savedScrollTop, maxScrollTop), 'auto')
       return
     }
 
@@ -1913,7 +1994,34 @@ export function useChatController({
     dispatch(clearActivePaginationIntentAC())
     previousMessagesRef.current = []
 
-    if (channel.backToLinkedChannel && channel?.id) {
+    if (!channel?.id) {
+      return
+    }
+
+    // Priority 1: saved per-channel restore window (wins over all other boot paths)
+    const savedRestoreWindow = channelRestoreWindowMap.get(channel.id)
+    if (savedRestoreWindow) {
+      if (!channel.isLinkedChannel) {
+        clearVisibleMessagesMap()
+      }
+      if (channel.backToLinkedChannel) {
+        restoreRef.current = { mode: 'restore-scroll-top', scrollTop: savedRestoreWindow.scrollTop }
+        const restoreWindowPayload: RestoreWindowPayload = {
+          startId: savedRestoreWindow.startId,
+          endId: savedRestoreWindow.endId,
+          anchorId: savedRestoreWindow.anchorId,
+          prevCount: savedRestoreWindow.prevCount,
+          nextCount: savedRestoreWindow.nextCount,
+          preferCache: true
+        }
+        suppressNextMessageChange()
+        dispatch(loadAroundMessageAC(channel, savedRestoreWindow.anchorId, undefined, restoreWindowPayload))
+        return
+      }
+    }
+
+    // Priority 2: linked-channel special return
+    if (channel.backToLinkedChannel) {
       const visibleMessages = getVisibleMessagesMap()
       const visibleMessagesIds = Object.values(visibleMessages)
         .filter((message) => !!message.id)
@@ -1924,19 +2032,19 @@ export function useChatController({
         suppressNextMessageChange()
         dispatch(loadAroundMessageAC(channel, messageId))
       }
+      return
+    }
+
+    // Priority 3: unread boot; Priority 4: default/latest boot
+    if (!channel.isLinkedChannel) {
+      clearVisibleMessagesMap()
+    }
+    if (channel.newMessageCount && channel.lastDisplayedMessageId) {
+      suppressNextMessageChange()
+      dispatch(loadNearUnreadAC(channel))
     } else {
-      if (!channel.isLinkedChannel) {
-        clearVisibleMessagesMap()
-      }
-      if (channel?.id) {
-        if (channel.newMessageCount && channel.lastDisplayedMessageId) {
-          suppressNextMessageChange()
-          dispatch(loadNearUnreadAC(channel))
-        } else {
-          suppressNextMessageChange()
-          dispatch(loadDefaultMessagesAC(channel))
-        }
-      }
+      suppressNextMessageChange()
+      dispatch(loadDefaultMessagesAC(channel))
     }
   }, [dispatch, channel?.id, channel.backToLinkedChannel, channel.isLinkedChannel, suppressNextMessageChange])
 

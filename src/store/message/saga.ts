@@ -154,6 +154,7 @@ import {
   hasPrevContiguousInMap,
   hasNextContiguousInMap,
   getCachedNearMessages,
+  getCachedWindowInterval,
   LOAD_MAX_MESSAGE_COUNT_PREFETCH,
   removeMessageFromMap
 } from '../../helpers/messagesHalper'
@@ -2022,14 +2023,175 @@ function* reloadActiveChannelAfterReconnect(action: IAction): any {
   }
 }
 
+function* loadAroundMessageFromServer(
+  channel: IChannel,
+  anchorId: string,
+  prevCount: number,
+  nextCount: number,
+  connectionState: string
+): any {
+  const SceytChatClient = getClient()
+  const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
+  messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
+  messageQueryBuilder.reverse(true)
+  const messageQuery =
+    connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
+  query.messageQuery = messageQuery
+
+  messageQuery.limit = prevCount || MESSAGES_MAX_PAGE_COUNT / 2
+  const firstResult =
+    anchorId && connectionState === CONNECTION_STATUS.CONNECTED
+      ? yield call(messageQuery.loadPreviousMessageId, anchorId)
+      : { messages: [], hasNext: false }
+
+  const pivotId = firstResult.messages.length > 0 ? getLastConfirmedMessageId(firstResult.messages) : anchorId || '0'
+  messageQuery.reverse = false
+  messageQuery.limit = nextCount || MESSAGES_MAX_PAGE_COUNT / 2
+  const secondResult =
+    pivotId && connectionState === CONNECTION_STATUS.CONNECTED
+      ? yield call(messageQuery.loadNextMessageId, pivotId)
+      : { messages: [], hasNext: false }
+
+  const resultMessages = [...firstResult.messages, ...secondResult.messages]
+  const firstConfirmedMessageId = getFirstConfirmedMessageId(resultMessages)
+  const lastConfirmedMessageId = getLastConfirmedMessageId(resultMessages)
+  if (firstConfirmedMessageId && lastConfirmedMessageId) {
+    setMessagesToMap(channel.id, resultMessages, firstConfirmedMessageId, lastConfirmedMessageId)
+    setActiveSegment(channel.id, firstConfirmedMessageId, lastConfirmedMessageId)
+    yield spawn(prefetchMessages, channel.id, firstConfirmedMessageId, MESSAGE_LOAD_DIRECTION.PREV, 2)
+    yield spawn(prefetchMessages, channel.id, lastConfirmedMessageId, MESSAGE_LOAD_DIRECTION.NEXT, 2)
+  }
+  const appliedMessages = getCachedMessagesForResult(channel.id, resultMessages)
+  yield call(loadOGMetadataForLinkMessages, appliedMessages, true, false, false)
+  yield put(setMessagesAC(JSON.parse(JSON.stringify(appliedMessages)), channel.id))
+  yield put(setMessagesHasNextAC(true))
+
+  const filteredPendingMessages = getFilteredPendingMessages(channel, appliedMessages)
+  yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+  yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+  const waitToSendPendingMessages = store.getState().UserReducer.waitToSendPendingMessages
+  if (connectionState === CONNECTION_STATUS.CONNECTED && waitToSendPendingMessages) {
+    yield put(setWaitToSendPendingMessagesAC(false))
+    yield spawn(sendPendingMessages, connectionState)
+  }
+}
+
+function* backgroundRefreshRestoreWindow(
+  channel: IChannel,
+  restoreWindow: { anchorId: string; prevCount: number; nextCount: number },
+  cachedMessages: IMessage[]
+): any {
+  try {
+    const connectionState = store.getState().UserReducer.connectionStatus
+    if (connectionState !== CONNECTION_STATUS.CONNECTED) {
+      return
+    }
+    if (!isChannelStillActive(channel.id)) {
+      return
+    }
+
+    const SceytChatClient = getClient()
+    const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
+    messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
+    messageQueryBuilder.reverse(true)
+    const messageQuery = yield call(messageQueryBuilder.build)
+
+    messageQuery.limit = restoreWindow.prevCount || MESSAGES_MAX_PAGE_COUNT / 2
+    const prevResult: { messages: IMessage[]; hasNext: boolean } = restoreWindow.anchorId
+      ? yield call(messageQuery.loadPreviousMessageId, restoreWindow.anchorId)
+      : { messages: [], hasNext: false }
+
+    const pivotId =
+      prevResult.messages.length > 0
+        ? getLastConfirmedMessageId(prevResult.messages)
+        : restoreWindow.anchorId || '0'
+    messageQuery.reverse = false
+    messageQuery.limit = restoreWindow.nextCount || MESSAGES_MAX_PAGE_COUNT / 2
+    const nextResult: { messages: IMessage[]; hasNext: boolean } = pivotId
+      ? yield call(messageQuery.loadNextMessageId, pivotId)
+      : { messages: [], hasNext: false }
+
+    const refreshedMessages = [...prevResult.messages, ...nextResult.messages]
+    if (!refreshedMessages.length) {
+      return
+    }
+
+    const firstId = getFirstConfirmedMessageId(refreshedMessages)
+    const lastId = getLastConfirmedMessageId(refreshedMessages)
+    if (firstId && lastId) {
+      setMessagesToMap(channel.id, refreshedMessages, firstId, lastId)
+      setActiveSegment(channel.id, firstId, lastId)
+    }
+
+    yield call(loadOGMetadataForLinkMessages, refreshedMessages, true, false, false)
+
+    if (!isChannelStillActive(channel.id)) {
+      return
+    }
+
+    const cachedConfirmed = cachedMessages.filter((m) => !!m.id)
+    if (sameConfirmedWindow(cachedConfirmed, refreshedMessages)) {
+      const changedMessages = getChangedActiveMessages(cachedConfirmed, refreshedMessages)
+      if (changedMessages.length > 0) {
+        yield put(patchMessagesAC(changedMessages))
+      }
+    } else {
+      const appliedMessages = getCachedMessagesForResult(channel.id, refreshedMessages)
+      yield put(setMessagesAC(JSON.parse(JSON.stringify(appliedMessages)), channel.id))
+      yield put(setMessagesHasNextAC(true))
+      const filteredPendingMessages = getFilteredPendingMessages(channel, appliedMessages)
+      yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+      yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+    }
+  } catch (e) {
+    log.error('error in backgroundRefreshRestoreWindow', e)
+  }
+}
+
 function* loadAroundMessageWorker(action: IAction): any {
   try {
-    yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
-    const { channel, messageId, networkChanged } = action.payload
+    const { channel, messageId, networkChanged, restoreWindow } = action.payload
     const connectionState = store.getState().UserReducer.connectionStatus
     const messages = store.getState().MessageReducer.activeChannelMessages
 
     if (channel?.id && !channel?.isMockChannel) {
+      // Cache-first path: restore a saved per-channel window without blocking on the server
+      if (restoreWindow?.preferCache) {
+        const cachedWindow = getCachedWindowInterval(channel.id, restoreWindow.startId, restoreWindow.endId)
+
+        if (cachedWindow.isFullyCached) {
+          setActiveSegment(channel.id, restoreWindow.startId, restoreWindow.endId)
+          yield call(loadOGMetadataForLinkMessages, cachedWindow.messages, true, false, false)
+          yield put(setMessagesHasPrevAC(cachedWindow.hasPrevMessages))
+          yield put(setMessagesHasNextAC(cachedWindow.hasNextMessages))
+          yield put(setMessagesAC(JSON.parse(JSON.stringify(cachedWindow.messages)), channel.id))
+          const filteredPendingMessages = getFilteredPendingMessages(channel, cachedWindow.messages, {
+            hasNext: cachedWindow.hasNextMessages
+          })
+          yield put(addMessagesAC(filteredPendingMessages, MESSAGE_LOAD_DIRECTION.NEXT))
+          yield call(loadOGMetadataForLinkMessages, filteredPendingMessages, true, false, false)
+          if (connectionState === CONNECTION_STATUS.CONNECTED) {
+            yield spawn(backgroundRefreshRestoreWindow, channel, restoreWindow, cachedWindow.messages)
+          }
+          return
+        }
+
+        // Cache miss: fall back to server using saved pivot
+        yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+        yield call(
+          loadAroundMessageFromServer,
+          channel,
+          restoreWindow.anchorId,
+          restoreWindow.prevCount,
+          restoreWindow.nextCount,
+          connectionState
+        )
+        return
+      }
+
+      // Standard around-message path
+      yield call(setMessageListLoading, 'both', LOADING_STATE.LOADING)
+
       const SceytChatClient = getClient()
       const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
       messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
@@ -3629,6 +3791,7 @@ export const __messageSagaTestables = {
   loadDefaultMessages,
   loadMoreMessages,
   loadAroundMessage,
+  loadAroundMessageWorker,
   getMessagesQuery,
   prefetchMessages,
   refreshCacheAroundMessage

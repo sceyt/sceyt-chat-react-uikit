@@ -148,7 +148,7 @@ function* createChannel(action: IAction): any {
       const allChannels = getAllChannels()
       const memberId = channelData.members[0].id
       allChannels.forEach((channel: IChannel) => {
-        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT) {
+        if (channel.type === DEFAULT_CHANNEL_TYPE.DIRECT && !channel.hidden) {
           if (isSelfChannel) {
             if (channel.members?.length === 1 && channel.members[0].id === memberId) {
               channelIsExistOnAllChannels = true
@@ -169,7 +169,7 @@ function* createChannel(action: IAction): any {
           isMockChannel: true,
           avatarUrl: '',
           createdAt: new Date(Date.now()),
-          hidden: false,
+          hidden: true,
           id: uuidv4(),
           lastMessage: null,
           memberCount: 2,
@@ -967,7 +967,6 @@ function* channelsForForwardLoadMore(action: IAction): any {
 function* markMessagesRead(action: IAction): any {
   const { payload } = action
   const { channelId, messageIds } = payload
-  console.log(messageIds, 'messageIds')
   const connectionStatus = store.getState().UserReducer.connectionStatus
   if (connectionStatus !== CONNECTION_STATUS.CONNECTED) {
     return
@@ -1574,9 +1573,9 @@ function* sendRecording(action: IAction): any {
 
   try {
     if (channel) {
-      if (state) {
+      if (state && channel?.startRecording) {
         yield call(channel.startRecording)
-      } else {
+      } else if (channel?.stopRecording) {
         yield call(channel.stopRecording)
       }
     }

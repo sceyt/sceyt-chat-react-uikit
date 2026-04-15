@@ -465,6 +465,59 @@ export function getCachedNearMessages(
   }
 }
 
+/**
+ * Returns the exact cached messages for the interval [startId, endId], plus
+ * contiguity flags, for cache-first window restoration.
+ *
+ * isFullyCached is true only when the entire interval is covered by a single
+ * loaded segment AND both startId and endId are present in the messages map.
+ */
+export function getCachedWindowInterval(
+  channelId: string,
+  startId: string,
+  endId: string
+): {
+  messages: IMessage[]
+  isFullyCached: boolean
+  hasPrevMessages: boolean
+  hasNextMessages: boolean
+} {
+  const segments = loadedSegmentsMap[channelId] || []
+  const channelMessages = messagesMap[channelId] || {}
+
+  const containingSegment = segments.find(
+    (s) => compareMessageIds(s.startId, startId) <= 0 && compareMessageIds(s.endId, endId) >= 0
+  )
+
+  if (!containingSegment) {
+    return { messages: [], isFullyCached: false, hasPrevMessages: false, hasNextMessages: false }
+  }
+
+  const messages = Object.values(channelMessages)
+    .filter(
+      (m): m is IMessage =>
+        !!m.id && compareMessageIds(m.id, startId) >= 0 && compareMessageIds(m.id, endId) <= 0
+    )
+    .sort(compareMessagesForList)
+
+  const hasStart = messages.some((m) => compareMessageIds(m.id!, startId) === 0)
+  const hasEnd = messages.some((m) => compareMessageIds(m.id!, endId) === 0)
+
+  const hasOlderSegmentBefore = segments.some(
+    (s) => compareMessageIds(s.endId, containingSegment.startId) < 0
+  )
+  const hasNewerSegmentAfter = segments.some(
+    (s) => compareMessageIds(s.startId, containingSegment.endId) > 0
+  )
+
+  return {
+    messages,
+    isFullyCached: hasStart && hasEnd,
+    hasPrevMessages: compareMessageIds(startId, containingSegment.startId) > 0 || hasOlderSegmentBefore,
+    hasNextMessages: compareMessageIds(endId, containingSegment.endId) < 0 || hasNewerSegmentAfter
+  }
+}
+
 export const getMessageSortKey = (message: IMessage): bigint => {
   if (message.id) {
     return BigInt(message.id)

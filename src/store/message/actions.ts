@@ -179,10 +179,24 @@ export function loadLatestMessagesAC(
   }
 }
 
-export function loadAroundMessageAC(channel: IChannel, messageId: string, networkChanged?: boolean) {
+export interface RestoreWindowPayload {
+  startId: string
+  endId: string
+  anchorId: string
+  prevCount: number
+  nextCount: number
+  preferCache: boolean
+}
+
+export function loadAroundMessageAC(
+  channel: IChannel,
+  messageId: string,
+  networkChanged?: boolean,
+  restoreWindow?: RestoreWindowPayload
+) {
   return {
     type: LOAD_AROUND_MESSAGE,
-    payload: { channel, messageId, networkChanged }
+    payload: { channel, messageId, networkChanged, restoreWindow }
   }
 }
 
