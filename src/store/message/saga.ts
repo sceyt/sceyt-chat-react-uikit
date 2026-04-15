@@ -2034,8 +2034,7 @@ function* loadAroundMessageFromServer(
   const messageQueryBuilder = new (SceytChatClient.MessageListQueryBuilder as any)(channel.id)
   messageQueryBuilder.limit(MESSAGES_MAX_LENGTH)
   messageQueryBuilder.reverse(true)
-  const messageQuery =
-    connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
+  const messageQuery = connectionState === CONNECTION_STATUS.CONNECTED ? yield call(messageQueryBuilder.build) : null
   query.messageQuery = messageQuery
 
   messageQuery.limit = prevCount || MESSAGES_MAX_PAGE_COUNT / 2
@@ -2102,9 +2101,7 @@ function* backgroundRefreshRestoreWindow(
       : { messages: [], hasNext: false }
 
     const pivotId =
-      prevResult.messages.length > 0
-        ? getLastConfirmedMessageId(prevResult.messages)
-        : restoreWindow.anchorId || '0'
+      prevResult.messages.length > 0 ? getLastConfirmedMessageId(prevResult.messages) : restoreWindow.anchorId || '0'
     messageQuery.reverse = false
     messageQuery.limit = restoreWindow.nextCount || MESSAGES_MAX_PAGE_COUNT / 2
     const nextResult: { messages: IMessage[]; hasNext: boolean } = pivotId
