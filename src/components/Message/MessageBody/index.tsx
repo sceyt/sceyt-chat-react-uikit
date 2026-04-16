@@ -25,7 +25,7 @@ import MessageHeader from '../MessageHeader'
 import Attachment from 'components/Attachment'
 import EmojisPopup from 'components/Emojis'
 import FrequentlyEmojis from 'components/Emojis/frequentlyEmojis'
-import { MessageTextFormat, trimReactMessage } from 'messageUtils'
+import { MessageTextFormat } from 'messageUtils'
 import { IMessageActions, IMessageStyles } from '../Message.types'
 import MessageStatusAndTime from '../MessageStatusAndTime'
 import PollMessage from '../PollMessage'
@@ -170,7 +170,7 @@ interface IMessageBodyProps {
   unsupportedMessage: boolean
   onInviteLinkClick?: (key: string) => void
   ifLatestAndHasNotPreview: boolean
-  collapsedCharacterLimit?: number
+  collapsedLinesLimit?: number
 }
 
 const MessageBody = ({
@@ -302,7 +302,7 @@ const MessageBody = ({
   ogMetadataProps,
   unsupportedMessage,
   onInviteLinkClick,
-  collapsedCharacterLimit,
+  collapsedLinesLimit,
   ifLatestAndHasNotPreview
 }: IMessageBodyProps) => {
   const {
@@ -383,11 +383,15 @@ const MessageBody = ({
     }
   }
 
-  const messageTextTrimmed = useMemo(() => {
-    if (!message.body) return { result: messageText, truncated: false }
-    if (isExpanded) return { result: messageText, truncated: false }
-    return trimReactMessage(messageText, collapsedCharacterLimit)
-  }, [message.body, messageText, isExpanded, collapsedCharacterLimit])
+  const isTruncated = useMemo(() => {
+    if (!message.body || isExpanded) return false
+    const limit = collapsedLinesLimit || 10
+    const lines = message.body.split('\n')
+    const estimatedLines = lines.reduce((total: number, line: string) => {
+      return total + Math.max(1, Math.ceil(line.length / 50))
+    }, 0)
+    return estimatedLines > limit
+  }, [message.body, isExpanded, collapsedLinesLimit])
 
   const prevMessageUserID = useMemo(() => (prevMessage ? getComparableUserId(prevMessage.user) : null), [prevMessage])
   const nextMessageUserID = useMemo(() => (nextMessage ? getComparableUserId(nextMessage.user) : null), [nextMessage])
@@ -850,9 +854,9 @@ const MessageBody = ({
             infoPadding={ogMetadataProps?.infoPadding}
           />
         )}
-        {message.type !== MESSAGE_TYPE.POLL && (
-          <TextContentContainer>
-            {viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+        {message.type !== MESSAGE_TYPE.POLL &&
+          (viewOnce && message.attachments?.length === 1 && message.attachments[0].type !== attachmentTypes.voice ? (
+            <TextContentContainer>
               <ViewOnceMessageWrapper color={hasOpened ? iconInactive : accentColor}>
                 {hasOpened ? (
                   <ViewOnceIconOpen style={{ marginRight: '8px' }} />
@@ -863,21 +867,22 @@ const MessageBody = ({
                 )}
                 <ViewOnceInfoText color={textSecondary}>{getViewOnceMessage()}</ViewOnceInfoText>
               </ViewOnceMessageWrapper>
-            ) : (
-              <React.Fragment>
-                <span ref={messageTextRef}>
-                  {messageTextTrimmed?.result}
-                  {messageTextTrimmed?.truncated && !isExpanded ? '...' : ''}
-                </span>
-                {messageTextTrimmed.truncated && !isExpanded && (
-                  <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
-                    Read more
-                  </ReadMoreLink>
-                )}
-              </React.Fragment>
-            )}
-          </TextContentContainer>
-        )}
+            </TextContentContainer>
+          ) : (
+            <React.Fragment>
+              <TextContentContainer
+                isExpanded={isExpanded}
+                linesLimit={isTruncated ? collapsedLinesLimit || 10 : undefined}
+              >
+                <span ref={messageTextRef}>{messageText}</span>
+              </TextContentContainer>
+              {isTruncated && !isExpanded && (
+                <ReadMoreLink onClick={() => setIsExpanded(true)} accentColor={accentColor}>
+                  Read more
+                </ReadMoreLink>
+              )}
+            </React.Fragment>
+          ))}
         {!withAttachments && message.state === MESSAGE_STATUS.DELETE ? (
           <MessageStatusDeleted color={textSecondary}> Message was deleted. </MessageStatusDeleted>
         ) : (
@@ -1160,7 +1165,7 @@ export default React.memo(MessageBody, (prevProps, nextProps) => {
     prevProps.ogMetadataProps?.ogShowDescription === nextProps.ogMetadataProps?.ogShowDescription &&
     prevProps.ogMetadataProps?.ogShowFavicon === nextProps.ogMetadataProps?.ogShowFavicon &&
     prevProps.ogMetadataProps?.order === nextProps.ogMetadataProps?.order &&
-    prevProps.collapsedCharacterLimit === nextProps.collapsedCharacterLimit
+    prevProps.collapsedLinesLimit === nextProps.collapsedLinesLimit
   )
 })
 
@@ -1343,8 +1348,16 @@ const FrequentlyEmojisContainer = styled.div<{ rtlDirection?: boolean }>`
   z-index: 99;
 `
 
-const TextContentContainer = styled.div`
+const TextContentContainer = styled.div<{ isExpanded?: boolean; linesLimit?: number }>`
   overflow: hidden;
+  ${(props) =>
+    !props.isExpanded &&
+    props.linesLimit &&
+    `
+    display: -webkit-box;
+    -webkit-line-clamp: ${props.linesLimit};
+    -webkit-box-orient: vertical;
+  `}
 `
 
 const ReadMoreLink = styled.span<{ accentColor: string }>`

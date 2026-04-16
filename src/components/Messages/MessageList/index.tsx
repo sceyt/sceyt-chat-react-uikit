@@ -268,7 +268,7 @@ interface MessagesProps {
     listItemStyles?: IListItemStyles
   }
   ogMetadataProps?: OGMetadataProps
-  collapsedCharacterLimit?: number
+  collapsedLinesLimit?: number
   createChatOnAvatarTap?: boolean
   allowSendAttachment?: boolean
 }
@@ -411,7 +411,7 @@ const MessageList: React.FC<MessagesProps> = ({
   shouldOpenUserProfileForMention,
   showInfoMessageProps = {},
   ogMetadataProps,
-  collapsedCharacterLimit,
+  collapsedLinesLimit,
   createChatOnAvatarTap = true,
   allowSendAttachment = true
 }) => {
@@ -931,7 +931,7 @@ const MessageList: React.FC<MessagesProps> = ({
           shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
           showInfoMessageProps={showInfoMessageProps}
           ogMetadataProps={ogMetadataProps}
-          collapsedCharacterLimit={collapsedCharacterLimit}
+          collapsedLinesLimit={collapsedLinesLimit}
           createChatOnAvatarTap={createChatOnAvatarTap}
         />
       </MessageWrapper>

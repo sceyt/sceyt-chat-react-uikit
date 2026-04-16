@@ -461,8 +461,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
   const [detectedUrl, setDetectedUrl] = useState<string | null>(null)
   const [dismissedUrls, setDismissedUrls] = useState<Set<string>>(new Set())
   const [isClosingPreview, setIsClosingPreview] = useState(false)
-  const [wrapperWidth, setWrapperWidth] = useState<number>(0)
-
   const addAttachmentByMenu = showChooseFileAttachment && showChooseMediaAttachment
   const linkify = new LinkifyIt()
   const oGMetadata = useSelector((state: any) => state.MessageReducer.oGMetadata)
@@ -545,32 +543,6 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
       setLinkPreview({ url: detectedUrl, metadata: oGMetadata[detectedUrl] })
     }
   }, [detectedUrl, oGMetadata, dismissedUrls])
-
-  // Measure wrapper width for link preview
-  useEffect(() => {
-    const updateWidth = () => {
-      if (sendMessageWrapperRef.current) {
-        setWrapperWidth(sendMessageWrapperRef.current.offsetWidth)
-      }
-    }
-
-    updateWidth()
-
-    // Check if ResizeObserver is available
-    const ResizeObserverClass = (window as any).ResizeObserver
-    if (typeof ResizeObserverClass !== 'undefined') {
-      const resizeObserver = new ResizeObserverClass(updateWidth)
-      if (sendMessageWrapperRef.current) {
-        resizeObserver.observe(sendMessageWrapperRef.current)
-      }
-
-      return () => {
-        resizeObserver.disconnect()
-      }
-    }
-
-    return undefined
-  }, [])
 
   // Hide link preview when attachments are added, restore when removed
   useEffect(() => {
@@ -1739,6 +1711,18 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     return selectedMessagesMap?.values()?.some((message: IMessage) => message.type === MESSAGE_TYPE.POLL)
   }, [selectedMessagesMap])
 
+  const showLinkPreview = useMemo(
+    () =>
+      linkPreview &&
+      linkPreview.metadata &&
+      !isDescriptionOnlySymbol(linkPreview.metadata.og?.description) &&
+      (linkPreview.metadata.og?.title ||
+        linkPreview.metadata.og?.description ||
+        linkPreview.metadata.og?.image?.[0]?.url ||
+        linkPreview.metadata.og?.favicon?.url),
+    [linkPreview]
+  )
+
   return (
     <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
@@ -2017,66 +2001,62 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     </ReplyMessageCont>
                   </EditReplyMessageCont>
                 )}
-                {linkPreview &&
-                  linkPreview.metadata &&
-                  !isDescriptionOnlySymbol(linkPreview.metadata.og?.description) &&
-                  (linkPreview.metadata.og?.title ||
-                    linkPreview.metadata.og?.description ||
-                    linkPreview.metadata.og?.image?.[0]?.url ||
-                    linkPreview.metadata.og?.favicon?.url) && (
-                    <LinkPreviewContainer
-                      backgroundColor={surface1Background}
-                      borderColor={borderColor}
-                      isClosing={isClosingPreview}
-                      width={wrapperWidth}
-                    >
-                      <LinkPreviewContent>
-                        {linkPreview.metadata.og?.image?.[0]?.url ? (
-                          <LinkPreviewImage
-                            onLoad={(e: any) => {
-                              if (e.target?.naturalHeight && e.target?.naturalWidth) {
-                                dispatch(
-                                  updateOGMetadataAC(linkPreview.url, {
-                                    ...linkPreview.metadata,
-                                    imageHeight: e.target.naturalHeight,
-                                    imageWidth: e.target.naturalWidth
-                                  })
-                                )
-                                storeMetadata(linkPreview.url, {
+                {showLinkPreview && linkPreview && (
+                  <LinkPreviewContainer
+                    backgroundColor={surface1Background}
+                    borderColor={borderColor}
+                    isClosing={isClosingPreview}
+                    width={replyEditMessageContainerWidth}
+                    borderRadius={messageForReply || messageToEdit ? '0px' : replyEditMessageContainerBorderRadius}
+                    left={replyEditMessageContainerLeftPosition}
+                    bottom={replyEditMessageContainerBottomPosition}
+                    padding={replyEditMessageContainerPadding}
+                  >
+                    <CloseEditMode color={textSecondary} onClick={handleRemoveLinkPreview}>
+                      <CloseIcon />
+                    </CloseEditMode>
+                    <LinkPreviewContent>
+                      {linkPreview.metadata.og?.image?.[0]?.url ? (
+                        <LinkPreviewImage
+                          onLoad={(e: any) => {
+                            if (e.target?.naturalHeight && e.target?.naturalWidth) {
+                              dispatch(
+                                updateOGMetadataAC(linkPreview.url, {
                                   ...linkPreview.metadata,
                                   imageHeight: e.target.naturalHeight,
                                   imageWidth: e.target.naturalWidth
                                 })
-                              }
-                            }}
-                            src={linkPreview.metadata.og.image[0].url}
-                            alt='Link preview'
-                          />
-                        ) : linkPreview.metadata.og?.favicon?.url ? (
-                          <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
-                        ) : (
-                          <LinkPreviewIcon color={accentColor} bg={background} />
+                              )
+                              storeMetadata(linkPreview.url, {
+                                ...linkPreview.metadata,
+                                imageHeight: e.target.naturalHeight,
+                                imageWidth: e.target.naturalWidth
+                              })
+                            }
+                          }}
+                          src={linkPreview.metadata.og.image[0].url}
+                          alt='Link preview'
+                        />
+                      ) : linkPreview.metadata.og?.favicon?.url ? (
+                        <LinkPreviewImage src={linkPreview.metadata.og.favicon.url} alt='Favicon' />
+                      ) : (
+                        <LinkPreviewIcon color={accentColor} bg={background} />
+                      )}
+                      <LinkPreviewTextContent
+                        hasImage={!!linkPreview.metadata.og?.image?.[0]?.url || !!linkPreview.metadata.og?.favicon?.url}
+                      >
+                        {linkPreview.metadata.og?.title && (
+                          <LinkPreviewTitle color={accentColor}>{linkPreview.metadata.og.title}</LinkPreviewTitle>
                         )}
-                        <LinkPreviewTextContent
-                          hasImage={
-                            !!linkPreview.metadata.og?.image?.[0]?.url || !!linkPreview.metadata.og?.favicon?.url
-                          }
-                        >
-                          {linkPreview.metadata.og?.title && (
-                            <LinkPreviewTitle color={accentColor}>{linkPreview.metadata.og.title}</LinkPreviewTitle>
-                          )}
-                          {linkPreview.metadata.og?.description && (
-                            <LinkPreviewDescription color={textPrimary}>
-                              {linkPreview.metadata.og.description}
-                            </LinkPreviewDescription>
-                          )}
-                        </LinkPreviewTextContent>
-                      </LinkPreviewContent>
-                      <LinkPreviewCloseButton onClick={handleRemoveLinkPreview}>
-                        <CloseIcon style={{ color: textSecondary }} />
-                      </LinkPreviewCloseButton>
-                    </LinkPreviewContainer>
-                  )}
+                        {linkPreview.metadata.og?.description && (
+                          <LinkPreviewDescription color={textPrimary}>
+                            {linkPreview.metadata.og.description}
+                          </LinkPreviewDescription>
+                        )}
+                      </LinkPreviewTextContent>
+                    </LinkPreviewContent>
+                  </LinkPreviewContainer>
+                )}
 
                 {!!attachments.length && !sendAttachmentSeparately && (
                   <ChosenAttachments>
@@ -2116,7 +2096,9 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
                     <MessageInputWrapper
                       className='message_input_wrapper'
                       borderRadius={
-                        messageForReply || messageToEdit ? borderRadiusOnOpenedEditReplyMessage : borderRadius
+                        messageForReply || messageToEdit || (showLinkPreview && linkPreview)
+                          ? borderRadiusOnOpenedEditReplyMessage
+                          : borderRadius
                       }
                       ref={inputWrapperRef}
                       backgroundColor={inputBackgroundColor || surface1Background}
@@ -3054,17 +3036,24 @@ const LinkPreviewContainer = styled.div<{
   backgroundColor: string
   borderColor: string
   isClosing: boolean
-  width: number
+  width?: string
+  borderRadius?: string
+  left?: string
+  bottom?: string
+  padding?: string
 }>`
-  width: ${(props) => (props.width ? `${props.width}px` : '100%')};
+  position: relative;
+  left: ${(props) => props.left || '0'};
+  bottom: ${(props) => props.bottom || '0'};
+  width: ${(props) => props.width || 'calc(100% - 82px)'};
+  border-radius: ${(props) => props.borderRadius || '18px 18px 0 0'};
+  padding: ${(props) => props.padding || '8px 16px 12px'};
   display: flex;
   align-items: flex-start;
-  box-sizing: border-box;
+  box-sizing: content-box;
   gap: 12px;
-  padding-left: 16px;
-  padding-right: 16px;
-  margin-bottom: 0;
   background-color: ${(props) => props.backgroundColor};
+  z-index: 19;
   animation: ${(props) => (props.isClosing ? linkPreviewSlideOut : linkPreviewSlideIn)} 0.3s ease-in-out forwards;
   overflow: hidden;
 `
@@ -3126,22 +3115,4 @@ const LinkPreviewDescription = styled.div<{ color: string }>`
   line-height: 20px;
   letter-spacing: -0.2px;
 `
-const LinkPreviewCloseButton = styled.button`
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 14px;
-  height: 25px;
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-
-  svg {
-    width: 12px;
-    height: 12px;
-  }
-`
-
 export default SendMessageInput

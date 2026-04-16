@@ -204,7 +204,7 @@ const Message = ({
   shouldOpenUserProfileForMention,
   ogMetadataProps,
   showInfoMessageProps = {},
-  collapsedCharacterLimit,
+  collapsedLinesLimit,
   createChatOnAvatarTap = true,
   ifLatestAndHasNotPreview
 }: IMessageProps) => {
@@ -964,7 +964,7 @@ const Message = ({
             shouldOpenUserProfileForMention={shouldOpenUserProfileForMention}
             ogMetadataProps={ogMetadataProps}
             unsupportedMessage={unsupportedMessage}
-            collapsedCharacterLimit={collapsedCharacterLimit}
+            collapsedLinesLimit={collapsedLinesLimit}
           />
         )}
         {messageStatusAndTimePosition === 'bottomOfMessage' && (messageStatusVisible || messageTimeVisible) && (
