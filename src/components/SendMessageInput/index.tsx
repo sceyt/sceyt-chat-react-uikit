@@ -1723,6 +1723,14 @@ const SendMessageInput: React.FC<SendMessageProps> = ({
     [linkPreview]
   )
 
+  useEffect(() => {
+    if (messageContRef && messageContRef.current) {
+      setTimeout(() => {
+        dispatch(setSendMessageInputHeightAC(messageContRef.current.getBoundingClientRect().height))
+      }, 301)
+    }
+  }, [showLinkPreview])
+
   return (
     <SendMessageWrapper ref={sendMessageWrapperRef} backgroundColor={backgroundColor || background}>
       <Container
